@@ -9,7 +9,7 @@ export default function DealerSettings() {
   const dealer = useDealerSelf();
 
   return (
-    <div className="p-9 max-w-[800px]">
+    <div className="p-9">
       <header className="mb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Settings</p>
         <h1 className="font-display text-3xl mt-1.5 tracking-tight">Your account</h1>

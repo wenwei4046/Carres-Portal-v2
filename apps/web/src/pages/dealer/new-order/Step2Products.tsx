@@ -9,16 +9,17 @@ interface Props {
   catalog: CatalogResponse;
 }
 
+const RM = (n: number) =>
+  `RM ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 /**
- * Step 2: products + addons + floor surcharge + running summary.
+ * Step 2 — single-column layout matching proto/new-order-step2.jsx:
+ *   Add products → Add-ons (3-col cards) → Stair carry (3-col grid with fee
+ *   panel) → Order summary (full-width section at bottom).
  *
- * Wires up ProductPicker (which handles category browse + 3 configurators),
- * an addon checklist, a floor/lift control, and a live line list with remove.
- *
- * Floor surcharge is computed inline here — pulls floor_config from catalog
- * (D5 ensures catalog refetch on Step 2 mount), uses the same formula as
- * `apps/web/src/lib/order-totals.ts` floorSurcharge() so the displayed total
- * matches what the order detail page will show post-submit.
+ * Floor surcharge math goes through `floorSurchargeRaw` (single source of
+ * truth, also used by Step 3 + the order-detail page) so the wizard preview
+ * and the order detail can never drift.
  */
 export default function Step2Products({ draft, onChange, catalog }: Props) {
   const cfg = catalog.floorConfig;
@@ -56,134 +57,174 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
     onChange({ ...draft, addons: [...draft.addons, next] });
   }
 
-  // Live totals — stair carry uses the shared formula in lib/order-totals.ts
-  // (floorSurchargeRaw) so wizard preview and order-detail page can never drift.
+  function setFloor(next: number) {
+    setDelivery({ floor: Math.max(1, next) });
+  }
+
+  // Live totals — same formula as Step 3 + order detail.
   const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
   const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
   const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
   const stair = floorSurchargeRaw(draft.delivery.floor, draft.delivery.hasLift, itemsTotal, cfg);
   const total = lineSub + addonSub + stair;
+  const empty = draft.lines.length === 0 && draft.addons.length === 0 && stair === 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-7">
-      {/* Left column: picker + addons + floor */}
-      <div className="flex flex-col gap-7 min-w-0">
-        <Section title="Products" hint="Browse the catalog and add to this order">
-          <ProductPicker catalog={catalog} onAddLine={addLine} />
-        </Section>
+    <div className="flex flex-col gap-7">
+      {/* ---------- Add products ---------- */}
+      <Section title="Add products" hint="Pick category, model, then configure">
+        <ProductPicker catalog={catalog} onAddLine={addLine} />
+      </Section>
 
-        <Section title="Add-ons" hint="Optional services">
-          <div className="grid grid-cols-2 gap-2.5">
+      {/* ---------- Add-ons (3-col cards) ---------- */}
+      <Section title="Add-ons" hint="Optional services — set quantity per item">
+        {catalog.addons.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No addons configured.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {catalog.addons.map((a) => {
               const on = draft.addons.some((d) => d.key === a.key);
               return (
-                <label
+                <button
                   key={a.key}
-                  className={`flex items-center gap-2.5 rounded-md border px-3 py-2.5 cursor-pointer ${
-                    on ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/40"
+                  type="button"
+                  onClick={() => toggleAddon(a.key)}
+                  className={`text-left rounded-md border px-3.5 py-3 transition-colors ${
+                    on
+                      ? "border-primary bg-primary/5"
+                      : "border-border bg-white hover:border-primary/40"
                   }`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => toggleAddon(a.key)}
-                    className="w-4 h-4"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{a.name}</div>
-                    <div className="font-mono text-[11px] text-muted-foreground">
-                      RM {a.price.toLocaleString()}
-                    </div>
+                  <div className="text-sm font-medium">+ {a.name}</div>
+                  <div className="font-mono text-[11px] text-muted-foreground mt-1">
+                    {RM(a.price)}
                   </div>
-                </label>
+                </button>
               );
             })}
-            {catalog.addons.length === 0 && (
-              <p className="col-span-full text-xs text-muted-foreground">No addons configured.</p>
-            )}
           </div>
-        </Section>
+        )}
+      </Section>
 
-        <Section
-          title="Stair carry"
-          hint={`1F–${cfg.freeUpToFloor}F free · RM ${cfg.perFloorPerItem} per floor per item from ${cfg.freeUpToFloor + 1}F`}
-        >
-          <div className="grid grid-cols-[1fr_auto] gap-3.5 items-end">
-            <FieldLabel label="Delivery floor">
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setDelivery({ floor: Math.max(1, draft.delivery.floor - 1) })}
-                  className="px-2.5 py-2 rounded-md border border-border text-sm hover:border-primary/40"
-                  aria-label="Decrease floor"
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  min={1}
-                  value={draft.delivery.floor}
-                  onChange={(e) =>
-                    setDelivery({ floor: Math.max(1, parseInt(e.target.value, 10) || 1) })
-                  }
-                  className="w-20 text-center px-2.5 py-2 text-sm font-mono rounded-md border border-border bg-card outline-none focus:border-primary"
-                />
-                <button
-                  onClick={() => setDelivery({ floor: draft.delivery.floor + 1 })}
-                  className="px-2.5 py-2 rounded-md border border-border text-sm hover:border-primary/40"
-                  aria-label="Increase floor"
-                >
-                  +
-                </button>
-              </div>
-            </FieldLabel>
-            <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground font-body pb-2">
+      {/* ---------- Stair carry (3-col grid: floor / lift / fee panel) ---------- */}
+      <Section
+        title="Stair carry"
+        hint={`1F–${cfg.freeUpToFloor}F free · ${RM(cfg.perFloorPerItem)} per floor per item from ${cfg.freeUpToFloor + 1}F`}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 items-end">
+          <FieldLabel label="Floor">
+            <div className="flex items-center gap-1.5 border border-border bg-white rounded-md px-1.5 py-1">
+              <button
+                type="button"
+                onClick={() => setFloor(draft.delivery.floor - 1)}
+                className="px-2.5 py-1.5 rounded text-sm hover:bg-secondary"
+                aria-label="Decrease floor"
+              >
+                −
+              </button>
               <input
-                type="checkbox"
-                checked={draft.delivery.hasLift}
-                onChange={(e) => setDelivery({ hasLift: e.target.checked })}
-                className="w-3.5 h-3.5"
+                type="number"
+                min={1}
+                value={draft.delivery.floor}
+                onChange={(e) => setFloor(parseInt(e.target.value, 10) || 1)}
+                className="flex-1 text-center text-sm font-mono bg-transparent outline-none border-none py-1"
               />
-              Has lift (no surcharge)
-            </label>
-          </div>
-          {stair > 0 && (
-            <p className="text-[11px] text-muted-foreground mt-2">
-              {itemsTotal} item{itemsTotal === 1 ? "" : "s"} ×{" "}
-              {draft.delivery.floor - cfg.freeUpToFloor} floor
-              {draft.delivery.floor - cfg.freeUpToFloor === 1 ? "" : "s"} above {cfg.freeUpToFloor}F
-              × RM {cfg.perFloorPerItem} ={" "}
-              <span className="font-mono font-semibold text-foreground">
-                RM {stair.toLocaleString()}
-              </span>
-            </p>
-          )}
-        </Section>
-      </div>
+              <button
+                type="button"
+                onClick={() => setFloor(draft.delivery.floor + 1)}
+                className="px-2.5 py-1.5 rounded text-sm hover:bg-secondary"
+                aria-label="Increase floor"
+              >
+                +
+              </button>
+            </div>
+          </FieldLabel>
 
-      {/* Right column: running line list + totals */}
-      <aside className="md:sticky md:top-0 md:self-start">
-        <div className="rounded-md border border-border bg-card overflow-hidden">
-          <div className="px-3.5 py-2.5 border-b border-border bg-secondary/30">
-            <h3 className="text-xs uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-              Order summary
-            </h3>
+          <FieldLabel label="Lift available?">
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setDelivery({ hasLift: false })}
+                className={pillClass(!draft.delivery.hasLift)}
+              >
+                No lift
+              </button>
+              <button
+                type="button"
+                onClick={() => setDelivery({ hasLift: true })}
+                className={pillClass(draft.delivery.hasLift)}
+              >
+                Has lift
+              </button>
+            </div>
+          </FieldLabel>
+
+          <div
+            className={`rounded-md border px-3.5 py-3 text-right ${
+              stair > 0
+                ? "border-primary bg-primary/5"
+                : "border-border bg-secondary/30"
+            }`}
+          >
+            <div
+              className={`text-[10px] uppercase tracking-wider font-semibold ${
+                stair > 0 ? "text-primary" : "text-muted-foreground"
+              }`}
+            >
+              Stair carry fee
+            </div>
+            <div
+              className={`font-mono text-lg font-bold mt-0.5 ${
+                stair > 0 ? "text-primary" : "text-foreground"
+              }`}
+            >
+              {RM(stair)}
+            </div>
           </div>
-          <div className="px-3.5 py-3 max-h-[360px] overflow-auto">
-            {draft.lines.length === 0 && draft.addons.length === 0 && (
-              <p className="text-xs text-muted-foreground py-3 text-center">No items yet.</p>
-            )}
-            {draft.lines.map((l) => (
+        </div>
+        {stair > 0 && (
+          <p className="text-[11px] text-muted-foreground mt-2.5">
+            {itemsTotal} item{itemsTotal === 1 ? "" : "s"} ×{" "}
+            {draft.delivery.floor - cfg.freeUpToFloor} floor
+            {draft.delivery.floor - cfg.freeUpToFloor === 1 ? "" : "s"} above {cfg.freeUpToFloor}F
+            × {RM(cfg.perFloorPerItem)} ={" "}
+            <span className="font-mono font-semibold text-foreground">{RM(stair)}</span>
+          </p>
+        )}
+      </Section>
+
+      {/* ---------- Order summary (full-width section at bottom) ---------- */}
+      <div className="rounded-md border border-border bg-white overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-border bg-secondary/30 flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-[0.16em] font-semibold text-muted-foreground">
+            Order summary
+          </span>
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {itemsTotal} item{itemsTotal === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        {empty ? (
+          <p className="px-4 py-5 text-xs text-muted-foreground text-center">
+            No items yet — pick a product above to get started.
+          </p>
+        ) : (
+          <div>
+            {draft.lines.map((l, i) => (
               <div
                 key={l.localId}
-                className="flex items-start gap-2 py-2 border-b border-border last:border-0"
+                className={`flex items-start justify-between gap-3 px-4 py-2.5 ${i ? "border-t border-border" : ""}`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold truncate">{l.label}</div>
-                  <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
-                    {l.sku}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] truncate">
+                    {l.label} <span className="text-muted-foreground">×{l.qty}</span>
                   </div>
-                  <div className="flex items-center gap-1 mt-1.5">
+                  <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+                    {RM(l.unitPrice)} ea · {l.sku}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1.5">
                     <button
+                      type="button"
                       onClick={() => bumpLineQty(l.localId, -1)}
                       className="px-1.5 py-0.5 text-[11px] border border-border rounded hover:border-primary/40"
                       aria-label="Decrease quantity"
@@ -192,50 +233,74 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
                     </button>
                     <span className="font-mono text-[11px] w-6 text-center">{l.qty}</span>
                     <button
+                      type="button"
                       onClick={() => bumpLineQty(l.localId, 1)}
                       className="px-1.5 py-0.5 text-[11px] border border-border rounded hover:border-primary/40"
                       aria-label="Increase quantity"
                     >
                       +
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => removeLine(l.localId)}
+                      className="ml-2 text-[10px] text-muted-foreground hover:text-destructive"
+                    >
+                      Remove
+                    </button>
                   </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <div className="font-mono text-xs font-semibold">
-                    RM {(l.unitPrice * l.qty).toLocaleString()}
-                  </div>
-                  <button
-                    onClick={() => removeLine(l.localId)}
-                    className="text-[10px] text-muted-foreground hover:text-destructive mt-0.5"
-                  >
-                    Remove
-                  </button>
-                </div>
+                <span className="font-mono text-[13px] font-semibold whitespace-nowrap">
+                  {RM(l.unitPrice * l.qty)}
+                </span>
               </div>
             ))}
             {draft.addons.map((a) => (
               <div
                 key={a.key}
-                className="flex items-center justify-between gap-2 py-2 border-b border-border last:border-0 text-muted-foreground"
+                className="flex items-start justify-between gap-3 px-4 py-2.5 border-t border-border text-muted-foreground"
               >
-                <div className="text-xs">+ {a.name}</div>
-                <div className="font-mono text-xs">RM {(a.unitPrice * a.qty).toLocaleString()}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px]">
+                    + {a.name}
+                    {a.qty > 1 && <span className="text-muted-foreground/70"> ×{a.qty}</span>}
+                  </div>
+                  <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+                    {RM(a.unitPrice)} ea · service add-on
+                  </div>
+                </div>
+                <span className="font-mono text-[13px] font-semibold whitespace-nowrap">
+                  {RM(a.unitPrice * a.qty)}
+                </span>
               </div>
             ))}
+            {stair > 0 && (
+              <div className="flex items-start justify-between gap-3 px-4 py-2.5 border-t border-border text-muted-foreground">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px]">+ Stair carry</div>
+                  <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+                    {itemsTotal} item{itemsTotal === 1 ? "" : "s"} · floor {draft.delivery.floor}
+                    {draft.delivery.hasLift ? " (with lift)" : " (no lift)"}
+                  </div>
+                </div>
+                <span className="font-mono text-[13px] font-semibold whitespace-nowrap">
+                  {RM(stair)}
+                </span>
+              </div>
+            )}
           </div>
+        )}
 
-          {/* Totals */}
-          <div className="px-3.5 py-3 border-t border-border bg-secondary/30 text-xs">
-            <Row label="Subtotal" value={`RM ${lineSub.toLocaleString()}`} />
-            {addonSub > 0 && <Row label="Add-ons" value={`RM ${addonSub.toLocaleString()}`} />}
-            {stair > 0 && <Row label="Stair carry" value={`RM ${stair.toLocaleString()}`} />}
-            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
-              <span className="text-sm font-semibold">Total</span>
-              <span className="font-mono text-sm font-bold">RM {total.toLocaleString()}</span>
-            </div>
+        {/* Subtotal block */}
+        <div className="px-4 py-3 border-t border-border bg-secondary/30 text-[12px]">
+          <Row label="Items subtotal" value={RM(lineSub)} />
+          {addonSub > 0 && <Row label="Add-ons" value={RM(addonSub)} />}
+          {stair > 0 && <Row label="Stair carry" value={RM(stair)} />}
+          <div className="flex justify-between mt-2 pt-2 border-t border-border">
+            <span className="text-sm font-semibold">Total</span>
+            <span className="font-mono text-base font-bold">{RM(total)}</span>
           </div>
         </div>
-      </aside>
+      </div>
     </div>
   );
 }
@@ -267,7 +332,7 @@ function Section({
 function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+      <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
         {label}
       </span>
       {children}
@@ -282,4 +347,13 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="font-mono">{value}</span>
     </div>
   );
+}
+
+function pillClass(active: boolean) {
+  return [
+    "px-3 py-2 rounded-md border text-sm font-semibold transition-colors",
+    active
+      ? "border-primary bg-primary/10 text-primary"
+      : "border-border bg-white text-foreground hover:border-primary/40",
+  ].join(" ");
 }

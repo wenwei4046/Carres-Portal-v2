@@ -60,8 +60,13 @@ export default {
         terracotta: "hsl(var(--terracotta))",
       },
       fontFamily: {
+        // Body / display both use DM Sans per the Warm Linen preset in
+        // reference/shared/styles.css. The proto reserves Big Shoulders Stencil
+        // for nothing in this preset; v2 keeps it on `font-stencil` for any
+        // future poster/login-mark surface but no current page uses it.
         sans: ["DM Sans", "system-ui", "sans-serif"],
-        display: ["Big Shoulders Stencil Display", "DM Sans", "sans-serif"],
+        display: ["DM Sans", "system-ui", "sans-serif"],
+        stencil: ["Big Shoulders Stencil Display", "DM Sans", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       borderRadius: {

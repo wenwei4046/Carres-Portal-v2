@@ -45,12 +45,18 @@ test.describe("dealer Phase 2B.2 — wizard shell + Step 1", () => {
     // Customer fields
     await page.getByPlaceholder(/Tan Mei Ling/i).fill("E2E Tester");
     await page.getByPlaceholder("012-3456789").fill("012-1234567");
-    await page.getByPlaceholder(/Street, postcode/i).fill("123 Jalan E2E, 50000 Kuala Lumpur");
+
+    // Structured Malaysia address — Line 1 + cascading state→city→postcode.
+    // Selects in dialog order: 0=outlet, 1=salesperson, 2=state, 3=city, 4=postcode, 5=relationship.
+    await page.getByPlaceholder(/Building, unit, street/i).fill("12-3, Jalan E2E, 50000 KL");
+    await page.locator("select").nth(2).selectOption("Selangor");
+    await page.locator("select").nth(3).selectOption("Petaling Jaya");
+    await page.locator("select").nth(4).selectOption({ index: 1 });
 
     // Emergency contact
     await page.getByPlaceholder("Name").fill("E2E Spouse");
     await page.getByPlaceholder("012-9988776").fill("012-7654321");
-    await page.locator("select").nth(2).selectOption("Spouse"); // relationship select
+    await page.locator("select").nth(5).selectOption("Spouse"); // relationship select
 
     // Delivery date
     await page.locator('input[type="date"]').fill("2026-06-15");
@@ -82,10 +88,13 @@ test.describe("dealer Phase 2B.2 — wizard shell + Step 1", () => {
     await page.locator("select").nth(1).selectOption({ index: 1 });
     await page.getByPlaceholder(/Tan Mei Ling/i).fill("E2E Step2");
     await page.getByPlaceholder("012-3456789").fill("012-1234567");
-    await page.getByPlaceholder(/Street, postcode/i).fill("123 Jalan E2E, KL");
+    await page.getByPlaceholder(/Building, unit, street/i).fill("12-3, Jalan E2E, KL");
+    await page.locator("select").nth(2).selectOption("Selangor");
+    await page.locator("select").nth(3).selectOption("Petaling Jaya");
+    await page.locator("select").nth(4).selectOption({ index: 1 });
     await page.getByPlaceholder("Name").fill("E2E Spouse");
     await page.getByPlaceholder("012-9988776").fill("012-7654321");
-    await page.locator("select").nth(2).selectOption("Spouse");
+    await page.locator("select").nth(5).selectOption("Spouse");
     await page.locator('input[type="date"]').fill("2026-06-15");
     await page.getByRole("button", { name: /Continue/i }).click();
     await expect(page.getByText(/Products & add-ons/i)).toBeVisible({ timeout: 10_000 });

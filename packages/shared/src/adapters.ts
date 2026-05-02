@@ -185,8 +185,17 @@ export const orderFromRow = (
     hasLift: r.delivery_has_lift,
   },
   paid: Number(r.paid),
-  signatureUrl: r.signature_url,
+  // `?? null` so an old DB row missing this column reads as null rather than
+  // tripping zod's nullable check downstream. Migration 0005 added the column
+  // but legacy rows from before the migration still surface as undefined.
+  signatureUrl: r.signature_url ?? null,
+  paymentSlipUrl: r.payment_slip_url ?? null,
   termsAccepted: r.terms_accepted,
+  // 0007 added payment_method/approval_code/installment_months. Pre-0007 rows
+  // surface as undefined → null here so zod nullable enums stay happy.
+  paymentMethod: r.payment_method ?? null,
+  approvalCode: r.approval_code ?? null,
+  installmentMonths: r.installment_months ?? null,
   logisticsStage: r.logistics_stage,
   warehouseId: r.warehouse_id,
   deliveryPartnerId: r.delivery_partner_id,
@@ -314,6 +323,9 @@ export const orderInputToRpcPayload = (
   signature_url: input.signaturePath,
   payment_slip_url: input.paymentSlipPath,
   terms_accepted: input.termsAccepted,
+  payment_method: input.paymentMethod,
+  approval_code: input.approvalCode,
+  installment_months: input.installmentMonths,
   lines: input.lines.map((l) => ({
     sku: l.sku,
     qty: l.qty,

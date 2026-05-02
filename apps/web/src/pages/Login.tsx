@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { loginSchema } from "@carres/shared";
+import CarresLockup from "@/components/CarresLockup";
 import { useAuth } from "@/lib/auth";
 import { supabaseConfigured } from "@/lib/supabase";
 
@@ -52,8 +53,10 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md rounded-lg border border-border bg-card text-card-foreground shadow-sm">
         <div className="space-y-1 p-6">
-          <h1 className="font-display text-4xl tracking-wide text-primary">CARRES PORTAL</h1>
-          <p className="text-sm text-muted-foreground">Sign in to continue.</p>
+          <h1>
+            <CarresLockup showPortal size={32} />
+          </h1>
+          <p className="text-sm text-muted-foreground pt-1">Sign in to continue.</p>
         </div>
         <div className="px-6 pb-6">
           <form onSubmit={onSubmit} className="space-y-4">

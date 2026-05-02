@@ -78,7 +78,11 @@ export const orderSchema = z.object({
   }),
   paid: z.number(),
   signatureUrl: z.string().nullable(),
+  paymentSlipUrl: z.string().nullable(),
   termsAccepted: z.boolean(),
+  paymentMethod: z.enum(["online", "credit", "installment"]).nullable(),
+  approvalCode: z.string().nullable(),
+  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
   logisticsStage: logisticsStageSchema.nullable(),
   warehouseId: z.string().uuid().nullable(),
   deliveryPartnerId: z.string().uuid().nullable(),
@@ -92,6 +96,11 @@ export const orderSchema = z.object({
   placedAt: z.string(),
   // List response augments — set server-side in the list handler only.
   lineCount: z.number().int().optional(),
+  /** Sum of line_subtotal + addon_subtotal computed by the list handler. Excludes
+   *  stair carry (proto's monthValue definition). Detail endpoint omits it; use
+   *  `lineSubtotal + addonSubtotal + floorSurcharge` from `order-totals.ts`
+   *  there to get the authoritative grand total. */
+  totalAmount: z.number().optional(),
   // Detail response augments — populated only by the detail handler.
   lines: z.array(orderLineSchema).optional(),
   addons: z.array(orderAddonSchema).optional(),
@@ -164,6 +173,35 @@ export const createOrderInputSchema = z.object({
   paymentSlipPath: z.string().nullable(),
   termsAccepted: z.literal(true),
   depositPct: z.number().int().min(0).max(100),
+  /** Payment instrument used at order time. Persisted as `orders.payment_method`
+   *  (DB CHECK gates the enum). Phase 2D's payments table will reference this
+   *  for full-payment workflows; this field always represents the *initial*
+   *  deposit method. */
+  paymentMethod: z.enum(["online", "credit", "installment"]),
+  /** Bank/EDC approval code from the slip, when method ∈ {credit, installment}.
+   *  Required for those methods (≥ 3 chars), null for "online". The wizard
+   *  enforces the ≥3 rule; the schema accepts any non-empty string when given. */
+  approvalCode: z.string().nullable(),
+  /** Installment plan months. Only valid when paymentMethod === "installment".
+   *  RPC re-checks the cross-field rule and rejects with 22023. */
+  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
+}).superRefine((data, ctx) => {
+  if (data.paymentMethod === "installment") {
+    if (data.installmentMonths === null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["installmentMonths"], message: "required for installment" });
+    }
+    if (!data.approvalCode || data.approvalCode.trim().length < 3) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["approvalCode"], message: "approval code must be ≥3 chars for installment" });
+    }
+  }
+  if (data.paymentMethod === "credit") {
+    if (!data.approvalCode || data.approvalCode.trim().length < 3) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["approvalCode"], message: "approval code must be ≥3 chars for credit" });
+    }
+  }
+  if (data.paymentMethod !== "installment" && data.installmentMonths !== null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["installmentMonths"], message: "only valid when paymentMethod is installment" });
+  }
 });
 export type CreateOrderInput = z.infer<typeof createOrderInputSchema>;
 export type OrderLineInput = z.infer<typeof orderLineInputSchema>;

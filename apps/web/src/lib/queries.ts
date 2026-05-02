@@ -1,6 +1,13 @@
-import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationOptions,
+  type UseQueryOptions,
+} from "@tanstack/react-query";
 import {
   type CatalogResponse,
+  type CreateOrderInput,
   type DealerSelf,
   type Order,
   type OrdersListResponse,
@@ -62,6 +69,34 @@ export function useOrder(id: string | null, opts?: Partial<UseQueryOptions<Order
     queryFn: () => apiFetch<Order>(`/api/orders/${id}`),
     enabled: !!id,
     staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/**
+ * useCreateOrder — POST /api/orders. On success, prime the detail cache with
+ * the just-created order (so the ThankYou screen can render its number
+ * without a second round-trip) and invalidate the list cache so the dashboard
+ * kanban picks up the new card on next mount.
+ */
+export function useCreateOrder(
+  opts?: Partial<UseMutationOptions<Order, Error, CreateOrderInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, Error, CreateOrderInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>("/api/orders", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(order.id), order);
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      // Forward to caller's onSuccess if provided. Spread keeps us
+      // signature-agnostic across TanStack versions.
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
     ...opts,
   });
 }

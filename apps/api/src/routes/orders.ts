@@ -33,9 +33,14 @@ ordersRouter.get("/", async (c) => {
 
   const sb = userClient(c.env, auth.jwt);
   // PostgREST: select.eq*.order — .order() ends the chain (returns awaitable).
-  // Selecting `line_count:order_lines(count)` is the cheap way to get item
-  // count per order without shipping the full lines array on the list path.
-  let q = sb.from("orders").select("*, line_count:order_lines(count)");
+  // We embed minimal `unit_price/qty` from order_lines + order_addons so the
+  // dashboard can show the per-card RM total and the monthly-spend subtitle
+  // without an extra round-trip per order. Stair carry is intentionally
+  // EXCLUDED here (matches the prototype's `monthValue` definition which sums
+  // line+addon only — stair is a delivery-time concern, not a sales metric).
+  let q = sb.from("orders").select(
+    "*, line_count:order_lines(count), order_lines(unit_price, qty), order_addons(unit_price, qty)",
+  );
 
   if (status) q = q.eq("status", status);
   if (outletId) q = q.eq("outlet_id", outletId);
@@ -56,9 +61,25 @@ ordersRouter.get("/", async (c) => {
   if (error) throw new HTTPException(500, { message: error.message });
 
   const orders = (data ?? []).map((row) => {
-    const r = row as DB.OrderRow & { line_count?: Array<{ count: number }> };
+    const r = row as DB.OrderRow & {
+      line_count?: Array<{ count: number }>;
+      order_lines?: Array<{ unit_price: string | number; qty: number }>;
+      order_addons?: Array<{ unit_price: string | number; qty: number }>;
+    };
     const lineCount = r.line_count?.[0]?.count ?? 0;
-    return { ...Adapters.orderFromRow(r), lineCount };
+    const lineTotal = (r.order_lines ?? []).reduce(
+      (s, l) => s + Number(l.unit_price) * l.qty,
+      0,
+    );
+    const addonTotal = (r.order_addons ?? []).reduce(
+      (s, a) => s + Number(a.unit_price) * a.qty,
+      0,
+    );
+    return {
+      ...Adapters.orderFromRow(r),
+      lineCount,
+      totalAmount: lineTotal + addonTotal,
+    };
   });
 
   const body = ordersListResponseSchema.parse({ orders, total: orders.length });
@@ -175,6 +196,34 @@ ordersRouter.post("/", async (c) => {
   return c.json(orderSchema.parse(order), 201);
 });
 
+/**
+ * Storage path → signed URL with 1h TTL. Persisted column stores
+ * `orders-attachments/{dealer_id}/{wizard_uuid}/file.ext`; createSignedUrl
+ * wants the path *within* the bucket, so we strip the bucket prefix.
+ *
+ * Returns null when the input is null or the path doesn't begin with the
+ * expected bucket. We never reveal whether an unsigned path was malformed
+ * vs. genuinely missing — the caller just sees a missing URL field, same
+ * as if the dealer never uploaded one.
+ */
+const ATTACHMENTS_BUCKET = "orders-attachments";
+const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour
+
+async function signAttachment(
+  sb: ReturnType<typeof userClient>,
+  pathWithBucket: string | null,
+): Promise<string | null> {
+  if (!pathWithBucket) return null;
+  const prefix = `${ATTACHMENTS_BUCKET}/`;
+  if (!pathWithBucket.startsWith(prefix)) return null;
+  const objectKey = pathWithBucket.slice(prefix.length);
+  const { data, error } = await sb.storage
+    .from(ATTACHMENTS_BUCKET)
+    .createSignedUrl(objectKey, SIGNED_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
+
 ordersRouter.get("/:id", async (c) => {
   const auth = c.var.auth;
   const id = c.req.param("id");
@@ -206,7 +255,18 @@ ordersRouter.get("/:id", async (c) => {
     addons: row.order_addons ?? [],
     history: row.order_history ?? [],
   });
-  return c.json(orderSchema.parse(order));
+
+  // Replace raw Storage paths with 1h signed URLs so the client can render
+  // <img src=> directly. Stored DB values stay as paths — RLS still gates
+  // who can sign them, so an internal viewer reading another dealer's order
+  // gets a properly signed URL only when their RLS policy allows it.
+  const [signatureUrl, paymentSlipUrl] = await Promise.all([
+    signAttachment(sb, order.signatureUrl),
+    signAttachment(sb, order.paymentSlipUrl),
+  ]);
+  const signed = { ...order, signatureUrl, paymentSlipUrl };
+
+  return c.json(orderSchema.parse(signed));
 });
 
 export default ordersRouter;

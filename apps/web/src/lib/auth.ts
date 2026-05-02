@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Role } from "@carres/shared/domain";
+import { queryClient } from "./query-client";
 import { supabase } from "./supabase";
 
 type AuthState = {
@@ -112,6 +113,14 @@ export const useAuth = create<AuthState & AuthActions>((set, get) => ({
       sessionStorage.removeItem("carres-order-draft");
     } catch {
       // sessionStorage may be unavailable in some environments — swallow.
+    }
+    // Drop every cached query — orders, customer details, signed Storage URLs
+    // — so the next user on this tab cannot read PII from React Query's
+    // module-level cache before their own queries refetch.
+    try {
+      queryClient.clear();
+    } catch {
+      // Defensive: never let a cache-clear failure block sign-out.
     }
   },
 }));

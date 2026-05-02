@@ -60,7 +60,11 @@ function makeOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
     delivery_has_lift: false,
     paid: "0",
     signature_url: null,
+    payment_slip_url: null,
     terms_accepted: true,
+    payment_method: null,
+    approval_code: null,
+    installment_months: null,
     logistics_stage: null,
     warehouse_id: null,
     delivery_partner_id: null,
@@ -77,7 +81,39 @@ function makeOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-function buildSb(rowsFor: { list?: unknown[]; one?: unknown }) {
+/**
+ * Records every Supabase Storage createSignedUrl call. Returns a deterministic
+ * fake signed URL (`https://signed.test/<path>?token=...`) so tests can assert
+ * on whether the route invoked signing AND on what path it asked for. Returns
+ * `{ data: null, error }` when the test set `signError: true`.
+ */
+function buildStorageMock(opts: { signError?: boolean } = {}) {
+  const signCalls: Array<{ bucket: string; path: string; ttl: number }> = [];
+  return {
+    storage: {
+      from(bucket: string) {
+        return {
+          async createSignedUrl(path: string, ttl: number) {
+            signCalls.push({ bucket, path, ttl });
+            if (opts.signError) {
+              return { data: null, error: { message: "sign failed" } };
+            }
+            return {
+              data: { signedUrl: `https://signed.test/${bucket}/${path}?token=fake` },
+              error: null,
+            };
+          },
+        };
+      },
+    },
+    _signCalls: signCalls,
+  };
+}
+
+function buildSb(
+  rowsFor: { list?: unknown[]; one?: unknown },
+  storageOpts: { signError?: boolean } = {},
+) {
   // Simulates a Supabase PostgREST chain that records .eq() filters and
   // returns rows on .order() (list) or .maybeSingle() (single row).
   const eqs: Array<[string, unknown]> = [];
@@ -89,11 +125,13 @@ function buildSb(rowsFor: { list?: unknown[]; one?: unknown }) {
     order: async () => ({ data: rowsFor.list ?? [], error: null }),
     maybeSingle: async () => ({ data: rowsFor.one ?? null, error: null }),
   };
+  const storage = buildStorageMock(storageOpts);
   return Object.assign(
     {
       from: () => ({ select: () => chain }),
       _eqs: eqs,
     },
+    storage,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ) as any;
 }
@@ -117,6 +155,7 @@ function buildSbForCreate(opts: {
     order: async () => ({ data: [], error: null }),
     maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
   };
+  const storage = buildStorageMock();
   return Object.assign(
     {
       from: () => ({ select: () => chain }),
@@ -130,6 +169,7 @@ function buildSbForCreate(opts: {
       _eqs: eqs,
       _rpcCalls: rpcCalls,
     },
+    storage,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ) as any;
 }
@@ -164,6 +204,9 @@ function validCreateBody(over: Record<string, unknown> = {}) {
     paymentSlipPath: null,
     termsAccepted: true,
     depositPct: 50,
+    paymentMethod: "online",
+    approvalCode: null,
+    installmentMonths: null,
     ...over,
   };
 }
@@ -303,6 +346,82 @@ describe("GET /api/orders/:id", () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+
+  it("rewrites signature_url + payment_slip_url Storage paths to 1h signed URLs", async () => {
+    const sigPath = `orders-attachments/${DEALER_A}/wiz-1/signature.png`;
+    const slipPath = `orders-attachments/${DEALER_A}/wiz-1/payment-slip.jpg`;
+    const oneRow = {
+      ...makeOrderRow({ signature_url: sigPath, payment_slip_url: slipPath }),
+      order_lines: [],
+      order_addons: [],
+      order_history: [],
+    };
+    const sb = buildSb({ one: oneRow });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders/11111111-1111-1111-1111-111111111111", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { signatureUrl: string; paymentSlipUrl: string };
+    expect(body.signatureUrl).toMatch(/^https:\/\/signed\.test\/orders-attachments\/.+\/signature\.png\?token=/);
+    expect(body.paymentSlipUrl).toMatch(/^https:\/\/signed\.test\/orders-attachments\/.+\/payment-slip\.jpg\?token=/);
+    // Both signs were attempted in parallel — exactly one call per path
+    expect(sb._signCalls).toHaveLength(2);
+    expect(sb._signCalls.map((c: { path: string }) => c.path).sort()).toEqual(
+      [`${DEALER_A}/wiz-1/payment-slip.jpg`, `${DEALER_A}/wiz-1/signature.png`].sort(),
+    );
+    expect(sb._signCalls[0]!.ttl).toBe(60 * 60);
+  });
+
+  it("leaves null url fields as null without invoking Storage signing", async () => {
+    const oneRow = {
+      ...makeOrderRow({ signature_url: null, payment_slip_url: null }),
+      order_lines: [],
+      order_addons: [],
+      order_history: [],
+    };
+    const sb = buildSb({ one: oneRow });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders/11111111-1111-1111-1111-111111111111", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { signatureUrl: string | null; paymentSlipUrl: string | null };
+    expect(body.signatureUrl).toBeNull();
+    expect(body.paymentSlipUrl).toBeNull();
+    expect(sb._signCalls).toHaveLength(0);
+  });
+
+  it("returns null url field when Storage sign fails (defensive — no leak of internal error)", async () => {
+    const sigPath = `orders-attachments/${DEALER_A}/wiz-1/signature.png`;
+    const oneRow = {
+      ...makeOrderRow({ signature_url: sigPath, payment_slip_url: null }),
+      order_lines: [],
+      order_addons: [],
+      order_history: [],
+    };
+    const sb = buildSb({ one: oneRow }, { signError: true });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders/11111111-1111-1111-1111-111111111111", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { signatureUrl: string | null };
+    expect(body.signatureUrl).toBeNull();
+    expect(sb._signCalls).toHaveLength(1); // attempted, then swallowed
   });
 });
 

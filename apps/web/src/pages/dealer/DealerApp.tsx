@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useSearchParams } from "react-router-dom";
+import CarresLockup from "@/components/CarresLockup";
 import { useAuth } from "@/lib/auth";
 import { useDealerSelf } from "@/lib/queries";
 import DealerDashboard from "./DealerDashboard";
@@ -54,7 +55,7 @@ function DealerSidebar({ dealerName, initials }: { dealerName: string; initials:
     <aside className="fixed left-0 top-0 bottom-0 w-[220px] bg-card border-r border-border flex flex-col py-[22px] z-10">
       <div className="px-[22px] pb-6 border-b border-border mb-[14px]">
         <Link to="/dealer" className="block">
-          <span className="font-display text-2xl tracking-wide text-primary">CARRES</span>
+          <CarresLockup />
         </Link>
       </div>
 

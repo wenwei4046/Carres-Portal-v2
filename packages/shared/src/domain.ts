@@ -181,7 +181,11 @@ export interface Order {
 
   paid: number;
   signatureUrl: string | null;
+  paymentSlipUrl: string | null;
   termsAccepted: boolean;
+  paymentMethod: "online" | "credit" | "installment" | null;
+  approvalCode: string | null;
+  installmentMonths: 6 | 12 | null;
 
   logisticsStage: "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered" | null;
   warehouseId: string | null;

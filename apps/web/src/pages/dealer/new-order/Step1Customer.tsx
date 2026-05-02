@@ -1,4 +1,6 @@
 import type { OutletDto, SalespersonDto } from "@carres/shared";
+import MYAddressFields from "@/components/MYAddressFields";
+import { composeAddress } from "@/data/malaysia-postcodes";
 import type { WizardDraft } from "./draft";
 
 const RELATIONSHIPS = [
@@ -101,8 +103,9 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
               value={c.name}
               placeholder="e.g. Tan Mei Ling, 陈志强, Ahmad bin Yusof"
               onChange={(e) => setC({ name: e.target.value })}
-              className={inputClass()}
+              className={inputClass({ error: !v.name(c.name) })}
             />
+            {!v.name(c.name) && <p className={errorHint}>Need at least 2 characters.</p>}
           </Field>
           <Field label="Phone *">
             <input
@@ -110,21 +113,33 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
               value={c.phone}
               placeholder="012-3456789"
               onChange={(e) => setC({ phone: e.target.value })}
-              className={inputClass()}
+              className={inputClass({ error: !v.phone(c.phone) })}
             />
+            {!v.phone(c.phone) && (
+              <p className={errorHint}>Need at least 8 digits (numbers, spaces, +, − allowed).</p>
+            )}
           </Field>
         </div>
 
-        {/* Address */}
+        {/* Address — cascading state → city → postcode picker */}
         <div className="mt-3.5">
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center justify-between mb-2.5">
             <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
               Delivery address {!c.addressUnknown && "*"}
             </label>
             <InlineCheckbox
               label="Customer hasn't provided yet"
               checked={c.addressUnknown}
-              onChange={(v) => setC({ addressUnknown: v, address: v ? "" : c.address })}
+              onChange={(v) =>
+                setC({
+                  addressUnknown: v,
+                  // Wipe structured fields when toggled on so a later un-toggle
+                  // doesn't surface stale data.
+                  ...(v
+                    ? { addressLine1: "", addressState: "", addressCity: "", addressPostcode: "" }
+                    : {}),
+                })
+              }
             />
           </div>
           {c.addressUnknown ? (
@@ -132,12 +147,14 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
               Address will be required before this order can move to logistics.
             </div>
           ) : (
-            <textarea
-              rows={2}
-              value={c.address}
-              placeholder="Street, postcode, city, state"
-              onChange={(e) => setC({ address: e.target.value })}
-              className={inputClass()}
+            <MYAddressFields
+              data={{
+                addressLine1: c.addressLine1,
+                addressState: c.addressState,
+                addressCity: c.addressCity,
+                addressPostcode: c.addressPostcode,
+              }}
+              onChange={(patch) => setC(patch)}
             />
           )}
         </div>
@@ -148,20 +165,30 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
             Emergency contact *
           </label>
           <div className="grid grid-cols-3 gap-2.5">
-            <input
-              type="text"
-              value={c.emergencyName}
-              placeholder="Name"
-              onChange={(e) => setC({ emergencyName: e.target.value })}
-              className={inputClass()}
-            />
-            <input
-              type="text"
-              value={c.emergencyPhone}
-              placeholder="012-9988776"
-              onChange={(e) => setC({ emergencyPhone: e.target.value })}
-              className={inputClass()}
-            />
+            <div>
+              <input
+                type="text"
+                value={c.emergencyName}
+                placeholder="Name"
+                onChange={(e) => setC({ emergencyName: e.target.value })}
+                className={inputClass({ error: !v.name(c.emergencyName) })}
+              />
+              {!v.name(c.emergencyName) && (
+                <p className={errorHint}>Need at least 2 characters.</p>
+              )}
+            </div>
+            <div>
+              <input
+                type="text"
+                value={c.emergencyPhone}
+                placeholder="012-9988776"
+                onChange={(e) => setC({ emergencyPhone: e.target.value })}
+                className={inputClass({ error: !v.phone(c.emergencyPhone) })}
+              />
+              {!v.phone(c.emergencyPhone) && (
+                <p className={errorHint}>Need at least 8 digits.</p>
+              )}
+            </div>
             <select
               value={c.emergencyRelationship}
               onChange={(e) =>
@@ -199,20 +226,38 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
         <InlineCheckbox
           label="Same as delivery address"
           checked={c.billingSame}
-          onChange={(v) => setC({ billingSame: v, billing: v ? c.address : c.billing })}
+          onChange={(v) =>
+            setC({
+              billingSame: v,
+              billing: v ? composeAddress({ line1: c.addressLine1, state: c.addressState, city: c.addressCity, postcode: c.addressPostcode }) : c.billing,
+            })
+          }
         />
         {!c.billingSame && (
-          <textarea
-            rows={2}
-            value={c.billing}
-            placeholder="Billing address"
-            onChange={(e) => setC({ billing: e.target.value })}
-            className={`${inputClass()} mt-2.5`}
-          />
+          <>
+            <textarea
+              rows={2}
+              value={c.billing}
+              placeholder="Billing address"
+              onChange={(e) => setC({ billing: e.target.value })}
+              className={`${inputClass({ error: !v.billing(c.billing) })} mt-2.5`}
+            />
+            {!v.billing(c.billing) && (
+              <p className={errorHint}>Need at least 5 characters.</p>
+            )}
+          </>
         )}
-        {c.billingSame && c.address && (
+        {c.billingSame && !c.addressUnknown && c.addressLine1 && (
           <div className="rounded-md bg-secondary/40 border border-dashed border-border px-3 py-2.5 text-xs font-body text-muted-foreground mt-2">
-            ↳ Bills will be sent to: <strong className="text-foreground">{c.address}</strong>
+            ↳ Bills will be sent to:{" "}
+            <strong className="text-foreground">
+              {composeAddress({
+                line1: c.addressLine1,
+                state: c.addressState,
+                city: c.addressCity,
+                postcode: c.addressPostcode,
+              })}
+            </strong>
           </div>
         )}
       </Section>
@@ -287,12 +332,27 @@ function InlineCheckbox({ label, checked, onChange }: { label: string; checked: 
   );
 }
 
-function inputClass({ disabled }: { disabled?: boolean } = {}) {
-  return [
-    "w-full px-3 py-2.5 text-sm font-body rounded-md border border-border bg-card",
-    "outline-none focus:border-primary",
-    disabled ? "bg-secondary/40 text-muted-foreground cursor-not-allowed" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+function inputClass({ disabled, error }: { disabled?: boolean; error?: boolean } = {}) {
+  // Two-tone gating cue: active fields are pure WHITE (next to fill, draws
+  // the eye); disabled / waiting-on-prerequisite fields fall back to the
+  // body cream so the form's filling order reads at a glance. Adds a red
+  // border when a gated rule fails so the user can see WHAT is blocking
+  // Continue without guessing.
+  if (disabled) {
+    return "w-full px-3 py-2.5 text-sm font-body rounded-md border border-border bg-background text-muted-foreground cursor-not-allowed outline-none";
+  }
+  const borderClass = error ? "border-destructive" : "border-border";
+  return `w-full px-3 py-2.5 text-sm font-body rounded-md border ${borderClass} bg-white outline-none focus:border-primary`;
 }
+
+// Small per-field predicates so the JSX stays clean. All return true when the
+// field is empty (so the error UI doesn't shout at the user before they've
+// even started typing) — only complain when they typed something invalid.
+const len = (s: string) => s.trim().length;
+const v = {
+  name: (s: string) => !s || len(s) >= 2,
+  phone: (s: string) => !s || /^[0-9-+\s]{8,}/.test(s),
+  addressLine: (s: string) => !s || len(s) >= 5,
+  billing: (s: string) => !s || len(s) >= 5,
+};
+const errorHint = "text-[11px] text-destructive mt-1";

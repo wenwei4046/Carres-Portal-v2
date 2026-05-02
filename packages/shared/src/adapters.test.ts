@@ -32,6 +32,9 @@ function baseInput(over: Partial<CreateOrderInput> = {}): CreateOrderInput {
     paymentSlipPath: null,
     termsAccepted: true,
     depositPct: 50,
+    paymentMethod: "online",
+    approvalCode: null,
+    installmentMonths: null,
     ...over,
   };
 }
@@ -158,5 +161,26 @@ describe("orderInputToRpcPayload", () => {
     expect(out.paid).toBe(1200);
     expect(out.deposit_pct).toBe(80);
     expect(out.terms_accepted).toBe(true);
+  });
+
+  it("forwards payment_method + approval_code + installment_months for installment", () => {
+    const out = orderInputToRpcPayload(
+      baseInput({
+        paymentMethod: "installment",
+        approvalCode: "INST-9981",
+        installmentMonths: 12,
+      }),
+      DEALER_ID,
+    );
+    expect(out.payment_method).toBe("installment");
+    expect(out.approval_code).toBe("INST-9981");
+    expect(out.installment_months).toBe(12);
+  });
+
+  it("nulls approval_code + installment_months for online method", () => {
+    const out = orderInputToRpcPayload(baseInput(), DEALER_ID);
+    expect(out.payment_method).toBe("online");
+    expect(out.approval_code).toBeNull();
+    expect(out.installment_months).toBeNull();
   });
 });

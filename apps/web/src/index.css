@@ -4,14 +4,19 @@
 
 @layer base {
   :root {
-    /* shadcn semantic tokens — warm linen */
+    /* shadcn semantic tokens — three-layer editorial look. The proto's dashboard
+     * stacks three distinct shades for clear visual hierarchy:
+     *   1. Body (`--background`)  — light cool cream, almost off-white grey
+     *   2. Column wrapper (`--card`) — warmer cream, noticeably deeper than body
+     *   3. Inner kanban cards     — pure white (`bg-white` Tailwind utility)
+     * Loo confirmed this look via screenshot review on 2026-05-02. */
     --background: 36 20% 95%;
     --foreground: 340 5% 13%;
 
-    --card: 0 0% 100%;
+    --card: 40 53% 97%;
     --card-foreground: 340 5% 13%;
 
-    --popover: 0 0% 100%;
+    --popover: 40 53% 97%;
     --popover-foreground: 340 5% 13%;
 
     --primary: 15 74% 48%;

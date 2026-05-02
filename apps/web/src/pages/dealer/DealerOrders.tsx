@@ -60,7 +60,7 @@ export default function DealerOrders() {
   const list = buckets[tab];
 
   return (
-    <div className="p-9 max-w-[1100px]">
+    <div className="p-9">
       <header className="flex items-start justify-between mb-6 gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Orders</p>

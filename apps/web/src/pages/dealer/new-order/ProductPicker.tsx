@@ -97,7 +97,7 @@ export default function ProductPicker({ catalog, onAddLine }: Props) {
           const fabrics = fabricsByModel.get(model.id) ?? [];
           const open = openModelId === model.id;
           return (
-            <div key={model.id} className="rounded-md border border-border bg-card overflow-hidden">
+            <div key={model.id} className="rounded-md border border-border bg-white overflow-hidden">
               <button
                 onClick={() => setOpenModelId(open ? null : model.id)}
                 className={`w-full px-3.5 py-3 text-left flex items-center justify-between gap-3 ${
@@ -468,13 +468,12 @@ function FieldLabel({ label, children }: { label: string; children: React.ReactN
 }
 
 function inputClass({ disabled }: { disabled?: boolean } = {}) {
-  return [
-    "w-full px-2.5 py-2 text-sm font-body rounded-md border border-border bg-card",
-    "outline-none focus:border-primary",
-    disabled ? "bg-secondary/40 text-muted-foreground cursor-not-allowed" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  // Active inputs go white (gating cue: white = next to fill); disabled
+  // selectors fall back to body cream so the user sees what's locked.
+  if (disabled) {
+    return "w-full px-2.5 py-2 text-sm font-body rounded-md border border-border bg-background text-muted-foreground cursor-not-allowed outline-none";
+  }
+  return "w-full px-2.5 py-2 text-sm font-body rounded-md border border-border bg-white outline-none focus:border-primary";
 }
 
 function addBtnClass(enabled: boolean) {

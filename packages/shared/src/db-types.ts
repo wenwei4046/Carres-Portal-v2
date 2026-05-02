@@ -179,7 +179,11 @@ export interface OrderRow {
   delivery_has_lift: boolean;
   paid: number;
   signature_url: string | null;
+  payment_slip_url: string | null;
   terms_accepted: boolean;
+  payment_method: "online" | "credit" | "installment" | null;
+  approval_code: string | null;
+  installment_months: 6 | 12 | null;
   logistics_stage: LogisticsStage | null;
   warehouse_id: string | null;
   delivery_partner_id: string | null;

@@ -1,16 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { useCatalog, useOutlets, useSalespersons } from "@/lib/queries";
+import type { CreateOrderInput, Order } from "@carres/shared";
+import { composeAddress } from "@/data/malaysia-postcodes";
+import { useAuth } from "@/lib/auth";
+import { useCatalog, useCreateOrder, useOutlets, useSalespersons } from "@/lib/queries";
+import { extensionForMime, uploadDataUrl } from "@/lib/storage";
 import {
   type WizardDraft,
   clearDraft,
+  composeEmergency,
   emptyDraft,
   loadDraft,
   saveDraft,
   step1Valid,
   step2Valid,
+  step3Valid,
 } from "./draft";
 import Step1Customer from "./Step1Customer";
 import Step2Products from "./Step2Products";
+import Step3SignaturePayment from "./Step3SignaturePayment";
+import ThankYou from "./ThankYou";
 
 interface Props {
   /** Modal is mounted globally; this prop drives visibility from `?new=1`. */
@@ -37,6 +45,13 @@ const STEP_LABELS: Record<number, string> = {
 export default function DealerNewOrder({ open, onClose }: Props) {
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<WizardDraft>(() => loadDraft() ?? emptyDraft());
+  // After a successful Submit we hold the freshly minted Order so the modal
+  // can render the ThankYou screen instead of Step 3. Reset on close / new.
+  const [submitted, setSubmitted] = useState<Order | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const dealerId = useAuth((s) => s.dealerId);
+  const createOrder = useCreateOrder();
 
   const outletsQ = useOutlets({ enabled: open });
   const salespersonsQ = useSalespersons(undefined, { enabled: open });
@@ -55,6 +70,8 @@ export default function DealerNewOrder({ open, onClose }: Props) {
     if (open) {
       setDraft(loadDraft() ?? emptyDraft());
       setStep(1);
+      setSubmitted(null);
+      setSubmitError(null);
     }
   }, [open]);
 
@@ -62,8 +79,9 @@ export default function DealerNewOrder({ open, onClose }: Props) {
   // would clobber the cleared-on-close invariant.
   useEffect(() => {
     if (!open) return;
+    if (submitted) return; // Don't re-persist post-submit; draft has been cleared.
     saveDraft(draft);
-  }, [open, draft]);
+  }, [open, draft, submitted]);
 
   // ESC = soft close (preserves draft). Only the footer Cancel button discards.
   useEffect(() => {
@@ -90,8 +108,130 @@ export default function DealerNewOrder({ open, onClose }: Props) {
 
   const canStep1 = useMemo(() => step1Valid(draft), [draft]);
   const canStep2 = useMemo(() => step2Valid(draft), [draft]);
-  // Step 3 gate (signature + payment + min-deposit + T&C) lands in 2B.3.c.
-  const canAdvance = step === 1 ? canStep1 : step === 2 ? canStep2 : false;
+  const canStep3 = useMemo(() => step3Valid(draft), [draft]);
+  const canAdvance = step === 1 ? canStep1 : step === 2 ? canStep2 : canStep3;
+  const submitDisabled =
+    !canStep3 || uploading || createOrder.isPending || !dealerId;
+
+  // Footer total — shown from Step 2 onward to mirror proto. We exclude
+  // stair carry from the visible Total to match proto's `monthValue` definition
+  // and the Step 3 deposit-pct math (line + addon only).
+  const footerTotal = useMemo(() => {
+    if (!catalogQ.data) return 0;
+    const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+    const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
+    const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
+    const stair = catalogQ.data
+      ? draft.delivery.hasLift
+        ? 0
+        : Math.max(0, draft.delivery.floor - catalogQ.data.floorConfig.freeUpToFloor) *
+          catalogQ.data.floorConfig.perFloorPerItem *
+          itemsTotal
+      : 0;
+    return lineSub + addonSub + stair;
+  }, [draft, catalogQ.data]);
+
+  /**
+   * Submit pipeline:
+   *   1. Upload signature dataURL → orders-attachments/{dealerId}/{wizardSessionId}/signature.png
+   *   2. Upload payment slip dataURL (if present) → same folder, ext from MIME
+   *   3. POST /api/orders with the two paths
+   *   4. On success → clearDraft() + setSubmitted(order) → ThankYou renders
+   *   5. On any error → keep draft intact + surface message in the footer
+   */
+  async function handleSubmit() {
+    if (!canStep3 || !dealerId || !draft.wizardSessionId) return;
+    setSubmitError(null);
+    try {
+      setUploading(true);
+      const signaturePath = await uploadDataUrl({
+        dealerId,
+        wizardSessionId: draft.wizardSessionId,
+        filename: "signature.png",
+        dataUrl: draft.signature!,
+      });
+      let paymentSlipPath: string | null = null;
+      if (draft.payment.slip) {
+        paymentSlipPath = await uploadDataUrl({
+          dealerId,
+          wizardSessionId: draft.wizardSessionId,
+          filename: `payment-slip.${extensionForMime(draft.payment.slip.mime)}`,
+          dataUrl: draft.payment.slip.dataUrl,
+        });
+      }
+      setUploading(false);
+
+      const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+      const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
+      const totalForPct = lineSub + addonSub; // Stair excluded — matches preview math.
+      const depositPct =
+        totalForPct > 0 ? Math.round((draft.paid / totalForPct) * 100) : 0;
+
+      const composedAddress = composeAddress({
+        line1: draft.customer.addressLine1,
+        state: draft.customer.addressState,
+        city: draft.customer.addressCity,
+        postcode: draft.customer.addressPostcode,
+      });
+      const input: CreateOrderInput = {
+        outletId: draft.outletId!,
+        salespersonId: draft.salespersonId!,
+        customer: {
+          name: draft.customer.name,
+          phone: draft.customer.phone,
+          address: draft.customer.addressUnknown ? null : composedAddress,
+          addressUnknown: draft.customer.addressUnknown,
+          billing: draft.customer.billingSame ? null : draft.customer.billing,
+          billingSame: draft.customer.billingSame,
+          emergency: composeEmergency(draft.customer),
+        },
+        delivery: {
+          date: draft.delivery.dateTbd ? null : draft.delivery.date,
+          dateTbd: draft.delivery.dateTbd,
+          floor: draft.delivery.floor,
+          hasLift: draft.delivery.hasLift,
+        },
+        lines: draft.lines.map((l) => ({
+          sku: l.sku,
+          qty: l.qty,
+          attrs: l.attrs,
+          unitPrice: l.unitPrice,
+        })),
+        addons: draft.addons.map((a) => ({
+          addonKey: a.key,
+          qty: a.qty,
+          unitPrice: a.unitPrice,
+        })),
+        paid: draft.paid,
+        signaturePath,
+        paymentSlipPath,
+        termsAccepted: true,
+        depositPct: Math.min(100, Math.max(0, depositPct)),
+        paymentMethod: draft.payment.method,
+        approvalCode:
+          draft.payment.method === "online"
+            ? null
+            : draft.payment.approvalCode.trim() || null,
+        installmentMonths:
+          draft.payment.method === "installment" ? draft.payment.installmentMonths : null,
+      };
+
+      const created = await createOrder.mutateAsync(input);
+      clearDraft();
+      setSubmitted(created);
+    } catch (err) {
+      setUploading(false);
+      const msg = err instanceof Error ? err.message : "Submit failed";
+      setSubmitError(msg);
+    }
+  }
+
+  function startAnotherOrder() {
+    setSubmitted(null);
+    setSubmitError(null);
+    setDraft(emptyDraft());
+    setStep(1);
+  }
 
   if (!open) return null;
 
@@ -110,36 +250,58 @@ export default function DealerNewOrder({ open, onClose }: Props) {
         {/* Header */}
         <header className="px-7 py-5 border-b border-border flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-              New order · step {step} of 3
-            </p>
-            <h2 className="font-display text-xl mt-0.5 tracking-tight leading-tight">
-              {STEP_LABELS[step]}
-            </h2>
+            {submitted ? (
+              <>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-600">
+                  Order placed
+                </p>
+                <h2 className="font-display text-xl mt-0.5 tracking-tight leading-tight">
+                  Thank you
+                </h2>
+              </>
+            ) : (
+              <>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                  New order · step {step} of 3
+                </p>
+                <h2 className="font-display text-xl mt-0.5 tracking-tight leading-tight">
+                  {STEP_LABELS[step]}
+                </h2>
+              </>
+            )}
           </div>
           <button
             onClick={softClose}
             aria-label="Close"
-            title="Close — your draft will be saved"
+            title={submitted ? "Close" : "Close — your draft will be saved"}
             className="text-2xl leading-none px-2 text-muted-foreground hover:text-foreground"
           >
             ×
           </button>
         </header>
 
-        {/* Stepper */}
-        <div className="flex px-7 pt-3.5 pb-1 gap-1.5">
-          {[1, 2, 3].map((n) => (
-            <div
-              key={n}
-              className={`flex-1 h-[3px] rounded-sm ${n <= step ? "bg-primary" : "bg-secondary"}`}
-            />
-          ))}
-        </div>
+        {/* Stepper — hidden on the ThankYou screen */}
+        {!submitted && (
+          <div className="flex px-7 pt-3.5 pb-1 gap-1.5">
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className={`flex-1 h-[3px] rounded-sm ${n <= step ? "bg-primary" : "bg-secondary"}`}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Body — scrollable */}
-        <div className="px-7 py-6 overflow-auto flex-1">
-          {step === 1 && (
+        <div className={submitted ? "overflow-auto flex-1" : "px-7 py-6 overflow-auto flex-1"}>
+          {submitted && (
+            <ThankYou
+              order={submitted}
+              onNewOrder={startAnotherOrder}
+              onClose={cancelAndClose}
+            />
+          )}
+          {!submitted && step === 1 && (
             <>
               {(outletsQ.isPending || salespersonsQ.isPending) && (
                 <p className="text-sm text-muted-foreground">Loading outlets + salespersons…</p>
@@ -160,7 +322,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
               )}
             </>
           )}
-          {step === 2 && (
+          {!submitted && step === 2 && (
             <>
               {catalogQ.isPending && (
                 <p className="text-sm text-muted-foreground">Loading catalog…</p>
@@ -175,56 +337,86 @@ export default function DealerNewOrder({ open, onClose }: Props) {
               )}
             </>
           )}
-          {step === 3 && <StepPlaceholder n={3} />}
+          {!submitted && step === 3 && (
+            <>
+              {catalogQ.data && (
+                <Step3SignaturePayment
+                  draft={draft}
+                  onChange={setDraft}
+                  catalog={catalogQ.data}
+                />
+              )}
+              {!catalogQ.data && (
+                <p className="text-sm text-muted-foreground">Loading catalog…</p>
+              )}
+            </>
+          )}
         </div>
 
-        {/* Footer */}
-        <footer className="px-7 py-3.5 border-t border-border flex justify-between items-center bg-secondary/30">
-          <button
-            onClick={() => (step === 1 ? cancelAndClose() : setStep(step - 1))}
-            title={step === 1 ? "Cancel — discards your draft" : "Back to previous step"}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            {step === 1 ? "Cancel" : "← Back"}
-          </button>
-          <div className="flex items-center gap-4">
-            {step < 3 ? (
-              <button
-                onClick={() => canAdvance && setStep(step + 1)}
-                disabled={!canAdvance}
-                className={`px-4 py-2 rounded-md text-sm font-semibold ${
-                  canAdvance
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : "bg-secondary text-muted-foreground cursor-not-allowed"
-                }`}
-              >
-                Continue →
-              </button>
-            ) : (
-              <button
-                disabled
-                className="px-4 py-2 rounded-md text-sm font-semibold bg-secondary text-muted-foreground cursor-not-allowed"
-                title="Submit ships in Phase 2B.3"
-              >
-                Submit (2B.3)
-              </button>
+        {/* Footer — hidden on ThankYou screen (its own buttons take over) */}
+        {!submitted && (
+          <footer className="px-7 py-3.5 border-t border-border flex flex-col gap-2 bg-secondary/30">
+            {submitError && (
+              <p className="text-xs text-destructive bg-destructive/5 border border-destructive/30 rounded px-3 py-1.5">
+                {submitError}
+              </p>
             )}
-          </div>
-        </footer>
+            <div className="flex justify-between items-center">
+              <button
+                onClick={() => (step === 1 ? cancelAndClose() : setStep(step - 1))}
+                title={step === 1 ? "Cancel — discards your draft" : "Back to previous step"}
+                className="text-xs text-muted-foreground hover:text-foreground"
+                disabled={uploading || createOrder.isPending}
+              >
+                {step === 1 ? "Cancel" : "← Back"}
+              </button>
+              <div className="flex items-center gap-4">
+                {step >= 2 && (
+                  <span className="text-[11px] text-muted-foreground">
+                    Total{" "}
+                    <span className="font-mono font-semibold text-foreground">
+                      RM{" "}
+                      {footerTotal.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </span>
+                )}
+                {step < 3 ? (
+                  <button
+                    onClick={() => canAdvance && setStep(step + 1)}
+                    disabled={!canAdvance}
+                    className={`px-4 py-2 rounded-md text-sm font-semibold ${
+                      canAdvance
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "bg-secondary text-muted-foreground cursor-not-allowed"
+                    }`}
+                  >
+                    Continue →
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitDisabled}
+                    className={`px-4 py-2 rounded-md text-sm font-semibold ${
+                      submitDisabled
+                        ? "bg-secondary text-muted-foreground cursor-not-allowed"
+                        : "bg-primary text-primary-foreground hover:bg-primary/90"
+                    }`}
+                  >
+                    {uploading
+                      ? "Uploading…"
+                      : createOrder.isPending
+                        ? "Submitting…"
+                        : "Submit order"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </footer>
+        )}
       </div>
-    </div>
-  );
-}
-
-function StepPlaceholder({ n }: { n: number }) {
-  return (
-    <div className="rounded-md border border-dashed border-border bg-secondary/20 p-9 text-center">
-      <p className="text-sm font-semibold mb-1">Step {n} ships in Phase 2B.3</p>
-      <p className="text-xs text-muted-foreground">
-        {n === 2
-          ? "Product picker + 3 configurators (mattress / bedframe / sofa) + add-ons + floor surcharge."
-          : "Signature pad + payment slip uploader + 3 payment methods + min-deposit gate + Submit."}
-      </p>
     </div>
   );
 }

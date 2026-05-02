@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { type MeResponse } from "@carres/shared";
+import CarresLockup from "@/components/CarresLockup";
 import { useAuth } from "@/lib/auth";
 import { apiFetch, ApiError } from "@/lib/api";
 
@@ -35,7 +36,7 @@ export default function Me() {
     <div className="min-h-screen bg-background p-8">
       <div className="mx-auto max-w-2xl space-y-6">
         <header className="flex items-center justify-between">
-          <h1 className="font-display text-3xl tracking-wide text-primary">CARRES PORTAL</h1>
+          <CarresLockup showPortal size={28} />
           <button
             onClick={handleSignOut}
             className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
