@@ -1,18 +1,24 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { authMiddleware } from "./middleware/auth";
+import authRouter from "./routes/auth";
+import type { AppEnv } from "./types";
 
-type Bindings = {
-  // Wired in Phase 1+ via wrangler secret put or .dev.vars
-  SUPABASE_URL?: string;
-  SUPABASE_ANON_KEY?: string;
-  SUPABASE_SERVICE_ROLE_KEY?: string;
-  SUPABASE_JWT_SECRET?: string;
-};
+const app = new Hono<AppEnv>();
 
-const app = new Hono<{ Bindings: Bindings }>();
-
-app.use("*", cors());
+app.use("*", cors({
+  origin: "*",
+  allowHeaders: ["Content-Type", "Authorization"],
+  allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  maxAge: 600,
+}));
 
 app.get("/health", (c) => c.json({ ok: true }));
+
+const api = new Hono<AppEnv>();
+api.use("*", authMiddleware);
+api.route("/auth", authRouter);
+
+app.route("/api", api);
 
 export default app;
