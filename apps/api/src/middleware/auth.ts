@@ -9,12 +9,23 @@ import type { AppEnv, AuthContext } from "../types";
 // the keyset and refreshes on key rotation, so we don't fetch on every request.
 let jwksCache: JWTVerifyGetKey | null = null;
 let jwksCacheUrl: string | null = null;
+let jwksInjectedForTest = false;
 function getJwks(supabaseUrl: string): JWTVerifyGetKey {
+  if (jwksInjectedForTest && jwksCache) return jwksCache;
   const url = `${supabaseUrl}/auth/v1/.well-known/jwks.json`;
   if (jwksCache && jwksCacheUrl === url) return jwksCache;
   jwksCache = createRemoteJWKSet(new URL(url));
   jwksCacheUrl = url;
   return jwksCache;
+}
+
+// Test-only: jose's Node runtime uses node:https.request which msw can't
+// intercept, so integration tests inject a local JWKSet (built from
+// createLocalJWKSet) to bypass the network. Pass null to clear.
+export function _setJwksForTesting(jwks: JWTVerifyGetKey | null): void {
+  jwksCache = jwks;
+  jwksCacheUrl = null;
+  jwksInjectedForTest = jwks !== null;
 }
 
 const VALID_ROLES: ReadonlyArray<Role> = [
