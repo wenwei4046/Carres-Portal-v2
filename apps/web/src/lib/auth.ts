@@ -26,26 +26,43 @@ const VALID_ROLES = [
   "logistics", "supplier", "partner", "finance", "bd",
 ] as const;
 
-function pickRole(session: Session | null): Role | null {
-  const r = session?.user.app_metadata?.role;
+// Supabase Auth Hook (custom_access_token_hook) injects role/entity ids into
+// JWT app_metadata at sign-in. The User object's app_metadata only carries
+// provider info — the enriched claims live in the JWT itself, so we decode
+// the access_token to read them.
+function decodeJwtClaims(jwt: string): Record<string, unknown> | null {
+  try {
+    const payload = jwt.split(".")[1];
+    if (!payload) return null;
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function pickRole(appMeta: Record<string, unknown>): Role | null {
+  const r = appMeta.role;
   if (typeof r !== "string") return null;
   return (VALID_ROLES as readonly string[]).includes(r) ? (r as Role) : null;
 }
 
-function pickEntity(session: Session | null, key: string): string | null {
-  const v = session?.user.app_metadata?.[key];
+function pickEntity(appMeta: Record<string, unknown>, key: string): string | null {
+  const v = appMeta[key];
   return typeof v === "string" && v.length > 0 ? v : null;
 }
 
 function projectSession(session: Session | null) {
+  const claims = session ? decodeJwtClaims(session.access_token) : null;
+  const appMeta = (claims?.app_metadata as Record<string, unknown> | undefined) ?? {};
   return {
     session,
     user: session?.user ?? null,
-    role: pickRole(session),
-    dealerId: pickEntity(session, "dealer_id"),
-    supplierId: pickEntity(session, "supplier_id"),
-    partnerId: pickEntity(session, "partner_id"),
-    outletId: pickEntity(session, "outlet_id"),
+    role: pickRole(appMeta),
+    dealerId: pickEntity(appMeta, "dealer_id"),
+    supplierId: pickEntity(appMeta, "supplier_id"),
+    partnerId: pickEntity(appMeta, "partner_id"),
+    outletId: pickEntity(appMeta, "outlet_id"),
   };
 }
 

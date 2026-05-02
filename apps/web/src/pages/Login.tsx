@@ -8,6 +8,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const session = useAuth((s) => s.session);
+  const role = useAuth((s) => s.role);
   const loading = useAuth((s) => s.loading);
   const signIn = useAuth((s) => s.signIn);
 
@@ -17,11 +18,14 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (session) {
+    if (session && role) {
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from && from !== "/login" ? from : "/me", { replace: true });
+      // Role-aware default home. As more roles ship (Phase 3+), extend here.
+      const defaultHome =
+        role === "dealer" || role === "salesperson" ? "/dealer" : "/me";
+      navigate(from && from !== "/login" ? from : defaultHome, { replace: true });
     }
-  }, [session, location.state, navigate]);
+  }, [session, role, location.state, navigate]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

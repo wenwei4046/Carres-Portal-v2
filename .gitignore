@@ -101,6 +101,8 @@ playwright/.cache/
 test-results/
 .playwright-mcp/
 phase-*-success-*.png
+phase-*-dealer-*.png
+phase-*-detail-*.png
 
 # -----------------------------------------------------------------------------
 # Cache
