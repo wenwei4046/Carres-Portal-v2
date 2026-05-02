@@ -17,7 +17,7 @@
 --
 -- AFTER APPLYING THIS MIGRATION (one-time, manual step in Supabase Dashboard):
 --   Dashboard → Authentication → Hooks → Send SMS / Hooks → Custom Access Token Hook
---   Function: auth.custom_access_token_hook
+--   Function: public.custom_access_token_hook
 --   Enable.
 --
 -- GRACEFUL DEGRADATION:
@@ -26,7 +26,7 @@
 --   but the JWT carries no role and RLS will reject all dependent queries.
 -- =============================================================================
 
-create or replace function auth.custom_access_token_hook(event jsonb)
+create or replace function public.custom_access_token_hook(event jsonb)
 returns jsonb
 language plpgsql
 security definer
@@ -73,5 +73,5 @@ end;
 $$;
 
 -- Lock down. Only Supabase's auth admin role may call this.
-grant execute on function auth.custom_access_token_hook to supabase_auth_admin;
-revoke execute on function auth.custom_access_token_hook from public, anon, authenticated;
+grant execute on function public.custom_access_token_hook to supabase_auth_admin;
+revoke execute on function public.custom_access_token_hook from public, anon, authenticated;

@@ -32,7 +32,7 @@ begin
   insert into order_history (order_id, text, by_role, by_user_id)
   values (p_order_id,
           'Proceeded · routed to Logistics',
-          auth.app_role(),
+          public.app_role(),
           auth.uid());
 
   return v_order;
@@ -64,7 +64,7 @@ begin
   insert into order_history (order_id, text, by_role, by_user_id)
   values (p_order_id,
           format('Payment received · RM %s · %s', p_amount, p_method),
-          auth.app_role(), auth.uid());
+          public.app_role(), auth.uid());
 
   return v_pay;
 end;
@@ -85,7 +85,7 @@ create or replace function po_issue(
 language plpgsql security definer as $$
 declare v_po purchase_orders;
 begin
-  if auth.app_role() not in ('logistics','principal') then
+  if public.app_role() not in ('logistics','principal') then
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
@@ -120,7 +120,7 @@ begin
   end if;
 
   insert into po_history (po_id, text, by_role, by_user_id)
-  values (p_po_id, coalesce(p_note, p_to_status::text), auth.app_role(), auth.uid());
+  values (p_po_id, coalesce(p_note, p_to_status::text), public.app_role(), auth.uid());
 
   return v_po;
 end;
@@ -141,7 +141,7 @@ declare
   v_po purchase_orders;
   v_receipt po_receipts;
 begin
-  if auth.app_role() not in ('logistics','principal') then
+  if public.app_role() not in ('logistics','principal') then
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
@@ -159,7 +159,7 @@ begin
 
   insert into stock_movements (sku, warehouse_id, qty, kind, ref, note, by_role, by_user_id)
   values (v_po.sku, v_po.warehouse_id, p_received_qty, 'in', p_po_id,
-          format('DO #%s', p_do_number), auth.app_role(), auth.uid());
+          format('DO #%s', p_do_number), public.app_role(), auth.uid());
 
   update purchase_orders set status = 'received', sup_status = 'delivered', updated_at = now()
     where id = p_po_id;
@@ -183,7 +183,7 @@ create or replace function order_dispatch(
 language plpgsql security definer as $$
 declare v_order orders;
 begin
-  if auth.app_role() not in ('logistics','principal') then
+  if public.app_role() not in ('logistics','principal') then
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
@@ -252,7 +252,7 @@ create or replace function approval_decide(
 language plpgsql security definer as $$
 declare v_app approvals;
 begin
-  if not auth.is_principal() then
+  if not public.is_principal() then
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
@@ -296,7 +296,7 @@ declare
   v_inv invoices;
   v_no  text;
 begin
-  if auth.app_role() not in ('finance','principal') then
+  if public.app_role() not in ('finance','principal') then
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
@@ -336,7 +336,7 @@ begin
   update dealers set deposit_balance = deposit_balance + p_amount where id = p_dealer_id;
 
   insert into audit_log (role, actor_text, action, dealer_id, ref)
-  values (auth.app_role(),
+  values (public.app_role(),
           (select name from app_users where id = auth.uid()),
           format('Top-up · RM %s · %s', p_amount, p_method),
           p_dealer_id,
@@ -364,7 +364,7 @@ language plpgsql security definer as $$
 declare
   v_order  orders;
   v_dl     int;
-  v_role   app_role := auth.app_role();
+  v_role   app_role := public.app_role();
   v_dealer uuid     := (p_payload->>'dealer_id')::uuid;
   v_line   jsonb;
   v_addon  jsonb;
