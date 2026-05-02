@@ -1,0 +1,296 @@
+/**
+ * camelCase domain types — UI code uses these. Adapters in `adapters.ts`
+ * convert from snake_case DB rows to these.
+ */
+
+export type Role =
+  | "principal" | "dealer" | "salesperson" | "showroom"
+  | "logistics" | "supplier" | "partner" | "finance" | "bd";
+
+export interface Dealer {
+  id: string;
+  name: string;
+  region: string | null;
+  contact: string | null;
+  joinedDate: string | null;
+  status: "active" | "suspended" | "pending";
+  creditLimit: number;
+  paymentTerms: string | null;
+  depositBalance: number;
+  channel: string;
+}
+
+export interface Outlet {
+  id: string;
+  dealerId: string;
+  name: string;
+  address: string;
+}
+
+export interface Salesperson {
+  id: string;
+  dealerId: string;
+  outletId: string | null;
+  name: string;
+  phone: string | null;
+  userId: string | null;
+}
+
+export interface ProductModel {
+  id: string;
+  category: "mattress" | "bedframe" | "sofa";
+  modelKey: string;
+  name: string;
+  blurb: string | null;
+  colors: string[] | null;
+  gaps: string[] | null;
+  sofaMode: "preset" | "custom" | "both" | null;
+}
+
+export interface ProductSku {
+  id: string;
+  modelId: string;
+  sku: string;
+  variant: string;
+  variantKind: "size" | "preset" | "part";
+  price: number;
+}
+
+export interface SofaFabric {
+  id: string;
+  modelId: string;
+  fabricName: string;
+  surcharge: number;
+}
+
+export interface Addon {
+  key: string;
+  name: string;
+  price: number;
+  active: boolean;
+}
+
+export interface Warehouse {
+  id: string;
+  name: string;
+  address: string | null;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contact: string | null;
+  leadTime: string | null;
+  kind: "own_logistics" | "factory_pickup";
+  catCovered: string[];
+}
+
+export interface DeliveryPartner {
+  id: string;
+  name: string;
+  contact: string | null;
+  zones: string | null;
+  onboardedDate: string | null;
+  rateCard: Record<string, { base: number; perFloorWalkUp: number; perKm: number }> | null;
+}
+
+export interface PartnerFleet {
+  id: string;
+  partnerId: string;
+  plate: string;
+  vehicleType: string;
+  capacity: string | null;
+  driverName: string | null;
+  driverPhone: string | null;
+}
+
+export interface StockBalance {
+  sku: string;
+  warehouseId: string;
+  qty: number;
+}
+
+export interface StockMovement {
+  id: string;
+  sku: string;
+  warehouseId: string;
+  qty: number;
+  kind: "in" | "out" | "adjust";
+  ref: string | null;
+  note: string | null;
+  byRole: Role | null;
+  occurredAt: string;
+}
+
+export interface OrderLine {
+  id: string;
+  orderId: string;
+  sku: string;
+  qty: number;
+  attrs: Record<string, unknown> | null;
+  unitPrice: number;
+}
+
+export interface OrderAddon {
+  id: string;
+  orderId: string;
+  addonKey: string;
+  qty: number;
+  unitPrice: number;
+}
+
+export interface OrderHistory {
+  id: string;
+  orderId: string;
+  text: string;
+  byRole: Role | null;
+  occurredAt: string;
+}
+
+export interface Order {
+  id: string;
+  dl: number;
+  status: "place" | "proceed_order" | "delivered" | "cancelled";
+  channel: string;
+  dealerId: string;
+  outletId: string | null;
+  salespersonId: string | null;
+
+  customer: {
+    name: string;
+    phone: string | null;
+    address: string | null;
+    addressUnknown: boolean;
+    billing: string | null;
+    billingSame: boolean;
+    emergency: string | null;
+  };
+
+  delivery: {
+    date: string | null;
+    dateTbd: boolean;
+    floor: number;
+    hasLift: boolean;
+  };
+
+  paid: number;
+  signatureUrl: string | null;
+  termsAccepted: boolean;
+
+  logisticsStage: "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered" | null;
+  warehouseId: string | null;
+  deliveryPartnerId: string | null;
+  partnerStage: "assigned" | "picked_from_wh" | "en_route" | "delivered" | null;
+  partnerPickedAt: string | null;
+  partnerEta: string | null;
+  doNumber: string | null;
+  doNote: string | null;
+
+  invoiceNo: string | null;
+  invoicedAt: string | null;
+
+  placedAt: string;
+
+  lines?: OrderLine[];
+  addons?: OrderAddon[];
+  history?: OrderHistory[];
+}
+
+export interface PurchaseOrder {
+  id: string;
+  dl: number | null;
+  supplierId: string;
+  warehouseId: string;
+  sku: string;
+  qty: number;
+  status: "open" | "received" | "cancelled";
+  supStatus:
+    | "pending" | "acknowledged" | "in_production"
+    | "shipped" | "delivered"
+    | "ready_for_pickup" | "pickup_assigned" | "pickup_accepted" | "picked_up" | "reassign_needed";
+  deliveryPartnerId: string | null;
+  expectedReadyDate: string | null;
+  pickupDate: string | null;
+  etaDate: string | null;
+  payStatus: "unpaid" | "scheduled" | "paid";
+  placedAt: string;
+}
+
+export interface Payment {
+  id: string;
+  direction: "in" | "out";
+  amount: number;
+  method:
+    | "cash" | "bank_transfer" | "cheque" | "credit_card"
+    | "debit_card" | "duitnow_qr" | "dealer_deposit";
+  reference: string | null;
+  note: string | null;
+  paidAt: string;
+  orderId: string | null;
+  poId: string | null;
+  refundId: string | null;
+  receiptUrl: string | null;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNo: string;
+  orderId: string;
+  amount: number;
+  taxAmount: number;
+  issuedAt: string;
+  voidedAt: string | null;
+  pdfUrl: string | null;
+}
+
+export interface Refund {
+  id: string;
+  orderId: string;
+  dealerId: string | null;
+  amount: number;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected" | "paid";
+  approvalId: string | null;
+  approvedAt: string | null;
+  paidAt: string | null;
+  creditNoteNo: string | null;
+}
+
+export interface Approval {
+  id: string;
+  kind: "refund" | "discount" | "new_dealer" | "top_up" | "price_change" | "other";
+  title: string;
+  actor: string | null;
+  refersTo: string | null;
+  amount: number | null;
+  dealerId: string | null;
+  reason: string | null;
+  payload: Record<string, unknown> | null;
+  status: "pending" | "approved" | "rejected";
+  decidedAt: string | null;
+  decisionNote: string | null;
+  createdAt: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  role: Role | null;
+  actorText: string | null;
+  action: string;
+  dealerId: string | null;
+  ref: string | null;
+  occurredAt: string;
+}
+
+export interface Inquiry {
+  id: string;
+  kind: "new_dealer" | "expansion" | "product";
+  company: string;
+  region: string | null;
+  contact: string | null;
+  stage: "new" | "contacted" | "qualified" | "converted" | "lost";
+  ownerUserId: string | null;
+  note: string | null;
+  linkedDealerId: string | null;
+  createdAt: string;
+}
