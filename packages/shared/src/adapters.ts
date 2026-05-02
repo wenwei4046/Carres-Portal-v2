@@ -3,6 +3,7 @@
  */
 import type * as DB from "./db-types";
 import type * as D from "./domain";
+import type { CreateOrderInput } from "./schemas/orders";
 
 export const dealerFromRow = (r: DB.DealerRow): D.Dealer => ({
   id: r.id,
@@ -281,6 +282,50 @@ export const auditFromRow = (r: DB.AuditLogRow): D.AuditEntry => ({
   dealerId: r.dealer_id,
   ref: r.ref,
   occurredAt: r.occurred_at,
+});
+
+/**
+ * orderInputToRpcPayload — converts the camelCase CreateOrderInput from the
+ * web wizard into the snake_case jsonb shape that `public.create_order(jsonb)`
+ * expects. Stays a pure function so it's testable without a Supabase client.
+ *
+ * `dealerId` is added by the API layer from the verified JWT — the input
+ * schema deliberately doesn't include it (cross-dealer posts are forbidden).
+ */
+export const orderInputToRpcPayload = (
+  input: CreateOrderInput,
+  dealerId: string,
+): Record<string, unknown> => ({
+  dealer_id: dealerId,
+  outlet_id: input.outletId,
+  salesperson_id: input.salespersonId,
+  customer_name: input.customer.name,
+  customer_phone: input.customer.phone,
+  customer_address: input.customer.addressUnknown ? null : input.customer.address,
+  customer_address_unknown: input.customer.addressUnknown,
+  customer_billing: input.customer.billingSame ? null : input.customer.billing,
+  customer_billing_same: input.customer.billingSame,
+  customer_emergency: input.customer.emergency,
+  delivery_date: input.delivery.dateTbd ? null : input.delivery.date,
+  delivery_date_tbd: input.delivery.dateTbd,
+  delivery_floor: input.delivery.floor,
+  delivery_has_lift: input.delivery.hasLift,
+  paid: input.paid,
+  signature_url: input.signaturePath,
+  payment_slip_url: input.paymentSlipPath,
+  terms_accepted: input.termsAccepted,
+  lines: input.lines.map((l) => ({
+    sku: l.sku,
+    qty: l.qty,
+    attrs: l.attrs,
+    unit_price: l.unitPrice,
+  })),
+  addons: input.addons.map((a) => ({
+    addon_key: a.addonKey,
+    qty: a.qty,
+    unit_price: a.unitPrice,
+  })),
+  deposit_pct: input.depositPct,
 });
 
 export const inquiryFromRow = (r: DB.InquiryRow): D.Inquiry => ({

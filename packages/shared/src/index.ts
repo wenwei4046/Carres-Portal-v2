@@ -21,6 +21,7 @@ export {
   orderStatusSchema,
   ordersListResponseSchema,
   dealerSelfSchema,
+  createOrderInputSchema,
   type Order,
   type OrderLine,
   type OrderAddon,
@@ -28,6 +29,9 @@ export {
   type OrderStatus,
   type OrdersListResponse,
   type DealerSelf,
+  type CreateOrderInput,
+  type OrderLineInput,
+  type OrderAddonInput,
 } from "./schemas/orders";
 
 export {

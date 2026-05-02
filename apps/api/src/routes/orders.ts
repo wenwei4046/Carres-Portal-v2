@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   Adapters,
   DB,
+  createOrderInputSchema,
   orderSchema,
   ordersListResponseSchema,
   orderStatusSchema,
@@ -62,6 +63,93 @@ ordersRouter.get("/", async (c) => {
 
   const body = ordersListResponseSchema.parse({ orders, total: orders.length });
   return c.json(body);
+});
+
+/**
+ * POST /api/orders — atomic create via RPC `create_order(payload jsonb)`.
+ *
+ * Flow:
+ *   1. Verify caller is dealer/salesperson/internal (middleware sets c.var.auth)
+ *   2. Validate camelCase input with zod
+ *   3. Adapter converts → snake_case jsonb RPC payload (+ injects dealerId from JWT)
+ *   4. Call RPC — atomic insert across 5 tables (orders + lines + addons +
+ *      history + audit_log). If anything fails, Postgres rolls back the whole TX.
+ *   5. Re-fetch the inserted order with rels (same shape as GET /:id) so the
+ *      client can route directly to /dealer/orders/:id without a second fetch.
+ *
+ * Cross-dealer guard: input has no `dealerId` field; the API derives it from
+ * the JWT. The RPC also re-checks via SECURITY DEFINER manual check, so even
+ * a hand-crafted payload can't sneak through.
+ */
+ordersRouter.post("/", async (c) => {
+  const auth = c.var.auth;
+
+  if (auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "principal" &&
+      auth.role !== "logistics" && auth.role !== "finance" && auth.role !== "bd") {
+    throw new HTTPException(403, { message: "Role cannot create orders" });
+  }
+  if ((auth.role === "dealer" || auth.role === "salesperson") && !auth.dealerId) {
+    throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+
+  const parsed = createOrderInputSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid order input: " + parsed.error.issues[0]?.message,
+    });
+  }
+  if (!auth.dealerId) {
+    // Internal roles (principal/logistics/finance/bd) creating on behalf of a
+    // dealer must Phase 3 — for 2B only dealers/salespersons create.
+    throw new HTTPException(403, { message: "Phase 2B only supports dealer-self order creation" });
+  }
+
+  const payload = Adapters.orderInputToRpcPayload(parsed.data, auth.dealerId);
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data: created, error } = await sb.rpc("create_order", { payload });
+  if (error) {
+    // 42501 = manual cross-dealer check inside the RPC. We map to 403 so the
+    // client sees the same code as RLS-denied reads.
+    if (error.code === "42501" || /forbidden/i.test(error.message ?? "")) {
+      throw new HTTPException(403, { message: "Forbidden" });
+    }
+    if (error.code === "22023") {
+      throw new HTTPException(400, { message: error.message });
+    }
+    throw new HTTPException(500, { message: error.message });
+  }
+
+  const id = (created as { id: string } | null)?.id;
+  if (!id) throw new HTTPException(500, { message: "RPC did not return an order id" });
+
+  // Compose full response — same shape as GET /:id (lines + addons + history).
+  const { data: full, error: fetchErr } = await sb
+    .from("orders")
+    .select("*, order_lines(*), order_addons(*), order_history(*)")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchErr) throw new HTTPException(500, { message: fetchErr.message });
+  if (!full) throw new HTTPException(500, { message: "Order created but not readable" });
+
+  const row = full as DB.OrderRow & {
+    order_lines?: DB.OrderLineRow[];
+    order_addons?: DB.OrderAddonRow[];
+    order_history?: DB.OrderHistoryRow[];
+  };
+  const order = Adapters.orderFromRow(row, {
+    lines: row.order_lines ?? [],
+    addons: row.order_addons ?? [],
+    history: row.order_history ?? [],
+  });
+  return c.json(orderSchema.parse(order), 201);
 });
 
 ordersRouter.get("/:id", async (c) => {

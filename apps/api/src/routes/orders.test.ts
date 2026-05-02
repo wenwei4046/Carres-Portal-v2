@@ -98,6 +98,74 @@ function buildSb(rowsFor: { list?: unknown[]; one?: unknown }) {
   ) as any;
 }
 
+/**
+ * Like buildSb but also stubs `.rpc('create_order', { payload })` so POST tests
+ * can assert on what was sent and on rpc-returned errors. Use for POST flow.
+ */
+function buildSbForCreate(opts: {
+  rpcResult?: { id: string; dl: number; placed_at: string };
+  rpcError?: { code?: string; message?: string };
+  fetchedRow?: unknown;
+}) {
+  const rpcCalls: Array<{ name: string; payload: unknown }> = [];
+  const eqs: Array<[string, unknown]> = [];
+  const chain = {
+    eq(col: string, val: unknown) {
+      eqs.push([col, val]);
+      return chain;
+    },
+    order: async () => ({ data: [], error: null }),
+    maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
+  };
+  return Object.assign(
+    {
+      from: () => ({ select: () => chain }),
+      rpc: async (name: string, args: { payload: unknown }) => {
+        rpcCalls.push({ name, payload: args.payload });
+        if (opts.rpcError) {
+          return { data: null, error: opts.rpcError };
+        }
+        return { data: opts.rpcResult ?? null, error: null };
+      },
+      _eqs: eqs,
+      _rpcCalls: rpcCalls,
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) as any;
+}
+
+function validCreateBody(over: Record<string, unknown> = {}) {
+  return {
+    outletId: "00000000-0000-0000-0000-00000000ee01",
+    salespersonId: "00000000-0000-0000-0000-00000000ff01",
+    customer: {
+      name: "Tan Mei Ling",
+      phone: "012-3456789",
+      address: "123 Jalan Sample, 50000 KL",
+      addressUnknown: false,
+      billing: null,
+      billingSame: true,
+      emergency: "Tan Junior · 012-9988776 · Spouse",
+    },
+    delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false },
+    lines: [
+      {
+        sku: "mattress:carres-classic:queen",
+        qty: 1,
+        attrs: null,
+        unitPrice: 1500,
+      },
+    ],
+    addons: [],
+    paid: 750,
+    signaturePath: "orders-attachments/dealerA/wiz/signature.png",
+    paymentSlipPath: null,
+    termsAccepted: true,
+    depositPct: 50,
+    ...over,
+  };
+}
+
 beforeAll(async () => {
   const kp = await generateKeyPair("ES256", { extractable: true });
   signKey = kp.privateKey;
@@ -233,5 +301,207 @@ describe("GET /api/orders/:id", () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/orders", () => {
+  const NEW_ORDER_ID = "11111111-1111-1111-1111-111111111111";
+
+  it("happy path → calls RPC, then refetches order with rels, returns 201 + full order", async () => {
+    const sb = buildSbForCreate({
+      rpcResult: { id: NEW_ORDER_ID, dl: 1251, placed_at: "2026-05-02T10:00:00Z" },
+      fetchedRow: {
+        ...makeOrderRow({
+          id: NEW_ORDER_ID,
+          dl: 1251,
+          dealer_id: DEALER_A,
+          customer_name: "Tan Mei Ling",
+          paid: "750",
+        }),
+        order_lines: [
+          {
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            order_id: NEW_ORDER_ID,
+            sku: "mattress:carres-classic:queen",
+            qty: 1,
+            attrs: null,
+            unit_price: "1500",
+          },
+        ],
+        order_addons: [],
+        order_history: [
+          {
+            id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            order_id: NEW_ORDER_ID,
+            text: "Order created · 50% deposit",
+            by_role: "dealer",
+            occurred_at: "2026-05-02T10:00:00Z",
+          },
+        ],
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validCreateBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { id: string; dl: number; lines: unknown[]; history: unknown[] };
+    expect(body.id).toBe(NEW_ORDER_ID);
+    expect(body.dl).toBe(1251);
+    expect(body.lines).toHaveLength(1);
+    expect(body.history).toHaveLength(1);
+
+    // RPC was called with the snake_case payload + dealer_id from JWT
+    expect(sb._rpcCalls).toHaveLength(1);
+    const sentPayload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
+    expect(sentPayload.dealer_id).toBe(DEALER_A);
+    expect(sentPayload.customer_name).toBe("Tan Mei Ling");
+    expect(sentPayload.deposit_pct).toBe(50);
+    expect((sentPayload.lines as unknown[])).toHaveLength(1);
+
+    // Then re-fetched the order by id
+    expect(sb._eqs).toContainEqual(["id", NEW_ORDER_ID]);
+  });
+
+  it("returns 400 on invalid payload (missing required field)", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSbForCreate({}));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const body = validCreateBody();
+    delete (body as Record<string, unknown>).signaturePath; // signature is required
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 on empty lines array (zod min(1))", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSbForCreate({}));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validCreateBody({ lines: [] })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when termsAccepted is false (literal(true) gate)", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSbForCreate({}));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validCreateBody({ termsAccepted: false })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("maps RPC 42501 (cross-dealer block) to HTTP 403", async () => {
+    const sb = buildSbForCreate({
+      rpcError: { code: "42501", message: "forbidden: cross-dealer insert" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validCreateBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    // RPC was attempted; no follow-up fetch happened
+    expect(sb._rpcCalls).toHaveLength(1);
+    expect(sb._eqs).toEqual([]);
+  });
+
+  it("maps RPC 22023 (validation in PL/pgSQL) to HTTP 400", async () => {
+    const sb = buildSbForCreate({
+      rpcError: { code: "22023", message: "order must have at least one line" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validCreateBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 403 when dealer role JWT has no dealerId", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSbForCreate({}));
+    const jwt = await makeJwt("dealer", null);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validCreateBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 for principal role in Phase 2B (cross-dealer create deferred)", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSbForCreate({}));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validCreateBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 401 without Authorization header", async () => {
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validCreateBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 on malformed JSON body", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSbForCreate({}));
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: "{not-json",
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
   });
 });
