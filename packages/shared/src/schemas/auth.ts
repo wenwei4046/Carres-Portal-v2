@@ -6,7 +6,10 @@ import { z } from "zod";
  */
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  // Server-side (Supabase) is the password authority — client validation
+  // only checks non-empty. This lets demo users log in with weak test
+  // passwords without blocking real users from project-level rules.
+  password: z.string().min(1),
 });
 export type LoginPayload = z.infer<typeof loginSchema>;
 
