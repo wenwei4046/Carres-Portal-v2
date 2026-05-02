@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { type Order, type OrderStatus } from "@carres/shared";
 import { useOrders } from "@/lib/queries";
 import DealerOrderDetail from "./DealerOrderDetail";
@@ -14,6 +14,7 @@ export default function DealerOrders() {
   const [tab, setTab] = useState<OrderStatus>("place");
   const [searchParams, setSearchParams] = useSearchParams();
   const openId = searchParams.get("open");
+  const loc = useLocation();
   const ordersQ = useOrders(); // single fetch — filter client-side per tab
 
   // Keep ?open in sync with the modal lifecycle.
@@ -60,7 +61,7 @@ export default function DealerOrders() {
 
   return (
     <div className="p-9 max-w-[1100px]">
-      <header className="flex items-start justify-between mb-6">
+      <header className="flex items-start justify-between mb-6 gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Orders</p>
           <h1 className="font-display text-3xl mt-1.5 tracking-tight">Your customers' journey</h1>
@@ -68,6 +69,12 @@ export default function DealerOrders() {
             <span className="font-mono font-semibold text-foreground">{allOrders.length}</span> total · click any row for detail
           </p>
         </div>
+        <Link
+          to={`${loc.pathname}?new=1`}
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 whitespace-nowrap"
+        >
+          + New order
+        </Link>
       </header>
 
       <div className="flex gap-1 border-b border-border mb-4">

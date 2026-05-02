@@ -1,10 +1,11 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useDealerSelf, useOrders } from "@/lib/queries";
 import { type Order } from "@carres/shared";
 
 export default function DealerDashboard() {
   const dealer = useDealerSelf();
   const ordersQ = useOrders();
+  const loc = useLocation();
 
   if (ordersQ.isPending || dealer.isPending) {
     return <DashboardSkeleton />;
@@ -27,17 +28,25 @@ export default function DealerDashboard() {
 
   return (
     <div className="p-9 max-w-[1100px]">
-      <header className="mb-7">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Selamat pagi</p>
-        <h1 className="font-display text-4xl mt-2 leading-tight tracking-tight">
-          {dealer.data?.name ?? "Dealer"}.
-          <br />
-          <span className="text-muted-foreground font-medium">Here's where things stand.</span>
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          <span className="font-mono font-semibold text-foreground">{inFlight}</span> in flight ·{" "}
-          <span className="font-mono font-semibold text-foreground">{delivered.length}</span> delivered
-        </p>
+      <header className="mb-7 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Selamat pagi</p>
+          <h1 className="font-display text-4xl mt-2 leading-tight tracking-tight">
+            {dealer.data?.name ?? "Dealer"}.
+            <br />
+            <span className="text-muted-foreground font-medium">Here's where things stand.</span>
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            <span className="font-mono font-semibold text-foreground">{inFlight}</span> in flight ·{" "}
+            <span className="font-mono font-semibold text-foreground">{delivered.length}</span> delivered
+          </p>
+        </div>
+        <Link
+          to={`${loc.pathname}?new=1`}
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 whitespace-nowrap"
+        >
+          + New order
+        </Link>
       </header>
 
       <div className="grid grid-cols-3 gap-3.5">

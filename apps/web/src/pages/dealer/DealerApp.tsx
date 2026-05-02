@@ -1,11 +1,12 @@
 import { type ReactNode } from "react";
-import { Link, Navigate, NavLink, Route, Routes } from "react-router-dom";
+import { Link, Navigate, NavLink, Route, Routes, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useDealerSelf } from "@/lib/queries";
 import DealerDashboard from "./DealerDashboard";
 import DealerOrders from "./DealerOrders";
 import DealerProducts from "./DealerProducts";
 import DealerSettings from "./DealerSettings";
+import DealerNewOrder from "./new-order/DealerNewOrder";
 
 const NAV_ITEMS = [
   { to: "/dealer", label: "Dashboard", icon: "▦", end: true, enabled: true },
@@ -18,6 +19,17 @@ export default function DealerApp() {
   const dealer = useDealerSelf();
   const userEmail = useAuth((s) => s.user?.email ?? "");
   const initials = (dealer.data?.name ?? userEmail).slice(0, 2).toUpperCase();
+
+  // Modal-over-pages: any /dealer/* path can append `?new=1` to pop the wizard
+  // (D4: modal, not full route). Closing strips the param without changing path.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const newOrderOpen = searchParams.get("new") === "1";
+  function closeNewOrder() {
+    setSearchParams((p) => {
+      p.delete("new");
+      return p;
+    });
+  }
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -32,6 +44,7 @@ export default function DealerApp() {
           <Route path="*" element={<Navigate to="" replace />} />
         </Routes>
       </main>
+      <DealerNewOrder open={newOrderOpen} onClose={closeNewOrder} />
     </div>
   );
 }
