@@ -305,10 +305,10 @@ Don't burn an hour spinning. Surface and ask.
 ## 17. Project status (update as we progress)
 
 ```
-Current phase: Phase 0 (Foundation)
-Started: <date when Phase 0 begins>
-Last phase completed: —
-Next decision pending: —
+Current phase: between phases — Phase 0 done, Phase 1 not yet started
+Project started: 2026-05-02
+Last phase completed: Phase 0 (Foundation) — 2026-05-02, tag phase-0-complete
+Next decision pending: when to begin Phase 1 (Schema + Auth)
 ```
 
 Update this section at the start and end of every working session.
