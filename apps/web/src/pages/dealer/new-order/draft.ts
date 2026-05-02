@@ -12,6 +12,31 @@
  * for editing convenience; the persisted DB column `customer_emergency` is a
  * single composed string built via `composeEmergency()` at submit time (2B.3).
  */
+/**
+ * A single line item the wizard has staged. Mirrors the OrderLineInput shape
+ * (camelCase, sku + qty + attrs + unitPrice) plus a transient `localId` used
+ * for React keys + Remove targeting since real `id` lands only after the RPC
+ * inserts the row. attrs may carry { color, gap } for bedframe or
+ * { fabric_name, fabric_surcharge } for sofa custom-with-fabric.
+ */
+export interface DraftLine {
+  localId: string;
+  sku: string;
+  qty: number;
+  attrs: Record<string, unknown> | null;
+  unitPrice: number;
+  /** Free-text label for the LineList row, e.g. "Carres Cloud · Queen" */
+  label: string;
+}
+
+/** Addon staged on the order. Persisted as order_addons rows on submit. */
+export interface DraftAddon {
+  key: string;       // matches addons.key
+  qty: number;
+  unitPrice: number; // snapshot at staging time
+  name: string;      // for LineList rendering
+}
+
 export interface WizardDraft {
   outletId: string | null;
   salespersonId: string | null;
@@ -33,6 +58,9 @@ export interface WizardDraft {
     floor: number;
     hasLift: boolean;
   };
+  /** Step 2: products picked + addons toggled. Empty array = no products yet. */
+  lines: DraftLine[];
+  addons: DraftAddon[];
 }
 
 export const DRAFT_STORAGE_KEY = "carres-order-draft";
@@ -54,6 +82,8 @@ export function emptyDraft(): WizardDraft {
       emergencyRelationshipOther: "",
     },
     delivery: { date: "", dateTbd: false, floor: 1, hasLift: false },
+    lines: [],
+    addons: [],
   };
 }
 
@@ -75,7 +105,12 @@ export function loadDraft(): WizardDraft | null {
     // rather than render a half-broken form.
     if (!parsed || typeof parsed !== "object") return null;
     if (!parsed.customer || !parsed.delivery) return null;
-    return parsed as WizardDraft;
+    // Backfill 2B.3 fields for drafts saved before this slice landed.
+    return {
+      ...(parsed as WizardDraft),
+      lines: parsed.lines ?? [],
+      addons: parsed.addons ?? [],
+    };
   } catch {
     return null;
   }
@@ -121,6 +156,14 @@ export function step1Valid(d: WizardDraft): boolean {
   if (!d.outletId) return false;
   if (!d.salespersonId) return false;
   return true;
+}
+
+/**
+ * Step 2 gate — at least one line must be staged. Addons alone don't count
+ * (mirrors proto: lines.length > 0 check). The Continue button calls this.
+ */
+export function step2Valid(d: WizardDraft): boolean {
+  return d.lines.length > 0;
 }
 
 /**

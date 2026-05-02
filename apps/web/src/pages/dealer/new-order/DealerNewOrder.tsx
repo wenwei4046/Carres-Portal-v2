@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useOutlets, useSalespersons } from "@/lib/queries";
+import { useCatalog, useOutlets, useSalespersons } from "@/lib/queries";
 import {
   type WizardDraft,
   clearDraft,
@@ -7,8 +7,10 @@ import {
   loadDraft,
   saveDraft,
   step1Valid,
+  step2Valid,
 } from "./draft";
 import Step1Customer from "./Step1Customer";
+import Step2Products from "./Step2Products";
 
 interface Props {
   /** Modal is mounted globally; this prop drives visibility from `?new=1`. */
@@ -38,6 +40,14 @@ export default function DealerNewOrder({ open, onClose }: Props) {
 
   const outletsQ = useOutlets({ enabled: open });
   const salespersonsQ = useSalespersons(undefined, { enabled: open });
+  // Catalog needed for Step 2; only fetched when wizard is open. D5 rationale:
+  // staleTime is 5min globally, but we explicitly refetch on Step 2 entry so
+  // the dealer's locked unit_price is always fresh against principal updates.
+  const catalogQ = useCatalog({ enabled: open });
+  useEffect(() => {
+    if (open && step === 2) catalogQ.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, step]);
 
   // Restore draft each time the modal re-opens. If the dealer closed via X /
   // Cancel previously, sessionStorage was cleared and we get a fresh draft.
@@ -79,8 +89,9 @@ export default function DealerNewOrder({ open, onClose }: Props) {
   }
 
   const canStep1 = useMemo(() => step1Valid(draft), [draft]);
-  // Step 2 + 3 gates land in 2B.3.
-  const canAdvance = step === 1 ? canStep1 : false;
+  const canStep2 = useMemo(() => step2Valid(draft), [draft]);
+  // Step 3 gate (signature + payment + min-deposit + T&C) lands in 2B.3.c.
+  const canAdvance = step === 1 ? canStep1 : step === 2 ? canStep2 : false;
 
   if (!open) return null;
 
@@ -149,7 +160,21 @@ export default function DealerNewOrder({ open, onClose }: Props) {
               )}
             </>
           )}
-          {step === 2 && <StepPlaceholder n={2} />}
+          {step === 2 && (
+            <>
+              {catalogQ.isPending && (
+                <p className="text-sm text-muted-foreground">Loading catalog…</p>
+              )}
+              {catalogQ.error && (
+                <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  Couldn't load catalog: {(catalogQ.error as Error).message}
+                </p>
+              )}
+              {catalogQ.data && (
+                <Step2Products draft={draft} onChange={setDraft} catalog={catalogQ.data} />
+              )}
+            </>
+          )}
           {step === 3 && <StepPlaceholder n={3} />}
         </div>
 

@@ -8,6 +8,7 @@ import {
   loadDraft,
   saveDraft,
   step1Valid,
+  step2Valid,
 } from "./draft";
 
 afterEach(() => {
@@ -34,6 +35,8 @@ function validDraft(): WizardDraft {
       emergencyRelationshipOther: "",
     },
     delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false },
+    lines: [],
+    addons: [],
   };
 }
 
@@ -181,6 +184,47 @@ describe("step1Valid — Continue gate", () => {
     const d = validDraft();
     d.salespersonId = null;
     expect(step1Valid(d)).toBe(false);
+  });
+});
+
+describe("step2Valid — at least one line", () => {
+  it("returns false when lines empty even if addons exist", () => {
+    const d = validDraft();
+    d.lines = [];
+    d.addons = [{ key: "warranty5", qty: 1, unitPrice: 200, name: "5-yr warranty" }];
+    expect(step2Valid(d)).toBe(false);
+  });
+
+  it("returns true with one line", () => {
+    const d = validDraft();
+    d.lines = [
+      {
+        localId: "x1",
+        sku: "mattress:carres-classic:queen",
+        qty: 1,
+        attrs: null,
+        unitPrice: 1500,
+        label: "Carres Classic · Queen",
+      },
+    ];
+    expect(step2Valid(d)).toBe(true);
+  });
+});
+
+describe("loadDraft backfills lines/addons for pre-2B.3 drafts", () => {
+  it("returns empty arrays when an older draft (no lines/addons keys) is restored", () => {
+    const oldShape = {
+      outletId: "x",
+      salespersonId: "y",
+      customer: validDraft().customer,
+      delivery: validDraft().delivery,
+      // no lines/addons — saved before 2B.3
+    };
+    sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(oldShape));
+    const restored = loadDraft();
+    expect(restored).not.toBeNull();
+    expect(restored!.lines).toEqual([]);
+    expect(restored!.addons).toEqual([]);
   });
 });
 

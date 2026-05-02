@@ -59,10 +59,64 @@ test.describe("dealer Phase 2B.2 — wizard shell + Step 1", () => {
     const cont = page.getByRole("button", { name: /Continue/i });
     await expect(cont).toBeEnabled();
 
-    // Click → advances to Step 2 placeholder
+    // Click → advances to Step 2 (real picker now, not placeholder)
     await cont.click();
     await expect(page.getByText(/step 2 of 3/i)).toBeVisible();
-    await expect(page.getByText(/Step 2 ships in Phase 2B.3/i)).toBeVisible();
+    await expect(page.getByText(/Products & add-ons/i)).toBeVisible();
+    // Step 2 has 3 category tabs (Mattress / Bed frame / Sofa) inside the
+    // dialog. Match by content rather than exact name to avoid icon-span
+    // accessible-name quirks.
+    const dialog = page.getByRole("dialog", { name: /New order/i });
+    await expect(dialog.getByRole("button", { name: /Mattress/ })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /Bed frame/ })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /^.*Sofa$/ })).toBeVisible();
+  });
+
+  test("Step 2: picking a mattress + addon enables Continue", async ({ page }) => {
+    await login(page, "dealer@carres.com", "111");
+    await page.getByRole("link", { name: /\+ New order/i }).first().click();
+
+    // Walk through Step 1 quickly
+    await expect(page.getByRole("combobox").first()).toBeEnabled({ timeout: 10_000 });
+    await page.locator("select").nth(0).selectOption({ index: 1 });
+    await page.locator("select").nth(1).selectOption({ index: 1 });
+    await page.getByPlaceholder(/Tan Mei Ling/i).fill("E2E Step2");
+    await page.getByPlaceholder("012-3456789").fill("012-1234567");
+    await page.getByPlaceholder(/Street, postcode/i).fill("123 Jalan E2E, KL");
+    await page.getByPlaceholder("Name").fill("E2E Spouse");
+    await page.getByPlaceholder("012-9988776").fill("012-7654321");
+    await page.locator("select").nth(2).selectOption("Spouse");
+    await page.locator('input[type="date"]').fill("2026-06-15");
+    await page.getByRole("button", { name: /Continue/i }).click();
+    await expect(page.getByText(/Products & add-ons/i)).toBeVisible({ timeout: 10_000 });
+
+    // Continue is disabled until at least one line is added
+    await expect(page.getByRole("button", { name: /Continue/i })).toBeDisabled();
+
+    // Open the first mattress model (already on the Mattress tab by default)
+    const firstModelToggle = page
+      .locator("button")
+      .filter({ hasText: /\d+ variants?/ })
+      .first();
+    await firstModelToggle.click();
+
+    // Pick the first size variant in that model's configurator (the inline
+    // size <select> is the one that just appeared after toggling)
+    const sizeSelect = page
+      .locator('select[aria-label="Size"], select')
+      .filter({ hasText: /pick size/i })
+      .first();
+    // Fallback to selecting whatever the first non-placeholder option is
+    const allSelects = page.locator("select");
+    const lastSelect = allSelects.nth(await allSelects.count() - 1);
+    await sizeSelect.or(lastSelect).selectOption({ index: 1 });
+
+    // Click the inline + Add button
+    await page.getByRole("button", { name: /\+ Add/ }).first().click();
+
+    // Order summary now has at least one line; Continue is enabled
+    await expect(page.getByText(/^E2E Step2$|Order summary/i).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /Continue/i })).toBeEnabled();
   });
 
   test("draft persists across X-close + reopen via sessionStorage", async ({ page }) => {
