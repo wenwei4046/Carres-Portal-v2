@@ -305,10 +305,11 @@ Don't burn an hour spinning. Surface and ask.
 ## 17. Project status (update as we progress)
 
 ```
-Current phase: between phases — Phase 0 done, Phase 1 not yet started
+Current phase: between phases — Phase 1 complete, Phase 2 not yet started
 Project started: 2026-05-02
-Last phase completed: Phase 0 (Foundation) — 2026-05-02, tag phase-0-complete
-Next decision pending: when to begin Phase 1 (Schema + Auth)
+Last phase completed: Phase 1 (Schema + Auth) — 2026-05-02, tag phase-1-complete
+RLS perf baseline (10K orders): all 3 targets passed with 14-53x headroom
+Next decision pending: when to begin Phase 2 (Dealer flow)
 ```
 
 Update this section at the start and end of every working session.
