@@ -99,6 +99,8 @@ coverage/
 playwright-report/
 playwright/.cache/
 test-results/
+.playwright-mcp/
+phase-*-success-*.png
 
 # -----------------------------------------------------------------------------
 # Cache
