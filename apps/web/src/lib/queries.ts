@@ -1,12 +1,23 @@
 import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
-import { type DealerSelf, type Order, type OrdersListResponse, type OrderStatus } from "@carres/shared";
+import {
+  type CatalogResponse,
+  type DealerSelf,
+  type Order,
+  type OrdersListResponse,
+  type OrderStatus,
+  type OutletsListResponse,
+  type SalespersonsListResponse,
+} from "@carres/shared";
 import { apiFetch } from "./api";
 
 export const qk = {
-  dealers:    () => ["dealers"] as const,
-  dealerSelf: () => ["dealers", "me"] as const,
-  orders:     (filters?: OrderFilters) => ["orders", filters ?? {}] as const,
-  order:      (id: string) => ["orders", id] as const,
+  dealers:      () => ["dealers"] as const,
+  dealerSelf:   () => ["dealers", "me"] as const,
+  orders:       (filters?: OrderFilters) => ["orders", filters ?? {}] as const,
+  order:        (id: string) => ["orders", id] as const,
+  catalog:      () => ["catalog"] as const,
+  outlets:      () => ["outlets"] as const,
+  salespersons: (outletId?: string) => ["salespersons", outletId ?? null] as const,
 };
 
 export interface OrderFilters {
@@ -51,6 +62,44 @@ export function useOrder(id: string | null, opts?: Partial<UseQueryOptions<Order
     queryFn: () => apiFetch<Order>(`/api/orders/${id}`),
     enabled: !!id,
     staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/**
+ * Catalog bundle — models + skus + sofa fabrics + addons + floor_config.
+ * staleTime: 5 min (D5). Wizard Step 2 explicitly calls `.refetch()` on mount
+ * so the dealer always sees fresh prices before they pick products.
+ */
+export function useCatalog(opts?: Partial<UseQueryOptions<CatalogResponse>>) {
+  return useQuery({
+    queryKey: qk.catalog(),
+    queryFn: () => apiFetch<CatalogResponse>("/api/catalog"),
+    staleTime: 5 * 60_000,
+    ...opts,
+  });
+}
+
+export function useOutlets(opts?: Partial<UseQueryOptions<OutletsListResponse>>) {
+  return useQuery({
+    queryKey: qk.outlets(),
+    queryFn: () => apiFetch<OutletsListResponse>("/api/outlets"),
+    staleTime: 5 * 60_000,
+    ...opts,
+  });
+}
+
+export function useSalespersons(
+  outletId?: string,
+  opts?: Partial<UseQueryOptions<SalespersonsListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.salespersons(outletId),
+    queryFn: () =>
+      apiFetch<SalespersonsListResponse>(
+        outletId ? `/api/salespersons?outletId=${outletId}` : "/api/salespersons",
+      ),
+    staleTime: 5 * 60_000,
     ...opts,
   });
 }

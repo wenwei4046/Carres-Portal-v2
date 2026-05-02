@@ -67,6 +67,12 @@ export const addonFromRow = (r: DB.AddonRow): D.Addon => ({
   active: r.active,
 });
 
+export const floorConfigFromRow = (r: DB.FloorConfigRow): D.FloorConfig => ({
+  id: r.id,
+  freeUpToFloor: r.free_up_to_floor,
+  perFloorPerItem: Number(r.per_floor_per_item),
+});
+
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({
   id: r.id,
   name: r.name,

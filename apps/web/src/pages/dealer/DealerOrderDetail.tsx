@@ -1,9 +1,11 @@
 import { useEffect } from "react";
-import { useOrder } from "@/lib/queries";
-import { orderTotal, lineSubtotal, addonSubtotal } from "@/lib/order-totals";
+import type { FloorConfigDto } from "@carres/shared";
+import { useCatalog, useOrder } from "@/lib/queries";
+import { orderTotal, lineSubtotal, addonSubtotal, floorSurcharge } from "@/lib/order-totals";
 
 export default function DealerOrderDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: order, isPending, error } = useOrder(id);
+  const { data: catalog } = useCatalog();
 
   // ESC closes the modal.
   useEffect(() => {
@@ -47,7 +49,8 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
               {(error as Error).message}
             </p>
           )}
-          {order && <OrderBody order={order} />}
+          {order && catalog && <OrderBody order={order} floorConfig={catalog.floorConfig} />}
+          {order && !catalog && <p className="text-sm text-muted-foreground">Loading totals…</p>}
         </div>
 
         <footer className="px-7 py-4 border-t border-border bg-secondary/30 text-[11px] text-muted-foreground">
@@ -58,10 +61,17 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
   );
 }
 
-function OrderBody({ order }: { order: ReturnType<typeof useOrder>["data"] & {} }) {
-  const total = orderTotal(order);
+function OrderBody({
+  order,
+  floorConfig,
+}: {
+  order: ReturnType<typeof useOrder>["data"] & {};
+  floorConfig: FloorConfigDto;
+}) {
+  const total = orderTotal(order, floorConfig);
   const sub = lineSubtotal(order);
   const ad = addonSubtotal(order);
+  const stair = floorSurcharge(order, floorConfig);
   const paidPct = total > 0 ? Math.round((order.paid / total) * 100) : 0;
 
   const stages = [
@@ -130,6 +140,7 @@ function OrderBody({ order }: { order: ReturnType<typeof useOrder>["data"] & {} 
         <div className="px-3.5 py-3 border-t border-border bg-secondary/30">
           <Row label="Subtotal" value={`RM ${sub.toLocaleString()}`} />
           {ad > 0 && <Row label="Add-ons" value={`RM ${ad.toLocaleString()}`} />}
+          {stair > 0 && <Row label="Stair carry" value={`RM ${stair.toLocaleString()}`} />}
           <div className="flex justify-between mt-2 pt-2 border-t border-border">
             <span className="text-sm font-semibold">Total</span>
             <span className="font-mono text-sm font-bold">RM {total.toLocaleString()}</span>

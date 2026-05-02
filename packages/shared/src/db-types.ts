@@ -97,6 +97,13 @@ export interface AddonRow {
   active: boolean;
 }
 
+export interface FloorConfigRow {
+  id: number;
+  free_up_to_floor: number;
+  per_floor_per_item: number;
+  updated_at: string;
+}
+
 export interface WarehouseRow {
   id: string;
   name: string;

@@ -2,8 +2,11 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { authMiddleware } from "./middleware/auth";
 import authRouter from "./routes/auth";
+import catalogRouter from "./routes/catalog";
 import dealerRouter from "./routes/dealers";
 import ordersRouter from "./routes/orders";
+import outletsRouter from "./routes/outlets";
+import salespersonsRouter from "./routes/salespersons";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -22,6 +25,9 @@ api.use("*", authMiddleware);
 api.route("/auth", authRouter);
 api.route("/dealers", dealerRouter);
 api.route("/orders", ordersRouter);
+api.route("/catalog", catalogRouter);
+api.route("/outlets", outletsRouter);
+api.route("/salespersons", salespersonsRouter);
 
 app.route("/api", api);
 

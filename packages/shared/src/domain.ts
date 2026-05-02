@@ -70,6 +70,12 @@ export interface Addon {
   active: boolean;
 }
 
+export interface FloorConfig {
+  id: number;
+  freeUpToFloor: number;
+  perFloorPerItem: number;
+}
+
 export interface Warehouse {
   id: string;
   name: string;

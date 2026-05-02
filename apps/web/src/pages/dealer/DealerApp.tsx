@@ -4,12 +4,14 @@ import { useAuth } from "@/lib/auth";
 import { useDealerSelf } from "@/lib/queries";
 import DealerDashboard from "./DealerDashboard";
 import DealerOrders from "./DealerOrders";
+import DealerProducts from "./DealerProducts";
+import DealerSettings from "./DealerSettings";
 
 const NAV_ITEMS = [
   { to: "/dealer", label: "Dashboard", icon: "▦", end: true, enabled: true },
   { to: "/dealer/orders", label: "Orders", icon: "▤", end: false, enabled: true },
-  { to: "/dealer/products", label: "Products", icon: "▭", end: false, enabled: false, soonIn: "Phase 2C" },
-  { to: "/dealer/settings", label: "Settings", icon: "✦", end: false, enabled: false, soonIn: "Phase 2D" },
+  { to: "/dealer/products", label: "Products", icon: "▭", end: false, enabled: true },
+  { to: "/dealer/settings", label: "Settings", icon: "✦", end: false, enabled: true },
 ] as const;
 
 export default function DealerApp() {
@@ -25,6 +27,8 @@ export default function DealerApp() {
           <Route index element={<DealerDashboard />} />
           <Route path="orders" element={<DealerOrders />} />
           <Route path="orders/:id" element={<Navigate to=".." replace />} />
+          <Route path="products" element={<DealerProducts />} />
+          <Route path="settings" element={<DealerSettings />} />
           <Route path="*" element={<Navigate to="" replace />} />
         </Routes>
       </main>
@@ -62,18 +66,6 @@ function DealerSidebar({ dealerName, initials }: { dealerName: string; initials:
 
 function NavItem({ item }: { item: (typeof NAV_ITEMS)[number] }) {
   const baseStyle = "relative flex items-center gap-3 px-3.5 py-2.5 rounded-md text-sm";
-  if (!item.enabled) {
-    return (
-      <div
-        className={`${baseStyle} text-muted-foreground/60 cursor-not-allowed`}
-        title={`Coming in ${item.soonIn ?? "later phase"}`}
-      >
-        <span className="w-4 text-center text-[14px]">{item.icon}</span>
-        <span className="font-medium">{item.label}</span>
-        <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground">soon</span>
-      </div>
-    );
-  }
   return (
     <NavLink
       to={item.to}

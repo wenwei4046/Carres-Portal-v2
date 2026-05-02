@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import type { Order } from "@carres/shared";
-import { addonSubtotal, floorSurcharge, lineSubtotal, orderTotal } from "./order-totals";
+import type { FloorConfigDto, Order } from "@carres/shared";
+import { addonSubtotal, floorSurcharge, lineSubtotal, orderTotal, totalItems } from "./order-totals";
+
+const CFG: FloorConfigDto = { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 };
 
 function baseOrder(over: Partial<Order> = {}): Order {
   return {
@@ -50,15 +52,81 @@ describe("order-totals pure functions", () => {
     expect(addonSubtotal(withAddons)).toBe(60);
   });
 
-  it("floorSurcharge returns 0 (Phase 2A stub)", () => {
-    expect(floorSurcharge(baseOrder({ delivery: { date: null, dateTbd: false, floor: 5, hasLift: false } }))).toBe(0);
+  it("totalItems sums line qty", () => {
+    const o = baseOrder({
+      lines: [
+        { id: "a", orderId: "x", sku: "s1", qty: 2, attrs: null, unitPrice: 100 },
+        { id: "b", orderId: "x", sku: "s2", qty: 3, attrs: null, unitPrice: 50 },
+      ],
+    });
+    expect(totalItems(o)).toBe(5);
+  });
+});
+
+describe("floorSurcharge — un-stubbed in 2B.1", () => {
+  const lineQty2 = [{ id: "a", orderId: "x", sku: "s1", qty: 2, attrs: null, unitPrice: 100 }];
+
+  it("returns 0 when delivery has a lift (floor irrelevant)", () => {
+    const o = baseOrder({
+      delivery: { date: null, dateTbd: false, floor: 12, hasLift: true },
+      lines: lineQty2,
+    });
+    expect(floorSurcharge(o, CFG)).toBe(0);
   });
 
-  it("orderTotal sums lines + addons + floor", () => {
+  it("returns 0 when floor is at or below freeUpToFloor", () => {
+    expect(
+      floorSurcharge(
+        baseOrder({ delivery: { date: null, dateTbd: false, floor: 1, hasLift: false }, lines: lineQty2 }),
+        CFG,
+      ),
+    ).toBe(0);
+    expect(
+      floorSurcharge(
+        baseOrder({ delivery: { date: null, dateTbd: false, floor: 2, hasLift: false }, lines: lineQty2 }),
+        CFG,
+      ),
+    ).toBe(0);
+  });
+
+  it("charges (floor − freeUpToFloor) × perFloorPerItem × total_qty when no lift", () => {
+    // 2 items, floor 5, free up to 2 → flights=3, 3 × 50 × 2 = 300
+    const o = baseOrder({
+      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false },
+      lines: lineQty2,
+    });
+    expect(floorSurcharge(o, CFG)).toBe(300);
+  });
+
+  it("multi-line items sum into qty correctly for surcharge", () => {
+    // 3 items total (qty 2 + qty 1), floor 4, free up to 2 → flights=2, 2 × 50 × 3 = 300
+    const o = baseOrder({
+      delivery: { date: null, dateTbd: false, floor: 4, hasLift: false },
+      lines: [
+        { id: "a", orderId: "x", sku: "s1", qty: 2, attrs: null, unitPrice: 100 },
+        { id: "b", orderId: "x", sku: "s2", qty: 1, attrs: null, unitPrice: 50 },
+      ],
+    });
+    expect(floorSurcharge(o, CFG)).toBe(300);
+  });
+});
+
+describe("orderTotal", () => {
+  it("sums lines + addons + floor surcharge", () => {
     const o = baseOrder({
       lines: [{ id: "a", orderId: "x", sku: "s1", qty: 1, attrs: null, unitPrice: 100 }],
       addons: [{ id: "b", orderId: "x", addonKey: "p", qty: 2, unitPrice: 25 }],
+      delivery: { date: null, dateTbd: false, floor: 1, hasLift: false },
     });
-    expect(orderTotal(o)).toBe(150);
+    expect(orderTotal(o, CFG)).toBe(150);
+  });
+
+  it("includes stair-carry charge when applicable", () => {
+    const o = baseOrder({
+      lines: [{ id: "a", orderId: "x", sku: "s1", qty: 1, attrs: null, unitPrice: 1000 }],
+      delivery: { date: null, dateTbd: false, floor: 4, hasLift: false },
+    });
+    // 1000 + 0 + (4−2) × 50 × 1 = 1100
+    expect(orderTotal(o, CFG)).toBe(1100);
   });
 });
