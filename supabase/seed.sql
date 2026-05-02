@@ -356,6 +356,21 @@ insert into auth.users (
    jsonb_build_object('name','Carres KL Bangsar'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now())
 on conflict (id) do nothing;
 
+-- GoTrue (Supabase Auth, written in Go) cannot scan NULL into a Go string —
+-- signInWithPassword fails with "Database error querying schema" if any of
+-- these 4 token columns is NULL. The columns default to NULL (not ''), so
+-- direct INSERT into auth.users leaves seed users unloginable. Force them
+-- to '' explicitly. (The other 4 token columns — email_change_token_current,
+-- phone_change, phone_change_token, reauthentication_token — already default
+-- to '' so they're fine.)
+update auth.users
+set
+  confirmation_token     = coalesce(confirmation_token,     ''),
+  recovery_token         = coalesce(recovery_token,         ''),
+  email_change_token_new = coalesce(email_change_token_new, ''),
+  email_change           = coalesce(email_change,           '')
+where email like '%@carres.com';
+
 -- The handle_new_auth_user trigger from 0002 inserts a default app_users row
 -- (role='dealer'). Override with the right role + scope ids.
 insert into app_users (id, email, name, role, status, dealer_id, supplier_id, partner_id, outlet_id) values
