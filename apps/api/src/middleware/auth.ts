@@ -1,8 +1,21 @@
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
-import { jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 import type { Role } from "@carres/shared/domain";
 import type { AppEnv, AuthContext } from "../types";
+
+// Supabase issues ES256 (asymmetric) JWTs signed with a per-project EC key. The
+// public key lives at /auth/v1/.well-known/jwks.json. createRemoteJWKSet caches
+// the keyset and refreshes on key rotation, so we don't fetch on every request.
+let jwksCache: JWTVerifyGetKey | null = null;
+let jwksCacheUrl: string | null = null;
+function getJwks(supabaseUrl: string): JWTVerifyGetKey {
+  const url = `${supabaseUrl}/auth/v1/.well-known/jwks.json`;
+  if (jwksCache && jwksCacheUrl === url) return jwksCache;
+  jwksCache = createRemoteJWKSet(new URL(url));
+  jwksCacheUrl = url;
+  return jwksCache;
+}
 
 const VALID_ROLES: ReadonlyArray<Role> = [
   "principal", "dealer", "salesperson", "showroom",
@@ -25,14 +38,14 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const jwt = header.slice("Bearer ".length).trim();
   if (!jwt) throw new HTTPException(401, { message: "Empty bearer token" });
 
-  if (!c.env.SUPABASE_JWT_SECRET) {
-    throw new HTTPException(500, { message: "JWT secret not configured" });
+  if (!c.env.SUPABASE_URL) {
+    throw new HTTPException(500, { message: "SUPABASE_URL not configured" });
   }
 
   let payload: Record<string, unknown>;
   try {
-    const secret = new TextEncoder().encode(c.env.SUPABASE_JWT_SECRET);
-    const result = await jwtVerify(jwt, secret, { algorithms: ["HS256"] });
+    const jwks = getJwks(c.env.SUPABASE_URL);
+    const result = await jwtVerify(jwt, jwks, { algorithms: ["ES256"] });
     payload = result.payload as Record<string, unknown>;
   } catch {
     throw new HTTPException(401, { message: "Invalid or expired token" });
