@@ -318,7 +318,7 @@ insert into po_history (po_id, text, by_role, occurred_at) values
 -- =============================================================================
 -- DEMO AUTH USERS — one per role for testing (Phase 1 decision: auto-confirm)
 -- =============================================================================
--- Email pattern: <role>@demo.carres.local
+-- Email pattern: <role>@carres.com
 -- Password: 'carres-demo-pass' (bcrypt-hashed via pgcrypto crypt() at insert)
 -- email_confirmed_at = now() — bypasses Supabase Auth's email confirmation flow
 -- =============================================================================
@@ -328,46 +328,46 @@ insert into auth.users (
   raw_user_meta_data, raw_app_meta_data, created_at, updated_at
 ) values
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000001', 'authenticated', 'authenticated',
-   'principal@demo.carres.local',  crypt('carres-demo-pass', gen_salt('bf')), now(),
+   'principal@carres.com',  crypt('carres-demo-pass', gen_salt('bf')), now(),
    jsonb_build_object('name','Sara · Principal'),  '{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000002', 'authenticated', 'authenticated',
-   'dealer@demo.carres.local',     crypt('carres-demo-pass', gen_salt('bf')), now(),
+   'dealer@carres.com',     crypt('carres-demo-pass', gen_salt('bf')), now(),
    jsonb_build_object('name','Lily · BedHouse KL'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000003', 'authenticated', 'authenticated',
-   'salesperson@demo.carres.local',crypt('carres-demo-pass', gen_salt('bf')), now(),
+   'salesperson@carres.com',crypt('carres-demo-pass', gen_salt('bf')), now(),
    jsonb_build_object('name','Aisha · BedHouse KL Bangsar'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000004', 'authenticated', 'authenticated',
-   'logistics@demo.carres.local',  crypt('carres-demo-pass', gen_salt('bf')), now(),
+   'logistics@carres.com',  crypt('carres-demo-pass', gen_salt('bf')), now(),
    jsonb_build_object('name','Daniel · Logistics'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000005', 'authenticated', 'authenticated',
-   'finance@demo.carres.local',    crypt('carres-demo-pass', gen_salt('bf')), now(),
+   'finance@carres.com',    crypt('carres-demo-pass', gen_salt('bf')), now(),
    jsonb_build_object('name','Aisha · Finance'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000006', 'authenticated', 'authenticated',
-   'supplier@demo.carres.local',   crypt('carres-demo-pass', gen_salt('bf')), now(),
+   'supplier@carres.com',   crypt('carres-demo-pass', gen_salt('bf')), now(),
    jsonb_build_object('name','Alex · HoOKkA'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000007', 'authenticated', 'authenticated',
-   'partner@demo.carres.local',    crypt('carres-demo-pass', gen_salt('bf')), now(),
+   'partner@carres.com',    crypt('carres-demo-pass', gen_salt('bf')), now(),
    jsonb_build_object('name','JT Express dispatcher'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000008', 'authenticated', 'authenticated',
-   'bd@demo.carres.local',         crypt('carres-demo-pass', gen_salt('bf')), now(),
+   'bd@carres.com',         crypt('carres-demo-pass', gen_salt('bf')), now(),
    jsonb_build_object('name','Hannah · BD'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000009', 'authenticated', 'authenticated',
-   'showroom@demo.carres.local',   crypt('carres-demo-pass', gen_salt('bf')), now(),
+   'showroom@carres.com',   crypt('carres-demo-pass', gen_salt('bf')), now(),
    jsonb_build_object('name','Carres KL Bangsar'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now())
 on conflict (id) do nothing;
 
 -- The handle_new_auth_user trigger from 0002 inserts a default app_users row
 -- (role='dealer'). Override with the right role + scope ids.
 insert into app_users (id, email, name, role, status, dealer_id, supplier_id, partner_id, outlet_id) values
-  ('11111111-1111-1111-1111-000000000001','principal@demo.carres.local', 'Sara · Principal',                'principal',   'active', null,                                     null,                                     null,                                     null),
-  ('11111111-1111-1111-1111-000000000002','dealer@demo.carres.local',    'Lily · BedHouse KL',              'dealer',      'active', '00000000-0000-0000-0000-000000000d01',   null,                                     null,                                     null),
-  ('11111111-1111-1111-1111-000000000003','salesperson@demo.carres.local','Aisha · BedHouse KL Bangsar',     'salesperson', 'active', '00000000-0000-0000-0000-000000000d01',   null,                                     null,                                     '00000000-0000-0000-0000-0000000000a1'),
-  ('11111111-1111-1111-1111-000000000004','logistics@demo.carres.local', 'Daniel · Logistics',              'logistics',   'active', null,                                     null,                                     null,                                     null),
-  ('11111111-1111-1111-1111-000000000005','finance@demo.carres.local',   'Aisha · Finance',                 'finance',     'active', null,                                     null,                                     null,                                     null),
-  ('11111111-1111-1111-1111-000000000006','supplier@demo.carres.local',  'Alex · HoOKkA',                   'supplier',    'active', null,                                     '00000000-0000-0000-0000-0000000000e1',   null,                                     null),
-  ('11111111-1111-1111-1111-000000000007','partner@demo.carres.local',   'JT Express dispatcher',           'partner',     'active', null,                                     null,                                     '00000000-0000-0000-0000-0000000000f1',   null),
-  ('11111111-1111-1111-1111-000000000008','bd@demo.carres.local',        'Hannah · BD',                     'bd',          'active', null,                                     null,                                     null,                                     null),
-  ('11111111-1111-1111-1111-000000000009','showroom@demo.carres.local',  'Carres KL Bangsar',               'showroom',    'active', '00000000-0000-0000-0000-000000000d99',   null,                                     null,                                     '00000000-0000-0000-0000-0000000000a9')
+  ('11111111-1111-1111-1111-000000000001','principal@carres.com', 'Sara · Principal',                'principal',   'active', null,                                     null,                                     null,                                     null),
+  ('11111111-1111-1111-1111-000000000002','dealer@carres.com',    'Lily · BedHouse KL',              'dealer',      'active', '00000000-0000-0000-0000-000000000d01',   null,                                     null,                                     null),
+  ('11111111-1111-1111-1111-000000000003','salesperson@carres.com','Aisha · BedHouse KL Bangsar',     'salesperson', 'active', '00000000-0000-0000-0000-000000000d01',   null,                                     null,                                     '00000000-0000-0000-0000-0000000000a1'),
+  ('11111111-1111-1111-1111-000000000004','logistics@carres.com', 'Daniel · Logistics',              'logistics',   'active', null,                                     null,                                     null,                                     null),
+  ('11111111-1111-1111-1111-000000000005','finance@carres.com',   'Aisha · Finance',                 'finance',     'active', null,                                     null,                                     null,                                     null),
+  ('11111111-1111-1111-1111-000000000006','supplier@carres.com',  'Alex · HoOKkA',                   'supplier',    'active', null,                                     '00000000-0000-0000-0000-0000000000e1',   null,                                     null),
+  ('11111111-1111-1111-1111-000000000007','partner@carres.com',   'JT Express dispatcher',           'partner',     'active', null,                                     null,                                     '00000000-0000-0000-0000-0000000000f1',   null),
+  ('11111111-1111-1111-1111-000000000008','bd@carres.com',        'Hannah · BD',                     'bd',          'active', null,                                     null,                                     null,                                     null),
+  ('11111111-1111-1111-1111-000000000009','showroom@carres.com',  'Carres KL Bangsar',               'showroom',    'active', '00000000-0000-0000-0000-000000000d99',   null,                                     null,                                     '00000000-0000-0000-0000-0000000000a9')
 on conflict (id) do update
   set role        = excluded.role,
       status      = excluded.status,

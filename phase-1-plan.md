@@ -62,7 +62,7 @@
 | `supabase/migrations/0002_rls.sql` | `reference/production/supabase/migrations/0002_rls.sql` | Copy + audit InitPlan wrap (every `auth.app_xxx()` becomes `(select auth.app_xxx())`) per CLAUDE.md §8 Fix 2 |
 | `supabase/migrations/0003_rpcs.sql` | `reference/production/supabase/migrations/0003_rpcs.sql` | Copy verbatim (462 lines) |
 | `supabase/migrations/0004_auth_hook.sql` | **NEW (write from CLAUDE.md §8 spec)** | Defines `auth.custom_access_token_hook(jsonb)` injecting role + entity ids |
-| `supabase/seed.sql` | zip's seed.sql + auto-confirm patch | Copy + append `update auth.users set email_confirmed_at = now() where email like '%@demo.carres.local'` |
+| `supabase/seed.sql` | zip's seed.sql + auto-confirm patch | Copy + append `update auth.users set email_confirmed_at = now() where email like '%@carres.com'` |
 
 ### packages/shared (4 files)
 | File | Source |
