@@ -1,0 +1,10 @@
+# Wrangler dev secrets — copy to .dev.vars (gitignored) and fill in real values.
+# Wrangler reads .dev.vars automatically when running `wrangler dev`.
+# For production deploy (Phase 9): use `wrangler secret put <KEY>` instead.
+
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+
+# Hono-only — never exposed to the browser bundle.
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_JWT_SECRET=your-jwt-secret

@@ -1,0 +1,18 @@
+# Wrangler config for the Hono API on Cloudflare Workers.
+# Local dev: pnpm dev (runs `wrangler dev`)
+# Deploy: deferred until end of project (per Loo's directive — localhost-first).
+
+name = "carres-portal-v2-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Wrangler reads .dev.vars (gitignored) for local secrets.
+# See .dev.vars.example for the required keys.
+
+# Cron triggers — activate in later phases. Times in UTC; MYT = UTC + 8.
+# [[triggers.crons]]
+# cron = "0 1 * * *"  # 09:00 MYT daily
+
+[observability]
+enabled = true
