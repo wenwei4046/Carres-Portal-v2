@@ -104,5 +104,14 @@ export const useAuth = create<AuthState & AuthActions>((set, get) => ({
 
   async signOut() {
     await supabase.auth.signOut();
+    // PII guardrail: wipe wizard draft (customer name/phone/address) so a
+    // subsequent login on the same tab (shared-kiosk scenario) doesn't restore
+    // the previous dealer's in-progress order. Hard-coded key to avoid pulling
+    // a wizard import into the auth store.
+    try {
+      sessionStorage.removeItem("carres-order-draft");
+    } catch {
+      // sessionStorage may be unavailable in some environments — swallow.
+    }
   },
 }));

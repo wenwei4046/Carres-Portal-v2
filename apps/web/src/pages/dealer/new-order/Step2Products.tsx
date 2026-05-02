@@ -1,4 +1,5 @@
-import type { CatalogResponse, FloorConfigDto } from "@carres/shared";
+import type { CatalogResponse } from "@carres/shared";
+import { floorSurchargeRaw } from "@/lib/order-totals";
 import type { DraftAddon, DraftLine, WizardDraft } from "./draft";
 import ProductPicker from "./ProductPicker";
 
@@ -55,11 +56,12 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
     onChange({ ...draft, addons: [...draft.addons, next] });
   }
 
-  // Live totals
+  // Live totals — stair carry uses the shared formula in lib/order-totals.ts
+  // (floorSurchargeRaw) so wizard preview and order-detail page can never drift.
   const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
   const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
   const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
-  const stair = computeStair(draft.delivery.floor, draft.delivery.hasLift, itemsTotal, cfg);
+  const stair = floorSurchargeRaw(draft.delivery.floor, draft.delivery.hasLift, itemsTotal, cfg);
   const total = lineSub + addonSub + stair;
 
   return (
@@ -241,17 +243,6 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
-
-function computeStair(
-  floor: number,
-  hasLift: boolean,
-  totalQty: number,
-  cfg: FloorConfigDto,
-): number {
-  if (hasLift) return 0;
-  if (floor <= cfg.freeUpToFloor) return 0;
-  return (floor - cfg.freeUpToFloor) * cfg.perFloorPerItem * totalQty;
-}
 
 function Section({
   title,

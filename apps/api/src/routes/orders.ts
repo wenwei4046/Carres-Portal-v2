@@ -111,6 +111,29 @@ ordersRouter.post("/", async (c) => {
     throw new HTTPException(403, { message: "Phase 2B only supports dealer-self order creation" });
   }
 
+  // Storage path guard: the wizard uploads attachments directly to Supabase
+  // Storage with the user JWT before calling this endpoint. Storage RLS
+  // gates the WRITE side (dealer can only upload to their own folder), but the
+  // path string we receive here is just data — a malicious payload could point
+  // at another dealer's folder. Without this check, an internal role rendering
+  // the order detail (which has read-all on storage) would see an attachment
+  // belonging to a different dealer. Reject any path outside the caller's
+  // dealer folder before we persist it.
+  const expectedPrefix = `orders-attachments/${auth.dealerId}/`;
+  if (!parsed.data.signaturePath.startsWith(expectedPrefix)) {
+    throw new HTTPException(400, {
+      message: "signaturePath must be inside your dealer folder",
+    });
+  }
+  if (
+    parsed.data.paymentSlipPath &&
+    !parsed.data.paymentSlipPath.startsWith(expectedPrefix)
+  ) {
+    throw new HTTPException(400, {
+      message: "paymentSlipPath must be inside your dealer folder",
+    });
+  }
+
   const payload = Adapters.orderInputToRpcPayload(parsed.data, auth.dealerId);
 
   const sb = userClient(c.env, auth.jwt);

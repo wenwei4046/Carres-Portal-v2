@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import type { FloorConfigDto, Order } from "@carres/shared";
-import { addonSubtotal, floorSurcharge, lineSubtotal, orderTotal, totalItems } from "./order-totals";
+import {
+  addonSubtotal,
+  floorSurcharge,
+  floorSurchargeRaw,
+  lineSubtotal,
+  orderTotal,
+  totalItems,
+} from "./order-totals";
 
 const CFG: FloorConfigDto = { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 };
 
@@ -108,6 +115,28 @@ describe("floorSurcharge — un-stubbed in 2B.1", () => {
       ],
     });
     expect(floorSurcharge(o, CFG)).toBe(300);
+  });
+});
+
+describe("floorSurchargeRaw — single source of truth shared with wizard", () => {
+  it("returns 0 when hasLift is true regardless of floor / qty", () => {
+    expect(floorSurchargeRaw(12, true, 2, CFG)).toBe(0);
+  });
+
+  it("returns 0 at or below freeUpToFloor", () => {
+    expect(floorSurchargeRaw(2, false, 2, CFG)).toBe(0);
+  });
+
+  it("(floor − freeUpToFloor) × perFloorPerItem × qty", () => {
+    expect(floorSurchargeRaw(5, false, 2, CFG)).toBe(300);
+  });
+
+  it("matches floorSurcharge(order, cfg) for the same inputs", () => {
+    const o = {
+      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false },
+      lines: [{ id: "x", orderId: "y", sku: "s", qty: 2, attrs: null, unitPrice: 100 }],
+    } as unknown as Parameters<typeof floorSurcharge>[0];
+    expect(floorSurcharge(o, CFG)).toBe(floorSurchargeRaw(5, false, 2, CFG));
   });
 });
 

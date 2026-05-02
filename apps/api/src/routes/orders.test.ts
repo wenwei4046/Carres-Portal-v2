@@ -158,7 +158,9 @@ function validCreateBody(over: Record<string, unknown> = {}) {
     ],
     addons: [],
     paid: 750,
-    signaturePath: "orders-attachments/dealerA/wiz/signature.png",
+    // Path prefix MUST match the caller's dealerId — the POST handler validates
+    // this. Tests using a different caller (e.g. cross-dealer) need to override.
+    signaturePath: `orders-attachments/${DEALER_A}/wiz/signature.png`,
     paymentSlipPath: null,
     termsAccepted: true,
     depositPct: 50,
@@ -477,6 +479,46 @@ describe("POST /api/orders", () => {
       env,
     );
     expect(res.status).toBe(403);
+  });
+
+  it("rejects signaturePath pointing to another dealer's folder (no RPC call)", async () => {
+    const sb = buildSbForCreate({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const body = validCreateBody({
+      // Path scoped to DEALER_B but caller is DEALER_A — must 400
+      signaturePath: `orders-attachments/${DEALER_B}/wiz/signature.png`,
+    });
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    // Critically: RPC was NOT called — guard fires before DB write
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("rejects paymentSlipPath pointing to another dealer's folder", async () => {
+    const sb = buildSbForCreate({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const body = validCreateBody({
+      paymentSlipPath: `orders-attachments/${DEALER_B}/wiz/payment-slip.jpg`,
+    });
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
   });
 
   it("returns 401 without Authorization header", async () => {
