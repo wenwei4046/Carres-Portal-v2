@@ -75,14 +75,15 @@ describe("GET /api/logistics/orders", () => {
     const ilike = vi.fn().mockReturnThis();
     const or = vi.fn().mockReturnThis();
     const not = vi.fn().mockReturnThis();
+    const is = vi.fn().mockReturnThis();
     const order = vi.fn().mockReturnThis();
     const limit = vi.fn().mockResolvedValue({ data: rows, error: null });
-    const select = vi.fn(() => ({ in: inFn, eq, ilike, or, not, order, limit }));
+    const select = vi.fn(() => ({ in: inFn, eq, ilike, or, not, is, order, limit }));
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn(() => ({ select })),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, inFn, ilike, or, not, order, limit };
+    return { eq, inFn, ilike, or, not, is, order, limit };
   }
 
   it("returns orders for logistics with default 'all' stage and 'all' channel", async () => {
@@ -124,10 +125,12 @@ describe("GET /api/logistics/orders", () => {
       }),
       env,
     );
-    // dealers channel: outlet_id IS NULL via .eq("outlet_id", null) — handler uses .eq with null which Supabase translates to IS NULL.
-    // (Public 'channel=dealers' wording kept per spec §18.3; internally filters on outlet_id.)
+    // dealers channel: outlet_id IS NULL via .is("outlet_id", null). PostgREST
+    // requires .is(col, null) for SQL IS NULL — .eq(col, null) serializes to
+    // outlet_id=eq.null (string filter) which never matches a uuid column.
+    // Public 'channel=dealers' wording kept per spec §18.3; filter uses outlet_id.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const calls = (m.eq as any).mock.calls;
+    const calls = (m.is as any).mock.calls;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(calls.find((c: any[]) => c[0] === 'outlet_id' && c[1] === null)).toBeTruthy();
   });
@@ -444,6 +447,7 @@ describe("POST /api/logistics/orders/:id/attach-do", () => {
       p_order_id: ORDER_ID,
       p_do_number: "DO-9801",
       p_do_note: "Delivered to lobby",
+      p_signed: true,
     });
   });
 
@@ -494,6 +498,7 @@ describe("POST /api/logistics/orders/:id/attach-do", () => {
       p_order_id: ORDER_ID,
       p_do_number: "DO-9802",
       p_do_note: null,
+      p_signed: true,
     });
   });
 

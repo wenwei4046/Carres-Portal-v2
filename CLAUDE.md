@@ -316,7 +316,7 @@ Biz model locked (per Loo 2026-05-03):
   • Outstanding column = customer-owe-HQ (dealer chases for 50% top-up gate)
   • Phase 4 (Logistics) and Phase 6 (Supplier) are HQ INTERNAL roles, NOT dealer-side
 Next decision pending: M4 (warehouse + movements) start time. M3 procurement fully shipped + smoke-verified.
-Carry-forward TODOs: orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping) · phase-4-m2-schema-audit (3 column-mismatches caught at M2 smoke; do an audit before M3-M5) · phase-4-rpc-shape-audit (recommended next; see 2026-05-03 schema audit §Methodology gaps)
+Carry-forward TODOs: orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping) · phase-4-m2-schema-audit (3 column-mismatches caught at M2 smoke; do an audit before M3-M5) · phase-4-rpc-shape-audit (recommended next; see 2026-05-03 schema audit §Methodology gaps) · phase-4-or-filter-harden (orders.ts:85,163 PostgREST .or() interpolation; tighten zod search to whitelist) · phase-4-replace-any-types (~40 eslint-disable any in logistics routes; use db-types per §9.1) · phase-4-zod-strict-uniform (logistics.ts: .strict() partial; pick a convention) · phase-4-logistics-test-gaps (search int/text branches, JWT edge cases, SQLSTATE 42501 mapping, dashboard error coverage) · phase-4-detail-partner-name-join (orders.ts:108 add delivery_partners(name) — verify against proto §18.3)
 ```
 
 Update this section at the start and end of every working session.

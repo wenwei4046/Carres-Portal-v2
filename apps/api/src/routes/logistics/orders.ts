@@ -77,7 +77,7 @@ logisticsOrdersRouter.get("/", async (c) => {
   if (stage !== "all") q = q.eq("logistics_stage", stage);
   // Public 'channel' enum kept as 'dealers'|'showrooms' per spec §18.3 (Loo-facing wording).
   // Internally maps to outlet_id IS [NOT] NULL — schema column is outlet_id, not showroom_id.
-  if (channel === "dealers") q = q.eq("outlet_id", null);
+  if (channel === "dealers") q = q.is("outlet_id", null);
   if (channel === "showrooms") q = q.not("outlet_id", "is", null);
   if (search) {
     const asInt = Number.parseInt(search, 10);
@@ -232,6 +232,7 @@ logisticsOrdersRouter.post("/:id/attach-do", async (c) => {
     p_order_id: c.req.param("id"),
     p_do_number: parsed.data.doNumber,
     p_do_note: parsed.data.doNote ?? null,
+    p_signed: parsed.data.signed,
   });
   if (error) {
     const m = mapPgError(error);
