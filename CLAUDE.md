@@ -305,19 +305,22 @@ Don't burn an hour spinning. Surface and ask.
 ## 17. Project status (update as we progress)
 
 ```
-Current phase: Phase 4 (Logistics) M1 + M2 + M3 complete; M4 in progress — Tasks 1-4 (warehouse list, adjust, movements, PDF infra) done; Tasks 5-6 (/print-do + /print endpoints) pending
+Current phase: Phase 4 (Logistics) IMPLEMENTATION COMPLETE; phase-4-complete tag BLOCKED on RLS migration 0022 approval (purchase_order_lines policies)
 Project started: 2026-05-02
-Last phase completed: Phase 3 (Principal MVP) — 2026-05-03, tag phase-3-complete · Phase 4 in progress (M1 + M2 + M3 + M4-T1..T4 done, no tag yet — tags only at full phase close)
-Tags so far: phase-0/1/2a/2b/2c/3-complete (6 tags)
-Test count: 380/380 green (shared 69 + api 212 + web 99) · 5 Playwright E2E specs
-Migrations applied: 21 (0001-0021, all additive, zero RLS changes since Phase 1)
+Last phase completed: Phase 3 (Principal MVP) — 2026-05-03, tag phase-3-complete · Phase 4 implementation 2026-05-04
+Tags so far: phase-0/1/2a/2b/2c/3-complete (6 tags) · phase-4-complete PENDING
+Test count: 489/489 green (shared 69 + api 232 + web 188) · 5 Playwright E2E specs unchanged
+Migrations applied: 21 (0001-0021, latest = 0021_stock_movements_index, all additive, zero RLS changes since Phase 1)
 F-11 (Workers bundle size) status: 1034 KiB raw / 197 KiB gzipped after @react-pdf/renderer landed. Workers free-tier ceiling is 1 MiB gzipped — we sit at ~19% of the limit. Achieved via runtime CJK font fetch from Fontsource jsdelivr CDN (no font bytes in bundle). Resolves TODO `phase-7-pdf-gen-options`.
 Biz model locked (per Loo 2026-05-03):
   • Dealer just sells. Customer pays HQ direct. No HQ→dealer credit / debt.
   • Outstanding column = customer-owe-HQ (dealer chases for 50% top-up gate)
   • Phase 4 (Logistics) and Phase 6 (Supplier) are HQ INTERNAL roles, NOT dealer-side
-Next decision pending: M4 Tasks 5-6 (`/print-do` + `/print` endpoints) wire PDF infra to actual Supabase reads.
-Carry-forward TODOs: orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping) · phase-4-m2-schema-audit (3 column-mismatches caught at M2 smoke; do an audit before M3-M5) · phase-4-rpc-shape-audit (recommended next; see 2026-05-03 schema audit §Methodology gaps) · phase-4-or-filter-harden (orders.ts:85,163 PostgREST .or() interpolation; tighten zod search to whitelist) · phase-4-replace-any-types (~40 eslint-disable any in logistics routes; use db-types per §9.1) · phase-4-zod-strict-uniform (logistics.ts: .strict() partial; pick a convention) · phase-4-logistics-test-gaps (search int/text branches, JWT edge cases, SQLSTATE 42501 mapping, dashboard error coverage) · phase-4-detail-partner-name-join (orders.ts:108 add delivery_partners(name) — verify against proto §18.3)
+Next decision pending:
+  1. RLS migration 0022 for purchase_order_lines (BLOCKS phase-4-complete tag)
+  2. After tag: M4.6 PO COGS source (currently uses product_skus.price as proxy)
+  3. After tag: photo upload reconcile (drop RPC arg or add UI?)
+Carry-forward TODOs: orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping) · phase-4-m2-schema-audit (3 column-mismatches caught at M2 smoke; do an audit before M3-M5) · phase-4-rpc-shape-audit (recommended next; see 2026-05-03 schema audit §Methodology gaps) · phase-4-or-filter-harden (orders.ts:85,163 PostgREST .or() interpolation; tighten zod search to whitelist) · phase-4-replace-any-types (~40 eslint-disable any in logistics routes; use db-types per §9.1) · phase-4-zod-strict-uniform (logistics.ts: .strict() partial; pick a convention) · phase-4-logistics-test-gaps (search int/text branches, JWT edge cases, SQLSTATE 42501 mapping, dashboard error coverage) · phase-4-detail-partner-name-join (orders.ts:108 add delivery_partners(name) — verify against proto §18.3) · phase-4-purchase-order-lines-rls-policies (CRITICAL — blocks phase-4 tag) · phase-4-or-filter-harden-orders (apply M4.3 regex whitelist to orders.ts:79-86) · phase-4-22p02-mapping (add SQLSTATE 22P02 → 422 in mapPgError) · phase-4-uuid-path-validation (wrap :id route params with zod UUID guard at entry) · phase-4-spec-photo-upload-reconcile (DispatchModal photo upload OR drop RPC arg) · phase-4-create-po-eta-partner (extend createPoInput zod for eta + per-supplier partnerId) · phase-4-cross-order-bundle-aggregation (server-side bundle-prep endpoint or client aggregation) · phase-4-zod-strict-nested-lines (createPoInput.lines inner objects not strict) · phase-7-reassign-warehouse-wire (wire ReassignWarehouseDialog when partner-rejection state ships) · phase-7-pdf-do-photo-upload (retention TBD if photo upload added) · phase-9-movements-cursor-pagination · phase-9-pdf-visual-snapshots · phase-9-dashboard-split-layout · phase-9-trigram-search · phase-9-pdf-cache-immutable-orders · phase-9-bundle-size-monitor · phase-9-cjk-font-extended · phase-9-po-cogs-source
 ```
 
 Update this section at the start and end of every working session.

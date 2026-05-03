@@ -171,3 +171,197 @@ Phase 2 acceptance items NOT covered by 2C (carry-forward from `phase-2c-reflect
 **Revisit when**: Loo's network grows to 3+ warehouses with frequent inter-warehouse imbalance. Or when dealer feedback shows "can my order ship from KL even if half the lines are in Penang?"
 
 **Surfaced by**: `/plan-eng-review` 2026-05-03 confirmed spec §12 deferral.
+
+---
+
+# Phase 4 closeout — 16 new TODOs (2026-05-04)
+
+Surfaced during M4 + M5 + M6 by `/plan-eng-review`, `/review`, and `/design-review`. Grouped by priority. See `docs/phase-4-reflection.md` for context.
+
+## CRITICAL (blocks phase-4-complete tag)
+
+### phase-4-purchase-order-lines-rls-policies
+
+**What**: Migration `0017_purchase_order_lines.sql` created the `purchase_order_lines` table without any RLS policies. RLS is enabled on the table; with zero policies, all user-JWT reads return empty (Postgres default deny).
+
+**Why deferred**: Per CLAUDE.md §14 RED LINE 2, RLS policy changes need explicit Loo approval in current conversation. Recording the fix path here, awaiting approval.
+
+**Why dormant in production**: 0 PO rows exist, so 0 lines to deny. Tests don't catch it because vitest mocks Supabase.
+
+**Affected surfaces**: M4.5 print-DO endpoint linked POs section; M4.6 print-PO PDF lines; M5.2 OrderDetailDrawer "Linked POs" panel; M5.3 LogisticsProcurement PO list lines column.
+
+**Fix**: New migration `0022_purchase_order_lines_rls.sql` adding `po_lines_scoped_read` policy (mirror `po_scoped_read` from `0002_rls.sql:241` — logistics + principal full read; supplier-scoped for own supplier).
+
+**BLOCKS**: `phase-4-complete` tag.
+
+**Surfaced by**: M6 reflection write-up (this commit), 2026-05-04.
+
+---
+
+## IMPORTANT (Phase 4 polish — after tag lands)
+
+### phase-4-or-filter-harden-orders
+
+**What**: Apply the M4.3 regex whitelist pattern (movements route) to `apps/api/src/routes/logistics/orders.ts:79-86` PostgREST `.or()` search interpolation. Without it, search input could inject filter operators.
+
+**Why deferred**: M4.3 fixed movements; orders branch was scoped out of that refactor.
+
+**Surfaced by**: `/review` 2026-05-04. Continuation of carry-forward `phase-4-or-filter-harden`.
+
+### phase-4-22p02-mapping
+
+**What**: Add SQLSTATE `22P02` (invalid_text_representation, e.g. malformed UUID) → HTTP 422 in `apps/api/src/lib/route-helpers.ts` `mapPgError`. Currently routes through to a generic 500.
+
+**Why deferred**: Currently masked by zod validation at most route entries; surfaces only on edge cases.
+
+**Surfaced by**: `/review` 2026-05-04.
+
+### phase-4-uuid-path-validation
+
+**What**: Wrap `:id` route params with zod UUID guard at entry (e.g., `c.req.param('id')` → `z.string().uuid().parse(...)`). Currently only some routes do this; consistency would let mapPgError 22P02 fix above stay rare.
+
+**Why deferred**: Plumbing change across ~20 routes; bundle with `phase-4-22p02-mapping`.
+
+**Surfaced by**: `/review` 2026-05-04.
+
+### phase-4-spec-photo-upload-reconcile
+
+**What**: `logistics_attach_do_and_deliver` RPC (migration 0019) accepts `photo_paths jsonb`. DispatchModal UI doesn't gather photos. Either add the photo upload flow or drop the RPC arg.
+
+**Why deferred**: D10=A in `/plan-eng-review` chose to defer until Loo decides the workflow.
+
+**Decision pending**: Loo to choose — add UI (with retention policy `phase-7-pdf-do-photo-upload`) or drop arg in next migration.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04 D10.
+
+### phase-4-create-po-eta-partner
+
+**What**: Extend `createPoInput` zod schema to accept `eta date` + per-supplier `partnerId`. Currently both default at the RPC level.
+
+**Why deferred**: D14 in `/plan-eng-review` flagged the gap; full UI for these fields wasn't in M5 scope.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04.
+
+### phase-4-cross-order-bundle-aggregation
+
+**What**: D4=A chose client-side bundle aggregation in `CrossOrderBundleSheet`. Server-side bundle-prep endpoint (`POST /api/logistics/orders/bundle-prep`) would simplify client + cap query weight.
+
+**Why deferred**: Client aggregation works at MVP volume (<50 awaiting orders). D4=A.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04 D4.
+
+### phase-4-replace-any-types
+
+**What**: ~30 sites in `apps/api/src/routes/logistics/orders.ts` and `pos.ts` still have `// eslint-disable @typescript-eslint/no-explicit-any` annotations. Replace with proper db-types per CLAUDE.md §9.1.
+
+**Why deferred**: Warehouse/movements/dashboard/partners/suppliers routes are clean; orders + pos are the holdouts. Bundling for next sweep.
+
+**Surfaced by**: `/review` 2026-05-04. Continuation of carry-forward `phase-4-replace-any-types`.
+
+### phase-4-logistics-test-gaps
+
+**What**: Test coverage gaps in M4-M5: partners/suppliers happy-path-only (no JWT edge cases); JWT edge case coverage not uniform across routes; SQLSTATE 42501 mapping not consistently asserted; dashboard error coverage thin.
+
+**Why deferred**: 489 tests hit the M5 ship bar; gaps are acceptable for MVP.
+
+**Surfaced by**: `/review` 2026-05-04.
+
+### phase-4-rpc-shape-audit
+
+**What**: `assertRpcCallShape` helper (refactor C1) is used in `warehouse.test` but not consistently in pos/orders test files. Audit + retrofit for RPC mock shape consistency.
+
+**Why deferred**: D8=A approved partial rollout; finish in a polish pass.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04 D8.
+
+### phase-4-zod-strict-nested-lines
+
+**What**: `createPoInput.lines` array — outer array is `.strict()` per refactor B2, but inner line objects aren't. Inconsistent with sibling schemas.
+
+**Why deferred**: D9=A approved closing the outer-level uniformity TODO; nested case is Phase 9 polish.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04 D9. Bridges to `phase-9-zod-strict-nested-lines`.
+
+---
+
+## MINOR (Phase 7+)
+
+### phase-7-reassign-warehouse-wire
+
+**What**: `ReassignWarehouseDialog.tsx` ships in M5 but no caller invokes it. The trigger state is partner-rejection (Phase 7 territory).
+
+**Why deferred**: D3=A — UI is built; wiring waits for Phase 7 partner-rejection state machine.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04 D3.
+
+### phase-7-pdf-do-photo-upload
+
+**What**: If `phase-4-spec-photo-upload-reconcile` adds photos to DO PDF, retention policy must be decided (signed URLs? embed in PDF? Storage lifecycle?).
+
+**Why deferred**: Conditional on the photo-upload decision above.
+
+**Surfaced by**: M6 reflection 2026-05-04.
+
+### phase-9-movements-cursor-pagination
+
+**What**: Movements page hard caps at LIMIT 200. At >200 movements per filter, oldest are silently dropped. Cursor pagination needed for high-volume warehouses.
+
+**Why deferred**: D5=A — LIMIT 200 acceptable at MVP volume.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04 D5.
+
+### phase-9-pdf-visual-snapshots
+
+**What**: Add Playwright visual snapshot test for DO and PO PDFs (rendered in headless Chrome, compared against golden image).
+
+**Why deferred**: Phase 4 has unit tests for PDF route shape but no visual regression coverage.
+
+**Surfaced by**: `/review` 2026-05-04.
+
+### phase-9-dashboard-split-layout
+
+**What**: D13=A kept LogisticsDashboard as a single page (KPIs + 3 pipeline columns + 2 side cards). At higher volume, split into a dedicated Kanban page + dashboard summary page.
+
+**Why deferred**: D13=A — single page works at MVP. Revisit if dashboard load >500ms.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04 D13.
+
+### phase-9-trigram-search
+
+**What**: Postgres `pg_trgm` index on `orders.dl_text`, `purchase_orders.id`, `dealers.name` for fuzzy search at scale. Current `.ilike('%query%')` is fine at MVP.
+
+**Why deferred**: D14=A.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04 D14.
+
+### phase-9-pdf-cache-immutable-orders
+
+**What**: Once an order is `delivered` and DO PDF is generated, the result is immutable. Cache by `order_id` in Workers KV (or R2) to skip future renders.
+
+**Why deferred**: D6=A — current cost (one font fetch + render per print click) is low. KV setup is overhead.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04 D6.
+
+### phase-9-bundle-size-monitor
+
+**What**: CI gate that fails if Workers bundle gzip size grows past a threshold (e.g., 500 KiB). Currently 197 KiB; would catch a bad dependency add early.
+
+**Why deferred**: D11=A — current headroom is comfortable; gate is "nice to have", not "must have".
+
+**Surfaced by**: `/plan-eng-review` 2026-05-04 D11.
+
+### phase-9-cjk-font-extended
+
+**What**: Fontsource Noto Sans SC subset is only `chinese-simplified-400`. If we ship to Hong Kong / Taiwan / Japan markets, need traditional + Japanese subsets.
+
+**Why deferred**: MVP is Malaysia (English + Simplified Chinese for some product names).
+
+**Surfaced by**: M6 reflection 2026-05-04.
+
+### phase-9-po-cogs-source
+
+**What**: M4.6 PO PDF computes `total = sum(line.qty * product_skus.price)` because `purchase_orders.total` doesn't exist. `product_skus.price` is the retail price — wrong proxy for COGS. Real fix: add `purchase_order_lines.unit_cost` column or `purchase_orders.total_cost` field.
+
+**Why deferred**: Phase 5 (Finance) territory — finance phase will define COGS data model.
+
+**Surfaced by**: M4.6 implementer subagent 2026-05-04.
