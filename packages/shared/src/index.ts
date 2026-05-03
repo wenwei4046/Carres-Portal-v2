@@ -106,6 +106,8 @@ export {
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
   listLogisticsOrdersQuery,
+  listPurchaseOrdersQuery,
+  cancelPoInput,
   type AssignPartnerInput,
   type AttachDoInput,
   type ReceivePoLineInput,
@@ -118,4 +120,6 @@ export {
   type AssignPickupPartnerInput,
   type ReassignPoWarehouseInput,
   type ListLogisticsOrdersQuery,
+  type ListPurchaseOrdersQuery,
+  type CancelPoInput,
 } from "./schemas/logistics";

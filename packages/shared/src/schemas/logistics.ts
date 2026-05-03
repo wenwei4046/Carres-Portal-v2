@@ -158,3 +158,24 @@ export const listLogisticsOrdersQuery = z.object({
   search: z.string().trim().max(100).optional(),
 });
 export type ListLogisticsOrdersQuery = z.infer<typeof listLogisticsOrdersQuery>;
+
+/**
+ * `listPurchaseOrdersQuery` — GET /api/logistics/pos query string.
+ * status: 'all' (default) or one of the 3 PO statuses (open / received / cancelled).
+ * supplierId: optional uuid for per-supplier filtering.
+ */
+export const listPurchaseOrdersQuery = z.object({
+  status: z.enum(['all', 'open', 'received', 'cancelled']).default('all'),
+  supplierId: z.string().uuid().optional(),
+});
+export type ListPurchaseOrdersQuery = z.infer<typeof listPurchaseOrdersQuery>;
+
+/**
+ * `cancelPoInput` — POST /api/logistics/pos/:id/cancel.
+ * Maps to `logistics_cancel_po(po_id, reason)` RPC (0020 migration). Reason is
+ * required for the audit trail (mirrors abandonOrderInput shape).
+ */
+export const cancelPoInput = z.object({
+  reason: z.string().min(1),
+});
+export type CancelPoInput = z.infer<typeof cancelPoInput>;
