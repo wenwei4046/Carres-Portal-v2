@@ -680,3 +680,85 @@ describe("POST /api/logistics/orders/:id/warehouse", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/logistics/orders/:id/recheck-stock", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+  const WH_ID = "00000000-0000-0000-0000-000000000c01";
+
+  it("returns 200 with shortages list", async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: WH_ID, error: null })
+      .mockResolvedValueOnce({ data: [{ sku: "MAT-K-001", qty: 2, missing: 2 }], error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/recheck-stock`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.warehouseId).toBe(WH_ID);
+    expect(body.shortages).toEqual([{ sku: "MAT-K-001", qty: 2, missing: 2 }]);
+    expect(rpc).toHaveBeenNthCalledWith(1, "logistics_pick_warehouse", { p_order_id: ORDER_ID });
+    expect(rpc).toHaveBeenNthCalledWith(2, "logistics_calc_shortages", { p_order_id: ORDER_ID, p_warehouse_id: WH_ID });
+  });
+
+  it("returns warehouseId=null and empty shortages when no warehouse pickable", async () => {
+    const rpc = vi.fn().mockResolvedValueOnce({ data: null, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/recheck-stock`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.warehouseId).toBeNull();
+    expect(body.shortages).toEqual([]);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 422 when body has extra keys (.strict)", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/recheck-stock`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ unexpected: "key" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("returns 403 for non-logistics (no rpc call)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/recheck-stock`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

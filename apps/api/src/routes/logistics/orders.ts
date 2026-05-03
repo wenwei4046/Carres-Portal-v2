@@ -5,6 +5,7 @@ import {
   assignPartnerInput,
   attachDoInput,
   listLogisticsOrdersQuery,
+  recheckStockInput,
   warehousePickInput,
 } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
@@ -280,6 +281,36 @@ logisticsOrdersRouter.post("/:id/warehouse", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ order: data });
+});
+
+// ----- POST /:id/recheck-stock -----
+logisticsOrdersRouter.post("/:id/recheck-stock", async (c) => {
+  let body: unknown;
+  try { body = await c.req.json(); } catch { body = {}; }
+  const parsed = recheckStockInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const orderId = c.req.param("id");
+
+  const { data: wh, error: e1 } = await sb.rpc("logistics_pick_warehouse", { p_order_id: orderId });
+  if (e1) {
+    const m = mapPgError(e1);
+    return c.json(m.body, m.status);
+  }
+  if (!wh) {
+    return c.json({ warehouseId: null, shortages: [] });
+  }
+  const { data: shortages, error: e2 } = await sb.rpc("logistics_calc_shortages", { p_order_id: orderId, p_warehouse_id: wh });
+  if (e2) {
+    const m = mapPgError(e2);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ warehouseId: wh, shortages: shortages ?? [] });
 });
 
 export default logisticsOrdersRouter;
