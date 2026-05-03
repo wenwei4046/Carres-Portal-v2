@@ -168,7 +168,7 @@ export default function LogisticsOrders() {
   return (
     <div className="px-9 py-7">
       {/* Header */}
-      <div className="flex justify-between items-start mb-5.5 gap-4 flex-wrap">
+      <div className="flex justify-between items-start mb-[22px] gap-4 flex-wrap">
         <div>
           <div className="kicker">Orders</div>
           <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
@@ -202,7 +202,7 @@ export default function LogisticsOrders() {
 
       {/* Stage filter chips */}
       <div
-        className="flex gap-1.5 mb-4.5 flex-wrap"
+        className="flex gap-1.5 mb-[18px] flex-wrap"
         role="tablist"
         aria-label="Stage filter"
       >

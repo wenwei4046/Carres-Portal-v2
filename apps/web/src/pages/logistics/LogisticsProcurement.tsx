@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import {
+  useCatalog,
   useLogisticsPos,
   useLogisticsSuppliers,
   useLogisticsWarehouse,
   type LogisticsPoListRow,
   type SupplierRow,
 } from "@/lib/queries";
+import type { ProductSkuDto } from "@carres/shared";
 import AssignPickupDialog from "./components/AssignPickupDialog";
 import CreatePOModal, {
   type CreatePoPrefill,
@@ -91,6 +93,7 @@ export default function LogisticsProcurement() {
   const posQ = useLogisticsPos();
   const suppliersQ = useLogisticsSuppliers();
   const warehouseQ = useLogisticsWarehouse();
+  const catalogQ = useCatalog();
 
   const pos = posQ.data?.pos ?? [];
   const suppliers = suppliersQ.data?.suppliers ?? [];
@@ -105,6 +108,15 @@ export default function LogisticsProcurement() {
     for (const w of warehouses) m.set(w.id, w);
     return m;
   }, [warehouses]);
+  // SKU lookup: catalog gives us the friendly variant name. The list endpoint
+  // returns raw `sku` strings (e.g. `mattress:cloud:king`); joining via this
+  // map matches LogisticsWarehouse.tsx so the Items column reads as a real
+  // product name instead of a code.
+  const skuLabelMap = useMemo(() => {
+    const m = new Map<string, ProductSkuDto>();
+    for (const s of catalogQ.data?.skus ?? []) m.set(s.sku, s);
+    return m;
+  }, [catalogQ.data]);
 
   // Filter pipeline mirrors proto lines 430-446.
   const counts = useMemo(() => {
@@ -173,7 +185,7 @@ export default function LogisticsProcurement() {
   return (
     <div className="px-9 py-7 pb-14">
       {/* Header */}
-      <div className="flex justify-between items-start mb-5.5">
+      <div className="flex justify-between items-start mb-[22px]">
         <div>
           <div className="kicker">Procurement</div>
           <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
@@ -198,7 +210,7 @@ export default function LogisticsProcurement() {
 
       {/* Filter chips */}
       <div
-        className="flex gap-1.5 mb-4.5 flex-wrap"
+        className="flex gap-1.5 mb-[18px] flex-wrap"
         role="tablist"
         aria-label="PO filter"
       >
@@ -215,7 +227,7 @@ export default function LogisticsProcurement() {
       {/* PO list table */}
       <div className="card p-0" data-testid="po-list-table">
         <div
-          className="grid items-center gap-4 px-4.5 py-3 bg-base-50 border-b border-base-200"
+          className="grid items-center gap-4 px-[18px] py-3 bg-base-50 border-b border-base-200"
           style={{
             gridTemplateColumns: "96px 2.4fr 1.2fr 1fr 96px 120px 130px",
           }}
@@ -240,15 +252,21 @@ export default function LogisticsProcurement() {
             <div
               key={po.id}
               data-testid={`po-row-${po.id}`}
-              className="grid items-center gap-4 px-4.5 py-3 border-t border-base-100"
+              className="grid items-center gap-4 px-[18px] py-3 border-t border-base-100 hover:bg-base-50 transition-colors"
               style={{
                 gridTemplateColumns: "96px 2.4fr 1.2fr 1fr 96px 120px 130px",
               }}
             >
-              <div className="font-mono text-[12px] font-semibold">{po.id}</div>
+              <div
+                className="font-mono text-[12px] font-semibold"
+                title={po.id}
+              >
+                {po.id.slice(0, 8)}
+              </div>
               <div className="min-w-0">
                 {lines.map((l, i) => {
                   const fully = (l.received_qty || 0) >= (l.qty || 0);
+                  const skuName = skuLabelMap.get(l.sku)?.variant ?? l.sku;
                   return (
                     <div
                       key={i}
@@ -267,8 +285,11 @@ export default function LogisticsProcurement() {
                           transform: "translateY(-1px)",
                         }}
                       />
-                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                        {l.sku}
+                      <span
+                        className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={l.sku}
+                      >
+                        {skuName}
                       </span>
                       <span
                         className="font-mono text-[11px] whitespace-nowrap"

@@ -142,9 +142,9 @@ export default function OrderCard({
           </span>
         </div>
         <div className="text-[11px] text-base-500 mt-0.5">{dateLabel}</div>
-        {order.delivery_partner_id && (
-          <div className="text-[10px] text-base-500 mt-0.5">via partner assigned</div>
-        )}
+        {/* Partner name needs the drawer-fetch join to surface here — list
+            endpoint returns id only. Keep this line off until the M5.0
+            phase-4-detail-partner-name-join TODO lands. */}
         <div className="flex items-baseline justify-end mt-1.5">
           {actionHint && (
             <span className="text-[10px] text-primary font-semibold">

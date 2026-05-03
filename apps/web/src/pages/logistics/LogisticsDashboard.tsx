@@ -125,9 +125,14 @@ export default function LogisticsDashboard({ setTab }: Props) {
         />
       </div>
 
-      {/* Active pipeline header — proto lines 78-83. */}
+      {/* Active pipeline header — proto lines 78-83. The proto's overline
+          is base-500 (calm-operations), not terracotta — so we use explicit
+          Tailwind here instead of the .kicker utility (which @applies
+          text-primary). */}
       <div className="flex items-end justify-between gap-4 mb-3.5 flex-wrap">
-        <div className="kicker text-base-500">Active pipeline</div>
+        <div className="text-[11px] uppercase tracking-[0.22em] font-semibold text-base-500">
+          Active pipeline
+        </div>
         <button
           type="button"
           onClick={() => setTab("orders")}
@@ -194,7 +199,7 @@ function Hero({ kpis, pipeline }: HeroProps) {
   return (
     <div>
       <div className="kicker">{fmtDate} &middot; Logistics</div>
-      <h1 className="font-display text-[36px] leading-[1.05] mt-2 tracking-[-0.025em] font-semibold text-base-900">
+      <h1 className="font-display text-[36px] leading-[1.05] mt-2 tracking-[-0.025em] font-bold text-base-900">
         {kpis.today_deliveries} deliveries today.
         <br />
         <span className="text-base-600 font-medium">

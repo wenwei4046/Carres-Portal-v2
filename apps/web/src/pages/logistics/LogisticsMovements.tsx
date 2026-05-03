@@ -294,7 +294,7 @@ export default function LogisticsMovements({ initialFilters, setTab, clearInitia
   return (
     <div className="px-9 py-7 pb-14" data-testid="logistics-movements-page">
       {/* Header */}
-      <div className="flex justify-between items-start mb-5.5 gap-4">
+      <div className="flex justify-between items-start mb-[22px] gap-4">
         <div>
           <div className="kicker flex items-center">
             <button
@@ -346,12 +346,12 @@ export default function LogisticsMovements({ initialFilters, setTab, clearInitia
 
       {/* 4 KPI tiles */}
       <div
-        className="grid gap-3 mb-5.5"
+        className="grid gap-3 mb-[22px]"
         style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
         data-testid="movements-kpis"
       >
         <div
-          className="bg-white border border-base-200 rounded-md px-4.5 py-3.5"
+          className="bg-white border border-base-200 rounded-md px-[18px] py-3.5"
           data-testid="movements-kpi-count"
         >
           <div className="label">Movements</div>
@@ -363,7 +363,7 @@ export default function LogisticsMovements({ initialFilters, setTab, clearInitia
           </div>
         </div>
         <div
-          className="bg-white rounded-md px-4.5 py-3.5"
+          className="bg-white rounded-md px-[18px] py-3.5"
           style={{ border: "1px solid rgba(50,120,80,.4)" }}
           data-testid="movements-kpi-in"
         >
@@ -381,7 +381,7 @@ export default function LogisticsMovements({ initialFilters, setTab, clearInitia
           </div>
         </div>
         <div
-          className="bg-white rounded-md px-4.5 py-3.5"
+          className="bg-white rounded-md px-[18px] py-3.5"
           style={{ border: "1px solid rgba(214,79,32,.4)" }}
           data-testid="movements-kpi-out"
         >
@@ -399,7 +399,7 @@ export default function LogisticsMovements({ initialFilters, setTab, clearInitia
           </div>
         </div>
         <div
-          className="bg-white border border-base-200 rounded-md px-4.5 py-3.5"
+          className="bg-white border border-base-200 rounded-md px-[18px] py-3.5"
           data-testid="movements-kpi-net"
         >
           <div className="label">Net change</div>
@@ -421,7 +421,7 @@ export default function LogisticsMovements({ initialFilters, setTab, clearInitia
 
       {/* Period chips + view toggle */}
       <div
-        className="bg-white border border-base-200 rounded-md px-4.5 py-3.5 mb-3.5"
+        className="bg-white border border-base-200 rounded-md px-[18px] py-3.5 mb-3.5"
         data-testid="movements-period-bar"
       >
         <div className="flex justify-between items-center flex-wrap gap-3.5">
@@ -652,7 +652,7 @@ export default function LogisticsMovements({ initialFilters, setTab, clearInitia
                       {g.items.length} movement{g.items.length === 1 ? "" : "s"}
                     </div>
                   </div>
-                  <div className="flex gap-4.5">
+                  <div className="flex gap-[18px]">
                     <div className="text-right">
                       <div className="label" style={{ color: "var(--success)" }}>
                         ↑ in
@@ -729,7 +729,7 @@ const ROW_GRID = "120px 70px 1.6fr 1fr 90px 1.6fr 100px";
 function MovementTableHeader() {
   return (
     <div
-      className="grid items-center px-4.5 py-2.5 bg-base-50 border-b border-base-200 gap-2.5"
+      className="grid items-center px-[18px] py-2.5 bg-base-50 border-b border-base-200 gap-2.5"
       style={{ gridTemplateColumns: ROW_GRID }}
     >
       <div className="label">When</div>
@@ -784,7 +784,7 @@ function MovementTableRow({
   return (
     <div
       data-testid={`movements-row-${row.id}`}
-      className="grid items-center px-4.5 py-3 border-t border-base-100 gap-2.5 text-[12.5px]"
+      className="grid items-center px-[18px] py-3 border-t border-base-100 gap-2.5 text-[12.5px]"
       style={{ gridTemplateColumns: ROW_GRID }}
     >
       <div className="font-body text-base-700 leading-snug">

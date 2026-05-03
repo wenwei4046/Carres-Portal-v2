@@ -68,7 +68,7 @@ export default function OrderColumn({
 
   return (
     <div
-      className={`bg-white border border-base-100 rounded-[4px] overflow-hidden min-h-[360px] border-t-2 ${accentBorder}`}
+      className={`bg-white border border-base-200 rounded-[4px] overflow-hidden min-h-[360px] border-t-2 ${accentBorder}`}
       data-testid={`stage-column-${stage}`}
     >
       <div className="px-4 py-3.5 border-b border-base-100">

@@ -180,7 +180,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
   return (
     <div className="px-9 py-7 pb-14">
       {/* Header */}
-      <div className="flex justify-between items-start mb-5.5 gap-4">
+      <div className="flex justify-between items-start mb-[22px] gap-4">
         <div>
           <div className="kicker">Warehouse</div>
           <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
@@ -220,7 +220,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
 
       {/* Warehouse selector tiles */}
       <div
-        className="grid gap-3 mb-5.5"
+        className="grid gap-3 mb-[22px]"
         style={{
           gridTemplateColumns: warehouses.length
             ? `repeat(${warehouses.length}, minmax(0, 1fr))`
@@ -240,7 +240,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
               aria-selected={isActive}
               onClick={() => setActiveWh(t.warehouse.id)}
               data-testid={`warehouse-tile-${t.warehouse.id}`}
-              className="text-left rounded-[6px] p-4.5 transition-colors"
+              className="text-left rounded-[6px] p-[18px] transition-colors"
               style={{
                 border: `1.5px solid ${isActive ? "var(--terracotta)" : "var(--base-200)"}`,
                 background: isActive ? "var(--signature-50)" : "#fff",
@@ -252,7 +252,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
               <div className="font-body text-[11px] text-base-500 mt-0.5">
                 {t.warehouse.address ?? "—"}
               </div>
-              <div className="flex gap-5.5 mt-3">
+              <div className="flex gap-[22px] mt-3">
                 <div>
                   <div className="font-mono text-[26px] font-semibold leading-none text-base-900">
                     {t.units}
@@ -294,7 +294,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
 
       {/* Category tabs */}
       <div
-        className="flex gap-2 mb-4.5 flex-wrap"
+        className="flex gap-2 mb-[18px] flex-wrap"
         role="tablist"
         aria-label="Category"
       >
@@ -325,7 +325,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
       {/* Stock table */}
       <div className="card p-0" data-testid="warehouse-stock-table">
         <div
-          className="grid items-center gap-4 px-4.5 py-3 bg-base-50 border-b border-base-200"
+          className="grid items-center gap-4 px-[18px] py-3 bg-base-50 border-b border-base-200"
           style={{
             gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 96px",
           }}
@@ -361,7 +361,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
               <div
                 key={row.sku}
                 data-testid={`warehouse-row-${row.sku}`}
-                className="grid items-center gap-4 px-4.5 py-3 border-t border-base-100"
+                className="grid items-center gap-4 px-[18px] py-3 border-t border-base-100"
                 style={{
                   gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 96px",
                 }}
