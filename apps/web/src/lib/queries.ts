@@ -64,6 +64,7 @@ export const qk = {
     orders:    (filters?: LogisticsOrderFilters) =>
       ["logistics", "orders", filters ?? {}] as const,
     order:     (id: string) => ["logistics", "orders", id] as const,
+    partners:  () => ["logistics", "partners"] as const,
     pos:       (filters?: LogisticsPoFilters) =>
       ["logistics", "pos", filters ?? {}] as const,
     po:        (id: string) => ["logistics", "pos", id] as const,
@@ -832,6 +833,19 @@ export interface LogisticsDashboardResponse {
   alerts: LogisticsAlerts;
 }
 
+/** Row in GET /api/logistics/partners. Bare `delivery_partners` row trimmed to
+ *  what `DispatchModal` needs (name + zones in the option label, contact in the
+ *  preview). */
+export interface DeliveryPartnerRow {
+  id: string;
+  name: string;
+  contact: string | null;
+  zones: string | null;
+}
+export interface DeliveryPartnersListResponse {
+  partners: DeliveryPartnerRow[];
+}
+
 /** Row in GET /api/logistics/orders. Embedded `dealers(name)` is a PostgREST
  *  nested fetch shape — the route forwards it verbatim. */
 export interface LogisticsOrderListRow {
@@ -1061,6 +1075,20 @@ export function useLogisticsDashboard(
     queryFn: () =>
       apiFetch<LogisticsDashboardResponse>("/api/logistics/dashboard"),
     staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Delivery partners — populates the DispatchModal dropdown (M5 task 2 §18.3).
+ *  Stable list, rarely changes; cache for 5 minutes. */
+export function useDeliveryPartners(
+  opts?: Partial<UseQueryOptions<DeliveryPartnersListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.partners(),
+    queryFn: () =>
+      apiFetch<DeliveryPartnersListResponse>("/api/logistics/partners"),
+    staleTime: 5 * 60_000,
     ...opts,
   });
 }

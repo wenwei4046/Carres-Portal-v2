@@ -110,7 +110,7 @@ function TileBody({
       </div>
       <div
         data-kpi-value
-        className="font-display text-[36px] leading-none mt-1.5 font-semibold tracking-tight text-base-900"
+        className="font-display text-[36px] leading-none mt-1.5 font-bold tracking-tight text-base-900"
       >
         {value}
       </div>

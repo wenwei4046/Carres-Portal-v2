@@ -103,7 +103,7 @@ function PipelineOrderCard({ order, onClick }: OrderCardProps) {
 
   // Mirror proto: white card, base-100 border, hover swaps to brand-signature.
   const baseCls =
-    "block w-full text-left bg-white border border-base-100 rounded-sm px-3 py-2.5 mb-1.5 last:mb-0 transition-colors";
+    "block w-full text-left bg-white border border-base-100 rounded-[4px] px-3 py-2.5 mb-1.5 last:mb-0 transition-colors";
   const interactiveCls = onClick
     ? "cursor-pointer hover:border-primary"
     : "";

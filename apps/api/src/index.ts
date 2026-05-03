@@ -12,6 +12,7 @@ import principalDealersRouter from "./routes/principal/dealers";
 import logisticsDashboardRouter from "./routes/logistics/dashboard";
 import logisticsMovementsRouter from "./routes/logistics/movements";
 import logisticsOrdersRouter from "./routes/logistics/orders";
+import logisticsPartnersRouter from "./routes/logistics/partners";
 import logisticsPosRouter from "./routes/logistics/pos";
 import logisticsWarehouseRouter from "./routes/logistics/warehouse";
 import salespersonsRouter from "./routes/salespersons";
@@ -42,6 +43,7 @@ api.route("/salespersons", salespersonsRouter);
 api.route("/logistics/dashboard", logisticsDashboardRouter);
 api.route("/logistics/movements", logisticsMovementsRouter);
 api.route("/logistics/orders", logisticsOrdersRouter);
+api.route("/logistics/partners", logisticsPartnersRouter);
 api.route("/logistics/pos", logisticsPosRouter);
 api.route("/logistics/warehouse", logisticsWarehouseRouter);
 
