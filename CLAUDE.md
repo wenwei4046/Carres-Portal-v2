@@ -305,11 +305,13 @@ Don't burn an hour spinning. Surface and ask.
 ## 17. Project status (update as we progress)
 
 ```
-Current phase: between phases — Phase 1 complete, Phase 2 not yet started
+Current phase: between phases — Phase 2C complete, Phase 3 not yet started
 Project started: 2026-05-02
-Last phase completed: Phase 1 (Schema + Auth) — 2026-05-02, tag phase-1-complete
-RLS perf baseline (10K orders): all 3 targets passed with 14-53x headroom
-Next decision pending: when to begin Phase 2 (Dealer flow)
+Last phase completed: Phase 2C (Dealer order mutations) — 2026-05-03, tag phase-2c-complete
+Tags so far: phase-0-complete · phase-1-complete · phase-2a-complete · phase-2b-complete · phase-2c-complete
+Test count: 159/159 green (shared 17 + api 65 + web 77)
+Next decision pending: Phase 3 scope — master plan says Principal (Week 5), recent notes drifted to "Logistics" — confirm with Loo
+Phase 2 leftovers (defer-or-fold into Phase 3): mobile bottom-tab nav, salesperson outlet scoping, top_up→approvals wiring
 ```
 
 Update this section at the start and end of every working session.
