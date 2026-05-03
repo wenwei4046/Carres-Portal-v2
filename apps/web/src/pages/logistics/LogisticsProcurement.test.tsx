@@ -1,0 +1,454 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import LogisticsProcurement from "./LogisticsProcurement";
+import type { CatalogResponse } from "@carres/shared";
+import type {
+  DeliveryPartnersListResponse,
+  LogisticsPosListResponse,
+  LogisticsPoListRow,
+  SuppliersListResponse,
+  WarehouseListResponse,
+} from "@/lib/queries";
+
+/**
+ * LogisticsProcurement page + 4 modals — covers the M5 Task 3 plan list
+ * (~12 tests).
+ *
+ * Same vi.mock(@/lib/queries) pattern as LogisticsOrders.test.tsx — each test
+ * sets the mocked hook return states before rendering. Mutations resolve to
+ * empty payloads; modal-specific submit behavior is exercised via the same
+ * suite (CreatePOModal validation + ReceivePOModal per-line + AssignPickup
+ * partner select).
+ */
+
+let posHookState: {
+  data: LogisticsPosListResponse | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  error: Error | null;
+  refetch: ReturnType<typeof vi.fn>;
+};
+let suppliersHookState: { data: SuppliersListResponse | undefined };
+let warehouseHookState: { data: WarehouseListResponse | undefined };
+let partnersHookState: { data: DeliveryPartnersListResponse | undefined };
+let catalogHookState: { data: CatalogResponse | undefined };
+const refetchSpy = vi.fn();
+const createMutateAsync = vi.fn().mockResolvedValue({});
+const receiveMutateAsync = vi.fn().mockResolvedValue({});
+const assignPickupMutateAsync = vi.fn().mockResolvedValue({});
+const reassignMutateAsync = vi.fn().mockResolvedValue({});
+
+vi.mock("@/lib/queries", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
+  return {
+    ...actual,
+    useLogisticsPos: () => posHookState,
+    useLogisticsSuppliers: () => suppliersHookState,
+    useLogisticsWarehouse: () => warehouseHookState,
+    useDeliveryPartners: () => partnersHookState,
+    useCatalog: () => catalogHookState,
+    useCreatePoMutation: () => ({
+      mutateAsync: createMutateAsync,
+      isPending: false,
+    }),
+    useReceivePoLineMutation: () => ({
+      mutateAsync: receiveMutateAsync,
+      isPending: false,
+    }),
+    useAssignPickupPartnerMutation: () => ({
+      mutateAsync: assignPickupMutateAsync,
+      isPending: false,
+    }),
+    useReassignPoWarehouseMutation: () => ({
+      mutateAsync: reassignMutateAsync,
+      isPending: false,
+    }),
+  };
+});
+
+function wrap(node: React.ReactNode) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={qc}>{node}</QueryClientProvider>;
+}
+
+const SUPPLIER_A = {
+  id: "11111111-1111-1111-1111-000000000001",
+  name: "Carres Manufacturing",
+  kind: "own_logistics" as const,
+  cat_covered: ["mattress", "bedframe"],
+  lead_time: "5–7 days",
+  contact: "+60 3-1111 1111",
+};
+const SUPPLIER_B = {
+  id: "11111111-1111-1111-1111-000000000002",
+  name: "Sofa Factory Co",
+  kind: "factory_pickup" as const,
+  cat_covered: ["sofa"],
+  lead_time: "10–14 days",
+  contact: "+60 3-2222 2222",
+};
+
+const WAREHOUSE_KL = {
+  id: "22222222-2222-2222-2222-000000000001",
+  name: "KL Warehouse",
+  address: "Subang Jaya",
+};
+const WAREHOUSE_PG = {
+  id: "22222222-2222-2222-2222-000000000002",
+  name: "Penang Warehouse",
+  address: "George Town",
+};
+
+const PARTNER_A = {
+  id: "33333333-3333-3333-3333-000000000001",
+  name: "GD Express",
+  contact: "+60 3-9999 9999",
+  zones: "Klang Valley",
+};
+
+function makePo(overrides: Partial<LogisticsPoListRow> = {}): LogisticsPoListRow {
+  return {
+    id: "PO-2031",
+    supplier_id: SUPPLIER_A.id,
+    warehouse_id: WAREHOUSE_KL.id,
+    status: "open",
+    sup_status: "pending",
+    dl: 1234,
+    dl_refs: null,
+    eta_date: "2026-05-15",
+    placed_at: "2026-05-01T00:00:00Z",
+    purchase_order_lines: [
+      { sku: "mattress:carres-cloud:King", qty: 5, received_qty: 0 },
+    ],
+    ...overrides,
+  };
+}
+
+function setLoaded(pos: LogisticsPoListRow[]) {
+  posHookState = {
+    data: { pos },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: refetchSpy,
+  };
+  suppliersHookState = {
+    data: { suppliers: [SUPPLIER_A, SUPPLIER_B] },
+  };
+  warehouseHookState = {
+    data: {
+      warehouses: [WAREHOUSE_KL, WAREHOUSE_PG],
+      byWarehouse: {},
+      totalsBySku: {},
+    },
+  };
+  partnersHookState = { data: { partners: [PARTNER_A] } };
+  catalogHookState = {
+    data: {
+      models: [],
+      skus: [
+        {
+          id: "s1",
+          modelId: "m1",
+          sku: "mattress:carres-cloud:King",
+          variant: "Carres Cloud · King",
+          variantKind: "size",
+          price: 3500,
+        },
+        {
+          id: "s2",
+          modelId: "m2",
+          sku: "sofa:nordic:3s",
+          variant: "Nordic Sofa · 3 seater",
+          variantKind: "preset",
+          price: 4500,
+        },
+        {
+          id: "s3",
+          modelId: "m1",
+          sku: "mattress:carres-cloud:Queen",
+          variant: "Carres Cloud · Queen",
+          variantKind: "size",
+          price: 3000,
+        },
+      ],
+      sofaFabrics: [],
+      addons: [],
+      floorConfig: { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 },
+    },
+  };
+}
+
+beforeEach(() => {
+  refetchSpy.mockClear();
+  createMutateAsync.mockClear();
+  receiveMutateAsync.mockClear();
+  assignPickupMutateAsync.mockClear();
+  reassignMutateAsync.mockClear();
+});
+
+describe("LogisticsProcurement page", () => {
+  it("1. renders the PO list table with rows", () => {
+    setLoaded([
+      makePo({ id: "PO-2031" }),
+      makePo({ id: "PO-2032", supplier_id: SUPPLIER_B.id }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.getByTestId("po-list-table")).toBeInTheDocument();
+    expect(screen.getByTestId("po-row-PO-2031")).toBeInTheDocument();
+    expect(screen.getByTestId("po-row-PO-2032")).toBeInTheDocument();
+  });
+
+  it("2. status filter chips narrow visible rows", () => {
+    setLoaded([
+      makePo({ id: "PO-2031", status: "open" }),
+      makePo({ id: "PO-2032", status: "received" }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    // Default filter is `open`
+    expect(screen.getByTestId("po-row-PO-2031")).toBeInTheDocument();
+    expect(screen.queryByTestId("po-row-PO-2032")).not.toBeInTheDocument();
+
+    // Switch to "Received"
+    fireEvent.click(screen.getByRole("tab", { name: /Received · 1/ }));
+    expect(screen.queryByTestId("po-row-PO-2031")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-row-PO-2032")).toBeInTheDocument();
+
+    // Switch to All
+    fireEvent.click(screen.getByRole("tab", { name: /^All · 2/ }));
+    expect(screen.getByTestId("po-row-PO-2031")).toBeInTheDocument();
+    expect(screen.getByTestId("po-row-PO-2032")).toBeInTheDocument();
+  });
+
+  it("3. clicking '+ New PO' opens CreatePOModal", () => {
+    setLoaded([makePo()]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.queryByText(/New purchase order/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    expect(screen.getByText(/New purchase order/)).toBeInTheDocument();
+    expect(screen.getByTestId("po-lines-table")).toBeInTheDocument();
+  });
+
+  it("4. CreatePOModal disables 'Issue PO' when no warehouse picked", () => {
+    setLoaded([]);
+    // Empty warehouses
+    warehouseHookState = {
+      data: { warehouses: [], byWarehouse: {}, totalsBySku: {} },
+    };
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
+    expect(issueBtn).toBeDisabled();
+  });
+
+  it("5. CreatePOModal submit calls useCreatePoMutation per supplier group", async () => {
+    setLoaded([]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    // Default first SKU is `mattress:carres-cloud:King` which maps to SUPPLIER_A.
+    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
+    expect(issueBtn).not.toBeDisabled();
+    fireEvent.click(issueBtn);
+    await waitFor(() => {
+      expect(createMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    const callArg = createMutateAsync.mock.calls[0][0] as {
+      supplierId: string;
+      warehouseId: string;
+      lines: { sku: string; qty: number }[];
+    };
+    expect(callArg.supplierId).toBe(SUPPLIER_A.id);
+    expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
+    expect(callArg.lines.length).toBeGreaterThan(0);
+  });
+
+  it("6. clicking 'Receive →' on a delivered PO opens ReceivePOModal", () => {
+    setLoaded([
+      makePo({
+        id: "PO-2050",
+        sup_status: "delivered",
+        purchase_order_lines: [
+          { sku: "sofa:nordic:3s", qty: 3, received_qty: 0 },
+        ],
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    // The default 'open' filter matches non-received, non-cancelled status ✔
+    fireEvent.click(screen.getByTestId("receive-po-PO-2050"));
+    expect(screen.getByText(/Receive PO-2050/)).toBeInTheDocument();
+    expect(screen.getByTestId("receive-po-lines-table")).toBeInTheDocument();
+  });
+
+  it("7. ReceivePOModal 'Receive all pending' presets each line qty to its pending value", () => {
+    setLoaded([
+      makePo({
+        id: "PO-2050",
+        sup_status: "delivered",
+        purchase_order_lines: [
+          { sku: "sofa:nordic:3s", qty: 3, received_qty: 1 },
+        ],
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("receive-po-PO-2050"));
+    // Pending = 3 - 1 = 2
+    fireEvent.click(screen.getByRole("button", { name: /Clear/ }));
+    expect(screen.getByText(/Σ 0 units this DO/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Receive all pending/ }));
+    expect(screen.getByText(/Σ 2 units this DO/)).toBeInTheDocument();
+  });
+
+  it("8. ReceivePOModal submit loops one mutation call per ticked line", async () => {
+    setLoaded([
+      makePo({
+        id: "PO-2051",
+        sup_status: "delivered",
+        purchase_order_lines: [
+          { sku: "sofa:nordic:3s", qty: 2, received_qty: 0 },
+          { sku: "mattress:carres-cloud:King", qty: 1, received_qty: 0 },
+        ],
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("receive-po-PO-2051"));
+    // Tick the signed checkbox (DO# is auto-suggested already)
+    const signedLabel = screen.getByText(
+      /Goods inspected and DO signed by warehouse/,
+    );
+    fireEvent.click(signedLabel.previousSibling as Element);
+    fireEvent.click(screen.getByRole("button", { name: /Mark received/ }));
+    await waitFor(() => {
+      expect(receiveMutateAsync).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("9. clicking 'Assign partner' on a ready_for_pickup PO opens AssignPickupDialog", () => {
+    setLoaded([
+      makePo({
+        id: "PO-2060",
+        sup_status: "ready_for_pickup",
+        supplier_id: SUPPLIER_B.id,
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("assign-pickup-PO-2060"));
+    expect(
+      screen.getByText(/Assign pickup partner · PO-2060/),
+    ).toBeInTheDocument();
+  });
+
+  it("10. AssignPickupDialog submit fires the assign-pickup mutation", async () => {
+    setLoaded([
+      makePo({
+        id: "PO-2061",
+        sup_status: "ready_for_pickup",
+        supplier_id: SUPPLIER_B.id,
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("assign-pickup-PO-2061"));
+    // Two buttons named "Assign partner": the row CTA and the modal's primary.
+    // The modal-rendered one is inside [role=dialog]; pick that one.
+    const dialog = screen.getByRole("dialog");
+    const modalAssignBtn = Array.from(
+      dialog.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((b) => b.textContent?.trim() === "Assign partner");
+    expect(modalAssignBtn).toBeDefined();
+    fireEvent.click(modalAssignBtn!);
+    await waitFor(() => {
+      expect(assignPickupMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    expect(assignPickupMutateAsync.mock.calls[0][0]).toEqual({
+      partnerId: PARTNER_A.id,
+    });
+  });
+
+  it("11. loading state renders the procurement-skeleton", () => {
+    posHookState = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: refetchSpy,
+    };
+    suppliersHookState = { data: { suppliers: [] } };
+    warehouseHookState = {
+      data: { warehouses: [], byWarehouse: {}, totalsBySku: {} },
+    };
+    partnersHookState = { data: { partners: [] } };
+    catalogHookState = {
+      data: {
+        models: [],
+        skus: [],
+        sofaFabrics: [],
+        addons: [],
+        floorConfig: { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 },
+      },
+    };
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.getByTestId("procurement-skeleton")).toBeInTheDocument();
+  });
+
+  it("12. error state renders Retry button which calls refetch", () => {
+    posHookState = {
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error("boom"),
+      refetch: refetchSpy,
+    };
+    suppliersHookState = { data: { suppliers: [] } };
+    warehouseHookState = {
+      data: { warehouses: [], byWarehouse: {}, totalsBySku: {} },
+    };
+    partnersHookState = { data: { partners: [] } };
+    catalogHookState = {
+      data: {
+        models: [],
+        skus: [],
+        sofaFabrics: [],
+        addons: [],
+        floorConfig: { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 },
+      },
+    };
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.getByText(/Couldn.+t load purchase orders/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Retry/ }));
+    expect(refetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("13. CreatePOModal warns when 2 suppliers match → auto-split notice", () => {
+    setLoaded([]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    // Add a second SKU mapped to SUPPLIER_B (sofa:...)
+    fireEvent.click(screen.getByRole("button", { name: /\+ Add SKU/ }));
+    const skuSelects = screen.getAllByLabelText(/Line \d+ SKU/);
+    expect(skuSelects.length).toBe(2);
+    fireEvent.change(skuSelects[1], { target: { value: "sofa:nordic:3s" } });
+    // The notice has "Auto-split:" followed by N separate POs in a <strong>;
+    // grab the parent of "Auto-split:" and check its text.
+    const autoSplitLabel = screen.getByText(/Auto-split:/);
+    expect(autoSplitLabel.parentElement?.textContent).toContain(
+      "2 separate POs",
+    );
+    // Both supplier names should also be in the same notice.
+    expect(autoSplitLabel.parentElement?.textContent).toContain(
+      "Carres Manufacturing",
+    );
+    expect(autoSplitLabel.parentElement?.textContent).toContain(
+      "Sofa Factory Co",
+    );
+  });
+
+  it("14. focus-trap: pressing Esc closes the CreatePOModal", () => {
+    setLoaded([]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    expect(screen.getByText(/New purchase order/)).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByText(/New purchase order/)).not.toBeInTheDocument();
+  });
+});
