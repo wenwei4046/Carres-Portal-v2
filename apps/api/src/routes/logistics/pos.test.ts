@@ -548,3 +548,76 @@ describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/logistics/pos/:id/reassign-warehouse", () => {
+  const PO_ID = "PO-2030";
+  const NEW_WH = "00000000-0000-0000-0000-000000000d01";
+
+  it("returns 200 on success and calls RPC with snake_case args", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { id: PO_ID, warehouse_id: NEW_WH, sup_status: "ready_for_pickup" }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/reassign-warehouse`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newWarehouseId: NEW_WH }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_reassign_po_warehouse", {
+      p_po_id: PO_ID,
+      p_new_warehouse_id: NEW_WH,
+    });
+  });
+
+  it("returns 422 when newWarehouseId is not uuid", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/reassign-warehouse`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newWarehouseId: "not-a-uuid" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("maps 22023 wrong_state → 422 (PO not in reassign_needed)", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "22023", message: "not in reassign state", details: "wrong_state" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/reassign-warehouse`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newWarehouseId: NEW_WH }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("returns 403 for non-logistics (no rpc)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/reassign-warehouse`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newWarehouseId: NEW_WH }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
