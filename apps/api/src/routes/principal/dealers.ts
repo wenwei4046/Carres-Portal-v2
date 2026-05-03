@@ -4,6 +4,7 @@ import {
   inviteDealerInput,
   setDealerStatusInput,
 } from "@carres/shared";
+import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -22,9 +23,8 @@ import type { AppEnv } from "../../types";
  * POST /:id/status — suspend/reactivate (active|suspended only).
  *
  * Error contract mirrors approvals.ts: SQLSTATE → HTTP status with stable
- * `code` in the body the frontend can branch on. The inline `mapPgError`
- * is duplicated from approvals.ts intentionally — extracting to a shared
- * helper is a separate cleanup commit.
+ * `code` in the body the frontend can branch on. Shared mapPgError +
+ * parseJsonBody come from lib/route-helpers (Pre-M4 B1 extract).
  */
 const principalDealersRouter = new Hono<AppEnv>();
 
@@ -36,32 +36,6 @@ principalDealersRouter.use("*", async (c, next) => {
   }
   await next();
 });
-
-/** SQLSTATE -> HTTP body+status. Mirrors approvals.ts inline mapper. */
-function mapPgError(error: { code?: string; message?: string }) {
-  switch (error.code) {
-    case "42501":
-      return {
-        status: 403 as const,
-        body: { error: "forbidden", code: "forbidden", message: error.message ?? "forbidden" },
-      };
-    case "42P01":
-      return {
-        status: 404 as const,
-        body: { error: "not_found", code: "not_found", message: error.message ?? "not found" },
-      };
-    case "22023":
-      return {
-        status: 422 as const,
-        body: { error: "invalid_param", code: "invalid_param", message: error.message ?? "invalid param" },
-      };
-    default:
-      return {
-        status: 500 as const,
-        body: { error: "rpc_failed", code: "rpc_failed", message: error.message ?? "rpc failed" },
-      };
-  }
-}
 
 // ----- GET / list -----
 principalDealersRouter.get("/", async (c) => {
@@ -149,23 +123,8 @@ principalDealersRouter.get("/:id", async (c) => {
 
 // ----- POST /invite -----
 principalDealersRouter.post("/invite", async (c) => {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    body = {};
-  }
-  const parsed = inviteDealerInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "invalid_param",
-        message: parsed.error.issues[0]?.message ?? "invalid input",
-      },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, inviteDealerInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("dealer_invite", {
     p_name: parsed.data.name,
@@ -181,23 +140,8 @@ principalDealersRouter.post("/invite", async (c) => {
 
 // ----- POST /:id/status -----
 principalDealersRouter.post("/:id/status", async (c) => {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    body = {};
-  }
-  const parsed = setDealerStatusInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "invalid_param",
-        message: parsed.error.issues[0]?.message ?? "invalid input",
-      },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, setDealerStatusInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("dealer_set_status", {
     p_dealer_id: c.req.param("id"),

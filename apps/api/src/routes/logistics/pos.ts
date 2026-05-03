@@ -8,6 +8,7 @@ import {
   reassignPoWarehouseInput,
   receivePoLineInput,
 } from "@carres/shared";
+import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -21,7 +22,8 @@ import type { AppEnv } from "../../types";
  * POST /:id/assign-pickup-partner, POST /:id/reassign-warehouse.
  *
  * Pattern: matches apps/api/src/routes/logistics/orders.ts (multi-endpoint
- * router with role-only middleware + inline mapPgError + RPC wraps).
+ * router with role-only middleware + shared mapPgError/parseJsonBody from
+ * lib/route-helpers + RPC wraps).
  */
 const logisticsPosRouter = new Hono<AppEnv>();
 
@@ -33,22 +35,6 @@ logisticsPosRouter.use("*", async (c, next) => {
   }
   await next();
 });
-
-/** SQLSTATE -> HTTP body+status. Mirrors logistics/orders.ts inline mapper. */
-function mapPgError(error: { code?: string; message?: string; details?: string }) {
-  switch (error.code) {
-    case "42501":
-      return { status: 403 as const, body: { error: "forbidden", code: "forbidden", message: error.message ?? "forbidden" } };
-    case "42P01":
-      return { status: 404 as const, body: { error: "not_found", code: "not_found", message: error.message ?? "not found" } };
-    case "22023":
-      return { status: 422 as const, body: { error: "invalid_param", code: "invalid_param", message: error.message ?? "invalid param" } };
-    case "P0001":
-      return { status: 422 as const, body: { error: "rule_violation", code: error.details ?? "invalid_param", message: error.message ?? "rule violation" } };
-    default:
-      return { status: 500 as const, body: { error: "rpc_failed", code: "rpc_failed", message: error.message ?? "rpc failed" } };
-  }
-}
 
 // ----- GET / list -----
 logisticsPosRouter.get("/", async (c) => {
@@ -85,15 +71,8 @@ logisticsPosRouter.get("/", async (c) => {
 
 // ----- POST / create -----
 logisticsPosRouter.post("/", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = createPoInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, createPoInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_create_po", {
     p_supplier_id: parsed.data.supplierId,
@@ -111,15 +90,8 @@ logisticsPosRouter.post("/", async (c) => {
 
 // ----- POST /:id/receive -----
 logisticsPosRouter.post("/:id/receive", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = receivePoLineInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, receivePoLineInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_receive_po_line", {
     p_po_id: c.req.param("id"),
@@ -135,15 +107,8 @@ logisticsPosRouter.post("/:id/receive", async (c) => {
 
 // ----- POST /:id/cancel -----
 logisticsPosRouter.post("/:id/cancel", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = cancelPoInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, cancelPoInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_cancel_po", {
     p_po_id: c.req.param("id"),
@@ -158,15 +123,8 @@ logisticsPosRouter.post("/:id/cancel", async (c) => {
 
 // ----- POST /:id/assign-pickup-partner -----
 logisticsPosRouter.post("/:id/assign-pickup-partner", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = assignPickupPartnerInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, assignPickupPartnerInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_assign_pickup_partner", {
     p_po_id: c.req.param("id"),
@@ -181,15 +139,8 @@ logisticsPosRouter.post("/:id/assign-pickup-partner", async (c) => {
 
 // ----- POST /:id/reassign-warehouse -----
 logisticsPosRouter.post("/:id/reassign-warehouse", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = reassignPoWarehouseInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, reassignPoWarehouseInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_reassign_po_warehouse", {
     p_po_id: c.req.param("id"),

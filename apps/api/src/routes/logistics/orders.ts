@@ -9,6 +9,7 @@ import {
   recheckStockInput,
   warehousePickInput,
 } from "@carres/shared";
+import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -22,7 +23,8 @@ import type { AppEnv } from "../../types";
  * POST /:id/abandon, POST /:id/warehouse, POST /:id/recheck-stock.
  *
  * Pattern: matches apps/api/src/routes/principal/dealers.ts (multi-endpoint
- * router with role-only middleware + inline mapPgError).
+ * router with role-only middleware + shared mapPgError/parseJsonBody from
+ * lib/route-helpers).
  */
 const logisticsOrdersRouter = new Hono<AppEnv>();
 
@@ -34,22 +36,6 @@ logisticsOrdersRouter.use("*", async (c, next) => {
   }
   await next();
 });
-
-/** SQLSTATE -> HTTP body+status. Mirrors principal/dealers.ts inline mapper. */
-function mapPgError(error: { code?: string; message?: string; details?: string }) {
-  switch (error.code) {
-    case "42501":
-      return { status: 403 as const, body: { error: "forbidden", code: "forbidden", message: error.message ?? "forbidden" } };
-    case "42P01":
-      return { status: 404 as const, body: { error: "not_found", code: "not_found", message: error.message ?? "not found" } };
-    case "22023":
-      return { status: 422 as const, body: { error: "invalid_param", code: "invalid_param", message: error.message ?? "invalid param" } };
-    case "P0001":
-      return { status: 422 as const, body: { error: "rule_violation", code: error.details ?? "invalid_param", message: error.message ?? "rule violation" } };
-    default:
-      return { status: 500 as const, body: { error: "rpc_failed", code: "rpc_failed", message: error.message ?? "rpc failed" } };
-  }
-}
 
 // ----- GET / list -----
 logisticsOrdersRouter.get("/", async (c) => {
@@ -195,15 +181,8 @@ logisticsOrdersRouter.get("/:id", async (c) => {
 
 // ----- POST /:id/assign-partner -----
 logisticsOrdersRouter.post("/:id/assign-partner", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = assignPartnerInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, assignPartnerInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_assign_partner", {
     p_order_id: c.req.param("id"),
@@ -218,15 +197,8 @@ logisticsOrdersRouter.post("/:id/assign-partner", async (c) => {
 
 // ----- POST /:id/attach-do -----
 logisticsOrdersRouter.post("/:id/attach-do", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = attachDoInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, attachDoInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_attach_do_and_deliver", {
     p_order_id: c.req.param("id"),
@@ -243,15 +215,8 @@ logisticsOrdersRouter.post("/:id/attach-do", async (c) => {
 
 // ----- POST /:id/abandon -----
 logisticsOrdersRouter.post("/:id/abandon", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = abandonOrderInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, abandonOrderInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_abandon_order", {
     p_order_id: c.req.param("id"),
@@ -266,15 +231,8 @@ logisticsOrdersRouter.post("/:id/abandon", async (c) => {
 
 // ----- POST /:id/warehouse -----
 logisticsOrdersRouter.post("/:id/warehouse", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = warehousePickInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, warehousePickInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_warehouse_pick", {
     p_order_id: c.req.param("id"),
@@ -289,15 +247,8 @@ logisticsOrdersRouter.post("/:id/warehouse", async (c) => {
 
 // ----- POST /:id/recheck-stock -----
 logisticsOrdersRouter.post("/:id/recheck-stock", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = recheckStockInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, recheckStockInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const orderId = c.req.param("id");
 
@@ -319,15 +270,8 @@ logisticsOrdersRouter.post("/:id/recheck-stock", async (c) => {
 
 // ----- POST /:id/issue-pos -----
 logisticsOrdersRouter.post("/:id/issue-pos", async (c) => {
-  let body: unknown;
-  try { body = await c.req.json(); } catch { body = {}; }
-  const parsed = issuePosForOrderInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, issuePosForOrderInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_issue_pos_for_order", {
     p_order_id: c.req.param("id"),
