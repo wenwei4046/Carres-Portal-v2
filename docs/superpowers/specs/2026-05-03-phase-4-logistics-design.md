@@ -378,3 +378,195 @@ M6 — Polish: smoke + /review + /design-review + reflection + tag (~3 hr)
 
 Total: ~23 hr active = 3-4 days. Achievable across 2-3 sessions.
 ```
+
+---
+
+## 17. Review-driven updates (2026-05-03 plan-eng-review)
+
+> This section supersedes overlapping content in §1-§16 above. Implementer reads §17 for the **decided execution plan**; §1-§16 captures the original brainstorm. 16 decisions confirmed by Loo on 2026-05-03.
+
+### 17.1 Schema accuracy fixes (Step 0 P1 findings)
+
+Three pre-existing discrepancies between spec §6 and `0001_init.sql`:
+
+1. **`is_logistics()` helper missing.** Spec referenced it 7× but `0002_rls.sql` only has `is_principal()` + `is_internal()`. Migration `0019` MUST add at top:
+   ```sql
+   create or replace function public.is_logistics()
+   returns boolean
+   language sql stable security definer as $$
+     select coalesce((select role from public.app_users where id = auth.uid()) = 'logistics', false)
+   $$;
+   ```
+
+2. **Column name `delivery_do_ref` is wrong.** Actual column on `orders` is `do_number` (line 274 of `0001_init.sql`). All RPC bodies in §6 that wrote `delivery_do_ref` MUST use `do_number`. `do_note` already exists too. No new column needed.
+
+3. **`dispatched_at` and `delivered_at` columns missing.** Migration `0019` MUST add 2 columns:
+   ```sql
+   alter table orders
+     add column dispatched_at timestamptz,
+     add column delivered_at  timestamptz;
+   ```
+
+### 17.2 Proto-vs-spec deviations (D1)
+
+After reading `reference/proto/logistics-*.jsx`, 4 deviations identified. Loo's decisions:
+
+| Deviation | Proto behavior | Spec behavior | Decision |
+|---|---|---|---|
+| D1.dispatch | 2-step modal (assign partner, then attach DO + deliver) | 1-step combined | **Follow proto.** Split into 2 RPCs: `logistics_assign_partner` + `logistics_attach_do_and_deliver`. 2 separate modals. Preserves "in-transit" visibility. |
+| D1.auto-PO | Auto-issued on Proceed (server-side) | Manual button | **Follow spec.** logistics clicks "Auto-issue POs" button. `proceed_order` extension only sets `awaiting_stock` / `ready_to_dispatch`, does NOT create POs. |
+| D1.sofa-split | All combined per supplier | Sofa lines split (1 PO per qty=1), others combined | **Follow spec.** Sofa per-piece tracking required for fabric/color/size customization. |
+| D1.reserved | No reservation; deduct at delivered | Add `stock_balances.reserved` + reservation logic | **Follow spec.** Concurrency-safe across multi-order dispatch window. |
+
+### 17.3 Proto add-ons (E1, E2, E3)
+
+Proto features missing from original spec, now added:
+
+- **E1. Re-check stock button** (proto `LogisticsOrders.jsx:408`). Awaiting_stock drawer "↻ Re-check stock" re-runs `pickWarehouseFor` + `stockShortageFor` in case stock landed via transfer between visits. New route: `POST /api/logistics/orders/:id/recheck-stock`.
+
+- **E2. Print DO button** (proto `LogisticsOrders.jsx:287`). Order drawer + delivered orders show "Print DO". **Server-side PDF endpoint** (Loo's choice over client-side `window.print()`). New route: `GET /api/logistics/orders/:id/print-do` → `application/pdf`. PDF library TBD during M2 (candidates: `@react-pdf/renderer` for Workers, Cloudflare Browser Rendering API).
+
+- **E3. Cross-order PO bundle** (proto `LogisticsOrders.jsx:78-126`). Awaiting_stock kanban column has multi-select checkboxes. Selected orders aggregate by category:
+  - Sofa: 1 PO per sofa unit, `dl` = source order's dl
+  - Mattress + Bedframe: aggregate SKUs across selected orders, group by supplier, multi-line PO with `dl_refs int[]` (array of all source DLs)
+  - Combined PO routing rule: same `category → suppliers.cat_covered` matching as auto-issue
+  - Schema: `purchase_orders.dl_refs int[]` column (17.4 below)
+
+### 17.4 Architecture decisions (A5-A8)
+
+| # | Decision | Implementation |
+|---|---|---|
+| A5 | Auto-promote concurrency: `SELECT FOR UPDATE` on order row + relevant `stock_balances` rows | `logistics_receive_po_line` opens with `select * from orders where id = ... for update;` then iterates stock_balances for affected SKUs with FOR UPDATE. ~50ms lock window. |
+| A6 | Post-Proceed cancel: add `logistics_abandon_order` RPC | Logistics drawer has "Abandon order" button when `status='proceed_order'`. Sets `status='cancelled'`, `logistics_stage='cancelled'`, releases `reserved` stock. Does NOT issue refund (Phase 5 Finance). |
+| A7 | Cross-order PO multi-DL: `purchase_orders.dl_refs int[]` array column | Sofa POs use `dl` (single int). Combined POs use `dl_refs` (array). drawer query: `where p.dl = $1 OR $1 = ANY(p.dl_refs)`. GIN index in `0017`. |
+| A8 | Print DO: server-side PDF gen | Library decision deferred to M2 (see TODOs). Phase 4 implementation may add 1-2 days for PDF gen exploration. |
+
+### 17.5 Code quality decisions (CQ1-CQ3)
+
+- **CQ1.** `0017` is destructive (drops `purchase_orders.sku, qty`). Safety guard at top:
+  ```sql
+  do $$
+  begin
+    if (select count(*) from purchase_orders) > 0 then
+      raise exception 'purchase_orders is not empty (% rows). Drop columns aborted.',
+        (select count(*) from purchase_orders);
+    end if;
+  end $$;
+  ```
+  Fails loudly if remote has unexpected data instead of silently dropping.
+
+- **CQ2.** Error contracts for new RPCs:
+  ```
+  is_logistics():           returns boolean (no errors)
+  proceed_order EXTEND:     existing 42501/42P01/22023 + P0001 codes preserved
+  logistics_assign_partner: 42501 forbidden / 42P01 order_not_found / 22023 wrong_stage / P0001 partner_not_found
+  logistics_attach_do_and_deliver: 42501 / 42P01 / 22023 / P0001 do_required
+  logistics_receive_po_line: 42501 / 42P01 po_not_found / 22023 wrong_status / P0001 over_received
+  logistics_adjust_stock:   42501 / P0001 negative_stock / P0001 below_reserved / P0001 reason_required
+  logistics_abandon_order:  42501 / 42P01 order_not_found / 22023 wrong_status / P0001 reason_required
+  logistics_warehouse_pick: 42501 / 42P01 / 22023 wrong_stage / P0001 has_open_pos
+  logistics_create_po:      42501 / P0001 supplier_not_found / P0001 warehouse_not_found / P0001 lines_empty / P0001 invalid_qty
+  logistics_issue_pos_for_order: 42501 / 42P01 / 22023 wrong_stage / P0001 already_issued (soft idempotency)
+  logistics_dashboard_summary: 42501 (read RPC, returns jsonb)
+  ```
+
+- **CQ3.** Zod schema names in `packages/shared/src/zod-schemas/logistics.ts`:
+  ```ts
+  assignPartnerInput        // { partnerId: uuid }
+  attachDoInput             // { doNumber: string, doNote?: string, signed: boolean }
+  receivePoLineInput        // { sku: string, receivedQty: number }  (poId is path param)
+  adjustStockInput          // { sku: string, warehouseId: uuid, delta: number, reason: string }
+  abandonOrderInput         // { reason: string }
+  createPoInput             // { supplierId: uuid, warehouseId: uuid, lines: { sku, qty }[], dlRefs?: number[] }
+  warehousePickInput        // { warehouseId: uuid }
+  issuePosForOrderInput     // (no body, action route)
+  recheckStockInput         // (no body, action route)
+  ```
+  9 schemas total.
+
+### 17.6 Test coverage (TS1)
+
+**Target: 100% coverage, ~140 tests.** Boil-the-Lake: cost difference between 55-test smoke and 140-test full coverage with CC is ~3 extra hours, but Phase 5 regression risk drops to near-zero.
+
+Breakdown:
+- Shared zod: 9 schemas × ~2 tests = ~18
+- Backend RPC tests: ~50
+- API route tests: 16 routes × ~4 = ~64
+- Frontend: ~30 (5 pages + 7 modals incl. cross-order multi-select UX critical test)
+- E2E Playwright: 2 (full happy path; cross-order combined PO bundle)
+
+Repo target: 215 + 140 = ~355 after Phase 4.
+
+**Critical gap tests (mandatory, no AskUserQuestion per skill REGRESSION RULE):**
+1. Concurrent `logistics_receive_po_line` race under FOR UPDATE locks (verify A5 actually serializes)
+2. `logistics_attach_do_and_deliver` stock deduction (qty -= line.qty AND reserved -= line.qty in same tx)
+3. `logistics_adjust_stock` rejects when delta would put qty below reserved (new CHECK constraint)
+4. Cross-order multi-select UX: aggregates SKU correctly across N selected orders, opens Procurement with prefilled lines
+
+### 17.7 Performance decisions (P1-P4)
+
+- **P1.** Dashboard implemented as single RPC `logistics_dashboard_summary()` returning jsonb. Mirrors Phase 3 pattern. 1 round-trip per render.
+- **P2.** Auto-promote loop is O(N×M) where N = awaiting orders, M = lines/order. Acceptable at MVP scale (< 100 awaiting). Optimization deferred to TODOs.
+- **P3.** GIN index on `purchase_orders.dl_refs` added in `0017`:
+  ```sql
+  create index po_dl_refs_idx on purchase_orders using gin(dl_refs);
+  ```
+- **P4.** Composite index `(warehouse_id, occurred_at desc)` on `stock_movements` deferred to TODOs.
+
+### 17.8 Updated scope summary
+
+```
+Pages:          5  (Dashboard, Orders, Procurement, Warehouse, Movements)
+                   was 8 — drop separate Dispatch page (modal in Orders drawer)
+
+Modals:         7  (DispatchModal, DOAttachModal, ReceivePOModal, IssuePOsModal,
+                    AdjustStockModal, CreatePOModal, AbandonOrderModal)
+                   was 4
+
+Routes:         16 (added: abandon, recheck-stock, print-do)
+                   was 14
+
+RPCs:           11 total (1 helper + 1 extension + 9 new)
+                   is_logistics()                    [helper, new]
+                   proceed_order                     [extend, no new RPC]
+                   logistics_dashboard_summary       [new]
+                   logistics_issue_pos_for_order     [new]
+                   logistics_receive_po_line         [new]
+                   logistics_assign_partner          [new — split from mark_dispatched]
+                   logistics_attach_do_and_deliver   [new — split]
+                   logistics_adjust_stock            [new]
+                   logistics_warehouse_pick          [new]
+                   logistics_create_po               [new — accepts dl_refs]
+                   logistics_abandon_order           [new — A6]
+
+Migrations:     3  (0017 + 0018 + 0019)
+                   0017 — purchase_order_lines + dl_refs[] + GIN index + assertion guard + drop sku/qty
+                   0018 — stock_balances.reserved + check constraints
+                   0019 — is_logistics() + dispatched_at/delivered_at + 9 new RPCs + extend proceed_order
+
+Tests:          ~140 (was 55)
+
+Estimate:       4-6 day human / ~1-1.5 day CC
+                was 3-4 day human (added: PDF gen + 1 RPC + 2 routes + scope clarifications)
+```
+
+### 17.9 Risks resolved by review
+
+- §15 risk #1 (`delivery_do_ref` / `dispatched_at` / `delivered_at`): RESOLVED via 17.1.
+- §15 risk #5 (auto-promote race): RESOLVED via A5 FOR UPDATE strategy (17.4).
+- §15 risks #2, #3, #4, #6, #7: unchanged, addressed during M1-M3 implementation.
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 16 issues / 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+**UNRESOLVED:** 0
+**VERDICT:** ENG CLEARED — ready to implement Phase 4 M1 (foundation). Loo confirmed all 16 review decisions on 2026-05-03.

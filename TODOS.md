@@ -85,3 +85,91 @@ Phase 2 acceptance items NOT covered by 2C (carry-forward from `phase-2c-reflect
 **Revisit when**: Phase 9 deploy planning confirms no HS256 use case.
 
 **Surfaced by**: `phase-1-reflection.md` §6.
+
+---
+
+## P4-polish-cancel-flow
+
+**What**: Phase 4 MVP added `logistics_abandon_order` RPC for post-Proceed cancel (status='cancelled', release reserved stock). It does NOT issue refund or coordinate with Finance. Full post-Proceed cancel flow needs: (a) refund issuance via existing approvals table, (b) reservation release (already done), (c) audit trail linking cancel ↔ refund ↔ stock movement.
+
+**Why deferred**: MVP needs at least an escape hatch (abandon = release stock). Full flow requires Finance phase coordination and is not in Phase 4 scope.
+
+**Revisit when**: Phase 4 polish (after MVP ship) OR Phase 5 Finance — Phase 5 likely better since refund issuance is finance domain.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-03 finding A6 on Phase 4 spec.
+
+---
+
+## P4-perf-receive-loop
+
+**What**: `logistics_receive_po_line` after receiving a line iterates ALL `awaiting_stock` orders to recompute shortages. O(N×M) where N=awaiting orders, M=lines per order. At MVP scale (<100 awaiting) fine; at >500 awaiting becomes slow.
+
+**Why deferred**: Premature optimization at MVP volume. Phase 4 will have <50 awaiting orders during burn-in.
+
+**Revisit when**: Production receive p95 latency exceeds 500ms OR `awaiting_stock` order count regularly exceeds 100. Optimization: filter to orders that have ANY line with the just-received SKU first (subset query before iterate).
+
+**Surfaced by**: `/plan-eng-review` 2026-05-03 finding P2 on Phase 4 spec.
+
+---
+
+## P4-perf-movements-index
+
+**What**: Add composite index `(warehouse_id, occurred_at desc)` on `stock_movements` for the Movements page filter-by-warehouse query.
+
+**Why deferred**: Existing indexes `(sku)` and `(occurred_at desc)` cover the main use cases. Filter-by-warehouse uses sequential scan + sort which is fine at <10k movements. Phase 4 won't generate that volume in MVP.
+
+**Revisit when**: Movements page p95 > 500ms OR `stock_movements` row count exceeds 50k.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-03 finding P4 on Phase 4 spec.
+
+---
+
+## phase-5-logistics-cancel
+
+**What**: Phase 5 (Finance) needs proper post-Proceed cancel flow with refund coordination. Spec §12 lists this as NOT in MVP. Builds on `logistics_abandon_order` (Phase 4 MVP) by adding the refund leg.
+
+**Why deferred**: Refund issuance is Finance phase domain. Phase 4 only releases reserved stock; doesn't return customer money.
+
+**Revisit when**: Phase 5 Finance kickoff. Likely overlaps with the existing `refunds` table and `approval_decide` flow.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-03 finding A6 + spec §12 NOT in MVP.
+
+---
+
+## phase-7-pdf-gen-options
+
+**What**: Phase 4 chose server-side PDF gen for Print DO endpoint (`GET /api/logistics/orders/:id/print-do`). Library decision deferred to M2 backend implementation. Candidates:
+
+- `@react-pdf/renderer` — pure JS, runs in Cloudflare Workers, deterministic but layout differs from screen
+- Cloudflare Browser Rendering API (beta) — headless Chrome, prints exactly like screen, ~$0.30/1k renders
+- External PDF service (Resend / Documenso) — adds dependency but offloads complexity
+
+**Why deferred**: Decision needs hands-on prototyping during M2 backend session. Pre-deciding without running code risks picking the wrong option.
+
+**Revisit when**: Phase 4 M2 backend session, or sooner if Loo wants email-DO-to-customer (Phase 7 territory).
+
+**Surfaced by**: `/plan-eng-review` 2026-05-03 finding A8 (E2 add-on) on Phase 4 spec.
+
+---
+
+## phase-4-reservation-expiry
+
+**What**: When `logistics_stage='ready_to_dispatch'`, stock is reserved but not deducted. If logistics never dispatches (forgotten order), reservation sits forever. Auto-release after N days (e.g. 7) prevents zombie reservations.
+
+**Why deferred**: Spec §12 explicit NOT in MVP. Edge case at MVP scale; not urgent.
+
+**Revisit when**: Phase 4 polish or Phase 5. Implementation: cron RPC `logistics_release_stale_reservations()` runs daily, releases reservations older than 7 days, writes audit + history.
+
+**Surfaced by**: `/plan-eng-review` 2026-05-03 confirmed spec §12 deferral.
+
+---
+
+## phase-4-multi-warehouse-split
+
+**What**: Currently `pickWarehouseFor` picks ONE warehouse with full stock. If no single warehouse has full stock for all lines, falls back to first warehouse → shortages (auto-issue PO from that warehouse). Multi-warehouse split (one order's lines drawn from 2+ warehouses) not supported.
+
+**Why deferred**: Spec §12 explicit. Adds significant complexity to dispatch logic (which warehouse owns which lines, multi-DO printing). Unnecessary at MVP scale.
+
+**Revisit when**: Loo's network grows to 3+ warehouses with frequent inter-warehouse imbalance. Or when dealer feedback shows "can my order ship from KL even if half the lines are in Penang?"
+
+**Surfaced by**: `/plan-eng-review` 2026-05-03 confirmed spec §12 deferral.
