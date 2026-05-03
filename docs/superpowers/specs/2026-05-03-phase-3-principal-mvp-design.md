@@ -1,8 +1,8 @@
 # Phase 3 — Principal MVP Design
 
-> **Status**: Approved by Loo · 2026-05-03
+> **Status**: Approved by Loo · 2026-05-03 · `/plan-eng-review` clean
 > **Scope**: 3-page MVP (Dashboard + Approvals + Dealers) + Invite dealer flow
-> **Estimate**: ~14 hrs / 1.5–2 days
+> **Estimate**: ~17 hrs / 2–2.5 days (post eng-review revision)
 > **Prerequisite**: Phase 2C complete (tag `phase-2c-complete`)
 
 ---
@@ -176,23 +176,32 @@ Submit flow:
 
 ## 4. Backend changes
 
-### 4.1 New / modified RPCs (1 new migration: `0012_principal_admin.sql`)
+### 4.1 Migrations
 
-| RPC | Purpose | Auth |
-|---|---|---|
-| `dealer_invite(name text, region text, contact text)` | Create dealer (status=pending) + new_dealer approval | `is_principal()` only |
-| `dealer_set_status(dealer_id uuid, new_status dealer_status, reason text)` | Suspend / reactivate, with audit log | `is_principal()` only |
-| `dealer_set_terms(dealer_id uuid, credit_limit numeric, payment_terms text)` | Update credit_limit + payment_terms | `is_principal()` only |
-| `principal_dashboard_summary()` | Returns JSON `{ kpis, leaderboard, pending_approvals, audit_recent, alerts }` for one round-trip | `is_principal()` only |
+Three new SQL files, all additive:
 
-All `security definer`, mirror Phase 2C pattern. Use SQLSTATE codes:
-- `42501` forbidden
-- `42P01` not_found
-- `22023` invalid_param
+| File | Adds |
+|---|---|
+| `0012_add_rejected_dealer_status.sql` | `alter type dealer_status add value 'rejected'` (must be standalone — Postgres rule: can't alter enum + use new value in same tx) |
+| `0013_principal_admin.sql` | `dealer_invite` + `dealer_set_status` + `dealer_set_terms` + `principal_dashboard_summary` RPCs · `audit_log_occurred_at_idx` index for Recent Activity tile perf |
+| `0014_approval_decide_extend.sql` | Extends `approval_decide` to handle `new_dealer` (approve→active, reject→rejected) |
 
-### 4.2 Modified `approval_decide` RPC (1 new migration: `0013_approval_decide_extend.sql`)
+### 4.2 RPC details
 
-Add `new_dealer` side-effect (after existing refund block):
+| RPC | Purpose | Auth | Idempotency |
+|---|---|---|---|
+| `dealer_invite(name text, region text, contact text)` | Create dealer (status=pending) + new_dealer approval | `is_principal()` only | **Yes** — checks for existing pending dealer with same `(name, region)` and returns existing record without creating duplicate |
+| `dealer_set_status(dealer_id uuid, new_status dealer_status, reason text)` | Suspend / reactivate, with audit log | `is_principal()` only | Natural — same-status update is no-op |
+| `dealer_set_terms(dealer_id uuid, credit_limit numeric, payment_terms text)` | Update credit_limit + payment_terms | `is_principal()` only | Natural |
+| `principal_dashboard_summary()` | Returns JSON `{ kpis, leaderboard, pending_approvals, audit_recent, alerts }` for one round-trip | `is_principal()` only | Pure read |
+
+All `security definer`, mirror Phase 2C pattern. SQLSTATE codes: `42501` forbidden · `42P01` not_found · `22023` invalid_param.
+
+**Performance**: `principal_dashboard_summary` and dealer list both use **lateral join** for per-dealer order/gmv/outstanding aggregations — single query, no N+1. SQL examples in implementation plan.
+
+### 4.3 Modified `approval_decide` RPC (in `0014_approval_decide_extend.sql`)
+
+Adds `new_dealer` side-effect after existing refund block:
 ```sql
 if v_app.kind = 'new_dealer' and v_app.refers_to is not null then
   update dealers
@@ -203,9 +212,15 @@ if v_app.kind = 'new_dealer' and v_app.refers_to is not null then
 end if;
 ```
 
-(Note: `dealer_status` enum needs to include `'rejected'`. If it doesn't, only handle approve case and leave rejected dealers as `pending` for manual cleanup. **TBD: confirm enum values during implementation** — if missing, skip the rejected-side update.)
+`dealer_status` enum is extended in `0012` first (separate migration; Postgres requires it). Frontend `Dealers` page filters out `status='rejected'` by default; "Rejected" filter chip surfaces them on demand.
 
-### 4.3 NO RLS policy changes (RED LINE intact ✅)
+### 4.4 Cross-cutting code-quality decisions
+
+- **Toast copy**: extracted to `apps/web/src/lib/toast-copy.ts` (constants only). Phase 2C convention preserved.
+- **Dealer detail shape**: `fetchAndShapeDealer` helper in `apps/api/src/routes/principal/dealers.ts` mirrors Phase 2C's `fetchAndShapeOrder`. All mutation routes + GET `/:id` use it for identical response shape.
+- **Sidebar disabled state**: greyed text (`text-base-400`), `cursor-not-allowed`, hover tooltip showing the target Phase. No click-toast — silently no-op (less noise).
+
+### 4.5 NO RLS policy changes (RED LINE intact ✅)
 
 Principal already has read-everything from Phase 1 (`app_role() = 'principal'` in policies). All new mutations go through `security definer` RPCs with internal `is_principal()` guard.
 
@@ -305,23 +320,27 @@ Login redirect logic: principal role → `/principal`; existing dealer → `/dea
 | `packages/shared` | New zod schemas (decide / invite / set-status / set-terms) | ~5 |
 | `apps/api` | All 7 new routes — happy path + role guard + 422 cases + cross-role side-effects | ~20 |
 | `apps/web` | KPI calculations + AlertsTile empty-state + Approval drawer + InviteDealerModal validation | ~10 |
+| **RLS deny** | Non-principal (dealer / logistics / finance) hitting `/api/principal/*` returns 403 | **~5** |
+| **Idempotency** | Double-submit `dealer_invite` returns same dealer; double-Approve same id no-op | **~2** |
+| **Edge** | Dealer drawer with 0 recent orders empty state | **~1** |
 
-**Target**: 159 (current) + ~35 = **~194 total green**.
+**Target**: 159 (current) + ~43 = **~202 total green**.
 
-E2E (Playwright, optional for MVP):
-- Login as Sara → dashboard loads → click pending count → Approvals → approve refund → toast → list refreshes
-- Login as Sara → Dealers → suspend BedHouse KL → reload → still suspended
+**E2E (Playwright, included in MVP)**:
+- Spec 1: Login as Sara → dashboard loads → click pending KPI → Approvals → Approve refund (DL-1239) → success toast → refunds.status flips → list re-renders without manual refresh
+- (Optional, defer if time tight): Invite dealer flow end-to-end
 
 ---
 
 ## 8. Migrations summary
 
 ```
-supabase/migrations/0012_principal_admin.sql       — dealer_invite + dealer_set_status + dealer_set_terms + principal_dashboard_summary
-supabase/migrations/0013_approval_decide_extend.sql — add new_dealer side-effect to approval_decide
+supabase/migrations/0012_add_rejected_dealer_status.sql  — alter type dealer_status add value 'rejected' (standalone, Postgres rule)
+supabase/migrations/0013_principal_admin.sql             — dealer_invite + dealer_set_status + dealer_set_terms + principal_dashboard_summary + audit_log_occurred_at_idx
+supabase/migrations/0014_approval_decide_extend.sql      — add new_dealer side-effect to approval_decide (uses 'rejected' from 0012)
 ```
 
-Both additive. **No table changes**, only new functions + extended function body. Apply via `mcp__supabase__apply_migration` after local commit (Phase 2B/2C pattern).
+All additive. One enum value addition + one index + new functions + extended function body. **No table column changes, no destructive ops.** Apply via `mcp__supabase__apply_migration` after local commit (Phase 2B/2C pattern). 0012 must apply before 0014 (Postgres can't use a newly-added enum value in the same transaction it was created).
 
 ---
 
@@ -370,8 +389,21 @@ Both additive. **No table changes**, only new functions + extended function body
 
 ## 12. Risks & open questions
 
-1. **`dealer_status` enum**: confirm during implementation whether `'rejected'` value exists. If not, MVP only handles approve→active flow for new_dealer; rejection leaves dealer as pending (acceptable, unlikely in practice).
+1. ~~`dealer_status` enum~~ ✅ Resolved per `/plan-eng-review` A1: add `'rejected'` via migration `0012`.
 2. **`principal_dashboard_summary` JSON shape**: define and document; freeze before any frontend tile starts consuming.
 3. **Audit log entries from Phase 2C `top_up_order`**: already write `'order.top_up'` action. Confirm Recent Activity tile RoleChip handles all action shapes.
 4. **Race: rapid approve/reject**: TanStack Query invalidation should serialize, but worth a manual test of "click approve, click reject quickly" to confirm UX.
-5. **Search performance on Dealers**: current implementation client-side filter. At ~10 dealers fine; revisit at 100+.
+5. **Search/pagination on Dealers + Approvals**: current implementation client-side filter, no pagination. At ~10 entries fine; revisit at 50+. Captured as TODO (`pagination-deferred`).
+6. **Dashboard 0-data empty states**: Spec doesn't test "0 dealers / 0 orders" UI — won't happen in practice (seed always populated). Skipped intentionally.
+
+## 13. Eng-review log
+
+`/plan-eng-review` run 2026-05-03 against this spec. Decisions accepted:
+- **A1** Add `'rejected'` to `dealer_status` enum (migration `0012`)
+- **A2** `dealer_invite` made idempotent (check existing pending dealer with same name+region)
+- **A3** Pagination deferred to Phase 9 (TODO captured)
+- **Code quality**: `toast-copy.ts` constants · `fetchAndShapeDealer` helper · disabled-nav silent-no-op
+- **Tests**: +5 RLS-deny + 1 Playwright E2E + 2 idempotency + 1 drawer empty state = **+8 tests** (total ~43 new, ~202 repo-wide)
+- **Performance**: lateral join for dealer aggregations · `audit_log_occurred_at_idx` in 0013
+
+**Updated estimate**: ~17 hrs (was 14) · **24+ files** (was 22) · **3 migrations** (was 2)

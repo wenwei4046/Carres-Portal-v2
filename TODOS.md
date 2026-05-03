@@ -1,0 +1,41 @@
+# TODOS
+
+Deferred work captured during planning / review. Each item explains *why* it was deferred and *when* to revisit.
+
+---
+
+## pagination-deferred
+
+**What**: Server-side pagination for `/api/principal/approvals` and `/api/principal/dealers` (and the corresponding UI infinite-scroll or page controls).
+
+**Why deferred**: Current data volume is ~5 dealers + ~4 approvals (seed). Client-side filtering is fine. Pagination would be over-engineering today.
+
+**Revisit when**: Either (a) Phase 9 go-live data load planning shows >50 dealers / >50 active approvals, or (b) page load time on these routes exceeds 500ms in production.
+
+**Surfaced by**: `/plan-eng-review` on `docs/superpowers/specs/2026-05-03-phase-3-principal-mvp-design.md` (finding A3).
+
+**Where to start**: Add `?limit=` + `?cursor=` to the two routes; introduce shared `paginated<T>` response type in `packages/shared`. UI: switch `useQuery` → `useInfiniteQuery` with cursor in queryKey.
+
+---
+
+## phase-2-leftovers
+
+Phase 2 acceptance items NOT covered by 2C (carry-forward from `phase-2c-reflection.md`):
+
+1. **Mobile (<768px) bottom-tab navigation** — touched lightly in 2A but not fully audited against `proto/dealer-mobile.jsx`. Triage: do as Phase 2D sweep, or accept as "desktop-first MVP" and revisit after go-live.
+2. **Salesperson role outlet scoping** — not yet implemented. Spec'd in Phase 2 acceptance #6 but no code. Triage: Phase 2D or fold into Phase 3.5.
+3. **Top-up requests appearing in `approvals` table** — Phase 2C `top_up_order` writes to `order_history` only; `dealer_topup` (Phase 1) bumps `deposit_balance` directly. Master plan §572 envisioned an approval gate but Loo confirmed (`/plan-eng-review` 2026-05-03) that direct self-record is the chosen flow. **No work needed** — close this item.
+
+**Surfaced by**: `phase-2c-reflection.md` §10 acceptance check.
+
+---
+
+## supabase-jwt-secret-cleanup
+
+**What**: Remove `SUPABASE_JWT_SECRET` from `.dev.vars`, `.dev.vars.example`, and the `Bindings` type in `apps/api/src/index.ts`.
+
+**Why deferred**: Phase 1 switched to ES256/JWKS; secret is unused but kept for potential HS256 service-to-service tokens in Phase 9.
+
+**Revisit when**: Phase 9 deploy planning confirms no HS256 use case.
+
+**Surfaced by**: `phase-1-reflection.md` §6.
