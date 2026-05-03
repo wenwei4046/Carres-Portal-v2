@@ -193,6 +193,10 @@ export interface OrderRow {
   partner_eta: string | null;
   do_number: string | null;
   do_note: string | null;
+  // Logistics timestamps (migration 0019). `dispatched_at` set by
+  // logistics_assign_partner; `delivered_at` set by logistics_attach_do_and_deliver.
+  dispatched_at: string | null;
+  delivered_at: string | null;
   invoice_no: string | null;
   invoiced_at: string | null;
   placed_at: string;
@@ -229,10 +233,14 @@ export interface OrderHistoryRow {
 export interface PurchaseOrderRow {
   id: string;
   dl: number | null;
+  // Cross-order PO bundle backrefs (migration 0017). Combined POs that group
+  // SKUs across N source orders populate this; single-order POs use `dl`.
+  // GIN-indexed for `= ANY(dl_refs)` lookups (drawer + linked-PO queries).
+  dl_refs: number[] | null;
   supplier_id: string;
   warehouse_id: string;
-  sku: string;
-  qty: number;
+  // Single-line `sku` + `qty` columns were dropped in migration 0017; lines
+  // now live in the `purchase_order_lines` child table — see PurchaseOrderLineRow.
   status: POStatus;
   sup_status: POSupStatus;
   delivery_partner_id: string | null;
@@ -242,6 +250,18 @@ export interface PurchaseOrderRow {
   customer_rejection: Record<string, unknown> | null;
   pay_status: POPayStatus;
   placed_at: string;
+}
+
+/**
+ * `purchase_order_lines` child table (migration 0017). Composite PK on
+ * (po_id, sku); CHECK constraint enforces received_qty <= qty so over-receipt
+ * is impossible at the DB layer.
+ */
+export interface PurchaseOrderLineRow {
+  po_id: string;
+  sku: string;
+  qty: number;
+  received_qty: number;
 }
 
 export interface POHistoryRow {

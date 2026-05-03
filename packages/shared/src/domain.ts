@@ -114,6 +114,9 @@ export interface StockBalance {
   sku: string;
   warehouseId: string;
   qty: number;
+  // Reserved-against-pending-orders count (migration 0018). Phase 4 M5
+  // warehouse + drawer views need it to compute available = qty - reserved.
+  reserved: number;
 }
 
 export interface StockMovement {
@@ -195,6 +198,10 @@ export interface Order {
   partnerEta: string | null;
   doNumber: string | null;
   doNote: string | null;
+  // Logistics timestamps (migration 0019). dispatchedAt set on D1 step 1;
+  // deliveredAt set on D1 step 2 (DO attach + sign).
+  dispatchedAt: string | null;
+  deliveredAt: string | null;
 
   invoiceNo: string | null;
   invoicedAt: string | null;
@@ -209,10 +216,11 @@ export interface Order {
 export interface PurchaseOrder {
   id: string;
   dl: number | null;
+  // Cross-order bundle backrefs (migration 0017). See PurchaseOrderRow comment.
+  dlRefs: number[] | null;
   supplierId: string;
   warehouseId: string;
-  sku: string;
-  qty: number;
+  // Single-sku/qty columns dropped in 0017 — lines live in purchase_order_lines.
   status: "open" | "received" | "cancelled";
   supStatus:
     | "pending" | "acknowledged" | "in_production"
@@ -224,6 +232,16 @@ export interface PurchaseOrder {
   etaDate: string | null;
   payStatus: "unpaid" | "scheduled" | "paid";
   placedAt: string;
+  // Optionally hydrated by detail handlers via PostgREST nested fetch.
+  lines?: PurchaseOrderLine[];
+}
+
+/** Child rows of a PO (migration 0017). */
+export interface PurchaseOrderLine {
+  poId: string;
+  sku: string;
+  qty: number;
+  receivedQty: number;
 }
 
 export interface Payment {

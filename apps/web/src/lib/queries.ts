@@ -6,19 +6,31 @@ import {
   type UseQueryOptions,
 } from "@tanstack/react-query";
 import {
+  type AbandonOrderInput,
+  type AdjustStockInput,
+  type AssignPartnerInput,
+  type AssignPickupPartnerInput,
+  type AttachDoInput,
+  type CancelOrderInput,
   type CatalogResponse,
   type CreateOrderInput,
+  type CreatePoInput,
   type DealerSelf,
+  type ListLogisticsOrdersQuery,
+  type ListMovementsQuery,
+  type ListPurchaseOrdersQuery,
   type Order,
   type OrdersListResponse,
   type OrderStatus,
   type OutletsListResponse,
+  type ReassignPoWarehouseInput,
+  type ReceivePoLineInput,
   type SalespersonsListResponse,
-  type CancelOrderInput,
   type SetOrderAddressInput,
   type SetOrderDateInput,
   type TopUpOrderInput,
   type UpdateOrderInput,
+  type WarehousePickInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 
@@ -41,6 +53,24 @@ export const qk = {
       ["principal", "dealers", filters ?? {}] as const,
     dealer:    (id: string) => ["principal", "dealers", id] as const,
   },
+  // Phase 4 — HQ Logistics namespace. Same nested-key strategy as `principal`
+  // so M5 mutation hooks can blast `["logistics"]` (or a sub-tree) on each
+  // ripple — e.g. assign-partner invalidates orders + dashboard; PO receive
+  // invalidates pos + warehouse + dashboard. Filter keys are typed via the
+  // `List*Query` zod-derived shapes from `@carres/shared` so a wrong key fails
+  // typecheck at the call site rather than silently breaking cache reads.
+  logistics: {
+    dashboard: () => ["logistics", "dashboard"] as const,
+    orders:    (filters?: LogisticsOrderFilters) =>
+      ["logistics", "orders", filters ?? {}] as const,
+    order:     (id: string) => ["logistics", "orders", id] as const,
+    pos:       (filters?: LogisticsPoFilters) =>
+      ["logistics", "pos", filters ?? {}] as const,
+    po:        (id: string) => ["logistics", "pos", id] as const,
+    warehouse: () => ["logistics", "warehouse"] as const,
+    movements: (filters?: MovementsFilters) =>
+      ["logistics", "movements", filters ?? {}] as const,
+  },
 };
 
 export interface OrderFilters {
@@ -62,6 +92,18 @@ export interface PrincipalDealerFilters {
   status?: "active" | "suspended" | "pending";
   search?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 4 — Logistics filter shapes
+// ---------------------------------------------------------------------------
+// Re-exported as plain type aliases of the zod-inferred query shapes from
+// @carres/shared/schemas/logistics. The web side only needs these as cache-key
+// values + URLSearchParams sources — no runtime parse here, the server already
+// owns that boundary. Keeping the alias means a schema change in one file
+// updates both the API and the React Query keys without drift.
+export type LogisticsOrderFilters = Partial<ListLogisticsOrdersQuery>;
+export type LogisticsPoFilters = Partial<ListPurchaseOrdersQuery>;
+export type MovementsFilters = Partial<ListMovementsQuery>;
 
 function toSearch(f?: OrderFilters): string {
   if (!f) return "";
@@ -712,6 +754,717 @@ export function useDealerSetStatus(
       opts?.onSuccess?.(
         ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
       );
+    },
+    ...opts,
+  });
+}
+
+// ===========================================================================
+// Phase 4 — HQ Logistics hooks
+// ===========================================================================
+// API contract is snake_case across the board (matching how Phase 3 principal
+// dashboard / approvals payloads are forwarded verbatim from the RPCs). The
+// list endpoints returning PostgREST-shaped rows keep the snake_case row
+// fields too — adapters live at the consumer page if/when they need camelCase.
+//
+// Mutation hooks follow the Phase 2C / Phase 3 pattern:
+//   1. Closure-capture the path-id (e.g. `useAssignPartnerMutation(orderId)`)
+//      so callers cannot accidentally mismatch the URL param vs. the cache key.
+//   2. `onSuccess` `await`s the relevant invalidations BEFORE returning so the
+//      next render sees authoritative data — closes the "out of sync drawer"
+//      class of bugs we hit in Phase 2C.
+//   3. Forward the caller's `onSuccess` last (signature-agnostic spread).
+
+// --- Shared response shapes (snake_case, forwarded from RPC / route) -------
+
+/** GET /api/logistics/dashboard — `logistics_dashboard_summary()` payload. */
+export interface LogisticsDashboardKpis {
+  pending_dispatch: number;
+  in_transit: number;
+  open_pos: number;
+  late_orders: number;
+  active_orders: number;
+  active_gmv: number;
+}
+export interface LogisticsPipelineCounts {
+  awaiting_stock: number;
+  ready_to_dispatch: number;
+  dispatched: number;
+}
+export interface LogisticsOpenPoRow {
+  id: string;
+  supplier_id: string;
+  warehouse_id: string;
+  status: string;
+  sup_status: string;
+  eta_date: string | null;
+  placed_at: string;
+  dl: number | null;
+  dl_refs: number[] | null;
+}
+export interface LogisticsLowStockRow {
+  sku: string;
+  warehouse_id: string;
+  qty: number;
+  reserved: number;
+  available: number;
+}
+export interface LogisticsAuditRow {
+  id: string;
+  role: string;
+  actor_text: string | null;
+  action: string;
+  dealer_id: string | null;
+  ref: string | null;
+  occurred_at: string;
+}
+export interface LogisticsAlerts {
+  out_of_stock_skus: number;
+}
+export interface LogisticsDashboardResponse {
+  kpis: LogisticsDashboardKpis;
+  pipeline: LogisticsPipelineCounts;
+  open_pos: LogisticsOpenPoRow[];
+  low_stock: LogisticsLowStockRow[];
+  audit_recent: LogisticsAuditRow[];
+  alerts: LogisticsAlerts;
+}
+
+/** Row in GET /api/logistics/orders. Embedded `dealers(name)` is a PostgREST
+ *  nested fetch shape — the route forwards it verbatim. */
+export interface LogisticsOrderListRow {
+  id: string;
+  dl: number;
+  status: "proceed_order" | "delivered";
+  logistics_stage:
+    | "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered" | null;
+  warehouse_id: string | null;
+  customer_name: string;
+  placed_at: string;
+  delivery_date: string | null;
+  delivery_partner_id: string | null;
+  do_number: string | null;
+  dispatched_at: string | null;
+  delivered_at: string | null;
+  outlet_id: string | null;
+  dealer_id: string;
+  dealers: { name: string } | null;
+}
+export interface LogisticsOrdersListResponse {
+  orders: LogisticsOrderListRow[];
+}
+
+/** GET /api/logistics/orders/:id — composed drawer payload (orders.ts §97). */
+export interface LogisticsOrderDetailOrder {
+  id: string;
+  dl: number;
+  status: string;
+  logistics_stage:
+    | "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered" | null;
+  warehouse_id: string | null;
+  customer_name: string;
+  customer_phone: string | null;
+  customer_address: string | null;
+  customer_address_unknown: boolean;
+  delivery_date: string | null;
+  delivery_date_tbd: boolean;
+  placed_at: string;
+  do_number: string | null;
+  do_note: string | null;
+  dispatched_at: string | null;
+  delivered_at: string | null;
+  delivery_partner_id: string | null;
+  dealer_id: string;
+  outlet_id: string | null;
+  dealers: { name: string } | null;
+  outlets: { name: string } | null;
+}
+export interface LogisticsOrderDetailLine {
+  sku: string;
+  qty: number;
+  unit_price: number;
+}
+export interface LogisticsOrderDetailAddon {
+  addon_key: string;
+  qty: number;
+  unit_price: number;
+}
+export interface LogisticsOrderDetailHistoryRow {
+  text: string;
+  by_role: string | null;
+  occurred_at: string;
+}
+export interface LogisticsOrderDetailWarehouse {
+  id: string;
+  name: string;
+  address: string | null;
+}
+export interface LogisticsOrderDetailStockBalance {
+  sku: string;
+  warehouse_id: string;
+  qty: number;
+  reserved: number;
+}
+export interface LogisticsOrderDetailPoLine {
+  po_id: string;
+  sku: string;
+  qty: number;
+  received_qty: number;
+}
+export interface LogisticsOrderDetailPo {
+  id: string;
+  supplier_id: string;
+  warehouse_id: string;
+  status: string;
+  sup_status: string;
+  dl: number | null;
+  dl_refs: number[] | null;
+  eta_date: string | null;
+  lines: LogisticsOrderDetailPoLine[];
+}
+export interface LogisticsOrderDetailResponse {
+  order: LogisticsOrderDetailOrder;
+  lines: LogisticsOrderDetailLine[];
+  addons: LogisticsOrderDetailAddon[];
+  total: number;
+  warehouse: LogisticsOrderDetailWarehouse | null;
+  stockBalances: LogisticsOrderDetailStockBalance[];
+  pos: LogisticsOrderDetailPo[];
+  history: LogisticsOrderDetailHistoryRow[];
+}
+
+/** Row in GET /api/logistics/pos. `purchase_order_lines(...)` is the embedded
+ *  PostgREST nested resource. */
+export interface LogisticsPoListRow {
+  id: string;
+  supplier_id: string;
+  warehouse_id: string;
+  status: "open" | "received" | "cancelled";
+  sup_status: string;
+  dl: number | null;
+  dl_refs: number[] | null;
+  eta_date: string | null;
+  placed_at: string;
+  purchase_order_lines: { sku: string; qty: number; received_qty: number }[];
+}
+export interface LogisticsPosListResponse {
+  pos: LogisticsPoListRow[];
+}
+
+/** GET /api/logistics/warehouse — composed table-style payload (warehouse.ts). */
+export type LowStockStatus = "out" | "low" | "ok";
+export interface WarehouseStockEntry {
+  sku: string;
+  qty: number;
+  reserved: number;
+  low_stock_status: LowStockStatus;
+}
+export interface WarehouseSkuTotals {
+  total_qty: number;
+  total_reserved: number;
+  low_stock_status_aggregate: LowStockStatus;
+}
+export interface WarehouseListResponse {
+  warehouses: { id: string; name: string; address: string | null }[];
+  byWarehouse: Record<string, WarehouseStockEntry[]>;
+  totalsBySku: Record<string, WarehouseSkuTotals>;
+}
+
+/** GET /api/logistics/movements — `stock_movements` table rows + cap. */
+export interface MovementRow {
+  id: string;
+  sku: string;
+  warehouse_id: string;
+  qty: number;
+  kind: "in" | "out" | "adjust";
+  ref: string | null;
+  note: string | null;
+  by_role: string | null;
+  occurred_at: string;
+}
+export interface MovementsListResponse {
+  rows: MovementRow[];
+  limit: number;
+}
+
+/** Mutation responses — RPCs return the mutated row; routes wrap in `{ x: data }`. */
+export interface LogisticsOrderMutationResponse {
+  order: unknown;
+}
+export interface LogisticsPoMutationResponse {
+  po: unknown;
+}
+export interface LogisticsRecheckStockResponse {
+  warehouseId: string | null;
+  shortages: { sku: string; short: number }[];
+}
+export interface LogisticsIssuePosResponse {
+  pos_created: { po_id: string; supplier_id: string; lines: number }[];
+}
+export interface LogisticsAdjustStockResponse {
+  sku: string;
+  warehouse_id: string;
+  qty: number;
+  reserved: number;
+}
+export interface LogisticsReceivePoLineResponse {
+  po: unknown;
+  line: { po_id: string; sku: string; qty: number; received_qty: number };
+}
+
+// --- Filter → query string helpers -----------------------------------------
+
+function logisticsOrdersSearch(f?: LogisticsOrderFilters): string {
+  if (!f) return "";
+  const params = new URLSearchParams();
+  if (f.stage && f.stage !== "all") params.set("stage", f.stage);
+  if (f.channel && f.channel !== "all") params.set("channel", f.channel);
+  if (f.search) params.set("search", f.search);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+function logisticsPosSearch(f?: LogisticsPoFilters): string {
+  if (!f) return "";
+  const params = new URLSearchParams();
+  if (f.status && f.status !== "all") params.set("status", f.status);
+  if (f.supplierId) params.set("supplierId", f.supplierId);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+function movementsSearch(f?: MovementsFilters): string {
+  if (!f) return "";
+  const params = new URLSearchParams();
+  if (f.warehouseId) params.set("warehouseId", f.warehouseId);
+  if (f.category && f.category !== "all") params.set("category", f.category);
+  if (f.sku) params.set("sku", f.sku);
+  if (f.kind && f.kind !== "all") params.set("kind", f.kind);
+  if (f.search) params.set("search", f.search);
+  if (f.period && f.period !== "30d") params.set("period", f.period);
+  if (f.from) params.set("from", f.from);
+  if (f.to) params.set("to", f.to);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+// --- Query hooks (7) -------------------------------------------------------
+
+/** Logistics dashboard — KPIs + pipeline + open POs + low stock + audit. */
+export function useLogisticsDashboard(
+  opts?: Partial<UseQueryOptions<LogisticsDashboardResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.dashboard(),
+    queryFn: () =>
+      apiFetch<LogisticsDashboardResponse>("/api/logistics/dashboard"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Logistics orders kanban list. Server defaults stage='all', channel='all'. */
+export function useLogisticsOrders(
+  filters: LogisticsOrderFilters = {},
+  opts?: Partial<UseQueryOptions<LogisticsOrdersListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.orders(filters),
+    queryFn: () =>
+      apiFetch<LogisticsOrdersListResponse>(
+        "/api/logistics/orders" + logisticsOrdersSearch(filters),
+      ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Drawer detail. `null` id disables the query (mirror of usePrincipalDealer). */
+export function useLogisticsOrder(
+  id: string | null,
+  opts?: Partial<UseQueryOptions<LogisticsOrderDetailResponse>>,
+) {
+  return useQuery({
+    queryKey: id ? qk.logistics.order(id) : (["logistics", "orders", "null"] as const),
+    queryFn: () =>
+      apiFetch<LogisticsOrderDetailResponse>(`/api/logistics/orders/${id}`),
+    enabled: !!id,
+    staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/** Procurement (PO) list. Server defaults status='all'. */
+export function useLogisticsPos(
+  filters: LogisticsPoFilters = {},
+  opts?: Partial<UseQueryOptions<LogisticsPosListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.pos(filters),
+    queryFn: () =>
+      apiFetch<LogisticsPosListResponse>(
+        "/api/logistics/pos" + logisticsPosSearch(filters),
+      ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** PO drawer detail. There is no GET /:id route — the list embeds lines via
+ *  PostgREST nested fetch. Kept here as a future hook; for now M5 pages should
+ *  pluck the row from `useLogisticsPos`. The unused-id query is disabled when
+ *  id is null. (Endpoint may land in M5 task 4 when the drawer needs richer
+ *  history; this hook is a placeholder for that.) */
+export function useLogisticsPo(
+  _id: string | null,
+  opts?: Partial<UseQueryOptions<LogisticsPoListRow>>,
+) {
+  return useQuery({
+    queryKey: _id ? qk.logistics.po(_id) : (["logistics", "pos", "null"] as const),
+    queryFn: () => {
+      throw new Error(
+        "useLogisticsPo: GET /api/logistics/pos/:id not implemented yet — read from useLogisticsPos list cache via select() instead.",
+      );
+    },
+    enabled: false,
+    staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/** Warehouse stock matrix. */
+export function useLogisticsWarehouse(
+  opts?: Partial<UseQueryOptions<WarehouseListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.warehouse(),
+    queryFn: () => apiFetch<WarehouseListResponse>("/api/logistics/warehouse"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Movements log. Default period='30d'; cap at 200 rows server-side. */
+export function useLogisticsMovements(
+  filters: MovementsFilters = {},
+  opts?: Partial<UseQueryOptions<MovementsListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.movements(filters),
+    queryFn: () =>
+      apiFetch<MovementsListResponse>(
+        "/api/logistics/movements" + movementsSearch(filters),
+      ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+// --- Mutation hooks (12) ---------------------------------------------------
+//
+// Invalidation strategy: every mutation invalidates a minimum of
+//   • the affected detail key (`qk.logistics.order(id)` / .po(id))
+//   • the affected list key tree (`["logistics", "orders"]` / .pos)
+//   • the dashboard (`qk.logistics.dashboard()`) — KPIs depend on order /
+//     PO state changes universally.
+// Stock-touching mutations also invalidate `["logistics", "warehouse"]` and
+// `["logistics", "movements"]` because stock_balances + stock_movements rows
+// shift on every receive / adjust / dispatch.
+
+/** D1 step 1 — assign a delivery partner. Stage flips to dispatched; KPIs +
+ *  list + drawer all need a refetch. */
+export function useAssignPartnerMutation(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsOrderMutationResponse, ApiError, AssignPartnerInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsOrderMutationResponse, ApiError, AssignPartnerInput>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsOrderMutationResponse>(
+        `/api/logistics/orders/${orderId}/assign-partner`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** D1 step 2 — attach DO + flip to delivered. Decrements stock so warehouse
+ *  + movements caches also get busted. */
+export function useAttachDoMutation(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsOrderMutationResponse, ApiError, AttachDoInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsOrderMutationResponse, ApiError, AttachDoInput>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsOrderMutationResponse>(
+        `/api/logistics/orders/${orderId}/attach-do`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** A6 post-Proceed cancel. Releases reserved stock → warehouse cache busts. */
+export function useAbandonOrderMutation(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsOrderMutationResponse, ApiError, AbandonOrderInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsOrderMutationResponse, ApiError, AbandonOrderInput>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsOrderMutationResponse>(
+        `/api/logistics/orders/${orderId}/abandon`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** Manual override of the auto-picked source warehouse (E1 awaiting_stock). */
+export function useWarehousePickMutation(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsOrderMutationResponse, ApiError, WarehousePickInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsOrderMutationResponse, ApiError, WarehousePickInput>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsOrderMutationResponse>(
+        `/api/logistics/orders/${orderId}/warehouse`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** E1 re-check stock — re-runs pick_warehouse + calc_shortages. Body empty. */
+export function useRecheckStockMutation(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsRecheckStockResponse, ApiError, void>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsRecheckStockResponse, ApiError, void>({
+    mutationFn: () =>
+      apiFetch<LogisticsRecheckStockResponse>(
+        `/api/logistics/orders/${orderId}/recheck-stock`,
+        { method: "POST", body: JSON.stringify({}) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** Auto-issue POs for an awaiting_stock order's shortages. Body empty. */
+export function useIssuePosForOrderMutation(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsIssuePosResponse, ApiError, void>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsIssuePosResponse, ApiError, void>({
+    mutationFn: () =>
+      apiFetch<LogisticsIssuePosResponse>(
+        `/api/logistics/orders/${orderId}/issue-pos`,
+        { method: "POST", body: JSON.stringify({}) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** Manual create-PO from procurement page. */
+export function useCreatePoMutation(
+  opts?: Partial<
+    UseMutationOptions<LogisticsPoMutationResponse, ApiError, CreatePoInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsPoMutationResponse, ApiError, CreatePoInput>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsPoMutationResponse>("/api/logistics/pos", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      // If the PO is tied to a DL (single or via dl_refs), the awaiting_stock
+      // drawer for those orders should refresh. Bust the orders sub-tree too.
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** Receive a PO line — increments stock + may flip PO to received. */
+export function useReceivePoLineMutation(
+  poId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsReceivePoLineResponse, ApiError, ReceivePoLineInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsReceivePoLineResponse, ApiError, ReceivePoLineInput>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsReceivePoLineResponse>(
+        `/api/logistics/pos/${poId}/receive`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
+      // Receiving stock can unblock awaiting_stock orders → invalidate orders.
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** Cancel an open PO. Reason required; mirrors abandon-order shape. */
+export function useCancelPoMutation(
+  poId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsPoMutationResponse, ApiError, { reason: string }>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsPoMutationResponse, ApiError, { reason: string }>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsPoMutationResponse>(
+        `/api/logistics/pos/${poId}/cancel`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** F1.A factory_pickup — assign pickup partner to a ready_for_pickup PO. */
+export function useAssignPickupPartnerMutation(
+  poId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsPoMutationResponse, ApiError, AssignPickupPartnerInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsPoMutationResponse, ApiError, AssignPickupPartnerInput>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsPoMutationResponse>(
+        `/api/logistics/pos/${poId}/assign-pickup-partner`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** F1.A customer-rejection flow — reassign destination warehouse on a PO. */
+export function useReassignPoWarehouseMutation(
+  poId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsPoMutationResponse, ApiError, ReassignPoWarehouseInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsPoMutationResponse, ApiError, ReassignPoWarehouseInput>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsPoMutationResponse>(
+        `/api/logistics/pos/${poId}/reassign-warehouse`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** Manual stock adjustment (positive=inbound, negative=damage/loss). Writes a
+ *  stock_movements row + audit_log entry. */
+export function useAdjustStockMutation(
+  opts?: Partial<
+    UseMutationOptions<LogisticsAdjustStockResponse, ApiError, AdjustStockInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsAdjustStockResponse, ApiError, AdjustStockInput>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsAdjustStockResponse>("/api/logistics/warehouse/adjust", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
     ...opts,
   });

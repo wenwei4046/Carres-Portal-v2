@@ -119,6 +119,7 @@ export const stockBalanceFromRow = (r: DB.StockBalanceRow): D.StockBalance => ({
   sku: r.sku,
   warehouseId: r.warehouse_id,
   qty: r.qty,
+  reserved: r.reserved,
 });
 
 export const stockMovementFromRow = (r: DB.StockMovementRow): D.StockMovement => ({
@@ -204,6 +205,9 @@ export const orderFromRow = (
   partnerEta: r.partner_eta,
   doNumber: r.do_number,
   doNote: r.do_note,
+  // 0019 migration columns. `?? null` so pre-0019 rows still adapt cleanly.
+  dispatchedAt: r.dispatched_at ?? null,
+  deliveredAt: r.delivered_at ?? null,
   invoiceNo: r.invoice_no,
   invoicedAt: r.invoiced_at,
   placedAt: r.placed_at,
@@ -212,13 +216,24 @@ export const orderFromRow = (
   history: rels?.history?.map(orderHistoryFromRow),
 });
 
-export const purchaseOrderFromRow = (r: DB.PurchaseOrderRow): D.PurchaseOrder => ({
-  id: r.id,
-  dl: r.dl,
-  supplierId: r.supplier_id,
-  warehouseId: r.warehouse_id,
+export const purchaseOrderLineFromRow = (
+  r: DB.PurchaseOrderLineRow,
+): D.PurchaseOrderLine => ({
+  poId: r.po_id,
   sku: r.sku,
   qty: r.qty,
+  receivedQty: r.received_qty,
+});
+
+export const purchaseOrderFromRow = (
+  r: DB.PurchaseOrderRow,
+  rels?: { lines?: DB.PurchaseOrderLineRow[] },
+): D.PurchaseOrder => ({
+  id: r.id,
+  dl: r.dl,
+  dlRefs: r.dl_refs,
+  supplierId: r.supplier_id,
+  warehouseId: r.warehouse_id,
   status: r.status,
   supStatus: r.sup_status,
   deliveryPartnerId: r.delivery_partner_id,
@@ -227,6 +242,7 @@ export const purchaseOrderFromRow = (r: DB.PurchaseOrderRow): D.PurchaseOrder =>
   etaDate: r.eta_date,
   payStatus: r.pay_status,
   placedAt: r.placed_at,
+  lines: rels?.lines?.map(purchaseOrderLineFromRow),
 });
 
 export const paymentFromRow = (r: DB.PaymentRow): D.Payment => ({
