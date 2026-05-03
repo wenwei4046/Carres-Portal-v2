@@ -64,18 +64,6 @@ Phase 2 acceptance items NOT covered by 2C (carry-forward from `phase-2c-reflect
 
 ---
 
-## approval-row-type-missing-reason
-
-**What**: The `ApprovalRow` type in `apps/web/src/lib/queries.ts` doesn't declare the optional `reason` field, even though `select * from approvals` returns it. The `ApprovalDrawer` types it locally (`reason?: string | null`) to compensate.
-
-**Why deferred**: One-line type fix, no runtime impact.
-
-**Revisit when**: Next time `queries.ts` is touched, or M6 polish.
-
-**Surfaced by**: M4 implementer subagent on commit `dfecddd`.
-
----
-
 ## audit-log-duplicate-index
 
 **What**: `audit_log` table now has two functionally identical indexes on `occurred_at desc`: `audit_log_at_idx` (from migration `0001`) and `audit_log_occurred_at_idx` (from migration `0013`).

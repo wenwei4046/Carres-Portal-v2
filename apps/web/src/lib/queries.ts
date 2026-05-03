@@ -452,6 +452,7 @@ export interface ApprovalRow {
   refers_to: string | null;
   amount: number | null;
   dealer_id: string | null;
+  reason: string | null;
   decided_by: string | null;
   decision_note: string | null;
   decided_at: string | null;
