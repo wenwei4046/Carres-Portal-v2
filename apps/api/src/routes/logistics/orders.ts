@@ -158,7 +158,7 @@ logisticsOrdersRouter.get("/:id", async (c) => {
   // Linked POs (own dl OR within dl_refs[]).
   const { data: pos, error: e_pos } = await sb
     .from("purchase_orders")
-    .select("id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta")
+    .select("id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta_date")
     .or(`dl.eq.${order.dl},dl_refs.cs.{${order.dl}}`);
   if (e_pos) { const m = mapPgError(e_pos); return c.json(m.body, m.status); }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
