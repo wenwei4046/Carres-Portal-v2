@@ -3,6 +3,7 @@ import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type 
 import { DB } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
+import { assertRpcCallShape } from "../../test-utils/assert-rpc";
 
 vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
@@ -278,5 +279,181 @@ describe("GET /api/logistics/warehouse", () => {
   it("returns 401 without Authorization header", async () => {
     const res = await app.fetch(new Request("http://t/api/logistics/warehouse"), env);
     expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /api/logistics/warehouse/adjust", () => {
+  // Hex-only UUID — adjustStockInput.warehouseId is z.string().uuid(); the
+  // 'w' shape used in this file's GET tests is fine for raw fixtures but
+  // would fail zod parsing here.
+  const SKU = "MAT-K-001";
+  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000b01";
+  const VALID_BODY = { sku: SKU, warehouseId: WAREHOUSE_ID, delta: 5, reason: "Found extra units in back room" };
+
+  it("returns 200 on positive delta and calls RPC with snake_case args", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { sku: SKU, warehouse_id: WAREHOUSE_ID, delta: 5, qty_after: 17, reason: VALID_BODY.reason },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/warehouse/adjust", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID_BODY),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sku: string; qty_after: number };
+    expect(body.sku).toBe(SKU);
+    expect(body.qty_after).toBe(17);
+    expect(rpc).toHaveBeenCalledWith("logistics_adjust_stock", {
+      p_sku: SKU,
+      p_warehouse_id: WAREHOUSE_ID,
+      p_delta: 5,
+      p_reason: VALID_BODY.reason,
+    });
+    assertRpcCallShape(rpc, "logistics_adjust_stock", [
+      "p_sku",
+      "p_warehouse_id",
+      "p_delta",
+      "p_reason",
+    ]);
+  });
+
+  it("returns 200 on negative delta (shrinkage / damage)", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { sku: SKU, warehouse_id: WAREHOUSE_ID, delta: -3, qty_after: 9, reason: "Damaged in transit" },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/warehouse/adjust", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: SKU, warehouseId: WAREHOUSE_ID, delta: -3, reason: "Damaged in transit" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_adjust_stock", {
+      p_sku: SKU,
+      p_warehouse_id: WAREHOUSE_ID,
+      p_delta: -3,
+      p_reason: "Damaged in transit",
+    });
+    assertRpcCallShape(rpc, "logistics_adjust_stock", [
+      "p_sku",
+      "p_warehouse_id",
+      "p_delta",
+      "p_reason",
+    ]);
+  });
+
+  it("maps SQLSTATE P0001 negative_stock → 422 rule_violation", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "P0001", message: "stock would go negative", details: "negative_stock" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/warehouse/adjust", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: SKU, warehouseId: WAREHOUSE_ID, delta: -999, reason: "Big shrinkage" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: string; code: string; message: string };
+    expect(body.error).toBe("rule_violation");
+    expect(body.code).toBe("negative_stock");
+    expect(body.message).toBe("stock would go negative");
+  });
+
+  it("maps SQLSTATE P0001 below_reserved → 422 rule_violation", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "P0001", message: "stock would fall below reserved units", details: "below_reserved" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/warehouse/adjust", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: SKU, warehouseId: WAREHOUSE_ID, delta: -2, reason: "Test" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: string; code: string };
+    expect(body.error).toBe("rule_violation");
+    expect(body.code).toBe("below_reserved");
+  });
+
+  it("returns 422 invalid_input when required fields are missing (zod)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/warehouse/adjust", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: SKU }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("invalid_input");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 invalid_input when extra keys are passed (.strict)", async () => {
+    // adjustStockInput is .strict() post-Prep-2 — extra keys must be rejected
+    // before reaching Supabase, otherwise PostgREST PGRST202 leaks through.
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/warehouse/adjust", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...VALID_BODY, malicious: "drop tables" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("invalid_input");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for non-logistics role (no rpc call)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/warehouse/adjust", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID_BODY),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

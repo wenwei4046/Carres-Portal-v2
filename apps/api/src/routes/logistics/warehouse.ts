@@ -1,18 +1,21 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { DB } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { DB, adjustStockInput } from "@carres/shared";
+import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
  * /api/logistics/warehouse — Phase 4 M4 backend warehouse subsystem.
  *
- * Endpoints implemented in this task (M4 Task 1):
- *   GET / — composed query: warehouses + stock_balances aggregated per
- *           warehouse with low_stock flags.
+ * Endpoints implemented:
+ *   GET /        — composed query: warehouses + stock_balances aggregated per
+ *                  warehouse with low_stock flags. (M4 Task 1)
+ *   POST /adjust — wraps logistics_adjust_stock RPC for manual stock
+ *                  corrections (positive delta = inbound, negative = damage/
+ *                  loss). (M4 Task 2)
  *
- * Future M4 tasks add: POST /adjust (RPC wrap), GET /movements (list).
+ * Future M4 tasks add: GET /movements (list).
  *
  * Aggregation contract (per spec §18.5):
  *   - low_stock_status badge is row-level (per SKU). Spec §18.5 wording:
@@ -125,6 +128,28 @@ logisticsWarehouseRouter.get("/", async (c) => {
   }
 
   return c.json({ warehouses, byWarehouse, totalsBySku });
+});
+
+// ----- POST /adjust — manual stock adjustment -----
+// Wraps logistics_adjust_stock RPC (0019). Per spec §17.4 A4 + adjustStockInput
+// schema: signed delta (P0001 negative_stock if delta would dip below 0;
+// P0001 below_reserved if it would dip below stock_balances.reserved). The RPC
+// also writes a stock_movements row (kind='adjust') and an audit_log entry.
+logisticsWarehouseRouter.post("/adjust", async (c) => {
+  const parsed = await parseJsonBody(c, adjustStockInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("logistics_adjust_stock", {
+    p_sku: parsed.data.sku,
+    p_warehouse_id: parsed.data.warehouseId,
+    p_delta: parsed.data.delta,
+    p_reason: parsed.data.reason,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
 });
 
 export default logisticsWarehouseRouter;
