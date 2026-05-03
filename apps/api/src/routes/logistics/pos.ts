@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import {
   createPoInput,
   listPurchaseOrdersQuery,
+  receivePoLineInput,
 } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -103,6 +104,30 @@ logisticsPosRouter.post("/", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ po: data });
+});
+
+// ----- POST /:id/receive -----
+logisticsPosRouter.post("/:id/receive", async (c) => {
+  let body: unknown;
+  try { body = await c.req.json(); } catch { body = {}; }
+  const parsed = receivePoLineInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("logistics_receive_po_line", {
+    p_po_id: c.req.param("id"),
+    p_sku: parsed.data.sku,
+    p_received_qty: parsed.data.receivedQty,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
 });
 
 export default logisticsPosRouter;
