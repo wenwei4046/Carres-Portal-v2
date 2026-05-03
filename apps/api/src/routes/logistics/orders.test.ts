@@ -179,3 +179,137 @@ describe("GET /api/logistics/orders", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("GET /api/logistics/orders/:id", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+
+  function mockDetailQueries(opts: {
+    order?: any;
+    lines?: any[];
+    addons?: any[];
+    history?: any[];
+    pos?: any[];
+    poLines?: any[];
+    warehouse?: any;
+    stockBalances?: any[];
+  }) {
+    const fromImpl = vi.fn((table: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        or: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        single: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockReturnThis(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const promise = (data: any) => Promise.resolve({ data, error: null });
+      switch (table) {
+        case 'orders':
+          chain.maybeSingle = vi.fn(() => promise(opts.order ?? null));
+          break;
+        case 'order_lines':
+          chain.eq = vi.fn(() => promise(opts.lines ?? []));
+          break;
+        case 'order_addons':
+          chain.eq = vi.fn(() => promise(opts.addons ?? []));
+          break;
+        case 'order_history':
+          chain.order = vi.fn(() => promise(opts.history ?? []));
+          break;
+        case 'purchase_orders':
+          chain.or = vi.fn(() => promise(opts.pos ?? []));
+          break;
+        case 'purchase_order_lines':
+          chain.in = vi.fn(() => promise(opts.poLines ?? []));
+          break;
+        case 'warehouses':
+          chain.maybeSingle = vi.fn(() => promise(opts.warehouse ?? null));
+          break;
+        case 'stock_balances':
+          chain.in = vi.fn(() => promise(opts.stockBalances ?? []));
+          break;
+      }
+      return chain;
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
+    return fromImpl;
+  }
+
+  it("returns 404 when order does not exist", async () => {
+    mockDetailQueries({ order: null });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns aggregated detail for an awaiting_stock order", async () => {
+    mockDetailQueries({
+      order: {
+        id: ORDER_ID, dl: 4001, status: "proceed_order", logistics_stage: "awaiting_stock",
+        warehouse_id: "00000000-0000-0000-0000-000000000w01",
+        customer_name: "Tan Ah Kow", customer_phone: "+60123456789", customer_address: "...",
+        delivery_date: "2026-05-10", placed_at: "2026-05-03T10:00:00Z",
+        do_number: null, do_note: null, dispatched_at: null, delivered_at: null,
+        delivery_partner_id: null, dealer_id: "00000000-0000-0000-0000-000000000d01",
+        dealers: { name: "BedHouse KL" }, showroom_id: null, showrooms: null,
+      },
+      lines: [
+        { sku: "MAT-K-001", qty: 2, unit_price: 1500 },
+        { sku: "BED-K-002", qty: 1, unit_price: 800 },
+      ],
+      addons: [{ sku: "PIL-001", qty: 4, unit_price: 50 }],
+      history: [{ text: "Order placed", by_role: "dealer", occurred_at: "2026-05-03T09:00:00Z" }],
+      pos: [{ id: "PO-2030", supplier_id: "00000000-0000-0000-0000-000000000s01", warehouse_id: "00000000-0000-0000-0000-000000000w01", status: "open", sup_status: "pending", dl: 4001, dl_refs: null }],
+      poLines: [{ po_id: "PO-2030", sku: "MAT-K-001", qty: 2, received_qty: 0 }],
+      warehouse: { id: "00000000-0000-0000-0000-000000000w01", name: "KL HQ", address: "..." },
+      stockBalances: [
+        { sku: "MAT-K-001", warehouse_id: "00000000-0000-0000-0000-000000000w01", qty: 0, reserved: 0 },
+        { sku: "BED-K-002", warehouse_id: "00000000-0000-0000-0000-000000000w01", qty: 5, reserved: 0 },
+      ],
+    });
+
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.order.dl).toBe(4001);
+    expect(body.lines).toHaveLength(2);
+    expect(body.addons).toHaveLength(1);
+    expect(body.total).toBe(2 * 1500 + 1 * 800 + 4 * 50);
+    expect(body.warehouse.name).toBe("KL HQ");
+    expect(body.stockBalances).toHaveLength(2);
+    expect(body.pos).toHaveLength(1);
+    expect(body.pos[0].lines).toHaveLength(1);
+    expect(body.history).toHaveLength(1);
+  });
+
+  it("returns 403 for dealer role (no Supabase round-trip)", async () => {
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(from).not.toHaveBeenCalled();
+  });
+});

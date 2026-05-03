@@ -87,4 +87,96 @@ logisticsOrdersRouter.get("/", async (c) => {
   return c.json({ orders: data ?? [] });
 });
 
+// ----- GET /:id detail -----
+logisticsOrdersRouter.get("/:id", async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: order, error: e1 } = await sb
+    .from("orders")
+    .select(
+      "id, dl, status, logistics_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, dealer_id, showroom_id, dealers(name), showrooms(name)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (e1) {
+    const m = mapPgError(e1);
+    return c.json(m.body, m.status);
+  }
+  if (!order) {
+    return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
+  }
+
+  const [linesRes, addonsRes, historyRes] = await Promise.all([
+    sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", id),
+    sb.from("order_addons").select("sku, qty, unit_price").eq("order_id", id),
+    sb.from("order_history").select("text, by_role, occurred_at").order("occurred_at", { ascending: true }),
+  ]);
+  if (linesRes.error) { const m = mapPgError(linesRes.error); return c.json(m.body, m.status); }
+  if (addonsRes.error) { const m = mapPgError(addonsRes.error); return c.json(m.body, m.status); }
+  if (historyRes.error) { const m = mapPgError(historyRes.error); return c.json(m.body, m.status); }
+
+  const lines = linesRes.data ?? [];
+  const addons = addonsRes.data ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const total = [...lines, ...addons].reduce((s: number, r: any) => s + Number(r.unit_price) * Number(r.qty), 0);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let warehouse: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let stockBalances: any[] = [];
+  if (order.warehouse_id) {
+    const { data: wh } = await sb
+      .from("warehouses")
+      .select("id, name, address")
+      .eq("id", order.warehouse_id)
+      .maybeSingle();
+    warehouse = wh;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const skus = lines.map((l: any) => l.sku);
+    if (skus.length > 0) {
+      const { data: sb_rows } = await sb
+        .from("stock_balances")
+        .select("sku, warehouse_id, qty, reserved")
+        .eq("warehouse_id", order.warehouse_id)
+        .in("sku", skus);
+      stockBalances = sb_rows ?? [];
+    }
+  }
+
+  // Linked POs (own dl OR within dl_refs[]).
+  const { data: pos } = await sb
+    .from("purchase_orders")
+    .select("id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta")
+    .or(`dl.eq.${order.dl},dl_refs.cs.{${order.dl}}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let poLinesByPo: Record<string, any[]> = {};
+  if (pos && pos.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const poIds = pos.map((p: any) => p.id);
+    const { data: poLines } = await sb
+      .from("purchase_order_lines")
+      .select("po_id, sku, qty, received_qty")
+      .in("po_id", poIds);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    poLinesByPo = (poLines ?? []).reduce((acc: Record<string, any[]>, l: any) => {
+      (acc[l.po_id] ??= []).push(l);
+      return acc;
+    }, {});
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const posWithLines = (pos ?? []).map((p: any) => ({ ...p, lines: poLinesByPo[p.id] ?? [] }));
+
+  return c.json({
+    order,
+    lines,
+    addons,
+    total,
+    warehouse,
+    stockBalances,
+    pos: posWithLines,
+    history: historyRes.data ?? [],
+  });
+});
+
 export default logisticsOrdersRouter;
