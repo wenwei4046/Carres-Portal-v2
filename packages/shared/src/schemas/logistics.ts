@@ -145,3 +145,16 @@ export const reassignPoWarehouseInput = z.object({
   newWarehouseId: z.string().uuid(),
 });
 export type ReassignPoWarehouseInput = z.infer<typeof reassignPoWarehouseInput>;
+
+/**
+ * `listLogisticsOrdersQuery` — GET /api/logistics/orders query string.
+ * stage: 'all' (default) or one of the 4 logistics stages.
+ * channel: 'all' (default) | 'dealers' | 'showrooms'.
+ * search: free-text matched against customer_name (ILIKE) AND parsed as int for dl exact match.
+ */
+export const listLogisticsOrdersQuery = z.object({
+  stage: z.enum(['all', 'awaiting_stock', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
+  channel: z.enum(['all', 'dealers', 'showrooms']).default('all'),
+  search: z.string().trim().max(100).optional(),
+});
+export type ListLogisticsOrdersQuery = z.infer<typeof listLogisticsOrdersQuery>;
