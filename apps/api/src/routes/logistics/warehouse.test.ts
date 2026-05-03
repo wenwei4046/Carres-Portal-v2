@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { DB } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -34,8 +35,11 @@ async function makeJwt(role: string) {
     .sign(signKey);
 }
 
-interface WarehouseRow { id: string; name: string; address: string | null }
-interface StockBalanceRow { sku: string; warehouse_id: string; qty: number; reserved: number }
+// The route only reads sku/warehouse_id/qty/reserved off stock_balances rows;
+// updated_at (present on DB.StockBalanceRow) is irrelevant for these fixtures,
+// so we use a column-Pick to keep test fixtures minimal while still typing
+// against the shared schema.
+type StockBalanceFixture = Pick<DB.StockBalanceRow, "sku" | "warehouse_id" | "qty" | "reserved">;
 
 /**
  * Build a userClient mock whose `.from(table)` returns a chain that resolves to
@@ -43,9 +47,9 @@ interface StockBalanceRow { sku: string; warehouse_id: string; qty: number; rese
  * reads (warehouses, stock_balances). Errors can be injected per table.
  */
 function mockWarehouseQueries(opts: {
-  warehouses?: WarehouseRow[];
+  warehouses?: DB.WarehouseRow[];
   warehousesError?: { code?: string; message?: string };
-  balances?: StockBalanceRow[];
+  balances?: StockBalanceFixture[];
   balancesError?: { code?: string; message?: string };
 }) {
   const fromImpl = vi.fn((table: string) => {
@@ -115,7 +119,7 @@ describe("GET /api/logistics/warehouse", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      warehouses: WarehouseRow[];
+      warehouses: DB.WarehouseRow[];
       byWarehouse: Record<string, Array<{ sku: string; qty: number; reserved: number; low_stock_status: string }>>;
       totalsBySku: Record<string, { total_qty: number; total_reserved: number; low_stock_status_aggregate: string }>;
     };

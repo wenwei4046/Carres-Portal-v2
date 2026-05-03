@@ -142,6 +142,7 @@ export interface StockBalanceRow {
   sku: string;
   warehouse_id: string;
   qty: number;
+  reserved: number;
   updated_at: string;
 }
 

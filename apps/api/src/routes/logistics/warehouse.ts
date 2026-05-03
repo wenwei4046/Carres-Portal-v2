@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { DB } from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -51,19 +52,9 @@ function statusFor(qty: number): LowStockStatus {
   return "ok";
 }
 
-interface StockBalanceRow {
-  sku: string;
-  warehouse_id: string;
-  qty: number;
-  reserved: number;
-}
-
-interface WarehouseRow {
-  id: string;
-  name: string;
-  address: string | null;
-}
-
+// Response-shape types are local on purpose — the wire payload is owned by
+// this route and not (yet) shared with the web app. Migrating these to
+// packages/shared/src/domain.ts is M4 Task 2 territory, not this task.
 interface PerWarehouseStockEntry {
   sku: string;
   qty: number;
@@ -92,8 +83,8 @@ logisticsWarehouseRouter.get("/", async (c) => {
     return c.json(m.body, m.status);
   }
 
-  const warehouses = (whRes.data ?? []) as WarehouseRow[];
-  const balances = (sbRes.data ?? []) as StockBalanceRow[];
+  const warehouses = (whRes.data ?? []) as DB.WarehouseRow[];
+  const balances = (sbRes.data ?? []) as DB.StockBalanceRow[];
 
   // Initialise byWarehouse with every warehouse (so empty warehouses surface as []).
   const byWarehouse: Record<string, PerWarehouseStockEntry[]> = {};
@@ -107,8 +98,8 @@ logisticsWarehouseRouter.get("/", async (c) => {
     const reserved = Number(b.reserved) || 0;
     // Only push to byWarehouse if the warehouse exists in the warehouses list.
     // Defensive: balance rows for deleted warehouses (cascade should remove them
-    // but keep the route resilient) are skipped from the per-warehouse view but
-    // still ignored from totals to avoid surfacing orphan SKUs.
+    // but keep the route resilient) are skipped from BOTH the per-warehouse
+    // view AND totals, so orphan SKUs never surface in the response.
     if (!Object.prototype.hasOwnProperty.call(byWarehouse, b.warehouse_id)) continue;
 
     byWarehouse[b.warehouse_id]!.push({
