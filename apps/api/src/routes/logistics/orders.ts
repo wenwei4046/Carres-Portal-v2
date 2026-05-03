@@ -5,6 +5,7 @@ import {
   assignPartnerInput,
   attachDoInput,
   listLogisticsOrdersQuery,
+  warehousePickInput,
 } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -250,6 +251,29 @@ logisticsOrdersRouter.post("/:id/abandon", async (c) => {
   const { data, error } = await sb.rpc("logistics_abandon_order", {
     p_order_id: c.req.param("id"),
     p_reason: parsed.data.reason,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ order: data });
+});
+
+// ----- POST /:id/warehouse -----
+logisticsOrdersRouter.post("/:id/warehouse", async (c) => {
+  let body: unknown;
+  try { body = await c.req.json(); } catch { body = {}; }
+  const parsed = warehousePickInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("logistics_warehouse_pick", {
+    p_order_id: c.req.param("id"),
+    p_warehouse_id: parsed.data.warehouseId,
   });
   if (error) {
     const m = mapPgError(error);

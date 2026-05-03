@@ -604,3 +604,79 @@ describe("POST /api/logistics/orders/:id/abandon", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/logistics/orders/:id/warehouse", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000c02";
+
+  it("returns 200 on success", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { id: ORDER_ID, warehouse_id: WAREHOUSE_ID, logistics_stage: "ready_to_dispatch" }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/warehouse`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_warehouse_pick", {
+      p_order_id: ORDER_ID,
+      p_warehouse_id: WAREHOUSE_ID,
+    });
+  });
+
+  it("returns 422 when warehouseId is not uuid", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/warehouse`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ warehouseId: "not-a-uuid" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("maps P0001 has_open_pos → 422 with code", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "PO already issued", details: "has_open_pos" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/warehouse`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("has_open_pos");
+  });
+
+  it("returns 403 for non-logistics (no rpc call)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/warehouse`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
