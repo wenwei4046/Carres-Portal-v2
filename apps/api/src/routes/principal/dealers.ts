@@ -3,7 +3,6 @@ import { HTTPException } from "hono/http-exception";
 import {
   inviteDealerInput,
   setDealerStatusInput,
-  setDealerTermsInput,
 } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -21,7 +20,6 @@ import type { AppEnv } from "../../types";
  *
  * POST /invite — idempotent dealer creation + new_dealer approval.
  * POST /:id/status — suspend/reactivate (active|suspended only).
- * POST /:id/terms — credit limit + payment terms.
  *
  * Error contract mirrors approvals.ts: SQLSTATE → HTTP status with stable
  * `code` in the body the frontend can branch on. The inline `mapPgError`
@@ -205,38 +203,6 @@ principalDealersRouter.post("/:id/status", async (c) => {
     p_dealer_id: c.req.param("id"),
     p_new_status: parsed.data.status,
     p_reason: parsed.data.reason ?? null,
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json({ dealer: data });
-});
-
-// ----- POST /:id/terms -----
-principalDealersRouter.post("/:id/terms", async (c) => {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    body = {};
-  }
-  const parsed = setDealerTermsInput.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "invalid_param",
-        message: parsed.error.issues[0]?.message ?? "invalid input",
-      },
-      422,
-    );
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("dealer_set_terms", {
-    p_dealer_id: c.req.param("id"),
-    p_credit_limit: parsed.data.creditLimit,
-    p_payment_terms: parsed.data.paymentTerms,
   });
   if (error) {
     const m = mapPgError(error);

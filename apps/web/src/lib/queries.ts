@@ -716,39 +716,3 @@ export function useDealerSetStatus(
   });
 }
 
-/** Update a dealer's credit terms (creditLimit + paymentTerms). No dashboard
- *  side-effect; only dealer detail + list need to refetch. */
-export function useDealerSetTerms(
-  dealerId: string,
-  opts?: Partial<
-    UseMutationOptions<
-      { dealer: PrincipalDealerDetailDealer },
-      ApiError,
-      { creditLimit: number; paymentTerms: string }
-    >
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<
-    { dealer: PrincipalDealerDetailDealer },
-    ApiError,
-    { creditLimit: number; paymentTerms: string }
-  >({
-    mutationFn: (input) =>
-      apiFetch<{ dealer: PrincipalDealerDetailDealer }>(
-        `/api/principal/dealers/${dealerId}/terms`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({
-        queryKey: qk.principal.dealer(dealerId),
-        exact: true,
-      });
-      await qc.invalidateQueries({ queryKey: ["principal", "dealers"] });
-      opts?.onSuccess?.(
-        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
-      );
-    },
-    ...opts,
-  });
-}

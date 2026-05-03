@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { inviteDealerInput, setDealerStatusInput, setDealerTermsInput } from './principal-dealers';
+import { inviteDealerInput, setDealerStatusInput } from './principal-dealers';
 
 describe('inviteDealerInput', () => {
   it('accepts valid', () => {
@@ -28,17 +28,3 @@ describe('setDealerStatusInput', () => {
   });
 });
 
-describe('setDealerTermsInput', () => {
-  it('accepts valid', () => {
-    expect(setDealerTermsInput.safeParse({ creditLimit: 50000, paymentTerms: 'NET 30' }).success).toBe(true);
-  });
-  it('rejects negative credit limit', () => {
-    expect(setDealerTermsInput.safeParse({ creditLimit: -1, paymentTerms: 'NET 30' }).success).toBe(false);
-  });
-  it('rejects unknown payment terms', () => {
-    expect(setDealerTermsInput.safeParse({ creditLimit: 0, paymentTerms: 'NET 90' }).success).toBe(false);
-  });
-  it('accepts zero credit limit', () => {
-    expect(setDealerTermsInput.safeParse({ creditLimit: 0, paymentTerms: 'COD' }).success).toBe(true);
-  });
-});

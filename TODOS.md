@@ -30,6 +30,26 @@ Phase 2 acceptance items NOT covered by 2C (carry-forward from `phase-2c-reflect
 
 ---
 
+## orphaned-debt-rpcs-and-columns
+
+**What**: After Phase 3 stripped the Credit terms feature (Loo confirmed: no HQ→dealer debt — customer pays HQ direct, dealer just sells), several DB artifacts are now orphaned with no caller:
+
+- `dealer_set_terms(uuid, numeric, text)` RPC (migration `0013`) — no API route, no UI calls it
+- `dealer_topup(uuid, numeric, payment_method, text, text)` RPC (migration `0003`) — also no caller; the dealer-side TopUpDepositModal uses `top_up_order` (Phase 2C `0009`), which writes to `orders.paid` not `dealers.deposit_balance`
+- `dealers.credit_limit numeric` column — not exposed in any UI
+- `dealers.payment_terms text` column — not exposed in any UI
+- `dealers.deposit_balance numeric` column — not exposed in any UI
+
+**Why deferred**: Dropping requires a migration with `drop function ...` + `alter table dealers drop column ...`. Schema changes need explicit Loo approval per project CLAUDE.md §7. Leaving them is harmless (functions sit unused; columns default to 0).
+
+**Revisit when**: Phase 5 (Finance) — that phase will revisit how money flows through the system; if it confirms these are truly dead, do one cleanup migration `0XXX_drop_unused_dealer_credit.sql`.
+
+**Risk if not cleaned**: Future engineer might re-discover these and assume they're load-bearing. Code reviewer might flag "why is dealer_set_terms here if nothing uses it?"
+
+**Surfaced by**: Loo's biz-model clarification on 2026-05-03 — "my dealer wont have any debt to me, our system is about dealer sell item, customer pay HQ directly".
+
+---
+
 ## approval-decided-by-shows-uuid
 
 **What**: `approvals.decided_by uuid references app_users(id)` returns the UUID, not the name. The Approval drawer's "Decision" block shows `<UUID> · <timestamp>` instead of `<Name> · <timestamp>`.

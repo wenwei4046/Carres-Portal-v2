@@ -89,8 +89,6 @@ export {
 export {
   inviteDealerInput,
   setDealerStatusInput,
-  setDealerTermsInput,
   type InviteDealerInput,
   type SetDealerStatusInput,
-  type SetDealerTermsInput,
 } from "./schemas/principal-dealers";

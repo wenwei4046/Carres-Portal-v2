@@ -7,23 +7,29 @@ import {
 } from "@/lib/queries";
 import { TOAST } from "@/lib/toast-copy";
 import DealerStatusPill from "./DealerStatusPill";
-import CreditTermsEditor from "./CreditTermsEditor";
 
 /**
  * Right slide-in drawer for a single dealer. Mirrors the proto's
- * `DealerDrawer` (`reference/proto/principal-dealers.jsx` lines 121-225).
+ * `DealerDrawer` (`reference/proto/principal-dealers.jsx` lines 121-225)
+ * minus the Credit terms editor — Carres business model has no HQ→dealer
+ * credit (customer pays HQ direct; dealer just sells), so credit_limit /
+ * payment_terms columns stay unused in the schema and absent from this UI.
  *
  * Layout (top → bottom):
  *   1. Header — dealer id kicker (first 8 chars) + name + close X
  *   2. Status pill + region/joined date row
  *   3. Stat tiles — Orders / GMV / Outstanding (3-col)
- *   4. Credit terms editor (CreditTermsEditor handles its own save)
- *   5. Recent orders panel (last 8) or empty placeholder
- *   6. Action footer — status-aware:
+ *   4. Recent orders panel (last 8) or empty placeholder
+ *   5. Action footer — status-aware:
  *        active    → Suspend (with window.confirm)
  *        suspended → Reactivate
  *        pending   → "Awaiting approval · review in Approvals tab"
  *        rejected  → "Application rejected." (no actions)
+ *
+ * Outstanding semantic: `orders.total - orders.paid` summed across this
+ * dealer's orders = how much end customers still owe HQ via this dealer.
+ * Dealers chase customers for the 50% top-up gate before they can proceed
+ * an order (see Phase 2C `proceedBlockers` payment_below_50 code).
  *
  * Data source: `usePrincipalDealer(dealerId)` returns
  *   { dealer (snake_case), recentOrders (camelCase) } — the mixed casing
@@ -156,13 +162,6 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
             accent={outstandingNum > 0}
           />
         </div>
-
-        <CreditTermsEditor
-          dealerId={dealer.id}
-          dealerName={dealer.name}
-          creditLimit={Number(dealer.credit_limit ?? 0)}
-          paymentTerms={dealer.payment_terms ?? "NET 30"}
-        />
 
         <div className="mb-[18px]">
           <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-2">

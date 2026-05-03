@@ -26,14 +26,3 @@ export const setDealerStatusInput = z.object({
   reason: z.string().trim().max(200).optional(),
 });
 export type SetDealerStatusInput = z.infer<typeof setDealerStatusInput>;
-
-/**
- * `setDealerTermsInput` updates commercial terms. Credit limit allows zero
- * (COD-only dealers exist), capped at 10M to catch fat-finger entries.
- * Payment terms are constrained to the four values the proto exposes.
- */
-export const setDealerTermsInput = z.object({
-  creditLimit:  z.number().nonnegative().max(10_000_000),
-  paymentTerms: z.enum(['NET 14', 'NET 30', 'NET 60', 'COD']),
-});
-export type SetDealerTermsInput = z.infer<typeof setDealerTermsInput>;
