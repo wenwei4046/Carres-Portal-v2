@@ -17,7 +17,7 @@ import { z } from 'zod';
  */
 export const assignPartnerInput = z.object({
   partnerId: z.string().uuid(),
-});
+}).strict();
 export type AssignPartnerInput = z.infer<typeof assignPartnerInput>;
 
 /**
@@ -32,7 +32,7 @@ export const attachDoInput = z.object({
   doNumber: z.string().min(3),
   doNote: z.string().optional(),
   signed: z.literal(true),
-});
+}).strict();
 export type AttachDoInput = z.infer<typeof attachDoInput>;
 
 /**
@@ -45,7 +45,7 @@ export type AttachDoInput = z.infer<typeof attachDoInput>;
 export const receivePoLineInput = z.object({
   sku: z.string().min(1),
   receivedQty: z.number().int().positive(),
-});
+}).strict();
 export type ReceivePoLineInput = z.infer<typeof receivePoLineInput>;
 
 /**
@@ -60,7 +60,7 @@ export const adjustStockInput = z.object({
   warehouseId: z.string().uuid(),
   delta: z.number().int(),
   reason: z.string().min(1),
-});
+}).strict();
 export type AdjustStockInput = z.infer<typeof adjustStockInput>;
 
 /**
@@ -71,7 +71,7 @@ export type AdjustStockInput = z.infer<typeof adjustStockInput>;
  */
 export const abandonOrderInput = z.object({
   reason: z.string().min(1),
-});
+}).strict();
 export type AbandonOrderInput = z.infer<typeof abandonOrderInput>;
 
 /**
@@ -90,7 +90,7 @@ export const createPoInput = z.object({
   })).min(1),
   dl: z.number().int().positive().optional(),
   dlRefs: z.array(z.number().int().positive()).optional(),
-});
+}).strict();
 export type CreatePoInput = z.infer<typeof createPoInput>;
 
 /**
@@ -101,7 +101,7 @@ export type CreatePoInput = z.infer<typeof createPoInput>;
  */
 export const warehousePickInput = z.object({
   warehouseId: z.string().uuid(),
-});
+}).strict();
 export type WarehousePickInput = z.infer<typeof warehousePickInput>;
 
 /**
@@ -130,7 +130,7 @@ export type RecheckStockInput = z.infer<typeof recheckStockInput>;
  */
 export const assignPickupPartnerInput = z.object({
   partnerId: z.string().uuid(),
-});
+}).strict();
 export type AssignPickupPartnerInput = z.infer<typeof assignPickupPartnerInput>;
 
 /**
@@ -143,7 +143,7 @@ export type AssignPickupPartnerInput = z.infer<typeof assignPickupPartnerInput>;
  */
 export const reassignPoWarehouseInput = z.object({
   newWarehouseId: z.string().uuid(),
-});
+}).strict();
 export type ReassignPoWarehouseInput = z.infer<typeof reassignPoWarehouseInput>;
 
 /**
@@ -156,7 +156,7 @@ export const listLogisticsOrdersQuery = z.object({
   stage: z.enum(['all', 'awaiting_stock', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
   channel: z.enum(['all', 'dealers', 'showrooms']).default('all'),
   search: z.string().trim().max(100).optional(),
-});
+}).strict();
 export type ListLogisticsOrdersQuery = z.infer<typeof listLogisticsOrdersQuery>;
 
 /**
@@ -167,7 +167,7 @@ export type ListLogisticsOrdersQuery = z.infer<typeof listLogisticsOrdersQuery>;
 export const listPurchaseOrdersQuery = z.object({
   status: z.enum(['all', 'open', 'received', 'cancelled']).default('all'),
   supplierId: z.string().uuid().optional(),
-});
+}).strict();
 export type ListPurchaseOrdersQuery = z.infer<typeof listPurchaseOrdersQuery>;
 
 /**
@@ -177,5 +177,5 @@ export type ListPurchaseOrdersQuery = z.infer<typeof listPurchaseOrdersQuery>;
  */
 export const cancelPoInput = z.object({
   reason: z.string().min(1),
-});
+}).strict();
 export type CancelPoInput = z.infer<typeof cancelPoInput>;

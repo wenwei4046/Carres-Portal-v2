@@ -11,6 +11,9 @@ import {
   recheckStockInput,
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
+  listLogisticsOrdersQuery,
+  listPurchaseOrdersQuery,
+  cancelPoInput,
 } from './logistics';
 
 const UUID = '00000000-0000-4000-8000-000000000000';
@@ -22,6 +25,9 @@ describe('assignPartnerInput', () => {
   });
   it('rejects a non-uuid partnerId', () => {
     expect(assignPartnerInput.safeParse({ partnerId: 'not-a-uuid' }).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(assignPartnerInput.safeParse({ partnerId: UUID, extraField: 'x' }).success).toBe(false);
   });
 });
 
@@ -36,6 +42,11 @@ describe('attachDoInput', () => {
       attachDoInput.safeParse({ doNumber: 'DO-9801', signed: false }).success,
     ).toBe(false);
   });
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      attachDoInput.safeParse({ doNumber: 'DO-9801', signed: true, extraField: 'x' }).success,
+    ).toBe(false);
+  });
 });
 
 describe('receivePoLineInput', () => {
@@ -47,6 +58,11 @@ describe('receivePoLineInput', () => {
   it('rejects zero or non-integer qty', () => {
     expect(
       receivePoLineInput.safeParse({ sku: 'SOFA-OAK-3S', receivedQty: 0 }).success,
+    ).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      receivePoLineInput.safeParse({ sku: 'SOFA-OAK-3S', receivedQty: 2, extraField: 'x' }).success,
     ).toBe(false);
   });
 });
@@ -72,6 +88,17 @@ describe('adjustStockInput', () => {
       }).success,
     ).toBe(false);
   });
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      adjustStockInput.safeParse({
+        sku: 'MAT-Q-FOAM',
+        warehouseId: UUID,
+        delta: 1,
+        reason: 'fix',
+        extraField: 'x',
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe('abandonOrderInput', () => {
@@ -80,6 +107,11 @@ describe('abandonOrderInput', () => {
   });
   it('rejects empty reason', () => {
     expect(abandonOrderInput.safeParse({ reason: '' }).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      abandonOrderInput.safeParse({ reason: 'customer cancelled', extraField: 'x' }).success,
+    ).toBe(false);
   });
 });
 
@@ -102,6 +134,16 @@ describe('createPoInput', () => {
       }).success,
     ).toBe(false);
   });
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [{ sku: 'SOFA-OAK-3S', qty: 1 }],
+        extraField: 'x',
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe('warehousePickInput', () => {
@@ -110,6 +152,11 @@ describe('warehousePickInput', () => {
   });
   it('rejects a missing warehouseId', () => {
     expect(warehousePickInput.safeParse({}).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      warehousePickInput.safeParse({ warehouseId: UUID, extraField: 'x' }).success,
+    ).toBe(false);
   });
 });
 
@@ -138,6 +185,11 @@ describe('assignPickupPartnerInput', () => {
   it('rejects a non-uuid partnerId', () => {
     expect(assignPickupPartnerInput.safeParse({ partnerId: 'P-001' }).success).toBe(false);
   });
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({ partnerId: UUID, extraField: 'x' }).success,
+    ).toBe(false);
+  });
 });
 
 describe('reassignPoWarehouseInput', () => {
@@ -146,5 +198,28 @@ describe('reassignPoWarehouseInput', () => {
   });
   it('rejects a non-uuid newWarehouseId', () => {
     expect(reassignPoWarehouseInput.safeParse({ newWarehouseId: 'WH-1' }).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      reassignPoWarehouseInput.safeParse({ newWarehouseId: UUID, extraField: 'x' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('listLogisticsOrdersQuery', () => {
+  it('rejects extra keys (strict mode)', () => {
+    expect(listLogisticsOrdersQuery.safeParse({ stage: 'all', extraField: 'x' }).success).toBe(false);
+  });
+});
+
+describe('listPurchaseOrdersQuery', () => {
+  it('rejects extra keys (strict mode)', () => {
+    expect(listPurchaseOrdersQuery.safeParse({ status: 'all', extraField: 'x' }).success).toBe(false);
+  });
+});
+
+describe('cancelPoInput', () => {
+  it('rejects extra keys (strict mode)', () => {
+    expect(cancelPoInput.safeParse({ reason: 'duplicate', extraField: 'x' }).success).toBe(false);
   });
 });
