@@ -25,9 +25,11 @@ export default function Login() {
       const defaultHome =
         role === "principal"
           ? "/principal"
-          : role === "dealer" || role === "salesperson"
-            ? "/dealer"
-            : "/me";
+          : role === "logistics"
+            ? "/logistics"
+            : role === "dealer" || role === "salesperson"
+              ? "/dealer"
+              : "/me";
       navigate(from && from !== "/login" ? from : defaultHome, { replace: true });
     }
   }, [session, role, location.state, navigate]);

@@ -1,0 +1,150 @@
+import { describe, it, expect } from 'vitest';
+import {
+  assignPartnerInput,
+  attachDoInput,
+  receivePoLineInput,
+  adjustStockInput,
+  abandonOrderInput,
+  createPoInput,
+  warehousePickInput,
+  issuePosForOrderInput,
+  recheckStockInput,
+  assignPickupPartnerInput,
+  reassignPoWarehouseInput,
+} from './logistics';
+
+const UUID = '00000000-0000-4000-8000-000000000000';
+const UUID2 = '11111111-1111-4111-8111-111111111111';
+
+describe('assignPartnerInput', () => {
+  it('accepts a valid uuid', () => {
+    expect(assignPartnerInput.safeParse({ partnerId: UUID }).success).toBe(true);
+  });
+  it('rejects a non-uuid partnerId', () => {
+    expect(assignPartnerInput.safeParse({ partnerId: 'not-a-uuid' }).success).toBe(false);
+  });
+});
+
+describe('attachDoInput', () => {
+  it('accepts DO# + signed=true (note optional)', () => {
+    expect(
+      attachDoInput.safeParse({ doNumber: 'DO-9801', signed: true }).success,
+    ).toBe(true);
+  });
+  it('rejects when signed is false (customer-signed checkbox required)', () => {
+    expect(
+      attachDoInput.safeParse({ doNumber: 'DO-9801', signed: false }).success,
+    ).toBe(false);
+  });
+});
+
+describe('receivePoLineInput', () => {
+  it('accepts sku + positive int qty', () => {
+    expect(
+      receivePoLineInput.safeParse({ sku: 'SOFA-OAK-3S', receivedQty: 2 }).success,
+    ).toBe(true);
+  });
+  it('rejects zero or non-integer qty', () => {
+    expect(
+      receivePoLineInput.safeParse({ sku: 'SOFA-OAK-3S', receivedQty: 0 }).success,
+    ).toBe(false);
+  });
+});
+
+describe('adjustStockInput', () => {
+  it('accepts a negative delta with reason (loss/damage)', () => {
+    expect(
+      adjustStockInput.safeParse({
+        sku: 'MAT-Q-FOAM',
+        warehouseId: UUID,
+        delta: -1,
+        reason: 'damaged in transit',
+      }).success,
+    ).toBe(true);
+  });
+  it('rejects when reason is empty', () => {
+    expect(
+      adjustStockInput.safeParse({
+        sku: 'MAT-Q-FOAM',
+        warehouseId: UUID,
+        delta: 5,
+        reason: '',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('abandonOrderInput', () => {
+  it('accepts a non-empty reason', () => {
+    expect(abandonOrderInput.safeParse({ reason: 'customer cancelled' }).success).toBe(true);
+  });
+  it('rejects empty reason', () => {
+    expect(abandonOrderInput.safeParse({ reason: '' }).success).toBe(false);
+  });
+});
+
+describe('createPoInput', () => {
+  it('accepts supplier + warehouse + at least one line', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [{ sku: 'SOFA-OAK-3S', qty: 1 }],
+      }).success,
+    ).toBe(true);
+  });
+  it('rejects an empty lines array', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('warehousePickInput', () => {
+  it('accepts a valid warehouse uuid', () => {
+    expect(warehousePickInput.safeParse({ warehouseId: UUID }).success).toBe(true);
+  });
+  it('rejects a missing warehouseId', () => {
+    expect(warehousePickInput.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('issuePosForOrderInput', () => {
+  it('accepts an empty body', () => {
+    expect(issuePosForOrderInput.safeParse({}).success).toBe(true);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(issuePosForOrderInput.safeParse({ orderId: UUID }).success).toBe(false);
+  });
+});
+
+describe('recheckStockInput', () => {
+  it('accepts an empty body', () => {
+    expect(recheckStockInput.safeParse({}).success).toBe(true);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(recheckStockInput.safeParse({ foo: 'bar' }).success).toBe(false);
+  });
+});
+
+describe('assignPickupPartnerInput', () => {
+  it('accepts a valid partner uuid', () => {
+    expect(assignPickupPartnerInput.safeParse({ partnerId: UUID }).success).toBe(true);
+  });
+  it('rejects a non-uuid partnerId', () => {
+    expect(assignPickupPartnerInput.safeParse({ partnerId: 'P-001' }).success).toBe(false);
+  });
+});
+
+describe('reassignPoWarehouseInput', () => {
+  it('accepts a valid new warehouse uuid', () => {
+    expect(reassignPoWarehouseInput.safeParse({ newWarehouseId: UUID }).success).toBe(true);
+  });
+  it('rejects a non-uuid newWarehouseId', () => {
+    expect(reassignPoWarehouseInput.safeParse({ newWarehouseId: 'WH-1' }).success).toBe(false);
+  });
+});
