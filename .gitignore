@@ -114,10 +114,11 @@ phase-*-detail-*.png
 .vite/
 
 # -----------------------------------------------------------------------------
-# AI tooling artifacts (local sessions + GitNexus index/generated files)
+# AI tooling artifacts (local sessions + GitNexus index/generated files + gstack)
 # -----------------------------------------------------------------------------
 .claude/
 .gitnexus/
+.gstack/
 AGENTS.md
 
 # -----------------------------------------------------------------------------
