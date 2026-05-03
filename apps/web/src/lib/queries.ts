@@ -30,6 +30,17 @@ export const qk = {
   catalog:      () => ["catalog"] as const,
   outlets:      () => ["outlets"] as const,
   salespersons: (outletId?: string) => ["salespersons", outletId ?? null] as const,
+  // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
+  // we can selectively invalidate the whole sub-tree (e.g. after a decision
+  // ripples to dealers + dashboard) without touching dealer/order caches.
+  principal: {
+    dashboard: () => ["principal", "dashboard"] as const,
+    approvals: (filters?: ApprovalFilters) =>
+      ["principal", "approvals", filters ?? {}] as const,
+    dealers:   (filters?: PrincipalDealerFilters) =>
+      ["principal", "dealers", filters ?? {}] as const,
+    dealer:    (id: string) => ["principal", "dealers", id] as const,
+  },
 };
 
 export interface OrderFilters {
@@ -37,6 +48,19 @@ export interface OrderFilters {
   outletId?: string;
   salespersonId?: string;
   dealerId?: string;
+}
+
+// Phase 3 — Principal filter shapes. Kept tiny on purpose: the route handlers
+// already do the heavy lifting; the frontend just needs stable cache keys
+// keyed on whatever the user picked in the inbox / dealers list.
+export interface ApprovalFilters {
+  status?: "pending" | "approved" | "rejected" | "all";
+  kind?: "refund" | "new_dealer" | "top_up" | "price_change" | "other";
+}
+
+export interface PrincipalDealerFilters {
+  status?: "active" | "suspended" | "pending";
+  search?: string;
 }
 
 function toSearch(f?: OrderFilters): string {
@@ -357,6 +381,374 @@ export function useSalespersons(
         outletId ? `/api/salespersons?outletId=${outletId}` : "/api/salespersons",
       ),
     staleTime: 5 * 60_000,
+    ...opts,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Principal hooks
+// ---------------------------------------------------------------------------
+// API contract is snake_case for dashboard / approvals / audit (the RPC
+// payload is forwarded verbatim) and camelCase for the dealer list rows
+// (the dealers route does the snake→camel adapter inline). We mirror that
+// distinction here in the response types — no silent conversion.
+
+/** Shape returned by GET /api/principal/dashboard.
+ *  Matches `principal_dashboard_summary()` (migration 0013). */
+export interface PrincipalDashboardKpis {
+  total_gmv: number;
+  active_orders: number;
+  active_dealers: number;
+  total_dealers: number;
+  pending_approvals: number;
+  low_stock_skus: number;
+}
+export interface PrincipalLeaderboardRow {
+  id: string;
+  name: string;
+  region: string;
+  status: string;
+  order_count: number;
+  gmv: number;
+}
+export interface PrincipalPendingApprovalRow {
+  id: string;
+  kind: string;
+  title: string;
+  actor: string;
+  refers_to: string | null;
+  amount: number | null;
+  dealer_id: string | null;
+  created_at: string;
+}
+export interface PrincipalAuditRow {
+  id: string;
+  role: string;
+  actor_text: string;
+  action: string;
+  dealer_id: string | null;
+  ref: string | null;
+  occurred_at: string;
+}
+export interface PrincipalAlerts {
+  suspended_dealers: number;
+  low_stock: { sku: string; name: string; available: number; incoming: number }[];
+}
+export interface PrincipalDashboardResponse {
+  kpis: PrincipalDashboardKpis;
+  leaderboard: PrincipalLeaderboardRow[];
+  pending_approvals: PrincipalPendingApprovalRow[];
+  audit_recent: PrincipalAuditRow[];
+  alerts: PrincipalAlerts;
+}
+
+/** Shape returned by GET /api/approvals (raw row from approvals table). */
+export interface ApprovalRow {
+  id: string;
+  kind: string;
+  status: "pending" | "approved" | "rejected";
+  title: string;
+  actor: string;
+  refers_to: string | null;
+  amount: number | null;
+  dealer_id: string | null;
+  decided_by: string | null;
+  decision_note: string | null;
+  decided_at: string | null;
+  created_at: string;
+}
+export interface ApprovalsListResponse {
+  approvals: ApprovalRow[];
+}
+
+/** Shape returned by GET /api/principal/dealers (camelCase via inline adapter). */
+export interface PrincipalDealerRow {
+  id: string;
+  name: string;
+  region: string;
+  contact: string;
+  status: "active" | "suspended" | "pending" | "rejected";
+  joinedDate: string;
+  creditLimit: number;
+  paymentTerms: string;
+  depositBalance: number;
+  orderCount: number;
+  gmv: number;
+  outstanding: number;
+}
+export interface PrincipalDealersListResponse {
+  dealers: PrincipalDealerRow[];
+}
+
+/** Shape returned by GET /api/principal/dealers/:id. The `dealer` field is
+ *  the raw row from `dealer_with_stats` RPC (snake_case). `recentOrders` is
+ *  hand-rolled camelCase in the route. */
+export interface PrincipalDealerDetailDealer {
+  id: string;
+  name: string;
+  region: string;
+  contact: string;
+  status: string;
+  joined_date: string;
+  credit_limit: number;
+  payment_terms: string;
+  deposit_balance: number;
+  order_count: number;
+  gmv: number;
+  outstanding: number;
+}
+export interface PrincipalDealerRecentOrder {
+  id: string;
+  dl: number;
+  status: string;
+  customerName: string;
+  paid: number;
+  total: number;
+}
+export interface PrincipalDealerDetailResponse {
+  dealer: PrincipalDealerDetailDealer;
+  recentOrders: PrincipalDealerRecentOrder[];
+}
+
+// === Read hooks ===
+
+/** Dashboard summary — KPIs + leaderboard + pending approvals + audit recent
+ *  + alerts. One round-trip per refresh. */
+export function usePrincipalDashboard(
+  opts?: Partial<UseQueryOptions<PrincipalDashboardResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.principal.dashboard(),
+    queryFn: () =>
+      apiFetch<PrincipalDashboardResponse>("/api/principal/dashboard"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Approvals inbox — defaults to status='pending' on the server when omitted. */
+export function useApprovals(
+  filters: ApprovalFilters = {},
+  opts?: Partial<UseQueryOptions<ApprovalsListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.principal.approvals(filters),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (filters.status) params.set("status", filters.status);
+      if (filters.kind) params.set("kind", filters.kind);
+      const qs = params.toString();
+      return apiFetch<ApprovalsListResponse>(
+        `/api/approvals${qs ? `?${qs}` : ""}`,
+      );
+    },
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Dealer admin list — rolled-up stats (gmv, order_count, outstanding). */
+export function usePrincipalDealers(
+  filters: PrincipalDealerFilters = {},
+  opts?: Partial<UseQueryOptions<PrincipalDealersListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.principal.dealers(filters),
+    queryFn: () =>
+      apiFetch<PrincipalDealersListResponse>("/api/principal/dealers"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Dealer detail + last 8 orders. Pass `null` when no dealer is open
+ *  (e.g. drawer closed) to disable the query. */
+export function usePrincipalDealer(
+  id: string | null,
+  opts?: Partial<UseQueryOptions<PrincipalDealerDetailResponse>>,
+) {
+  return useQuery({
+    queryKey: id ? qk.principal.dealer(id) : (["principal", "dealers", "null"] as const),
+    queryFn: () =>
+      apiFetch<PrincipalDealerDetailResponse>(`/api/principal/dealers/${id}`),
+    enabled: !!id,
+    staleTime: 10_000,
+    ...opts,
+  });
+}
+
+// === Mutation hooks (closure-captured ID, await invalidate) ===
+//
+// All four follow the Phase 2C cache-sync pattern:
+//   1. The mutation hook closes over the id (e.g. `useDecideApproval(id)`)
+//      so callers cannot accidentally mismatch the URL param vs the cache key
+//      when reading from the same query.
+//   2. `onSuccess` `await`s every invalidation BEFORE returning, so the next
+//      render sees authoritative data — fixes the "Windows screen out of
+//      sync" class of bugs we hit in 2C.
+
+/** Decide an approval (approve | reject). Ripples to dashboard (KPI counts),
+ *  approvals list (status flip), and dealers (new_dealer approvals turn a
+ *  pending dealer active). */
+export function useDecideApproval(
+  approvalId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { approval: ApprovalRow },
+      ApiError,
+      { status: "approved" | "rejected"; note?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { approval: ApprovalRow },
+    ApiError,
+    { status: "approved" | "rejected"; note?: string }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ approval: ApprovalRow }>(
+        `/api/approvals/${approvalId}/decide`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["principal", "approvals"] });
+      await qc.invalidateQueries({
+        queryKey: qk.principal.dashboard(),
+        exact: true,
+      });
+      await qc.invalidateQueries({ queryKey: ["principal", "dealers"] });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+    ...opts,
+  });
+}
+
+/** Invite a new dealer. Idempotent on (name, region) — server returns
+ *  `idempotent: true` when the second call hits an existing pending dealer. */
+export function useInviteDealer(
+  opts?: Partial<
+    UseMutationOptions<
+      {
+        dealer: PrincipalDealerDetailDealer;
+        approval: ApprovalRow;
+        idempotent: boolean;
+      },
+      ApiError,
+      { name: string; region: string; contact: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    {
+      dealer: PrincipalDealerDetailDealer;
+      approval: ApprovalRow;
+      idempotent: boolean;
+    },
+    ApiError,
+    { name: string; region: string; contact: string }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{
+        dealer: PrincipalDealerDetailDealer;
+        approval: ApprovalRow;
+        idempotent: boolean;
+      }>("/api/principal/dealers/invite", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["principal", "dealers"] });
+      await qc.invalidateQueries({ queryKey: ["principal", "approvals"] });
+      await qc.invalidateQueries({
+        queryKey: qk.principal.dashboard(),
+        exact: true,
+      });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+    ...opts,
+  });
+}
+
+/** Suspend / reactivate a dealer. Updates dashboard suspended_dealers count
+ *  via dashboard invalidate. */
+export function useDealerSetStatus(
+  dealerId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { dealer: PrincipalDealerDetailDealer },
+      ApiError,
+      { status: "active" | "suspended"; reason?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { dealer: PrincipalDealerDetailDealer },
+    ApiError,
+    { status: "active" | "suspended"; reason?: string }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ dealer: PrincipalDealerDetailDealer }>(
+        `/api/principal/dealers/${dealerId}/status`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({
+        queryKey: qk.principal.dealer(dealerId),
+        exact: true,
+      });
+      await qc.invalidateQueries({ queryKey: ["principal", "dealers"] });
+      await qc.invalidateQueries({
+        queryKey: qk.principal.dashboard(),
+        exact: true,
+      });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+    ...opts,
+  });
+}
+
+/** Update a dealer's credit terms (creditLimit + paymentTerms). No dashboard
+ *  side-effect; only dealer detail + list need to refetch. */
+export function useDealerSetTerms(
+  dealerId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { dealer: PrincipalDealerDetailDealer },
+      ApiError,
+      { creditLimit: number; paymentTerms: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { dealer: PrincipalDealerDetailDealer },
+    ApiError,
+    { creditLimit: number; paymentTerms: string }
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ dealer: PrincipalDealerDetailDealer }>(
+        `/api/principal/dealers/${dealerId}/terms`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({
+        queryKey: qk.principal.dealer(dealerId),
+        exact: true,
+      });
+      await qc.invalidateQueries({ queryKey: ["principal", "dealers"] });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
     ...opts,
   });
 }
