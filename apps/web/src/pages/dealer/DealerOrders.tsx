@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { type Order, type OrderStatus } from "@carres/shared";
 import { useOrders } from "@/lib/queries";
+import { proceedBlockers } from "@/lib/order-blockers";
 import DealerOrderDetail from "./DealerOrderDetail";
 
 const TABS: { key: OrderStatus; label: string }[] = [
@@ -12,26 +13,6 @@ const TABS: { key: OrderStatus; label: string }[] = [
 
 const RM = (n: number) =>
   `RM ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-/** Mirrors proto/store.jsx proceedBlockers — list endpoint variant.
- *  Phase 2C will likely lift this into lib/order-blockers.ts when the
- *  Place→Proceed transition needs the same gating from a 3rd caller. */
-function proceedBlockers(o: Order): string[] {
-  const blockers: string[] = [];
-  if (!o.customer.name?.trim()) blockers.push("Customer name");
-  if (!o.customer.phone?.trim()) blockers.push("Phone");
-  if (o.customer.addressUnknown || !o.customer.address?.trim()) blockers.push("Delivery address");
-  if (o.delivery.dateTbd || !o.delivery.date) blockers.push("Delivery date");
-  if (!o.signatureUrl) blockers.push("Signature");
-  if (!o.termsAccepted) blockers.push("T&C accepted");
-  if (typeof o.totalAmount !== "number") {
-    blockers.push("Order pricing");
-  } else {
-    const pct = o.totalAmount > 0 ? (o.paid / o.totalAmount) * 100 : 0;
-    if (pct < 50) blockers.push(`Payment ≥50% (now ${Math.round(pct)}%)`);
-  }
-  return blockers;
-}
 
 export default function DealerOrders() {
   const [tab, setTab] = useState<OrderStatus>("place");

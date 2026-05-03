@@ -1,20 +1,36 @@
-import { useEffect } from "react";
-import type { FloorConfigDto } from "@carres/shared";
-import { useCatalog, useOrder } from "@/lib/queries";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import {
+  PROCEED_BLOCKER_LABEL,
+  isProceedBlockerCode,
+  type FloorConfigDto,
+  type Order,
+} from "@carres/shared";
+import { ApiError } from "@/lib/api";
+import { proceedBlockers } from "@/lib/order-blockers";
+import { useCatalog, useOrder, useProceedOrder } from "@/lib/queries";
 import { orderTotal, lineSubtotal, addonSubtotal, floorSurcharge } from "@/lib/order-totals";
+import AddAddressModal from "./order-actions/AddAddressModal";
+import CancelOrderDialog from "./order-actions/CancelOrderDialog";
+import ConfirmDateModal from "./order-actions/ConfirmDateModal";
+import EditOrderModal from "./order-actions/EditOrderModal";
+import TopUpDepositModal from "./order-actions/TopUpDepositModal";
 
 export default function DealerOrderDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: order, isPending, error } = useOrder(id);
   const { data: catalog } = useCatalog();
+  const [editing, setEditing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
-  // ESC closes the modal.
+  // ESC closes the modal — but only when no inner modal is layered on top
+  // (otherwise ESC inside an editor/dialog would close the parent and lose state).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !editing && !cancelling) onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, editing, cancelling]);
 
   return (
     <div
@@ -25,38 +41,68 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[760px] max-h-[88vh] flex flex-col bg-card text-card-foreground rounded-md shadow-md border border-base-900/10"
       >
-        <header className="px-7 py-5 border-b border-base-100 flex items-start justify-between">
-          <div>
+        <header className="px-7 py-5 border-b border-base-100 flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
             <div className="font-mono text-xs text-base-500">{order ? `#${order.dl}` : "—"}</div>
-            <div className="font-display text-2xl mt-0.5 tracking-[-0.02em]">{order?.customer.name ?? "Loading…"}</div>
+            <div className="font-display text-2xl mt-0.5 tracking-[-0.02em] truncate">{order?.customer.name ?? "Loading…"}</div>
             {order?.customer.phone && (
               <div className="font-mono text-xs text-base-500 mt-0.5">{order.customer.phone}</div>
             )}
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="btn-ghost text-xl leading-none px-2 py-1"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Edit + Cancel only on Place orders — once proceeded, changes
+             *  and cancellation go through logistics. Mirrors proto's
+             *  customer editor button + the implicit cancel intent. */}
+            {order?.status === "place" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="btn-secondary text-[11px] py-1.5 px-3"
+                >
+                  ✎ Edit details
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCancelling(true)}
+                  className="btn-ghost text-[11px] py-1.5 px-3 hover:text-destructive"
+                  title="Cancel this order"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="btn-ghost text-xl leading-none px-2 py-1"
+            >
+              ×
+            </button>
+          </div>
         </header>
 
         <div className="px-7 py-6 overflow-auto flex-1">
-          {isPending && <p className="text-sm text-muted-foreground">Loading order…</p>}
+          {isPending && <p className="text-sm text-base-500">Loading order…</p>}
           {error && (
-            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <p className="rounded border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {(error as Error).message}
             </p>
           )}
           {order && catalog && <OrderBody order={order} floorConfig={catalog.floorConfig} />}
-          {order && !catalog && <p className="text-sm text-muted-foreground">Loading totals…</p>}
+          {order && !catalog && <p className="text-sm text-base-500">Loading totals…</p>}
         </div>
-
-        <footer className="px-7 py-4 border-t border-base-100 bg-base-50 text-[11px] text-base-500">
-          Read-only view. Order actions (Proceed, Top-up, Edit) ship in Phase 2C.
-        </footer>
       </div>
+
+      {/* Edit + Cancel modals layered on top of the detail modal. Each
+       *  closes itself on submit success — detail stays open until the
+       *  outer × is clicked. */}
+      {editing && order && (
+        <EditOrderModal order={order} onClose={() => setEditing(false)} />
+      )}
+      {cancelling && order && (
+        <CancelOrderDialog order={order} onClose={() => setCancelling(false)} />
+      )}
     </div>
   );
 }
@@ -65,7 +111,7 @@ function OrderBody({
   order,
   floorConfig,
 }: {
-  order: ReturnType<typeof useOrder>["data"] & {};
+  order: Order;
   floorConfig: FloorConfigDto;
 }) {
   const total = orderTotal(order, floorConfig);
@@ -109,6 +155,9 @@ function OrderBody({
           </span>
         ))}
       </div>
+
+      {/* Action panel — Place→Proceed transition or status info */}
+      <ActionPanel order={order} />
 
       {/* Customer */}
       <p className="label mb-2">Customer details</p>
@@ -165,6 +214,173 @@ function OrderBody({
           <div className="px-3.5 py-3 text-sm text-base-500">No activity yet.</div>
         )}
       </div>
+    </>
+  );
+}
+
+/**
+ * Action panel — proto/dealer-orders.jsx:271-307 parity. Three states:
+ *   • status === 'place' + no blockers → success-soft callout + Proceed button
+ *   • status === 'place' + blockers    → warning-soft callout + blocker list +
+ *                                         3 resolution buttons + disabled
+ *                                         "Locked (N pending)" button
+ *   • status === 'proceed_order'       → info-soft "In logistics' hands" panel
+ *   • else (delivered / cancelled)     → no panel
+ *
+ * Each resolution button opens a focused modal (AddAddress / ConfirmDate /
+ * TopUpDeposit) that calls the corresponding RPC. Once the modal succeeds,
+ * React Query invalidates the order detail and the panel re-renders with
+ * one less blocker — repeat until ready, then the Proceed button enables.
+ *
+ * Server-side validation (RPC `proceed_order`) re-runs every blocker check so
+ * a race condition where the client sees "ready" but the order changed under
+ * us still gets caught — we surface the server's blocker code via toast.
+ */
+function ActionPanel({ order }: { order: Order }) {
+  // Which resolution modal is currently open. null when none. Mutually
+  // exclusive — only one modal is mounted at a time.
+  const [openModal, setOpenModal] = useState<"address" | "date" | "topup" | null>(null);
+
+  const proceedMut = useProceedOrder({
+    onSuccess: () => {
+      toast.success(`Order #${order.dl} sent to logistics`);
+    },
+    onError: (err) => {
+      // 422 with a known blocker code → show the matching label so the dealer
+      // knows exactly which precondition the server rejected. Other errors
+      // get the generic message from ApiError.
+      if (err instanceof ApiError && err.status === 422) {
+        const code = (err.body as { code?: unknown } | null)?.code;
+        if (isProceedBlockerCode(code)) {
+          toast.error(`Cannot proceed: ${PROCEED_BLOCKER_LABEL[code]}`);
+          return;
+        }
+      }
+      toast.error(err.message || "Could not proceed order");
+    },
+  });
+
+  if (order.status === "proceed_order") {
+    return (
+      <div className="rounded p-4 mb-5 bg-info-soft border border-info">
+        <div className="text-[13px] font-semibold text-info">In logistics&rsquo; hands</div>
+        <p className="text-xs text-base-700 mt-0.5">
+          Order will move to <strong>Delivered</strong> when logistics submits the DO.
+        </p>
+      </div>
+    );
+  }
+
+  if (order.status !== "place") {
+    return null;
+  }
+
+  const blockers = proceedBlockers(order);
+  const ready = blockers.length === 0;
+
+  if (ready) {
+    return (
+      <div className="rounded p-4 mb-5 bg-success-soft border border-success">
+        <div className="text-[13px] font-semibold text-success mb-1">✓ Ready to proceed</div>
+        <p className="text-xs text-base-700">
+          Customer info complete and payment ≥ 50%. You can push this order to logistics.
+        </p>
+        <button
+          type="button"
+          onClick={() => proceedMut.mutate(order.id)}
+          disabled={proceedMut.isPending}
+          className="btn-primary w-full mt-3"
+        >
+          {proceedMut.isPending ? "Sending…" : "Proceed → Send to logistics"}
+        </button>
+      </div>
+    );
+  }
+
+  // Total for TopUpDepositModal balance math. Mirrors the RPC formula
+  // (line + addon, no stair). Fall back to summing rels when totalAmount is
+  // missing from older responses.
+  const total =
+    order.totalAmount ??
+    (order.lines?.reduce((s, l) => s + l.unitPrice * l.qty, 0) ?? 0) +
+      (order.addons?.reduce((s, a) => s + a.unitPrice * a.qty, 0) ?? 0);
+
+  // Which resolution buttons to render. Mirrors proto/dealer-orders.jsx:286-289.
+  const showAddress = order.customer.addressUnknown;
+  const showDate = order.delivery.dateTbd;
+  const paidPct = total > 0 ? (order.paid / total) * 100 : 0;
+  const showTopUp = paidPct < 50;
+
+  return (
+    <>
+      <div className="rounded p-4 mb-5 bg-warning-soft border border-warning">
+        <div className="text-[13px] font-semibold text-warning mb-2">Resolve before proceeding</div>
+        <ul className="m-0 pl-4 text-xs text-base-800 leading-[1.7] list-disc">
+          {blockers.map((b) => (
+            <li key={b.code}>{b.message}</li>
+          ))}
+        </ul>
+
+        {/* Resolution buttons — proto:285-289. Smaller btn-secondary style so
+         *  the "Locked" Proceed button below stays the visual primary. */}
+        {(showAddress || showDate || showTopUp) && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {showAddress && (
+              <button
+                type="button"
+                onClick={() => setOpenModal("address")}
+                className="btn-secondary text-[11px] py-1.5 px-3"
+              >
+                + Add address
+              </button>
+            )}
+            {showDate && (
+              <button
+                type="button"
+                onClick={() => setOpenModal("date")}
+                className="btn-secondary text-[11px] py-1.5 px-3"
+              >
+                + Confirm date
+              </button>
+            )}
+            {showTopUp && (
+              <button
+                type="button"
+                onClick={() => setOpenModal("topup")}
+                className="btn-secondary text-[11px] py-1.5 px-3"
+              >
+                + Top up to 50%
+              </button>
+            )}
+          </div>
+        )}
+
+        <button
+          type="button"
+          disabled
+          className="btn-primary w-full mt-3"
+          title={`Resolve ${blockers.length} item${blockers.length === 1 ? "" : "s"} above to enable`}
+        >
+          Proceed Order — locked ({blockers.length} pending)
+        </button>
+      </div>
+
+      {/* Modals — only one mounted at a time. Each closes itself + invalidates
+       *  React Query on success so the panel re-renders without this row
+       *  having to re-derive state. */}
+      {openModal === "address" && (
+        <AddAddressModal order={order} onClose={() => setOpenModal(null)} />
+      )}
+      {openModal === "date" && (
+        <ConfirmDateModal order={order} onClose={() => setOpenModal(null)} />
+      )}
+      {openModal === "topup" && (
+        <TopUpDepositModal
+          order={order}
+          total={total}
+          onClose={() => setOpenModal(null)}
+        />
+      )}
     </>
   );
 }

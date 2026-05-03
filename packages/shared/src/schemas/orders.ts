@@ -207,6 +207,85 @@ export type CreateOrderInput = z.infer<typeof createOrderInputSchema>;
 export type OrderLineInput = z.infer<typeof orderLineInputSchema>;
 export type OrderAddonInput = z.infer<typeof orderAddonInputSchema>;
 
+/**
+ * Phase 2C.1b — Blocker resolution mutation inputs. Each one targets a single
+ * field on a Place order so the dealer can clear specific blockers without
+ * going through the full edit modal. Server-side RPCs re-validate everything.
+ */
+
+export const topUpOrderInputSchema = z.object({
+  amount: z.number().positive(),
+  /** Internal method key — matches reference/proto's TopUpDepositModal options. */
+  method: z.enum(["cash", "bank", "cheque", "online", "card"]),
+  /** Human-readable label captured from the UI so the order_history line reads
+   *  "Top-up RM 500 via Bank transfer" without the API needing a label table. */
+  methodLabel: z.string().min(1),
+  reference: z.string().nullable(),
+  note: z.string().nullable(),
+  /** ISO date string (YYYY-MM-DD) when the dealer received the top-up. */
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** Storage paths for receipt photos, validated by the route to live inside
+   *  the caller's dealer folder. Up to 4 (proto matches that cap). */
+  photoPaths: z.array(z.string()).max(4),
+});
+export type TopUpOrderInput = z.infer<typeof topUpOrderInputSchema>;
+
+export const setOrderAddressInputSchema = z.object({
+  /** Composed address string the wizard would have written. The RPC stores
+   *  it as-is; the `MYAddressFields` cascade is unmounted on submit. */
+  address: z.string().min(5),
+  billing: z.string().nullable(),
+  billingSame: z.boolean(),
+});
+export type SetOrderAddressInput = z.infer<typeof setOrderAddressInputSchema>;
+
+export const setOrderDateInputSchema = z.object({
+  /** ISO date string (YYYY-MM-DD). The RPC rejects nulls; the wizard's
+   *  separate `dateTbd` checkbox is what flips the order back to TBD via the
+   *  full edit modal. */
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+export type SetOrderDateInput = z.infer<typeof setOrderDateInputSchema>;
+
+/**
+ * Phase 2C.2 — Full edit input. All fields optional; the RPC only updates
+ * keys that are present in the payload. The Hono route converts this
+ * camelCase shape to the snake_case the `update_order` RPC consumes.
+ */
+/** Phase 2C.3 — dealer cancel input. Reason is optional but the UI
+ *  encourages it (audit trail value). RPC trims + nulls empty strings. */
+export const cancelOrderInputSchema = z.object({
+  reason: z.string().nullable(),
+});
+export type CancelOrderInput = z.infer<typeof cancelOrderInputSchema>;
+
+export const updateOrderInputSchema = z
+  .object({
+    customer: z
+      .object({
+        name: z.string().min(2).optional(),
+        phone: z.string().regex(/^[0-9-+\s]{8,}/).optional(),
+        address: z.string().nullable().optional(),
+        addressUnknown: z.boolean().optional(),
+        billing: z.string().nullable().optional(),
+        billingSame: z.boolean().optional(),
+        emergency: z.string().min(1).optional(),
+      })
+      .optional(),
+    delivery: z
+      .object({
+        date: z.string().nullable().optional(),
+        dateTbd: z.boolean().optional(),
+        floor: z.number().int().min(1).optional(),
+        hasLift: z.boolean().optional(),
+      })
+      .optional(),
+  })
+  .refine((v) => !!v.customer || !!v.delivery, {
+    message: "At least one of customer / delivery must be provided",
+  });
+export type UpdateOrderInput = z.infer<typeof updateOrderInputSchema>;
+
 export const dealerSelfSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),

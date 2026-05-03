@@ -1,33 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
 import { useDealerSelf, useOrders } from "@/lib/queries";
+import { proceedBlockers } from "@/lib/order-blockers";
 import { type Order } from "@carres/shared";
 
 const CJK_RE = /[一-鿿]/;
-
-/**
- * Mirrors `reference/proto/store.jsx proceedBlockers` — the human-readable
- * list of fields a Place order is still missing before it can move to Proceed.
- *
- * Slimmed for the list endpoint: we don't have the full lines/addons here,
- * so the paid-pct check uses the server-computed `totalAmount`. Order rows
- * predating the totalAmount augment fall through to "Order pricing" (defensive).
- */
-function proceedBlockers(o: Order): string[] {
-  const blockers: string[] = [];
-  if (!o.customer.name?.trim()) blockers.push("Customer name");
-  if (!o.customer.phone?.trim()) blockers.push("Phone");
-  if (o.customer.addressUnknown || !o.customer.address?.trim()) blockers.push("Delivery address");
-  if (o.delivery.dateTbd || !o.delivery.date) blockers.push("Delivery date");
-  if (!o.signatureUrl) blockers.push("Signature");
-  if (!o.termsAccepted) blockers.push("T&C accepted");
-  if (typeof o.totalAmount !== "number") {
-    blockers.push("Order pricing");
-  } else {
-    const pct = o.totalAmount > 0 ? (o.paid / o.totalAmount) * 100 : 0;
-    if (pct < 50) blockers.push(`Payment ≥50% (now ${Math.round(pct)}%)`);
-  }
-  return blockers;
-}
 
 const RM = (n: number) =>
   `RM ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -191,7 +167,7 @@ function StatusColumn({
                 {o.customer.name}
               </div>
               {o.status === "place" && blockers.length > 0 && (
-                <div className="text-[10px] text-warning mt-1">⚠ {blockers[0]}</div>
+                <div className="text-[10px] text-warning mt-1">⚠ {blockers[0]?.message}</div>
               )}
               {o.status === "place" && blockers.length === 0 && (
                 <div className="text-[10px] text-success mt-1">✓ Ready to proceed</div>

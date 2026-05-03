@@ -14,8 +14,13 @@ import {
   type OrderStatus,
   type OutletsListResponse,
   type SalespersonsListResponse,
+  type CancelOrderInput,
+  type SetOrderAddressInput,
+  type SetOrderDateInput,
+  type TopUpOrderInput,
+  type UpdateOrderInput,
 } from "@carres/shared";
-import { apiFetch } from "./api";
+import { ApiError, apiFetch } from "./api";
 
 export const qk = {
   dealers:      () => ["dealers"] as const,
@@ -95,6 +100,155 @@ export function useCreateOrder(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       // Forward to caller's onSuccess if provided. Spread keeps us
       // signature-agnostic across TanStack versions.
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/**
+ * useProceedOrder — POST /api/orders/:id/proceed. Atomically transitions a
+ * Place order to Proceed (sent to logistics). On success, primes both the
+ * detail cache and invalidates the list cache so kanban + tabs reflect the
+ * new bucket on next mount.
+ *
+ * Errors:
+ *   - 422 with `{ code: ProceedBlockerCode }` — caller can read
+ *     `(err as ApiError).body.code` to show the matching inline blocker hint.
+ *   - 403 / 404 / 500 — generic toast.
+ */
+export function useProceedOrder(
+  opts?: Partial<UseMutationOptions<Order, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, string>({
+    mutationFn: (id) => apiFetch<Order>(`/api/orders/${id}/proceed`, { method: "POST" }),
+    onSuccess: (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(order.id), order);
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/**
+ * useTopUpOrder — POST /api/orders/:id/top-up. Records an additional partial
+ * payment toward the order total. On success, primes the detail cache + busts
+ * the list so kanban paid pct updates on next mount.
+ *
+ * 422 errors carry an `already_paid` / `wrong_status` / `invalid_amount` code
+ * that the caller can branch on (sonner toast text).
+ */
+export function useTopUpOrder(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<Order, ApiError, TopUpOrderInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, TopUpOrderInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>(`/api/orders/${orderId}/top-up`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(order.id), order);
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** useSetOrderAddress — POST /api/orders/:id/address. Resolves the
+ *  addressUnknown blocker by writing customer_address. */
+export function useSetOrderAddress(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<Order, ApiError, SetOrderAddressInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, SetOrderAddressInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>(`/api/orders/${orderId}/address`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(order.id), order);
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** useSetOrderDate — POST /api/orders/:id/date. Resolves the dateTbd blocker. */
+export function useSetOrderDate(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<Order, ApiError, SetOrderDateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, SetOrderDateInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>(`/api/orders/${orderId}/date`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(order.id), order);
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** useUpdateOrder — PATCH /api/orders/:id. Phase 2C.2 — full edit of a Place
+ *  order's customer + delivery fields. Only keys present in the payload are
+ *  updated; the RPC enforces that no fields → 400, status≠place → 422. */
+export function useUpdateOrder(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<Order, ApiError, UpdateOrderInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, UpdateOrderInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(order.id), order);
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+    ...opts,
+  });
+}
+
+/** useCancelOrder — POST /api/orders/:id/cancel. Phase 2C.3 — sets status to
+ *  'cancelled'. Only Place orders cancelable. Reason persisted in
+ *  order_history.metadata for the audit trail. */
+export function useCancelOrder(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<Order, ApiError, CancelOrderInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, CancelOrderInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>(`/api/orders/${orderId}/cancel`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(order.id), order);
+      void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
     ...opts,

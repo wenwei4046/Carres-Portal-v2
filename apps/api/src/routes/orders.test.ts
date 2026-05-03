@@ -666,3 +666,596 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(400);
   });
 });
+
+// =============================================================================
+// POST /api/orders/:id/proceed — Place→Proceed transition
+// =============================================================================
+
+/** Mocks `.rpc('proceed_order', { p_order_id })` + the post-success re-fetch
+ *  chain. Set `rpcError` to simulate RPC validation failures (P0001 with a
+ *  blocker code in DETAIL, 42501 cross-dealer, 42P01 not found, 22023 wrong
+ *  status). Set `fetchedRow` to control what the re-fetch returns on success. */
+function buildSbForProceed(opts: {
+  rpcError?: { code?: string; message?: string; details?: string };
+  fetchedRow?: unknown;
+}) {
+  const rpcCalls: Array<{ name: string; args: unknown }> = [];
+  const eqs: Array<[string, unknown]> = [];
+  const chain = {
+    eq(col: string, val: unknown) {
+      eqs.push([col, val]);
+      return chain;
+    },
+    order: async () => ({ data: [], error: null }),
+    maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
+  };
+  const storage = buildStorageMock();
+  return Object.assign(
+    {
+      from: () => ({ select: () => chain }),
+      rpc: async (name: string, args: unknown) => {
+        rpcCalls.push({ name, args });
+        if (opts.rpcError) {
+          return { data: null, error: opts.rpcError };
+        }
+        return {
+          data: { id: "11111111-1111-1111-1111-111111111111", dl: 1001, status: "proceed_order" },
+          error: null,
+        };
+      },
+      _rpcCalls: rpcCalls,
+      _eqs: eqs,
+    },
+    storage,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) as any;
+}
+
+const PROCEED_ID = "11111111-1111-1111-1111-111111111111";
+const proceedUrl = `http://t/api/orders/${PROCEED_ID}/proceed`;
+
+describe("POST /api/orders/:id/proceed", () => {
+  it("200 — calls proceed_order RPC and returns the re-fetched order with proceed_order status", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        status: "proceed_order",
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(proceedUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status?: string; code?: string | null; message?: string; error?: string };
+    expect(body.status).toBe("proceed_order");
+    expect(sb._rpcCalls).toHaveLength(1);
+    expect(sb._rpcCalls[0].name).toBe("proceed_order");
+    expect(sb._rpcCalls[0].args).toEqual({ p_order_id: PROCEED_ID });
+  });
+
+  it("422 with code='signature_required' when RPC raises P0001 with blocker DETAIL", async () => {
+    const sb = buildSbForProceed({
+      rpcError: {
+        code: "P0001",
+        message: "Customer signature is required",
+        details: "signature_required",
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(proceedUrl, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { status?: string; code?: string | null; message?: string; error?: string };
+    expect(body.code).toBe("signature_required");
+    expect(body.error).toBe("proceed_order_blocked");
+  });
+
+  it("422 with code='payment_below_50' when RPC raises P0001", async () => {
+    const sb = buildSbForProceed({
+      rpcError: {
+        code: "P0001",
+        message: "Payment must be at least 50 percent of total",
+        details: "payment_below_50",
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(proceedUrl, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { status?: string; code?: string | null; message?: string; error?: string };
+    expect(body.code).toBe("payment_below_50");
+  });
+
+  it("422 with code='wrong_status' when RPC raises 22023", async () => {
+    const sb = buildSbForProceed({
+      rpcError: { code: "22023", message: "Order is not in Place status", details: "wrong_status" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(proceedUrl, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { status?: string; code?: string | null; message?: string; error?: string };
+    expect(body.code).toBe("wrong_status");
+  });
+
+  it("403 when RPC raises 42501 (cross-dealer)", async () => {
+    const sb = buildSbForProceed({
+      rpcError: { code: "42501", message: "forbidden: cross-dealer proceed", details: "forbidden" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(proceedUrl, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("404 when RPC raises 42P01 (order not found)", async () => {
+    const sb = buildSbForProceed({
+      rpcError: { code: "42P01", message: "Order not found", details: "order_not_found" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(proceedUrl, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("404 on non-uuid path param (no RPC called)", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders/not-a-uuid/proceed", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("401 without Authorization header", async () => {
+    const res = await app.fetch(new Request(proceedUrl, { method: "POST" }), env);
+    expect(res.status).toBe(401);
+  });
+
+  it("422 body still has code=null when DETAIL is unrecognized (defensive)", async () => {
+    // If the RPC ever raises with a DETAIL value outside our enum (older code,
+    // typo, etc.), the API route still returns 422 but with code=null so the
+    // client falls back to the generic message instead of trying to look up a
+    // bogus code in PROCEED_BLOCKER_LABEL.
+    const sb = buildSbForProceed({
+      rpcError: { code: "P0001", message: "Some unknown failure", details: "not_a_known_code" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(proceedUrl, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { status?: string; code?: string | null; message?: string; error?: string };
+    expect(body.code).toBeNull();
+    expect(body.message).toBe("Some unknown failure");
+  });
+});
+
+// =============================================================================
+// POST /api/orders/:id/top-up — partial payment toward order total
+// POST /api/orders/:id/address — fill in deferred delivery address
+// POST /api/orders/:id/date — confirm TBD delivery date
+// All three share the same dispatchOrderMutation helper, so we test the
+// happy path + RPC error mapping for each plus body validation.
+// =============================================================================
+
+const topUpUrl = `http://t/api/orders/${PROCEED_ID}/top-up`;
+const addressUrl = `http://t/api/orders/${PROCEED_ID}/address`;
+const dateUrl = `http://t/api/orders/${PROCEED_ID}/date`;
+
+function validTopUpBody(over: Record<string, unknown> = {}) {
+  return {
+    amount: 500,
+    method: "bank",
+    methodLabel: "Bank transfer",
+    reference: "MB-12345",
+    note: null,
+    date: "2026-05-03",
+    photoPaths: [`orders-attachments/${DEALER_A}/topup-1/receipt.jpg`],
+    ...over,
+  };
+}
+
+describe("POST /api/orders/:id/top-up", () => {
+  it("200 — calls top_up_order RPC, validates dealer-owned photo paths, returns shaped order", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(topUpUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validTopUpBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("top_up_order");
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_amount).toBe(500);
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_method).toBe("bank");
+  });
+
+  it("400 when a photoPath is outside the caller's dealer folder", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(topUpUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          validTopUpBody({
+            photoPaths: [`orders-attachments/${DEALER_B}/topup-1/receipt.jpg`],
+          }),
+        ),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("422 when RPC raises P0001 with already_paid DETAIL", async () => {
+    const sb = buildSbForProceed({
+      rpcError: { code: "22023", message: "Order is already fully paid", details: "already_paid" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(topUpUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validTopUpBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string | null; error?: string };
+    expect(body.code).toBe("already_paid");
+    expect(body.error).toBe("top_up_blocked");
+  });
+
+  it("400 on invalid body shape", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(topUpUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: -50 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("401 without Authorization header", async () => {
+    const res = await app.fetch(
+      new Request(topUpUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validTopUpBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /api/orders/:id/address", () => {
+  it("200 — calls set_order_address RPC", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        customer_address: "123 Jalan Updated, 50000 KL",
+        customer_address_unknown: false,
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addressUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: "123 Jalan Updated, 50000 KL",
+          billing: null,
+          billingSame: true,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("set_order_address");
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_address).toBe("123 Jalan Updated, 50000 KL");
+  });
+
+  it("400 when address is too short", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addressUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ address: "abc", billing: null, billingSame: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("422 when RPC says wrong status", async () => {
+    const sb = buildSbForProceed({
+      rpcError: { code: "22023", message: "Not in Place", details: "wrong_status" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(addressUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: "123 Jalan Long Enough Address, 50000 KL",
+          billing: null,
+          billingSame: true,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string | null };
+    expect(body.code).toBe("wrong_status");
+  });
+});
+
+describe("POST /api/orders/:id/date", () => {
+  it("200 — calls set_order_date RPC", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        delivery_date: "2026-06-15",
+        delivery_date_tbd: false,
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(dateUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ date: "2026-06-15" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("set_order_date");
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_date).toBe("2026-06-15");
+  });
+
+  it("400 when date string is malformed", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(dateUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ date: "not-a-date" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+// =============================================================================
+// PATCH /api/orders/:id — Phase 2C.2 full edit
+// =============================================================================
+
+const editUrl = `http://t/api/orders/${PROCEED_ID}`;
+
+describe("PATCH /api/orders/:id", () => {
+  it("200 — flattens camelCase to snake_case payload, calls update_order RPC", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        customer_name: "Updated Name",
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editUrl, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer: { name: "Updated Name", phone: "012-9988776" },
+          delivery: { floor: 5, hasLift: true },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("update_order");
+    const args = sb._rpcCalls[0].args as { p_payload: Record<string, unknown> };
+    expect(args.p_payload.customer_name).toBe("Updated Name");
+    expect(args.p_payload.customer_phone).toBe("012-9988776");
+    expect(args.p_payload.delivery_floor).toBe(5);
+    expect(args.p_payload.delivery_has_lift).toBe(true);
+  });
+
+  it("422 with code='wrong_status' when RPC says order isn't in Place", async () => {
+    const sb = buildSbForProceed({
+      rpcError: {
+        code: "22023",
+        message: "Order is no longer editable",
+        details: "wrong_status",
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editUrl, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ customer: { name: "Updated Name" } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string | null; error?: string };
+    expect(body.code).toBe("wrong_status");
+    expect(body.error).toBe("update_order_blocked");
+  });
+
+  it("400 when neither customer nor delivery is provided", async () => {
+    const sb = buildSbForProceed({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editUrl, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("403 when RPC returns 42501 (cross-dealer)", async () => {
+    const sb = buildSbForProceed({
+      rpcError: { code: "42501", message: "forbidden", details: "forbidden" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editUrl, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ customer: { name: "Cross-dealer attempt" } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+// =============================================================================
+// POST /api/orders/:id/cancel — Phase 2C.3 dealer cancel
+// =============================================================================
+
+const cancelUrl = `http://t/api/orders/${PROCEED_ID}/cancel`;
+
+describe("POST /api/orders/:id/cancel", () => {
+  it("200 — calls cancel_order RPC with reason", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        status: "cancelled",
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(cancelUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Customer changed mind" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls[0].name).toBe("cancel_order");
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_reason).toBe("Customer changed mind");
+  });
+
+  it("200 — accepts null reason", async () => {
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        status: "cancelled",
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(cancelUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_reason).toBeNull();
+  });
+
+  it("422 when RPC says wrong_status (already proceeded / cancelled)", async () => {
+    const sb = buildSbForProceed({
+      rpcError: {
+        code: "22023",
+        message: "Only Place orders can be cancelled by the dealer",
+        details: "wrong_status",
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(cancelUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Late" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string | null; error?: string };
+    expect(body.code).toBe("wrong_status");
+    expect(body.error).toBe("cancel_order_blocked");
+  });
+});

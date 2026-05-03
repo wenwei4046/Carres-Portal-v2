@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Toaster } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { RequireRole } from "@/lib/require-role";
 import Login from "@/pages/Login";
@@ -47,21 +48,29 @@ export default function App() {
   }, [hydrate]);
 
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/me" element={<RequireAuth><Me /></RequireAuth>} />
-      <Route
-        path="/dealer/*"
-        element={
-          <RequireAuth>
-            <RequireRole roles={["dealer", "salesperson"]}>
-              <DealerApp />
-            </RequireRole>
-          </RequireAuth>
-        }
-      />
-      <Route path="/" element={<HomeRedirect />} />
-      <Route path="*" element={<HomeRedirect />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/me" element={<RequireAuth><Me /></RequireAuth>} />
+        <Route
+          path="/dealer/*"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["dealer", "salesperson"]}>
+                <DealerApp />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route path="/" element={<HomeRedirect />} />
+        <Route path="*" element={<HomeRedirect />} />
+      </Routes>
+      {/* Global toast surface — top-right per dealer-portal convention.
+       *  rich-colors uses sonner's theme classes so success / error / warning
+       *  pick up our --success / --warning / --destructive tokens via the
+       *  default Tailwind cascade. closeButton lets dealers dismiss long
+       *  messages (e.g. server validation errors) before auto-fade. */}
+      <Toaster position="top-right" richColors closeButton />
+    </>
   );
 }
