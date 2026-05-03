@@ -30,6 +30,32 @@ Phase 2 acceptance items NOT covered by 2C (carry-forward from `phase-2c-reflect
 
 ---
 
+## approval-decided-by-shows-uuid
+
+**What**: `approvals.decided_by uuid references app_users(id)` returns the UUID, not the name. The Approval drawer's "Decision" block shows `<UUID> · <timestamp>` instead of `<Name> · <timestamp>`.
+
+**Why deferred**: Cosmetic. Drawer is functional, decisions are recorded correctly, audit_log has full names. Polish item.
+
+**Revisit when**: M6 polish, or any time before Loo demos to a third party.
+
+**Fix sketch**: Either (a) add `decided_by_name text` column populated from `app_users.name` in `approval_decide` RPC, or (b) add a join in the GET `/api/approvals` query, or (c) UI looks up name from a roster the dashboard already has.
+
+**Surfaced by**: M4 implementer subagent on commit `dfecddd`.
+
+---
+
+## approval-row-type-missing-reason
+
+**What**: The `ApprovalRow` type in `apps/web/src/lib/queries.ts` doesn't declare the optional `reason` field, even though `select * from approvals` returns it. The `ApprovalDrawer` types it locally (`reason?: string | null`) to compensate.
+
+**Why deferred**: One-line type fix, no runtime impact.
+
+**Revisit when**: Next time `queries.ts` is touched, or M6 polish.
+
+**Surfaced by**: M4 implementer subagent on commit `dfecddd`.
+
+---
+
 ## audit-log-duplicate-index
 
 **What**: `audit_log` table now has two functionally identical indexes on `occurred_at desc`: `audit_log_at_idx` (from migration `0001`) and `audit_log_occurred_at_idx` (from migration `0013`).
