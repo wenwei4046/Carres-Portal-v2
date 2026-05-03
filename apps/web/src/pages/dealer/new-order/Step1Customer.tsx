@@ -52,7 +52,7 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
       {/* Sale info */}
       <Section title="Sale info" hint="Manage outlets & salespersons in Settings">
         {outlets.length === 0 ? (
-          <div className="rounded-md bg-amber-100 text-amber-900 px-3 py-2.5 text-xs font-body">
+          <div className="rounded bg-warning-soft text-warning px-3 py-2.5 text-xs font-body">
             ⚠ No outlets yet — add one in <strong>Settings</strong> before creating an order.
           </div>
         ) : (
@@ -103,9 +103,8 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
               value={c.name}
               placeholder="e.g. Tan Mei Ling, 陈志强, Ahmad bin Yusof"
               onChange={(e) => setC({ name: e.target.value })}
-              className={inputClass({ error: !v.name(c.name) })}
+              className={inputClass()}
             />
-            {!v.name(c.name) && <p className={errorHint}>Need at least 2 characters.</p>}
           </Field>
           <Field label="Phone *">
             <input
@@ -113,20 +112,17 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
               value={c.phone}
               placeholder="012-3456789"
               onChange={(e) => setC({ phone: e.target.value })}
-              className={inputClass({ error: !v.phone(c.phone) })}
+              className={inputClass()}
             />
-            {!v.phone(c.phone) && (
-              <p className={errorHint}>Need at least 8 digits (numbers, spaces, +, − allowed).</p>
-            )}
           </Field>
         </div>
 
         {/* Address — cascading state → city → postcode picker */}
         <div className="mt-3.5">
           <div className="flex items-center justify-between mb-2.5">
-            <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+            <span className="label">
               Delivery address {!c.addressUnknown && "*"}
-            </label>
+            </span>
             <InlineCheckbox
               label="Customer hasn't provided yet"
               checked={c.addressUnknown}
@@ -143,7 +139,7 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
             />
           </div>
           {c.addressUnknown ? (
-            <div className="rounded-md bg-secondary/40 border border-dashed border-border px-3 py-2.5 text-xs font-body text-muted-foreground">
+            <div className="rounded bg-base-50 border border-dashed border-base-200 px-3 py-2.5 text-xs font-body text-base-500">
               Address will be required before this order can move to logistics.
             </div>
           ) : (
@@ -161,34 +157,24 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
 
         {/* Emergency contact */}
         <div className="mt-3.5">
-          <label className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
+          <span className="label block mb-1.5">
             Emergency contact *
-          </label>
+          </span>
           <div className="grid grid-cols-3 gap-2.5">
-            <div>
-              <input
-                type="text"
-                value={c.emergencyName}
-                placeholder="Name"
-                onChange={(e) => setC({ emergencyName: e.target.value })}
-                className={inputClass({ error: !v.name(c.emergencyName) })}
-              />
-              {!v.name(c.emergencyName) && (
-                <p className={errorHint}>Need at least 2 characters.</p>
-              )}
-            </div>
-            <div>
-              <input
-                type="text"
-                value={c.emergencyPhone}
-                placeholder="012-9988776"
-                onChange={(e) => setC({ emergencyPhone: e.target.value })}
-                className={inputClass({ error: !v.phone(c.emergencyPhone) })}
-              />
-              {!v.phone(c.emergencyPhone) && (
-                <p className={errorHint}>Need at least 8 digits.</p>
-              )}
-            </div>
+            <input
+              type="text"
+              value={c.emergencyName}
+              placeholder="Name"
+              onChange={(e) => setC({ emergencyName: e.target.value })}
+              className={inputClass()}
+            />
+            <input
+              type="text"
+              value={c.emergencyPhone}
+              placeholder="012-9988776"
+              onChange={(e) => setC({ emergencyPhone: e.target.value })}
+              className={inputClass()}
+            />
             <select
               value={c.emergencyRelationship}
               onChange={(e) =>
@@ -234,23 +220,18 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
           }
         />
         {!c.billingSame && (
-          <>
-            <textarea
-              rows={2}
-              value={c.billing}
-              placeholder="Billing address"
-              onChange={(e) => setC({ billing: e.target.value })}
-              className={`${inputClass({ error: !v.billing(c.billing) })} mt-2.5`}
-            />
-            {!v.billing(c.billing) && (
-              <p className={errorHint}>Need at least 5 characters.</p>
-            )}
-          </>
+          <textarea
+            rows={2}
+            value={c.billing}
+            placeholder="Billing address"
+            onChange={(e) => setC({ billing: e.target.value })}
+            className={`${inputClass()} mt-2.5`}
+          />
         )}
         {c.billingSame && !c.addressUnknown && c.addressLine1 && (
-          <div className="rounded-md bg-secondary/40 border border-dashed border-border px-3 py-2.5 text-xs font-body text-muted-foreground mt-2">
+          <div className="rounded bg-base-50 border border-dashed border-base-200 px-3 py-2.5 text-xs font-body text-base-700 mt-2">
             ↳ Bills will be sent to:{" "}
-            <strong className="text-foreground">
+            <strong className="text-base-900">
               {composeAddress({
                 line1: c.addressLine1,
                 state: c.addressState,
@@ -274,7 +255,7 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
               className={inputClass({ disabled: d.dateTbd })}
             />
           </Field>
-          <div className="pb-2">
+          <div className="pb-2.5">
             <InlineCheckbox
               label="Confirm later"
               checked={d.dateTbd}
@@ -283,7 +264,7 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
           </div>
         </div>
         {d.dateTbd && (
-          <div className="rounded-md bg-amber-100 text-amber-900 px-3 py-2.5 text-xs font-body mt-2.5">
+          <div className="rounded bg-warning-soft text-warning px-3 py-2.5 text-xs font-body mt-2.5">
             ⓘ Order will sit in <strong>Place</strong> until you confirm a date — it can't move
             to <em>Proceed</em> without one.
           </div>
@@ -299,8 +280,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="font-display text-base font-semibold tracking-tight">{title}</h3>
-        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+        <h3 className="font-display text-base font-semibold tracking-[-0.01em]">{title}</h3>
+        {hint && <p className="text-[11px] text-base-500">{hint}</p>}
       </div>
       {children}
     </section>
@@ -310,9 +291,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
-        {label}
-      </span>
+      <span className="label block mb-1.5">{label}</span>
       {children}
     </label>
   );
@@ -320,7 +299,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function InlineCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground font-body">
+    <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-base-700 font-body">
       <input
         type="checkbox"
         checked={checked}
@@ -332,27 +311,12 @@ function InlineCheckbox({ label, checked, onChange }: { label: string; checked: 
   );
 }
 
-function inputClass({ disabled, error }: { disabled?: boolean; error?: boolean } = {}) {
+function inputClass({ disabled }: { disabled?: boolean } = {}) {
   // Two-tone gating cue: active fields are pure WHITE (next to fill, draws
   // the eye); disabled / waiting-on-prerequisite fields fall back to the
-  // body cream so the form's filling order reads at a glance. Adds a red
-  // border when a gated rule fails so the user can see WHAT is blocking
-  // Continue without guessing.
+  // body cream so the form's filling order reads at a glance.
   if (disabled) {
-    return "w-full px-3 py-2.5 text-sm font-body rounded-md border border-border bg-background text-muted-foreground cursor-not-allowed outline-none";
+    return "w-full px-3 py-2.5 text-sm font-body rounded border border-base-300 bg-base-50 text-base-500 cursor-not-allowed outline-none";
   }
-  const borderClass = error ? "border-destructive" : "border-border";
-  return `w-full px-3 py-2.5 text-sm font-body rounded-md border ${borderClass} bg-white outline-none focus:border-primary`;
+  return "w-full px-3 py-2.5 text-sm font-body rounded border border-base-300 bg-white outline-none focus:border-primary";
 }
-
-// Small per-field predicates so the JSX stays clean. All return true when the
-// field is empty (so the error UI doesn't shout at the user before they've
-// even started typing) — only complain when they typed something invalid.
-const len = (s: string) => s.trim().length;
-const v = {
-  name: (s: string) => !s || len(s) >= 2,
-  phone: (s: string) => !s || /^[0-9-+\s]{8,}/.test(s),
-  addressLine: (s: string) => !s || len(s) >= 5,
-  billing: (s: string) => !s || len(s) >= 5,
-};
-const errorHint = "text-[11px] text-destructive mt-1";

@@ -20,10 +20,13 @@ interface Props {
 }
 
 /**
- * 3-category product picker with inline configurators per the proto:
- *   - Mattress: pick model → pick size SKU → qty → Add
- *   - Bedframe: pick model → pick size SKU + color + gap → qty → Add
- *   - Sofa (full per D2): pick model → mode (preset / custom for sofa_mode='both';
+ * 3-category product picker — proto-faithful 2-col model card grid.
+ *   Category tab bar → grid of model cards (2-col) → inline configurator at
+ *   bottom when a model is selected.
+ *
+ *   Mattress: pick model → pick size SKU → qty → Add
+ *   Bedframe: pick model → pick size SKU + color + gap → qty → Add
+ *   Sofa (full per D2): pick model → mode (preset / custom for sofa_mode='both';
  *     locked otherwise) → pick a SKU + optional fabric (with surcharge) → qty → Add
  *
  * Each configurator owns its own transient state and only mutates parent state
@@ -31,7 +34,7 @@ interface Props {
  */
 export default function ProductPicker({ catalog, onAddLine }: Props) {
   const [activeCat, setActiveCat] = useState<ProductCategory>("mattress");
-  const [openModelId, setOpenModelId] = useState<string | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
 
   // Pre-index for fast model→skus + model→fabrics lookups.
   const skusByModel = useMemo(() => {
@@ -55,16 +58,19 @@ export default function ProductPicker({ catalog, onAddLine }: Props) {
   }, [catalog.sofaFabrics]);
 
   const inCat = catalog.models.filter((m) => m.category === activeCat);
+  const selected = selectedModelId ? catalog.models.find((m) => m.id === selectedModelId) : null;
+  const selectedSkus = selected ? skusByModel.get(selected.id) ?? [] : [];
+  const selectedFabrics = selected ? fabricsByModel.get(selected.id) ?? [] : [];
 
   function handleAdd(line: DraftLine) {
     onAddLine(line);
-    setOpenModelId(null);
+    setSelectedModelId(null);
   }
 
   return (
-    <div>
+    <div className="rounded border border-base-200 bg-white overflow-hidden">
       {/* Category tabs */}
-      <div className="flex gap-1.5 mb-3 border-b border-border">
+      <div className="flex border-b border-base-100">
         {CATEGORIES.map((c) => {
           const active = activeCat === c.key;
           return (
@@ -72,72 +78,74 @@ export default function ProductPicker({ catalog, onAddLine }: Props) {
               key={c.key}
               onClick={() => {
                 setActiveCat(c.key);
-                setOpenModelId(null);
+                setSelectedModelId(null);
               }}
-              className={`px-3.5 py-2.5 text-sm border-b-2 -mb-px ${
+              className={`flex-1 px-4 py-3 text-center border-b-2 transition-colors ${
                 active
-                  ? "border-primary text-foreground font-semibold"
-                  : "border-transparent text-muted-foreground font-medium hover:text-foreground"
+                  ? "bg-white border-primary text-base-900"
+                  : "bg-base-50 border-transparent text-base-600 hover:text-base-900"
               }`}
             >
-              <span className="mr-1.5">{c.icon}</span>
-              {c.label}
+              <span className="text-base mr-1.5">{c.icon}</span>
+              <span className="text-[13px] font-semibold">{c.label}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Model list — click expands inline configurator */}
-      <div className="flex flex-col gap-2">
-        {inCat.length === 0 && (
-          <p className="text-xs text-muted-foreground py-3">No {activeCat} models in catalog.</p>
-        )}
-        {inCat.map((model) => {
-          const skus = skusByModel.get(model.id) ?? [];
-          const fabrics = fabricsByModel.get(model.id) ?? [];
-          const open = openModelId === model.id;
-          return (
-            <div key={model.id} className="rounded-md border border-border bg-white overflow-hidden">
+      {/* Model grid (2-col) */}
+      {inCat.length === 0 && (
+        <p className="px-8 py-8 text-center text-xs text-base-500">
+          No {activeCat} models in catalog.
+        </p>
+      )}
+      {inCat.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
+          {inCat.map((model) => {
+            const skuCount = (skusByModel.get(model.id) ?? []).length;
+            const active = selectedModelId === model.id;
+            return (
               <button
-                onClick={() => setOpenModelId(open ? null : model.id)}
-                className={`w-full px-3.5 py-3 text-left flex items-center justify-between gap-3 ${
-                  open ? "bg-secondary/30" : "hover:bg-secondary/20"
+                key={model.id}
+                onClick={() => setSelectedModelId(active ? null : model.id)}
+                className={`text-left p-3 rounded border-[1.5px] transition-colors ${
+                  active
+                    ? "border-primary bg-signature-50"
+                    : "border-base-200 bg-white hover:border-primary/40"
                 }`}
               >
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate">{model.name}</div>
-                  {model.blurb && (
-                    <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                      {model.blurb}
-                    </div>
-                  )}
+                <div className="text-[13px] font-semibold">{model.name}</div>
+                {model.blurb && (
+                  <div className="text-[11px] text-base-500 mt-0.5">{model.blurb}</div>
+                )}
+                <div className="text-[10px] text-base-500 mt-1.5 font-mono">
+                  {skuCount} variant{skuCount === 1 ? "" : "s"}
                 </div>
-                <span className="text-xs text-muted-foreground font-mono shrink-0">
-                  {open ? "▼" : "▶"} {skus.length} variant{skus.length === 1 ? "" : "s"}
-                </span>
               </button>
-              {open && (
-                <div className="px-3.5 py-3 border-t border-border bg-background">
-                  {model.category === "mattress" && (
-                    <MattressConfigurator model={model} skus={skus} onAdd={handleAdd} />
-                  )}
-                  {model.category === "bedframe" && (
-                    <BedframeConfigurator model={model} skus={skus} onAdd={handleAdd} />
-                  )}
-                  {model.category === "sofa" && (
-                    <SofaConfigurator
-                      model={model}
-                      skus={skus}
-                      fabrics={fabrics}
-                      onAdd={handleAdd}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Inline configurator for the selected model */}
+      {selected && (
+        <div className="border-t border-base-100 p-3.5 bg-base-50">
+          {selected.category === "mattress" && (
+            <MattressConfigurator model={selected} skus={selectedSkus} onAdd={handleAdd} />
+          )}
+          {selected.category === "bedframe" && (
+            <BedframeConfigurator model={selected} skus={selectedSkus} onAdd={handleAdd} />
+          )}
+          {selected.category === "sofa" && (
+            <SofaConfigurator
+              model={selected}
+              skus={selectedSkus}
+              fabrics={selectedFabrics}
+              onAdd={handleAdd}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -206,11 +214,7 @@ function MattressConfigurator({
           className={inputClass()}
         />
       </FieldLabel>
-      <button
-        onClick={add}
-        disabled={!sku}
-        className={addBtnClass(!!sku)}
-      >
+      <button onClick={add} disabled={!sku} className="btn-primary whitespace-nowrap">
         + Add
       </button>
     </div>
@@ -303,7 +307,7 @@ function BedframeConfigurator({
             className={inputClass()}
           />
         </FieldLabel>
-        <button onClick={add} disabled={!sku} className={addBtnClass(!!sku)}>
+        <button onClick={add} disabled={!sku} className="btn-primary whitespace-nowrap">
           + Add
         </button>
       </div>
@@ -367,7 +371,7 @@ function SofaConfigurator({
 
   return (
     <div className="flex flex-col gap-2.5">
-      {/* Mode tabs (visible only when sofa_mode='both') */}
+      {/* Mode pills (visible only when sofa_mode='both') */}
       {allowed.length > 1 && (
         <div className="flex gap-1.5">
           {allowed.map((m) => (
@@ -377,10 +381,10 @@ function SofaConfigurator({
                 setMode(m);
                 setSkuId("");
               }}
-              className={`px-3 py-1.5 text-xs rounded-md border ${
+              className={`px-3 py-1.5 text-xs rounded border-[1.5px] ${
                 mode === m
-                  ? "border-primary bg-primary/10 text-primary font-semibold"
-                  : "border-border text-muted-foreground hover:border-primary/40"
+                  ? "border-primary bg-signature-50 text-primary font-semibold"
+                  : "border-base-200 text-base-700 hover:border-primary/40"
               }`}
             >
               {m === "preset" ? "Preset" : "Custom (parts)"}
@@ -390,9 +394,7 @@ function SofaConfigurator({
       )}
 
       {skusForMode.length === 0 && (
-        <p className="text-xs text-muted-foreground">
-          No {mode} variants for this model yet.
-        </p>
+        <p className="text-xs text-base-500">No {mode} variants for this model yet.</p>
       )}
 
       <div className="grid grid-cols-2 gap-2.5">
@@ -439,11 +441,18 @@ function SofaConfigurator({
             className={inputClass()}
           />
         </FieldLabel>
-        <div className="text-xs text-muted-foreground self-end pb-2.5">
-          Unit price <span className="font-mono font-semibold text-foreground">RM {unitPrice.toLocaleString()}</span>
-          {surcharge > 0 && <span className="ml-1.5 text-[10px]">(base RM {sku?.price.toLocaleString() ?? 0} + fabric RM {surcharge})</span>}
+        <div className="text-xs text-base-500 self-end pb-2.5">
+          Unit price{" "}
+          <span className="font-mono font-semibold text-base-900">
+            RM {unitPrice.toLocaleString()}
+          </span>
+          {surcharge > 0 && (
+            <span className="ml-1.5 text-[10px]">
+              (base RM {sku?.price.toLocaleString() ?? 0} + fabric RM {surcharge})
+            </span>
+          )}
         </div>
-        <button onClick={add} disabled={!sku} className={addBtnClass(!!sku)}>
+        <button onClick={add} disabled={!sku} className="btn-primary whitespace-nowrap">
           + Add
         </button>
       </div>
@@ -459,9 +468,7 @@ function SofaConfigurator({
 function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
-        {label}
-      </span>
+      <span className="label block mb-1">{label}</span>
       {children}
     </label>
   );
@@ -471,16 +478,7 @@ function inputClass({ disabled }: { disabled?: boolean } = {}) {
   // Active inputs go white (gating cue: white = next to fill); disabled
   // selectors fall back to body cream so the user sees what's locked.
   if (disabled) {
-    return "w-full px-2.5 py-2 text-sm font-body rounded-md border border-border bg-background text-muted-foreground cursor-not-allowed outline-none";
+    return "w-full px-2.5 py-2 text-sm font-body rounded border border-base-300 bg-base-50 text-base-500 cursor-not-allowed outline-none";
   }
-  return "w-full px-2.5 py-2 text-sm font-body rounded-md border border-border bg-white outline-none focus:border-primary";
-}
-
-function addBtnClass(enabled: boolean) {
-  return [
-    "px-3.5 py-2 rounded-md text-sm font-semibold whitespace-nowrap",
-    enabled
-      ? "bg-primary text-primary-foreground hover:bg-primary/90"
-      : "bg-secondary text-muted-foreground cursor-not-allowed",
-  ].join(" ");
+  return "w-full px-2.5 py-2 text-sm font-body rounded border border-base-300 bg-white outline-none focus:border-primary";
 }

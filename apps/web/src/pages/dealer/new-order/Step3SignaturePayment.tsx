@@ -29,8 +29,8 @@ const PAYMENT_METHODS: ReadonlyArray<{
 /**
  * Step 3 — Confirm + sign + record payment. Mirrors proto/new-order-step3.jsx
  * structurally (Customer / Order recap / Payment received / Payment method
- * / Signature / T&C) but uses Tailwind tokens instead of inline CSS vars and
- * persists slip/signature dataURLs into the wizard draft (sessionStorage).
+ * / Signature / T&C) and now uses proto warm-linen status tokens for the
+ * willProceed alerts, paid-pct hint, and T&C accept box.
  *
  * Submit lives in the parent footer. This component is purely presentational
  * + drives the draft mutations that step3Valid() reads.
@@ -92,11 +92,11 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
     <div className="flex flex-col gap-7">
       {/* ---------- Customer recap ---------- */}
       <Section title="Customer">
-        <div className="rounded-md border border-border bg-white p-4">
+        <div className="rounded border border-base-200 bg-white p-4">
           <div className="font-display text-lg font-semibold leading-tight">
-            {draft.customer.name || <em className="text-muted-foreground">—</em>}
+            {draft.customer.name || <em className="text-base-400">—</em>}
           </div>
-          <div className="font-mono text-xs text-muted-foreground mt-0.5">
+          <div className="font-mono text-xs text-base-500 mt-0.5">
             {draft.customer.phone}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mt-3.5">
@@ -104,7 +104,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               label="Delivery address"
               value={
                 draft.customer.addressUnknown ? (
-                  <em className="text-amber-600">Customer to provide later</em>
+                  <em className="text-warning">Customer to provide later</em>
                 ) : (
                   draft.customer.address
                 )
@@ -114,7 +114,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               label="Billing address"
               value={
                 draft.customer.billingSame ? (
-                  <em className="text-muted-foreground">Same as delivery</em>
+                  <em className="text-base-500">Same as delivery</em>
                 ) : (
                   draft.customer.billing
                 )
@@ -125,7 +125,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               label="Delivery date"
               value={
                 draft.delivery.dateTbd ? (
-                  <em className="text-amber-600">Confirm further notice</em>
+                  <em className="text-warning">Confirm further notice</em>
                 ) : (
                   draft.delivery.date
                 )
@@ -137,14 +137,14 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
 
       {/* ---------- Order recap ---------- */}
       <Section title="Order">
-        <div className="rounded-md border border-border bg-white overflow-hidden">
+        <div className="rounded border border-base-200 bg-white overflow-hidden">
           {draft.lines.map((l, i) => (
             <div
               key={l.localId}
-              className={`flex justify-between px-3.5 py-2.5 ${i ? "border-t border-border" : ""}`}
+              className={`flex justify-between px-3.5 py-2.5 ${i ? "border-t border-base-100" : ""}`}
             >
               <span className="text-[13px]">
-                {l.label} <span className="text-muted-foreground">×{l.qty}</span>
+                {l.label} <span className="text-base-500">×{l.qty}</span>
               </span>
               <span className="font-mono text-[13px]">
                 RM {(l.unitPrice * l.qty).toLocaleString()}
@@ -154,11 +154,11 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
           {draft.addons.map((a) => (
             <div
               key={a.key}
-              className="flex justify-between px-3.5 py-2.5 border-t border-border text-muted-foreground"
+              className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600"
             >
               <span className="text-[13px]">
                 + {a.name}
-                {a.qty > 1 && <span className="text-muted-foreground/70"> ×{a.qty}</span>}
+                {a.qty > 1 && <span className="text-base-500"> ×{a.qty}</span>}
               </span>
               <span className="font-mono text-[13px]">
                 RM {(a.unitPrice * a.qty).toLocaleString()}
@@ -166,7 +166,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
             </div>
           ))}
           {stair > 0 && (
-            <div className="flex justify-between px-3.5 py-2.5 border-t border-border text-muted-foreground">
+            <div className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600">
               <span className="text-[13px]">
                 + Stair carry · floor {draft.delivery.floor}
                 {draft.delivery.hasLift ? " (with lift)" : ""}
@@ -174,11 +174,11 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               <span className="font-mono text-[13px]">RM {stair.toLocaleString()}</span>
             </div>
           )}
-          <div className="px-3.5 py-3 border-t border-border bg-secondary/30 text-xs">
+          <div className="px-3.5 py-3 border-t border-base-200 bg-base-50 text-xs">
             <Row label="Subtotal" value={`RM ${lineSub.toLocaleString()}`} />
             {addonSub > 0 && <Row label="Add-ons" value={`RM ${addonSub.toLocaleString()}`} />}
             {stair > 0 && <Row label="Stair carry" value={`RM ${stair.toLocaleString()}`} />}
-            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-200">
               <span className="text-sm font-semibold">Total</span>
               <span className="font-mono text-base font-bold">RM {total.toLocaleString()}</span>
             </div>
@@ -210,18 +210,18 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
                   if (p.pct === 50) onChange({ ...draft, paid: minDeposit });
                   else if (p.pct === 100) onChange({ ...draft, paid: total });
                 }}
-                className={`px-3 py-3 rounded-md border-2 text-center ${
-                  active ? "border-primary bg-primary/5" : "border-border bg-white"
+                className={`px-3 py-3 rounded border-[1.5px] text-center ${
+                  active ? "border-primary bg-signature-50" : "border-base-200 bg-white"
                 }`}
               >
                 <div className="text-[13px] font-semibold">{p.label}</div>
-                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">{p.sub}</div>
+                <div className="font-mono text-[11px] text-base-500 mt-0.5">{p.sub}</div>
               </button>
             );
           })}
         </div>
         <div className="flex items-center gap-2.5">
-          <span className="font-mono text-[13px] text-muted-foreground">RM</span>
+          <span className="font-mono text-[13px] text-base-500">RM</span>
           <input
             type="number"
             value={draft.paid || ""}
@@ -234,23 +234,21 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
                 paid: Math.min(total, Math.max(0, parseFloat(e.target.value) || 0)),
               })
             }
-            className="flex-1 px-3 py-2.5 border border-border rounded-md font-mono text-sm bg-white outline-none focus:border-primary"
+            className="flex-1 px-3 py-2.5 border border-base-300 rounded font-mono text-sm bg-white outline-none focus:border-primary"
             aria-label="Amount received"
           />
           <span
-            className={`text-xs font-body ${
-              paidPct >= 50 ? "text-emerald-600" : "text-amber-600"
-            }`}
+            className={`text-xs font-body ${paidPct >= 50 ? "text-success" : "text-warning"}`}
           >
             {paidPct}% of total
           </span>
         </div>
         {draft.paid > 0 && (
           <div
-            className={`mt-2.5 px-3 py-2.5 rounded-md text-xs leading-relaxed ${
+            className={`mt-2.5 px-3 py-2.5 rounded text-xs leading-relaxed text-base-800 border ${
               willProceed
-                ? "border border-emerald-400 bg-emerald-50 text-emerald-900"
-                : "border border-amber-400 bg-amber-50 text-amber-900"
+                ? "border-success bg-success-soft"
+                : "border-warning bg-warning-soft"
             }`}
           >
             {willProceed ? (
@@ -286,12 +284,12 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
                 key={m.id}
                 type="button"
                 onClick={() => setPay({ method: m.id })}
-                className={`px-3 py-3 rounded-md border-2 text-center ${
-                  active ? "border-primary bg-primary/5" : "border-border bg-white"
+                className={`px-3 py-3 rounded border-[1.5px] text-center ${
+                  active ? "border-primary bg-signature-50" : "border-base-200 bg-white"
                 }`}
               >
                 <div className="text-[13px] font-semibold">{m.label}</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">{m.sub}</div>
+                <div className="text-[11px] text-base-500 mt-0.5">{m.sub}</div>
               </button>
             );
           })}
@@ -337,12 +335,12 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
                       key={m}
                       type="button"
                       onClick={() => setPay({ installmentMonths: m })}
-                      className={`px-3 py-3 rounded-md border-2 text-center ${
-                        active ? "border-primary bg-primary/5" : "border-border bg-white"
+                      className={`px-3 py-3 rounded border-[1.5px] text-center ${
+                        active ? "border-primary bg-signature-50" : "border-base-200 bg-white"
                       }`}
                     >
                       <div className="text-[13px] font-semibold">{m} months</div>
-                      <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
+                      <div className="font-mono text-[11px] text-base-500 mt-0.5">
                         ≈ RM {Math.round(monthly).toLocaleString()} / mo
                       </div>
                     </button>
@@ -380,8 +378,8 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
 
       {/* ---------- T&C ---------- */}
       <Section title="Terms & conditions">
-        <div className="rounded-md border border-border bg-white p-3.5 text-[11px] leading-relaxed text-muted-foreground max-h-[140px] overflow-auto">
-          <p className="text-foreground font-semibold mb-1.5">Carres Group Sdn Bhd · Order Terms</p>
+        <div className="rounded border border-base-200 bg-white p-3.5 text-[11px] leading-relaxed text-base-700 max-h-[140px] overflow-auto">
+          <p className="text-base-900 font-semibold mb-1.5">Carres Group Sdn Bhd · Order Terms</p>
           <p>
             1. All orders are subject to stock availability. 50% deposit confirms reservation.
           </p>
@@ -404,10 +402,10 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
           </p>
         </div>
         <label
-          className={`mt-2.5 flex items-start gap-2.5 px-3.5 py-3 border-2 rounded-md cursor-pointer ${
+          className={`mt-2.5 flex items-start gap-2.5 px-3.5 py-3 border rounded cursor-pointer ${
             draft.termsAccepted
-              ? "border-emerald-400 bg-emerald-50"
-              : "border-border bg-white"
+              ? "border-success bg-success-soft"
+              : "border-base-300 bg-white"
           }`}
         >
           <input
@@ -421,7 +419,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
             <div className="text-sm font-semibold">
               Customer accepts all terms and conditions
             </div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">
+            <div className="text-[11px] text-base-600 mt-0.5">
               By ticking, the customer confirms they have read and agreed to the above.
             </div>
           </div>
@@ -447,8 +445,8 @@ function Section({
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="font-display text-base font-semibold tracking-tight">{title}</h3>
-        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+        <h3 className="font-display text-base font-semibold tracking-[-0.01em]">{title}</h3>
+        {hint && <p className="text-[11px] text-base-500">{hint}</p>}
       </div>
       {children}
     </section>
@@ -458,11 +456,11 @@ function Section({
 function KV({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+      <div className="label mb-1" style={{ letterSpacing: "0.16em", fontSize: "10px" }}>
         {label}
       </div>
-      <div className="text-[13px] text-foreground">
-        {value || <em className="text-muted-foreground">—</em>}
+      <div className="text-[13px] text-base-800">
+        {value || <em className="text-base-400">—</em>}
       </div>
     </div>
   );
@@ -470,7 +468,7 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between text-muted-foreground">
+    <div className="flex justify-between text-base-600">
       <span>{label}</span>
       <span className="font-mono">{value}</span>
     </div>
@@ -480,9 +478,7 @@ function Row({ label, value }: { label: string; value: string }) {
 function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
-        {label}
-      </span>
+      <span className="label block mb-1.5">{label}</span>
       {children}
     </label>
   );
@@ -511,9 +507,9 @@ function ApprovalCodeField({
         placeholder={placeholder}
         maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2.5 border border-border rounded-md font-mono text-sm tracking-wider bg-white outline-none focus:border-primary"
+        className="w-full px-3 py-2.5 border border-base-300 rounded font-mono text-sm tracking-wider bg-white outline-none focus:border-primary"
       />
-      <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>
+      <div className="text-[11px] text-base-500 mt-1.5">{hint}</div>
     </FieldLabel>
   );
 }

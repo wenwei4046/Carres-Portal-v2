@@ -58,6 +58,36 @@ export default {
           900: "hsl(var(--base-900))",
         },
         terracotta: "hsl(var(--terracotta))",
+        // Signature tints — light fills for active states + darker hover.
+        // Mirrors --signature-50/100/700 in index.css.
+        signature: {
+          50:  "hsl(var(--signature-50))",
+          100: "hsl(var(--signature-100))",
+          700: "hsl(var(--signature-700))",
+        },
+        // Proto warm-linen status palette. *-soft variants are the muted
+        // background fills used inside callout boxes (e.g. "Ready to proceed").
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          soft: "hsl(var(--success-soft))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          soft: "hsl(var(--warning-soft))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          soft: "hsl(var(--info-soft))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        error: {
+          // --error shares its hue/saturation with --destructive to keep
+          // shadcn primitives (alerts, toasts) untouched. The *-soft variant
+          // is the only piece proto adds on top.
+          soft: "hsl(var(--error-soft))",
+        },
       },
       fontFamily: {
         // Body / display both use DM Sans per the Warm Linen preset in

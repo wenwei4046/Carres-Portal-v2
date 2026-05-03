@@ -102,7 +102,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+              className="btn-primary w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               {loading ? "Signing in…" : "Sign in"}
             </button>
@@ -110,7 +110,7 @@ export default function Login() {
             <div className="space-y-1 text-center text-xs text-muted-foreground">
               <p>Demo: dealer@carres.com / 111</p>
               {!supabaseConfigured && (
-                <p className="text-amber-700">Supabase not configured — set apps/web/.env.local</p>
+                <p className="text-warning">Supabase not configured — set apps/web/.env.local</p>
               )}
             </div>
           </form>

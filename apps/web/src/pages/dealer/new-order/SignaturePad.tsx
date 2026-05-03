@@ -95,8 +95,8 @@ export default function SignaturePad({ value, onChange }: Props) {
   return (
     <div>
       <div
-        className={`relative rounded-md overflow-hidden bg-card border-2 ${
-          signed ? "border-emerald-500" : "border-border"
+        className={`relative rounded overflow-hidden bg-card border-2 ${
+          signed ? "border-success" : "border-base-300"
         }`}
       >
         <canvas
@@ -114,25 +114,21 @@ export default function SignaturePad({ value, onChange }: Props) {
           aria-label="Customer signature pad"
         />
         {!signed && (
-          <div className="absolute inset-0 grid place-items-center pointer-events-none text-muted-foreground/70 text-sm">
+          <div className="absolute inset-0 grid place-items-center pointer-events-none text-base-400 text-sm">
             ✎ Sign here
           </div>
         )}
         {signed && (
-          <div className="absolute top-2 left-3 text-[10px] font-semibold tracking-[0.1em] uppercase text-emerald-600">
+          <div className="absolute top-2 left-3 text-[10px] font-semibold tracking-[0.1em] uppercase text-success">
             ✓ Signed
           </div>
         )}
       </div>
       <div className="mt-1.5 flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[11px] text-base-500">
           By signing, customer agrees to the terms below.
         </span>
-        <button
-          type="button"
-          onClick={clear}
-          className="text-[11px] px-2.5 py-1 rounded text-muted-foreground hover:text-foreground"
-        >
+        <button type="button" onClick={clear} className="btn-ghost text-[11px] px-2.5 py-1">
           ↻ Clear
         </button>
       </div>

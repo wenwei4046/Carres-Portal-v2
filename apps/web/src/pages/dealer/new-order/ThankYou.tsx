@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { Order } from "@carres/shared";
 
 interface Props {
@@ -10,72 +9,48 @@ interface Props {
 }
 
 /**
- * Post-submit confirmation screen. Shows the freshly minted order_no, a
- * one-click copy of the reference, customer name + total, and the two
- * obvious next-actions: file another order, or back to the kanban.
+ * Post-submit confirmation screen — proto-faithful: solid sage success badge
+ * + "Thank you" hero + "What's next" 3-step list + two CTA buttons.
  *
  * Order ID format: `CO-{dl}` where dl is the dealer-local sequence (the DB
  * column populated by create_order RPC). Same display string the dealer
  * sees on the kanban card.
  */
 export default function ThankYou({ order, onNewOrder, onClose }: Props) {
-  const [copied, setCopied] = useState(false);
-  const orderNo = `CO-${order.dl}`;
-  const total =
-    (order.lines ?? []).reduce((s, l) => s + l.unitPrice * l.qty, 0) +
-    (order.addons ?? []).reduce((s, a) => s + a.unitPrice * a.qty, 0);
-  // Stair carry isn't included here — display total stays consistent with the
-  // wizard preview which excluded stair when total was sub+addon. The order
-  // detail page renders the authoritative grand total via order-totals.ts.
-
-  function copy() {
-    void navigator.clipboard.writeText(orderNo).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }
-
   return (
-    <div className="px-7 py-10 flex flex-col items-center text-center">
-      <div className="w-16 h-16 rounded-full bg-emerald-100 grid place-items-center text-3xl text-emerald-600 mb-4">
-        ✓
+    <div className="text-center overflow-hidden">
+      <div className="px-9 pt-11 pb-7 bg-base-50">
+        <div className="w-16 h-16 mx-auto mb-[18px] rounded-full bg-success text-white grid place-items-center text-[28px] leading-none">
+          ✓
+        </div>
+        <div className="font-display text-[32px] tracking-[-0.025em] font-semibold leading-tight">
+          Thank you
+        </div>
+        <div className="text-sm text-base-600 mt-1.5">
+          Order <span className="font-mono font-semibold text-base-900">CO-{order.dl}</span> has
+          been submitted to Carres.
+        </div>
       </div>
-      <h2 className="font-display text-2xl font-semibold tracking-tight mb-1.5">
-        Order placed
-      </h2>
-      <p className="text-sm text-muted-foreground mb-6">
-        {order.customer.name} · RM {total.toLocaleString()}
-      </p>
-
-      <div className="flex items-center gap-2 mb-7">
-        <code className="font-mono text-base tracking-[0.16em] px-3 py-2 rounded-md bg-secondary border border-border">
-          {orderNo}
-        </code>
-        <button
-          type="button"
-          onClick={copy}
-          className="text-xs px-3 py-2 rounded-md border border-border hover:border-primary"
-          aria-label="Copy order number"
-        >
-          {copied ? "✓ Copied" : "Copy"}
-        </button>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-2.5 w-full max-w-sm">
-        <button
-          type="button"
-          onClick={onNewOrder}
-          className="flex-1 px-4 py-2.5 rounded-md border border-border text-sm font-semibold hover:border-primary"
-        >
-          + New order
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 px-4 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90"
-        >
-          Back to dashboard
-        </button>
+      <div className="px-9 pt-5 pb-7 text-left">
+        <div className="label mb-1.5">What's next</div>
+        <ol className="m-0 pl-[18px] text-[13px] text-base-700 leading-[1.7] font-body list-decimal">
+          <li>
+            Order sits in <strong>Place</strong> until you click <em>Proceed</em> when the
+            customer is ready.
+          </li>
+          <li>Logistics will issue a PO and prepare the goods.</li>
+          <li>
+            Once the DO is submitted, the order moves to <strong>Delivered</strong>.
+          </li>
+        </ol>
+        <div className="flex gap-2.5 mt-[22px]">
+          <button type="button" onClick={onNewOrder} className="btn-secondary flex-1">
+            + New order
+          </button>
+          <button type="button" onClick={onClose} className="btn-primary flex-1">
+            Back to dashboard
+          </button>
+        </div>
       </div>
     </div>
   );

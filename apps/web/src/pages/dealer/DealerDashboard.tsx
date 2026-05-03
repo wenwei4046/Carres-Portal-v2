@@ -68,15 +68,15 @@ export default function DealerDashboard() {
   return (
     <div className="p-9">
       {/* Top row — proto's 3-column hero: heading | "Start a sale" black CTA | "Ready to proceed" stat */}
-      <header className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(260px,300px)_minmax(220px,260px)] gap-3.5 mb-9 items-stretch">
+      <header className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr_1fr] gap-4 mb-7 items-stretch">
         <div className="self-end">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">Selamat pagi</p>
+          <p className="kicker">Selamat pagi</p>
           <h1 className="font-display text-[36px] font-bold mt-2 leading-[1.05] tracking-[-0.025em]">
             {dealer.data?.name ?? "Dealer"}.
             <br />
-            <span className="text-muted-foreground font-medium">Here&rsquo;s where things stand.</span>
+            <span className="text-base-600 font-medium">Here&rsquo;s where things stand.</span>
           </h1>
-          <p className="text-[13px] text-muted-foreground mt-1.5">
+          <p className="text-[13px] text-base-600 mt-1">
             <span className="font-mono font-semibold text-foreground">{inFlight}</span> in flight ·
             this month{" "}
             <span className="font-mono font-semibold text-foreground">{RM(monthValue)}</span>
@@ -87,7 +87,7 @@ export default function DealerDashboard() {
           className="rounded-md bg-base-900 text-white p-[22px] flex flex-col justify-between hover:bg-base-800 transition-colors"
         >
           <div>
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/90">
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-signature-100">
               Start a sale
             </span>
             <div className="font-display text-[26px] font-bold mt-1.5 leading-[1.1]">+ New order</div>
@@ -100,12 +100,12 @@ export default function DealerDashboard() {
         <Link
           to="/dealer/orders"
           className={`rounded-md bg-card border border-border p-5 hover:border-primary/40 transition-colors ${
-            readyToProceed.length > 0 ? "border-l-[3px] border-l-emerald-500" : "border-l-[3px] border-l-base-200"
+            readyToProceed.length > 0 ? "border-l-[3px] border-l-success" : "border-l-[3px] border-l-base-200"
           }`}
         >
           <span
             className={`block text-[11px] font-semibold uppercase tracking-[0.18em] ${
-              readyToProceed.length > 0 ? "text-emerald-700" : "text-muted-foreground"
+              readyToProceed.length > 0 ? "text-success" : "text-base-500"
             }`}
           >
             Ready to proceed
@@ -113,7 +113,7 @@ export default function DealerDashboard() {
           <div className="font-display text-[36px] font-bold mt-1.5 leading-none">
             {readyToProceed.length}
           </div>
-          <p className="text-[12px] text-muted-foreground mt-1">
+          <p className="text-[12px] text-base-600 mt-1">
             {readyToProceed.length === 0
               ? "All in-flight orders need more info"
               : `order${readyToProceed.length === 1 ? "" : "s"} ready to push to logistics`}
@@ -126,21 +126,21 @@ export default function DealerDashboard() {
 
       {/* Order journey kicker + see-all link */}
       <div className="flex items-baseline justify-between mb-3.5 gap-4 flex-wrap">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-base-500">
           Order journey
         </span>
         <Link
           to="/dealer/orders"
-          className="text-[12px] font-semibold uppercase tracking-[0.16em] text-base-700 hover:text-primary"
+          className="text-[12px] font-semibold uppercase tracking-[0.16em] text-base-700 hover:text-base-900"
         >
           See all orders →
         </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        <StatusColumn title="Place" hint="Awaiting completion" count={place.length} accent="text-amber-600" orders={place.slice(0, 4)} />
-        <StatusColumn title="Proceed" hint="Sent to logistics" count={proceed.length} accent="text-blue-600" orders={proceed.slice(0, 4)} />
-        <StatusColumn title="Delivered" hint="DO submitted" count={delivered.length} accent="text-emerald-700" orders={delivered.slice(0, 4)} />
+        <StatusColumn title="Place" hint="Awaiting completion" count={place.length} accent="text-warning" orders={place.slice(0, 4)} />
+        <StatusColumn title="Proceed" hint="Sent to logistics" count={proceed.length} accent="text-info" orders={proceed.slice(0, 4)} />
+        <StatusColumn title="Delivered" hint="DO submitted" count={delivered.length} accent="text-success" orders={delivered.slice(0, 4)} />
       </div>
     </div>
   );
@@ -166,10 +166,10 @@ function StatusColumn({
           <span className={`text-[11px] font-bold uppercase tracking-[0.14em] ${accent}`}>{title}</span>
           <span className="font-mono text-sm font-semibold">{count}</span>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-0.5">{hint}</p>
+        <p className="text-[11px] text-base-500 mt-0.5">{hint}</p>
       </div>
       <div className="p-2 min-h-[200px]">
-        {orders.length === 0 && <div className="text-center text-muted-foreground/60 text-[11px] py-6">—</div>}
+        {orders.length === 0 && <div className="text-center text-base-400 text-[11px] py-6">—</div>}
         {orders.map((o) => {
           const blockers = o.status === "place" ? proceedBlockers(o) : [];
           const isCJK = CJK_RE.test(o.customer.name);
@@ -177,11 +177,11 @@ function StatusColumn({
             <Link
               key={o.id}
               to={`/dealer/orders?open=${o.id}`}
-              className="block w-full bg-white border border-border rounded px-3 py-2.5 mb-1.5 hover:border-primary/60 transition-colors"
+              className="block w-full bg-white border border-base-100 rounded px-3 py-2.5 mb-1.5 hover:border-primary/60 transition-colors"
             >
               <div className="flex items-baseline justify-between">
                 <span className="font-mono text-[11px] font-semibold">#{o.dl}</span>
-                <span className="font-mono text-[11px] text-muted-foreground">
+                <span className="font-mono text-[11px] text-base-500">
                   {typeof o.totalAmount === "number" ? RM(o.totalAmount) : `${o.lineCount ?? 0} item${(o.lineCount ?? 0) === 1 ? "" : "s"}`}
                 </span>
               </div>
@@ -191,10 +191,10 @@ function StatusColumn({
                 {o.customer.name}
               </div>
               {o.status === "place" && blockers.length > 0 && (
-                <div className="text-[10px] text-amber-700 mt-1">⚠ {blockers[0]}</div>
+                <div className="text-[10px] text-warning mt-1">⚠ {blockers[0]}</div>
               )}
               {o.status === "place" && blockers.length === 0 && (
-                <div className="text-[10px] text-emerald-700 mt-1">✓ Ready to proceed</div>
+                <div className="text-[10px] text-success mt-1">✓ Ready to proceed</div>
               )}
             </Link>
           );

@@ -52,32 +52,30 @@ export default function PaymentSlipPicker({ label, hint, slip, onChange }: Props
     const isImage = slip.mime.startsWith("image/");
     return (
       <div>
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
-          {label}
-        </div>
-        <div className="rounded-md border border-emerald-400 bg-emerald-50 p-2.5 flex items-center gap-3">
+        <div className="label mb-1.5">{label}</div>
+        <div className="rounded border border-success bg-success-soft p-2.5 flex items-center gap-3">
           {isImage && (
             <img
               src={slip.dataUrl}
               alt=""
-              className="w-14 h-14 object-cover rounded border border-border shrink-0"
+              className="w-14 h-14 object-cover rounded border border-base-200 shrink-0"
             />
           )}
           {!isImage && (
-            <div className="w-14 h-14 grid place-items-center rounded border border-border bg-card shrink-0 text-[10px] font-mono text-muted-foreground">
+            <div className="w-14 h-14 grid place-items-center rounded border border-base-200 bg-card shrink-0 text-[10px] font-mono text-base-500">
               PDF
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-emerald-700">✓ Attached</div>
-            <div className="font-mono text-[11px] text-muted-foreground truncate">
+            <div className="text-sm font-semibold text-success">✓ Attached</div>
+            <div className="font-mono text-[11px] text-base-600 truncate">
               {slip.name} · {(slip.size / 1024).toFixed(0)} KB
             </div>
           </div>
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="text-[11px] px-2.5 py-1 rounded text-muted-foreground hover:text-foreground"
+            className="btn-ghost text-[11px] px-2.5 py-1"
           >
             ↻ Replace
           </button>
@@ -88,11 +86,9 @@ export default function PaymentSlipPicker({ label, hint, slip, onChange }: Props
 
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
-        {label}
-      </div>
-      <div className="border border-dashed border-border rounded-md bg-card px-4 py-5 text-center">
-        <p className="text-[11px] text-muted-foreground mb-3">
+      <div className="label mb-1.5">{label}</div>
+      <div className="border border-dashed border-base-300 rounded bg-card px-4 py-5 text-center">
+        <p className="text-[11px] text-base-500 mb-3">
           {hint} · max 5&nbsp;MB
         </p>
 
@@ -119,7 +115,7 @@ export default function PaymentSlipPicker({ label, hint, slip, onChange }: Props
             <label
               htmlFor={cameraId}
               role="button"
-              className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
+              className="px-[18px] py-2.5 rounded bg-primary text-primary-foreground text-[13px] font-semibold cursor-pointer"
             >
               📷 Take photo
             </label>
@@ -127,9 +123,9 @@ export default function PaymentSlipPicker({ label, hint, slip, onChange }: Props
           <label
             htmlFor={fileId}
             role="button"
-            className={`px-4 py-2 rounded-md text-sm font-semibold cursor-pointer ${
+            className={`px-[18px] py-2.5 rounded text-[13px] font-semibold cursor-pointer ${
               isTouch
-                ? "bg-white text-foreground border border-border"
+                ? "bg-white text-base-800 border border-base-300"
                 : "bg-primary text-primary-foreground"
             }`}
           >

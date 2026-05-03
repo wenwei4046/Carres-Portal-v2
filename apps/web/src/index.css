@@ -54,11 +54,78 @@
 
     /* Brand */
     --terracotta: 15 74% 48%;
+
+    /* Signature variants — light tints for active states + darker hover.
+     * Mirror reference/shared/styles.css lines 4-6 + observed proto usage. */
+    --signature-50:  23 84% 95%;  /* #FDF0E8 — pale peach: chip/card active fill */
+    --signature-100: 21 80% 90%;  /* #FAE0D2 — pale terracotta: "Start a sale" sub-label */
+    --signature-700: 15 79% 39%;  /* #B03C15 — darker terracotta: btn-primary hover */
+
+    /* Status palette — proto warm-linen Calm Operations.
+     * Mirrors reference/shared/styles.css lines 19-22. Used for pills, blocker /
+     * ready states, paid pct, success/warning bg fills, info chrome. */
+    --success:        100 30% 32%;  /* #4A6B3A — olive sage */
+    --success-soft:    83 27% 90%;  /* #E8EDE0 */
+    --success-foreground: 0 0% 100%;
+    --warning:         33 73% 45%;  /* #C97B1F — honey */
+    --warning-soft:    38 67% 91%;  /* #F7EBD7 */
+    --warning-foreground: 0 0% 100%;
+    --info:           225 31% 42%;  /* #4A5A8B — slate blue */
+    --info-soft:      224 31% 90%;  /* #DFE3EE */
+    --info-foreground: 0 0% 100%;
+    /* --error == --destructive (#8B1E1E); kept distinct only for *-soft pairing */
+    --error-soft:      0 55% 90%;   /* #F4D9D9 */
   }
 }
 
 @layer base {
   body {
     @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer components {
+  /* Proto button utilities — UPPERCASE, letter-spacing 0.06em, radius 4px,
+   * 13px font-semibold. Mirrors reference/shared/styles.css .btn-primary /
+   * .btn-secondary / .btn-ghost (lines 46-50). One source of truth for the
+   * Carres action button identity across every page. */
+  .btn-primary {
+    @apply inline-flex items-center justify-center
+           bg-primary text-primary-foreground
+           px-[18px] py-2.5 rounded
+           text-[13px] font-semibold uppercase tracking-[0.06em]
+           transition-colors
+           hover:bg-signature-700
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center
+           bg-transparent text-base-900
+           border border-base-300
+           px-[18px] py-2.5 rounded
+           text-[13px] font-semibold uppercase tracking-[0.06em]
+           transition-colors
+           hover:border-base-500
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center
+           bg-transparent text-base-700
+           px-3.5 py-2
+           text-[13px] font-semibold uppercase tracking-[0.06em]
+           transition-colors
+           hover:text-base-900
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  /* Proto typography utilities — small-caps labels used across cards, fields,
+   * section headers. Matches reference/shared/styles.css .kicker (line 36) and
+   * .label (line 37). Use .kicker for hero / section overlines (terracotta);
+   * .label for form fields and KV labels (base-500). */
+  .kicker {
+    @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-primary;
+  }
+  .label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-base-500;
   }
 }

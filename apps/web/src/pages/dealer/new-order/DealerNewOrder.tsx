@@ -238,33 +238,33 @@ export default function DealerNewOrder({ open, onClose }: Props) {
   return (
     <div
       onClick={softClose}
-      className="fixed inset-0 bg-foreground/40 grid place-items-center z-50 p-4"
+      className="fixed inset-0 bg-base-900/55 grid place-items-center z-50 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="New order"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[880px] max-h-[90vh] flex flex-col bg-card text-card-foreground rounded-lg shadow-xl border border-border"
+        className="w-full max-w-[880px] max-h-[90vh] flex flex-col bg-card text-card-foreground rounded-md shadow-md border border-base-900/10"
       >
         {/* Header */}
-        <header className="px-7 py-5 border-b border-border flex items-start justify-between gap-4">
+        <header className="px-7 pt-5 pb-3.5 border-b border-base-100 flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             {submitted ? (
               <>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-600">
+                <p className="kicker text-success">
                   Order placed
                 </p>
-                <h2 className="font-display text-xl mt-0.5 tracking-tight leading-tight">
+                <h2 className="font-display text-[22px] mt-0.5 tracking-[-0.02em] leading-[1.2] font-semibold">
                   Thank you
                 </h2>
               </>
             ) : (
               <>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                <p className="kicker">
                   New order · step {step} of 3
                 </p>
-                <h2 className="font-display text-xl mt-0.5 tracking-tight leading-tight">
+                <h2 className="font-display text-[22px] mt-0.5 tracking-[-0.02em] leading-[1.2] font-semibold">
                   {STEP_LABELS[step]}
                 </h2>
               </>
@@ -274,7 +274,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
             onClick={softClose}
             aria-label="Close"
             title={submitted ? "Close" : "Close — your draft will be saved"}
-            className="text-2xl leading-none px-2 text-muted-foreground hover:text-foreground"
+            className="btn-ghost text-xl leading-none px-2 py-1"
           >
             ×
           </button>
@@ -286,14 +286,14 @@ export default function DealerNewOrder({ open, onClose }: Props) {
             {[1, 2, 3].map((n) => (
               <div
                 key={n}
-                className={`flex-1 h-[3px] rounded-sm ${n <= step ? "bg-primary" : "bg-secondary"}`}
+                className={`flex-1 h-[3px] rounded-sm ${n <= step ? "bg-primary" : "bg-base-200"}`}
               />
             ))}
           </div>
         )}
 
         {/* Body — scrollable */}
-        <div className={submitted ? "overflow-auto flex-1" : "px-7 py-6 overflow-auto flex-1"}>
+        <div className={submitted ? "overflow-auto flex-1" : "p-7 overflow-auto flex-1"}>
           {submitted && (
             <ThankYou
               order={submitted}
@@ -355,7 +355,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
 
         {/* Footer — hidden on ThankYou screen (its own buttons take over) */}
         {!submitted && (
-          <footer className="px-7 py-3.5 border-t border-border flex flex-col gap-2 bg-secondary/30">
+          <footer className="px-7 py-3.5 border-t border-base-100 flex flex-col gap-2 bg-base-50">
             {submitError && (
               <p className="text-xs text-destructive bg-destructive/5 border border-destructive/30 rounded px-3 py-1.5">
                 {submitError}
@@ -365,16 +365,16 @@ export default function DealerNewOrder({ open, onClose }: Props) {
               <button
                 onClick={() => (step === 1 ? cancelAndClose() : setStep(step - 1))}
                 title={step === 1 ? "Cancel — discards your draft" : "Back to previous step"}
-                className="text-xs text-muted-foreground hover:text-foreground"
+                className="btn-ghost"
                 disabled={uploading || createOrder.isPending}
               >
                 {step === 1 ? "Cancel" : "← Back"}
               </button>
               <div className="flex items-center gap-4">
                 {step >= 2 && (
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-[13px] text-base-700">
                     Total{" "}
-                    <span className="font-mono font-semibold text-foreground">
+                    <span className="font-mono font-semibold text-base-900">
                       RM{" "}
                       {footerTotal.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
@@ -387,11 +387,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
                   <button
                     onClick={() => canAdvance && setStep(step + 1)}
                     disabled={!canAdvance}
-                    className={`px-4 py-2 rounded-md text-sm font-semibold ${
-                      canAdvance
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "bg-secondary text-muted-foreground cursor-not-allowed"
-                    }`}
+                    className="btn-primary"
                   >
                     Continue →
                   </button>
@@ -399,11 +395,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
                   <button
                     onClick={handleSubmit}
                     disabled={submitDisabled}
-                    className={`px-4 py-2 rounded-md text-sm font-semibold ${
-                      submitDisabled
-                        ? "bg-secondary text-muted-foreground cursor-not-allowed"
-                        : "bg-primary text-primary-foreground hover:bg-primary/90"
-                    }`}
+                    className="btn-primary"
                   >
                     {uploading
                       ? "Uploading…"

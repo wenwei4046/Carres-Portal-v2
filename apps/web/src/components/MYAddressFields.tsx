@@ -45,13 +45,8 @@ export default function MYAddressFields({ data, onChange }: Props) {
           value={data.addressLine1}
           placeholder="Building, unit, street (e.g. 12-3, Jalan Telawi 5, Bangsar Baru)"
           onChange={(e) => onChange({ addressLine1: e.target.value })}
-          className={
-            data.addressLine1 && data.addressLine1.trim().length < 5 ? ERROR_CLASS : ACTIVE_CLASS
-          }
+          className={ACTIVE_CLASS}
         />
-        {data.addressLine1 && data.addressLine1.trim().length < 5 && (
-          <p className="text-[11px] text-destructive mt-1">Need at least 5 characters.</p>
-        )}
       </FieldLabel>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -116,21 +111,15 @@ export default function MYAddressFields({ data, onChange }: Props) {
 //   LOCKED_CLASS  — dark cream (matches body bg), signals "waiting for the
 //                   prerequisite above". Disabled selects use this so the
 //                   sequence is visually obvious without reading labels.
-//   ERROR_CLASS   — same as ACTIVE but red border, used when the user typed
-//                   something invalid (e.g. address line < 5 chars).
 const ACTIVE_CLASS =
-  "w-full px-3 py-2.5 border border-border rounded-md bg-white text-sm outline-none focus:border-primary";
-const ERROR_CLASS =
-  "w-full px-3 py-2.5 border border-destructive rounded-md bg-white text-sm outline-none focus:border-destructive";
+  "w-full px-3 py-2.5 border border-base-300 rounded bg-white text-sm outline-none focus:border-primary";
 const LOCKED_CLASS =
-  "w-full px-3 py-2.5 border border-border rounded-md bg-background text-muted-foreground text-sm cursor-not-allowed";
+  "w-full px-3 py-2.5 border border-base-300 rounded bg-base-50 text-base-500 text-sm cursor-not-allowed";
 
 function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
-        {label}
-      </span>
+      <span className="label block mb-1.5">{label}</span>
       {children}
     </label>
   );
