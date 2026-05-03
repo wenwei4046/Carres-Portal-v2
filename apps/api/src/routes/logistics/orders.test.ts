@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vites
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
+import { assertRpcCallShape } from "../../test-utils/assert-rpc";
 
 vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
@@ -342,6 +343,7 @@ describe("POST /api/logistics/orders/:id/assign-partner", () => {
       p_order_id: ORDER_ID,
       p_partner_id: PARTNER_ID,
     });
+    assertRpcCallShape(rpc, "logistics_assign_partner", ["p_order_id", "p_partner_id"]);
   });
 
   it("returns 422 when partnerId is not a uuid", async () => {
@@ -449,6 +451,12 @@ describe("POST /api/logistics/orders/:id/attach-do", () => {
       p_do_note: "Delivered to lobby",
       p_signed: true,
     });
+    assertRpcCallShape(rpc, "logistics_attach_do_and_deliver", [
+      "p_order_id",
+      "p_do_number",
+      "p_do_note",
+      "p_signed",
+    ]);
   });
 
   it("rejects when signed is false", async () => {
@@ -500,6 +508,12 @@ describe("POST /api/logistics/orders/:id/attach-do", () => {
       p_do_note: null,
       p_signed: true,
     });
+    assertRpcCallShape(rpc, "logistics_attach_do_and_deliver", [
+      "p_order_id",
+      "p_do_number",
+      "p_do_note",
+      "p_signed",
+    ]);
   });
 
   it("maps P0001 do_required → 422 with code", async () => {
@@ -560,6 +574,7 @@ describe("POST /api/logistics/orders/:id/abandon", () => {
       p_order_id: ORDER_ID,
       p_reason: "Customer requested cancel",
     });
+    assertRpcCallShape(rpc, "logistics_abandon_order", ["p_order_id", "p_reason"]);
   });
 
   it("returns 422 when reason is empty", async () => {
@@ -633,6 +648,7 @@ describe("POST /api/logistics/orders/:id/warehouse", () => {
       p_order_id: ORDER_ID,
       p_warehouse_id: WAREHOUSE_ID,
     });
+    assertRpcCallShape(rpc, "logistics_warehouse_pick", ["p_order_id", "p_warehouse_id"]);
   });
 
   it("returns 422 when warehouseId is not uuid", async () => {
@@ -790,6 +806,7 @@ describe("POST /api/logistics/orders/:id/issue-pos", () => {
     );
     expect(res.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("logistics_issue_pos_for_order", { p_order_id: ORDER_ID });
+    assertRpcCallShape(rpc, "logistics_issue_pos_for_order", ["p_order_id"]);
   });
 
   it("returns 422 when body has extra keys (.strict)", async () => {

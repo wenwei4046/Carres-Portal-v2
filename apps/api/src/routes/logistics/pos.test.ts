@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vites
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
+import { assertRpcCallShape } from "../../test-utils/assert-rpc";
 
 vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
@@ -196,6 +197,13 @@ describe("POST /api/logistics/pos", () => {
       p_dl: 4001,
       p_dl_refs: null,
     });
+    assertRpcCallShape(rpc, "logistics_create_po", [
+      "p_supplier_id",
+      "p_warehouse_id",
+      "p_lines",
+      "p_dl",
+      "p_dl_refs",
+    ]);
   });
 
   it("supports combined PO with dlRefs[] (and no dl)", async () => {
@@ -223,6 +231,13 @@ describe("POST /api/logistics/pos", () => {
       p_dl: null,
       p_dl_refs: [4001, 4002, 4003],
     });
+    assertRpcCallShape(rpc, "logistics_create_po", [
+      "p_supplier_id",
+      "p_warehouse_id",
+      "p_lines",
+      "p_dl",
+      "p_dl_refs",
+    ]);
   });
 
   it("returns 422 when lines is empty", async () => {
@@ -317,6 +332,7 @@ describe("POST /api/logistics/pos/:id/receive", () => {
       p_sku: "MAT-K-001",
       p_received_qty: 2,
     });
+    assertRpcCallShape(rpc, "logistics_receive_po_line", ["p_po_id", "p_sku", "p_received_qty"]);
   });
 
   it("returns 422 when receivedQty is zero or negative", async () => {
@@ -409,6 +425,7 @@ describe("POST /api/logistics/pos/:id/cancel", () => {
       p_po_id: PO_ID,
       p_reason: "Wrong supplier selected",
     });
+    assertRpcCallShape(rpc, "logistics_cancel_po", ["p_po_id", "p_reason"]);
   });
 
   it("returns 422 when reason is empty", async () => {
@@ -498,6 +515,7 @@ describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
       p_po_id: PO_ID,
       p_partner_id: PARTNER_ID,
     });
+    assertRpcCallShape(rpc, "logistics_assign_pickup_partner", ["p_po_id", "p_partner_id"]);
   });
 
   it("returns 422 when partnerId is not uuid", async () => {
@@ -571,6 +589,7 @@ describe("POST /api/logistics/pos/:id/reassign-warehouse", () => {
       p_po_id: PO_ID,
       p_new_warehouse_id: NEW_WH,
     });
+    assertRpcCallShape(rpc, "logistics_reassign_po_warehouse", ["p_po_id", "p_new_warehouse_id"]);
   });
 
   it("returns 422 when newWarehouseId is not uuid", async () => {
