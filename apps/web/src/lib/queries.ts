@@ -123,9 +123,12 @@ export function useProceedOrder(
   const qc = useQueryClient();
   return useMutation<Order, ApiError, string>({
     mutationFn: (id) => apiFetch<Order>(`/api/orders/${id}/proceed`, { method: "POST" }),
-    onSuccess: (...args) => {
-      const [order] = args;
-      qc.setQueryData(qk.order(order.id), order);
+    onSuccess: async (...args) => {
+      const [order, mutateOrderId] = args;
+      // mutateOrderId is the id we passed to mutate(id) — guaranteed to
+      // match the URL param the parent's useOrder is observing.
+      qc.setQueryData(qk.order(mutateOrderId), order);
+      await qc.invalidateQueries({ queryKey: qk.order(mutateOrderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -152,9 +155,22 @@ export function useTopUpOrder(
         method: "POST",
         body: JSON.stringify(input),
       }),
-    onSuccess: (...args) => {
+    onSuccess: async (...args) => {
       const [order] = args;
-      qc.setQueryData(qk.order(order.id), order);
+      // Prime the detail cache with the freshly-mutated row so the page
+      // updates instantly. We key on the orderId we already have rather
+      // than the response's order.id — they should always match but the
+      // closure-captured value is the safer choice when callers are
+      // reading the same query.
+      qc.setQueryData(qk.order(orderId), order);
+      // Force a refetch on the order detail too, so the cache stays
+      // authoritative even if the response shape ever drifts from the
+      // GET /:id shape (defense-in-depth — no observable cost when the
+      // response was correct, fixes the "Windows screen out of sync"
+      // bug Loo flagged on 2026-05-03).
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      // List views (kanban / orders tabs) — invalidate so paid pct,
+      // status badge, and counts refresh when reopened.
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -175,9 +191,22 @@ export function useSetOrderAddress(
         method: "POST",
         body: JSON.stringify(input),
       }),
-    onSuccess: (...args) => {
+    onSuccess: async (...args) => {
       const [order] = args;
-      qc.setQueryData(qk.order(order.id), order);
+      // Prime the detail cache with the freshly-mutated row so the page
+      // updates instantly. We key on the orderId we already have rather
+      // than the response's order.id — they should always match but the
+      // closure-captured value is the safer choice when callers are
+      // reading the same query.
+      qc.setQueryData(qk.order(orderId), order);
+      // Force a refetch on the order detail too, so the cache stays
+      // authoritative even if the response shape ever drifts from the
+      // GET /:id shape (defense-in-depth — no observable cost when the
+      // response was correct, fixes the "Windows screen out of sync"
+      // bug Loo flagged on 2026-05-03).
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      // List views (kanban / orders tabs) — invalidate so paid pct,
+      // status badge, and counts refresh when reopened.
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -197,9 +226,22 @@ export function useSetOrderDate(
         method: "POST",
         body: JSON.stringify(input),
       }),
-    onSuccess: (...args) => {
+    onSuccess: async (...args) => {
       const [order] = args;
-      qc.setQueryData(qk.order(order.id), order);
+      // Prime the detail cache with the freshly-mutated row so the page
+      // updates instantly. We key on the orderId we already have rather
+      // than the response's order.id — they should always match but the
+      // closure-captured value is the safer choice when callers are
+      // reading the same query.
+      qc.setQueryData(qk.order(orderId), order);
+      // Force a refetch on the order detail too, so the cache stays
+      // authoritative even if the response shape ever drifts from the
+      // GET /:id shape (defense-in-depth — no observable cost when the
+      // response was correct, fixes the "Windows screen out of sync"
+      // bug Loo flagged on 2026-05-03).
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      // List views (kanban / orders tabs) — invalidate so paid pct,
+      // status badge, and counts refresh when reopened.
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -221,9 +263,22 @@ export function useUpdateOrder(
         method: "PATCH",
         body: JSON.stringify(input),
       }),
-    onSuccess: (...args) => {
+    onSuccess: async (...args) => {
       const [order] = args;
-      qc.setQueryData(qk.order(order.id), order);
+      // Prime the detail cache with the freshly-mutated row so the page
+      // updates instantly. We key on the orderId we already have rather
+      // than the response's order.id — they should always match but the
+      // closure-captured value is the safer choice when callers are
+      // reading the same query.
+      qc.setQueryData(qk.order(orderId), order);
+      // Force a refetch on the order detail too, so the cache stays
+      // authoritative even if the response shape ever drifts from the
+      // GET /:id shape (defense-in-depth — no observable cost when the
+      // response was correct, fixes the "Windows screen out of sync"
+      // bug Loo flagged on 2026-05-03).
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      // List views (kanban / orders tabs) — invalidate so paid pct,
+      // status badge, and counts refresh when reopened.
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -245,9 +300,22 @@ export function useCancelOrder(
         method: "POST",
         body: JSON.stringify(input),
       }),
-    onSuccess: (...args) => {
+    onSuccess: async (...args) => {
       const [order] = args;
-      qc.setQueryData(qk.order(order.id), order);
+      // Prime the detail cache with the freshly-mutated row so the page
+      // updates instantly. We key on the orderId we already have rather
+      // than the response's order.id — they should always match but the
+      // closure-captured value is the safer choice when callers are
+      // reading the same query.
+      qc.setQueryData(qk.order(orderId), order);
+      // Force a refetch on the order detail too, so the cache stays
+      // authoritative even if the response shape ever drifts from the
+      // GET /:id shape (defense-in-depth — no observable cost when the
+      // response was correct, fixes the "Windows screen out of sync"
+      // bug Loo flagged on 2026-05-03).
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      // List views (kanban / orders tabs) — invalidate so paid pct,
+      // status badge, and counts refresh when reopened.
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
