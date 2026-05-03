@@ -9,18 +9,29 @@ import {
   recheckStockInput,
   warehousePickInput,
 } from "@carres/shared";
+import { renderDoPdf } from "../../lib/pdf/render";
+import type { DoTemplateData } from "../../lib/pdf/types";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * /api/logistics/orders — Phase 4 M2 backend orders subsystem.
+ * /api/logistics/orders — Phase 4 backend orders subsystem.
  *
- * Endpoints implemented in this task (M2 Task 2):
- *   GET / — list with stage/channel/search filters
+ * M2 endpoints (list + drawer + actions):
+ *   GET    /                       — list with stage/channel/search filters
+ *   GET    /:id                    — drawer detail
+ *   POST   /:id/assign-partner     — D1 dispatch step 1
+ *   POST   /:id/attach-do          — D1 dispatch step 2 (logistics_attach_do_and_deliver)
+ *   POST   /:id/abandon            — A6 post-proceed cancel
+ *   POST   /:id/warehouse          — warehouse pick
+ *   POST   /:id/recheck-stock      — E1 re-check stock
  *
- * Future M2 tasks add: GET /:id, POST /:id/assign-partner, POST /:id/attach-do,
- * POST /:id/abandon, POST /:id/warehouse, POST /:id/recheck-stock.
+ * M3 endpoint:
+ *   POST   /:id/issue-pos          — auto-issue POs for shortages
+ *
+ * M4 endpoint:
+ *   GET    /:id/print-do           — server-side DO PDF (E2 / spec §17.3)
  *
  * Pattern: matches apps/api/src/routes/principal/dealers.ts (multi-endpoint
  * router with role-only middleware + shared mapPgError/parseJsonBody from
@@ -176,6 +187,152 @@ logisticsOrdersRouter.get("/:id", async (c) => {
     stockBalances,
     pos: posWithLines,
     history: historyRes.data ?? [],
+  });
+});
+
+// ----- GET /:id/print-do -----
+// Server-side DO PDF (E2 / spec §17.3). Only callable on delivered orders
+// (those have a signed DO attached via logistics_attach_do_and_deliver).
+// Returns application/pdf with attachment Content-Disposition.
+logisticsOrdersRouter.get("/:id/print-do", async (c) => {
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Fetch order + dealer/warehouse/partner in one round-trip via embedded resources.
+  // dealers / warehouses / delivery_partners are FK'd from orders, so PostgREST
+  // auto-detects the embedding. order_lines.sku is NOT FK'd to product_skus —
+  // SKU descriptions come from a separate query below.
+  const { data: order, error: e1 } = await sb
+    .from("orders")
+    .select(
+      "id, dl, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners(name)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (e1) {
+    const m = mapPgError(e1);
+    return c.json(m.body, m.status);
+  }
+  if (!order) {
+    return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
+  }
+
+  // Only delivered orders have a signed DO worth printing.
+  if (order.status !== "delivered") {
+    return c.json(
+      { error: "rule_violation", code: "order_not_delivered", message: "Only delivered orders have signed DO" },
+      422,
+    );
+  }
+  if (!order.do_number) {
+    // Defensive: status='delivered' should always pair with do_number set by logistics_attach_do_and_deliver.
+    return c.json(
+      { error: "rule_violation", code: "do_missing", message: "Order is delivered but DO number is missing" },
+      422,
+    );
+  }
+
+  // Lines + SKU descriptions (separate queries — order_lines.sku has no FK to product_skus).
+  const { data: lines, error: e2 } = await sb
+    .from("order_lines")
+    .select("sku, qty, unit_price")
+    .eq("order_id", id);
+  if (e2) {
+    const m = mapPgError(e2);
+    return c.json(m.body, m.status);
+  }
+  const lineRows = lines ?? [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const skus: string[] = lineRows.map((l: any) => l.sku);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const skuVariantBySku: Record<string, string> = {};
+  if (skus.length > 0) {
+    const { data: skuRows, error: e3 } = await sb
+      .from("product_skus")
+      .select("sku, variant")
+      .in("sku", skus);
+    if (e3) {
+      const m = mapPgError(e3);
+      return c.json(m.body, m.status);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of skuRows ?? []) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      skuVariantBySku[(r as any).sku] = (r as any).variant;
+    }
+  }
+
+  // Map DB rows → DoTemplateData. Currency values are MYR major units (per types.ts contract).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ord: any = order;
+  // Issue date: prefer delivered_at (when DO was attached), fall back to placed_at. ISO yyyy-mm-dd.
+  const issueIso = ord.delivered_at ?? ord.placed_at ?? new Date().toISOString();
+  const issueDate = String(issueIso).slice(0, 10);
+
+  const dealerRow = ord.dealers ?? null;
+  const warehouseRow = ord.warehouses ?? null;
+  const partnerRow = ord.delivery_partners ?? null;
+
+  // customer_address may be null (customer_address_unknown=true on TBD/showroom orders);
+  // template requires a string so coerce to "—" placeholder.
+  const customerAddress: string = ord.customer_address ?? "—";
+
+  // Dealer block: inject warehouse address line if present, since the DO ships
+  // FROM the dealer-affiliated HQ warehouse — useful as a "ship from" hint
+  // for the customer when there's no other origin shown.
+  const dealerName: string = dealerRow?.name ?? "Carres";
+  const dealerContactParts: string[] = [];
+  if (dealerRow?.contact) dealerContactParts.push(String(dealerRow.contact));
+  if (warehouseRow?.name) dealerContactParts.push(`Ship from: ${warehouseRow.name}`);
+  const dealerContact: string | null = dealerContactParts.length > 0 ? dealerContactParts.join(" · ") : null;
+
+  const templateData: DoTemplateData = {
+    do_number: String(ord.do_number),
+    issue_date: issueDate,
+    order_id: String(ord.id),
+    // Order code shown to dealer = `DL-${dl}` (matches existing UI conventions).
+    order_code: `DL-${ord.dl}`,
+    customer: {
+      name: String(ord.customer_name ?? ""),
+      address: customerAddress,
+      phone: ord.customer_phone ?? null,
+    },
+    dealer: {
+      name: dealerName,
+      contact: dealerContact,
+    },
+    partner: partnerRow?.name ? { name: String(partnerRow.name) } : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    lines: lineRows.map((l: any) => {
+      const qty = Number(l.qty);
+      const unitPrice = Number(l.unit_price);
+      return {
+        sku: String(l.sku),
+        description: skuVariantBySku[l.sku] ?? String(l.sku),
+        qty,
+        unit: "pc",
+        line_total: qty * unitPrice,
+      };
+    }),
+    currency: "MYR",
+  };
+
+  const pdfBytes = await renderDoPdf(templateData);
+  // Filename uses do_number directly. Spec §17.3 / E2 wrote `filename="DO-{do_number}.pdf"`,
+  // but the actual `do_number` text already carries its own `DO-` prefix
+  // (auto-suggest format `DO-{9800-9999}` per spec §18.3 DOAttachModal), so
+  // doubling the prefix would yield "DO-DO-9801.pdf". Use do_number raw and
+  // also tolerate edge values without the prefix by ensuring one is present.
+  const filenameBase = templateData.do_number.startsWith("DO-")
+    ? templateData.do_number
+    : `DO-${templateData.do_number}`;
+  // Hono c.body accepts ArrayBuffer | Uint8Array<ArrayBuffer>; renderDoPdf returns
+  // Uint8Array<ArrayBufferLike> (TS general), so pass the underlying ArrayBuffer.
+  return c.body(pdfBytes.buffer as ArrayBuffer, 200, {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `attachment; filename="${filenameBase}.pdf"`,
+    "Cache-Control": "no-store",
   });
 });
 

@@ -5,8 +5,9 @@
  * will fill from Supabase reads before handing to renderDoPdf / renderPoPdf.
  *
  * Keep flat / serialisable — no Date objects, no nested rows beyond what the
- * template renders. All currency values are MYR cents-as-number (matches DB
- * `numeric` columns coming back from PostgREST as JS number).
+ * template renders. All currency values are MYR major units as JS number
+ * (PostgREST returns `numeric(12,2)` rows as plain numbers like `1500.0`,
+ * representing MYR 1,500.00 — NOT cents).
  */
 
 export type DoTemplateData = {
@@ -44,7 +45,7 @@ export type DoTemplateData = {
     description: string;
     qty: number;
     unit: string;
-    /** Line subtotal in MYR (qty * unit_price). */
+    /** Line subtotal in MYR major units (qty * unit_price). */
     line_total: number;
   }>;
 
@@ -79,13 +80,13 @@ export type PoTemplateData = {
     description: string;
     qty: number;
     unit: string;
-    /** Unit cost in MYR (excluding tax). */
+    /** Unit cost in MYR major units (excluding tax). */
     unit_price: number;
-    /** Line subtotal in MYR (qty * unit_price). */
+    /** Line subtotal in MYR major units (qty * unit_price). */
     line_total: number;
   }>;
 
-  /** Order grand total in MYR (sum of line_total). */
+  /** Order grand total in MYR major units (sum of line_total). */
   grand_total: number;
 
   /** Currency display code, default "MYR". */
