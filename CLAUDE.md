@@ -305,18 +305,18 @@ Don't burn an hour spinning. Surface and ask.
 ## 17. Project status (update as we progress)
 
 ```
-Current phase: Phase 4 (Logistics) M1 + M2 complete; M3-M6 pending
+Current phase: Phase 4 (Logistics) M1 + M2 + M3 complete; M4-M6 pending
 Project started: 2026-05-02
 Last phase completed: Phase 3 (Principal MVP) — 2026-05-03, tag phase-3-complete · Phase 4 in progress (M1 + M2 done, no tag yet — tags only at full phase close)
 Tags so far: phase-0/1/2a/2b/2c/3-complete (6 tags)
-Test count: 274/274 green (shared 53 + api 122 + web 99) · 5 Playwright E2E specs
-Migrations applied: 19 (0001-0019, all additive, zero RLS changes since Phase 1)
+Test count: 309/309 green (shared 53 + api 157 + web 99) · 5 Playwright E2E specs
+Migrations applied: 20 (0001-0020, all additive, zero RLS changes since Phase 1)
 Biz model locked (per Loo 2026-05-03):
   • Dealer just sells. Customer pays HQ direct. No HQ→dealer credit / debt.
   • Outstanding column = customer-owe-HQ (dealer chases for 50% top-up gate)
   • Phase 4 (Logistics) and Phase 6 (Supplier) are HQ INTERNAL roles, NOT dealer-side
-Next decision pending: M3 (procurement) start time. M2 backend orders fully shipped + smoke-verified.
-Carry-forward TODOs: orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping) · phase-4-m2-schema-audit (3 column-mismatches caught at M2 smoke; do an audit before M3-M5)
+Next decision pending: M4 (warehouse + movements) start time. M3 procurement fully shipped + smoke-verified.
+Carry-forward TODOs: orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping) · phase-4-m2-schema-audit (3 column-mismatches caught at M2 smoke; do an audit before M3-M5) · phase-4-rpc-shape-audit (recommended next; see 2026-05-03 schema audit §Methodology gaps)
 ```
 
 Update this section at the start and end of every working session.
