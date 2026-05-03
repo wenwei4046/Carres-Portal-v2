@@ -729,6 +729,8 @@ describe("POST /api/logistics/orders/:id/recheck-stock", () => {
     expect(body.shortages).toEqual([{ sku: "MAT-K-001", qty: 2, missing: 2 }]);
     expect(rpc).toHaveBeenNthCalledWith(1, "logistics_pick_warehouse", { p_order_id: ORDER_ID });
     expect(rpc).toHaveBeenNthCalledWith(2, "logistics_calc_shortages", { p_order_id: ORDER_ID, p_warehouse_id: WH_ID });
+    assertRpcCallShape(rpc, "logistics_pick_warehouse", ["p_order_id"]);
+    assertRpcCallShape(rpc, "logistics_calc_shortages", ["p_order_id", "p_warehouse_id"]);
   });
 
   it("returns warehouseId=null and empty shortages when no warehouse pickable", async () => {

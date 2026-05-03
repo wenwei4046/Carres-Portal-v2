@@ -14,7 +14,10 @@ export function assertRpcCallShape(
   const matchingCalls = rpc.mock.calls.filter((c) => c[0] === fnName);
   expect(matchingCalls.length).toBeGreaterThan(0);
   for (const call of matchingCalls) {
-    const args = call[1] as Record<string, unknown>;
+    // Default to {} for zero-arg RPCs (e.g. sb.rpc("logistics_dashboard_summary"))
+    // where call[1] is undefined. Without this guard, Object.keys(undefined) throws
+    // an opaque TypeError instead of producing a useful assertion failure.
+    const args = (call[1] ?? {}) as Record<string, unknown>;
     const actualKeys = Object.keys(args).sort();
     expect(actualKeys).toEqual([...expectedArgKeys].sort());
   }
