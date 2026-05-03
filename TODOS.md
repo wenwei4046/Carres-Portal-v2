@@ -30,6 +30,18 @@ Phase 2 acceptance items NOT covered by 2C (carry-forward from `phase-2c-reflect
 
 ---
 
+## audit-log-duplicate-index
+
+**What**: `audit_log` table now has two functionally identical indexes on `occurred_at desc`: `audit_log_at_idx` (from migration `0001`) and `audit_log_occurred_at_idx` (from migration `0013`).
+
+**Why deferred**: Cost is negligible (~50 audit rows/day → tiny write amplification). Dropping in-place is a 1-line migration, not worth a separate cycle now.
+
+**Revisit when**: Any other Phase 4+ migration touches `audit_log` — bundle the `drop index audit_log_at_idx` into that migration. Or anytime a perf pass on writes is needed.
+
+**Surfaced by**: Phase 3 M1 implementer subagent on commit `b163ad1`.
+
+---
+
 ## supabase-jwt-secret-cleanup
 
 **What**: Remove `SUPABASE_JWT_SECRET` from `.dev.vars`, `.dev.vars.example`, and the `Bindings` type in `apps/api/src/index.ts`.
