@@ -3,6 +3,7 @@ import {
   useCatalog,
   useLogisticsWarehouse,
   type LowStockStatus,
+  type MovementsFilters,
   type WarehouseStockEntry,
 } from "@/lib/queries";
 import type { ProductCategory, ProductSkuDto } from "@carres/shared";
@@ -51,10 +52,13 @@ const CATEGORIES: { key: ProductCategory; label: string; icon: string }[] = [
 ];
 
 interface Props {
-  /** Optional shell-tab switcher. M5 task 5 will wire warehouse → movements
-   *  with sku + whId prefill; for M5 task 4 we accept the prop but only use
-   *  it for the bare "Movement log →" button which goes to the global log. */
+  /** Optional shell-tab switcher (used by the bare "Movement log →" button to
+   *  open the global movement log without any prefill). */
   setTab?: (t: string) => void;
+  /** Optional prefilled jump to the movements tab — fired on row click +
+   *  via the "Movement log →" button when we want to scope to this warehouse.
+   *  M5.5 wiring per `reference/proto/logistics.jsx` line 15+33. */
+  goMovements?: (prefill?: Partial<MovementsFilters>) => void;
 }
 
 function categoryForSku(sku: string): string | null {
@@ -76,7 +80,7 @@ function statusLabel(status: LowStockStatus): string {
   return "OK";
 }
 
-export default function LogisticsWarehouse({ setTab }: Props) {
+export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
   const warehouseQ = useLogisticsWarehouse();
   const catalogQ = useCatalog();
 
@@ -200,7 +204,13 @@ export default function LogisticsWarehouse({ setTab }: Props) {
           <button
             type="button"
             className="btn-secondary text-[12px] py-2 px-3 whitespace-nowrap"
-            onClick={() => setTab?.("movements")}
+            onClick={() => {
+              // Prefer the prefilled jump (scopes to this warehouse) when the
+              // shell wired it; fall back to plain tab switch otherwise so
+              // existing tests + the no-prefill case keep working.
+              if (goMovements) goMovements(activeWh ? { warehouseId: activeWh } : undefined);
+              else setTab?.("movements");
+            }}
             data-testid="warehouse-movement-log-button"
           >
             ⇅ Movement log →
@@ -357,9 +367,30 @@ export default function LogisticsWarehouse({ setTab }: Props) {
                 }}
               >
                 <div className="min-w-0">
-                  <div className="font-body text-[13px] truncate">
-                    {friendly}
-                  </div>
+                  {goMovements ? (
+                    <button
+                      type="button"
+                      className="text-left w-full font-body text-[13px] truncate hover:text-primary transition-colors"
+                      style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }}
+                      onClick={() =>
+                        goMovements({ sku: row.sku, warehouseId: activeWarehouse.id })
+                      }
+                      data-testid={`warehouse-row-link-${row.sku}`}
+                      title="View movement log for this SKU"
+                    >
+                      <span className="font-body text-[13px] truncate inline-block max-w-full">
+                        {friendly}
+                      </span>
+                      <span
+                        className="text-[10px] text-base-400 ml-1.5"
+                        aria-hidden="true"
+                      >
+                        view log →
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="font-body text-[13px] truncate">{friendly}</div>
+                  )}
                   {skuMeta ? (
                     <div className="font-mono text-[10px] text-base-500 mt-0.5 truncate">
                       {row.sku}
