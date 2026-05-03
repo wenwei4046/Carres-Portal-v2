@@ -132,6 +132,22 @@ describe("GET /api/logistics/orders", () => {
     expect(calls.find((c: any[]) => c[0] === 'showroom_id' && c[1] === null)).toBeTruthy();
   });
 
+  it("filters by channel=showrooms (showroom_id IS NOT NULL)", async () => {
+    const m = mockOrdersList([ORDER_ROW]);
+    const jwt = await makeJwt("logistics");
+    await app.fetch(
+      new Request("http://t/api/logistics/orders?channel=showrooms", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    // showrooms channel: showroom_id IS NOT NULL via .not("showroom_id", "is", null)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const calls = (m.not as any).mock.calls;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(calls.find((c: any[]) => c[0] === 'showroom_id' && c[1] === 'is' && c[2] === null)).toBeTruthy();
+  });
+
   it("returns 422 for invalid stage", async () => {
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
