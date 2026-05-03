@@ -6,6 +6,7 @@ import catalogRouter from "./routes/catalog";
 import dealerRouter from "./routes/dealers";
 import ordersRouter from "./routes/orders";
 import outletsRouter from "./routes/outlets";
+import approvalsRouter from "./routes/principal/approvals";
 import principalDashboardRouter from "./routes/principal/dashboard";
 import salespersonsRouter from "./routes/salespersons";
 import type { AppEnv } from "./types";
@@ -23,6 +24,7 @@ app.get("/health", (c) => c.json({ ok: true }));
 
 const api = new Hono<AppEnv>();
 api.use("*", authMiddleware);
+api.route("/approvals", approvalsRouter);
 api.route("/auth", authRouter);
 api.route("/dealers", dealerRouter);
 api.route("/orders", ordersRouter);
