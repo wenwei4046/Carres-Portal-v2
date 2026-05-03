@@ -179,3 +179,37 @@ export const cancelPoInput = z.object({
   reason: z.string().min(1),
 }).strict();
 export type CancelPoInput = z.infer<typeof cancelPoInput>;
+
+/**
+ * `listMovementsQuery` — GET /api/logistics/movements query string (M4 Task 3).
+ *
+ * Filters per spec §18.6 (LogisticsMovements page F3):
+ *   - warehouseId: optional uuid → `.eq("warehouse_id", id)`.
+ *   - category: 'all' (default) | 'mattress' | 'bedframe' | 'sofa'. Mapped to
+ *     SKU prefix `category:%` (project SKU convention is `cat:model:variant`,
+ *     e.g. `mattress:carres-cloud:King`; see seed.sql + migration 0019 comment
+ *     §17.2 D1 "sku_category derived from sku format `cat:model`").
+ *   - sku: optional substring (case-insensitive) → `.ilike("sku", '%' || sku || '%')`.
+ *   - kind: 'all' (default) | 'in' | 'out'. (stock_movements.kind also has
+ *     'adjust'; the spec page only exposes in/out toggles per §18.6 F3, so
+ *     this query schema mirrors that — adjust rows are still returned when
+ *     kind='all').
+ *   - search: optional free-text against `ref` + `note`. Regex whitelists
+ *     Unicode letters, numbers, space, underscore, dash (1-100 chars) — gates
+ *     PostgREST .or() interpolation per /review carry-forward
+ *     `phase-4-or-filter-harden`.
+ *   - period: '7d' | '30d' (default) | '90d' | 'all' | 'custom'. Translated
+ *     server-side into `.gte("occurred_at", ...)` (and `.lt(..., to)` for
+ *     custom). For period='custom', both `from` and `to` must be present.
+ */
+export const listMovementsQuery = z.object({
+  warehouseId: z.string().uuid().optional(),
+  category: z.enum(['all', 'mattress', 'bedframe', 'sofa']).default('all'),
+  sku: z.string().min(1).optional(),
+  kind: z.enum(['all', 'in', 'out']).default('all'),
+  search: z.string().trim().regex(/^[\p{L}\p{N} _-]{1,100}$/u).optional(),
+  period: z.enum(['7d', '30d', '90d', 'all', 'custom']).default('30d'),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+}).strict();
+export type ListMovementsQuery = z.infer<typeof listMovementsQuery>;

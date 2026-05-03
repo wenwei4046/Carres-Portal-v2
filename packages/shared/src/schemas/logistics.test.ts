@@ -14,6 +14,7 @@ import {
   listLogisticsOrdersQuery,
   listPurchaseOrdersQuery,
   cancelPoInput,
+  listMovementsQuery,
 } from './logistics';
 
 const UUID = '00000000-0000-4000-8000-000000000000';
@@ -221,5 +222,34 @@ describe('listPurchaseOrdersQuery', () => {
 describe('cancelPoInput', () => {
   it('rejects extra keys (strict mode)', () => {
     expect(cancelPoInput.safeParse({ reason: 'duplicate', extraField: 'x' }).success).toBe(false);
+  });
+});
+
+describe('listMovementsQuery', () => {
+  it('accepts an empty object and applies defaults (category=all, kind=all, period=30d)', () => {
+    const r = listMovementsQuery.safeParse({});
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.category).toBe('all');
+      expect(r.data.kind).toBe('all');
+      expect(r.data.period).toBe('30d');
+    }
+  });
+  it('accepts period=custom with valid from + to ISO datetimes', () => {
+    expect(
+      listMovementsQuery.safeParse({
+        period: 'custom',
+        from: '2026-04-01T00:00:00Z',
+        to: '2026-05-01T00:00:00Z',
+      }).success,
+    ).toBe(true);
+  });
+  it('rejects search containing shell/sql metacharacters', () => {
+    // Whitelist regex blocks ;, %, ', backticks, etc. — phase-4-or-filter-harden.
+    expect(listMovementsQuery.safeParse({ search: "%' OR 1=1 --" }).success).toBe(false);
+    expect(listMovementsQuery.safeParse({ search: 'PO;DROP' }).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(listMovementsQuery.safeParse({ category: 'all', extraField: 'x' }).success).toBe(false);
   });
 });
