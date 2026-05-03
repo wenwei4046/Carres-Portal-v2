@@ -558,6 +558,317 @@ Estimate:       4-6 day human / ~1-1.5 day CC
 
 ---
 
+## 18. Proto fidelity reference (2026-05-03 plan-design-review)
+
+> Per CLAUDE.md §3 "Frontend wins": `reference/proto/logistics-*.jsx` is the source of truth for behavior. This section maps each Phase 4 page to its proto file + required UX elements. Implementer reads proto + this section together. Initial proto fidelity rating 6/10 → 9/10 after fixes.
+
+### 18.1 Proto file paths (read these locally)
+
+```
+reference/proto/logistics-actions.jsx   (234 LOC: pickWarehouseFor, autoIssuePOsForOrder,
+                                         ingestProceededOrder, receivePO, dispatchOrder,
+                                         attachDOAndDeliver — all action functions)
+reference/proto/logistics-dashboard.jsx (262 LOC: LogisticsDashboard with stacked + split
+                                         layout variants, KPI tiles, side cards)
+reference/proto/logistics-orders.jsx    (558 LOC: LogisticsOrders kanban + OrderDetailDrawer
+                                         + DispatchDialog + DOAttachDialog)
+reference/proto/logistics-screens.jsx   (1155 LOC: LogisticsWarehouse + LogisticsMovements
+                                         + LogisticsProcurement + 5 modals: NewPO + POReceive
+                                         + AssignPickup + ReassignWarehouse + supplier
+                                         sub-status logic)
+```
+
+### 18.2 LogisticsDashboard
+
+Required UX elements (per `logistics-dashboard.jsx`):
+
+- Hero section: "{N} deliveries today" + "{X} waiting on stock, {Y} ready to ship" + active orders count + total active GMV (RM)
+- 3 KPI tiles (clickable, jump to relevant page):
+  - Today: deliveries scheduled count, accent green if > 0 else gray
+  - Open POs: PO count, accent yellow if > 0 else green
+  - Overdue: past delivery date count, accent red if > 0 else green
+- 3 active pipeline columns (DashColumn): awaiting_stock, ready_to_dispatch, dispatched (count + 4 items per column)
+- 2 side cards: Open purchase orders (top 4) + Low stock SKUs (top 5, ≤1 unit)
+- Layout variants in proto: `stacked` (default) and `split` (today's route + side cards on top, pipeline below)
+- **MVP F2 decision: stacked layout only**. Split variant deferred to Phase 4 polish.
+
+### 18.3 LogisticsOrders
+
+Required UX elements (per `logistics-orders.jsx`):
+
+Header:
+- Page title "Pipeline" with "{N} of {M} orders shown" subtitle
+- Search input ("Search #DL or customer…")
+- Sales channel selector with optgroup (Dealers / Showrooms split: "All sales channels" / "All dealers" / "All showrooms" / per-name)
+
+Stage filter chips (5):
+- All · {N} (default)
+- Awaiting stock · {N}
+- Ready to dispatch · {N}
+- Dispatched · {N}
+- Delivered · {N}
+
+Bulk-select action bar (only shows when N awaiting_stock orders selected, E3):
+- "{N} orders selected · {S} unique SKUs · {U} units to procure"
+- ⚠ warning if cross-warehouse (warehouseSet.size > 1)
+- "+ Create combined PO →" button → jumps to Procurement with `window.__poCreateRequest`
+
+4-column kanban:
+- Column header: stage label (uppercase, colored) + count + hint
+- "Select all to combine PO" checkbox in awaiting_stock column header
+- Order card: #DL + placed time + customer name (CJK font detection) + showroom badge + dealer name + delivery date + partner name + total RM
+- Awaiting_stock cards have multi-select checkbox
+
+Order detail drawer:
+- Header: #DL + StageChip + customer name (CJK font detect) + dealer + Print DO button (when DO attached, E2) + close
+- Action bar (depends on stage):
+  - awaiting_stock: ⚠ warning text + "↻ Re-check stock" (E1) + "+ Create PO for shortages" + linked PO count
+  - ready_to_dispatch: ✓ stock confirmed text + "📦 Assign delivery partner" → DispatchModal
+  - dispatched: 🚚 in-transit text + partner name + "📎 Attach DO & mark delivered" → DOAttachModal
+  - delivered: ✓ delivered text + DO number on file
+- Stock & warehouse section: source warehouse + total items + per-line table (SKU name + on-hand count + green/yellow indicator)
+- Linked POs section: per-PO (PO# + lines with received/qty + supplier + ETA + Σ + status badge)
+- Delivery section: phone, date (TBD warning), address, floor (with lift/stairs indicator), emergency, partner, DO#
+- History section: timeline of order_history entries with timestamp + actor
+- Order total at bottom
+
+DispatchModal (D1.dispatch step 1):
+- Title: "Assign delivery partner · #{DL}"
+- Body: "Stock has been allocated. Pick a delivery partner — they'll be notified to collect from {warehouse}."
+- Partner selector dropdown ("name · zones")
+- Selected partner detail card: name + contact (mono) + zones
+- Buttons: Cancel + "Dispatch"
+
+DOAttachModal (D1.dispatch step 2):
+- Title: "Attach Delivery Order · #{DL}"
+- Body: "Once attached, the order moves to **Delivered** and {N} items will be deducted from {warehouse}."
+- DO number input (auto-suggest `DO-{9800-9999}`)
+- Note textarea (optional, e.g. "Delivered at lobby · customer signed")
+- "Customer signed the DO on receipt" checkbox (REQUIRED to enable submit)
+- Buttons: Cancel + "Mark delivered"
+
+### 18.4 LogisticsProcurement
+
+Required UX elements (per `logistics-screens.jsx:410-594`):
+
+Header:
+- Page title "Purchase orders"
+- Subtitle: "POs auto-issue on order shortage. Own-logistics suppliers ship & you attach DO. Factory-pickup suppliers notify ready → you assign a delivery partner → partner collects & delivers → you receive."
+- "+ New PO" button → NewPODialog with empty prefill
+
+Filter chips (4):
+- All · {N}
+- Open / partial · {N}
+- Pickup action · {N} (POs needing logistics action: ready_for_pickup, delivered, reassign_needed)
+- Received · {N}
+
+7-column PO row table:
+- PO # (mono, e.g. PO-2031)
+- Items (multi-line: status dot color-coded + SKU name + received/qty count; "for order #{dl}" if dl set; "Σ {got}/{total} units" if multi-line)
+- Supplier name
+- Warehouse name
+- ETA date (mono)
+- Status badge (open/partial/received with color)
+- Action column (varies by sup_status, see below) + Print PO link below (F6)
+
+Action column logic (per po.sup_status when status != received):
+- pending / acknowledged / in_production: status text only ("in production")
+- ready_for_pickup: "Assign partner" button → AssignPickupDialog (F1.A)
+- pickup_assigned: partner name + "awaiting accept" (text only; partner accept = Phase 7)
+- pickup_accepted: partner name + "pickup {date}"
+- picked_up: "In transit · en route to WH"
+- delivered: "Receive →" button → POReceiveDialog
+- reassign_needed: "Reassign warehouse" button → ReassignWarehouseDialog (F1.A)
+- (status = received): show DO number
+
+NewPODialog:
+- Prefill detection: reads `window.__poCreateRequest` if set (from drawer "+ Create PO" or kanban "+ Create combined PO")
+- Form: warehouse selector + ETA date + supplier + per-line SKU + qty
+- For combined POs: dl_refs[] array tracks all source DLs (per A7)
+- Submit creates PO with sup_status='pending'
+
+POReceiveDialog (per F5):
+- Header: "Receive {PO#} · attach Supplier DO"
+- Subtitle: "Booking goods from {supplier} into {warehouse}. Tick or set the quantity for each SKU on this delivery — anything unreceived stays open on the PO."
+- Per-line grid: checkbox + SKU name + ordered/already-received + Pending qty + Receive-now qty input
+- Quick actions: "Receive all pending" + "Clear" buttons
+- Total counter: "Σ {N} units this DO"
+- DO number input (auto-suggest `DO-{5200-6000}`)
+- Receiving note textarea (optional, e.g. "2 cartons short · damage to packaging on unit 4")
+- DO PDF attach placeholder (simulated in MVP, real attachment Phase 7+)
+- "Goods inspected and DO signed by warehouse" checkbox (REQUIRED to enable submit)
+- Submit text changes: "Mark received" (if all pending qty selected) vs "Receive partial"
+
+AssignPickupDialog (F1.A — factory_pickup flow):
+- Title: "Assign pickup partner · {PO#}"
+- Body: "{supplier} has {N} units ready for collection. Choose a partner to dispatch to their factory."
+- Previous-rejection warning if pickupRejection (rare, requires Phase 7 partner-decline state)
+- Pickup details card: from supplier, to warehouse, lines summary
+- Partner selector dropdown ("name · zones")
+- Submit: assigns partner, sup_status → pickup_assigned
+- RPC: `logistics_assign_pickup_partner(po_id, partner_id)` (NEW per F1)
+
+ReassignWarehouseDialog (F1.A — customer rejection):
+- Title: "Reassign warehouse · {PO#}"
+- ⚠ Customer rejection card: "Customer cannot receive: {reason}"
+- Goods staged card: at supplier, lines summary, originally bound for {wh}
+- New destination warehouse selector (excludes current)
+- New WH detail card with name + address
+- Note: "Supplier will be notified · status returns to Ready · partner reassignment follows."
+- Submit: sup_status returns to ready_for_pickup, warehouse_id changes
+- RPC: `logistics_reassign_po_warehouse(po_id, new_warehouse_id)` (NEW per F1)
+- **Note**: in Phase 4 MVP no PO can reach `reassign_needed` state because it requires partner reporting (Phase 7). UI exists but unreachable until then. Document in M5 frontend.
+
+### 18.5 LogisticsWarehouse
+
+Required UX elements (per `logistics-screens.jsx:1-107`, F4):
+
+Header:
+- Page title "Stock balance"
+- Subtitle: "Auto-deducted on delivery, auto-incremented when supplier DO is received."
+- Search SKU input
+- "⇅ Movement log →" button → jumps to Movements with whId prefilled
+
+Warehouse selector tiles (1 per warehouse):
+- Card layout: name + address + units count (large mono) + SKU count
+- Click tile → filter table to that warehouse
+- Active tile: primary border + signature-50 background
+
+Category tabs (3: mattress / bedframe / sofa):
+- Tab uses `catalog[k].icon` + `catalog[k].label`
+- Active tab: black bg + white text
+
+4-column stock table:
+- Product name + "view log →" hint (small)
+- This warehouse qty (mono, right-aligned, bold)
+- All warehouses qty (mono, right-aligned, gray)
+- Status badge: OK (green) / Low (yellow, total ≤1) / Out (red, total = 0)
+- Click row → drill to Movements with sku + whId prefilled
+
+Adjust stock action (proto uses Tweaks panel; MVP needs UI):
+- Add small "Adjust" button per row → AdjustStockModal (already in spec)
+- Modal: SKU + warehouse pre-filled, delta input (signed), reason input
+- RPC: logistics_adjust_stock (already in spec)
+
+### 18.6 LogisticsMovements
+
+Required UX elements (per `logistics-screens.jsx:109-407`, F3):
+
+Header:
+- Breadcrumb: "← Warehouse / Movement log"
+- Page title "Stock in & out history"
+- Subtitle: "Showing {N} movements · {period} · {sku} · {warehouse}"
+- "↓ Export CSV" button (client-side blob download)
+- "Clear filters" button
+
+4 KPI tiles:
+- Movements: total filtered count
+- Stock in: +{N} (green, "↑")
+- Stock out: −{N} (orange, "↓")
+- Net change: ±{N} (green if positive, red if negative)
+
+Period chips (5):
+- Last 7 days / 30 days (default) / 90 days / All time / Custom
+- Custom mode: From + To date inputs (HTML date inputs)
+
+View toggle (2):
+- Flat list (default) — chronological rows
+- By month — grouped with per-month header (in/out/net stats)
+
+Filter row (5 selects):
+- Warehouse (all / per-warehouse)
+- Category (all / per-category — resets SKU)
+- SKU (all / filtered by category if set)
+- Kind (in + out / in only / out only)
+- Search (ref / note text)
+
+7-column movement row:
+- When (date "12 May" + time "14:23")
+- Kind: "↑ IN" or "↓ OUT" badge with colored bg
+- SKU name
+- Warehouse name
+- Qty: +N (green) or −N (orange, mono right)
+- Ref + note (e.g. "PO-2031" + "DO from supplier")
+- By (role: procurement / logistics)
+
+Month grouping (when view='month'):
+- Per-month card with header: month label + N movements + ↑in + ↓out + net stats
+- Inline movement table below
+
+### 18.7 Sidebar (Phase 3 sidebar pattern)
+
+5 nav items:
+- Dashboard
+- Orders
+- Procurement
+- Warehouse
+- Movements
+
+No disabled items (all 5 in Phase 4 MVP).
+
+### 18.8 F1-F7 design fidelity decisions
+
+| # | Finding | Decision |
+|---|---|---|
+| F1 | factory_pickup supplier flow missing | A) Add per proto: 2 RPCs (assign_pickup_partner, reassign_po_warehouse), 2 modals (AssignPickupDialog, ReassignWarehouseDialog), 5 sup_status transitions tested. +1 day. ReassignWarehouseDialog UI built but unreachable until Phase 7. |
+| F2 | Dashboard 2 layout variants | MVP: stacked only. Split layout deferred to Phase 4 polish. |
+| F3 | Movements page elaborate | Build per proto: 4 KPI tiles + period chips + view toggle + month grouping + CSV export + 5 filters. |
+| F4 | Warehouse page tiles + tabs + drill | Build per proto: warehouse tiles + category tabs + status badges + click row to drill Movements. Add Adjust button per row (proto uses Tweaks; MVP UX). |
+| F5 | ReceivePOModal rich | Build per proto: per-line checkbox + qty input, "Receive all" / "Clear" quick actions, signed-DO checkbox required, total counter, button text changes. |
+| F6 | Print PO button per row | Add server-side endpoint `GET /api/logistics/pos/:id/print` (matching A8 server-side PDF decision). |
+| F7 | ReassignWarehouseDialog | Built per F1.A. UI exists, unreachable in Phase 4 MVP. |
+
+### 18.9 CJK font detection
+
+Proto uses `/[一-鿿]/.test(name) ? "font-cjk" : "font-body"` for customer name display. Implementer must replicate this in:
+- LogisticsDashboard `DashColumn` order cards
+- LogisticsOrders kanban order cards
+- OrderDetailDrawer header
+
+Common in Loo's biz (Malaysian Chinese customer names).
+
+### 18.10 Updated scope after design review
+
+```
+Pages:          5  (unchanged from §17)
+Modals:         9  (was 7) — added: AssignPickupDialog, ReassignWarehouseDialog
+                   1. DispatchModal
+                   2. DOAttachModal
+                   3. ReceivePOModal (per F5 detail)
+                   4. IssuePOsModal
+                   5. AdjustStockModal
+                   6. CreatePOModal (NewPODialog with prefill)
+                   7. AbandonOrderModal
+                   8. AssignPickupDialog (F1.A NEW)
+                   9. ReassignWarehouseDialog (F1.A NEW)
+
+Routes:         18 (was 16) — added:
+                   POST /api/logistics/pos/:id/assign-pickup-partner (F1.A)
+                   POST /api/logistics/pos/:id/reassign-warehouse (F1.A)
+                   GET  /api/logistics/pos/:id/print (F6 server PDF)
+
+RPCs:           14 total (was 11) — added:
+                   logistics_assign_pickup_partner [F1.A]
+                   logistics_reassign_po_warehouse [F1.A]
+                   (+1 print PO endpoint, no RPC just SQL+PDF gen)
+
+Tests:          ~165 (was ~140) — added:
+                   12 sup_status transition tests (F1)
+                   8 Procurement modal interaction tests (F4-F7)
+                   5 Movements UX tests (F3 KPI tiles, period, view toggle, CSV)
+
+Estimate:       5-7 day human / ~1.5 day CC
+                was 4-6 day human (added: F1 factory_pickup +1 day + F3-F6 UX detail)
+```
+
+### 18.11 Risks added by design review
+
+- ReassignWarehouseDialog unreachable in Phase 4 MVP (requires Phase 7 partner customer-rejection state). UI exists, dead path until Phase 7. Document in M5 + add a TODO.
+- Proto's customer-name CJK detection (`font-cjk` class) must be wired up in 4+ component files. Easy to forget; mark in M3/M5 implementation checklist.
+- Adjust button on Warehouse page is a deviation from proto (proto uses Tweaks panel). MVP UX choice; flag in design QA after implementation.
+
+---
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
@@ -565,8 +876,8 @@ Estimate:       4-6 day human / ~1-1.5 day CC
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
 | Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 16 issues / 0 critical gaps |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL) | score 6/10 → 9/10, 7 decisions |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
 
 **UNRESOLVED:** 0
-**VERDICT:** ENG CLEARED — ready to implement Phase 4 M1 (foundation). Loo confirmed all 16 review decisions on 2026-05-03.
+**VERDICT:** ENG + DESIGN CLEARED — ready to implement Phase 4 M1 (foundation). All 23 review decisions confirmed on 2026-05-03 (16 eng + 7 design fidelity).
