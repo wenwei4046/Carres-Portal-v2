@@ -11,6 +11,7 @@ import principalDashboardRouter from "./routes/principal/dashboard";
 import principalDealersRouter from "./routes/principal/dealers";
 import logisticsDashboardRouter from "./routes/logistics/dashboard";
 import logisticsOrdersRouter from "./routes/logistics/orders";
+import logisticsPosRouter from "./routes/logistics/pos";
 import salespersonsRouter from "./routes/salespersons";
 import type { AppEnv } from "./types";
 
@@ -38,6 +39,7 @@ api.route("/principal/dealers", principalDealersRouter);
 api.route("/salespersons", salespersonsRouter);
 api.route("/logistics/dashboard", logisticsDashboardRouter);
 api.route("/logistics/orders", logisticsOrdersRouter);
+api.route("/logistics/pos", logisticsPosRouter);
 
 app.route("/api", api);
 
