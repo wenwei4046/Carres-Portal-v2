@@ -65,6 +65,7 @@ export const qk = {
       ["logistics", "orders", filters ?? {}] as const,
     order:     (id: string) => ["logistics", "orders", id] as const,
     partners:  () => ["logistics", "partners"] as const,
+    suppliers: () => ["logistics", "suppliers"] as const,
     pos:       (filters?: LogisticsPoFilters) =>
       ["logistics", "pos", filters ?? {}] as const,
     po:        (id: string) => ["logistics", "pos", id] as const,
@@ -846,6 +847,22 @@ export interface DeliveryPartnersListResponse {
   partners: DeliveryPartnerRow[];
 }
 
+/** Row in GET /api/logistics/suppliers. Used by `CreatePOModal` for the
+ *  supplier dropdown + auto-detect via `cat_covered`. `kind` is the supplier's
+ *  fulfilment mode (own_logistics ships goods themselves; factory_pickup
+ *  expects logistics to dispatch a partner to the factory). */
+export interface SupplierRow {
+  id: string;
+  name: string;
+  kind: "own_logistics" | "factory_pickup";
+  cat_covered: string[];
+  lead_time: string | null;
+  contact: string | null;
+}
+export interface SuppliersListResponse {
+  suppliers: SupplierRow[];
+}
+
 /** Row in GET /api/logistics/orders. Embedded `dealers(name)` is a PostgREST
  *  nested fetch shape — the route forwards it verbatim. */
 export interface LogisticsOrderListRow {
@@ -1088,6 +1105,21 @@ export function useDeliveryPartners(
     queryKey: qk.logistics.partners(),
     queryFn: () =>
       apiFetch<DeliveryPartnersListResponse>("/api/logistics/partners"),
+    staleTime: 5 * 60_000,
+    ...opts,
+  });
+}
+
+/** Suppliers — populates the CreatePOModal supplier dropdown (M5 task 3
+ *  §18.4). Stable list (suppliers are managed in Logistics Settings + don't
+ *  change between sessions); cache for 5 minutes. */
+export function useLogisticsSuppliers(
+  opts?: Partial<UseQueryOptions<SuppliersListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.suppliers(),
+    queryFn: () =>
+      apiFetch<SuppliersListResponse>("/api/logistics/suppliers"),
     staleTime: 5 * 60_000,
     ...opts,
   });
