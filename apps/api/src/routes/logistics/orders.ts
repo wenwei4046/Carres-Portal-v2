@@ -69,13 +69,15 @@ logisticsOrdersRouter.get("/", async (c) => {
   let q = sb
     .from("orders")
     .select(
-      "id, dl, status, logistics_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, do_number, dispatched_at, delivered_at, showroom_id, dealer_id, dealers(name)",
+      "id, dl, status, logistics_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name)",
     )
     .in("status", ["proceed_order", "delivered"]);
 
   if (stage !== "all") q = q.eq("logistics_stage", stage);
-  if (channel === "dealers") q = q.eq("showroom_id", null);
-  if (channel === "showrooms") q = q.not("showroom_id", "is", null);
+  // Public 'channel' enum kept as 'dealers'|'showrooms' per spec §18.3 (Loo-facing wording).
+  // Internally maps to outlet_id IS [NOT] NULL — schema column is outlet_id, not showroom_id.
+  if (channel === "dealers") q = q.eq("outlet_id", null);
+  if (channel === "showrooms") q = q.not("outlet_id", "is", null);
   if (search) {
     const asInt = Number.parseInt(search, 10);
     if (Number.isFinite(asInt)) {
@@ -102,7 +104,7 @@ logisticsOrdersRouter.get("/:id", async (c) => {
   const { data: order, error: e1 } = await sb
     .from("orders")
     .select(
-      "id, dl, status, logistics_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, dealer_id, showroom_id, dealers(name), showrooms(name)",
+      "id, dl, status, logistics_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, dealer_id, outlet_id, dealers(name), outlets(name)",
     )
     .eq("id", id)
     .maybeSingle();

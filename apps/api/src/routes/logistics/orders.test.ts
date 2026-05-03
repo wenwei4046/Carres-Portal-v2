@@ -65,7 +65,7 @@ describe("GET /api/logistics/orders", () => {
     do_number: null,
     dispatched_at: null,
     delivered_at: null,
-    showroom_id: null,
+    outlet_id: null,
     dealer_id: "00000000-0000-0000-0000-000000000d01",
     dealers: { name: "BedHouse KL" },
   };
@@ -116,7 +116,7 @@ describe("GET /api/logistics/orders", () => {
     expect(eq).toHaveBeenCalledWith("logistics_stage", "ready_to_dispatch");
   });
 
-  it("filters by channel=dealers excludes showroom orders (showroom_id IS NULL)", async () => {
+  it("filters by channel=dealers excludes showroom orders (outlet_id IS NULL)", async () => {
     const m = mockOrdersList([ORDER_ROW]);
     const jwt = await makeJwt("logistics");
     await app.fetch(
@@ -125,14 +125,15 @@ describe("GET /api/logistics/orders", () => {
       }),
       env,
     );
-    // dealers channel: showroom_id IS NULL via .eq("showroom_id", null) OR .is("showroom_id", null) — handler uses .eq with null which Supabase translates to IS NULL.
+    // dealers channel: outlet_id IS NULL via .eq("outlet_id", null) — handler uses .eq with null which Supabase translates to IS NULL.
+    // (Public 'channel=dealers' wording kept per spec §18.3; internally filters on outlet_id.)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const calls = (m.eq as any).mock.calls;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(calls.find((c: any[]) => c[0] === 'showroom_id' && c[1] === null)).toBeTruthy();
+    expect(calls.find((c: any[]) => c[0] === 'outlet_id' && c[1] === null)).toBeTruthy();
   });
 
-  it("filters by channel=showrooms (showroom_id IS NOT NULL)", async () => {
+  it("filters by channel=showrooms (outlet_id IS NOT NULL)", async () => {
     const m = mockOrdersList([ORDER_ROW]);
     const jwt = await makeJwt("logistics");
     await app.fetch(
@@ -141,11 +142,12 @@ describe("GET /api/logistics/orders", () => {
       }),
       env,
     );
-    // showrooms channel: showroom_id IS NOT NULL via .not("showroom_id", "is", null)
+    // showrooms channel: outlet_id IS NOT NULL via .not("outlet_id", "is", null)
+    // (Public 'channel=showrooms' wording kept per spec §18.3; internally filters on outlet_id.)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const calls = (m.not as any).mock.calls;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(calls.find((c: any[]) => c[0] === 'showroom_id' && c[1] === 'is' && c[2] === null)).toBeTruthy();
+    expect(calls.find((c: any[]) => c[0] === 'outlet_id' && c[1] === 'is' && c[2] === null)).toBeTruthy();
   });
 
   it("returns 422 for invalid stage", async () => {
@@ -260,7 +262,7 @@ describe("GET /api/logistics/orders/:id", () => {
         delivery_date: "2026-05-10", placed_at: "2026-05-03T10:00:00Z",
         do_number: null, do_note: null, dispatched_at: null, delivered_at: null,
         delivery_partner_id: null, dealer_id: "00000000-0000-0000-0000-000000000d01",
-        dealers: { name: "BedHouse KL" }, showroom_id: null, showrooms: null,
+        dealers: { name: "BedHouse KL" }, outlet_id: null, outlets: null,
       },
       lines: [
         { sku: "MAT-K-001", qty: 2, unit_price: 1500 },
