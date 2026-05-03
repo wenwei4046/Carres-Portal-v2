@@ -763,3 +763,78 @@ describe("POST /api/logistics/orders/:id/recheck-stock", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/logistics/orders/:id/issue-pos", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+
+  it("returns 200 on success with empty body", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { pos_created: [{ id: "PO-2050", supplier_id: "00000000-0000-0000-0000-000000000a01", line_count: 1 }] },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/issue-pos`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_issue_pos_for_order", { p_order_id: ORDER_ID });
+  });
+
+  it("returns 422 when body has extra keys (.strict)", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/issue-pos`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ unexpected: "key" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("maps P0001 already_issued → 422 with code (soft idempotency per spec §17.5)", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "POs already issued for this order", details: "already_issued" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/issue-pos`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("already_issued");
+  });
+
+  it("returns 403 for non-logistics (no rpc)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/issue-pos`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

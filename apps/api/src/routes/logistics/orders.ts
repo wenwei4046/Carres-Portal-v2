@@ -4,6 +4,7 @@ import {
   abandonOrderInput,
   assignPartnerInput,
   attachDoInput,
+  issuePosForOrderInput,
   listLogisticsOrdersQuery,
   recheckStockInput,
   warehousePickInput,
@@ -313,6 +314,28 @@ logisticsOrdersRouter.post("/:id/recheck-stock", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ warehouseId: wh, shortages: shortages ?? [] });
+});
+
+// ----- POST /:id/issue-pos -----
+logisticsOrdersRouter.post("/:id/issue-pos", async (c) => {
+  let body: unknown;
+  try { body = await c.req.json(); } catch { body = {}; }
+  const parsed = issuePosForOrderInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("logistics_issue_pos_for_order", {
+    p_order_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
 });
 
 export default logisticsOrdersRouter;
