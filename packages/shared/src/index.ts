@@ -78,3 +78,19 @@ export {
   type ProductCategory,
   type VariantKind,
 } from "./schemas/catalog";
+
+export {
+  decideApprovalInput,
+  listApprovalsQuery,
+  type DecideApprovalInput,
+  type ListApprovalsQuery,
+} from "./schemas/approvals";
+
+export {
+  inviteDealerInput,
+  setDealerStatusInput,
+  setDealerTermsInput,
+  type InviteDealerInput,
+  type SetDealerStatusInput,
+  type SetDealerTermsInput,
+} from "./schemas/principal-dealers";
