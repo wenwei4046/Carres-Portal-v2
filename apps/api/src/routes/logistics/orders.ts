@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
+  abandonOrderInput,
   assignPartnerInput,
   attachDoInput,
   listLogisticsOrdersQuery,
@@ -226,6 +227,29 @@ logisticsOrdersRouter.post("/:id/attach-do", async (c) => {
     p_order_id: c.req.param("id"),
     p_do_number: parsed.data.doNumber,
     p_do_note: parsed.data.doNote ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ order: data });
+});
+
+// ----- POST /:id/abandon -----
+logisticsOrdersRouter.post("/:id/abandon", async (c) => {
+  let body: unknown;
+  try { body = await c.req.json(); } catch { body = {}; }
+  const parsed = abandonOrderInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("logistics_abandon_order", {
+    p_order_id: c.req.param("id"),
+    p_reason: parsed.data.reason,
   });
   if (error) {
     const m = mapPgError(error);
