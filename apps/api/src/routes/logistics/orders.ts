@@ -110,7 +110,7 @@ logisticsOrdersRouter.get("/:id", async (c) => {
   const [linesRes, addonsRes, historyRes] = await Promise.all([
     sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", id),
     sb.from("order_addons").select("sku, qty, unit_price").eq("order_id", id),
-    sb.from("order_history").select("text, by_role, occurred_at").order("occurred_at", { ascending: true }),
+    sb.from("order_history").select("text, by_role, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
   ]);
   if (linesRes.error) { const m = mapPgError(linesRes.error); return c.json(m.body, m.status); }
   if (addonsRes.error) { const m = mapPgError(addonsRes.error); return c.json(m.body, m.status); }
@@ -126,38 +126,42 @@ logisticsOrdersRouter.get("/:id", async (c) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let stockBalances: any[] = [];
   if (order.warehouse_id) {
-    const { data: wh } = await sb
+    const { data: wh, error: e_wh } = await sb
       .from("warehouses")
       .select("id, name, address")
       .eq("id", order.warehouse_id)
       .maybeSingle();
+    if (e_wh) { const m = mapPgError(e_wh); return c.json(m.body, m.status); }
     warehouse = wh;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const skus = lines.map((l: any) => l.sku);
     if (skus.length > 0) {
-      const { data: sb_rows } = await sb
+      const { data: sb_rows, error: e_sb } = await sb
         .from("stock_balances")
         .select("sku, warehouse_id, qty, reserved")
         .eq("warehouse_id", order.warehouse_id)
         .in("sku", skus);
+      if (e_sb) { const m = mapPgError(e_sb); return c.json(m.body, m.status); }
       stockBalances = sb_rows ?? [];
     }
   }
 
   // Linked POs (own dl OR within dl_refs[]).
-  const { data: pos } = await sb
+  const { data: pos, error: e_pos } = await sb
     .from("purchase_orders")
     .select("id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta")
     .or(`dl.eq.${order.dl},dl_refs.cs.{${order.dl}}`);
+  if (e_pos) { const m = mapPgError(e_pos); return c.json(m.body, m.status); }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let poLinesByPo: Record<string, any[]> = {};
   if (pos && pos.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const poIds = pos.map((p: any) => p.id);
-    const { data: poLines } = await sb
+    const { data: poLines, error: e_polines } = await sb
       .from("purchase_order_lines")
       .select("po_id, sku, qty, received_qty")
       .in("po_id", poIds);
+    if (e_polines) { const m = mapPgError(e_polines); return c.json(m.body, m.status); }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     poLinesByPo = (poLines ?? []).reduce((acc: Record<string, any[]>, l: any) => {
       (acc[l.po_id] ??= []).push(l);
