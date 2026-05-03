@@ -23,7 +23,11 @@ export default function Login() {
       const from = (location.state as { from?: string } | null)?.from;
       // Role-aware default home. As more roles ship (Phase 3+), extend here.
       const defaultHome =
-        role === "dealer" || role === "salesperson" ? "/dealer" : "/me";
+        role === "principal"
+          ? "/principal"
+          : role === "dealer" || role === "salesperson"
+            ? "/dealer"
+            : "/me";
       navigate(from && from !== "/login" ? from : defaultHome, { replace: true });
     }
   }, [session, role, location.state, navigate]);

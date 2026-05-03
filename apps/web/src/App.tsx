@@ -6,6 +6,7 @@ import { RequireRole } from "@/lib/require-role";
 import Login from "@/pages/Login";
 import Me from "@/pages/Me";
 import DealerApp from "@/pages/dealer/DealerApp";
+import PrincipalApp from "@/pages/principal/PrincipalApp";
 
 function HomeRedirect() {
   const session = useAuth((s) => s.session);
@@ -19,6 +20,7 @@ function HomeRedirect() {
     );
   }
   if (!session) return <Navigate to="/login" replace />;
+  if (role === "principal") return <Navigate to="/principal" replace />;
   if (role === "dealer" || role === "salesperson") return <Navigate to="/dealer" replace />;
   return <Navigate to="/me" replace />;
 }
@@ -58,6 +60,16 @@ export default function App() {
             <RequireAuth>
               <RequireRole roles={["dealer", "salesperson"]}>
                 <DealerApp />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/principal/*"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["principal"]}>
+                <PrincipalApp />
               </RequireRole>
             </RequireAuth>
           }
