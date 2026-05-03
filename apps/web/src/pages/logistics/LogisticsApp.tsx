@@ -26,7 +26,7 @@ export default function LogisticsApp() {
     >
       <LogisticsSidebar active={tab} onChange={setTab} />
       <main className="min-w-0 overflow-auto bg-base-50">
-        {tab === "dashboard" && <LogisticsDashboard />}
+        {tab === "dashboard" && <LogisticsDashboard setTab={setTab} />}
         {tab === "orders" && <LogisticsOrders />}
         {tab === "procurement" && <LogisticsProcurement />}
         {tab === "warehouse" && <LogisticsWarehouse />}

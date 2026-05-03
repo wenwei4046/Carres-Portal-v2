@@ -777,12 +777,14 @@ export function useDealerSetStatus(
 
 // --- Shared response shapes (snake_case, forwarded from RPC / route) -------
 
-/** GET /api/logistics/dashboard — `logistics_dashboard_summary()` payload. */
+/** GET /api/logistics/dashboard — `logistics_dashboard_summary()` payload.
+ *  Field names mirror the RPC verbatim (migration 0019, lines 380-414):
+ *  `today_deliveries`, `open_pos`, `overdue_orders`, `active_orders`,
+ *  `active_gmv`. The proto KPI tiles read these as Today / Open POs / Overdue. */
 export interface LogisticsDashboardKpis {
-  pending_dispatch: number;
-  in_transit: number;
+  today_deliveries: number;
   open_pos: number;
-  late_orders: number;
+  overdue_orders: number;
   active_orders: number;
   active_gmv: number;
 }
