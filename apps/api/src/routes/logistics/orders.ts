@@ -118,7 +118,7 @@ logisticsOrdersRouter.get("/:id", async (c) => {
 
   const [linesRes, addonsRes, historyRes] = await Promise.all([
     sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", id),
-    sb.from("order_addons").select("sku, qty, unit_price").eq("order_id", id),
+    sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
     sb.from("order_history").select("text, by_role, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
   ]);
   if (linesRes.error) { const m = mapPgError(linesRes.error); return c.json(m.body, m.status); }

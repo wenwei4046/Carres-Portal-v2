@@ -268,7 +268,7 @@ describe("GET /api/logistics/orders/:id", () => {
         { sku: "MAT-K-001", qty: 2, unit_price: 1500 },
         { sku: "BED-K-002", qty: 1, unit_price: 800 },
       ],
-      addons: [{ sku: "PIL-001", qty: 4, unit_price: 50 }],
+      addons: [{ addon_key: "PIL-001", qty: 4, unit_price: 50 }],
       history: [{ text: "Order placed", by_role: "dealer", occurred_at: "2026-05-03T09:00:00Z" }],
       pos: [{ id: "PO-2030", supplier_id: "00000000-0000-0000-0000-000000000s01", warehouse_id: "00000000-0000-0000-0000-000000000w01", status: "open", sup_status: "pending", dl: 4001, dl_refs: null }],
       poLines: [{ po_id: "PO-2030", sku: "MAT-K-001", qty: 2, received_qty: 0 }],
