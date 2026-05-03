@@ -313,3 +313,108 @@ describe("GET /api/logistics/orders/:id", () => {
     expect(from).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/logistics/orders/:id/assign-partner", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+  const PARTNER_ID = "00000000-0000-0000-0000-000000000b01";
+
+  it("returns 200 on successful RPC call", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { id: ORDER_ID, dispatched_at: "2026-05-03T11:00:00Z" }, error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/assign-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_assign_partner", {
+      p_order_id: ORDER_ID,
+      p_partner_id: PARTNER_ID,
+    });
+  });
+
+  it("returns 422 when partnerId is not a uuid", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/assign-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: "not-a-uuid" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("returns 422 when body is empty", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/assign-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("maps SQLSTATE 42P01 → 404", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "42P01", message: "order not found" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/assign-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("maps SQLSTATE 22023 → 422 wrong_stage", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "22023", message: "wrong stage", details: "wrong_stage" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/assign-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("returns 403 for non-logistics role (no rpc call)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/assign-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
