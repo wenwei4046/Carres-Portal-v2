@@ -5,7 +5,6 @@ import { _setJwksForTesting } from "../../middleware/auth";
 
 vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
-  adminClient: vi.fn(),
 }));
 
 import { userClient } from "../../lib/supabase";
