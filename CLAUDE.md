@@ -305,17 +305,18 @@ Don't burn an hour spinning. Surface and ask.
 ## 17. Project status (update as we progress)
 
 ```
-Current phase: Phase 4 (Logistics) M1 + M2 + M3 complete; M4-M6 pending
+Current phase: Phase 4 (Logistics) M1 + M2 + M3 complete; M4 in progress — Tasks 1-4 (warehouse list, adjust, movements, PDF infra) done; Tasks 5-6 (/print-do + /print endpoints) pending
 Project started: 2026-05-02
-Last phase completed: Phase 3 (Principal MVP) — 2026-05-03, tag phase-3-complete · Phase 4 in progress (M1 + M2 done, no tag yet — tags only at full phase close)
+Last phase completed: Phase 3 (Principal MVP) — 2026-05-03, tag phase-3-complete · Phase 4 in progress (M1 + M2 + M3 + M4-T1..T4 done, no tag yet — tags only at full phase close)
 Tags so far: phase-0/1/2a/2b/2c/3-complete (6 tags)
-Test count: 309/309 green (shared 53 + api 157 + web 99) · 5 Playwright E2E specs
-Migrations applied: 20 (0001-0020, all additive, zero RLS changes since Phase 1)
+Test count: 380/380 green (shared 69 + api 212 + web 99) · 5 Playwright E2E specs
+Migrations applied: 21 (0001-0021, all additive, zero RLS changes since Phase 1)
+F-11 (Workers bundle size) status: 1034 KiB raw / 197 KiB gzipped after @react-pdf/renderer landed. Workers free-tier ceiling is 1 MiB gzipped — we sit at ~19% of the limit. Achieved via runtime CJK font fetch from Fontsource jsdelivr CDN (no font bytes in bundle). Resolves TODO `phase-7-pdf-gen-options`.
 Biz model locked (per Loo 2026-05-03):
   • Dealer just sells. Customer pays HQ direct. No HQ→dealer credit / debt.
   • Outstanding column = customer-owe-HQ (dealer chases for 50% top-up gate)
   • Phase 4 (Logistics) and Phase 6 (Supplier) are HQ INTERNAL roles, NOT dealer-side
-Next decision pending: M4 (warehouse + movements) start time. M3 procurement fully shipped + smoke-verified.
+Next decision pending: M4 Tasks 5-6 (`/print-do` + `/print` endpoints) wire PDF infra to actual Supabase reads.
 Carry-forward TODOs: orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping) · phase-4-m2-schema-audit (3 column-mismatches caught at M2 smoke; do an audit before M3-M5) · phase-4-rpc-shape-audit (recommended next; see 2026-05-03 schema audit §Methodology gaps) · phase-4-or-filter-harden (orders.ts:85,163 PostgREST .or() interpolation; tighten zod search to whitelist) · phase-4-replace-any-types (~40 eslint-disable any in logistics routes; use db-types per §9.1) · phase-4-zod-strict-uniform (logistics.ts: .strict() partial; pick a convention) · phase-4-logistics-test-gaps (search int/text branches, JWT edge cases, SQLSTATE 42501 mapping, dashboard error coverage) · phase-4-detail-partner-name-join (orders.ts:108 add delivery_partners(name) — verify against proto §18.3)
 ```
 

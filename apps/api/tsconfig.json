@@ -13,6 +13,7 @@
     "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true,
     "noEmit": true,
+    "jsx": "react-jsx",
     "types": ["@cloudflare/workers-types"],
     "baseUrl": ".",
     "paths": {
@@ -21,5 +22,5 @@
       "@carres/shared/*": ["../../packages/shared/src/*"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

@@ -136,19 +136,17 @@ Phase 2 acceptance items NOT covered by 2C (carry-forward from `phase-2c-reflect
 
 ---
 
-## phase-7-pdf-gen-options
+## phase-7-pdf-gen-options — RESOLVED 2026-05-04
 
-**What**: Phase 4 chose server-side PDF gen for Print DO endpoint (`GET /api/logistics/orders/:id/print-do`). Library decision deferred to M2 backend implementation. Candidates:
+**Decision (Loo D1=A)**: `@react-pdf/renderer` chosen and shipped in M4 Task 4.
 
-- `@react-pdf/renderer` — pure JS, runs in Cloudflare Workers, deterministic but layout differs from screen
-- Cloudflare Browser Rendering API (beta) — headless Chrome, prints exactly like screen, ~$0.30/1k renders
-- External PDF service (Resend / Documenso) — adds dependency but offloads complexity
+**F-11 outcome**: Bundle landed at **1034 KiB raw / 197 KiB gzipped** (Workers free-tier ceiling is 1 MiB gzipped). Comfortable headroom. Achieved via runtime font fetch from Fontsource jsdelivr CDN (`apps/api/src/lib/pdf/fonts/noto.ts`) — no font bytes in the bundle.
 
-**Why deferred**: Decision needs hands-on prototyping during M2 backend session. Pre-deciding without running code risks picking the wrong option.
+**Cold-start cost**: ~5 MB Noto Sans SC TTF pulled on first PDF render per Worker isolate. Subsequent renders reuse the in-isolate font cache.
 
-**Revisit when**: Phase 4 M2 backend session, or sooner if Loo wants email-DO-to-customer (Phase 7 territory).
+**Failure mode**: If jsdelivr is unreachable on first render, that single PDF fails (route returns 500); next request retries.
 
-**Surfaced by**: `/plan-eng-review` 2026-05-03 finding A8 (E2 add-on) on Phase 4 spec.
+**Surfaced by**: `/plan-eng-review` 2026-05-03 finding A8. Resolved by M4 Task 4.
 
 ---
 
