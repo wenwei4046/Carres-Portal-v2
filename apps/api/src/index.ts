@@ -6,6 +6,7 @@ import catalogRouter from "./routes/catalog";
 import dealerRouter from "./routes/dealers";
 import ordersRouter from "./routes/orders";
 import outletsRouter from "./routes/outlets";
+import logisticsDashboardRouter from "./routes/logistics/dashboard";
 import approvalsRouter from "./routes/principal/approvals";
 import principalDashboardRouter from "./routes/principal/dashboard";
 import principalDealersRouter from "./routes/principal/dealers";
@@ -32,6 +33,7 @@ api.route("/orders", ordersRouter);
 api.route("/catalog", catalogRouter);
 api.route("/outlets", outletsRouter);
 api.route("/principal/dashboard", principalDashboardRouter);
+api.route("/logistics/dashboard", logisticsDashboardRouter);
 api.route("/principal/dealers", principalDealersRouter);
 api.route("/salespersons", salespersonsRouter);
 
