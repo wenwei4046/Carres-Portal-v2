@@ -305,19 +305,18 @@ Don't burn an hour spinning. Surface and ask.
 ## 17. Project status (update as we progress)
 
 ```
-Current phase: between phases — Phase 3 complete, Phase 4 (Logistics) not yet started
+Current phase: Phase 4 (Logistics) M1 + M2 complete; M3-M6 pending
 Project started: 2026-05-02
-Last phase completed: Phase 3 (Principal MVP) — 2026-05-03, tag phase-3-complete
+Last phase completed: Phase 3 (Principal MVP) — 2026-05-03, tag phase-3-complete · Phase 4 in progress (M1 + M2 done, no tag yet — tags only at full phase close)
 Tags so far: phase-0/1/2a/2b/2c/3-complete (6 tags)
-Test count: 215/215 green (shared 35 + api 85 + web 99) · 5 Playwright E2E specs
-Migrations applied: 16 (0001-0016, all additive, zero RLS changes since Phase 1)
+Test count: 274/274 green (shared 53 + api 122 + web 99) · 5 Playwright E2E specs
+Migrations applied: 19 (0001-0019, all additive, zero RLS changes since Phase 1)
 Biz model locked (per Loo 2026-05-03):
   • Dealer just sells. Customer pays HQ direct. No HQ→dealer credit / debt.
   • Outstanding column = customer-owe-HQ (dealer chases for 50% top-up gate)
   • Phase 4 (Logistics) and Phase 6 (Supplier) are HQ INTERNAL roles, NOT dealer-side
-Next decision pending: when to start Phase 4 (Logistics — internal team PO + warehouse + delivery)
-Phase 4 RED LINE warning: will need new RLS UPDATE policies for logistics role. Get explicit yes/go-ahead at session start.
-Carry-forward TODOs: orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping)
+Next decision pending: M3 (procurement) start time. M2 backend orders fully shipped + smoke-verified.
+Carry-forward TODOs: orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping) · phase-4-m2-schema-audit (3 column-mismatches caught at M2 smoke; do an audit before M3-M5)
 ```
 
 Update this section at the start and end of every working session.
