@@ -6,6 +6,7 @@ import catalogRouter from "./routes/catalog";
 import dealerRouter from "./routes/dealers";
 import ordersRouter from "./routes/orders";
 import outletsRouter from "./routes/outlets";
+import principalDashboardRouter from "./routes/principal/dashboard";
 import salespersonsRouter from "./routes/salespersons";
 import type { AppEnv } from "./types";
 
@@ -27,6 +28,7 @@ api.route("/dealers", dealerRouter);
 api.route("/orders", ordersRouter);
 api.route("/catalog", catalogRouter);
 api.route("/outlets", outletsRouter);
+api.route("/principal/dashboard", principalDashboardRouter);
 api.route("/salespersons", salespersonsRouter);
 
 app.route("/api", api);
