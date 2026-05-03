@@ -29,7 +29,7 @@ export default function LogisticsApp() {
         {tab === "dashboard" && <LogisticsDashboard setTab={setTab} />}
         {tab === "orders" && <LogisticsOrders />}
         {tab === "procurement" && <LogisticsProcurement />}
-        {tab === "warehouse" && <LogisticsWarehouse />}
+        {tab === "warehouse" && <LogisticsWarehouse setTab={setTab} />}
         {tab === "movements" && <LogisticsMovements />}
       </main>
     </div>
