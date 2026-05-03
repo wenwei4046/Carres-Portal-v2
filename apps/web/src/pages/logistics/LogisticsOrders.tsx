@@ -3,6 +3,9 @@ import {
   useLogisticsOrders,
   type LogisticsOrderListRow,
 } from "@/lib/queries";
+import CreatePOModal, {
+  type CreatePoPrefill,
+} from "./components/CreatePOModal";
 import OrderColumn from "./components/OrderColumn";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import CrossOrderBundleSheet from "./components/CrossOrderBundleSheet";
@@ -50,6 +53,9 @@ export default function LogisticsOrders() {
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [selectedDls, setSelectedDls] = useState<Set<number>>(() => new Set());
+  const [bundlePrefill, setBundlePrefill] = useState<CreatePoPrefill | null>(
+    null,
+  );
 
   // The server applies stage + channel + search; we still fetch the full list
   // for the per-column filter chips (which need ALL stage counts even when a
@@ -220,11 +226,20 @@ export default function LogisticsOrders() {
         <CrossOrderBundleSheet
           selectedOrderIds={selectedOrderIds}
           onClear={clearSelected}
-          // M5.3 wires CreatePOModal here.
-          onBundleClick={() => {
-            // For now, no-op — keep the user in the kanban + clear selection
-            // so they can read the future modal preview without hidden state.
-            clearSelected();
+          // M5.3 wires the bundle CTA to CreatePOModal. We pass the selected
+          // orders' DL numbers as `dlRefs` so the create-PO RPC ties the new
+          // PO back to all source orders. Line aggregation is left to the
+          // user — the proto NewPODialog accepts manual SKU picking; the
+          // client-side N-detail-fetch shortage rollup was deferred so the
+          // modal feels fast.
+          onBundleClick={(orderIds) => {
+            const dls = allOrders
+              .filter((o) => orderIds.includes(o.id))
+              .map((o) => o.dl);
+            setBundlePrefill({
+              dlRefs: dls,
+              note: `Bundle from ${dls.length} orders: ${dls.map((d) => `#${d}`).join(", ")}`,
+            });
           }}
         />
       )}
@@ -251,6 +266,15 @@ export default function LogisticsOrders() {
         <OrderDetailDrawer
           orderId={openOrderId}
           onClose={() => setOpenOrderId(null)}
+        />
+      )}
+      {bundlePrefill && (
+        <CreatePOModal
+          prefill={bundlePrefill}
+          onClose={() => {
+            setBundlePrefill(null);
+            clearSelected();
+          }}
         />
       )}
     </div>
