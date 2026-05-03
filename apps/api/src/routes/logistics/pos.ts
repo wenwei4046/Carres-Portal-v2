@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
+  cancelPoInput,
   createPoInput,
   listPurchaseOrdersQuery,
   receivePoLineInput,
@@ -128,6 +129,29 @@ logisticsPosRouter.post("/:id/receive", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json(data);
+});
+
+// ----- POST /:id/cancel -----
+logisticsPosRouter.post("/:id/cancel", async (c) => {
+  let body: unknown;
+  try { body = await c.req.json(); } catch { body = {}; }
+  const parsed = cancelPoInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("logistics_cancel_po", {
+    p_po_id: c.req.param("id"),
+    p_reason: parsed.data.reason,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ po: data });
 });
 
 export default logisticsPosRouter;
