@@ -162,3 +162,132 @@ describe("GET /api/logistics/pos", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("POST /api/logistics/pos", () => {
+  const SUPPLIER_ID = "00000000-0000-0000-0000-000000000a01";
+  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000b01";
+  const VALID = {
+    supplierId: SUPPLIER_ID,
+    warehouseId: WAREHOUSE_ID,
+    lines: [{ sku: "MAT-K-001", qty: 2 }],
+    dl: 4001,
+  };
+
+  it("returns 200 on success and calls RPC with snake_case args", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { id: "PO-2050", supplier_id: SUPPLIER_ID, warehouse_id: WAREHOUSE_ID, status: "open", sup_status: "pending", dl: 4001, dl_refs: null }, error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_create_po", {
+      p_supplier_id: SUPPLIER_ID,
+      p_warehouse_id: WAREHOUSE_ID,
+      p_lines: [{ sku: "MAT-K-001", qty: 2 }],
+      p_dl: 4001,
+      p_dl_refs: null,
+    });
+  });
+
+  it("supports combined PO with dlRefs[] (and no dl)", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    await app.fetch(
+      new Request("http://t/api/logistics/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplierId: SUPPLIER_ID,
+          warehouseId: WAREHOUSE_ID,
+          lines: [{ sku: "MAT-K-001", qty: 5 }],
+          dlRefs: [4001, 4002, 4003],
+        }),
+      }),
+      env,
+    );
+    expect(rpc).toHaveBeenCalledWith("logistics_create_po", {
+      p_supplier_id: SUPPLIER_ID,
+      p_warehouse_id: WAREHOUSE_ID,
+      p_lines: [{ sku: "MAT-K-001", qty: 5 }],
+      p_dl: null,
+      p_dl_refs: [4001, 4002, 4003],
+    });
+  });
+
+  it("returns 422 when lines is empty", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...VALID, lines: [] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("returns 422 when supplierId is not uuid", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...VALID, supplierId: "not-a-uuid" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("maps P0001 supplier_not_found → 422 with code", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "supplier missing", details: "supplier_not_found" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("supplier_not_found");
+  });
+
+  it("returns 403 for non-logistics", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

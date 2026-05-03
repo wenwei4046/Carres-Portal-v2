@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { listPurchaseOrdersQuery } from "@carres/shared";
+import {
+  createPoInput,
+  listPurchaseOrdersQuery,
+} from "@carres/shared";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -74,6 +77,32 @@ logisticsPosRouter.get("/", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ pos: data ?? [] });
+});
+
+// ----- POST / create -----
+logisticsPosRouter.post("/", async (c) => {
+  let body: unknown;
+  try { body = await c.req.json(); } catch { body = {}; }
+  const parsed = createPoInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("logistics_create_po", {
+    p_supplier_id: parsed.data.supplierId,
+    p_warehouse_id: parsed.data.warehouseId,
+    p_lines: parsed.data.lines,
+    p_dl: parsed.data.dl ?? null,
+    p_dl_refs: parsed.data.dlRefs ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ po: data });
 });
 
 export default logisticsPosRouter;
