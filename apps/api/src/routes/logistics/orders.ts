@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
   assignPartnerInput,
+  attachDoInput,
   listLogisticsOrdersQuery,
 } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
@@ -201,6 +202,30 @@ logisticsOrdersRouter.post("/:id/assign-partner", async (c) => {
   const { data, error } = await sb.rpc("logistics_assign_partner", {
     p_order_id: c.req.param("id"),
     p_partner_id: parsed.data.partnerId,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ order: data });
+});
+
+// ----- POST /:id/attach-do -----
+logisticsOrdersRouter.post("/:id/attach-do", async (c) => {
+  let body: unknown;
+  try { body = await c.req.json(); } catch { body = {}; }
+  const parsed = attachDoInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("logistics_attach_do_and_deliver", {
+    p_order_id: c.req.param("id"),
+    p_do_number: parsed.data.doNumber,
+    p_do_note: parsed.data.doNote ?? null,
   });
   if (error) {
     const m = mapPgError(error);

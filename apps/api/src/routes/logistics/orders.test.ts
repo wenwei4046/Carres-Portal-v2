@@ -418,3 +418,117 @@ describe("POST /api/logistics/orders/:id/assign-partner", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/logistics/orders/:id/attach-do", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+  const VALID = { doNumber: "DO-9801", doNote: "Delivered to lobby", signed: true };
+
+  it("returns 200 on success and calls RPC with snake_case args", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { id: ORDER_ID, delivered_at: "2026-05-03T11:00:00Z" }, error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/attach-do`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_attach_do_and_deliver", {
+      p_order_id: ORDER_ID,
+      p_do_number: "DO-9801",
+      p_do_note: "Delivered to lobby",
+    });
+  });
+
+  it("rejects when signed is false", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/attach-do`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ doNumber: "DO-9801", signed: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects when doNumber is < 3 chars", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/attach-do`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ doNumber: "DO", signed: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("passes p_do_note as null when omitted", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/attach-do`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ doNumber: "DO-9802", signed: true }),
+      }),
+      env,
+    );
+    expect(rpc).toHaveBeenCalledWith("logistics_attach_do_and_deliver", {
+      p_order_id: ORDER_ID,
+      p_do_number: "DO-9802",
+      p_do_note: null,
+    });
+  });
+
+  it("maps P0001 do_required → 422 with code", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "DO required", details: "do_required" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/attach-do`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("do_required");
+  });
+
+  it("returns 403 for non-logistics role (no rpc call)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/attach-do`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
