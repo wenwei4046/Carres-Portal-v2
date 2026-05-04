@@ -105,9 +105,12 @@ export default function OrderCard({
           <input
             type="checkbox"
             checked={selected}
-            onChange={() => {
-              /* handled by wrapper */
-            }}
+            // onChange is the canonical React handler for checkbox toggles
+            // (covers click + keyboard space). The wrapper still handles
+            // clicks on its padding area for a larger hit target.
+            onChange={onToggleSelect}
+            // Prevent propagation so a direct native-checkbox click doesn't
+            // bubble to the outer card and open the drawer.
             onClick={(e) => e.stopPropagation()}
             className="m-0 cursor-pointer accent-primary"
             tabIndex={-1}
