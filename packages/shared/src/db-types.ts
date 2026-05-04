@@ -312,6 +312,8 @@ export interface PurchaseOrderRow {
   do_file_path: string | null;
   do_uploaded_at: string | null;
   do_uploaded_by: string | null;
+  // do_number text added in migration 0035 (hotfix for 0034 RPC reference).
+  do_number: string | null;
   // v3-S3 outsource fields (migration 0030). Used when a PO is delivered by a
   // one-shot outsourced partner (not a registered delivery_partners row); the
   // CHECK constraint po_outsource_xor_partner enforces these are mutually
