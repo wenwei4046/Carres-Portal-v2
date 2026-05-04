@@ -276,6 +276,37 @@ export const reservedDrilldownResponse = z.object({
 export type ReservedDrilldownResponse = z.infer<typeof reservedDrilldownResponse>;
 
 /**
+ * `awaitingStockShortageResponse` — GET /api/logistics/pos/awaiting-stock-shortage
+ * (Pipeline v2, C5.3). Server-side aggregation of SKU-level shortages across
+ * every order currently in `logistics_stage='awaiting_stock'`.
+ *
+ * Shape per row:
+ *   - `sku`: the product SKU.
+ *   - `need`: sum of `order_lines.qty` across awaiting_stock orders for this SKU.
+ *   - `available`: cross-warehouse total (sum of `qty - reserved` across every
+ *      `stock_balances` row for this SKU). Q2=A — we treat one big national
+ *      pool because the modal will route to suppliers, not specific warehouses.
+ *   - `shortage`: `need - available`. Always > 0; rows where avail >= need are
+ *      filtered out server-side.
+ *
+ * The route returns `{shortage: []}` when no awaiting_stock orders or every
+ * SKU is fully covered. Sorted by `sku` ascending for stable test snapshots.
+ *
+ * Frontend consumes this from `CreatePOModal`'s "Auto-fill from awaiting stock"
+ * button — Q3=A semantic: the returned `shortage` value is what becomes each
+ * line's `qty`.
+ */
+export const awaitingStockShortageResponse = z.object({
+  shortage: z.array(z.object({
+    sku: z.string().min(1),
+    need: z.number().int().nonnegative(),
+    available: z.number().int(),
+    shortage: z.number().int().positive(),
+  })),
+});
+export type AwaitingStockShortageResponse = z.infer<typeof awaitingStockShortageResponse>;
+
+/**
  * `listMovementsQuery` — GET /api/logistics/movements query string (M4 Task 3).
  *
  * Filters per spec §18.6 (LogisticsMovements page F3):

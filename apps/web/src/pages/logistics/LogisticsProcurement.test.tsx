@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import LogisticsProcurement from "./LogisticsProcurement";
+import CreatePOModal from "./components/CreatePOModal";
+import { ApiError } from "@/lib/api";
 import type { CatalogResponse } from "@carres/shared";
 import type {
   DeliveryPartnersListResponse,
@@ -10,6 +12,21 @@ import type {
   SuppliersListResponse,
   WarehouseListResponse,
 } from "@/lib/queries";
+
+// C5.3 — mock sonner so the auto-fill failure path can assert which toast
+// variant fires. The default `toast(...)` call is the empty-state notice;
+// `toast.error(...)` is the failure notice. The bug we fixed silently routed
+// failures through the empty-state branch, so the test must distinguish them.
+const sonnerMocks = vi.hoisted(() => {
+  const success = vi.fn();
+  const error = vi.fn();
+  const defaultFn = vi.fn();
+  const toast = Object.assign(defaultFn, { success, error });
+  return { success, error, defaultFn, toast };
+});
+vi.mock("sonner", () => ({
+  toast: sonnerMocks.toast,
+}));
 
 /**
  * LogisticsProcurement page + 4 modals — covers the M5 Task 3 plan list
@@ -33,6 +50,18 @@ let suppliersHookState: { data: SuppliersListResponse | undefined };
 let warehouseHookState: { data: WarehouseListResponse | undefined };
 let partnersHookState: { data: DeliveryPartnersListResponse | undefined };
 let catalogHookState: { data: CatalogResponse | undefined };
+// C5.3 — auto-fill hook state. `refetch` is a vi.fn so each test can program
+// what the click resolves to (success / empty / error). isFetching/isFetched
+// drive the button's disabled + label states. isError is optional so tests
+// that don't exercise the failure path can keep their existing setup; the
+// failure-path test sets it true to verify the disabled-state guard.
+let shortageHookState: {
+  data: { shortage: { sku: string; need: number; available: number; shortage: number }[] } | undefined;
+  isFetching: boolean;
+  isFetched: boolean;
+  isError?: boolean;
+  refetch: ReturnType<typeof vi.fn>;
+};
 const refetchSpy = vi.fn();
 const createMutateAsync = vi.fn().mockResolvedValue({});
 const createBatchMutateAsync = vi.fn().mockResolvedValue({ poIds: [] });
@@ -70,6 +99,7 @@ vi.mock("@/lib/queries", async () => {
       mutateAsync: reassignMutateAsync,
       isPending: false,
     }),
+    useAwaitingStockShortage: () => shortageHookState,
   };
 });
 
@@ -150,6 +180,12 @@ function setLoaded(pos: LogisticsPoListRow[]) {
     },
   };
   partnersHookState = { data: { partners: [PARTNER_A] } };
+  shortageHookState = {
+    data: undefined,
+    isFetching: false,
+    isFetched: false,
+    refetch: vi.fn().mockResolvedValue({ data: { shortage: [] } }),
+  };
   catalogHookState = {
     data: {
       models: [],
@@ -193,6 +229,9 @@ beforeEach(() => {
   receiveMutateAsync.mockClear();
   assignPickupMutateAsync.mockClear();
   reassignMutateAsync.mockClear();
+  sonnerMocks.success.mockClear();
+  sonnerMocks.error.mockClear();
+  sonnerMocks.defaultFn.mockClear();
 });
 
 describe("LogisticsProcurement page", () => {
@@ -390,6 +429,12 @@ describe("LogisticsProcurement page", () => {
       data: { warehouses: [], byWarehouse: {}, totalsBySku: {} },
     };
     partnersHookState = { data: { partners: [] } };
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch: vi.fn(),
+    };
     catalogHookState = {
       data: {
         models: [],
@@ -416,6 +461,12 @@ describe("LogisticsProcurement page", () => {
       data: { warehouses: [], byWarehouse: {}, totalsBySku: {} },
     };
     partnersHookState = { data: { partners: [] } };
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch: vi.fn(),
+    };
     catalogHookState = {
       data: {
         models: [],
@@ -609,5 +660,196 @@ describe("LogisticsProcurement page", () => {
       (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL =
         originalRevoke;
     }
+  });
+
+  // ---- C5.3 — Auto-fill from awaiting stock button ----
+
+  it("20. auto-fill button is visible in CreatePOModal when no prefill.dl and no prefill.dlRefs", () => {
+    setLoaded([]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    expect(
+      screen.getByTestId("auto-fill-shortage-button"),
+    ).toBeInTheDocument();
+  });
+
+  it("21. auto-fill button is HIDDEN when prefill.dl is set (single-order shortage flow)", () => {
+    setLoaded([]);
+    // Render the modal directly with a prefill.dl. The page only opens with
+    // empty prefill, so this is the cleanest way to exercise the visibility
+    // guard without forking the page's state machine for tests.
+    render(wrap(<CreatePOModal prefill={{ dl: 1234 }} onClose={() => {}} />));
+    expect(
+      screen.queryByTestId("auto-fill-shortage-button"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("22. auto-fill button is HIDDEN when prefill.dlRefs is non-empty (bundle flow)", () => {
+    setLoaded([]);
+    render(
+      wrap(
+        <CreatePOModal
+          prefill={{ dlRefs: [4001, 4002, 4003] }}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    expect(
+      screen.queryByTestId("auto-fill-shortage-button"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("23. clicking auto-fill triggers refetch and replaces lines (override behavior)", async () => {
+    setLoaded([]);
+    const refetch = vi.fn().mockResolvedValue({
+      data: {
+        shortage: [
+          { sku: "sofa:nordic:3s", need: 5, available: 1, shortage: 4 },
+          { sku: "mattress:carres-cloud:Queen", need: 3, available: 0, shortage: 3 },
+        ],
+      },
+    });
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch,
+    };
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    // Modal default seeds first line with first SKU = "mattress:carres-cloud:King".
+    expect(screen.getByDisplayValue("Carres Cloud · King")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("auto-fill-shortage-button"));
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+    // Override behavior — the previous default King line is gone, replaced by
+    // the two SKUs returned from the server (Queen + Nordic). Verified via the
+    // SKU labels rendered in the lines table.
+    await waitFor(() => {
+      expect(screen.queryByDisplayValue("Carres Cloud · King")).toBeNull();
+    });
+    expect(
+      screen.getAllByDisplayValue("Nordic Sofa · 3 seater").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByDisplayValue("Carres Cloud · Queen").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("24. empty shortage result disables the button + shows the empty label", async () => {
+    setLoaded([]);
+    const refetch = vi.fn().mockResolvedValue({ data: { shortage: [] } });
+    // Simulate the post-fetch state: isFetched=true, data is empty.
+    shortageHookState = {
+      data: { shortage: [] },
+      isFetching: false,
+      isFetched: true,
+      refetch,
+    };
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    const btn = screen.getByTestId("auto-fill-shortage-button");
+    expect(btn).toBeDisabled();
+    expect(btn.textContent ?? "").toMatch(/No shortages/i);
+  });
+
+  it("25. auto-fill across 2 suppliers → user picks per-PO warehouse for each → batch RPC fires (5.3 → 5.2 chain)", async () => {
+    setLoaded([]);
+    // Program refetch with two SKUs whose categories map to two different
+    // suppliers (mattress → SUPPLIER_A, sofa → SUPPLIER_B). After click the
+    // modal must render BOTH supplier-group cards, accept a warehouse pick
+    // for each, and submit via the batch RPC (NOT the single-PO RPC).
+    const refetch = vi.fn().mockResolvedValue({
+      data: {
+        shortage: [
+          { sku: "mattress:carres-cloud:King", need: 5, available: 0, shortage: 5 },
+          { sku: "sofa:nordic:3s", need: 3, available: 0, shortage: 3 },
+        ],
+      },
+    });
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch,
+    };
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    fireEvent.click(screen.getByTestId("auto-fill-shortage-button"));
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+    // Both supplier groups render — verifies setLines triggered the
+    // auto-grouping side-effect and per-PO warehouse pickers appear.
+    await waitFor(() => {
+      expect(
+        screen.getByTestId(`po-supplier-group-${SUPPLIER_A.id}`),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByTestId(`po-supplier-group-${SUPPLIER_B.id}`),
+    ).toBeInTheDocument();
+    // Issue button gates on per-supplier warehouse picks (Q4=A).
+    const issueBtn = screen.getByRole("button", { name: /Issue 2 POs/ });
+    expect(issueBtn).toBeDisabled();
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_B.id}`), {
+      target: { value: WAREHOUSE_PG.id },
+    });
+    expect(issueBtn).not.toBeDisabled();
+    fireEvent.click(issueBtn);
+    // Batch RPC fires (NOT the single-PO RPC) — atomic 2-PO commit.
+    await waitFor(() => {
+      expect(createBatchMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    expect(createMutateAsync).not.toHaveBeenCalled();
+    const callArg = createBatchMutateAsync.mock.calls[0][0] as {
+      pos: { supplierId: string; warehouseId: string; lines: { sku: string; qty: number }[] }[];
+    };
+    expect(callArg.pos).toHaveLength(2);
+    const aGroup = callArg.pos.find((p) => p.supplierId === SUPPLIER_A.id);
+    const bGroup = callArg.pos.find((p) => p.supplierId === SUPPLIER_B.id);
+    expect(aGroup?.warehouseId).toBe(WAREHOUSE_KL.id);
+    expect(bGroup?.warehouseId).toBe(WAREHOUSE_PG.id);
+    expect(aGroup?.lines).toEqual([
+      { sku: "mattress:carres-cloud:King", qty: 5 },
+    ]);
+    expect(bGroup?.lines).toEqual([{ sku: "sofa:nordic:3s", qty: 3 }]);
+  });
+
+  it("26. auto-fill failure surfaces toast.error and does NOT show the misleading 'No shortages' notice", async () => {
+    setLoaded([]);
+    // refetch resolves with React Query's `{data, error}` shape — `error` set,
+    // `data` undefined. Pre-fix this fell through to the empty-state toast,
+    // claiming "no shortages" while the endpoint was actually 5xx-ing.
+    const refetch = vi.fn().mockResolvedValue({
+      data: undefined,
+      error: new ApiError(500, "Internal Server Error", null),
+    });
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch,
+    };
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    fireEvent.click(screen.getByTestId("auto-fill-shortage-button"));
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+    // Failure routes through toast.error with the ApiError message…
+    await waitFor(() => {
+      expect(sonnerMocks.error).toHaveBeenCalled();
+    });
+    expect(sonnerMocks.error).toHaveBeenCalledWith("Internal Server Error");
+    // …and crucially does NOT fire the empty-state toast (`toast(...)`).
+    expect(sonnerMocks.defaultFn).not.toHaveBeenCalled();
+    // Lines stay untouched (no override happened).
+    expect(screen.getByDisplayValue("Carres Cloud · King")).toBeInTheDocument();
   });
 });

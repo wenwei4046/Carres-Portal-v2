@@ -642,6 +642,176 @@ describe("POST /api/logistics/pos/:id/reassign-warehouse", () => {
 });
 
 // ---------------------------------------------------------------------------
+// C5.3 — GET /api/logistics/pos/awaiting-stock-shortage (auto-fill feed)
+// ---------------------------------------------------------------------------
+describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
+  // Wire up a per-table .from() chain mock similar to orders.test.ts
+  // mockDetailQueries — each table call returns its own thenable chain.
+  function mockShortageQueries(opts: {
+    awaitingOrders?: { id: string }[];
+    orderLines?: { sku: string; qty: number }[];
+    stockBalances?: { sku: string; qty: number; reserved: number }[];
+  }) {
+    const fromImpl = vi.fn((table: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const promise = (data: any) => Promise.resolve({ data, error: null });
+      switch (table) {
+        case "orders":
+          // The route filters on logistics_stage='awaiting_stock' via .eq().
+          // Resolve at .eq(...) by overriding it with a thenable.
+          chain.eq = vi.fn(() => promise(opts.awaitingOrders ?? []));
+          break;
+        case "order_lines":
+          // Resolved at .in('order_id', [...]).
+          chain.in = vi.fn(() => promise(opts.orderLines ?? []));
+          break;
+        case "stock_balances":
+          // No filter on this query — the .select() chain itself awaits.
+          chain.select = vi.fn(() => promise(opts.stockBalances ?? []));
+          break;
+      }
+      return chain;
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
+    return fromImpl;
+  }
+
+  it("returns 403 for non-logistics role (no Supabase round-trip)", async () => {
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("returns {shortage: []} when no awaiting_stock orders exist", async () => {
+    mockShortageQueries({ awaitingOrders: [] });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { shortage: unknown[] };
+    expect(body.shortage).toEqual([]);
+  });
+
+  it("returns aggregated shortage when avail < need (3 orders, 2 SKUs, 1 in shortage)", async () => {
+    // Three awaiting_stock orders. Two SKUs hit. avail < need on MAT only.
+    mockShortageQueries({
+      awaitingOrders: [
+        { id: "00000000-0000-0000-0000-000000000a01" },
+        { id: "00000000-0000-0000-0000-000000000a02" },
+        { id: "00000000-0000-0000-0000-000000000a03" },
+      ],
+      orderLines: [
+        // MAT total need = 5
+        { sku: "mattress:cloud:King", qty: 2 },
+        { sku: "mattress:cloud:King", qty: 1 },
+        { sku: "mattress:cloud:King", qty: 2 },
+        // SOFA total need = 1
+        { sku: "sofa:nordic:3s", qty: 1 },
+      ],
+      stockBalances: [
+        // MAT avail = 3 → shortage 2
+        { sku: "mattress:cloud:King", qty: 3, reserved: 0 },
+        // SOFA avail = 5 → no shortage (excluded)
+        { sku: "sofa:nordic:3s", qty: 5, reserved: 0 },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; need: number; available: number; shortage: number }[];
+    };
+    expect(body.shortage).toHaveLength(1);
+    expect(body.shortage[0]).toEqual({
+      sku: "mattress:cloud:King",
+      need: 5,
+      available: 3,
+      shortage: 2,
+    });
+  });
+
+  it("excludes SKUs where avail >= need (negative case)", async () => {
+    mockShortageQueries({
+      awaitingOrders: [{ id: "00000000-0000-0000-0000-000000000a01" }],
+      orderLines: [{ sku: "sofa:nordic:3s", qty: 2 }],
+      stockBalances: [{ sku: "sofa:nordic:3s", qty: 10, reserved: 5 }], // avail = 5
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { shortage: unknown[] };
+    expect(body.shortage).toEqual([]);
+  });
+
+  it("sums correctly across multiple warehouses for `available`", async () => {
+    // Two warehouses both stock the same SKU. available = (10-5) + (3-2) = 6.
+    // need = 8. shortage = 2.
+    mockShortageQueries({
+      awaitingOrders: [
+        { id: "00000000-0000-0000-0000-000000000a01" },
+        { id: "00000000-0000-0000-0000-000000000a02" },
+      ],
+      orderLines: [
+        { sku: "mattress:cloud:King", qty: 5 },
+        { sku: "mattress:cloud:King", qty: 3 },
+      ],
+      stockBalances: [
+        { sku: "mattress:cloud:King", qty: 10, reserved: 5 }, // WH1: avail 5
+        { sku: "mattress:cloud:King", qty: 3, reserved: 2 },  // WH2: avail 1
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; need: number; available: number; shortage: number }[];
+    };
+    expect(body.shortage).toHaveLength(1);
+    expect(body.shortage[0]).toEqual({
+      sku: "mattress:cloud:King",
+      need: 8,
+      available: 6,
+      shortage: 2,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // C5.2 — POST /api/logistics/pos/batch (batch-create with per-PO warehouse)
 // ---------------------------------------------------------------------------
 describe("POST /api/logistics/pos/batch", () => {

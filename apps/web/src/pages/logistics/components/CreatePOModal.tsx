@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import {
+  useAwaitingStockShortage,
   useCatalog,
   useCreatePoMutation,
   useCreatePosBatch,
@@ -95,6 +96,13 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   const create = useCreatePoMutation();
   const createBatch = useCreatePosBatch();
 
+  // C5.3 — Auto-fill from awaiting stock. Lazy hook (enabled: false) — only
+  // fires on the button's onClick → refetch(). The visibility rule below
+  // hides the button entirely when the modal was opened with a specific
+  // order/bundle prefill (those flows already know the lines and we don't
+  // want to clobber them).
+  const shortageQ = useAwaitingStockShortage();
+
   const suppliers = suppliersQ.data?.suppliers ?? [];
   const warehouses = warehousesQ.data?.warehouses ?? [];
   const skuOptions = useMemo(() => {
@@ -157,6 +165,61 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     }
     return { groups: [...g.values()], orphans };
   }, [lines, suppliers]);
+
+  // C5.3 — Auto-fill button visibility. Hidden whenever the modal was opened
+  // with a specific order or bundle prefill, since those flows already know
+  // the lines (clicking the button would silently clobber the user's intent).
+  const showAutoFill =
+    prefill.dl == null && (prefill.dlRefs == null || prefill.dlRefs.length === 0);
+  // Empty result is sticky once known — disable the button until the user
+  // closes/reopens or until refetched data shows shortages. The `!isError`
+  // guard prevents the button from getting stuck in the "No shortages found"
+  // disabled state when the last refetch actually failed (data is undefined
+  // because of a 5xx, not because the order book is clean).
+  const lastShortageEmpty =
+    shortageQ.isFetched && !shortageQ.isError &&
+    (shortageQ.data?.shortage.length ?? 0) === 0;
+  const autoFillDisabled = shortageQ.isFetching || lastShortageEmpty;
+
+  async function autoFillFromShortage() {
+    try {
+      const res = await shortageQ.refetch();
+      // React Query's refetch resolves with `{data, error}` rather than
+      // throwing on HTTP failure. Without this branch a 5xx silently falls
+      // through to the empty-data toast, claiming "no shortages" while the
+      // endpoint is actually broken — misleads the operator into not raising
+      // a PO they need.
+      if (res.error) {
+        const err: unknown = res.error;
+        toast.error(
+          err instanceof ApiError && err.message
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Auto-fill failed",
+        );
+        return;
+      }
+      const data = res.data;
+      if (!data || data.shortage.length === 0) {
+        toast(
+          "No shortages — all awaiting_stock orders covered by stock",
+          { duration: 3000 },
+        );
+        return;
+      }
+      // Q3=A — override (replace), not append. Q2-extended — line.qty equals
+      // the literal shortfall (need - available), as returned by the server.
+      setLines(data.shortage.map((s) => ({ sku: s.sku, qty: s.shortage })));
+      const totalUnits = data.shortage.reduce((acc, s) => acc + s.need, 0);
+      toast.success(
+        `Auto-filled ${data.shortage.length} SKU${data.shortage.length === 1 ? "" : "s"} from ${totalUnits} unit${totalUnits === 1 ? "" : "s"} pending`,
+      );
+    } catch (e: unknown) {
+      if (e instanceof ApiError) toast.error(e.message || "Auto-fill failed");
+      else toast.error(e instanceof Error ? e.message : "Auto-fill failed");
+    }
+  }
 
   function setLine(idx: number, patch: Partial<DraftLine>) {
     setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
@@ -294,6 +357,28 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           }}
         >
           {prefill.note}
+        </div>
+      )}
+
+      {/* C5.3 — Auto-fill from awaiting stock. Hidden when a specific order
+          or bundle prefill is set (lines already known). Override behavior:
+          on success the modal's `lines` state is fully replaced. */}
+      {showAutoFill && (
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={autoFillFromShortage}
+            disabled={autoFillDisabled}
+            data-testid="auto-fill-shortage-button"
+            className="btn-ghost text-[12px] py-1.5 px-3"
+            style={{ opacity: autoFillDisabled ? 0.45 : 1 }}
+          >
+            {shortageQ.isFetching
+              ? "Loading awaiting stock..."
+              : lastShortageEmpty
+                ? "⚡ No shortages found"
+                : "⚡ Auto-fill from awaiting stock"}
+          </button>
         </div>
       )}
 

@@ -12,6 +12,7 @@ import {
   type AssignPartnerInput,
   type AssignPickupPartnerInput,
   type AttachDoInput,
+  type AwaitingStockShortageResponse,
   type CancelOrderInput,
   type CatalogResponse,
   type ConfirmProceedRequestInput,
@@ -75,6 +76,13 @@ export const qk = {
     pos:       (filters?: LogisticsPoFilters) =>
       ["logistics", "pos", filters ?? {}] as const,
     po:        (id: string) => ["logistics", "pos", id] as const,
+    /** Pipeline v2 (C5.3) — SKU-level shortage feed for the "Auto-fill from
+     *  awaiting stock" button on CreatePOModal. Lazy: fired only on click via
+     *  the hook's `refetch()`. Nested under `pos` so future blunt
+     *  invalidations on `["logistics","pos"]` reach this cache too (e.g. when
+     *  a PO is issued, the awaiting_stock pool changes). */
+    awaitingStockShortage: () =>
+      ["logistics", "pos", "awaiting-stock-shortage"] as const,
     warehouse: () => ["logistics", "warehouse"] as const,
     /** Pipeline v2 (C4) — reserve drill-down per (warehouse, sku). Nested under
      *  warehouse so future blunt invalidations on `["logistics","warehouse"]`
@@ -1021,6 +1029,10 @@ export interface LogisticsPosListResponse {
  *  don't have to import from @carres/shared directly. */
 export type LogisticsReservedDrilldownResponse = ReservedDrilldownResponse;
 
+/** Pipeline v2 (C5.3) — re-export the awaiting-stock shortage shape for the
+ *  CreatePOModal auto-fill button, same convention as the drill-down above. */
+export type LogisticsAwaitingStockShortageResponse = AwaitingStockShortageResponse;
+
 /** GET /api/logistics/warehouse — composed table-style payload (warehouse.ts). */
 export type LowStockStatus = "out" | "low" | "ok";
 export interface WarehouseStockEntry {
@@ -1272,6 +1284,27 @@ export function useReservedDrilldown(
     },
     enabled: !!warehouseId && !!sku,
     staleTime: 5_000,
+    ...opts,
+  });
+}
+
+/** Pipeline v2 (C5.3) — awaiting-stock shortage feed for the CreatePOModal
+ *  "Auto-fill from awaiting stock" button. Lazy: `enabled: false` so the
+ *  query only fires when the user clicks the button (via `refetch()`). The
+ *  result replaces the modal's `lines` state. staleTime is 0 so a fresh
+ *  refetch is always triggered — the awaiting_stock pool can change between
+ *  clicks (e.g. user dispatches an order, abandons one). */
+export function useAwaitingStockShortage(
+  opts?: Partial<UseQueryOptions<LogisticsAwaitingStockShortageResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.awaitingStockShortage(),
+    queryFn: () =>
+      apiFetch<LogisticsAwaitingStockShortageResponse>(
+        "/api/logistics/pos/awaiting-stock-shortage",
+      ),
+    enabled: false,
+    staleTime: 0,
     ...opts,
   });
 }

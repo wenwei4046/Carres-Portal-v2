@@ -115,6 +115,7 @@ export {
   transferReadyInputSchema,
   reservedDrilldownQuery,
   reservedDrilldownResponse,
+  awaitingStockShortageResponse,
   type AssignPartnerInput,
   type AttachDoInput,
   type ReceivePoLineInput,
@@ -136,4 +137,5 @@ export {
   type TransferReadyInput,
   type ReservedDrilldownQuery,
   type ReservedDrilldownResponse,
+  type AwaitingStockShortageResponse,
 } from "./schemas/logistics";

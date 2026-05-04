@@ -8,6 +8,7 @@ import {
   listPurchaseOrdersQuery,
   reassignPoWarehouseInput,
   receivePoLineInput,
+  type AwaitingStockShortageResponse,
 } from "@carres/shared";
 import { renderPoPdf } from "../../lib/pdf/render";
 import type { PoTemplateData } from "../../lib/pdf/types";
@@ -73,6 +74,91 @@ logisticsPosRouter.get("/", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ pos: data ?? [] });
+});
+
+// ----- GET /awaiting-stock-shortage -----
+// C5.3: SKU-level shortage feed for "Auto-fill from awaiting stock" button on
+// CreatePOModal. Aggregates demand across every order currently sitting in
+// `logistics_stage='awaiting_stock'`, compares against the cross-warehouse
+// stock pool, and returns only SKUs where avail < need. The button replaces
+// the modal's lines state with this list so logistics can issue one PO that
+// covers the whole pending order book.
+//
+// Q1=B (server-side aggregation, no new RPC). Existing tables only:
+//   - orders (logistics_stage filter)
+//   - order_lines (in-list by order_id)
+//   - stock_balances (no filter — sum across all warehouses per Q2=A)
+//
+// RLS: the inline role guard above plus the user JWT covers this; no
+// policy changes needed.
+//
+// Path is registered before `/:id/print` so the static segment wins over the
+// :id pattern in Hono's matcher.
+logisticsPosRouter.get("/awaiting-stock-shortage", async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Step 1 — fetch awaiting_stock order IDs.
+  const { data: orders, error: e_orders } = await sb
+    .from("orders")
+    .select("id")
+    .eq("logistics_stage", "awaiting_stock");
+  if (e_orders) {
+    const m = mapPgError(e_orders);
+    return c.json(m.body, m.status);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orderIds = (orders ?? []).map((o: any) => o.id);
+
+  // Short-circuit when no awaiting_stock orders exist — skip the parallel
+  // fetch entirely. Returns the documented `{shortage: []}` shape.
+  if (orderIds.length === 0) {
+    const empty: AwaitingStockShortageResponse = { shortage: [] };
+    return c.json(empty);
+  }
+
+  // Step 2 — fetch order_lines (for those order IDs) AND stock_balances (all
+  // rows) in parallel. Same Promise.all pattern as orders.ts:164/212.
+  const [linesRes, stockRes] = await Promise.all([
+    sb.from("order_lines").select("sku, qty").in("order_id", orderIds),
+    sb.from("stock_balances").select("sku, qty, reserved"),
+  ]);
+  if (linesRes.error) {
+    const m = mapPgError(linesRes.error);
+    return c.json(m.body, m.status);
+  }
+  if (stockRes.error) {
+    const m = mapPgError(stockRes.error);
+    return c.json(m.body, m.status);
+  }
+
+  // Step 3 — TS aggregation. need = Σ qty per SKU; available = Σ (qty -
+  // reserved) per SKU across every warehouse. Filter to shortage > 0.
+  const needBySku = new Map<string, number>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const l of (linesRes.data ?? []) as any[]) {
+    const sku = String(l.sku);
+    needBySku.set(sku, (needBySku.get(sku) ?? 0) + Number(l.qty));
+  }
+
+  const availBySku = new Map<string, number>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (stockRes.data ?? []) as any[]) {
+    const sku = String(r.sku);
+    const avail = Number(r.qty) - Number(r.reserved);
+    availBySku.set(sku, (availBySku.get(sku) ?? 0) + avail);
+  }
+
+  const shortage: AwaitingStockShortageResponse["shortage"] = [];
+  for (const [sku, need] of needBySku.entries()) {
+    const available = availBySku.get(sku) ?? 0;
+    if (available < need) {
+      shortage.push({ sku, need, available, shortage: need - available });
+    }
+  }
+  shortage.sort((a, b) => a.sku.localeCompare(b.sku));
+
+  const response: AwaitingStockShortageResponse = { shortage };
+  return c.json(response);
 });
 
 // ----- GET /:id/print -----
