@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -1136,6 +1137,12 @@ export function useLogisticsOrders(
         "/api/logistics/orders" + logisticsOrdersSearch(filters),
       ),
     staleTime: 30_000,
+    // Keep showing the previous filtered/searched list while fetching the
+    // next one — without this, the query key flips on every keystroke and
+    // TanStack treats each filter change as a brand-new query (no data →
+    // isLoading=true → page falls back to <KanbanSkeleton />, which
+    // unmounts the search input mid-keystroke and steals focus).
+    placeholderData: keepPreviousData,
     ...opts,
   });
 }

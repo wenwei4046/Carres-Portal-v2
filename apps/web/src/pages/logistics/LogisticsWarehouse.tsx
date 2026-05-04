@@ -116,6 +116,15 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
     return m;
   }, [catalogQ.data]);
 
+  // Model name lookup keyed on modelId so a SKU row can be rendered as
+  // "Carres Cloud · King" (proto format) instead of just "King" (variant
+  // alone) — `ProductSkuDto.variant` is only the size/preset segment.
+  const modelNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const md of catalogQ.data?.models ?? []) m.set(md.id, md.name);
+    return m;
+  }, [catalogQ.data]);
+
   // Per-warehouse totals for the tile cards: total units summed across SKUs
   // currently in that warehouse + count of SKUs with qty > 0. Mirrors proto
   // lines 14-18.
@@ -356,7 +365,13 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
             const totalAll = totals?.total_qty ?? row.qty;
             const aggStatus = totals?.low_stock_status_aggregate ?? row.low_stock_status;
             const skuMeta = skuLabelMap.get(row.sku);
-            const friendly = skuMeta?.variant ?? row.sku;
+            const modelName = skuMeta ? modelNameById.get(skuMeta.modelId) : undefined;
+            // Proto format: "{Model name} · {variant}" — e.g. "Carres Cloud
+            // · Single". Falls back to variant-only or raw SKU if catalog
+            // hasn't been loaded yet.
+            const friendly = modelName && skuMeta
+              ? `${modelName} · ${skuMeta.variant}`
+              : (skuMeta?.variant ?? row.sku);
             return (
               <div
                 key={row.sku}
@@ -391,11 +406,6 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
                   ) : (
                     <div className="font-body text-[13px] truncate">{friendly}</div>
                   )}
-                  {skuMeta ? (
-                    <div className="font-mono text-[10px] text-base-500 mt-0.5 truncate">
-                      {row.sku}
-                    </div>
-                  ) : null}
                 </div>
                 <div className="font-mono text-[13px] text-right font-semibold">
                   {row.qty}

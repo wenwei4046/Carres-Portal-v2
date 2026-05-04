@@ -310,21 +310,29 @@ function DrawerBody({
               const bal = stockBalances.find((b) => b.sku === l.sku);
               const have = bal ? Math.max(0, Number(bal.qty) - Number(bal.reserved)) : 0;
               const ok = have >= l.qty;
+              // Once the order is Delivered the on-hand check stops being
+              // meaningful (goods are gone from this warehouse already), so
+              // collapse the line row to just SKU × qty.
+              const showStock = stage !== "delivered";
               return (
                 <div
                   key={l.sku}
-                  className={`grid grid-cols-[1fr_auto_auto] gap-3 py-2 items-center ${i ? "border-t border-dashed border-base-100" : ""}`}
+                  className={`grid ${showStock ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr]"} gap-3 py-2 items-center ${i ? "border-t border-dashed border-base-100" : ""}`}
                 >
                   <div className="text-[12px] font-body">
                     <span className="font-mono">{l.sku}</span> ×{l.qty}
                   </div>
-                  <div className={`font-mono text-[11px] ${ok ? "text-success" : "text-warning"}`}>
-                    {have} on hand
-                  </div>
-                  <div
-                    className={`w-[14px] h-[14px] rounded-full ${ok ? "bg-success" : "bg-warning"}`}
-                    aria-label={ok ? "in stock" : "shortage"}
-                  />
+                  {showStock && (
+                    <>
+                      <div className={`font-mono text-[11px] ${ok ? "text-success" : "text-warning"}`}>
+                        {have} on hand
+                      </div>
+                      <div
+                        className={`w-[14px] h-[14px] rounded-full ${ok ? "bg-success" : "bg-warning"}`}
+                        aria-label={ok ? "in stock" : "shortage"}
+                      />
+                    </>
+                  )}
                 </div>
               );
             })}
