@@ -8,7 +8,7 @@ export type Role =
   | "logistics" | "supplier" | "partner" | "finance" | "bd";
 
 export type OrderStatus       = "place" | "proceed_order" | "delivered" | "cancelled";
-export type LogisticsStage    = "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered";
+export type LogisticsStage    = "placed" | "proceed_request" | "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered";
 export type PartnerStage      = "assigned" | "picked_from_wh" | "en_route" | "delivered";
 export type POStatus          = "open" | "received" | "cancelled";
 export type POSupStatus       =

@@ -190,7 +190,7 @@ export interface Order {
   approvalCode: string | null;
   installmentMonths: 6 | 12 | null;
 
-  logisticsStage: "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered" | null;
+  logisticsStage: "placed" | "proceed_request" | "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered" | null;
   warehouseId: string | null;
   deliveryPartnerId: string | null;
   partnerStage: "assigned" | "picked_from_wh" | "en_route" | "delivered" | null;
