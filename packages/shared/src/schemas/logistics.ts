@@ -193,11 +193,50 @@ export type RecheckStockInput = z.infer<typeof recheckStockInput>;
  * forwarded to the current 2-arg RPC; v3-S4 swaps to
  * `logistics_assign_partner_and_dispatch(... p_warehouse_override_id ...)`,
  * at which point this field becomes load-bearing.
+ *
+ * v3-S3.4 — Outsource toggle (spec §8.2). The dialog's partner select adds a
+ * synthetic last option "+ Outsource (one-time)" that hides the partner
+ * preview and reveals 3 inputs (name *, contact *, zones). On submit the body
+ * carries (outsourcePartnerName + outsourcePartnerContact + outsourcePartnerZones?)
+ * INSTEAD of `partnerId`. XOR semantic — exactly one of the two paths must
+ * win, never both, never neither. Mirrors the DB CHECK constraint
+ * `po_outsource_xor_partner` on purchase_orders (migration 0030 §3.6) which
+ * enforces this at the storage layer too (defense in depth).
+ *
+ * The route bridges the outsource path via a direct `purchase_orders` UPDATE
+ * (RLS-bounded by the logistics JWT). v3-S4 swaps both paths to the unified
+ * `logistics_assign_partner_and_dispatch` RPC.
  */
-export const assignPickupPartnerInput = z.object({
-  partnerId: z.string().uuid(),
-  warehouseId: z.string().uuid().optional(),
-}).strict();
+export const assignPickupPartnerInput = z
+  .object({
+    partnerId: z.string().uuid().optional(),
+    warehouseId: z.string().uuid().optional(),
+    outsourcePartnerName: z.string().min(1).optional(),
+    outsourcePartnerContact: z.string().min(1).optional(),
+    outsourcePartnerZones: z.string().optional(),
+  })
+  .strict()
+  // XOR: exactly one of (partnerId) vs (outsourcePartnerName) must be set.
+  .refine(
+    (data) => {
+      const hasPartner = !!data.partnerId;
+      const hasOutsource = !!data.outsourcePartnerName;
+      return hasPartner !== hasOutsource;
+    },
+    {
+      message:
+        'Either partnerId or outsourcePartnerName must be set, not both',
+    },
+  )
+  // When outsource path is taken, contact is required (name + contact must
+  // travel together — the proto §8.2 form marks both as `*`).
+  .refine(
+    (data) => !data.outsourcePartnerName || !!data.outsourcePartnerContact,
+    {
+      message:
+        'outsourcePartnerContact is required when outsourcePartnerName is set',
+    },
+  );
 export type AssignPickupPartnerInput = z.infer<typeof assignPickupPartnerInput>;
 
 /**

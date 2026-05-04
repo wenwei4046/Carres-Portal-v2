@@ -480,20 +480,58 @@ logisticsPosRouter.post("/:id/cancel", async (c) => {
 });
 
 // ----- POST /:id/assign-pickup-partner -----
+//
+// Two paths through this route, gated by the body shape (zod `assignPickupPartnerInput`
+// XOR refine):
+//
+//   1. partnerId path — registered delivery partner. Calls the existing
+//      `logistics_assign_pickup_partner(po_id, partner_id)` RPC. Unchanged
+//      from Phase 4. The `warehouseId` field is captured but NOT forwarded
+//      to the 2-arg RPC; v3-S4 swaps both paths to the unified
+//      `logistics_assign_partner_and_dispatch(... p_warehouse_override_id ...)`
+//      RPC at which point warehouseId becomes load-bearing.
+//
+//   2. outsource path (v3-S3.4 / spec §8.2) — one-shot ad-hoc transporter.
+//      No RPC exists for outsource yet (lands in v3-S4). This route does a
+//      direct `purchase_orders` UPDATE under the user JWT (RLS allows the
+//      logistics role to update POs — see `po_scoped_update` in 0002_rls.sql).
+//      The DB CHECK constraint `po_outsource_xor_partner` (migration 0030 §3.6)
+//      enforces XOR with delivery_partner_id at the storage layer (defense in
+//      depth — zod is the primary gate).
 logisticsPosRouter.post("/:id/assign-pickup-partner", async (c) => {
   const parsed = await parseJsonBody(c, assignPickupPartnerInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   // v3-S2.4 — destination warehouse override:
   // `warehouseId` is captured here from the request body (and validated as a
-  // UUID by the zod schema), but NOT yet forwarded to the RPC. The current
-  // `logistics_assign_pickup_partner(p_po_id, p_partner_id)` RPC has only
-  // those two args, so we keep the call shape unchanged for v3-S2. v3-S4 will
-  // swap to `logistics_assign_partner_and_dispatch` which accepts
+  // UUID by the zod schema), but NOT yet forwarded to either path. v3-S4 will
+  // swap both paths to `logistics_assign_partner_and_dispatch` which accepts
   // `p_warehouse_override_id`; at that point we'll thread `parsed.data.warehouseId`
-  // through to the RPC call.
+  // through to the RPC call (and drop the direct-UPDATE outsource branch).
   const _warehouseId = parsed.data.warehouseId;
   void _warehouseId; // intentionally unused — wired to UI/API; RPC binding lands in v3-S4
   const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Outsource path — direct PO UPDATE (no RPC, RLS-bounded).
+  if (parsed.data.outsourcePartnerName) {
+    const { data, error } = await sb
+      .from("purchase_orders")
+      .update({
+        outsource_partner_name: parsed.data.outsourcePartnerName,
+        outsource_partner_contact: parsed.data.outsourcePartnerContact,
+        outsource_partner_zones: parsed.data.outsourcePartnerZones ?? null,
+        sup_status: "pickup_assigned",
+      })
+      .eq("id", c.req.param("id"))
+      .select()
+      .single();
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json({ po: data });
+  }
+
+  // Partner path — existing RPC (unchanged from Phase 4).
   const { data, error } = await sb.rpc("logistics_assign_pickup_partner", {
     p_po_id: c.req.param("id"),
     p_partner_id: parsed.data.partnerId,

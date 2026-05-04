@@ -316,3 +316,182 @@ describe("AssignPickupDialog (v3-S2.4 warehouse picker)", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// v3-S3.4 — Outsource toggle (spec §8.2 + §8.3 Print DO toast).
+// ---------------------------------------------------------------------------
+describe("AssignPickupDialog (v3-S3.4 outsource toggle)", () => {
+  it("partner select includes a synthetic '+ Outsource (one-time)' option", () => {
+    render(
+      wrap(
+        <AssignPickupDialog
+          po={makePo()}
+          supplier={SUPPLIER}
+          warehouse={WAREHOUSE_KL}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    // The synthetic option appears at the end of the partner select.
+    expect(
+      screen.getByRole("option", { name: /\+ Outsource \(one-time\)/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("selecting Outsource hides partner preview and shows outsource form fields", () => {
+    render(
+      wrap(
+        <AssignPickupDialog
+          po={makePo()}
+          supplier={SUPPLIER}
+          warehouse={WAREHOUSE_KL}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    // Default = partner — preview card visible
+    expect(screen.getByText(PARTNER_A.name)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Delivery partner/i), {
+      target: { value: "__OUTSOURCE__" },
+    });
+
+    // Partner preview card is gone.
+    expect(screen.queryByText(PARTNER_A.contact)).not.toBeInTheDocument();
+    // Outsource form fields appear.
+    expect(
+      screen.getByLabelText(/Outsource partner name/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Contact \(phone\/email\)/i),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Zones/i)).toBeInTheDocument();
+  });
+
+  it("Submit disabled until outsource name + contact are both filled", () => {
+    render(
+      wrap(
+        <AssignPickupDialog
+          po={makePo()}
+          supplier={SUPPLIER}
+          warehouse={WAREHOUSE_KL}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    fireEvent.change(screen.getByLabelText(/Delivery partner/i), {
+      target: { value: "__OUTSOURCE__" },
+    });
+    const submit = screen.getByRole("button", { name: /Assign partner/ });
+    expect(submit).toBeDisabled();
+
+    // Fill name only — still disabled.
+    fireEvent.change(screen.getByLabelText(/Outsource partner name/i), {
+      target: { value: "Ah Beng Lorry" },
+    });
+    expect(submit).toBeDisabled();
+
+    // Fill contact too — now enabled.
+    fireEvent.change(screen.getByLabelText(/Contact \(phone\/email\)/i), {
+      target: { value: "+60 12-345 6789" },
+    });
+    expect(submit).not.toBeDisabled();
+  });
+
+  it("submit on outsource path sends correct payload (no partnerId)", async () => {
+    render(
+      wrap(
+        <AssignPickupDialog
+          po={makePo()}
+          supplier={SUPPLIER}
+          warehouse={WAREHOUSE_KL}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    fireEvent.change(screen.getByLabelText(/Delivery partner/i), {
+      target: { value: "__OUTSOURCE__" },
+    });
+    fireEvent.change(screen.getByLabelText(/Outsource partner name/i), {
+      target: { value: "Ah Beng Lorry" },
+    });
+    fireEvent.change(screen.getByLabelText(/Contact \(phone\/email\)/i), {
+      target: { value: "+60 12-345 6789" },
+    });
+    fireEvent.change(screen.getByLabelText(/Zones/i), {
+      target: { value: "Klang Valley" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Assign partner/ }));
+    await waitFor(() => {
+      expect(assignMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    expect(assignMutateAsync.mock.calls[0][0]).toEqual({
+      outsourcePartnerName: "Ah Beng Lorry",
+      outsourcePartnerContact: "+60 12-345 6789",
+      outsourcePartnerZones: "Klang Valley",
+      warehouseId: WAREHOUSE_KL.id,
+    });
+  });
+
+  it("submit on outsource path with empty zones sends payload without zones", async () => {
+    render(
+      wrap(
+        <AssignPickupDialog
+          po={makePo()}
+          supplier={SUPPLIER}
+          warehouse={WAREHOUSE_KL}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    fireEvent.change(screen.getByLabelText(/Delivery partner/i), {
+      target: { value: "__OUTSOURCE__" },
+    });
+    fireEvent.change(screen.getByLabelText(/Outsource partner name/i), {
+      target: { value: "Ah Beng Lorry" },
+    });
+    fireEvent.change(screen.getByLabelText(/Contact \(phone\/email\)/i), {
+      target: { value: "+60 12-345 6789" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Assign partner/ }));
+    await waitFor(() => {
+      expect(assignMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    // Zones omitted entirely (empty string would fail zod's `.min(1)` for the
+    // outsource trio refine; the FE sends only the 3 required fields).
+    expect(assignMutateAsync.mock.calls[0][0]).toEqual({
+      outsourcePartnerName: "Ah Beng Lorry",
+      outsourcePartnerContact: "+60 12-345 6789",
+      warehouseId: WAREHOUSE_KL.id,
+    });
+  });
+
+  it("switching back from Outsource to a partner hides the outsource form", () => {
+    render(
+      wrap(
+        <AssignPickupDialog
+          po={makePo()}
+          supplier={SUPPLIER}
+          warehouse={WAREHOUSE_KL}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    fireEvent.change(screen.getByLabelText(/Delivery partner/i), {
+      target: { value: "__OUTSOURCE__" },
+    });
+    expect(
+      screen.getByLabelText(/Outsource partner name/i),
+    ).toBeInTheDocument();
+
+    // Switch back to a real partner.
+    fireEvent.change(screen.getByLabelText(/Delivery partner/i), {
+      target: { value: PARTNER_B.id },
+    });
+    expect(
+      screen.queryByLabelText(/Outsource partner name/i),
+    ).not.toBeInTheDocument();
+    // Partner preview reappears.
+    expect(screen.getByText(PARTNER_B.name)).toBeInTheDocument();
+  });
+});

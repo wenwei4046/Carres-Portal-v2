@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import {
   useAssignPickupPartnerMutation,
   useDeliveryPartners,
@@ -22,13 +23,19 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  *     declined") — Phase 7 surface; renders if the field happens to be present.
  *   - Pickup details card (base-50 fill): "From {supplier}", "To {warehouse}",
  *     SKU summary
- *   - Required partner select (`{name} · {zones}` labels)
+ *   - Required partner select (`{name} · {zones}` labels) — v3-S3.4 appends a
+ *     synthetic last option `+ Outsource (one-time)` (value `__OUTSOURCE__`).
  *   - Selected partner preview (base-50 fill): bold name + mono contact + zones
+ *   - v3-S3.4 — Outsource form (visible only when Outsource picked): name *,
+ *     contact *, zones (optional). On submit, body sends the outsource trio
+ *     INSTEAD of `partnerId`. Hono bridges via direct PO UPDATE; v3-S4 swaps
+ *     to `logistics_assign_partner_and_dispatch`.
  *   - v3-S2.4 — Required destination warehouse picker (defaults to
  *     `po.warehouse_id`; logistics can override for divert-on-the-fly).
  *   - Selected warehouse preview card (mirrors the partner preview)
- *   - Primary CTA: "Assign partner" — disabled until both partner AND
- *     warehouse are picked.
+ *   - Primary CTA: "Assign partner" — disabled until either:
+ *      (a) a registered partner + warehouse, OR
+ *      (b) outsource name + outsource contact + warehouse.
  *
  * Wires to `POST /api/logistics/pos/:id/assign-pickup-partner`. The
  * `warehouseId` is forwarded on the request body — the Hono route currently
@@ -36,7 +43,13 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  * the eventual RPC `logistics_assign_partner_and_dispatch` is v3-S4 work).
  * This component is forward-compatible: when the new RPC ships, no FE change
  * is needed.
+ *
+ * v3-S3.4 spec §8.3 — Print DO toast: after a successful outsource submit,
+ * a toast shows a "Print DO for [name]" button. Click → fetches the existing
+ * `GET /api/logistics/pos/:id/print` PDF (with Authorization Bearer JWT) and
+ * opens it in a new tab. Mirrors PoDetailModal.handlePrint.
  */
+const OUTSOURCE_OPTION_VALUE = "__OUTSOURCE__";
 interface Props {
   po: LogisticsPoListRow;
   supplier: SupplierRow | undefined;
@@ -54,6 +67,14 @@ export default function AssignPickupDialog({
   const partners = partnersQ.data?.partners ?? [];
   const [partnerId, setPartnerId] = useState<string>("");
   const assign = useAssignPickupPartnerMutation(po.id);
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+
+  // v3-S3.4 — outsource form state. Lives alongside partnerId; the partner
+  // <select>'s synthetic '__OUTSOURCE__' option flips between paths.
+  const [outsourceName, setOutsourceName] = useState<string>("");
+  const [outsourceContact, setOutsourceContact] = useState<string>("");
+  const [outsourceZones, setOutsourceZones] = useState<string>("");
+  const isOutsource = partnerId === OUTSOURCE_OPTION_VALUE;
 
   // v3-S2.4 — destination warehouse picker: default to the PO's current
   // destination, but allow override (e.g. divert when origin WH is full).
@@ -78,11 +99,87 @@ export default function AssignPickupDialog({
   const selectedWarehouse = warehouses.find((w) => w.id === warehouseId);
   const lines = po.purchase_order_lines ?? [];
   const totalUnits = lines.reduce((s, l) => s + Number(l.qty || 0), 0);
-  const valid = !!partnerId && !!warehouseId && !assign.isPending;
+
+  // Validity: warehouse always required. For partner path, partnerId must be a
+  // real (non-synthetic) partner. For outsource path, name + contact required.
+  const validPartnerPath =
+    !!partnerId && partnerId !== OUTSOURCE_OPTION_VALUE && !!warehouseId;
+  const validOutsourcePath =
+    isOutsource &&
+    outsourceName.trim().length > 0 &&
+    outsourceContact.trim().length > 0 &&
+    !!warehouseId;
+  const valid = (validPartnerPath || validOutsourcePath) && !assign.isPending;
+
+  // v3-S3.4 spec §8.3 — Print DO for outsource. Mirrors PoDetailModal.handlePrint
+  // (auth header → blob → window.open with popup-blocked download fallback).
+  async function printDoForOutsource(name: string) {
+    try {
+      const session = useAuth.getState().session;
+      const headers = new Headers();
+      if (session?.access_token) {
+        headers.set("Authorization", `Bearer ${session.access_token}`);
+      }
+      const res = await fetch(
+        `${baseUrl}/api/logistics/pos/${po.id}/print`,
+        { headers },
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Print failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (!win) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${po.id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : `Print DO for ${name} failed`,
+      );
+    }
+  }
 
   async function submit() {
     if (!valid) return;
     try {
+      if (isOutsource) {
+        const payload: {
+          outsourcePartnerName: string;
+          outsourcePartnerContact: string;
+          outsourcePartnerZones?: string;
+          warehouseId: string;
+        } = {
+          outsourcePartnerName: outsourceName.trim(),
+          outsourcePartnerContact: outsourceContact.trim(),
+          warehouseId,
+        };
+        const trimmedZones = outsourceZones.trim();
+        if (trimmedZones) payload.outsourcePartnerZones = trimmedZones;
+        await assign.mutateAsync(payload);
+        // v3-S3.4 §8.3 — Print DO toast. Toast lifetime defaults to a few
+        // seconds; the action button gives logistics one click to grab the
+        // PDF for the ad-hoc transporter.
+        const name = outsourceName.trim();
+        toast.success(`${po.id} assigned to ${name} (outsource)`, {
+          action: {
+            label: `Print DO for ${name}`,
+            onClick: () => {
+              void printDoForOutsource(name);
+            },
+          },
+        });
+        onClose();
+        return;
+      }
+      // Partner path (unchanged from v3-S2.4).
       await assign.mutateAsync({ partnerId, warehouseId });
       toast.success(
         `${po.id} assigned${partner ? ` to ${partner.name}` : ""} · awaiting their accept`,
@@ -142,10 +239,16 @@ export default function AssignPickupDialog({
               {p.zones ? ` · ${p.zones}` : ""}
             </option>
           ))}
+          {/* v3-S3.4 — synthetic last option for one-shot outsource transporters
+              (spec §8.2). Selecting it hides the partner preview and reveals
+              the outsource form below. */}
+          <option value={OUTSOURCE_OPTION_VALUE}>
+            + Outsource (one-time)
+          </option>
         </select>
       )}
 
-      {partner && (
+      {!isOutsource && partner && (
         <div className="text-[12px] text-base-600 px-3 py-2.5 bg-base-50 rounded-[4px] mb-3.5">
           <div>
             <strong>{partner.name}</strong>
@@ -156,6 +259,50 @@ export default function AssignPickupDialog({
             </div>
           )}
           {partner.zones && <div>Zones: {partner.zones}</div>}
+        </div>
+      )}
+
+      {/*
+       * v3-S3.4 — Outsource form (spec §8.2). Visible only when the synthetic
+       * '+ Outsource (one-time)' option is picked. Name + contact are
+       * required; zones is optional. Submit gates on these via `validOutsourcePath`.
+       */}
+      {isOutsource && (
+        <div
+          className="px-3 py-2.5 bg-base-50 rounded-[4px] mb-3.5"
+          data-testid="assign-pickup-outsource-form"
+        >
+          <div className="label mb-1.5">
+            Outsource partner name <span className="text-destructive">*</span>
+          </div>
+          <input
+            type="text"
+            value={outsourceName}
+            onChange={(e) => setOutsourceName(e.target.value)}
+            aria-label="Outsource partner name"
+            className={`${INPUT_CLS} mb-3`}
+            placeholder="e.g. Ah Beng Lorry"
+          />
+          <div className="label mb-1.5">
+            Contact (phone/email) <span className="text-destructive">*</span>
+          </div>
+          <input
+            type="text"
+            value={outsourceContact}
+            onChange={(e) => setOutsourceContact(e.target.value)}
+            aria-label="Contact (phone/email)"
+            className={`${INPUT_CLS} mb-3`}
+            placeholder="+60 12-345 6789"
+          />
+          <div className="label mb-1.5">Zones / area covered</div>
+          <input
+            type="text"
+            value={outsourceZones}
+            onChange={(e) => setOutsourceZones(e.target.value)}
+            aria-label="Zones / area covered"
+            className={`${INPUT_CLS}`}
+            placeholder="e.g. Klang Valley"
+          />
         </div>
       )}
 

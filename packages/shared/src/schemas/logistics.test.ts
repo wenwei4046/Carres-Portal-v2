@@ -248,6 +248,75 @@ describe('assignPickupPartnerInput', () => {
       assignPickupPartnerInput.safeParse({ partnerId: UUID, warehouseId: 'not-a-uuid' }).success,
     ).toBe(false);
   });
+
+  // v3-S3.4 — Outsource toggle (XOR with partnerId).
+  // Mirrors DB CHECK constraint `po_outsource_xor_partner` (migration 0030).
+  it('accepts the outsource trio (name + contact + zones, no partnerId)', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({
+        outsourcePartnerName: 'Ah Beng Lorry',
+        outsourcePartnerContact: '+60 12-345 6789',
+        outsourcePartnerZones: 'Klang Valley, Selangor',
+      }).success,
+    ).toBe(true);
+  });
+  it('accepts outsource without zones (zones optional)', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({
+        outsourcePartnerName: 'Ah Beng Lorry',
+        outsourcePartnerContact: '+60 12-345 6789',
+      }).success,
+    ).toBe(true);
+  });
+  it('accepts outsource trio with optional warehouseId', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({
+        outsourcePartnerName: 'Ah Beng Lorry',
+        outsourcePartnerContact: '+60 12-345 6789',
+        warehouseId: UUID2,
+      }).success,
+    ).toBe(true);
+  });
+  it('rejects when both partnerId AND outsourcePartnerName are set (XOR)', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({
+        partnerId: UUID,
+        outsourcePartnerName: 'Ah Beng Lorry',
+        outsourcePartnerContact: '+60 12-345 6789',
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects when neither partnerId nor outsourcePartnerName is set (XOR)', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({}).success,
+    ).toBe(false);
+    expect(
+      assignPickupPartnerInput.safeParse({ warehouseId: UUID }).success,
+    ).toBe(false);
+  });
+  it('rejects outsourcePartnerName without outsourcePartnerContact', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({
+        outsourcePartnerName: 'Ah Beng Lorry',
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects empty-string outsourcePartnerName (min 1)', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({
+        outsourcePartnerName: '',
+        outsourcePartnerContact: '+60 12-345 6789',
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects empty-string outsourcePartnerContact when name is set', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({
+        outsourcePartnerName: 'Ah Beng Lorry',
+        outsourcePartnerContact: '',
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe('reassignPoWarehouseInput', () => {

@@ -630,6 +630,182 @@ describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
     expect(res.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  // -------------------------------------------------------------------------
+  // v3-S3.4 — Outsource toggle (spec §8.2). Body without `partnerId` but with
+  // (outsourcePartnerName + outsourcePartnerContact + outsourcePartnerZones?)
+  // hits a direct `purchase_orders` UPDATE path instead of the legacy RPC.
+  // The proper RPC `logistics_assign_partner_and_dispatch` lands in v3-S4.
+  // -------------------------------------------------------------------------
+  it("outsource path: direct PO update with outsource fields + sup_status='pickup_assigned'", async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: {
+        id: PO_ID,
+        sup_status: "pickup_assigned",
+        outsource_partner_name: "Ah Beng Lorry",
+        outsource_partner_contact: "+60 12-345 6789",
+        outsource_partner_zones: "Klang Valley",
+      },
+      error: null,
+    });
+    const select = vi.fn(() => ({ single }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ update }));
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from, rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outsourcePartnerName: "Ah Beng Lorry",
+          outsourcePartnerContact: "+60 12-345 6789",
+          outsourcePartnerZones: "Klang Valley",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // No RPC fired on the outsource path — direct UPDATE only.
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).toHaveBeenCalledWith("purchase_orders");
+    expect(update).toHaveBeenCalledWith({
+      outsource_partner_name: "Ah Beng Lorry",
+      outsource_partner_contact: "+60 12-345 6789",
+      outsource_partner_zones: "Klang Valley",
+      sup_status: "pickup_assigned",
+    });
+    expect(eq).toHaveBeenCalledWith("id", PO_ID);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.po.id).toBe(PO_ID);
+    expect(body.po.outsource_partner_name).toBe("Ah Beng Lorry");
+  });
+
+  it("outsource path: zones is optional (null when omitted)", async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: { id: PO_ID, sup_status: "pickup_assigned" },
+      error: null,
+    });
+    const select = vi.fn(() => ({ single }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ update }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from, rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outsourcePartnerName: "Ah Beng Lorry",
+          outsourcePartnerContact: "+60 12-345 6789",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(update).toHaveBeenCalledWith({
+      outsource_partner_name: "Ah Beng Lorry",
+      outsource_partner_contact: "+60 12-345 6789",
+      outsource_partner_zones: null,
+      sup_status: "pickup_assigned",
+    });
+  });
+
+  it("outsource path: maps PG error to 422 (e.g. CHECK constraint violation)", async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: null,
+      // 23514 = CHECK constraint violation; mapPgError treats unknown codes as 500.
+      // Use 22023 (invalid_param → 422) to validate that the route runs the
+      // result through mapPgError.
+      error: { code: "22023", message: "violates po_outsource_xor_partner", details: "wrong_state" },
+    });
+    const select = vi.fn(() => ({ single }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ update }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from, rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outsourcePartnerName: "Ah Beng Lorry",
+          outsourcePartnerContact: "+60 12-345 6789",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("returns 422 when both partnerId AND outsource fields are set (zod XOR)", async () => {
+    const rpc = vi.fn();
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          partnerId: PARTNER_ID,
+          outsourcePartnerName: "Ah Beng Lorry",
+          outsourcePartnerContact: "+60 12-345 6789",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 when neither partnerId nor outsource fields are set (zod XOR)", async () => {
+    const rpc = vi.fn();
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 when outsourcePartnerName is set but contact is missing (zod refine)", async () => {
+    const rpc = vi.fn();
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ outsourcePartnerName: "Ah Beng Lorry" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /api/logistics/pos/:id/reassign-warehouse", () => {
