@@ -85,9 +85,21 @@ logisticsPosRouter.get("/", async (c) => {
 // covers the whole pending order book.
 //
 // Q1=B (server-side aggregation, no new RPC). Existing tables only:
-//   - orders (logistics_stage filter)
+//   - orders (logistics_stage filter — also fetches `dl` for v3-S2.1 join)
+//   - purchase_orders (status='open' filter — v3-S2.1 covered-orders filter)
 //   - order_lines (in-list by order_id)
 //   - stock_balances (no filter — sum across all warehouses per Q2=A)
+//
+// v3-S2.1 (Bug 7 partial fix, defensive): before computing shortages, drop
+// orders whose `dl` matches an OPEN PO's `dl` or appears in `dl_refs`. This
+// stops repeated Auto-fill presses from re-suggesting orders that already
+// have a procurement-in-flight. Without this, two logistics users pressing
+// Auto-fill near-simultaneously would both see the same shortage list and
+// both submit duplicate POs covering the same orders. Race-window protection
+// (atomic SELECT FOR UPDATE on order_supplier_threads + concurrent_claim
+// error) is deferred to v3-S4 — that needs a new table this phase doesn't
+// have. Status discrimination: only `status='open'` POs gate orders. Done
+// (`received`) or dead (`cancelled`) POs leave the order in play.
 //
 // RLS: the inline role guard above plus the user JWT covers this; no
 // policy changes needed.
@@ -97,20 +109,51 @@ logisticsPosRouter.get("/", async (c) => {
 logisticsPosRouter.get("/awaiting-stock-shortage", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  // Step 1 — fetch awaiting_stock order IDs.
-  const { data: orders, error: e_orders } = await sb
-    .from("orders")
-    .select("id")
-    .eq("logistics_stage", "awaiting_stock");
-  if (e_orders) {
-    const m = mapPgError(e_orders);
+  // Step 1 — fetch awaiting_stock orders (id + dl for the PO-coverage join)
+  // AND the set of OPEN POs (dl + dl_refs) in parallel. Same Promise.all
+  // pattern as below; both queries are cheap and independent.
+  const [ordersRes, posRes] = await Promise.all([
+    sb.from("orders").select("id, dl").eq("logistics_stage", "awaiting_stock"),
+    sb.from("purchase_orders").select("dl, dl_refs").eq("status", "open"),
+  ]);
+  if (ordersRes.error) {
+    const m = mapPgError(ordersRes.error);
     return c.json(m.body, m.status);
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const orderIds = (orders ?? []).map((o: any) => o.id);
+  if (posRes.error) {
+    const m = mapPgError(posRes.error);
+    return c.json(m.body, m.status);
+  }
 
-  // Short-circuit when no awaiting_stock orders exist — skip the parallel
-  // fetch entirely. Returns the documented `{shortage: []}` shape.
+  // Build a Set of `dl` values that are already covered by an open PO. A PO
+  // covers a dl if (po.dl = dl) OR (dl = ANY(po.dl_refs)). We flatten both
+  // sides into one Set<number> for an O(1) per-order lookup.
+  const coveredDls = new Set<number>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const p of (posRes.data ?? []) as any[]) {
+    if (p.dl != null) coveredDls.add(Number(p.dl));
+    if (Array.isArray(p.dl_refs)) {
+      for (const ref of p.dl_refs) {
+        if (ref != null) coveredDls.add(Number(ref));
+      }
+    }
+  }
+
+  // Filter the awaiting_stock orders to only those NOT covered by an open
+  // PO. Orders with a null `dl` (shouldn't happen in practice — dl is the
+  // customer-facing order number — but be defensive) keep through, since
+  // null can't be in a covered Set<number>.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orderIds = ((ordersRes.data ?? []) as any[])
+    .filter((o) => {
+      const dl = o.dl;
+      if (dl == null) return true;
+      return !coveredDls.has(Number(dl));
+    })
+    .map((o) => o.id);
+
+  // Short-circuit when no awaiting_stock orders need procurement — either
+  // none exist OR all of them are already covered. Returns `{shortage: []}`.
   if (orderIds.length === 0) {
     const empty: AwaitingStockShortageResponse = { shortage: [] };
     return c.json(empty);

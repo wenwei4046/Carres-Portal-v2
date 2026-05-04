@@ -647,10 +647,20 @@ describe("POST /api/logistics/pos/:id/reassign-warehouse", () => {
 describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
   // Wire up a per-table .from() chain mock similar to orders.test.ts
   // mockDetailQueries — each table call returns its own thenable chain.
+  //
+  // v3-S2.1 update: also stubs purchase_orders for the "exclude orders already
+  // covered by an open PO" filter. The mock applies the route's
+  // `.eq("status", X)` filter to `opts.pos` so that tests can supply a mix of
+  // open/received/cancelled rows and verify the route filters correctly.
   function mockShortageQueries(opts: {
-    awaitingOrders?: { id: string }[];
-    orderLines?: { sku: string; qty: number }[];
+    awaitingOrders?: { id: string; dl?: number | null }[];
+    // v3-S2.1: lines may optionally carry `order_id` so the mock can mirror
+    // `.in("order_id", [...])` filtering — tests supply lines for ALL orders
+    // and assert the route narrows the input set BEFORE this fetch. Lines
+    // without order_id always pass through (preserves existing tests).
+    orderLines?: { sku: string; qty: number; order_id?: string }[];
     stockBalances?: { sku: string; qty: number; reserved: number }[];
+    pos?: { status: string; dl: number | null; dl_refs: number[] | null }[];
   }) {
     const fromImpl = vi.fn((table: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -668,12 +678,34 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
           chain.eq = vi.fn(() => promise(opts.awaitingOrders ?? []));
           break;
         case "order_lines":
-          // Resolved at .in('order_id', [...]).
-          chain.in = vi.fn(() => promise(opts.orderLines ?? []));
+          // Resolves at .in('order_id', [...]). Mock applies the same filter
+          // so tests can provide lines for ALL orders and verify the route
+          // narrowed the order set first (per v3-S2.1).
+          chain.in = vi.fn((col: string, ids: string[]) => {
+            let rows = opts.orderLines ?? [];
+            if (col === "order_id") {
+              rows = rows.filter((l) => l.order_id === undefined || ids.includes(l.order_id));
+            }
+            // Strip order_id from response — route only selects `sku, qty`.
+            return promise(
+              rows.map((l) => ({ sku: l.sku, qty: l.qty })),
+            );
+          });
           break;
         case "stock_balances":
           // No filter on this query — the .select() chain itself awaits.
           chain.select = vi.fn(() => promise(opts.stockBalances ?? []));
+          break;
+        case "purchase_orders":
+          // v3-S2.1: route calls `.eq("status", "open")` to grab POs that
+          // currently cover orders. Mock applies the same filter so a test
+          // that supplies a received/cancelled row sees an empty result —
+          // the route's filter is what makes that row invisible.
+          chain.eq = vi.fn((col: string, val: string) => {
+            let rows = opts.pos ?? [];
+            if (col === "status") rows = rows.filter((p) => p.status === val);
+            return promise(rows.map((p) => ({ dl: p.dl, dl_refs: p.dl_refs })));
+          });
           break;
       }
       return chain;
@@ -808,6 +840,171 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
       available: 6,
       shortage: 2,
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // v3-S2.1 — exclude orders already covered by an open PO (Bug 7 partial fix)
+  // -------------------------------------------------------------------------
+  it("filters out awaiting_stock orders covered by open POs via dl", async () => {
+    // Two awaiting_stock orders. Order A (dl=4001) is covered by an open PO
+    // that targets dl=4001 directly → its lines must NOT contribute to
+    // shortage. Order B (dl=4002) is uncovered → its lines DO contribute.
+    // Lines for BOTH orders are supplied to the mock; the mock filters by
+    // the order_id list the route passes to `.in()`, so if the route
+    // failed to drop order A, order A's `mattress` line would surface.
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    const ID_B = "00000000-0000-0000-0000-000000000a02";
+    mockShortageQueries({
+      awaitingOrders: [
+        { id: ID_A, dl: 4001 },
+        { id: ID_B, dl: 4002 },
+      ],
+      orderLines: [
+        // Order A — would surface if route fails to filter.
+        { order_id: ID_A, sku: "mattress:cloud:King", qty: 5 },
+        // Order B — should surface (uncovered).
+        { order_id: ID_B, sku: "sofa:nordic:3s", qty: 2 },
+      ],
+      stockBalances: [
+        { sku: "mattress:cloud:King", qty: 0, reserved: 0 },
+        { sku: "sofa:nordic:3s", qty: 0, reserved: 0 },
+      ],
+      pos: [
+        { status: "open", dl: 4001, dl_refs: null },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; need: number; available: number; shortage: number }[];
+    };
+    // Only order B's SKU surfaces — order A is covered by an open PO.
+    expect(body.shortage).toEqual([
+      { sku: "sofa:nordic:3s", need: 2, available: 0, shortage: 2 },
+    ]);
+  });
+
+  it("filters out awaiting_stock orders covered by open POs via dl_refs array", async () => {
+    // Order A (dl=4001) and Order B (dl=4002) are both covered by ONE batch
+    // PO with dl=null and dl_refs=[4001, 4002]. Order C (dl=4003) is not.
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    const ID_B = "00000000-0000-0000-0000-000000000a02";
+    const ID_C = "00000000-0000-0000-0000-000000000a03";
+    mockShortageQueries({
+      awaitingOrders: [
+        { id: ID_A, dl: 4001 },
+        { id: ID_B, dl: 4002 },
+        { id: ID_C, dl: 4003 },
+      ],
+      orderLines: [
+        { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
+        { order_id: ID_B, sku: "sofa:nordic:3s", qty: 1 },
+        { order_id: ID_C, sku: "mattress:cloud:King", qty: 3 },
+      ],
+      stockBalances: [
+        { sku: "mattress:cloud:King", qty: 1, reserved: 0 },
+        { sku: "sofa:nordic:3s", qty: 0, reserved: 0 },
+      ],
+      pos: [
+        { status: "open", dl: null, dl_refs: [4001, 4002] },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; need: number; available: number; shortage: number }[];
+    };
+    // Only order C's SKU surfaces — A and B are covered by the batch PO.
+    expect(body.shortage).toEqual([
+      { sku: "mattress:cloud:King", need: 3, available: 1, shortage: 2 },
+    ]);
+  });
+
+  it("received POs do NOT exclude orders (only open POs count)", async () => {
+    // Order A's PO is `received` — the PO is done, but the order is still
+    // in awaiting_stock somehow (e.g. PO partially received and a new
+    // shortage emerged). The route must NOT exclude this order on the
+    // basis of the received PO. The mock applies the route's
+    // `.eq("status", "open")` filter, so a received row returns []
+    // from the purchase_orders fetch — the test passes only if the route
+    // is asking for status='open' (any other filter returns the row and
+    // the order would be excluded).
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    mockShortageQueries({
+      awaitingOrders: [
+        { id: ID_A, dl: 4001 },
+      ],
+      orderLines: [
+        { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
+      ],
+      stockBalances: [
+        { sku: "sofa:nordic:3s", qty: 0, reserved: 0 },
+      ],
+      pos: [
+        { status: "received", dl: 4001, dl_refs: null },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; need: number; available: number; shortage: number }[];
+    };
+    // Order A's SKU IS in shortage — received PO does not gate it.
+    expect(body.shortage).toEqual([
+      { sku: "sofa:nordic:3s", need: 2, available: 0, shortage: 2 },
+    ]);
+  });
+
+  it("cancelled POs do NOT exclude orders (only open POs count)", async () => {
+    // Same shape as the received case — a cancelled PO is a dead PO; the
+    // order is back in play if it's still in awaiting_stock.
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    mockShortageQueries({
+      awaitingOrders: [
+        { id: ID_A, dl: 4001 },
+      ],
+      orderLines: [
+        { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
+      ],
+      stockBalances: [
+        { sku: "sofa:nordic:3s", qty: 0, reserved: 0 },
+      ],
+      pos: [
+        { status: "cancelled", dl: 4001, dl_refs: null },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; need: number; available: number; shortage: number }[];
+    };
+    expect(body.shortage).toEqual([
+      { sku: "sofa:nordic:3s", need: 2, available: 0, shortage: 2 },
+    ]);
   });
 });
 
