@@ -481,62 +481,66 @@ logisticsPosRouter.post("/:id/cancel", async (c) => {
 
 // ----- POST /:id/assign-pickup-partner -----
 //
-// Two paths through this route, gated by the body shape (zod `assignPickupPartnerInput`
-// XOR refine):
+// v3-S4.4 — both partner and outsource paths now go through the unified RPC
+// `logistics_assign_partner_and_dispatch` (migration 0034). The pre-v3-S4
+// implementation had two paths:
+//   1. partner — `logistics_assign_pickup_partner(po_id, partner_id)` (v2)
+//   2. outsource — direct `purchase_orders` UPDATE with outsource_* fields,
+//      RLS-bounded but skipped po_history + audit_log writes + state guards.
 //
-//   1. partnerId path — registered delivery partner. Calls the existing
-//      `logistics_assign_pickup_partner(po_id, partner_id)` RPC. Unchanged
-//      from Phase 4. The `warehouseId` field is captured but NOT forwarded
-//      to the 2-arg RPC; v3-S4 swaps both paths to the unified
-//      `logistics_assign_partner_and_dispatch(... p_warehouse_override_id ...)`
-//      RPC at which point warehouseId becomes load-bearing.
+// Both paths now hand the RPC the same 6-arg shape; the RPC validates XOR at
+// the DB layer (raises 22023 detail='partner_or_outsource_xor' if both/neither
+// of partner_id / outsource_name are set), writes po_history + audit_log,
+// optionally overrides destination warehouse via `p_warehouse_override_id`
+// (the FE sends this from AssignPickupDialog's warehouse picker), and returns
+// the final PO row JSON.
 //
-//   2. outsource path (v3-S3.4 / spec §8.2) — one-shot ad-hoc transporter.
-//      No RPC exists for outsource yet (lands in v3-S4). This route does a
-//      direct `purchase_orders` UPDATE under the user JWT (RLS allows the
-//      logistics role to update POs — see `po_scoped_update` in 0002_rls.sql).
-//      The DB CHECK constraint `po_outsource_xor_partner` (migration 0030 §3.6)
-//      enforces XOR with delivery_partner_id at the storage layer (defense in
-//      depth — zod is the primary gate).
+// XOR is gated three ways for defense-in-depth:
+//   • zod `assignPickupPartnerInput` refine (FE/Hono) — primary
+//   • RPC re-check (DB) — catches direct RPC callers / tampered payloads
+//   • CHECK constraint `po_outsource_xor_partner` (storage) — last line
+//
+// The RPC's 22023 detail='partner_or_outsource_xor' is intercepted here and
+// surfaced as 422 with code='invalid_xor' so the FE can distinguish it from
+// other 22023s (wrong_sup_status, warehouse_not_found, etc).
+//
+// Closes carry-forward `phase-4-v3-outsource-audit-gap`.
 logisticsPosRouter.post("/:id/assign-pickup-partner", async (c) => {
   const parsed = await parseJsonBody(c, assignPickupPartnerInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  // v3-S2.4 — destination warehouse override:
-  // `warehouseId` is captured here from the request body (and validated as a
-  // UUID by the zod schema), but NOT yet forwarded to either path. v3-S4 will
-  // swap both paths to `logistics_assign_partner_and_dispatch` which accepts
-  // `p_warehouse_override_id`; at that point we'll thread `parsed.data.warehouseId`
-  // through to the RPC call (and drop the direct-UPDATE outsource branch).
-  const _warehouseId = parsed.data.warehouseId;
-  void _warehouseId; // intentionally unused — wired to UI/API; RPC binding lands in v3-S4
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  // Outsource path — direct PO UPDATE (no RPC, RLS-bounded).
-  if (parsed.data.outsourcePartnerName) {
-    const { data, error } = await sb
-      .from("purchase_orders")
-      .update({
-        outsource_partner_name: parsed.data.outsourcePartnerName,
-        outsource_partner_contact: parsed.data.outsourcePartnerContact,
-        outsource_partner_zones: parsed.data.outsourcePartnerZones ?? null,
-        sup_status: "pickup_assigned",
-      })
-      .eq("id", c.req.param("id"))
-      .select()
-      .single();
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
-    return c.json({ po: data });
-  }
-
-  // Partner path — existing RPC (unchanged from Phase 4).
-  const { data, error } = await sb.rpc("logistics_assign_pickup_partner", {
+  // Single-RPC dispatch. Either partner_id is set (registered partner path)
+  // or outsource_name + outsource_contact are set (one-shot transporter
+  // path) — never both, never neither (zod refine + RPC re-check + CHECK).
+  // `p_warehouse_override_id` defaults to null when the FE didn't send a
+  // picker selection; the RPC interprets null as "keep PO's current
+  // warehouse_id".
+  const { data, error } = await sb.rpc("logistics_assign_partner_and_dispatch", {
     p_po_id: c.req.param("id"),
-    p_partner_id: parsed.data.partnerId,
+    p_partner_id: parsed.data.partnerId ?? null,
+    p_outsource_name: parsed.data.outsourcePartnerName ?? null,
+    p_outsource_contact: parsed.data.outsourcePartnerContact ?? null,
+    p_outsource_zones: parsed.data.outsourcePartnerZones ?? null,
+    p_warehouse_override_id: parsed.data.warehouseId ?? null,
   });
   if (error) {
+    // Specialize the RPC's defense-in-depth XOR raise so the FE can show a
+    // distinct error message. mapPgError otherwise collapses 22023 into
+    // generic code='invalid_param'.
+    const e = error as { code?: string; details?: string; message?: string };
+    if (e.code === "22023" && e.details === "partner_or_outsource_xor") {
+      return c.json(
+        {
+          error: "invalid_param",
+          code: "invalid_xor",
+          message:
+            e.message ??
+            "exactly one of partnerId / outsourcePartnerName must be set",
+        },
+        422,
+      );
+    }
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }

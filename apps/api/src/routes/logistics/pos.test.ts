@@ -496,8 +496,27 @@ describe("POST /api/logistics/pos/:id/cancel", () => {
 describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
   const PO_ID = "PO-2030";
   const PARTNER_ID = "00000000-0000-0000-0000-000000000c01";
+  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000d01";
 
-  it("returns 200 on success and calls RPC with snake_case args", async () => {
+  // v3-S4.4 — both partner AND outsource paths now hit the unified RPC
+  // `logistics_assign_partner_and_dispatch`. The 6-arg shape (p_po_id +
+  // p_partner_id + p_outsource_name + p_outsource_contact + p_outsource_zones
+  // + p_warehouse_override_id) is asserted on every successful call. The XOR
+  // refine in zod catches both/neither at the FE boundary; the new RPC
+  // re-checks at the DB layer and raises 22023 + detail='partner_or_outsource_xor'
+  // which maps to 422 + code='invalid_xor'. The pre-v3-S4 direct
+  // `purchase_orders` UPDATE branch is gone — RLS-bounded UPDATE skipped
+  // po_history + audit_log writes (carry-forward `phase-4-v3-outsource-audit-gap`).
+  const RPC_KEYS = [
+    "p_po_id",
+    "p_partner_id",
+    "p_outsource_name",
+    "p_outsource_contact",
+    "p_outsource_zones",
+    "p_warehouse_override_id",
+  ];
+
+  it("partner path: 200 + RPC called with full 6-arg shape (warehouseId omitted → null)", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { id: PO_ID, sup_status: "pickup_assigned" }, error: null });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
@@ -511,11 +530,40 @@ describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("logistics_assign_pickup_partner", {
+    expect(rpc).toHaveBeenCalledWith("logistics_assign_partner_and_dispatch", {
       p_po_id: PO_ID,
       p_partner_id: PARTNER_ID,
+      p_outsource_name: null,
+      p_outsource_contact: null,
+      p_outsource_zones: null,
+      p_warehouse_override_id: null,
     });
-    assertRpcCallShape(rpc, "logistics_assign_pickup_partner", ["p_po_id", "p_partner_id"]);
+    assertRpcCallShape(rpc, "logistics_assign_partner_and_dispatch", RPC_KEYS);
+  });
+
+  it("partner path: warehouseId set → forwarded as p_warehouse_override_id", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { id: PO_ID, sup_status: "pickup_assigned" }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID, warehouseId: WAREHOUSE_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_assign_partner_and_dispatch", {
+      p_po_id: PO_ID,
+      p_partner_id: PARTNER_ID,
+      p_outsource_name: null,
+      p_outsource_contact: null,
+      p_outsource_zones: null,
+      p_warehouse_override_id: WAREHOUSE_ID,
+    });
+    assertRpcCallShape(rpc, "logistics_assign_partner_and_dispatch", RPC_KEYS);
   });
 
   it("returns 422 when partnerId is not uuid", async () => {
@@ -566,54 +614,6 @@ describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  // v3-S2.4 — destination warehouse override: UI + zod + Hono accept it.
-  // The RPC binding lands in v3-S4 (logistics_assign_partner_and_dispatch).
-  // Until then, the chosen warehouseId is captured in the request body but
-  // not forwarded to the existing RPC, which still receives only the two
-  // original args.
-  it("accepts an optional warehouseId field (passes zod) and still calls RPC with only po_id + partner_id", async () => {
-    const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000d01";
-    const rpc = vi.fn().mockResolvedValue({ data: { id: PO_ID, sup_status: "pickup_assigned" }, error: null });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("logistics");
-    const res = await app.fetch(
-      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ partnerId: PARTNER_ID, warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    // RPC binding deferred to v3-S4 — current shape stays {p_po_id, p_partner_id}.
-    expect(rpc).toHaveBeenCalledWith("logistics_assign_pickup_partner", {
-      p_po_id: PO_ID,
-      p_partner_id: PARTNER_ID,
-    });
-    assertRpcCallShape(rpc, "logistics_assign_pickup_partner", ["p_po_id", "p_partner_id"]);
-  });
-
-  it("still works when warehouseId is not provided (backward-compat)", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: { id: PO_ID, sup_status: "pickup_assigned" }, error: null });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("logistics");
-    const res = await app.fetch(
-      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ partnerId: PARTNER_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("logistics_assign_pickup_partner", {
-      p_po_id: PO_ID,
-      p_partner_id: PARTNER_ID,
-    });
-  });
-
   it("returns 422 when warehouseId is not a uuid", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -632,29 +632,22 @@ describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
   });
 
   // -------------------------------------------------------------------------
-  // v3-S3.4 — Outsource toggle (spec §8.2). Body without `partnerId` but with
-  // (outsourcePartnerName + outsourcePartnerContact + outsourcePartnerZones?)
-  // hits a direct `purchase_orders` UPDATE path instead of the legacy RPC.
-  // The proper RPC `logistics_assign_partner_and_dispatch` lands in v3-S4.
+  // v3-S4.4 — Outsource path now goes through the same RPC. The pre-v3-S4
+  // direct `purchase_orders` UPDATE branch is gone (skipped po_history +
+  // audit_log writes — see carry-forward `phase-4-v3-outsource-audit-gap`).
+  // The new unified RPC writes both audit + history at the DB layer.
   // -------------------------------------------------------------------------
-  it("outsource path: direct PO update with outsource fields + sup_status='pickup_assigned'", async () => {
-    const single = vi.fn().mockResolvedValue({
+  it("outsource path: SAME RPC called with outsource fields set + partner_id null + warehouseId forwarded", async () => {
+    const rpc = vi.fn().mockResolvedValue({
       data: {
         id: PO_ID,
         sup_status: "pickup_assigned",
         outsource_partner_name: "Ah Beng Lorry",
-        outsource_partner_contact: "+60 12-345 6789",
-        outsource_partner_zones: "Klang Valley",
       },
       error: null,
     });
-    const select = vi.fn(() => ({ single }));
-    const eq = vi.fn(() => ({ select }));
-    const update = vi.fn(() => ({ eq }));
-    const from = vi.fn(() => ({ update }));
-    const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ from, rpc } as any);
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
       new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
@@ -664,38 +657,34 @@ describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
           outsourcePartnerName: "Ah Beng Lorry",
           outsourcePartnerContact: "+60 12-345 6789",
           outsourcePartnerZones: "Klang Valley",
+          warehouseId: WAREHOUSE_ID,
         }),
       }),
       env,
     );
     expect(res.status).toBe(200);
-    // No RPC fired on the outsource path — direct UPDATE only.
-    expect(rpc).not.toHaveBeenCalled();
-    expect(from).toHaveBeenCalledWith("purchase_orders");
-    expect(update).toHaveBeenCalledWith({
-      outsource_partner_name: "Ah Beng Lorry",
-      outsource_partner_contact: "+60 12-345 6789",
-      outsource_partner_zones: "Klang Valley",
-      sup_status: "pickup_assigned",
+    expect(rpc).toHaveBeenCalledWith("logistics_assign_partner_and_dispatch", {
+      p_po_id: PO_ID,
+      p_partner_id: null,
+      p_outsource_name: "Ah Beng Lorry",
+      p_outsource_contact: "+60 12-345 6789",
+      p_outsource_zones: "Klang Valley",
+      p_warehouse_override_id: WAREHOUSE_ID,
     });
-    expect(eq).toHaveBeenCalledWith("id", PO_ID);
+    assertRpcCallShape(rpc, "logistics_assign_partner_and_dispatch", RPC_KEYS);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(body.po.id).toBe(PO_ID);
     expect(body.po.outsource_partner_name).toBe("Ah Beng Lorry");
   });
 
-  it("outsource path: zones is optional (null when omitted)", async () => {
-    const single = vi.fn().mockResolvedValue({
+  it("outsource path: zones omitted → p_outsource_zones null; warehouseId omitted → null", async () => {
+    const rpc = vi.fn().mockResolvedValue({
       data: { id: PO_ID, sup_status: "pickup_assigned" },
       error: null,
     });
-    const select = vi.fn(() => ({ single }));
-    const eq = vi.fn(() => ({ select }));
-    const update = vi.fn(() => ({ eq }));
-    const from = vi.fn(() => ({ update }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ from, rpc: vi.fn() } as any);
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
       new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
@@ -709,28 +698,24 @@ describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(update).toHaveBeenCalledWith({
-      outsource_partner_name: "Ah Beng Lorry",
-      outsource_partner_contact: "+60 12-345 6789",
-      outsource_partner_zones: null,
-      sup_status: "pickup_assigned",
+    expect(rpc).toHaveBeenCalledWith("logistics_assign_partner_and_dispatch", {
+      p_po_id: PO_ID,
+      p_partner_id: null,
+      p_outsource_name: "Ah Beng Lorry",
+      p_outsource_contact: "+60 12-345 6789",
+      p_outsource_zones: null,
+      p_warehouse_override_id: null,
     });
+    assertRpcCallShape(rpc, "logistics_assign_partner_and_dispatch", RPC_KEYS);
   });
 
-  it("outsource path: maps PG error to 422 (e.g. CHECK constraint violation)", async () => {
-    const single = vi.fn().mockResolvedValue({
+  it("outsource path: PG error mapped to 422 via mapPgError", async () => {
+    const rpc = vi.fn().mockResolvedValue({
       data: null,
-      // 23514 = CHECK constraint violation; mapPgError treats unknown codes as 500.
-      // Use 22023 (invalid_param → 422) to validate that the route runs the
-      // result through mapPgError.
-      error: { code: "22023", message: "violates po_outsource_xor_partner", details: "wrong_state" },
+      error: { code: "22023", message: "wrong state", details: "wrong_sup_status" },
     });
-    const select = vi.fn(() => ({ single }));
-    const eq = vi.fn(() => ({ select }));
-    const update = vi.fn(() => ({ eq }));
-    const from = vi.fn(() => ({ update }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ from, rpc: vi.fn() } as any);
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
       new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
@@ -744,6 +729,37 @@ describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
       env,
     );
     expect(res.status).toBe(422);
+  });
+
+  it("maps 22023 detail='partner_or_outsource_xor' → 422 with code='invalid_xor' (RPC defense-in-depth)", async () => {
+    // The RPC re-validates XOR at the DB layer and raises 22023 with this
+    // specific detail. mapPgError treats generic 22023 as code='invalid_param';
+    // this route adds a one-detail intercept so the FE can distinguish a
+    // duplicated-args XOR violation from any other 22023 (wrong_sup_status,
+    // warehouse_not_found, etc).
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "22023",
+        message: "exactly one of p_partner_id / p_outsource_name must be set",
+        details: "partner_or_outsource_xor",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("invalid_xor");
   });
 
   it("returns 422 when both partnerId AND outsource fields are set (zod XOR)", async () => {
