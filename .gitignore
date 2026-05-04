@@ -131,3 +131,8 @@ AGENTS.md
 *.zip
 .tmp/
 tmp/
+
+# -----------------------------------------------------------------------------
+# Local-only working state (retro snapshots, drafts that don't belong in git)
+# -----------------------------------------------------------------------------
+.context/
