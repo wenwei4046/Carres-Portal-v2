@@ -216,6 +216,40 @@ export const cancelPoInput = z.object({
 export type CancelPoInput = z.infer<typeof cancelPoInput>;
 
 /**
+ * `reservedDrilldownQuery` — GET /api/logistics/warehouse/reserved-drilldown
+ * (Pipeline v2, C4). Drill-down on a single (warehouse, sku) pair to surface
+ * which orders are currently holding the reserve count shown in the warehouse
+ * page. Both fields required — the route 422s on missing/invalid input.
+ */
+export const reservedDrilldownQuery = z.object({
+  warehouseId: z.string().uuid(),
+  sku: z.string().min(1),
+}).strict();
+export type ReservedDrilldownQuery = z.infer<typeof reservedDrilldownQuery>;
+
+/**
+ * `reservedDrilldownResponse` — response shape for the reserved drill-down
+ * endpoint. `total` is the sum of reservedQty across orders, expected to match
+ * the per-(sku, warehouse) `stock_balances.reserved` value (sanity invariant —
+ * if it ever drifts, that's a reconciliation bug elsewhere). The orders array
+ * lists only orders in `ready_to_dispatch` or `dispatched` stages, since those
+ * are the only stages where `_logistics_reserve_order` keeps a reserve hold.
+ */
+export const reservedDrilldownResponse = z.object({
+  warehouseId: z.string().uuid(),
+  sku: z.string().min(1),
+  total: z.number().int().nonnegative(),
+  orders: z.array(z.object({
+    id: z.string().uuid(),
+    dl: z.number().int().positive(),
+    customerName: z.string(),
+    logisticsStage: z.enum(['ready_to_dispatch', 'dispatched']),
+    reservedQty: z.number().int().positive(),
+  })),
+});
+export type ReservedDrilldownResponse = z.infer<typeof reservedDrilldownResponse>;
+
+/**
  * `listMovementsQuery` — GET /api/logistics/movements query string (M4 Task 3).
  *
  * Filters per spec §18.6 (LogisticsMovements page F3):

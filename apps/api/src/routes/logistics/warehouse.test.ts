@@ -457,3 +457,190 @@ describe("POST /api/logistics/warehouse/adjust", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("GET /api/logistics/warehouse/reserved-drilldown", () => {
+  // Hex-only UUIDs — the route's reservedDrilldownQuery uses z.string().uuid()
+  // so the 'w' shape would fail zod parsing. Match adjustStockInput conventions.
+  const SKU = "mattress:carres-cloud:King";
+  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000c01";
+  const ORDER_A = "00000000-0000-0000-0000-00000000aaaa";
+  const ORDER_B = "00000000-0000-0000-0000-00000000bbbb";
+
+  /**
+   * Build a userClient mock for the embedded join shape used by the route:
+   *   .from('order_lines').select(...).eq().eq().in(...) → resolves with
+   *   Array<{qty, sku, orders: {...} | [{...}]}>.
+   *
+   * The chain returns `{ select }` then a chainable `{ eq, in }` pyramid that
+   * terminates in a Promise. The chainable pyramid is built fresh per call so
+   * each test can inject a different terminal payload.
+   */
+  function mockReservedDrilldown(opts: {
+    rows?: Array<{
+      qty: number;
+      sku: string;
+      orders:
+        | { id: string; dl: number; customer_name: string; logistics_stage: string; warehouse_id: string }
+        | Array<{ id: string; dl: number; customer_name: string; logistics_stage: string; warehouse_id: string }>
+        | null;
+    }>;
+    error?: { code?: string; message?: string };
+  }) {
+    const terminal = Promise.resolve({
+      data: opts.error ? null : opts.rows ?? [],
+      error: opts.error ?? null,
+    });
+    // PostgREST builder: each filter call returns the same builder; the builder
+    // is itself thenable (so awaiting it resolves the terminal promise).
+    const builder: {
+      eq: ReturnType<typeof vi.fn>;
+      in: ReturnType<typeof vi.fn>;
+      then: typeof terminal.then;
+    } = {
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      then: terminal.then.bind(terminal),
+    };
+    const select = vi.fn(() => builder);
+    const fromImpl = vi.fn((table: string) => {
+      if (table === "order_lines") {
+        return { select };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
+    return { fromImpl, select, builder };
+  }
+
+  it("returns 200 with grouped orders and total summed qty", async () => {
+    mockReservedDrilldown({
+      rows: [
+        // Order A has 2 lines on this SKU (e.g. one per pillow); they should sum.
+        {
+          qty: 1,
+          sku: SKU,
+          orders: {
+            id: ORDER_A,
+            dl: 4001,
+            customer_name: "Ahmad",
+            logistics_stage: "ready_to_dispatch",
+            warehouse_id: WAREHOUSE_ID,
+          },
+        },
+        {
+          qty: 2,
+          sku: SKU,
+          orders: {
+            id: ORDER_A,
+            dl: 4001,
+            customer_name: "Ahmad",
+            logistics_stage: "ready_to_dispatch",
+            warehouse_id: WAREHOUSE_ID,
+          },
+        },
+        // Order B has 1 line, dispatched stage.
+        {
+          qty: 1,
+          sku: SKU,
+          orders: {
+            id: ORDER_B,
+            dl: 4002,
+            customer_name: "Bee",
+            logistics_stage: "dispatched",
+            warehouse_id: WAREHOUSE_ID,
+          },
+        },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const url = `http://t/api/logistics/warehouse/reserved-drilldown?warehouseId=${WAREHOUSE_ID}&sku=${encodeURIComponent(SKU)}`;
+    const res = await app.fetch(new Request(url, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      warehouseId: string;
+      sku: string;
+      total: number;
+      orders: Array<{ id: string; dl: number; customerName: string; logisticsStage: string; reservedQty: number }>;
+    };
+    expect(body.warehouseId).toBe(WAREHOUSE_ID);
+    expect(body.sku).toBe(SKU);
+    expect(body.total).toBe(4); // 1 + 2 + 1
+    expect(body.orders).toHaveLength(2);
+    // Sorted by dl desc → B (4002) first, A (4001) second.
+    expect(body.orders[0]?.id).toBe(ORDER_B);
+    expect(body.orders[0]?.reservedQty).toBe(1);
+    expect(body.orders[0]?.logisticsStage).toBe("dispatched");
+    expect(body.orders[1]?.id).toBe(ORDER_A);
+    expect(body.orders[1]?.reservedQty).toBe(3); // grouped from 1 + 2
+    expect(body.orders[1]?.customerName).toBe("Ahmad");
+  });
+
+  it("returns 200 with empty orders + total=0 when no orders hold reserve", async () => {
+    mockReservedDrilldown({ rows: [] });
+    const jwt = await makeJwt("logistics");
+    const url = `http://t/api/logistics/warehouse/reserved-drilldown?warehouseId=${WAREHOUSE_ID}&sku=${encodeURIComponent(SKU)}`;
+    const res = await app.fetch(new Request(url, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      warehouseId: string;
+      sku: string;
+      total: number;
+      orders: unknown[];
+    };
+    expect(body.total).toBe(0);
+    expect(body.orders).toEqual([]);
+    expect(body.warehouseId).toBe(WAREHOUSE_ID);
+    expect(body.sku).toBe(SKU);
+  });
+
+  it("returns 422 invalid_query when warehouseId is missing", async () => {
+    const fromImpl = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
+    const jwt = await makeJwt("logistics");
+    const url = `http://t/api/logistics/warehouse/reserved-drilldown?sku=${encodeURIComponent(SKU)}`;
+    const res = await app.fetch(new Request(url, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("invalid_query");
+    expect(fromImpl).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 invalid_query when warehouseId is not a uuid", async () => {
+    const fromImpl = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
+    const jwt = await makeJwt("logistics");
+    const url = `http://t/api/logistics/warehouse/reserved-drilldown?warehouseId=not-a-uuid&sku=${encodeURIComponent(SKU)}`;
+    const res = await app.fetch(new Request(url, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("invalid_query");
+    expect(fromImpl).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 invalid_query when sku is empty", async () => {
+    const fromImpl = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
+    const jwt = await makeJwt("logistics");
+    const url = `http://t/api/logistics/warehouse/reserved-drilldown?warehouseId=${WAREHOUSE_ID}&sku=`;
+    const res = await app.fetch(new Request(url, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("invalid_query");
+    expect(fromImpl).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for non-logistics caller (no Supabase round-trip)", async () => {
+    const fromImpl = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
+    const jwt = await makeJwt("dealer");
+    const url = `http://t/api/logistics/warehouse/reserved-drilldown?warehouseId=${WAREHOUSE_ID}&sku=${encodeURIComponent(SKU)}`;
+    const res = await app.fetch(new Request(url, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(403);
+    expect(fromImpl).not.toHaveBeenCalled();
+  });
+});

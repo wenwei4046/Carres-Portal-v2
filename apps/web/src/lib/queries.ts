@@ -27,6 +27,7 @@ import {
   type OutletsListResponse,
   type ReassignPoWarehouseInput,
   type ReceivePoLineInput,
+  type ReservedDrilldownResponse,
   type SalespersonsListResponse,
   type SetOrderAddressInput,
   type SetOrderDateInput,
@@ -73,6 +74,11 @@ export const qk = {
       ["logistics", "pos", filters ?? {}] as const,
     po:        (id: string) => ["logistics", "pos", id] as const,
     warehouse: () => ["logistics", "warehouse"] as const,
+    /** Pipeline v2 (C4) — reserve drill-down per (warehouse, sku). Nested under
+     *  warehouse so future blunt invalidations on `["logistics","warehouse"]`
+     *  fan out to drill-down caches too. */
+    reservedDrilldown: (warehouseId: string | null, sku: string | null) =>
+      ["logistics", "warehouse", "reserved", warehouseId ?? "null", sku ?? "null"] as const,
     movements: (filters?: MovementsFilters) =>
       ["logistics", "movements", filters ?? {}] as const,
   },
@@ -1009,6 +1015,10 @@ export interface LogisticsPosListResponse {
   pos: LogisticsPoListRow[];
 }
 
+/** Pipeline v2 (C4) — re-export the zod-derived drill-down shape so consumers
+ *  don't have to import from @carres/shared directly. */
+export type LogisticsReservedDrilldownResponse = ReservedDrilldownResponse;
+
 /** GET /api/logistics/warehouse — composed table-style payload (warehouse.ts). */
 export type LowStockStatus = "out" | "low" | "ok";
 export interface WarehouseStockEntry {
@@ -1233,6 +1243,33 @@ export function useLogisticsWarehouse(
     queryKey: qk.logistics.warehouse(),
     queryFn: () => apiFetch<WarehouseListResponse>("/api/logistics/warehouse"),
     staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Pipeline v2 (C4) — drill-down on a single (warehouse, sku) pair to list
+ *  the orders currently holding `stock_balances.reserved`. `null` for either
+ *  param disables the query (mirror of `useLogisticsOrder`). staleTime is
+ *  short (5s) — reserve counts shift on every assign-partner / attach-do /
+ *  abandon, so we want fresh data when the dialog reopens. */
+export function useReservedDrilldown(
+  warehouseId: string | null,
+  sku: string | null,
+  opts?: Partial<UseQueryOptions<LogisticsReservedDrilldownResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.reservedDrilldown(warehouseId, sku),
+    queryFn: () => {
+      const params = new URLSearchParams({
+        warehouseId: warehouseId ?? "",
+        sku: sku ?? "",
+      });
+      return apiFetch<LogisticsReservedDrilldownResponse>(
+        `/api/logistics/warehouse/reserved-drilldown?${params.toString()}`,
+      );
+    },
+    enabled: !!warehouseId && !!sku,
+    staleTime: 5_000,
     ...opts,
   });
 }

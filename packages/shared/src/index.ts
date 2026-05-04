@@ -111,6 +111,8 @@ export {
   listMovementsQuery,
   confirmProceedRequestInputSchema,
   transferReadyInputSchema,
+  reservedDrilldownQuery,
+  reservedDrilldownResponse,
   type AssignPartnerInput,
   type AttachDoInput,
   type ReceivePoLineInput,
@@ -128,4 +130,6 @@ export {
   type ListMovementsQuery,
   type ConfirmProceedRequestInput,
   type TransferReadyInput,
+  type ReservedDrilldownQuery,
+  type ReservedDrilldownResponse,
 } from "./schemas/logistics";

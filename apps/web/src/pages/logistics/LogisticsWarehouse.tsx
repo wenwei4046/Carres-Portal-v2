@@ -8,6 +8,7 @@ import {
 } from "@/lib/queries";
 import type { ProductCategory, ProductSkuDto } from "@carres/shared";
 import AdjustStockModal from "./components/AdjustStockModal";
+import ReserveDrilldownDialog from "./components/ReserveDrilldownDialog";
 
 /**
  * LogisticsWarehouse — HQ stock balance per warehouse with category tabs +
@@ -45,6 +46,13 @@ import AdjustStockModal from "./components/AdjustStockModal";
  * truth for the tab filter (we don't trust catalog `models` for the table —
  * stock is keyed on the SKU code, not the model row).
  */
+/** Pipeline v2 (C4) — `'reserved'` is a pseudo-category that switches the
+ *  table semantics: instead of filtering by SKU prefix it shows every SKU in
+ *  the active warehouse where `reserved > 0`, with a drill-down trigger that
+ *  lists the orders holding the reserve. The other 3 tabs are 1-1 with
+ *  ProductCategory and behave as before. */
+type ActiveCat = ProductCategory | "reserved";
+
 const CATEGORIES: { key: ProductCategory; label: string; icon: string }[] = [
   { key: "mattress", label: "Mattress", icon: "▭" },
   { key: "bedframe", label: "Bed frame", icon: "▤" },
@@ -89,7 +97,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
   const totalsBySku = warehouseQ.data?.totalsBySku ?? {};
 
   const [activeWh, setActiveWh] = useState<string | null>(null);
-  const [activeCat, setActiveCat] = useState<ProductCategory>("mattress");
+  const [activeCat, setActiveCat] = useState<ActiveCat>("mattress");
   const [search, setSearch] = useState("");
   const [adjustTarget, setAdjustTarget] = useState<{
     sku: string;
@@ -97,6 +105,14 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
     warehouseName: string;
     currentQty: number;
     reservedQty: number;
+    skuLabel?: string;
+  } | null>(null);
+  // Pipeline v2 (C4) — drill-down dialog state. Set when the user clicks a
+  // row on the "Reserved" tab; cleared on Modal onClose.
+  const [drilldownTarget, setDrilldownTarget] = useState<{
+    sku: string;
+    warehouseId: string;
+    warehouseName: string;
     skuLabel?: string;
   } | null>(null);
 
@@ -142,13 +158,18 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
   }, [warehouses, byWarehouse]);
 
   // Rows for the active warehouse, filtered by category + search.
+  // Pipeline v2 (C4): when activeCat='reserved' we skip the category filter
+  // entirely and instead surface every SKU at this warehouse with reserved>0.
   const filteredRows = useMemo(() => {
     if (!activeWh) return [] as WarehouseStockEntry[];
     const rows = byWarehouse[activeWh] ?? [];
-    const inCat = rows.filter((r) => categoryForSku(r.sku) === activeCat);
-    if (!search.trim()) return inCat;
+    const baseRows =
+      activeCat === "reserved"
+        ? rows.filter((r) => r.reserved > 0)
+        : rows.filter((r) => categoryForSku(r.sku) === activeCat);
+    if (!search.trim()) return baseRows;
     const q = search.trim().toLowerCase();
-    return inCat.filter((r) => {
+    return baseRows.filter((r) => {
       if (r.sku.toLowerCase().includes(q)) return true;
       const label = skuLabelMap.get(r.sku)?.variant.toLowerCase() ?? "";
       return label.includes(q);
@@ -329,129 +350,232 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
             </button>
           );
         })}
+        {/* Pipeline v2 (C4) — Reserved pseudo-tab. Distinct color hint
+            (warning border when inactive) signals it's not just another
+            category but a different view. */}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeCat === "reserved"}
+          onClick={() => setActiveCat("reserved")}
+          data-testid="warehouse-cat-reserved"
+          className={[
+            "px-3.5 py-2 rounded-[4px] text-[12px] transition-colors border flex gap-2 items-center",
+            activeCat === "reserved"
+              ? "bg-base-900 text-white border-base-900 font-semibold"
+              : "bg-white text-warning border-warning font-medium hover:bg-warning-soft",
+          ].join(" ")}
+        >
+          <span className="text-[14px]">⊙</span>
+          <span>Reserved</span>
+        </button>
       </div>
 
-      {/* Stock table */}
-      <div className="card p-0" data-testid="warehouse-stock-table">
-        <div
-          className="grid items-center gap-4 px-[18px] py-3 bg-base-50 border-b border-base-200"
-          style={{
-            gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 96px",
-          }}
-        >
-          <div className="label">Product</div>
-          <div className="label text-right">This warehouse</div>
-          <div className="label text-right">All warehouses</div>
-          <div className="label text-right">Status</div>
-          <div className="label text-right" />
-        </div>
-
-        {!activeWarehouse ? (
-          <div className="p-9 text-center text-base-500 text-[13px]">
-            Pick a warehouse to view stock.
-          </div>
-        ) : filteredRows.length === 0 ? (
+      {/* Stock table — two layouts: stock view (default) vs reserved view (C4). */}
+      {activeCat === "reserved" ? (
+        <div className="card p-0" data-testid="warehouse-reserved-table">
           <div
-            className="p-9 text-center text-base-500 text-[13px]"
-            data-testid="warehouse-empty"
+            className="grid items-center gap-4 px-[18px] py-3 bg-base-50 border-b border-base-200"
+            style={{
+              gridTemplateColumns: "minmax(0,2.4fr) 150px 150px 120px",
+            }}
           >
-            {search
-              ? `No SKUs match "${search}" in ${activeCat}.`
-              : `No ${activeCat} stock at ${activeWarehouse.name} yet.`}
+            <div className="label">Product</div>
+            <div className="label text-right">Reserved here</div>
+            <div className="label text-right">All warehouses</div>
+            <div className="label text-right" />
           </div>
-        ) : (
-          filteredRows.map((row) => {
-            const totals = totalsBySku[row.sku];
-            const totalAll = totals?.total_qty ?? row.qty;
-            const aggStatus = totals?.low_stock_status_aggregate ?? row.low_stock_status;
-            const skuMeta = skuLabelMap.get(row.sku);
-            const modelName = skuMeta ? modelNameById.get(skuMeta.modelId) : undefined;
-            // Proto format: "{Model name} · {variant}" — e.g. "Carres Cloud
-            // · Single". Falls back to variant-only or raw SKU if catalog
-            // hasn't been loaded yet.
-            const friendly = modelName && skuMeta
-              ? `${modelName} · ${skuMeta.variant}`
-              : (skuMeta?.variant ?? row.sku);
-            return (
-              <div
-                key={row.sku}
-                data-testid={`warehouse-row-${row.sku}`}
-                className="grid items-center gap-4 px-[18px] py-3 border-t border-base-100"
-                style={{
-                  gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 96px",
-                }}
-              >
-                <div className="min-w-0">
-                  {goMovements ? (
+          {!activeWarehouse ? (
+            <div className="p-9 text-center text-base-500 text-[13px]">
+              Pick a warehouse to view reserved stock.
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div
+              className="p-9 text-center text-base-500 text-[13px]"
+              data-testid="warehouse-reserved-empty"
+            >
+              {search
+                ? `No reserved SKUs match "${search}" at ${activeWarehouse.name}.`
+                : `No SKUs are currently reserved at ${activeWarehouse.name}.`}
+            </div>
+          ) : (
+            filteredRows.map((row) => {
+              const totals = totalsBySku[row.sku];
+              const totalAllReserved = totals?.total_reserved ?? row.reserved;
+              const skuMeta = skuLabelMap.get(row.sku);
+              const modelName = skuMeta ? modelNameById.get(skuMeta.modelId) : undefined;
+              const friendly =
+                modelName && skuMeta
+                  ? `${modelName} · ${skuMeta.variant}`
+                  : skuMeta?.variant ?? row.sku;
+              return (
+                <div
+                  key={row.sku}
+                  data-testid={`warehouse-reserved-row-${row.sku}`}
+                  className="grid items-center gap-4 px-[18px] py-3 border-t border-base-100"
+                  style={{
+                    gridTemplateColumns: "minmax(0,2.4fr) 150px 150px 120px",
+                  }}
+                >
+                  <div className="min-w-0">
+                    <div className="font-body text-[13px] truncate">
+                      {friendly}
+                    </div>
+                  </div>
+                  <div className="font-mono text-[13px] text-right font-semibold">
+                    {row.reserved}
+                  </div>
+                  <div className="font-mono text-[13px] text-right text-base-600">
+                    {totalAllReserved}
+                  </div>
+                  <div className="text-right">
                     <button
                       type="button"
-                      className="text-left w-full font-body text-[13px] truncate hover:text-primary transition-colors"
-                      style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }}
+                      className="btn-secondary text-[11px] py-1 px-2.5"
                       onClick={() =>
-                        goMovements({ sku: row.sku, warehouseId: activeWarehouse.id })
+                        setDrilldownTarget({
+                          sku: row.sku,
+                          warehouseId: activeWarehouse.id,
+                          warehouseName: activeWarehouse.name,
+                          skuLabel: skuMeta
+                            ? modelName
+                              ? `${modelName} · ${skuMeta.variant}`
+                              : skuMeta.variant
+                            : undefined,
+                        })
                       }
-                      data-testid={`warehouse-row-link-${row.sku}`}
-                      title="View movement log for this SKU"
+                      data-testid={`warehouse-reserved-drilldown-${row.sku}`}
                     >
-                      <span className="font-body text-[13px] truncate inline-block max-w-full">
-                        {friendly}
-                      </span>
-                      <span
-                        className="text-[10px] text-base-400 ml-1.5"
-                        aria-hidden="true"
-                      >
-                        view log →
-                      </span>
+                      View orders →
                     </button>
-                  ) : (
-                    <div className="font-body text-[13px] truncate">{friendly}</div>
-                  )}
+                  </div>
                 </div>
-                <div className="font-mono text-[13px] text-right font-semibold">
-                  {row.qty}
+              );
+            })
+          )}
+        </div>
+      ) : (
+        <div className="card p-0" data-testid="warehouse-stock-table">
+          <div
+            className="grid items-center gap-4 px-[18px] py-3 bg-base-50 border-b border-base-200"
+            style={{
+              gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 96px",
+            }}
+          >
+            <div className="label">Product</div>
+            <div className="label text-right">This warehouse</div>
+            <div className="label text-right">All warehouses</div>
+            <div className="label text-right">Status</div>
+            <div className="label text-right" />
+          </div>
+
+          {!activeWarehouse ? (
+            <div className="p-9 text-center text-base-500 text-[13px]">
+              Pick a warehouse to view stock.
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div
+              className="p-9 text-center text-base-500 text-[13px]"
+              data-testid="warehouse-empty"
+            >
+              {search
+                ? `No SKUs match "${search}" in ${activeCat}.`
+                : `No ${activeCat} stock at ${activeWarehouse.name} yet.`}
+            </div>
+          ) : (
+            filteredRows.map((row) => {
+              const totals = totalsBySku[row.sku];
+              const totalAll = totals?.total_qty ?? row.qty;
+              const aggStatus = totals?.low_stock_status_aggregate ?? row.low_stock_status;
+              const skuMeta = skuLabelMap.get(row.sku);
+              const modelName = skuMeta ? modelNameById.get(skuMeta.modelId) : undefined;
+              // Proto format: "{Model name} · {variant}" — e.g. "Carres Cloud
+              // · Single". Falls back to variant-only or raw SKU if catalog
+              // hasn't been loaded yet.
+              const friendly = modelName && skuMeta
+                ? `${modelName} · ${skuMeta.variant}`
+                : (skuMeta?.variant ?? row.sku);
+              return (
+                <div
+                  key={row.sku}
+                  data-testid={`warehouse-row-${row.sku}`}
+                  className="grid items-center gap-4 px-[18px] py-3 border-t border-base-100"
+                  style={{
+                    gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 96px",
+                  }}
+                >
+                  <div className="min-w-0">
+                    {goMovements ? (
+                      <button
+                        type="button"
+                        className="text-left w-full font-body text-[13px] truncate hover:text-primary transition-colors"
+                        style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }}
+                        onClick={() =>
+                          goMovements({ sku: row.sku, warehouseId: activeWarehouse.id })
+                        }
+                        data-testid={`warehouse-row-link-${row.sku}`}
+                        title="View movement log for this SKU"
+                      >
+                        <span className="font-body text-[13px] truncate inline-block max-w-full">
+                          {friendly}
+                        </span>
+                        <span
+                          className="text-[10px] text-base-400 ml-1.5"
+                          aria-hidden="true"
+                        >
+                          view log →
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="font-body text-[13px] truncate">{friendly}</div>
+                    )}
+                  </div>
+                  <div className="font-mono text-[13px] text-right font-semibold">
+                    {row.qty}
+                  </div>
+                  <div className="font-mono text-[13px] text-right text-base-600">
+                    {totalAll}
+                  </div>
+                  <div className="text-right">
+                    <span
+                      className="font-ui font-bold uppercase border rounded-[3px] inline-block"
+                      data-testid={`warehouse-badge-${row.sku}`}
+                      style={{
+                        fontSize: 9,
+                        letterSpacing: "0.12em",
+                        color: statusColor(aggStatus),
+                        borderColor: statusColor(aggStatus),
+                        padding: "3px 7px",
+                      }}
+                    >
+                      {statusLabel(aggStatus)}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <button
+                      type="button"
+                      className="btn-secondary text-[11px] py-1 px-2.5"
+                      onClick={() =>
+                        setAdjustTarget({
+                          sku: row.sku,
+                          warehouseId: activeWarehouse.id,
+                          warehouseName: activeWarehouse.name,
+                          currentQty: row.qty,
+                          reservedQty: row.reserved,
+                          skuLabel: skuMeta?.variant,
+                        })
+                      }
+                      data-testid={`warehouse-adjust-${row.sku}`}
+                    >
+                      + Adjust
+                    </button>
+                  </div>
                 </div>
-                <div className="font-mono text-[13px] text-right text-base-600">
-                  {totalAll}
-                </div>
-                <div className="text-right">
-                  <span
-                    className="font-ui font-bold uppercase border rounded-[3px] inline-block"
-                    data-testid={`warehouse-badge-${row.sku}`}
-                    style={{
-                      fontSize: 9,
-                      letterSpacing: "0.12em",
-                      color: statusColor(aggStatus),
-                      borderColor: statusColor(aggStatus),
-                      padding: "3px 7px",
-                    }}
-                  >
-                    {statusLabel(aggStatus)}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <button
-                    type="button"
-                    className="btn-secondary text-[11px] py-1 px-2.5"
-                    onClick={() =>
-                      setAdjustTarget({
-                        sku: row.sku,
-                        warehouseId: activeWarehouse.id,
-                        warehouseName: activeWarehouse.name,
-                        currentQty: row.qty,
-                        reservedQty: row.reserved,
-                        skuLabel: skuMeta?.variant,
-                      })
-                    }
-                    data-testid={`warehouse-adjust-${row.sku}`}
-                  >
-                    + Adjust
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
       {adjustTarget && (
         <AdjustStockModal
@@ -462,6 +586,16 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
           reservedQty={adjustTarget.reservedQty}
           skuLabel={adjustTarget.skuLabel}
           onClose={() => setAdjustTarget(null)}
+        />
+      )}
+
+      {drilldownTarget && (
+        <ReserveDrilldownDialog
+          sku={drilldownTarget.sku}
+          warehouseId={drilldownTarget.warehouseId}
+          warehouseName={drilldownTarget.warehouseName}
+          skuLabel={drilldownTarget.skuLabel}
+          onClose={() => setDrilldownTarget(null)}
         />
       )}
     </div>

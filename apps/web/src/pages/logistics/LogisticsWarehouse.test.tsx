@@ -3,7 +3,10 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import LogisticsWarehouse from "./LogisticsWarehouse";
 import type { CatalogResponse } from "@carres/shared";
-import type { WarehouseListResponse } from "@/lib/queries";
+import type {
+  LogisticsReservedDrilldownResponse,
+  WarehouseListResponse,
+} from "@/lib/queries";
 
 /**
  * LogisticsWarehouse + AdjustStockModal — covers the M5 task 4 plan list
@@ -24,7 +27,15 @@ let warehouseHookState: {
   refetch: ReturnType<typeof vi.fn>;
 };
 let catalogHookState: { data: CatalogResponse | undefined };
+let drilldownHookState: {
+  data: LogisticsReservedDrilldownResponse | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  error: Error | null;
+  refetch: ReturnType<typeof vi.fn>;
+};
 const refetchSpy = vi.fn();
+const drilldownRefetchSpy = vi.fn();
 const adjustMutateAsync = vi.fn().mockResolvedValue({});
 
 vi.mock("@/lib/queries", async () => {
@@ -34,6 +45,7 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     useLogisticsWarehouse: () => warehouseHookState,
     useCatalog: () => catalogHookState,
+    useReservedDrilldown: () => drilldownHookState,
     useAdjustStockMutation: () => ({
       mutateAsync: adjustMutateAsync,
       isPending: false,
@@ -177,7 +189,17 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
 
 beforeEach(() => {
   refetchSpy.mockClear();
+  drilldownRefetchSpy.mockClear();
   adjustMutateAsync.mockClear();
+  // Default drill-down state — empty result, idle. Tests that need a populated
+  // drill-down override this directly via `drilldownHookState = ...`.
+  drilldownHookState = {
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: drilldownRefetchSpy,
+  };
 });
 
 describe("LogisticsWarehouse page", () => {
@@ -471,5 +493,201 @@ describe("LogisticsWarehouse page", () => {
     expect(
       screen.getByTestId(`warehouse-row-${SKU_MATTRESS_QUEEN}`),
     ).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // Pipeline v2 (C4) — Reserved tab + drill-down dialog
+  // -------------------------------------------------------------------------
+
+  it("16. Reserved tab swaps the table layout and lists every SKU with reserved>0", () => {
+    setLoaded();
+    render(wrap(<LogisticsWarehouse />));
+    expect(screen.getByTestId("warehouse-cat-reserved")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("warehouse-cat-reserved"));
+    // Stock-table is gone; reserved-table is visible.
+    expect(screen.queryByTestId("warehouse-stock-table")).not.toBeInTheDocument();
+    expect(screen.getByTestId("warehouse-reserved-table")).toBeInTheDocument();
+    // KL has King (reserved 2) + Queen (reserved 0) + Bedframe (reserved 0)
+    // + Sofa (reserved 1). Reserved view should only show King + Sofa.
+    expect(
+      screen.getByTestId(`warehouse-reserved-row-${SKU_MATTRESS_KING}`),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId(`warehouse-reserved-row-${SKU_SOFA}`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId(`warehouse-reserved-row-${SKU_MATTRESS_QUEEN}`),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(`warehouse-reserved-row-${SKU_BEDFRAME}`),
+    ).not.toBeInTheDocument();
+  });
+
+  it("17. Reserved tab shows empty state when no SKUs at this warehouse have reserved>0", () => {
+    setLoaded({
+      byWarehouse: {
+        [WAREHOUSE_KL.id]: [
+          // All zero reserves at KL.
+          { sku: SKU_MATTRESS_KING, qty: 8, reserved: 0, low_stock_status: "ok" },
+          { sku: SKU_SOFA, qty: 4, reserved: 0, low_stock_status: "ok" },
+        ],
+        [WAREHOUSE_PG.id]: [],
+      },
+      totalsBySku: {
+        [SKU_MATTRESS_KING]: { total_qty: 8, total_reserved: 0, low_stock_status_aggregate: "ok" },
+        [SKU_SOFA]: { total_qty: 4, total_reserved: 0, low_stock_status_aggregate: "ok" },
+      },
+    });
+    render(wrap(<LogisticsWarehouse />));
+    fireEvent.click(screen.getByTestId("warehouse-cat-reserved"));
+    expect(screen.getByTestId("warehouse-reserved-empty")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("warehouse-reserved-empty").textContent,
+    ).toMatch(/no SKUs are currently reserved at KL Warehouse/i);
+  });
+
+  it("18. clicking the drill-down trigger opens ReserveDrilldownDialog with summary + orders", () => {
+    setLoaded();
+    drilldownHookState = {
+      data: {
+        warehouseId: WAREHOUSE_KL.id,
+        sku: SKU_MATTRESS_KING,
+        total: 2,
+        orders: [
+          {
+            id: "33333333-3333-3333-3333-000000000a01",
+            dl: 4001,
+            customerName: "Ahmad Customer",
+            logisticsStage: "ready_to_dispatch",
+            reservedQty: 2,
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: drilldownRefetchSpy,
+    };
+    render(wrap(<LogisticsWarehouse />));
+    fireEvent.click(screen.getByTestId("warehouse-cat-reserved"));
+    // Drill-down trigger present per row.
+    fireEvent.click(
+      screen.getByTestId(`warehouse-reserved-drilldown-${SKU_MATTRESS_KING}`),
+    );
+    // Dialog is open — title contains friendly SKU label.
+    expect(screen.getByText(/Reserved orders/)).toBeInTheDocument();
+    const summary = screen.getByTestId("reserve-drilldown-summary");
+    expect(summary.textContent).toMatch(/2 reserved across 1 order/i);
+    expect(summary.textContent).toContain("KL Warehouse");
+    // Order row visible with #DL + customer + stage chip + qty.
+    const row = screen.getByTestId(
+      "reserve-drilldown-row-33333333-3333-3333-3333-000000000a01",
+    );
+    expect(row.textContent).toContain("#DL4001");
+    expect(row.textContent).toContain("Ahmad Customer");
+    expect(row.textContent?.toLowerCase()).toContain("ready to dispatch");
+    expect(row.textContent).toContain("×2");
+  });
+
+  it("19. ReserveDrilldownDialog shows empty state when no orders hold reserve", () => {
+    setLoaded();
+    drilldownHookState = {
+      data: {
+        warehouseId: WAREHOUSE_KL.id,
+        sku: SKU_MATTRESS_KING,
+        total: 0,
+        orders: [],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: drilldownRefetchSpy,
+    };
+    render(wrap(<LogisticsWarehouse />));
+    fireEvent.click(screen.getByTestId("warehouse-cat-reserved"));
+    fireEvent.click(
+      screen.getByTestId(`warehouse-reserved-drilldown-${SKU_MATTRESS_KING}`),
+    );
+    expect(
+      screen.getByTestId("reserve-drilldown-empty"),
+    ).toBeInTheDocument();
+  });
+
+  it("20. ReserveDrilldownDialog renders loading skeleton when query pending", () => {
+    setLoaded();
+    drilldownHookState = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: drilldownRefetchSpy,
+    };
+    render(wrap(<LogisticsWarehouse />));
+    fireEvent.click(screen.getByTestId("warehouse-cat-reserved"));
+    fireEvent.click(
+      screen.getByTestId(`warehouse-reserved-drilldown-${SKU_MATTRESS_KING}`),
+    );
+    expect(screen.getByTestId("reserve-drilldown-loading")).toBeInTheDocument();
+  });
+
+  it("21. ReserveDrilldownDialog renders error banner with Retry on isError", () => {
+    setLoaded();
+    drilldownHookState = {
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error("boom"),
+      refetch: drilldownRefetchSpy,
+    };
+    render(wrap(<LogisticsWarehouse />));
+    fireEvent.click(screen.getByTestId("warehouse-cat-reserved"));
+    fireEvent.click(
+      screen.getByTestId(`warehouse-reserved-drilldown-${SKU_MATTRESS_KING}`),
+    );
+    expect(screen.getByTestId("reserve-drilldown-error")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Retry/ }));
+    expect(drilldownRefetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("22. clicking Copy DL on a drill-down row writes #DL{n} to the clipboard", async () => {
+    setLoaded();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    drilldownHookState = {
+      data: {
+        warehouseId: WAREHOUSE_KL.id,
+        sku: SKU_MATTRESS_KING,
+        total: 1,
+        orders: [
+          {
+            id: "33333333-3333-3333-3333-000000000a02",
+            dl: 4007,
+            customerName: "Bee",
+            logisticsStage: "dispatched",
+            reservedQty: 1,
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: drilldownRefetchSpy,
+    };
+    render(wrap(<LogisticsWarehouse />));
+    fireEvent.click(screen.getByTestId("warehouse-cat-reserved"));
+    fireEvent.click(
+      screen.getByTestId(`warehouse-reserved-drilldown-${SKU_MATTRESS_KING}`),
+    );
+    fireEvent.click(
+      screen.getByTestId(
+        "reserve-drilldown-copy-33333333-3333-3333-3333-000000000a02",
+      ),
+    );
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith("#DL4007");
+    });
   });
 });

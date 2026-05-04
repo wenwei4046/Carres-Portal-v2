@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { DB, adjustStockInput } from "@carres/shared";
+import { DB, adjustStockInput, reservedDrilldownQuery } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -128,6 +128,111 @@ logisticsWarehouseRouter.get("/", async (c) => {
   }
 
   return c.json({ warehouses, byWarehouse, totalsBySku });
+});
+
+// ----- GET /reserved-drilldown — orders holding reserve at (sku, warehouse) -----
+//
+// Pipeline v2 C4: surfaces the order-level breakdown behind the
+// `stock_balances.reserved` count for a single (sku, warehouse) pair.
+// `_logistics_reserve_order` only holds a reserve while the order is in
+// `ready_to_dispatch` or `dispatched`; the stage filter mirrors that contract
+// so the sum of returned `reservedQty` should match the row's reserved value.
+//
+// Composes a join over `orders` + `order_lines` via the user-token client (RLS
+// is the security boundary). Stage values are cast to text in the .in() filter
+// so the PostgREST enum coercion stays predictable; the route guard already
+// enforces logistics-only role.
+logisticsWarehouseRouter.get("/reserved-drilldown", async (c) => {
+  const parsed = reservedDrilldownQuery.safeParse({
+    warehouseId: c.req.query("warehouseId") ?? undefined,
+    sku: c.req.query("sku") ?? undefined,
+  });
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_query", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid query" },
+      422,
+    );
+  }
+  const { warehouseId, sku } = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  // PostgREST does the join via embedded resource: select order_lines that
+  // match the sku, then filter parent orders by warehouse + stage. The shape
+  // we want (one row per order, with summed qty) is easier to assemble in
+  // application code than to express in a single PostgREST resource path —
+  // so we fetch lines + their order parent via embed and group in JS. This
+  // mirrors how dashboard.ts composes its open_pos summary.
+  const { data, error } = await sb
+    .from("order_lines")
+    .select(
+      "qty, sku, orders:orders!inner(id, dl, customer_name, logistics_stage, warehouse_id)",
+    )
+    .eq("sku", sku)
+    .eq("orders.warehouse_id", warehouseId)
+    .in("orders.logistics_stage", ["ready_to_dispatch", "dispatched"]);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  type LineWithOrder = {
+    qty: number;
+    sku: string;
+    // Supabase types `inner` joins as a single object (not array) when the FK is
+    // 1-1. PostgREST sometimes types it as array regardless; handle both.
+    orders:
+      | {
+          id: string;
+          dl: number;
+          customer_name: string;
+          logistics_stage: "ready_to_dispatch" | "dispatched";
+          warehouse_id: string;
+        }
+      | Array<{
+          id: string;
+          dl: number;
+          customer_name: string;
+          logistics_stage: "ready_to_dispatch" | "dispatched";
+          warehouse_id: string;
+        }>
+      | null;
+  };
+
+  // Group by order id + sum qty. We discard rows where the embedded `orders`
+  // is null/empty (defensive — the inner join + .eq should already filter
+  // those out, but the .inner clause depends on PostgREST request encoding).
+  const grouped = new Map<
+    string,
+    {
+      id: string;
+      dl: number;
+      customerName: string;
+      logisticsStage: "ready_to_dispatch" | "dispatched";
+      reservedQty: number;
+    }
+  >();
+  let total = 0;
+  for (const row of (data ?? []) as LineWithOrder[]) {
+    const orderRow = Array.isArray(row.orders) ? row.orders[0] : row.orders;
+    if (!orderRow) continue;
+    const qty = Number(row.qty) || 0;
+    if (qty <= 0) continue;
+    total += qty;
+    const existing = grouped.get(orderRow.id);
+    if (existing) {
+      existing.reservedQty += qty;
+    } else {
+      grouped.set(orderRow.id, {
+        id: orderRow.id,
+        dl: orderRow.dl,
+        customerName: orderRow.customer_name,
+        logisticsStage: orderRow.logistics_stage,
+        reservedQty: qty,
+      });
+    }
+  }
+  // Sort by dl desc — newest order first, matches the spec query order.
+  const orders = Array.from(grouped.values()).sort((a, b) => b.dl - a.dl);
+  return c.json({ warehouseId, sku, total, orders });
 });
 
 // ----- POST /adjust — manual stock adjustment -----
