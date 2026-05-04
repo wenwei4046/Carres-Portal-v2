@@ -41,6 +41,10 @@ async function makeJwt(role: string) {
 // so we use a column-Pick to keep test fixtures minimal while still typing
 // against the shared schema.
 type StockBalanceFixture = Pick<DB.StockBalanceRow, "sku" | "warehouse_id" | "qty" | "reserved">;
+// Likewise for warehouses: the route's GET only reads id/name/address; v3-S3
+// fields kind + owning_partner_id (added in migration 0027) aren't surfaced
+// here, so we Pick to keep fixtures minimal while still typing against shared.
+type WarehouseFixture = Pick<DB.WarehouseRow, "id" | "name" | "address">;
 
 /**
  * Build a userClient mock whose `.from(table)` returns a chain that resolves to
@@ -48,7 +52,7 @@ type StockBalanceFixture = Pick<DB.StockBalanceRow, "sku" | "warehouse_id" | "qt
  * reads (warehouses, stock_balances). Errors can be injected per table.
  */
 function mockWarehouseQueries(opts: {
-  warehouses?: DB.WarehouseRow[];
+  warehouses?: WarehouseFixture[];
   warehousesError?: { code?: string; message?: string };
   balances?: StockBalanceFixture[];
   balancesError?: { code?: string; message?: string };

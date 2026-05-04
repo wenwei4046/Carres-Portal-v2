@@ -190,7 +190,14 @@ export interface Order {
   approvalCode: string | null;
   installmentMonths: 6 | 12 | null;
 
-  logisticsStage: "placed" | "proceed_request" | "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered" | null;
+  // v3-S3 (migration 0028) added `awaiting_logistics_action` + `waiting`.
+  // `awaiting_stock` retained as alias for legacy code paths still matching it.
+  logisticsStage:
+    | "placed" | "proceed_request"
+    | "awaiting_logistics_action" | "awaiting_stock"
+    | "ready_to_dispatch" | "dispatched"
+    | "waiting" | "delivered"
+    | null;
   warehouseId: string | null;
   deliveryPartnerId: string | null;
   partnerStage: "assigned" | "picked_from_wh" | "en_route" | "delivered" | null;
@@ -222,10 +229,13 @@ export interface PurchaseOrder {
   warehouseId: string;
   // Single-sku/qty columns dropped in 0017 — lines live in purchase_order_lines.
   status: "open" | "received" | "cancelled";
+  // v3-S3 (migration 0030) added 6 values for the HoOKkA Sofa flow.
   supStatus:
     | "pending" | "acknowledged" | "in_production"
     | "shipped" | "delivered"
-    | "ready_for_pickup" | "pickup_assigned" | "pickup_accepted" | "picked_up" | "reassign_needed";
+    | "ready_for_pickup" | "pickup_assigned" | "pickup_accepted" | "picked_up" | "reassign_needed"
+    | "ready_confirm_sent" | "partner_confirmed" | "customer_rejected"
+    | "relocated" | "at_partner_wh" | "at_own_wh_waiting";
   deliveryPartnerId: string | null;
   expectedReadyDate: string | null;
   pickupDate: string | null;

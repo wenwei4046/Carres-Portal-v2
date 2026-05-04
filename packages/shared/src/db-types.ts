@@ -8,13 +8,24 @@ export type Role =
   | "logistics" | "supplier" | "partner" | "finance" | "bd";
 
 export type OrderStatus       = "place" | "proceed_order" | "delivered" | "cancelled";
-export type LogisticsStage    = "placed" | "proceed_request" | "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered";
+// `awaiting_logistics_action` and `waiting` added in migration 0028 (v3-S3).
+// `awaiting_stock` retained as alias for legacy code paths still matching against it.
+export type LogisticsStage    =
+  | "placed" | "proceed_request"
+  | "awaiting_logistics_action" | "awaiting_stock"
+  | "ready_to_dispatch" | "dispatched"
+  | "waiting" | "delivered";
 export type PartnerStage      = "assigned" | "picked_from_wh" | "en_route" | "delivered";
 export type POStatus          = "open" | "received" | "cancelled";
+// 6 new values appended in migration 0030 (v3-S3) for the HoOKkA Sofa flow:
+// ready_confirm -> partner confirm -> (customer_rejected -> relocated)? ->
+// at_partner_wh | at_own_wh_waiting.
 export type POSupStatus       =
   | "pending" | "acknowledged" | "in_production"
   | "shipped" | "delivered"
-  | "ready_for_pickup" | "pickup_assigned" | "pickup_accepted" | "picked_up" | "reassign_needed";
+  | "ready_for_pickup" | "pickup_assigned" | "pickup_accepted" | "picked_up" | "reassign_needed"
+  | "ready_confirm_sent" | "partner_confirmed" | "customer_rejected"
+  | "relocated" | "at_partner_wh" | "at_own_wh_waiting";
 export type POPayStatus       = "unpaid" | "scheduled" | "paid";
 export type PaymentMethod     =
   | "cash" | "bank_transfer" | "cheque" | "credit_card"
@@ -28,6 +39,10 @@ export type InquiryStage      = "new" | "contacted" | "qualified" | "converted" 
 export type ProductCategory   = "mattress" | "bedframe" | "sofa";
 export type VariantKind       = "size" | "preset" | "part";
 export type StockMovementKind = "in" | "out" | "adjust";
+// Migration 0027 (v3-S3). 'own' = HQ-controlled warehouse (default for legacy
+// rows). 'logistics_partner' = partner-owned WH; pairs with owning_partner_id
+// on warehouses (CHECK constraint warehouses_partner_kind_check).
+export type WarehouseKind     = "own" | "logistics_partner";
 
 export interface DealerRow {
   id: string;
@@ -81,6 +96,11 @@ export interface ProductSkuRow {
   variant: string;
   variant_kind: VariantKind;
   price: number;
+  // Added in migration 0026 (v3-S3). FK to suppliers; NOT NULL after seed
+  // populates it (staging/prod), but stays nullable in fresh-dev until the
+  // follow-up tightening migration runs (carry-forward
+  // phase-4-v3-skus-supplier-id-not-null-tighten).
+  supplier_id: string | null;
 }
 
 export interface SofaFabricRow {
@@ -108,6 +128,11 @@ export interface WarehouseRow {
   id: string;
   name: string;
   address: string | null;
+  // Added in migration 0027 (v3-S3). NOT NULL with default 'own' so legacy
+  // rows fall back to 'own'. owning_partner_id required when kind =
+  // 'logistics_partner' (CHECK constraint warehouses_partner_kind_check).
+  kind: WarehouseKind;
+  owning_partner_id: string | null;
 }
 
 export interface SupplierRow {
@@ -248,6 +273,20 @@ export interface PurchaseOrderRow {
   pickup_date: string | null;
   eta_date: string | null;
   customer_rejection: Record<string, unknown> | null;
+  // v3-S3 audit / DO-upload trail (migration 0030). Sofa-flow audit timestamps
+  // and Supabase Storage path for the delivery order PDF.
+  ready_confirm_at: string | null;
+  partner_confirmed_at: string | null;
+  do_file_path: string | null;
+  do_uploaded_at: string | null;
+  do_uploaded_by: string | null;
+  // v3-S3 outsource fields (migration 0030). Used when a PO is delivered by a
+  // one-shot outsourced partner (not a registered delivery_partners row); the
+  // CHECK constraint po_outsource_xor_partner enforces these are mutually
+  // exclusive with delivery_partner_id.
+  outsource_partner_name: string | null;
+  outsource_partner_contact: string | null;
+  outsource_partner_zones: string | null;
   pay_status: POPayStatus;
   placed_at: string;
 }
