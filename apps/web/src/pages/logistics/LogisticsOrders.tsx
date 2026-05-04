@@ -15,18 +15,22 @@ import type { LogisticsStage } from "./components/StageChip";
  * LogisticsOrders — full kanban view for the HQ logistics role.
  *
  * Mirrors `reference/proto/logistics-orders.jsx` `LogisticsOrders`
- * (lines 1-138). Contains:
+ * (lines 1-138) with Pipeline v2 (Phase 4 C3) extensions:
  *   - Header (Pipeline kicker + count strap + search + dealer/showroom select)
- *   - Stage filter chips (All + 4 stage chips with counts)
+ *   - Stage filter chips (All + 6 stage chips with counts)
  *   - Bulk action bar when ≥1 awaiting_stock orders selected
- *   - 4-column kanban grid (awaiting_stock / ready_to_dispatch / dispatched / delivered)
+ *   - 6-column kanban (placed / proceed_request / awaiting_stock /
+ *     ready_to_dispatch / dispatched / delivered) with click-to-expand
+ *     (the active column gets `flex: 4`, others compress to `flex: 0.4`)
  *   - OrderDetailDrawer overlay when an order is opened
  *
- * The 4 LOGISTICS_FLOW columns mirror proto store.jsx lines 690-695:
- *   awaiting_stock     → "PO open with supplier"           · action "Check stock"
- *   ready_to_dispatch  → "Stock secured · assign partner"  · action "Assign delivery"
- *   dispatched         → "With delivery partner"           · action "Attach DO"
- *   delivered          → "DO on file"                      · action null
+ * Pipeline v2 LOGISTICS_FLOW (mirrors proto + C1 enum extension):
+ *   placed             → "Awaiting request"        · action null
+ *   proceed_request    → "Awaiting your decision"  · action "Confirm"
+ *   awaiting_stock     → "PO open with supplier"   · action "Check stock"
+ *   ready_to_dispatch  → "Stock secured"           · action "Assign delivery"
+ *   dispatched         → "With delivery partner"   · action "Attach DO"
+ *   delivered          → "DO on file"              · action null
  *
  * Filtering: stage + channel both go to the server (cache key respects them);
  * `search` also goes to the server (the route's regex-whitelisted search field
@@ -38,10 +42,12 @@ const LOGISTICS_FLOW: ReadonlyArray<{
   hint: string;
   action: string | null;
 }> = [
-  { key: "awaiting_stock", label: "Awaiting Stock", hint: "PO open with supplier", action: "Check stock" },
-  { key: "ready_to_dispatch", label: "Ready to Dispatch", hint: "Stock secured · assign partner", action: "Assign delivery" },
-  { key: "dispatched", label: "Dispatched", hint: "With delivery partner", action: "Attach DO" },
-  { key: "delivered", label: "Delivered", hint: "DO on file", action: null },
+  { key: "placed",            label: "Placed",            hint: "Awaiting request",        action: null },
+  { key: "proceed_request",   label: "Proceed Request",   hint: "Awaiting your decision",  action: "Confirm" },
+  { key: "awaiting_stock",    label: "Awaiting Stock",    hint: "PO open with supplier",   action: "Check stock" },
+  { key: "ready_to_dispatch", label: "Ready to Dispatch", hint: "Stock secured",           action: "Assign delivery" },
+  { key: "dispatched",        label: "Dispatched",        hint: "With delivery partner",   action: "Attach DO" },
+  { key: "delivered",         label: "Delivered",         hint: "DO on file",              action: null },
 ];
 
 type StageFilter = "all" | LogisticsStage;
@@ -56,6 +62,10 @@ export default function LogisticsOrders() {
   const [bundlePrefill, setBundlePrefill] = useState<CreatePoPrefill | null>(
     null,
   );
+  // Pipeline v2 (C3) expand-to-zoom: clicking a column header focuses it (flex:4)
+  // while the others compress (flex:0.4). Click again to collapse. Clicking a
+  // different column flips focus instantly (no need to collapse first).
+  const [expandedStage, setExpandedStage] = useState<LogisticsStage | null>(null);
 
   // The server applies stage + channel + search; we still fetch the full list
   // for the per-column filter chips (which need ALL stage counts even when a
@@ -68,14 +78,25 @@ export default function LogisticsOrders() {
 
   const allOrders = useMemo(() => data?.orders ?? [], [data]);
 
-  // Bucket orders by stage. logistics_stage may be null on freshly-proceeded
-  // orders before logistics_ingest_proceed has run; treat null as awaiting_stock.
-  const stageOf = (o: LogisticsOrderListRow): LogisticsStage =>
-    (o.logistics_stage as LogisticsStage | null) ??
-    (o.status === "delivered" ? "delivered" : "awaiting_stock");
+  // Bucket orders by stage. Pipeline v2 (C1) widens the enum:
+  //   - status='place'     → placed (regardless of logistics_stage; the order
+  //                          hasn't been pushed to logistics yet)
+  //   - logistics_stage    → use it directly when set
+  //   - else status='delivered' → delivered (legacy seed safety net)
+  //   - else                → awaiting_stock (legacy proceed_order rows
+  //                          without a logistics_stage value still exist in
+  //                          older seed data; default them to the work bucket)
+  const stageOf = (o: LogisticsOrderListRow): LogisticsStage => {
+    if (o.status === "place") return "placed";
+    if (o.logistics_stage) return o.logistics_stage as LogisticsStage;
+    if (o.status === "delivered") return "delivered";
+    return "awaiting_stock";
+  };
 
   const stageCounts = useMemo(() => {
     const counts: Record<LogisticsStage, number> = {
+      placed: 0,
+      proceed_request: 0,
       awaiting_stock: 0,
       ready_to_dispatch: 0,
       dispatched: 0,
@@ -92,6 +113,8 @@ export default function LogisticsOrders() {
 
   const ordersByStage = useMemo(() => {
     const buckets: Record<LogisticsStage, LogisticsOrderListRow[]> = {
+      placed: [],
+      proceed_request: [],
       awaiting_stock: [],
       ready_to_dispatch: [],
       dispatched: [],
@@ -244,8 +267,8 @@ export default function LogisticsOrders() {
         />
       )}
 
-      {/* Kanban */}
-      <div className="grid grid-cols-4 gap-3">
+      {/* Kanban — flex row so each column can animate flex-basis on expand. */}
+      <div className="flex gap-3 items-stretch">
         {LOGISTICS_FLOW.map((s) => (
           <OrderColumn
             key={s.key}
@@ -258,6 +281,11 @@ export default function LogisticsOrders() {
             onToggleSelect={toggleSelect}
             onOpenOrder={setOpenOrderId}
             onSelectAll={() => selectAllInColumn(s.key)}
+            expanded={expandedStage === s.key}
+            anyExpanded={expandedStage !== null}
+            onToggleExpand={() =>
+              setExpandedStage((prev) => (prev === s.key ? null : s.key))
+            }
           />
         ))}
       </div>
@@ -313,15 +341,15 @@ function KanbanSkeleton() {
     <div data-testid="logistics-orders-skeleton">
       <div className="h-12 w-1/3 bg-base-100 rounded animate-pulse mb-6" />
       <div className="flex gap-2 mb-4">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {Array.from({ length: 7 }).map((_, i) => (
           <div key={i} className="h-7 w-24 bg-base-100 rounded animate-pulse" />
         ))}
       </div>
-      <div className="grid grid-cols-4 gap-3">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="flex gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="bg-white border border-base-200 rounded-[4px] min-h-[360px] p-3"
+            className="flex-1 bg-white border border-base-200 rounded-[4px] min-h-[360px] p-3"
           >
             <div className="h-4 w-1/2 bg-base-100 rounded animate-pulse mb-3" />
             {Array.from({ length: 3 }).map((__, j) => (

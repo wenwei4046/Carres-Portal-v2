@@ -109,6 +109,8 @@ export {
   listPurchaseOrdersQuery,
   cancelPoInput,
   listMovementsQuery,
+  confirmProceedRequestInputSchema,
+  transferReadyInputSchema,
   type AssignPartnerInput,
   type AttachDoInput,
   type ReceivePoLineInput,
@@ -124,4 +126,6 @@ export {
   type ListPurchaseOrdersQuery,
   type CancelPoInput,
   type ListMovementsQuery,
+  type ConfirmProceedRequestInput,
+  type TransferReadyInput,
 } from "./schemas/logistics";

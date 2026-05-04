@@ -56,7 +56,13 @@ const baseSummary: LogisticsDashboardResponse = {
     active_orders: 12,
     active_gmv: 1234567,
   },
-  pipeline: { awaiting_stock: 4, ready_to_dispatch: 2, dispatched: 1 },
+  pipeline: {
+    placed: 5,
+    proceed_request: 3,
+    awaiting_stock: 4,
+    ready_to_dispatch: 2,
+    dispatched: 1,
+  },
   open_pos: [
     {
       id: "po-aaaaaa01",
@@ -200,15 +206,21 @@ describe("LogisticsDashboard", () => {
     setLoaded(
       {
         ...baseSummary,
-        pipeline: { awaiting_stock: 0, ready_to_dispatch: 0, dispatched: 0 },
+        pipeline: {
+          placed: 0,
+          proceed_request: 0,
+          awaiting_stock: 0,
+          ready_to_dispatch: 0,
+          dispatched: 0,
+        },
       },
       [],
     );
     render(wrap(<LogisticsDashboard setTab={() => {}} />));
 
-    // Three columns × three em-dashes.
+    // Pipeline v2 (C3): five columns × five em-dashes.
     const dashes = screen.getAllByText("—");
-    expect(dashes.length).toBeGreaterThanOrEqual(3);
+    expect(dashes.length).toBeGreaterThanOrEqual(5);
   });
 
   it("loading state renders the skeleton placeholder", () => {
@@ -275,6 +287,43 @@ describe("LogisticsDashboard", () => {
     // The thousands separator MUST appear at least twice for 1,234,567.
     const separatorCount = (node.textContent ?? "").replace(/[^,.   ]/g, "").length;
     expect(separatorCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it("Pipeline v2 (C3): renders 5 pipeline columns in kanban order", () => {
+    setLoaded();
+    render(wrap(<LogisticsDashboard setTab={() => {}} />));
+
+    // All 5 column labels render. Use exact-match to avoid colliding with the
+    // hero strap line ("ready to ship") or KPI hints.
+    expect(screen.getByText("Placed")).toBeInTheDocument();
+    expect(screen.getByText("Proceed Request")).toBeInTheDocument();
+    expect(screen.getByText("Awaiting stock")).toBeInTheDocument();
+    expect(screen.getByText("Ready to dispatch")).toBeInTheDocument();
+    expect(screen.getByText("Dispatched")).toBeInTheDocument();
+  });
+
+  it("Pipeline v2 (C3): placed column filters by status='place' (not logistics_stage)", () => {
+    // status='place' orders may have logistics_stage NULL. They MUST still
+    // render in the Placed column, mirroring the kanban's `stageOf` rule.
+    const orders = [
+      makeOrder({
+        id: "ord-place-1",
+        customer_name: "Placed Pal",
+        status: "place",
+        logistics_stage: null,
+      }),
+      makeOrder({
+        id: "ord-pr-1",
+        customer_name: "Proceed Person",
+        status: "proceed_order",
+        logistics_stage: "proceed_request",
+      }),
+    ];
+    setLoaded(baseSummary, orders);
+    render(wrap(<LogisticsDashboard setTab={() => {}} />));
+
+    expect(screen.getByText("Placed Pal")).toBeInTheDocument();
+    expect(screen.getByText("Proceed Person")).toBeInTheDocument();
   });
 
   it("side card View all links navigate to the right tab", () => {

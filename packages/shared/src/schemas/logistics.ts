@@ -105,6 +105,38 @@ export const warehousePickInput = z.object({
 export type WarehousePickInput = z.infer<typeof warehousePickInput>;
 
 /**
+ * `confirmProceedRequestInputSchema` — POST /api/logistics/orders/:id/confirm-proceed
+ * (Pipeline v2, C2 / migration 0024). Maps to RPC
+ * `logistics_confirm_proceed_request(p_order_id, p_warehouse_id)`. Logistics'
+ * manual triage entry point: confirms a `proceed_request` order and decides
+ * `awaiting_stock` vs `ready_to_dispatch` based on shortage at the chosen
+ * warehouse. `warehouseId` is optional — RPC accepts NULL when the order
+ * already has `warehouse_id`. `nullable()` is included so callers can be
+ * explicit with `{ warehouseId: null }`.
+ */
+export const confirmProceedRequestInputSchema = z.object({
+  warehouseId: z.string().uuid().nullable().optional(),
+}).strict();
+export type ConfirmProceedRequestInput = z.infer<typeof confirmProceedRequestInputSchema>;
+
+/**
+ * `transferReadyInputSchema` — POST /api/logistics/orders/:id/transfer-ready
+ * (Pipeline v2, C2 / migration 0024). Maps to RPC
+ * `logistics_warehouse_pick(p_order_id, p_warehouse_id)` — the RPC's
+ * source-stage guard widens to IN ('proceed_request', 'awaiting_stock'), so
+ * this same RPC powers both warehouse-override and the v2 transfer flow.
+ * Naming kept distinct from `warehousePickInput` because the FE entry points
+ * are conceptually different (one is "change warehouse", the other is
+ * "mark ready"). `warehouseId` is required — the RPC `logistics_warehouse_pick`
+ * rejects NULL with `warehouse_required`. confirm-proceed accepts NULL via a
+ * different RPC; do not conflate.
+ */
+export const transferReadyInputSchema = z.object({
+  warehouseId: z.string().uuid(),
+}).strict();
+export type TransferReadyInput = z.infer<typeof transferReadyInputSchema>;
+
+/**
  * `issuePosForOrderInput` — POST /api/logistics/orders/:id/issue-pos.
  * Maps to `logistics_issue_pos_for_order(order_id)` RPC. Body is empty (the
  * order id is the path param). `.strict()` rejects any extra body keys so
@@ -148,12 +180,15 @@ export type ReassignPoWarehouseInput = z.infer<typeof reassignPoWarehouseInput>;
 
 /**
  * `listLogisticsOrdersQuery` — GET /api/logistics/orders query string.
- * stage: 'all' (default) or one of the 4 logistics stages.
+ * stage: 'all' (default) or one of the logistics stages. Pipeline v2 (C3,
+ *   migration 0023) added 'placed' (synthetic — derived from `status='place'`
+ *   in the route since pre-push orders don't necessarily have stage written
+ *   yet) and 'proceed_request' (post-proceed_order, pre-triage).
  * channel: 'all' (default) | 'dealers' | 'showrooms'.
  * search: free-text matched against customer_name (ILIKE) AND parsed as int for dl exact match.
  */
 export const listLogisticsOrdersQuery = z.object({
-  stage: z.enum(['all', 'awaiting_stock', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
+  stage: z.enum(['all', 'placed', 'proceed_request', 'awaiting_stock', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
   channel: z.enum(['all', 'dealers', 'showrooms']).default('all'),
   search: z.string().trim().max(100).optional(),
 }).strict();

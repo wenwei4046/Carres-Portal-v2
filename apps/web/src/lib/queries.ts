@@ -14,6 +14,7 @@ import {
   type AttachDoInput,
   type CancelOrderInput,
   type CatalogResponse,
+  type ConfirmProceedRequestInput,
   type CreateOrderInput,
   type CreatePoInput,
   type DealerSelf,
@@ -30,6 +31,7 @@ import {
   type SetOrderAddressInput,
   type SetOrderDateInput,
   type TopUpOrderInput,
+  type TransferReadyInput,
   type UpdateOrderInput,
   type WarehousePickInput,
 } from "@carres/shared";
@@ -791,6 +793,12 @@ export interface LogisticsDashboardKpis {
   active_gmv: number;
 }
 export interface LogisticsPipelineCounts {
+  /** Pipeline v2 (C3): orders with `status='place'` — dealer-side, not yet
+   *  proceeded. Counted via the dashboard route since the RPC is frozen. */
+  placed: number;
+  /** Pipeline v2 (C3): orders with `logistics_stage='proceed_request'` —
+   *  awaiting HQ logistics triage decision. */
+  proceed_request: number;
   awaiting_stock: number;
   ready_to_dispatch: number;
   dispatched: number;
@@ -864,13 +872,24 @@ export interface SuppliersListResponse {
 }
 
 /** Row in GET /api/logistics/orders. Embedded `dealers(name)` is a PostgREST
- *  nested fetch shape — the route forwards it verbatim. */
+ *  nested fetch shape — the route forwards it verbatim.
+ *
+ *  Pipeline v2 (C1/C2): adds `'placed'` + `'proceed_request'` to logistics_stage
+ *  and widens status to include the dealer-side `'place'` value (orders that
+ *  haven't been pushed to logistics yet still surface in the kanban so HQ can
+ *  see what's coming). */
 export interface LogisticsOrderListRow {
   id: string;
   dl: number;
-  status: "proceed_order" | "delivered";
+  status: "place" | "proceed_order" | "delivered";
   logistics_stage:
-    | "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered" | null;
+    | "placed"
+    | "proceed_request"
+    | "awaiting_stock"
+    | "ready_to_dispatch"
+    | "dispatched"
+    | "delivered"
+    | null;
   warehouse_id: string | null;
   customer_name: string;
   placed_at: string;
@@ -893,7 +912,13 @@ export interface LogisticsOrderDetailOrder {
   dl: number;
   status: string;
   logistics_stage:
-    | "awaiting_stock" | "ready_to_dispatch" | "dispatched" | "delivered" | null;
+    | "placed"
+    | "proceed_request"
+    | "awaiting_stock"
+    | "ready_to_dispatch"
+    | "dispatched"
+    | "delivered"
+    | null;
   warehouse_id: string | null;
   customer_name: string;
   customer_phone: string | null;
@@ -1335,6 +1360,94 @@ export function useWarehousePickMutation(
       await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Pipeline v2 (C2 / migration 0024) — confirm a `proceed_request` order.
+ *  RPC `logistics_confirm_proceed_request` decides awaiting_stock vs
+ *  ready_to_dispatch based on shortage at the chosen warehouse. `warehouseId`
+ *  is optional — RPC accepts NULL when the order already has a warehouse_id.
+ *
+ *  Stock-touching: ready_to_dispatch path reserves stock atomically, so the
+ *  warehouse cache must bust. Dashboard counts shift either way.
+ *
+ *  Errors (422 with body.code):
+ *    - `wrong_stage` — order has already been triaged
+ *    - `warehouse_required` — RPC needs a warehouse pick (shouldn't fire from
+ *      the dialog since picker is required, but kept in the contract for
+ *      defense-in-depth)
+ *    - `insufficient_stock_for_reserve` — race-condition: stock changed
+ *      between pre-flight check and submit. Body carries a `hint` like
+ *      "sku=X warehouse_id=Y". */
+export function useConfirmProceedRequest(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      LogisticsOrderMutationResponse,
+      ApiError,
+      ConfirmProceedRequestInput
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    LogisticsOrderMutationResponse,
+    ApiError,
+    ConfirmProceedRequestInput
+  >({
+    mutationFn: (input) =>
+      apiFetch<LogisticsOrderMutationResponse>(
+        `/api/logistics/orders/${orderId}/confirm-proceed`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Pipeline v2 (C2 / migration 0024) — flip a `proceed_request` or
+ *  `awaiting_stock` order directly to `ready_to_dispatch`. Wraps
+ *  `logistics_warehouse_pick` whose source-stage guard widens to permit both
+ *  stages. `warehouseId` is REQUIRED here (the RPC raises 22023
+ *  `warehouse_required` on NULL — confirm-proceed accepts NULL via a different
+ *  RPC, do not conflate). Reserves stock; busts warehouse cache. */
+export function useTransferReady(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      LogisticsOrderMutationResponse,
+      ApiError,
+      TransferReadyInput
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    LogisticsOrderMutationResponse,
+    ApiError,
+    TransferReadyInput
+  >({
+    mutationFn: (input) =>
+      apiFetch<LogisticsOrderMutationResponse>(
+        `/api/logistics/orders/${orderId}/transfer-ready`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

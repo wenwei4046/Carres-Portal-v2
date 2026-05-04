@@ -15,6 +15,8 @@ import {
   listPurchaseOrdersQuery,
   cancelPoInput,
   listMovementsQuery,
+  confirmProceedRequestInputSchema,
+  transferReadyInputSchema,
 } from './logistics';
 
 const UUID = '00000000-0000-4000-8000-000000000000';
@@ -251,5 +253,41 @@ describe('listMovementsQuery', () => {
   });
   it('rejects extra keys (strict mode)', () => {
     expect(listMovementsQuery.safeParse({ category: 'all', extraField: 'x' }).success).toBe(false);
+  });
+});
+
+describe('confirmProceedRequestInputSchema', () => {
+  it('accepts an empty body (warehouseId optional)', () => {
+    expect(confirmProceedRequestInputSchema.safeParse({}).success).toBe(true);
+  });
+  it('accepts warehouseId as a uuid', () => {
+    expect(confirmProceedRequestInputSchema.safeParse({ warehouseId: UUID }).success).toBe(true);
+  });
+  it('accepts warehouseId=null (explicit null)', () => {
+    expect(confirmProceedRequestInputSchema.safeParse({ warehouseId: null }).success).toBe(true);
+  });
+  it('rejects warehouseId that is not a uuid', () => {
+    expect(confirmProceedRequestInputSchema.safeParse({ warehouseId: 'not-a-uuid' }).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(confirmProceedRequestInputSchema.safeParse({ warehouseId: UUID, extraField: 'x' }).success).toBe(false);
+  });
+});
+
+describe('transferReadyInputSchema', () => {
+  it('rejects an empty body (warehouseId required — RPC `logistics_warehouse_pick` raises 22023 warehouse_required on NULL)', () => {
+    expect(transferReadyInputSchema.safeParse({}).success).toBe(false);
+  });
+  it('accepts warehouseId as a uuid', () => {
+    expect(transferReadyInputSchema.safeParse({ warehouseId: UUID }).success).toBe(true);
+  });
+  it('rejects warehouseId=null (RPC rejects NULL — distinct from confirm-proceed which accepts it)', () => {
+    expect(transferReadyInputSchema.safeParse({ warehouseId: null }).success).toBe(false);
+  });
+  it('rejects warehouseId that is not a uuid', () => {
+    expect(transferReadyInputSchema.safeParse({ warehouseId: 'bogus' }).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(transferReadyInputSchema.safeParse({ warehouseId: UUID, extraField: 'x' }).success).toBe(false);
   });
 });

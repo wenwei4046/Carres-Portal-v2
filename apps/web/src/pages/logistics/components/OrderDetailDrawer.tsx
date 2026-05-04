@@ -15,6 +15,8 @@ import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
 import AbandonOrderModal from "./AbandonOrderModal";
 import IssuePOsModal from "./IssuePOsModal";
+import ConfirmProceedDialog from "./ConfirmProceedDialog";
+import TransferReadyDialog from "./TransferReadyDialog";
 import { SectionHead } from "./Modal";
 
 /**
@@ -72,12 +74,20 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
   const [showDO, setShowDO] = useState(false);
   const [showIssuePOs, setShowIssuePOs] = useState(false);
   const [showAbandon, setShowAbandon] = useState(false);
+  const [showConfirmProceed, setShowConfirmProceed] = useState(false);
+  const [showTransferReady, setShowTransferReady] = useState(false);
 
   // Esc-to-close listener at the drawer level. Modals install their own Esc
   // handlers; while a modal is open we let it consume the key first by gating
   // ours on the modal-open flags.
   useEffect(() => {
-    const anyModalOpen = showDispatch || showDO || showIssuePOs || showAbandon;
+    const anyModalOpen =
+      showDispatch ||
+      showDO ||
+      showIssuePOs ||
+      showAbandon ||
+      showConfirmProceed ||
+      showTransferReady;
     if (anyModalOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -87,7 +97,15 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose, showDispatch, showDO, showIssuePOs, showAbandon]);
+  }, [
+    onClose,
+    showDispatch,
+    showDO,
+    showIssuePOs,
+    showAbandon,
+    showConfirmProceed,
+    showTransferReady,
+  ]);
 
   return (
     <div
@@ -122,6 +140,8 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
               onDOClick={() => setShowDO(true)}
               onIssuePOsClick={() => setShowIssuePOs(true)}
               onAbandonClick={() => setShowAbandon(true)}
+              onConfirmProceedClick={() => setShowConfirmProceed(true)}
+              onTransferReadyClick={() => setShowTransferReady(true)}
             />
             {showDispatch && (
               <DispatchModal
@@ -151,6 +171,20 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
               <AbandonOrderModal
                 order={data.order}
                 onClose={() => setShowAbandon(false)}
+              />
+            )}
+            {showConfirmProceed && (
+              <ConfirmProceedDialog
+                order={data.order}
+                lines={data.lines}
+                onClose={() => setShowConfirmProceed(false)}
+              />
+            )}
+            {showTransferReady && (
+              <TransferReadyDialog
+                order={data.order}
+                lines={data.lines}
+                onClose={() => setShowTransferReady(false)}
               />
             )}
           </>
@@ -231,6 +265,8 @@ interface DrawerBodyProps {
   onDOClick: () => void;
   onIssuePOsClick: () => void;
   onAbandonClick: () => void;
+  onConfirmProceedClick: () => void;
+  onTransferReadyClick: () => void;
 }
 
 function DrawerBody({
@@ -240,11 +276,19 @@ function DrawerBody({
   onDOClick,
   onIssuePOsClick,
   onAbandonClick,
+  onConfirmProceedClick,
+  onTransferReadyClick,
 }: DrawerBodyProps) {
   const { order, lines, addons, total, warehouse, stockBalances, pos, history } = data;
-  const stage: LogisticsStage =
-    (order.logistics_stage as LogisticsStage | null) ??
-    (order.status === "delivered" ? "delivered" : "awaiting_stock");
+  // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
+  // new placed/proceed_request enum values without falling through to a
+  // bogus awaiting_stock default.
+  const stage: LogisticsStage = (() => {
+    if (order.status === "place") return "placed";
+    if (order.logistics_stage) return order.logistics_stage as LogisticsStage;
+    if (order.status === "delivered") return "delivered";
+    return "awaiting_stock";
+  })();
   const shortages = calcShortages(lines, stockBalances);
   const dealerName = order.dealers?.name ?? "—";
 
@@ -295,6 +339,8 @@ function DrawerBody({
           onDOClick={onDOClick}
           onIssuePOsClick={onIssuePOsClick}
           onAbandonClick={onAbandonClick}
+          onConfirmProceedClick={onConfirmProceedClick}
+          onTransferReadyClick={onTransferReadyClick}
         />
       </div>
 
@@ -449,6 +495,8 @@ interface ActionBarProps {
   onDOClick: () => void;
   onIssuePOsClick: () => void;
   onAbandonClick: () => void;
+  onConfirmProceedClick: () => void;
+  onTransferReadyClick: () => void;
 }
 
 function ActionBar({
@@ -461,15 +509,54 @@ function ActionBar({
   onDOClick,
   onIssuePOsClick,
   onAbandonClick,
+  onConfirmProceedClick,
+  onTransferReadyClick,
 }: ActionBarProps) {
   const recheck = useRecheckStockMutation(orderId);
 
+  if (stage === "placed") {
+    return (
+      <div>
+        <div className="text-[12px] text-base-700 mb-2 font-body">
+          Order placed by dealer. Waiting for them to push it to logistics — no
+          action available yet.
+        </div>
+      </div>
+    );
+  }
+  if (stage === "proceed_request") {
+    return (
+      <div>
+        <div className="text-[12px] text-base-700 mb-2 font-body">
+          Dealer pushed this order. Confirm to triage — system will reserve
+          stock or queue a PO based on availability.
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            type="button"
+            className="btn-primary text-[12px]"
+            onClick={onConfirmProceedClick}
+          >
+            Confirm proceed
+          </button>
+          <button
+            type="button"
+            className="btn-ghost text-[12px] text-destructive"
+            onClick={onAbandonClick}
+          >
+            Abandon
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (stage === "awaiting_stock") {
     return (
       <div>
         <div className="text-[12px] text-warning mb-2 font-body">
           Waiting on stock for {shortageCount} line{shortageCount === 1 ? "" : "s"}.
-          When the supplier DO arrives, mark the PO as received in <strong>Procurement</strong>.
+          When the supplier DO arrives, mark the PO as received in <strong>Procurement</strong>{" "}
+          — or transfer manually if stock is already on-hand.
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
@@ -486,6 +573,13 @@ function ActionBar({
             disabled={recheck.isPending}
           >
             {recheck.isPending ? "Checking…" : "↻ Re-check stock"}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary text-[12px]"
+            onClick={onTransferReadyClick}
+          >
+            Transfer to ready (stock on-hand)
           </button>
           {shortageCount > 0 && (
             <button

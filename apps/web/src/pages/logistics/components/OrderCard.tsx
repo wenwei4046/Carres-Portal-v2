@@ -36,6 +36,10 @@ interface Props {
   onOpen: () => void;
   /** Optional CTA hint (e.g. "Assign delivery →") shown bottom-right. */
   actionHint?: string;
+  /** Pipeline v2 expand-to-zoom: when another column is expanded this column
+   *  shrinks to ~10% width, so we strip the card down to just `#DL` + customer
+   *  name to stay scannable. */
+  compact?: boolean;
 }
 
 export default function OrderCard({
@@ -45,6 +49,7 @@ export default function OrderCard({
   onToggleSelect,
   onOpen,
   actionHint,
+  compact = false,
 }: Props) {
   const customer = order.customer_name;
   const dealerName = order.dealers?.name ?? "—";
@@ -122,39 +127,45 @@ export default function OrderCard({
           <span className="font-mono text-[11px] font-semibold text-base-900">
             #{order.dl}
           </span>
-          <span className="font-mono text-[10px] text-base-500">
-            {placedShort}
-          </span>
+          {!compact && (
+            <span className="font-mono text-[10px] text-base-500">
+              {placedShort}
+            </span>
+          )}
         </div>
         <div
-          className={`${cjkClassName(customer)} text-[13px] font-medium text-base-900 mt-0.5`}
+          className={`${cjkClassName(customer)} text-[13px] font-medium text-base-900 mt-0.5 ${compact ? "truncate" : ""}`}
         >
           {customer}
         </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          {isShowroom && (
-            <span
-              className="inline-block text-[9px] font-bold uppercase tracking-[0.1em] leading-none py-[2px] px-[5px] border rounded-[2px] flex-shrink-0"
-              style={{ color: "#3c5a78", borderColor: "#3c5a78" }}
-            >
-              Showroom
-            </span>
-          )}
-          <span className="text-[11px] text-base-600 overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
-            {dealerLabel}
-          </span>
-        </div>
-        <div className="text-[11px] text-base-500 mt-0.5">{dateLabel}</div>
-        {/* Partner name needs the drawer-fetch join to surface here — list
-            endpoint returns id only. Keep this line off until the M5.0
-            phase-4-detail-partner-name-join TODO lands. */}
-        <div className="flex items-baseline justify-end mt-1.5">
-          {actionHint && (
-            <span className="text-[10px] text-primary font-semibold">
-              {actionHint} &rarr;
-            </span>
-          )}
-        </div>
+        {!compact && (
+          <>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {isShowroom && (
+                <span
+                  className="inline-block text-[9px] font-bold uppercase tracking-[0.1em] leading-none py-[2px] px-[5px] border rounded-[2px] flex-shrink-0"
+                  style={{ color: "#3c5a78", borderColor: "#3c5a78" }}
+                >
+                  Showroom
+                </span>
+              )}
+              <span className="text-[11px] text-base-600 overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
+                {dealerLabel}
+              </span>
+            </div>
+            <div className="text-[11px] text-base-500 mt-0.5">{dateLabel}</div>
+            {/* Partner name needs the drawer-fetch join to surface here — list
+                endpoint returns id only. Keep this line off until the M5.0
+                phase-4-detail-partner-name-join TODO lands. */}
+            <div className="flex items-baseline justify-end mt-1.5">
+              {actionHint && (
+                <span className="text-[10px] text-primary font-semibold">
+                  {actionHint} &rarr;
+                </span>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -21,11 +21,21 @@ import { cjkClassName } from "@/lib/cjk";
  * ("5 most recent orders").
  *
  * Stage → accent token map mirrors proto lines 203:
+ *   placed            → base-500 (muted — read-only, not yet proceeded)
+ *   proceed_request   → warning  (honey, action-needed)
  *   awaiting_stock    → warning  (honey)
  *   ready_to_dispatch → info     (slate blue)
  *   dispatched        → success  (olive)
+ *
+ * Pipeline v2 (C3): added `placed` + `proceed_request` to mirror the kanban's
+ * 6-column shape on the dashboard's at-a-glance row.
  */
-export type PipelineStage = "awaiting_stock" | "ready_to_dispatch" | "dispatched";
+export type PipelineStage =
+  | "placed"
+  | "proceed_request"
+  | "awaiting_stock"
+  | "ready_to_dispatch"
+  | "dispatched";
 
 interface Props {
   stage: PipelineStage;
@@ -37,12 +47,28 @@ interface Props {
 }
 
 const stageToText: Record<PipelineStage, string> = {
+  placed: "text-base-500",
+  proceed_request: "text-warning",
   awaiting_stock: "text-warning",
   ready_to_dispatch: "text-info",
   dispatched: "text-success",
 };
 
 const MAX_ORDERS = 5;
+
+/** Mirror of `stageOf` in LogisticsOrders.tsx: pipeline v2 derives `placed`
+ *  from `status='place'` (the order is dealer-side, not yet proceeded), while
+ *  every other stage reads from `logistics_stage` directly. Keeping this in
+ *  sync with the kanban guarantees the dashboard's at-a-glance counts match
+ *  what the user sees when they click through. */
+function derivePipelineStage(o: LogisticsOrderListRow): PipelineStage | null {
+  if (o.status === "place") return "placed";
+  const s = o.logistics_stage;
+  if (s === "proceed_request" || s === "awaiting_stock" || s === "ready_to_dispatch" || s === "dispatched") {
+    return s;
+  }
+  return null;
+}
 
 export default function PipelineColumn({
   stage,
@@ -54,9 +80,11 @@ export default function PipelineColumn({
 }: Props) {
   const accentText = stageToText[stage];
   // The dashboard hands us a pre-filtered list from `useLogisticsOrders`,
-  // but we re-filter defensively so the component is safe on its own.
+  // but we re-filter defensively so the component is safe on its own. The
+  // `placed` stage is derived from `status='place'` (not `logistics_stage`)
+  // to mirror the kanban's `stageOf` rule.
   const items = orders
-    .filter((o) => o.logistics_stage === stage)
+    .filter((o) => derivePipelineStage(o) === stage)
     .slice(0, MAX_ORDERS);
 
   return (

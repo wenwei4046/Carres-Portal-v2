@@ -4,9 +4,11 @@ import {
   abandonOrderInput,
   assignPartnerInput,
   attachDoInput,
+  confirmProceedRequestInputSchema,
   issuePosForOrderInput,
   listLogisticsOrdersQuery,
   recheckStockInput,
+  transferReadyInputSchema,
   warehousePickInput,
 } from "@carres/shared";
 import { renderDoPdf } from "../../lib/pdf/render";
@@ -48,6 +50,41 @@ logisticsOrdersRouter.use("*", async (c, next) => {
   await next();
 });
 
+/**
+ * Pipeline v2 error mapping. Wraps the generic `mapPgError` to expose the
+ * 22023 detail code (`wrong_stage` / `warehouse_required`) and, for P0001
+ * `insufficient_stock_for_reserve`, pass through the RPC's `hint`
+ * ("sku=… warehouse_id=…") so the UI can name the offending pair.
+ *
+ * The default `mapPgError` collapses 22023 to a generic `invalid_param`
+ * code; pipeline v2 contracts (spec §5, migration 0024:354-414) require the
+ * actual detail value to surface so the FE can branch on it.
+ */
+function mapPipelineV2Error(error: { code?: string; message?: string; details?: string; hint?: string }) {
+  if (error.code === "22023") {
+    return {
+      status: 422 as const,
+      body: {
+        error: "rule_violation",
+        code: error.details ?? "invalid_param",
+        message: error.message ?? "rule violation",
+      },
+    };
+  }
+  if (error.code === "P0001" && error.details === "insufficient_stock_for_reserve") {
+    return {
+      status: 422 as const,
+      body: {
+        error: "rule_violation",
+        code: error.details,
+        message: error.message ?? "insufficient stock to reserve",
+        hint: error.hint ?? null,
+      },
+    };
+  }
+  return mapPgError(error);
+}
+
 // ----- GET / list -----
 logisticsOrdersRouter.get("/", async (c) => {
   const parsed = listLogisticsOrdersQuery.safeParse({
@@ -69,9 +106,19 @@ logisticsOrdersRouter.get("/", async (c) => {
     .select(
       "id, dl, status, logistics_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name)",
     )
-    .in("status", ["proceed_order", "delivered"]);
+    // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
+    // render the "Placed" column. proceed_order + delivered preserved as
+    // before; existing M2 tests still pass.
+    .in("status", ["place", "proceed_order", "delivered"]);
 
-  if (stage !== "all") q = q.eq("logistics_stage", stage);
+  if (stage === "placed") {
+    // 'placed' is a synthetic stage derived from `status='place'` (pre-push
+    // orders may have NULL logistics_stage or 'placed' depending on whether
+    // they were seeded post-0024). Filter on status, not stage.
+    q = q.eq("status", "place");
+  } else if (stage !== "all") {
+    q = q.eq("logistics_stage", stage);
+  }
   // Public 'channel' enum kept as 'dealers'|'showrooms' per spec §18.3 (Loo-facing wording).
   // Internally maps to outlet_id IS [NOT] NULL — schema column is outlet_id, not showroom_id.
   if (channel === "dealers") q = q.is("outlet_id", null);
@@ -397,6 +444,57 @@ logisticsOrdersRouter.post("/:id/warehouse", async (c) => {
   });
   if (error) {
     const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ order: data });
+});
+
+// ----- POST /:id/confirm-proceed -----
+// Pipeline v2 (C2 / migration 0024). Logistics' manual triage entry point:
+// confirms a `proceed_request` order and decides awaiting_stock vs
+// ready_to_dispatch based on shortage. RPC accepts a NULL warehouseId when
+// the order already has one assigned.
+//
+// Error mapping (overrides the generic mapPgError for the 22023 cases that
+// carry a meaningful detail code, since spec §5 / 0024:354-414 promises
+// specific UI codes):
+//   • 42501                → 403 forbidden
+//   • 22023 wrong_stage    → 422 with code='wrong_stage'
+//   • 22023 warehouse_required → 422 with code='warehouse_required'
+//   • P0001 insufficient_stock_for_reserve → 422 with code +
+//                            hint passthrough (sku=... warehouse_id=...) so
+//                            the UI can name the offending pair.
+logisticsOrdersRouter.post("/:id/confirm-proceed", async (c) => {
+  const parsed = await parseJsonBody(c, confirmProceedRequestInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("logistics_confirm_proceed_request", {
+    p_order_id: c.req.param("id"),
+    p_warehouse_id: parsed.data.warehouseId ?? null,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ order: data });
+});
+
+// ----- POST /:id/transfer-ready -----
+// Pipeline v2 (C2 / migration 0024). Wraps `logistics_warehouse_pick` whose
+// source-stage guard now permits IN ('proceed_request', 'awaiting_stock').
+// Same error contract as /confirm-proceed. Note: warehouseId is REQUIRED here
+// (the RPC raises 22023 `warehouse_required` on NULL). confirm-proceed
+// accepts NULL via a different RPC; do not conflate.
+logisticsOrdersRouter.post("/:id/transfer-ready", async (c) => {
+  const parsed = await parseJsonBody(c, transferReadyInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("logistics_warehouse_pick", {
+    p_order_id: c.req.param("id"),
+    p_warehouse_id: parsed.data.warehouseId,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
   }
   return c.json({ order: data });

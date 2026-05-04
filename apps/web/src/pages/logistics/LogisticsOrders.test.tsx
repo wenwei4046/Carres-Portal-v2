@@ -38,6 +38,23 @@ let partnersHookState: {
   isLoading: boolean;
   isError: boolean;
 };
+// Pipeline v2 (C3.2): warehouse fixture must be test-mutable so the
+// TransferReadyDialog pre-flight branch can be exercised both with stock
+// (sufficient → submit enabled) and without (shortage → submit blocked).
+let warehouseHookState: {
+  data:
+    | {
+        warehouses: { id: string; name: string; address: string | null }[];
+        byWarehouse: Record<
+          string,
+          { sku: string; qty: number; reserved: number; low_stock_status: "ok" }[]
+        >;
+        totalsBySku: Record<string, never>;
+      }
+    | undefined;
+  isLoading: boolean;
+  isError: boolean;
+};
 const refetchSpy = vi.fn();
 
 vi.mock("@/lib/queries", async () => {
@@ -51,11 +68,17 @@ vi.mock("@/lib/queries", async () => {
     useLogisticsOrders: () => listHookState,
     useLogisticsOrder: () => detailHookState,
     useDeliveryPartners: () => partnersHookState,
+    // Pipeline v2 (C3): warehouses list powers the ConfirmProceed +
+    // TransferReady dialog pickers. Driven by test state so individual
+    // cases can flip the byWarehouse fixture between sufficient + short.
+    useLogisticsWarehouse: () => warehouseHookState,
     useAssignPartnerMutation: () => inertMutation(),
     useAttachDoMutation: () => inertMutation(),
     useAbandonOrderMutation: () => inertMutation(),
     useIssuePosForOrderMutation: () => inertMutation(),
     useRecheckStockMutation: () => inertMutation(),
+    useConfirmProceedRequest: () => inertMutation(),
+    useTransferReady: () => inertMutation(),
   };
 });
 
@@ -144,6 +167,21 @@ function setLoaded(orders: LogisticsOrderListRow[]) {
     isLoading: false,
     isError: false,
   };
+  // Default to a single warehouse with sufficient stock — individual tests
+  // can override before render to drive the dialog into shortage state.
+  warehouseHookState = {
+    data: {
+      warehouses: [{ id: "wh-1", name: "KL Warehouse", address: "Subang" }],
+      byWarehouse: {
+        "wh-1": [
+          { sku: "SOFA-NORD-3S", qty: 5, reserved: 0, low_stock_status: "ok" },
+        ],
+      },
+      totalsBySku: {},
+    },
+    isLoading: false,
+    isError: false,
+  };
 }
 
 beforeEach(() => {
@@ -151,7 +189,7 @@ beforeEach(() => {
 });
 
 describe("LogisticsOrders — kanban", () => {
-  it("1. renders all 4 stage columns", () => {
+  it("1. renders all 6 Pipeline v2 stage columns including Placed and Proceed Request", () => {
     setLoaded([
       makeOrder({ id: "a", logistics_stage: "awaiting_stock" }),
       makeOrder({ id: "b", logistics_stage: "ready_to_dispatch" }),
@@ -160,6 +198,8 @@ describe("LogisticsOrders — kanban", () => {
     ]);
     render(wrap(<LogisticsOrders />));
 
+    expect(screen.getByTestId("stage-column-placed")).toBeInTheDocument();
+    expect(screen.getByTestId("stage-column-proceed_request")).toBeInTheDocument();
     expect(screen.getByTestId("stage-column-awaiting_stock")).toBeInTheDocument();
     expect(screen.getByTestId("stage-column-ready_to_dispatch")).toBeInTheDocument();
     expect(screen.getByTestId("stage-column-dispatched")).toBeInTheDocument();
@@ -334,6 +374,7 @@ describe("LogisticsOrders — kanban", () => {
       refetch: vi.fn(),
     };
     partnersHookState = { data: undefined, isLoading: false, isError: false };
+    warehouseHookState = { data: undefined, isLoading: true, isError: false };
     render(wrap(<LogisticsOrders />));
     expect(screen.getByTestId("logistics-orders-skeleton")).toBeInTheDocument();
   });
@@ -354,6 +395,7 @@ describe("LogisticsOrders — kanban", () => {
       refetch: vi.fn(),
     };
     partnersHookState = { data: undefined, isLoading: false, isError: false };
+    warehouseHookState = { data: undefined, isLoading: false, isError: true };
     render(wrap(<LogisticsOrders />));
     expect(screen.getByText(/Couldn’t load orders/)).toBeInTheDocument();
     expect(screen.getByText(/boom/)).toBeInTheDocument();
@@ -434,5 +476,217 @@ describe("LogisticsOrders — kanban", () => {
     expect(
       screen.queryByRole("button", { name: /Abandon/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("18. order with status='place' lands in the Placed column", () => {
+    setLoaded([
+      makeOrder({
+        id: "ord-place",
+        dl: 7001,
+        status: "place",
+        // Place orders may have logistics_stage NULL (legacy seed) or 'placed'
+        // (post-C2). The kanban must bucket them by status, not stage.
+        logistics_stage: null,
+        customer_name: "Pending Push",
+      }),
+    ]);
+    render(wrap(<LogisticsOrders />));
+
+    const placedCol = screen.getByTestId("stage-column-placed");
+    expect(placedCol).toContainElement(screen.getByText("Pending Push"));
+    // Sanity: not in any other column.
+    expect(
+      screen.getByTestId("stage-column-awaiting_stock"),
+    ).not.toContainElement(screen.queryByText("Pending Push"));
+  });
+
+  it("19. drawer ActionBar shows Confirm proceed when stage is proceed_request", () => {
+    setLoaded([
+      makeOrder({
+        id: "ord-1",
+        dl: 9001,
+        customer_name: "Alice",
+        status: "proceed_order",
+        logistics_stage: "proceed_request",
+      }),
+    ]);
+    detailHookState = {
+      ...detailHookState,
+      data: {
+        ...makeDetail(),
+        order: {
+          ...makeDetail().order,
+          status: "proceed_order",
+          logistics_stage: "proceed_request",
+        },
+      },
+    };
+    render(wrap(<LogisticsOrders />));
+    fireEvent.click(screen.getByText("Alice"));
+    expect(
+      screen.getByRole("button", { name: /Confirm proceed/ }),
+    ).toBeInTheDocument();
+    // Abandon is the second action on proceed_request — keep it visible so
+    // logistics can reject without a stage trip first.
+    expect(
+      screen.getByRole("button", { name: /Abandon/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("20. drawer ActionBar on stage='placed' shows informational copy and no buttons", () => {
+    setLoaded([
+      makeOrder({
+        id: "ord-placed",
+        dl: 9050,
+        customer_name: "Awaiting Push",
+        status: "place",
+        logistics_stage: null,
+      }),
+    ]);
+    detailHookState = {
+      ...detailHookState,
+      data: {
+        ...makeDetail(),
+        order: {
+          ...makeDetail().order,
+          status: "place",
+          logistics_stage: null,
+        },
+      },
+    };
+    render(wrap(<LogisticsOrders />));
+    fireEvent.click(screen.getByText("Awaiting Push"));
+    expect(
+      screen.getByText(/Waiting for them to push it to logistics/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Confirm proceed/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("21. clicking a column header toggles its expanded state", () => {
+    setLoaded([
+      makeOrder({ id: "a", logistics_stage: "awaiting_stock" }),
+      makeOrder({ id: "b", logistics_stage: "ready_to_dispatch" }),
+    ]);
+    render(wrap(<LogisticsOrders />));
+
+    const awaitingCol = screen.getByTestId("stage-column-awaiting_stock");
+    expect(awaitingCol).toHaveAttribute("data-expanded", "false");
+
+    // Header is the column-toggle button (first button inside the column wrapper).
+    const header = awaitingCol.querySelector("button[aria-expanded]") as HTMLElement;
+    expect(header).toBeTruthy();
+    fireEvent.click(header);
+    expect(awaitingCol).toHaveAttribute("data-expanded", "true");
+
+    // Click again to collapse.
+    fireEvent.click(header);
+    expect(awaitingCol).toHaveAttribute("data-expanded", "false");
+  });
+
+  it("22. clicking a different column header transfers expansion focus instantly", () => {
+    setLoaded([
+      makeOrder({ id: "a", logistics_stage: "awaiting_stock" }),
+      makeOrder({ id: "b", logistics_stage: "ready_to_dispatch" }),
+    ]);
+    render(wrap(<LogisticsOrders />));
+
+    const awaitingCol = screen.getByTestId("stage-column-awaiting_stock");
+    const readyCol = screen.getByTestId("stage-column-ready_to_dispatch");
+    const awaitingHeader = awaitingCol.querySelector("button[aria-expanded]") as HTMLElement;
+    const readyHeader = readyCol.querySelector("button[aria-expanded]") as HTMLElement;
+
+    fireEvent.click(awaitingHeader);
+    expect(awaitingCol).toHaveAttribute("data-expanded", "true");
+    expect(readyCol).toHaveAttribute("data-expanded", "false");
+
+    // Click ready directly — focus flips, no need to collapse first.
+    fireEvent.click(readyHeader);
+    expect(awaitingCol).toHaveAttribute("data-expanded", "false");
+    expect(readyCol).toHaveAttribute("data-expanded", "true");
+  });
+
+  it("23. drawer awaiting_stock action bar exposes Transfer to ready (stock on-hand)", () => {
+    setLoaded([
+      makeOrder({
+        id: "ord-1",
+        dl: 9001,
+        customer_name: "Alice",
+        logistics_stage: "awaiting_stock",
+      }),
+    ]);
+    detailHookState = {
+      ...detailHookState,
+      data: {
+        ...makeDetail(),
+        order: {
+          ...makeDetail().order,
+          logistics_stage: "awaiting_stock",
+        },
+      },
+    };
+    render(wrap(<LogisticsOrders />));
+    fireEvent.click(screen.getByText("Alice"));
+    expect(
+      screen.getByRole("button", { name: /Transfer to ready \(stock on-hand\)/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("24. TransferReadyDialog blocks submit when shortages > 0 (RPC will reject)", () => {
+    setLoaded([
+      makeOrder({
+        id: "ord-1",
+        dl: 9001,
+        customer_name: "Alice",
+        logistics_stage: "awaiting_stock",
+      }),
+    ]);
+    detailHookState = {
+      ...detailHookState,
+      data: {
+        ...makeDetail(),
+        order: {
+          ...makeDetail().order,
+          logistics_stage: "awaiting_stock",
+        },
+        // Drawer-side shortage list also needs to be empty so calcShortages
+        // doesn't surface "Issue POs" only — but the dialog itself reads from
+        // useLogisticsWarehouse.byWarehouse, which we override below.
+        stockBalances: [
+          { sku: "SOFA-NORD-3S", warehouse_id: "wh-1", qty: 0, reserved: 0 },
+        ],
+      },
+    };
+    // Override the warehouse fixture: zero on-hand at wh-1 so the dialog's
+    // pre-flight reports a shortage and the submit button is disabled.
+    warehouseHookState = {
+      data: {
+        warehouses: [{ id: "wh-1", name: "KL Warehouse", address: "Subang" }],
+        byWarehouse: {
+          "wh-1": [
+            { sku: "SOFA-NORD-3S", qty: 0, reserved: 0, low_stock_status: "ok" },
+          ],
+        },
+        totalsBySku: {},
+      },
+      isLoading: false,
+      isError: false,
+    };
+    render(wrap(<LogisticsOrders />));
+    fireEvent.click(screen.getByText("Alice"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Transfer to ready \(stock on-hand\)/ }),
+    );
+
+    // Pre-flight surfaces the shortage warning.
+    const preflight = screen.getByTestId("transfer-ready-preflight");
+    expect(preflight).toBeInTheDocument();
+    expect(preflight.textContent).toMatch(/Some lines short/);
+    expect(preflight.textContent).toMatch(/insufficient_stock_for_reserve/);
+
+    // The dialog's primary submit button is disabled.
+    const submit = screen.getByRole("button", { name: /Transfer to ready$/ });
+    expect(submit).toBeDisabled();
   });
 });

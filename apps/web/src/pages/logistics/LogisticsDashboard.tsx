@@ -2,6 +2,7 @@ import {
   useLogisticsDashboard,
   useLogisticsOrders,
   type LogisticsDashboardKpis,
+  type LogisticsPipelineCounts,
 } from "@/lib/queries";
 import LogisticsKpiTile from "./components/LogisticsKpiTile";
 import PipelineColumn from "./components/PipelineColumn";
@@ -142,8 +143,28 @@ export default function LogisticsDashboard({ setTab }: Props) {
         </button>
       </div>
 
-      {/* Three pipeline columns — proto line 84. */}
-      <div className="grid grid-cols-3 gap-3.5 mb-7">
+      {/* Five pipeline columns — Pipeline v2 (C3) widens the dashboard's
+          at-a-glance row from the proto's 3 to mirror the kanban's 6-stage
+          shape (delivered is the side-card / drawer surface, not a column).
+          Order matches the kanban: Placed → Proceed Request → Awaiting
+          Stock → Ready to Dispatch → Dispatched. */}
+      <div className="grid grid-cols-5 gap-3.5 mb-7">
+        <PipelineColumn
+          stage="placed"
+          label="Placed"
+          hint="awaiting request to proceed"
+          count={pipeline.placed}
+          orders={orders}
+          onOpenOrder={() => setTab("orders")}
+        />
+        <PipelineColumn
+          stage="proceed_request"
+          label="Proceed Request"
+          hint="awaiting your decision"
+          count={pipeline.proceed_request}
+          orders={orders}
+          onOpenOrder={() => setTab("orders")}
+        />
         <PipelineColumn
           stage="awaiting_stock"
           label="Awaiting stock"
@@ -181,7 +202,7 @@ export default function LogisticsDashboard({ setTab }: Props) {
 
 interface HeroProps {
   kpis: LogisticsDashboardKpis;
-  pipeline: { awaiting_stock: number; ready_to_dispatch: number; dispatched: number };
+  pipeline: LogisticsPipelineCounts;
 }
 
 /** Hero block — proto lines 27-39. Today's date label, big headline, and
@@ -240,8 +261,8 @@ function DashboardSkeleton() {
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-3.5 mb-7">
-        {[0, 1, 2].map((i) => (
+      <div className="grid grid-cols-5 gap-3.5 mb-7">
+        {[0, 1, 2, 3, 4].map((i) => (
           <div
             key={i}
             className="bg-white border border-base-200 rounded-md min-h-[200px] p-4"

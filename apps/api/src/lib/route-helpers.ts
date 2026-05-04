@@ -8,6 +8,12 @@ import type { ZodTypeAny, infer as ZodInfer } from "zod";
  *   22023 → 422 invalid_param
  *   P0001 → 422 with detail code
  *   else  → 500 rpc_failed
+ *
+ * TODO (Pipeline v2 follow-up): v2 detail-passthrough is currently scoped to
+ * `mapPipelineV2Error` in routes/logistics/orders.ts (it forwards the RPC's
+ * `detail` as `code` for 22023 too, plus a `hint` field). Hoist that 22023
+ * detail handling here when other routes need it (attach_do, warehouse routes
+ * flagged in C3.1 review). Out of scope for C3.1 — wider blast radius.
  */
 export function mapPgError(error: { code?: string; message?: string; details?: string }) {
   switch (error.code) {
