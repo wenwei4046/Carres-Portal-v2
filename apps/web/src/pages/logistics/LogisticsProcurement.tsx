@@ -408,6 +408,14 @@ export default function LogisticsProcurement() {
           supplier={supplierById.get(detailPo.supplier_id)}
           warehouse={warehouseById.get(detailPo.warehouse_id)}
           onClose={() => setDetailPo(null)}
+          onReceive={() => {
+            // v3-S2.3 — capture id before clearing detailPo so the receive
+            // mount picks up the same PO. The detail modal closes; the
+            // ReceivePOModal opens for the same PO.
+            const id = detailPo.id;
+            setDetailPo(null);
+            setReceivePoId(id);
+          }}
         />
       )}
       {/*

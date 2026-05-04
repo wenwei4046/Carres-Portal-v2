@@ -954,4 +954,32 @@ describe("LogisticsProcurement page", () => {
     const row = screen.getByTestId("po-row-PO-3008");
     expect(row.textContent).toContain("in transit");
   });
+
+  // ---- v3-S2.3 — Receive entry from inside PoDetailModal ----
+  // The detail modal got a footer "Receive PO" button that closes itself and
+  // opens ReceivePOModal for the same PO. Wire-up test: open detail modal →
+  // click Receive → assert ReceivePOModal renders for the same PO.
+
+  it("35. v3-S2.3: clicking Receive PO inside PoDetailModal opens ReceivePOModal for same PO", () => {
+    setLoaded([
+      makePo({
+        id: "PO-4001",
+        sup_status: "in_production",
+        purchase_order_lines: [
+          { sku: "mattress:carres-cloud:King", qty: 5, received_qty: 0 },
+        ],
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    // Open the detail modal by clicking the row
+    fireEvent.click(screen.getByTestId("po-row-PO-4001"));
+    expect(screen.getByTestId("po-detail-modal")).toBeInTheDocument();
+    // The Receive button is visible inside the detail modal
+    const receiveBtn = screen.getByTestId("po-detail-receive-button");
+    expect(receiveBtn).toBeInTheDocument();
+    // Click it: detail modal closes, ReceivePOModal opens for the same PO
+    fireEvent.click(receiveBtn);
+    expect(screen.queryByTestId("po-detail-modal")).not.toBeInTheDocument();
+    expect(screen.getByText(/Receive PO-4001/)).toBeInTheDocument();
+  });
 });

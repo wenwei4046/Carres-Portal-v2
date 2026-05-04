@@ -32,6 +32,17 @@ interface Props {
   supplier: SupplierRow | undefined;
   warehouse: { id: string; name: string; address: string | null } | undefined;
   onClose: () => void;
+  /**
+   * v3-S2.3 — optional Receive entry. When provided AND the PO is Receive-
+   * eligible (display status NOT in {received, cancelled} AND sup_status NOT
+   * in the factory_pickup mid-flight carve-out: ready_for_pickup /
+   * pickup_assigned / pickup_accepted / picked_up), a "Receive PO" button
+   * appears in the footer. The parent (LogisticsProcurement) wires it to
+   * close this modal + open ReceivePOModal for the same PO. The prop is
+   * optional so the modal can be rendered without it (defensive — currently
+   * only LogisticsProcurement uses it).
+   */
+  onReceive?: () => void;
 }
 
 function lineStatus(line: { qty: number; received_qty: number }): {
@@ -61,11 +72,22 @@ function poDisplay(po: LogisticsPoListRow): {
   return { label: "partial", color: "var(--info, #2563eb)" };
 }
 
+// v3-S2.3 — sup_status values that gate out the Receive button. Mid-pickup
+// flight states where Receive doesn't apply; mirrors the ActionCell carve-out
+// in LogisticsProcurement.tsx (lines 463-489).
+const PICKUP_FLIGHT_SUP_STATUSES = new Set([
+  "ready_for_pickup",
+  "pickup_assigned",
+  "pickup_accepted",
+  "picked_up",
+]);
+
 export default function PoDetailModal({
   po,
   supplier,
   warehouse,
   onClose,
+  onReceive,
 }: Props) {
   const catalogQ = useCatalog();
   const [printing, setPrinting] = useState(false);
@@ -100,6 +122,16 @@ export default function PoDetailModal({
   const status = poDisplay(po);
   const dlRefs = po.dl_refs ?? (po.dl != null ? [po.dl] : []);
   const poShortId = po.id.slice(0, 8);
+
+  // v3-S2.3 — Receive eligibility mirrors the ActionCell carve-out in
+  // LogisticsProcurement.tsx exactly: hide for received/cancelled and for
+  // any factory_pickup mid-flight state. The button only renders when the
+  // parent has wired `onReceive`.
+  const canReceive =
+    onReceive !== undefined &&
+    status.label !== "received" &&
+    status.label !== "cancelled" &&
+    !PICKUP_FLIGHT_SUP_STATUSES.has(po.sup_status);
 
   async function handlePrint() {
     if (printing) return;
@@ -266,7 +298,7 @@ export default function PoDetailModal({
           )}
         </div>
 
-        {/* Footer: Print PO (left) + Close (right) */}
+        {/* Footer: Print PO (left) + Receive PO (when eligible) + Close (right) */}
         <div className="flex justify-between items-center mt-4">
           <button
             type="button"
@@ -277,14 +309,26 @@ export default function PoDetailModal({
           >
             {printing ? "Opening…" : "Print PO"}
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-ghost text-[12px]"
-            data-testid="po-detail-close-button"
-          >
-            Close
-          </button>
+          <div className="flex gap-2 items-center">
+            {canReceive && (
+              <button
+                type="button"
+                onClick={onReceive}
+                className="btn-primary text-[12px]"
+                data-testid="po-detail-receive-button"
+              >
+                Receive PO
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-ghost text-[12px]"
+              data-testid="po-detail-close-button"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </Modal>
