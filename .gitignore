@@ -104,6 +104,7 @@ test-results/
 phase-*-success-*.png
 phase-*-dealer-*.png
 phase-*-detail-*.png
+qa-*.png
 
 # -----------------------------------------------------------------------------
 # Cache
