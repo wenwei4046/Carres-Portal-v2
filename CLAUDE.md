@@ -305,21 +305,28 @@ Don't burn an hour spinning. Surface and ask.
 ## 17. Project status (update as we progress)
 
 ```
-Current phase: Phase 4 (Logistics) COMPLETE — phase-4-complete tagged 2026-05-04 after migration 0022 closed the purchase_order_lines RLS gap
+Current phase: Phase 4 v3-S1 COMPLETE — Codex bug fixes in v3 spec doc landed 2026-05-05. v3 implementation work begins at v3-S2 (operational bug fixes).
 Project started: 2026-05-02
-Last phase completed: Phase 4 (Logistics) — 2026-05-04, tag phase-4-complete · prior tag phase-3-complete 2026-05-03
+Last phase completed: Phase 4 (Logistics) — 2026-05-04, tag phase-4-complete · Pipeline v2 (C1-C5.3) landed post-tag 2026-05-04, untagged · v3 spec + eng review locked 2026-05-05 (commit `e29dd94`) · v3-S1 spec fixes landed 2026-05-05
 Tags so far: phase-0/1/2a/2b/2c/3/4-complete (7 tags)
-Test count: 568/568 green (shared 85 + api 267 + web 216) · 5 Playwright E2E specs unchanged
-Migrations applied: 25 (0001-0025, latest = 0025_logistics_create_pos_batch; Pipeline v2 series 0023-0025 covers logistics_stage enum widening + RPC overhaul + batch create-PO RPC, all additive)
+Test count: 568/568 green (shared 85 + api 267 + web 216) · 5 Playwright E2E specs unchanged · v3-S1 is spec-doc only, no code/test churn
+Migrations applied: 25 (0001-0025, latest = 0025_logistics_create_pos_batch). v3 migrations 0026-0033 specced but NOT YET applied — first one lands in v3-S3.
 F-11 (Workers bundle size) status: 1034 KiB raw / 197 KiB gzipped after @react-pdf/renderer landed. Workers free-tier ceiling is 1 MiB gzipped — we sit at ~19% of the limit. Achieved via runtime CJK font fetch from Fontsource jsdelivr CDN (no font bytes in bundle). Resolves TODO `phase-7-pdf-gen-options`.
 Biz model locked (per Loo 2026-05-03):
   • Dealer just sells. Customer pays HQ direct. No HQ→dealer credit / debt.
   • Outstanding column = customer-owe-HQ (dealer chases for 50% top-up gate)
   • Phase 4 (Logistics) and Phase 6 (Supplier) are HQ INTERNAL roles, NOT dealer-side
+v3 sprint plan (per `docs/superpowers/specs/2026-05-04-phase-4-v3-spec.md` §17.3 binding):
+  • v3-S1 ✅ Codex bug fixes in spec doc (po_id text-vs-uuid · drop logistics_partner role addition · 0029 no-op · ALTER TYPE idempotent guards · cat_covered → product_models.category · drop destination_warehouse_id dual field · auto-detect race FOR UPDATE guard)
+  • v3-S2 NEXT — Operational bug fixes (Auto-fill po_id IS NULL filter + atomic claim · Drop Receive button gate sup_status='delivered' · Add Receive entry from PoDetailModal · AssignPickupDialog warehouse picker + Outsource toggle + Print DO surface) · 1 session, NO schema changes
+  • v3-S3 — Schema migrations 0026-0030 (skus.supplier_id NOT NULL FK · warehouses.kind enum · logistics_stage += waiting · po_sup_status += 6 values · partner-role RLS) · 1 session
+  • v3-S4 — order_supplier_threads (0033) + thread-aware RPCs (0032) + stockpile PO mode in CreatePOModal · 1-2 sessions
+  • v3-S5 — orders_rollup_stage() + dealer-side trigger updates + carry-forward cleanup + tag `phase-4-v3-complete` · 1 session
+  Phase 4.5 deferred (post-v3, pre-Phase 5): Partner role tenancy + auth + UI · DO file upload to Supabase Storage · Sofa Ready Confirm + Reject→Relocate UI · Per-supplier tab UI rewrite · Stockpile PO advanced flows
 Next decision pending:
-  1. M4.6 PO COGS source (currently uses product_skus.price as proxy — `phase-9-po-cogs-source`)
-  2. Photo upload reconcile (drop RPC `photo_paths jsonb` arg or add UI to DispatchModal — `phase-4-spec-photo-upload-reconcile`)
-  3. Phase 5 kickoff (Finance) — confirm scope + start `/plan-eng-review`
+  1. v3-S2 kickoff confirmation (smallest valuable bundle, no schema)
+  2. M4.6 PO COGS source (still pending from v2 — `phase-9-po-cogs-source`)
+  3. Phase 5 Finance kickoff (deferred until v3 + Phase 4.5 complete)
 Carry-forward TODOs: orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping) · phase-4-m2-schema-audit (3 column-mismatches caught at M2 smoke; do an audit before M3-M5) · phase-4-rpc-shape-audit (recommended next; see 2026-05-03 schema audit §Methodology gaps) · phase-4-or-filter-harden (orders.ts:85,163 PostgREST .or() interpolation; tighten zod search to whitelist) · phase-4-replace-any-types (~40 eslint-disable any in logistics routes; use db-types per §9.1) · phase-4-zod-strict-uniform (logistics.ts: .strict() partial; pick a convention) · phase-4-logistics-test-gaps (search int/text branches, JWT edge cases, SQLSTATE 42501 mapping, dashboard error coverage) · phase-4-detail-partner-name-join (orders.ts:108 add delivery_partners(name) — verify against proto §18.3) · phase-4-or-filter-harden-orders (apply M4.3 regex whitelist to orders.ts:79-86) · phase-4-22p02-mapping (add SQLSTATE 22P02 → 422 in mapPgError) · phase-4-uuid-path-validation (wrap :id route params with zod UUID guard at entry) · phase-4-spec-photo-upload-reconcile (DispatchModal photo upload OR drop RPC arg) · phase-4-create-po-eta-partner (extend createPoInput zod for eta + per-supplier partnerId) · phase-4-cross-order-bundle-aggregation (server-side bundle-prep endpoint or client aggregation) · phase-4-zod-strict-nested-lines (createPoInput.lines inner objects not strict; propagated into createPosBatchInput.pos[].lines via re-use) · phase-4-po-id-race (0019/0025 MAX(seq)+1 PO id allocation; widened 20× by batch RPC; low-urgency since logistics is single-dept) · phase-4-prefill-warehouseid-q4-drift (CreatePOModal warehouseFor() falls back to prefill.warehouseId, silently bypassing Q4=A blank-required when callers populate it; currently dead code, tripwire for future shortage flows) · phase-4-orphans-warning-banner (CreatePOModal lacks top-level explanation when auto-fill produces only orphan SKUs; submit correctly disabled but UX confusing) · phase-7-reassign-warehouse-wire (wire ReassignWarehouseDialog when partner-rejection state ships) · phase-7-pdf-do-photo-upload (retention TBD if photo upload added) · phase-9-movements-cursor-pagination · phase-9-pdf-visual-snapshots · phase-9-dashboard-split-layout · phase-9-trigram-search · phase-9-pdf-cache-immutable-orders · phase-9-bundle-size-monitor · phase-9-cjk-font-extended · phase-9-po-cogs-source
 ```
 
