@@ -103,6 +103,22 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // want to clobber them).
   const shortageQ = useAwaitingStockShortage();
 
+  // v3-S4.5 — Stockpile PO mode. When the user wants to procure inventory
+  // ahead of demand (no specific customer order to cover), they tick this
+  // toggle. The submission then drops `dl` / `dlRefs` from the payload —
+  // backend RPC accepts NULL for both (validated against migration 0019/0025).
+  // Spec §17.1 A3 promotes this from edge-case to 1st-class flow.
+  //
+  // Mutually exclusive with auto-fill prefill: when the modal is opened with
+  // `dl` / `dlRefs` set, the toggle is disabled (you can't stockpile if the
+  // caller already pinned the order ref). UI-locked rather than hidden so the
+  // operator sees the option exists but understands why it's not available
+  // here.
+  const autoFillPrefilled =
+    prefill.dl != null ||
+    (prefill.dlRefs != null && prefill.dlRefs.length > 0);
+  const [stockpile, setStockpile] = useState<boolean>(false);
+
   const suppliers = suppliersQ.data?.suppliers ?? [];
   const warehouses = warehousesQ.data?.warehouses ?? [];
   const skuOptions = useMemo(() => {
@@ -169,7 +185,10 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // C5.3 — Auto-fill button visibility. Hidden whenever the modal was opened
   // with a specific order or bundle prefill, since those flows already know
   // the lines (clicking the button would silently clobber the user's intent).
+  // v3-S4.5 — also hidden in stockpile mode (auto-fill is order-shortage-
+  // driven; stockpile by definition has no order to drive from).
   const showAutoFill =
+    !stockpile &&
     prefill.dl == null && (prefill.dlRefs == null || prefill.dlRefs.length === 0);
   // Empty result is sticky once known — disable the button until the user
   // closes/reopens or until refetched data shows shortages. The `!isError`
@@ -281,13 +300,16 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         // Single supplier group → keep using the existing single-PO RPC.
         // This preserves the legacy contract (logistics_create_po) for the
         // common case and avoids touching tests that assert this path.
+        // v3-S4.5: stockpile mode forces dl/dlRefs out of the payload —
+        // backend RPC accepts NULL for both (= "this PO covers no specific
+        // customer order"). Spread guards apply only when NOT stockpile.
         const g = groups.groups[0];
         await create.mutateAsync({
           supplierId: g.supplier.id,
           warehouseId: warehouseFor(g.supplier),
           lines: g.lines.map((l) => ({ sku: l.sku, qty: l.qty })),
-          ...(prefill.dl ? { dl: prefill.dl } : {}),
-          ...(prefill.dlRefs && prefill.dlRefs.length > 0
+          ...(!stockpile && prefill.dl ? { dl: prefill.dl } : {}),
+          ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
             ? { dlRefs: prefill.dlRefs }
             : {}),
         });
@@ -299,12 +321,13 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         // warehouse pick. dl_refs (if present) propagates onto every PO since
         // a bundle PO is always cross-order. dl (single) doesn't apply when
         // splitting — the batch RPC's helper is bundle-shaped only.
+        // v3-S4.5: same stockpile carve-out as the single-supplier branch.
         await createBatch.mutateAsync({
           pos: groups.groups.map((g) => ({
             supplierId: g.supplier.id,
             warehouseId: warehouseFor(g.supplier),
             lines: g.lines.map((l) => ({ sku: l.sku, qty: l.qty })),
-            ...(prefill.dlRefs && prefill.dlRefs.length > 0
+            ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
               ? { dlRefs: prefill.dlRefs }
               : {}),
           })),
@@ -318,20 +341,76 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     }
   }
 
-  const titleSuffix = prefill.dl
-    ? ` · for order #${prefill.dl}`
-    : prefill.dlRefs && prefill.dlRefs.length > 0
-      ? ` · bundle of ${prefill.dlRefs.length} orders`
-      : "";
+  // v3-S4.5: stockpile mode overrides any order-ref title suffix because the
+  // PO is no longer for that order. We still use Modal's static `title` prop
+  // (so the test util's `getByText` lookups continue to work) and decorate
+  // with a "Stockpile" pill below in the body.
+  const titleSuffix = stockpile
+    ? ""
+    : prefill.dl
+      ? ` · for order #${prefill.dl}`
+      : prefill.dlRefs && prefill.dlRefs.length > 0
+        ? ` · bundle of ${prefill.dlRefs.length} orders`
+        : "";
+  const baseTitle = stockpile
+    ? "New stockpile PO"
+    : prefill.dl || prefill.dlRefs?.length
+      ? `New PO${titleSuffix}`
+      : "New purchase order";
 
   return (
-    <Modal
-      title={prefill.dl || prefill.dlRefs?.length ? `New PO${titleSuffix}` : "New purchase order"}
-      onClose={onClose}
-      size="lg"
-    >
+    <Modal title={baseTitle} onClose={onClose} size="lg">
+      {/* v3-S4.5 — Stockpile PO toggle. Disabled when caller pre-pinned an
+          order ref (single dl or bundle dlRefs); the prefill there dictates
+          the lines and dropping it would lose the link. */}
+      <div className="mb-3 flex items-center gap-2 text-[12px] font-body">
+        <input
+          id="stockpile-po-toggle"
+          data-testid="stockpile-po-toggle"
+          type="checkbox"
+          checked={stockpile}
+          disabled={autoFillPrefilled}
+          onChange={(e) => setStockpile(e.target.checked)}
+          className="h-3.5 w-3.5"
+          title={
+            autoFillPrefilled
+              ? "Disabled — modal opened with an order/bundle prefill"
+              : undefined
+          }
+        />
+        <label
+          htmlFor="stockpile-po-toggle"
+          className="select-none"
+          style={{ opacity: autoFillPrefilled ? 0.55 : 1 }}
+        >
+          <strong>Stockpile PO</strong>
+          <span className="text-base-600"> (no order ref — pre-stock inventory)</span>
+        </label>
+        {stockpile && (
+          <span
+            data-testid="stockpile-mode-badge"
+            className="px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+            style={{
+              fontSize: "9.5px",
+              background: "rgba(58,89,131,.12)",
+              color: "rgb(58,89,131)",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            Stockpile
+          </span>
+        )}
+      </div>
+
       <div className="text-[12px] text-base-600 mb-3 font-body">
-        {prefill.dl ? (
+        {stockpile ? (
+          <>
+            <strong>Stockpile mode:</strong> this PO is for inventory
+            replenishment only — it won&rsquo;t be linked to any specific
+            customer order.
+          </>
+        ) : prefill.dl ? (
           <>
             Auto-routed from order <strong>#{prefill.dl}</strong>. SKUs are
             matched to suppliers automatically.
