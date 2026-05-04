@@ -4,6 +4,12 @@ Deferred work captured during planning / review. Each item explains *why* it was
 
 ---
 
+## RESOLVED
+
+- phase-4-purchase-order-lines-rls-policies — RESOLVED 2026-05-04 in commit c6c4f07 via migration 0022_purchase_order_lines_rls (3 policies: scoped_read EXISTS-via-parent, logistics_insert, logistics_update; mirrors po_scoped_read pattern from 0002_rls.sql:241).
+
+---
+
 ## pagination-deferred
 
 **What**: Server-side pagination for `/api/principal/approvals` and `/api/principal/dealers` (and the corresponding UI infinite-scroll or page controls).
@@ -178,25 +184,7 @@ Phase 2 acceptance items NOT covered by 2C (carry-forward from `phase-2c-reflect
 
 Surfaced during M4 + M5 + M6 by `/plan-eng-review`, `/review`, and `/design-review`. Grouped by priority. See `docs/phase-4-reflection.md` for context.
 
-## CRITICAL (blocks phase-4-complete tag)
-
-### phase-4-purchase-order-lines-rls-policies
-
-**What**: Migration `0017_purchase_order_lines.sql` created the `purchase_order_lines` table without any RLS policies. RLS is enabled on the table; with zero policies, all user-JWT reads return empty (Postgres default deny).
-
-**Why deferred**: Per CLAUDE.md §14 RED LINE 2, RLS policy changes need explicit Loo approval in current conversation. Recording the fix path here, awaiting approval.
-
-**Why dormant in production**: 0 PO rows exist, so 0 lines to deny. Tests don't catch it because vitest mocks Supabase.
-
-**Affected surfaces**: M4.5 print-DO endpoint linked POs section; M4.6 print-PO PDF lines; M5.2 OrderDetailDrawer "Linked POs" panel; M5.3 LogisticsProcurement PO list lines column.
-
-**Fix**: New migration `0022_purchase_order_lines_rls.sql` adding `po_lines_scoped_read` policy (mirror `po_scoped_read` from `0002_rls.sql:241` — logistics + principal full read; supplier-scoped for own supplier).
-
-**BLOCKS**: `phase-4-complete` tag.
-
-**Surfaced by**: M6 reflection write-up (this commit), 2026-05-04.
-
----
+(`phase-4-purchase-order-lines-rls-policies` was originally listed CRITICAL here; resolved 2026-05-04 in commit c6c4f07 via migration 0022 — see RESOLVED section at top.)
 
 ## IMPORTANT (Phase 4 polish — after tag lands)
 

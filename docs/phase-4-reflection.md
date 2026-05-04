@@ -1,6 +1,6 @@
 # Phase 4 — Reflection
 
-> **Phase 4 (Logistics) implementation completed 2026-05-04.** Tag `phase-4-complete` is **BLOCKED** on Loo's approval of migration `0022_purchase_order_lines_rls.sql` (purchase_order_lines RLS policies). 60 commits across the phase, 5 SQL migrations (0017-0021), 5 Logistics pages, ~30 React components, server-side PDF infrastructure landed under Workers free-tier ceiling, 489 tests green. Built end-to-end across Pre-M4 + M4 + M5 milestones via subagent-driven dispatch with `model:opus`.
+> **Phase 4 (Logistics) tagged `phase-4-complete` 2026-05-04 at commit `c6c4f07` after migration 0022_purchase_order_lines_rls closed the M6.2 critical RLS gap.** 62 commits across the phase, 6 SQL migrations (0017-0022), 5 Logistics pages, ~30 React components, server-side PDF infrastructure landed under Workers free-tier ceiling (197 KiB gzipped), 489 tests green. Built end-to-end across Pre-M4 + M4 + M5 milestones via subagent-driven dispatch with `model:opus`.
 
 ---
 
@@ -14,7 +14,7 @@
 | **M3** | Backend procurement: GET pos list + 6 PO mutation routes (create, receive, cancel, assign-pickup-partner, reassign-warehouse, issue-pos). Migration 0020 added logistics_cancel_po RPC. | 7bb8827 · 211a95b · ef14dec · a6967be · cb145c4 · 0f1f1e8 · 39589a5 · 051d8d8 |
 | **M4** | Warehouse + movements + PDF: GET warehouse with low_stock flags, POST adjust, GET movements (5 filters + 200 LIMIT). Migration 0021 added composite index. **Server-side PDF infra landed**: @react-pdf/renderer + Noto CJK runtime fetch + DO/PO templates + 2 print routes. | 59e21b0 · f8bc783 · 117bb7d · 49adf9f · a23e271 · 5b7d79a · 1de15eb · 67fc0ab |
 | **M5** | 5 Logistics pages: Dashboard (KPI tiles + 3 pipeline columns), Orders (kanban + drawer + 4 modals), Procurement (PO list + 3 modals), Warehouse (tiles + category tabs), Movements (KPIs + period chips + filters + by-month + CSV). Plus partner+supplier picker endpoints, kanban primitives, AdjustStockModal, ReassignWarehouseDialog, CrossOrderBundleSheet wired. | 2ea6483 · fc7f92f · d977107 · 1892af2 · d51ac2d · d7f74ca · 6bb23f2 · 3742309 · 4890a90 · 1641eac · e58739f · d837e22 · d8ae8a2 · 57e0a73 |
-| **M6** | Reflection (this file) + CLAUDE.md status update. Tag PENDING on RLS approval. | _this commit_ |
+| **M6** | Reflection (this file) + CLAUDE.md status update + migration 0022 closing the RLS gap. Tag `phase-4-complete` landed at commit c6c4f07 on 2026-05-04. | _this commit_ |
 
 **60 commits since `phase-3-complete`, 189 files changed, +23,601 / -499 lines, 489 tests green** (309 → 489, +180 tests across the phase).
 
@@ -79,7 +79,7 @@ The biggest plan risk going into M4 was F-11: would `@react-pdf/renderer` push t
 
 ---
 
-## CRITICAL BLOCKER
+## CRITICAL BLOCKER — RESOLVED 2026-05-04 in commit c6c4f07
 
 ### `purchase_order_lines` RLS policies missing — phase-4-complete tag is held
 
@@ -98,6 +98,8 @@ The biggest plan risk going into M4 was F-11: would `@react-pdf/renderer` push t
 **Fix path**: New migration `0022_purchase_order_lines_rls.sql` adding `po_lines_scoped_read` policy (logistics + principal can read all; supplier-scoped read for own supplier — mirrors `po_scoped_read` from `0002_rls.sql:241`).
 
 **Why blocked**: Per CLAUDE.md §14 RED LINE 2, RLS policy changes require explicit Loo approval in the current conversation. We're recording the fix path here; Loo to confirm before applying.
+
+**Resolution (2026-05-04)**: Loo approved migration `0022_purchase_order_lines_rls.sql` in-conversation. Three policies landed mirroring the `po_scoped_read` pattern from `0002_rls.sql:241`: `scoped_read` (EXISTS-via-parent join to `purchase_orders`), `logistics_insert`, and `logistics_update`. Phase 4 tagged `phase-4-complete` at commit c6c4f07.
 
 **`phase-4-complete` tag is held** until 0022 lands.
 
