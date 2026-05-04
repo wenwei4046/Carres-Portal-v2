@@ -65,7 +65,11 @@ function DealerSidebar({ dealerName, initials }: { dealerName: string; initials:
         ))}
       </nav>
 
-      <div className="px-[18px] pt-[14px] border-t border-border flex items-center gap-2.5">
+      <Link
+        to="/me"
+        title="Profile · Sign out"
+        className="px-[18px] pt-[14px] pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
+      >
         <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-semibold flex-shrink-0">
           {initials}
         </div>
@@ -73,7 +77,7 @@ function DealerSidebar({ dealerName, initials }: { dealerName: string; initials:
           <div className="text-xs font-semibold truncate">{dealerName}</div>
           <div className="text-[11px] text-muted-foreground">Dealer</div>
         </div>
-      </div>
+      </Link>
     </aside>
   );
 }

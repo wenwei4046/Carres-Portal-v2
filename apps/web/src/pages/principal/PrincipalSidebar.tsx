@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import CarresLockup from "@/components/CarresLockup";
 
@@ -138,7 +139,11 @@ export default function PrincipalSidebar({ active, onChange, pendingCount }: Pro
         ))}
       </nav>
 
-      <div className="px-[22px] py-4 border-t border-base-100 flex items-center gap-2.5">
+      <Link
+        to="/me"
+        title="Profile · Sign out"
+        className="px-[22px] py-4 border-t border-base-100 flex items-center gap-2.5 hover:bg-base-50 transition-colors"
+      >
         <div className="w-[34px] h-[34px] rounded-full bg-base-900 text-white grid place-items-center text-[11px] font-semibold">
           {initials}
         </div>
@@ -148,7 +153,7 @@ export default function PrincipalSidebar({ active, onChange, pendingCount }: Pro
             Principal
           </div>
         </div>
-      </div>
+      </Link>
     </aside>
   );
 }
