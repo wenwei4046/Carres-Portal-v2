@@ -4,6 +4,7 @@ import { ApiError } from "@/lib/api";
 import {
   useAssignPickupPartnerMutation,
   useDeliveryPartners,
+  useLogisticsWarehouse,
   type LogisticsPoListRow,
   type SupplierRow,
 } from "@/lib/queries";
@@ -23,9 +24,18 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  *     SKU summary
  *   - Required partner select (`{name} · {zones}` labels)
  *   - Selected partner preview (base-50 fill): bold name + mono contact + zones
- *   - Primary CTA: "Assign partner" — disabled until partner picked
+ *   - v3-S2.4 — Required destination warehouse picker (defaults to
+ *     `po.warehouse_id`; logistics can override for divert-on-the-fly).
+ *   - Selected warehouse preview card (mirrors the partner preview)
+ *   - Primary CTA: "Assign partner" — disabled until both partner AND
+ *     warehouse are picked.
  *
- * Wires to `POST /api/logistics/pos/:id/assign-pickup-partner`.
+ * Wires to `POST /api/logistics/pos/:id/assign-pickup-partner`. The
+ * `warehouseId` is forwarded on the request body — the Hono route currently
+ * captures it but does NOT pass it to the underlying RPC (per v3 spec §8.1
+ * the eventual RPC `logistics_assign_partner_and_dispatch` is v3-S4 work).
+ * This component is forward-compatible: when the new RPC ships, no FE change
+ * is needed.
  */
 interface Props {
   po: LogisticsPoListRow;
@@ -45,19 +55,35 @@ export default function AssignPickupDialog({
   const [partnerId, setPartnerId] = useState<string>("");
   const assign = useAssignPickupPartnerMutation(po.id);
 
+  // v3-S2.4 — destination warehouse picker: default to the PO's current
+  // destination, but allow override (e.g. divert when origin WH is full).
+  const warehousesQ = useLogisticsWarehouse();
+  const warehouses = warehousesQ.data?.warehouses ?? [];
+  const [warehouseId, setWarehouseId] = useState<string>("");
+
   useEffect(() => {
     if (!partnerId && partners.length > 0) setPartnerId(partners[0].id);
   }, [partnerId, partners]);
 
+  // Initialize warehouse selection once the list loads. Prefer the PO's own
+  // warehouse_id when it appears in the response; otherwise fall back to the
+  // first available warehouse so the form is still submittable.
+  useEffect(() => {
+    if (warehouseId || warehouses.length === 0) return;
+    const match = warehouses.find((w) => w.id === po.warehouse_id);
+    setWarehouseId(match ? match.id : warehouses[0].id);
+  }, [warehouseId, warehouses, po.warehouse_id]);
+
   const partner = partners.find((p) => p.id === partnerId);
+  const selectedWarehouse = warehouses.find((w) => w.id === warehouseId);
   const lines = po.purchase_order_lines ?? [];
   const totalUnits = lines.reduce((s, l) => s + Number(l.qty || 0), 0);
-  const valid = !!partnerId && !assign.isPending;
+  const valid = !!partnerId && !!warehouseId && !assign.isPending;
 
   async function submit() {
     if (!valid) return;
     try {
-      await assign.mutateAsync({ partnerId });
+      await assign.mutateAsync({ partnerId, warehouseId });
       toast.success(
         `${po.id} assigned${partner ? ` to ${partner.name}` : ""} · awaiting their accept`,
       );
@@ -133,11 +159,65 @@ export default function AssignPickupDialog({
         </div>
       )}
 
+      {/*
+       * v3-S2.4 — destination warehouse picker. Layout mirrors the partner
+       * select pattern above (label · input · preview card) for consistency.
+       * Defaults to po.warehouse_id; logistics can override when the original
+       * destination is full or otherwise unavailable.
+       */}
+      <div className="label mb-1.5">
+        Destination warehouse <span className="text-destructive">*</span>
+      </div>
+      {warehousesQ.isLoading ? (
+        <div className="text-[12px] text-base-500 mb-3.5">
+          Loading warehouses…
+        </div>
+      ) : warehousesQ.isError ? (
+        <div className="text-[12px] text-destructive mb-3.5">
+          Couldn&rsquo;t load warehouses — try again later.
+        </div>
+      ) : warehouses.length === 0 ? (
+        <div className="text-[12px] text-warning mb-3.5">
+          No warehouses on file.
+        </div>
+      ) : (
+        <select
+          value={warehouseId}
+          onChange={(e) => setWarehouseId(e.target.value)}
+          aria-label="Destination warehouse"
+          className={`${INPUT_CLS} mb-3.5`}
+        >
+          {warehouses.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {selectedWarehouse && (
+        <div
+          className="text-[12px] text-base-600 px-3 py-2.5 bg-base-50 rounded-[4px] mb-3.5"
+          data-testid="assign-pickup-warehouse-preview"
+        >
+          <div>
+            <strong>{selectedWarehouse.name}</strong>
+          </div>
+          {selectedWarehouse.address && (
+            <div className="font-mono text-[11px] mt-1">
+              {selectedWarehouse.address}
+            </div>
+          )}
+        </div>
+      )}
+
       <ModalActions
         onCancel={onClose}
         onPrimary={submit}
         primary="Assign partner"
-        primaryDisabled={!valid || partners.length === 0}
+        primaryDisabled={
+          !valid || partners.length === 0 || warehouses.length === 0
+        }
         primaryPending={assign.isPending}
       />
     </Modal>

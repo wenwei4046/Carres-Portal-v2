@@ -483,6 +483,16 @@ logisticsPosRouter.post("/:id/cancel", async (c) => {
 logisticsPosRouter.post("/:id/assign-pickup-partner", async (c) => {
   const parsed = await parseJsonBody(c, assignPickupPartnerInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // v3-S2.4 — destination warehouse override:
+  // `warehouseId` is captured here from the request body (and validated as a
+  // UUID by the zod schema), but NOT yet forwarded to the RPC. The current
+  // `logistics_assign_pickup_partner(p_po_id, p_partner_id)` RPC has only
+  // those two args, so we keep the call shape unchanged for v3-S2. v3-S4 will
+  // swap to `logistics_assign_partner_and_dispatch` which accepts
+  // `p_warehouse_override_id`; at that point we'll thread `parsed.data.warehouseId`
+  // through to the RPC call.
+  const _warehouseId = parsed.data.warehouseId;
+  void _warehouseId; // intentionally unused — wired to UI/API; RPC binding lands in v3-S4
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("logistics_assign_pickup_partner", {
     p_po_id: c.req.param("id"),

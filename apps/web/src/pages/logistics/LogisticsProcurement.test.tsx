@@ -411,8 +411,11 @@ describe("LogisticsProcurement page", () => {
     await waitFor(() => {
       expect(assignPickupMutateAsync).toHaveBeenCalledTimes(1);
     });
+    // v3-S2.4 — FE now also sends the chosen destination warehouse.
+    // Default selection = po.warehouse_id (= WAREHOUSE_KL on the seeded PO).
     expect(assignPickupMutateAsync.mock.calls[0][0]).toEqual({
       partnerId: PARTNER_A.id,
+      warehouseId: WAREHOUSE_KL.id,
     });
   });
 

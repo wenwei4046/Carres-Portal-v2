@@ -232,6 +232,22 @@ describe('assignPickupPartnerInput', () => {
       assignPickupPartnerInput.safeParse({ partnerId: UUID, extraField: 'x' }).success,
     ).toBe(false);
   });
+  // v3-S2.4 — optional warehouseId (UI captures the destination override; the
+  // current RPC ignores it. v3-S4 will swap to logistics_assign_partner_and_dispatch
+  // which accepts p_warehouse_override_id).
+  it('accepts an optional warehouseId uuid', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({ partnerId: UUID, warehouseId: UUID2 }).success,
+    ).toBe(true);
+  });
+  it('still accepts payload without warehouseId (backward-compat)', () => {
+    expect(assignPickupPartnerInput.safeParse({ partnerId: UUID }).success).toBe(true);
+  });
+  it('rejects warehouseId that is not a uuid', () => {
+    expect(
+      assignPickupPartnerInput.safeParse({ partnerId: UUID, warehouseId: 'not-a-uuid' }).success,
+    ).toBe(false);
+  });
 });
 
 describe('reassignPoWarehouseInput', () => {

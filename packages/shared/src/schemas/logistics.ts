@@ -185,9 +185,18 @@ export type RecheckStockInput = z.infer<typeof recheckStockInput>;
  * Maps to `logistics_assign_pickup_partner(po_id, partner_id)` RPC (F1.A,
  * factory_pickup flow). Picks a partner to dispatch to the supplier's factory
  * once `sup_status = ready_for_pickup`. Sets `sup_status → pickup_assigned`.
+ *
+ * v3-S2.4 — `warehouseId` is the v3 spec §8.1 destination override the FE
+ * sends from AssignPickupDialog's warehouse picker. It is OPTIONAL so the
+ * existing API contract is backward-compatible (Phase 4 callers without a
+ * picker still send only `partnerId`). Captured by the Hono route but not
+ * forwarded to the current 2-arg RPC; v3-S4 swaps to
+ * `logistics_assign_partner_and_dispatch(... p_warehouse_override_id ...)`,
+ * at which point this field becomes load-bearing.
  */
 export const assignPickupPartnerInput = z.object({
   partnerId: z.string().uuid(),
+  warehouseId: z.string().uuid().optional(),
 }).strict();
 export type AssignPickupPartnerInput = z.infer<typeof assignPickupPartnerInput>;
 

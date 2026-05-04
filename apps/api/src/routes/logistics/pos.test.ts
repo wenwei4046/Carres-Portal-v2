@@ -565,6 +565,71 @@ describe("POST /api/logistics/pos/:id/assign-pickup-partner", () => {
     expect(res.status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  // v3-S2.4 — destination warehouse override: UI + zod + Hono accept it.
+  // The RPC binding lands in v3-S4 (logistics_assign_partner_and_dispatch).
+  // Until then, the chosen warehouseId is captured in the request body but
+  // not forwarded to the existing RPC, which still receives only the two
+  // original args.
+  it("accepts an optional warehouseId field (passes zod) and still calls RPC with only po_id + partner_id", async () => {
+    const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000d01";
+    const rpc = vi.fn().mockResolvedValue({ data: { id: PO_ID, sup_status: "pickup_assigned" }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID, warehouseId: WAREHOUSE_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // RPC binding deferred to v3-S4 — current shape stays {p_po_id, p_partner_id}.
+    expect(rpc).toHaveBeenCalledWith("logistics_assign_pickup_partner", {
+      p_po_id: PO_ID,
+      p_partner_id: PARTNER_ID,
+    });
+    assertRpcCallShape(rpc, "logistics_assign_pickup_partner", ["p_po_id", "p_partner_id"]);
+  });
+
+  it("still works when warehouseId is not provided (backward-compat)", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { id: PO_ID, sup_status: "pickup_assigned" }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_assign_pickup_partner", {
+      p_po_id: PO_ID,
+      p_partner_id: PARTNER_ID,
+    });
+  });
+
+  it("returns 422 when warehouseId is not a uuid", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/assign-pickup-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID, warehouseId: "not-a-uuid" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /api/logistics/pos/:id/reassign-warehouse", () => {
