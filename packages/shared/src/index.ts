@@ -53,6 +53,16 @@ export {
 } from "./blockers";
 
 export {
+  SOP_STANDARD,
+  SOP_SOFA_SPECIAL,
+  SUPPLIER_SOP,
+  sopFor,
+  type LogisticsStageV3,
+  type SopName,
+  type SopDef,
+} from "./sops";
+
+export {
   catalogResponseSchema,
   productModelSchema,
   productSkuSchema,
