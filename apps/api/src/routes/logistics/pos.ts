@@ -4,6 +4,7 @@ import {
   assignPickupPartnerInput,
   cancelPoInput,
   createPoInput,
+  createPosBatchInput,
   listPurchaseOrdersQuery,
   reassignPoWarehouseInput,
   receivePoLineInput,
@@ -238,6 +239,82 @@ logisticsPosRouter.post("/", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ po: data });
+});
+
+// ----- POST /batch create -----
+// C5.2: per-PO warehouse picker. When the modal's supplier-grouping yields >1
+// supplier, the FE submits a single batch payload here instead of N parallel
+// POSTs to POST /. The RPC `logistics_create_pos_batch` is atomic — any
+// helper-raised error rolls back the whole batch.
+//
+// Error mapping (extends generic mapPgError so the FE can surface the
+// pos_index for per-row UI feedback):
+//   • 22023 + detail='invalid_batch_size'  → 422 code 'invalid_batch_size'
+//   • 22023 + detail='warehouse_required'  → 422 code 'warehouse_required',
+//                                            includes pos_index parsed from
+//                                            the RPC's hint ("pos_index=N")
+//   • 42501                                → 403
+//   • Other PG errors                      → mapPgError fallback
+logisticsPosRouter.post("/batch", async (c) => {
+  const parsed = await parseJsonBody(c, createPosBatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Reshape camelCase pos[] entries into the snake_case shape expected by the
+  // RPC's JSONB array argument. Done at the boundary, not in shared schemas,
+  // so the wire contract stays camelCase like every other route.
+  const payload = parsed.data.pos.map((p) => ({
+    supplier_id: p.supplierId,
+    warehouse_id: p.warehouseId,
+    lines: p.lines,
+    eta_date: null as string | null,
+    dl_refs: p.dlRefs ?? null,
+    note: null as string | null,
+  }));
+
+  const { data, error } = await sb.rpc("logistics_create_pos_batch", {
+    p_pos: payload,
+  });
+  if (error) {
+    const e = error as { code?: string; message?: string; details?: string; hint?: string };
+
+    // 22023 invalid_batch_size — surface the detail code unchanged.
+    if (e.code === "22023" && e.details === "invalid_batch_size") {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "invalid_batch_size",
+          message: e.message ?? "invalid batch size",
+        },
+        422,
+      );
+    }
+
+    // 22023 warehouse_required — annotate the offending entry index. RPC's
+    // hint is "pos_index=N" (0-based); parse it for the FE so a single PO
+    // group can be highlighted without string-matching on the UI side.
+    if (e.code === "22023" && e.details === "warehouse_required") {
+      const m = /pos_index=(\d+)/.exec(e.hint ?? "");
+      const posIndex = m ? Number.parseInt(m[1], 10) : null;
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "warehouse_required",
+          message: e.message ?? "warehouse is required",
+          pos_index: posIndex,
+        },
+        422,
+      );
+    }
+
+    const mapped = mapPgError(e);
+    return c.json(mapped.body, mapped.status);
+  }
+
+  // RPC returns { po_ids: ['PO-2031', ...] } — adapt to camelCase poIds for
+  // wire consistency with the rest of the route surface.
+  const out = data as { po_ids?: string[] } | null;
+  return c.json({ poIds: out?.po_ids ?? [] });
 });
 
 // ----- POST /:id/receive -----

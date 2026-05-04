@@ -4,6 +4,7 @@ import { ApiError } from "@/lib/api";
 import {
   useCatalog,
   useCreatePoMutation,
+  useCreatePosBatch,
   useDeliveryPartners,
   useLogisticsSuppliers,
   useLogisticsWarehouse,
@@ -34,8 +35,18 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  *   - auto-split notice band when N>1 suppliers
  *   - per-supplier group cards (orange-tinted for factory_pickup with partner
  *     select; green-tinted for own_logistics)
- *   - warehouse + ETA pickers
+ *   - per-group warehouse picker (C5.2 — Q4=A blank required) + ETA picker
  *   - primary CTA: "Issue N POs · M lines" or "Issue PO · M lines"
+ *
+ * C5.2 — per-PO warehouse picker.
+ *   The warehouse used to be a single dropdown at the modal bottom shared by
+ *   all supplier groups. Now each group picks its own destination warehouse
+ *   (a sofa supplier may ship to PJ while a mattress supplier ships to Klang).
+ *   Default value is blank and required — submit stays disabled until every
+ *   group has one.
+ *   When groups > 1 we collapse the N sequential useCreatePoMutation calls
+ *   into a single useCreatePosBatch call (atomic — all-or-nothing PG tx, see
+ *   migration 0025).
  */
 export interface CreatePoPrefill {
   /** Single-order PO — sets the `dl` foreign key. */
@@ -82,6 +93,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   const catalogQ = useCatalog();
   const partnersQ = useDeliveryPartners();
   const create = useCreatePoMutation();
+  const createBatch = useCreatePosBatch();
 
   const suppliers = suppliersQ.data?.suppliers ?? [];
   const warehouses = warehousesQ.data?.warehouses ?? [];
@@ -109,14 +121,12 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     }
   }, [lines.length, skuOptions, initialLines.length]);
 
-  const [warehouseId, setWarehouseId] = useState<string>(
-    prefill.warehouseId ?? "",
-  );
-  useEffect(() => {
-    if (!warehouseId && warehouses.length > 0) {
-      setWarehouseId(warehouses[0].id);
-    }
-  }, [warehouseId, warehouses]);
+  // C5.2 — per-supplier-group warehouse (Q4=A: blank required, no auto-default).
+  // `prefill.warehouseId` (when supplied) seeds every group on first paint, so
+  // shortage-aggregation flows that already know the destination still pre-fill.
+  const [warehouseBySupplier, setWarehouseBySupplier] = useState<
+    Record<string, string>
+  >({});
 
   // ETA + per-supplier partner are visual elements present in proto but the
   // current `createPoInput` zod schema (packages/shared/src/schemas/logistics.ts:84)
@@ -168,6 +178,14 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   function partnerFor(sup: SupplierRow): string {
     return partnerBySupplier[sup.id] ?? partners[0]?.id ?? "";
   }
+  function setWarehouseForSupplier(supplierId: string, warehouseId: string) {
+    setWarehouseBySupplier((m) => ({ ...m, [supplierId]: warehouseId }));
+  }
+  function warehouseFor(sup: SupplierRow): string {
+    // Prefer explicit pick; fall back to the prefilled hint (used by shortage
+    // aggregation flows so users don't have to re-pick what was already known).
+    return warehouseBySupplier[sup.id] ?? prefill.warehouseId ?? "";
+  }
 
   // ---- Validation ----
   const allLinesOk =
@@ -175,12 +193,17 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   const partnersOk = groups.groups.every(
     (g) => g.supplier.kind !== "factory_pickup" || !!partnerFor(g.supplier),
   );
+  // Q4=A — every supplier group must have its own warehouse picked. No
+  // global modal-level fallback. Empty-groups case (orphan SKUs only) is
+  // handled by the orphans guard below.
+  const warehousesOk = groups.groups.every((g) => !!warehouseFor(g.supplier));
+  const isPending = create.isPending || createBatch.isPending;
   const valid =
     allLinesOk &&
-    !!warehouseId &&
+    warehousesOk &&
     groups.orphans.length === 0 &&
     partnersOk &&
-    !create.isPending;
+    !isPending;
 
   const skuSet = new Set(lines.map((l) => l.sku));
   const dup = skuSet.size !== lines.length;
@@ -190,24 +213,41 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   async function submit() {
     if (!valid) return;
     try {
-      // One create call per supplier group (auto-split).
-      for (const g of groups.groups) {
+      const n = groups.groups.length;
+      if (n === 1) {
+        // Single supplier group → keep using the existing single-PO RPC.
+        // This preserves the legacy contract (logistics_create_po) for the
+        // common case and avoids touching tests that assert this path.
+        const g = groups.groups[0];
         await create.mutateAsync({
           supplierId: g.supplier.id,
-          warehouseId,
+          warehouseId: warehouseFor(g.supplier),
           lines: g.lines.map((l) => ({ sku: l.sku, qty: l.qty })),
           ...(prefill.dl ? { dl: prefill.dl } : {}),
           ...(prefill.dlRefs && prefill.dlRefs.length > 0
             ? { dlRefs: prefill.dlRefs }
             : {}),
         });
+        toast.success(
+          `PO issued · ${lines.length} line${lines.length === 1 ? "" : "s"} · ${totalUnits} units`,
+        );
+      } else {
+        // 2+ supplier groups → atomic batch RPC. Each entry carries its own
+        // warehouse pick. dl_refs (if present) propagates onto every PO since
+        // a bundle PO is always cross-order. dl (single) doesn't apply when
+        // splitting — the batch RPC's helper is bundle-shaped only.
+        await createBatch.mutateAsync({
+          pos: groups.groups.map((g) => ({
+            supplierId: g.supplier.id,
+            warehouseId: warehouseFor(g.supplier),
+            lines: g.lines.map((l) => ({ sku: l.sku, qty: l.qty })),
+            ...(prefill.dlRefs && prefill.dlRefs.length > 0
+              ? { dlRefs: prefill.dlRefs }
+              : {}),
+          })),
+        });
+        toast.success(`Issued ${n} POs`);
       }
-      const n = groups.groups.length;
-      toast.success(
-        n > 1
-          ? `${n} POs issued · auto-split by supplier`
-          : `PO issued · ${lines.length} line${lines.length === 1 ? "" : "s"} · ${totalUnits} units`,
-      );
       onClose();
     } catch (e: unknown) {
       if (e instanceof ApiError) toast.error(e.message || "Issue PO failed");
@@ -384,14 +424,16 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         </div>
       )}
 
-      {/* Per-supplier groups */}
+      {/* Per-supplier groups — each picks its own destination warehouse (C5.2). */}
       <div className="flex flex-col gap-2.5 mb-3.5">
         {groups.groups.map((g) => {
           const needsPartner = g.supplier.kind === "factory_pickup";
           const groupUnits = g.lines.reduce((s, l) => s + (l.qty || 0), 0);
+          const supWarehouseId = warehouseFor(g.supplier);
           return (
             <div
               key={g.supplier.id}
+              data-testid={`po-supplier-group-${g.supplier.id}`}
               className="rounded-[4px] p-3"
               style={{
                 background: needsPartner
@@ -402,9 +444,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                   : "1px solid rgba(50,120,80,.25)",
               }}
             >
-              <div
-                className={`flex justify-between items-start gap-3 ${needsPartner ? "mb-2.5" : ""}`}
-              >
+              <div className="flex justify-between items-start gap-3 mb-2.5">
                 <div>
                   <div className="font-ui text-[13px] font-semibold">
                     {g.supplier.name}
@@ -434,50 +474,59 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                   {needsPartner ? "Needs partner" : "No partner needed"}
                 </div>
               </div>
-              {needsPartner && (
+              <div
+                className={`grid gap-3 ${needsPartner ? "grid-cols-2" : "grid-cols-1"}`}
+              >
                 <div>
-                  <div className="label mb-1.5">Logistics partner *</div>
+                  <div className="label mb-1.5">Warehouse *</div>
                   <select
-                    value={partnerFor(g.supplier)}
-                    onChange={(e) => setPartner(g.supplier.id, e.target.value)}
-                    aria-label={`Logistics partner for ${g.supplier.name}`}
+                    value={supWarehouseId}
+                    onChange={(e) =>
+                      setWarehouseForSupplier(g.supplier.id, e.target.value)
+                    }
+                    aria-label={`Warehouse for ${g.supplier.name}`}
+                    data-testid={`po-warehouse-${g.supplier.id}`}
                     className={INPUT_CLS}
                   >
-                    {partners.length === 0 && (
-                      <option value="">— no partners configured —</option>
-                    )}
-                    {partners.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                        {p.zones ? ` · ${p.zones}` : ""}
+                    <option value="">— pick a warehouse —</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
+                {needsPartner && (
+                  <div>
+                    <div className="label mb-1.5">Logistics partner *</div>
+                    <select
+                      value={partnerFor(g.supplier)}
+                      onChange={(e) =>
+                        setPartner(g.supplier.id, e.target.value)
+                      }
+                      aria-label={`Logistics partner for ${g.supplier.name}`}
+                      className={INPUT_CLS}
+                    >
+                      {partners.length === 0 && (
+                        <option value="">— no partners configured —</option>
+                      )}
+                      {partners.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                          {p.zones ? ` · ${p.zones}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Warehouse + ETA */}
+      {/* ETA — global. Warehouse moved into each supplier group above (C5.2). */}
       <div className="grid grid-cols-2 gap-3 mb-4">
-        <div>
-          <div className="label mb-1.5">Warehouse *</div>
-          <select
-            value={warehouseId}
-            onChange={(e) => setWarehouseId(e.target.value)}
-            aria-label="Warehouse"
-            className={INPUT_CLS}
-          >
-            {warehouses.length === 0 && <option value="">—</option>}
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-        </div>
         <div>
           <div className="label mb-1.5">Expected delivery</div>
           <input
@@ -490,6 +539,12 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         </div>
       </div>
 
+      {!warehousesOk && groups.groups.length > 0 && (
+        <div className="text-[11px] text-base-600 mb-2 font-body">
+          Pick a warehouse for each PO.
+        </div>
+      )}
+
       <ModalActions
         onCancel={onClose}
         onPrimary={submit}
@@ -499,7 +554,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             : `Issue PO · ${lines.length} line${lines.length === 1 ? "" : "s"}`
         }
         primaryDisabled={!valid}
-        primaryPending={create.isPending}
+        primaryPending={isPending}
       />
     </Modal>
   );

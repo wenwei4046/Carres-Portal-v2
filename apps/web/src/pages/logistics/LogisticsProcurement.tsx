@@ -12,6 +12,7 @@ import AssignPickupDialog from "./components/AssignPickupDialog";
 import CreatePOModal, {
   type CreatePoPrefill,
 } from "./components/CreatePOModal";
+import PoDetailModal from "./components/PoDetailModal";
 import ReceivePOModal from "./components/ReceivePOModal";
 
 /**
@@ -89,6 +90,10 @@ export default function LogisticsProcurement() {
   );
   const [receivePoId, setReceivePoId] = useState<string | null>(null);
   const [assignPickupPoId, setAssignPickupPoId] = useState<string | null>(null);
+  // C5.1 — selected PO row to show in the read-only detail modal. We hold the
+  // full row (not just id) so the modal doesn't need a new GET /:id endpoint;
+  // it reads everything from the list cache.
+  const [detailPo, setDetailPo] = useState<LogisticsPoListRow | null>(null);
 
   const posQ = useLogisticsPos();
   const suppliersQ = useLogisticsSuppliers();
@@ -252,7 +257,16 @@ export default function LogisticsProcurement() {
             <div
               key={po.id}
               data-testid={`po-row-${po.id}`}
-              className="grid items-center gap-4 px-[18px] py-3 border-t border-base-100 hover:bg-base-50 transition-colors"
+              onClick={() => setDetailPo(po)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setDetailPo(po);
+                }
+              }}
+              className="grid items-center gap-4 px-[18px] py-3 border-t border-base-100 hover:bg-base-50 transition-colors cursor-pointer"
               style={{
                 gridTemplateColumns: "96px 2.4fr 1.2fr 1fr 96px 120px 130px",
               }}
@@ -387,6 +401,14 @@ export default function LogisticsProcurement() {
             />
           );
         })()}
+      {detailPo && (
+        <PoDetailModal
+          po={detailPo}
+          supplier={supplierById.get(detailPo.supplier_id)}
+          warehouse={warehouseById.get(detailPo.warehouse_id)}
+          onClose={() => setDetailPo(null)}
+        />
+      )}
       {/*
         ReassignWarehouseDialog deliberately NOT wired here per Loo D3=A.
         See components/ReassignWarehouseDialog.tsx header for the rationale —
@@ -425,7 +447,11 @@ function ActionCell({
       <button
         type="button"
         className="btn-primary text-[11px] py-1 px-2.5"
-        onClick={onAssignPickup}
+        onClick={(e) => {
+          // Don't bubble to the row's onClick (opens PoDetailModal — C5.1).
+          e.stopPropagation();
+          onAssignPickup();
+        }}
         data-testid={`assign-pickup-${po.id}`}
       >
         Assign partner
@@ -438,7 +464,11 @@ function ActionCell({
         type="button"
         className="btn-secondary text-[11px] py-1 px-2.5"
         style={{ borderColor: "var(--success)", color: "var(--success)" }}
-        onClick={onReceive}
+        onClick={(e) => {
+          // Don't bubble to the row's onClick (opens PoDetailModal — C5.1).
+          e.stopPropagation();
+          onReceive();
+        }}
         data-testid={`receive-po-${po.id}`}
       >
         Receive →

@@ -17,6 +17,8 @@ import {
   type ConfirmProceedRequestInput,
   type CreateOrderInput,
   type CreatePoInput,
+  type CreatePosBatchInput,
+  type CreatePosBatchResponse,
   type DealerSelf,
   type ListLogisticsOrdersQuery,
   type ListMovementsQuery,
@@ -1557,6 +1559,46 @@ export function useCreatePoMutation(
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       // If the PO is tied to a DL (single or via dl_refs), the awaiting_stock
       // drawer for those orders should refresh. Bust the orders sub-tree too.
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * C5.2 — Batch create POs in one atomic RPC call.
+ *
+ * The CreatePOModal now picks a warehouse per supplier-group (Q4=A, blank
+ * required). When the SKU set spans 2+ suppliers, we collapse the N parallel
+ * useCreatePoMutation calls into a single useCreatePosBatch call so the PG
+ * transaction either commits all rows or none — no half-issued batches if
+ * (say) the 3rd supplier validation fails.
+ *
+ * Cache invalidation matches useCreatePoMutation (pos / dashboard / warehouse
+ * / orders sub-trees) so the procurement list, KPI strip, awaiting_stock
+ * drawers, and the warehouse stock view all refresh after the batch lands.
+ *
+ * de8bf4e pattern: spread `...opts` BEFORE `onSuccess` so caller-supplied
+ * onSuccess runs LAST (after our cache busting completes), matching every
+ * other Phase 4 mutation hook.
+ */
+export function useCreatePosBatch(
+  opts?: Partial<
+    UseMutationOptions<CreatePosBatchResponse, ApiError, CreatePosBatchInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<CreatePosBatchResponse, ApiError, CreatePosBatchInput>({
+    mutationFn: (input) =>
+      apiFetch<CreatePosBatchResponse>("/api/logistics/pos/batch", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },

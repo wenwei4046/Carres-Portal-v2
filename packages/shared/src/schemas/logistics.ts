@@ -94,6 +94,32 @@ export const createPoInput = z.object({
 export type CreatePoInput = z.infer<typeof createPoInput>;
 
 /**
+ * `createPosBatchInput` — POST /api/logistics/pos/batch (C5.2).
+ * Maps to `logistics_create_pos_batch(p_pos jsonb)` RPC. `pos` is the array
+ * of per-PO objects, each shaped exactly like `createPoInput`. The batch RPC
+ * is atomic: any helper failure rolls back the whole batch (default plpgsql
+ * function-as-tx semantics). Cap of 20 mirrors the RPC's sanity guard
+ * (22023 invalid_batch_size). Min of 1 enforces the same cap on the empty
+ * end. Frontend submits this from CreatePOModal when supplier groups > 1
+ * (per-supplier-group warehouse picker, blank required).
+ */
+export const createPosBatchInput = z.object({
+  pos: z.array(createPoInput).min(1).max(20),
+}).strict();
+export type CreatePosBatchInput = z.infer<typeof createPosBatchInput>;
+
+/**
+ * `createPosBatchResponse` — RPC returns `{po_ids: [text, ...]}` where each
+ * id is a generated 'PO-NNNN' text id (NOT a uuid — the project's PO PK is
+ * text, see 0001_init.sql line 323). Surfaced to the UI for the success
+ * toast ("Issued N POs").
+ */
+export const createPosBatchResponse = z.object({
+  poIds: z.array(z.string().min(1)),
+});
+export type CreatePosBatchResponse = z.infer<typeof createPosBatchResponse>;
+
+/**
  * `warehousePickInput` — POST /api/logistics/orders/:id/warehouse.
  * Maps to `logistics_warehouse_pick(order_id, warehouse_id)` RPC. Manual
  * override of the auto-picked source warehouse. Only allowed when

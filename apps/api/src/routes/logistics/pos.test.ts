@@ -640,3 +640,201 @@ describe("POST /api/logistics/pos/:id/reassign-warehouse", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// C5.2 — POST /api/logistics/pos/batch (batch-create with per-PO warehouse)
+// ---------------------------------------------------------------------------
+describe("POST /api/logistics/pos/batch", () => {
+  const SUPPLIER_A = "00000000-0000-0000-0000-000000000a01";
+  const SUPPLIER_B = "00000000-0000-0000-0000-000000000a02";
+  const WH_KLANG = "00000000-0000-0000-0000-000000000b01";
+  const WH_PJ = "00000000-0000-0000-0000-000000000b02";
+
+  const TWO_POS = {
+    pos: [
+      {
+        supplierId: SUPPLIER_A,
+        warehouseId: WH_KLANG,
+        lines: [{ sku: "mattress:carres-cloud:King", qty: 2 }],
+      },
+      {
+        supplierId: SUPPLIER_B,
+        warehouseId: WH_PJ,
+        lines: [{ sku: "sofa:oak:3-seater", qty: 1 }],
+      },
+    ],
+  };
+
+  it("happy path: 2 POs different suppliers + warehouses → returns poIds[]", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { po_ids: ["PO-2031", "PO-2032"] },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(TWO_POS),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { poIds: string[] };
+    expect(body.poIds).toEqual(["PO-2031", "PO-2032"]);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("logistics_create_pos_batch", {
+      p_pos: [
+        {
+          supplier_id: SUPPLIER_A,
+          warehouse_id: WH_KLANG,
+          lines: [{ sku: "mattress:carres-cloud:King", qty: 2 }],
+          eta_date: null,
+          dl_refs: null,
+          note: null,
+        },
+        {
+          supplier_id: SUPPLIER_B,
+          warehouse_id: WH_PJ,
+          lines: [{ sku: "sofa:oak:3-seater", qty: 1 }],
+          eta_date: null,
+          dl_refs: null,
+          note: null,
+        },
+      ],
+    });
+    assertRpcCallShape(rpc, "logistics_create_pos_batch", ["p_pos"]);
+  });
+
+  it("atomicity: helper failure on one PO returns 422; the RPC's single-call shape guarantees no partial inserts", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "P0001", message: "invalid sku/qty", details: "invalid_qty", hint: "pos_index=1" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(TWO_POS),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("invalid_qty");
+    // Single RPC call — atomicity is enforced inside Postgres, not here.
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 422 for empty pos array (zod min(1))", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pos: [] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 for 21 entries (zod max(20))", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const onePo = {
+      supplierId: SUPPLIER_A,
+      warehouseId: WH_KLANG,
+      lines: [{ sku: "mattress:carres-cloud:King", qty: 1 }],
+    };
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pos: Array.from({ length: 21 }, () => onePo) }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps 22023 invalid_batch_size from RPC → 422 with code='invalid_batch_size'", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "batch size", details: "invalid_batch_size" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(TWO_POS),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("invalid_batch_size");
+  });
+
+  it("maps 22023 warehouse_required → 422 with pos_index parsed from RPC hint", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "22023",
+        message: "warehouse is required",
+        details: "warehouse_required",
+        hint: "pos_index=1",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(TWO_POS),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("warehouse_required");
+    expect(body.pos_index).toBe(1);
+  });
+
+  it("returns 403 for dealer caller (no rpc)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(TWO_POS),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

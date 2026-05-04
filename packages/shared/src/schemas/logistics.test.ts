@@ -6,6 +6,7 @@ import {
   adjustStockInput,
   abandonOrderInput,
   createPoInput,
+  createPosBatchInput,
   warehousePickInput,
   issuePosForOrderInput,
   recheckStockInput,
@@ -144,6 +145,44 @@ describe('createPoInput', () => {
         warehouseId: UUID2,
         lines: [{ sku: 'SOFA-OAK-3S', qty: 1 }],
         extraField: 'x',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('createPosBatchInput', () => {
+  const VALID_PO = {
+    supplierId: UUID,
+    warehouseId: UUID2,
+    lines: [{ sku: 'SOFA-OAK-3S', qty: 1 }],
+  };
+  it('accepts an array with one valid PO entry', () => {
+    expect(
+      createPosBatchInput.safeParse({ pos: [VALID_PO] }).success,
+    ).toBe(true);
+  });
+  it('accepts an array with 20 entries (cap)', () => {
+    const pos = Array.from({ length: 20 }, () => VALID_PO);
+    expect(createPosBatchInput.safeParse({ pos }).success).toBe(true);
+  });
+  it('rejects an empty pos array', () => {
+    expect(createPosBatchInput.safeParse({ pos: [] }).success).toBe(false);
+  });
+  it('rejects 21 entries (over cap)', () => {
+    const pos = Array.from({ length: 21 }, () => VALID_PO);
+    expect(createPosBatchInput.safeParse({ pos }).success).toBe(false);
+  });
+  it('rejects when one entry has empty lines', () => {
+    expect(
+      createPosBatchInput.safeParse({
+        pos: [VALID_PO, { ...VALID_PO, lines: [] }],
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects when warehouseId is not uuid in any entry', () => {
+    expect(
+      createPosBatchInput.safeParse({
+        pos: [VALID_PO, { ...VALID_PO, warehouseId: 'nope' }],
       }).success,
     ).toBe(false);
   });

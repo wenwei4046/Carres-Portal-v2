@@ -35,6 +35,7 @@ let partnersHookState: { data: DeliveryPartnersListResponse | undefined };
 let catalogHookState: { data: CatalogResponse | undefined };
 const refetchSpy = vi.fn();
 const createMutateAsync = vi.fn().mockResolvedValue({});
+const createBatchMutateAsync = vi.fn().mockResolvedValue({ poIds: [] });
 const receiveMutateAsync = vi.fn().mockResolvedValue({});
 const assignPickupMutateAsync = vi.fn().mockResolvedValue({});
 const reassignMutateAsync = vi.fn().mockResolvedValue({});
@@ -51,6 +52,10 @@ vi.mock("@/lib/queries", async () => {
     useCatalog: () => catalogHookState,
     useCreatePoMutation: () => ({
       mutateAsync: createMutateAsync,
+      isPending: false,
+    }),
+    useCreatePosBatch: () => ({
+      mutateAsync: createBatchMutateAsync,
       isPending: false,
     }),
     useReceivePoLineMutation: () => ({
@@ -184,6 +189,7 @@ function setLoaded(pos: LogisticsPoListRow[]) {
 beforeEach(() => {
   refetchSpy.mockClear();
   createMutateAsync.mockClear();
+  createBatchMutateAsync.mockClear();
   receiveMutateAsync.mockClear();
   assignPickupMutateAsync.mockClear();
   reassignMutateAsync.mockClear();
@@ -248,7 +254,13 @@ describe("LogisticsProcurement page", () => {
     render(wrap(<LogisticsProcurement />));
     fireEvent.click(screen.getByTestId("new-po-button"));
     // Default first SKU is `mattress:carres-cloud:King` which maps to SUPPLIER_A.
+    // C5.2 — warehouse defaults blank per supplier group, so the button is
+    // disabled until the user picks one. Pick KL for SUPPLIER_A then submit.
     const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
+    expect(issueBtn).toBeDisabled();
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
     expect(issueBtn).not.toBeDisabled();
     fireEvent.click(issueBtn);
     await waitFor(() => {
@@ -450,5 +462,152 @@ describe("LogisticsProcurement page", () => {
     expect(screen.getByText(/New purchase order/)).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByText(/New purchase order/)).not.toBeInTheDocument();
+  });
+
+  // ---- C5.1 — PoDetailModal (read-only PO detail + Print PO) ----
+
+  it("15. clicking a PO row opens PoDetailModal with the PO data", () => {
+    setLoaded([
+      makePo({
+        id: "PO-2070",
+        supplier_id: SUPPLIER_A.id,
+        warehouse_id: WAREHOUSE_KL.id,
+        eta_date: "2026-06-01",
+        purchase_order_lines: [
+          { sku: "mattress:carres-cloud:King", qty: 5, received_qty: 2 },
+        ],
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.queryByTestId("po-detail-modal")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("po-row-PO-2070"));
+    expect(screen.getByTestId("po-detail-modal")).toBeInTheDocument();
+    // Header shows the short PO id (first 8 chars of "PO-2070").
+    expect(
+      screen.getByText(`#PO-${"PO-2070".slice(0, 8)}`),
+    ).toBeInTheDocument();
+    // Supplier + warehouse + eta from the row appear in the KV grid.
+    const modal = screen.getByTestId("po-detail-modal");
+    expect(modal.textContent).toContain("Carres Manufacturing");
+    expect(modal.textContent).toContain("KL Warehouse");
+    expect(modal.textContent).toContain("2026-06-01");
+    // Line table rendered with friendly SKU label.
+    expect(screen.getByTestId("po-detail-line-0")).toBeInTheDocument();
+    expect(modal.textContent).toContain("Carres Cloud · King");
+  });
+
+  it("16. clicking 'Assign partner' button does NOT open PoDetailModal (stopPropagation)", () => {
+    setLoaded([
+      makePo({
+        id: "PO-2071",
+        sup_status: "ready_for_pickup",
+        supplier_id: SUPPLIER_B.id,
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("assign-pickup-PO-2071"));
+    // The AssignPickupDialog opens
+    expect(
+      screen.getByText(/Assign pickup partner · PO-2071/),
+    ).toBeInTheDocument();
+    // But the read-only PoDetailModal does NOT
+    expect(screen.queryByTestId("po-detail-modal")).not.toBeInTheDocument();
+  });
+
+  it("17. clicking 'Receive →' button does NOT open PoDetailModal (stopPropagation)", () => {
+    setLoaded([
+      makePo({
+        id: "PO-2072",
+        sup_status: "delivered",
+        purchase_order_lines: [
+          { sku: "sofa:nordic:3s", qty: 3, received_qty: 0 },
+        ],
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("receive-po-PO-2072"));
+    expect(screen.getByText(/Receive PO-2072/)).toBeInTheDocument();
+    expect(screen.queryByTestId("po-detail-modal")).not.toBeInTheDocument();
+  });
+
+  it("18. PoDetailModal Close button dismisses the modal", () => {
+    setLoaded([makePo({ id: "PO-2073" })]);
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("po-row-PO-2073"));
+    expect(screen.getByTestId("po-detail-modal")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("po-detail-close-button"));
+    expect(screen.queryByTestId("po-detail-modal")).not.toBeInTheDocument();
+  });
+
+  it("19. PoDetailModal Print button calls fetch with /print URL + Bearer JWT", async () => {
+    setLoaded([makePo({ id: "PO-2074" })]);
+    // Stub fetch to return a tiny PDF blob.
+    const blob = new Blob(["%PDF-1.4 fake"], { type: "application/pdf" });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(blob, { status: 200, headers: { "content-type": "application/pdf" } }),
+    );
+    // Stub the auth store so we get a known token in the Authorization header.
+    const authMod = await import("@/lib/auth");
+    const getStateSpy = vi.spyOn(authMod.useAuth, "getState").mockReturnValue({
+      session: { access_token: "fake-jwt", refresh_token: "r", expires_at: 0, user: null },
+      user: null,
+      role: null,
+      bootstrap: vi.fn(),
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      signUp: vi.fn(),
+      resetPassword: vi.fn(),
+    } as unknown as ReturnType<typeof authMod.useAuth.getState>);
+    // Stub window.open + URL.createObjectURL/revokeObjectURL so the test
+    // doesn't try to actually navigate. JSDOM doesn't ship these, so we
+    // assign them directly instead of using vi.spyOn (which fails on missing
+    // properties).
+    const openSpy = vi
+      .spyOn(window, "open")
+      .mockReturnValue({} as Window);
+    const originalCreate = (URL as unknown as { createObjectURL?: unknown })
+      .createObjectURL;
+    const originalRevoke = (URL as unknown as { revokeObjectURL?: unknown })
+      .revokeObjectURL;
+    (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL =
+      vi.fn().mockReturnValue("blob:fake");
+    (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL =
+      vi.fn();
+
+    render(wrap(<LogisticsProcurement />));
+    fireEvent.click(screen.getByTestId("po-row-PO-2074"));
+    fireEvent.click(screen.getByTestId("po-detail-print-button"));
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/logistics\/pos\/PO-2074\/print$/);
+    const headers = (init?.headers as Headers) ?? new Headers();
+    expect(headers.get("Authorization")).toBe("Bearer fake-jwt");
+    // Modal opened the blob in a new tab (popup not blocked in test env).
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledWith(
+        "blob:fake",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    });
+
+    fetchSpy.mockRestore();
+    getStateSpy.mockRestore();
+    openSpy.mockRestore();
+    if (originalCreate === undefined) {
+      delete (URL as unknown as { createObjectURL?: unknown }).createObjectURL;
+    } else {
+      (URL as unknown as { createObjectURL: unknown }).createObjectURL =
+        originalCreate;
+    }
+    if (originalRevoke === undefined) {
+      delete (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL;
+    } else {
+      (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL =
+        originalRevoke;
+    }
   });
 });
