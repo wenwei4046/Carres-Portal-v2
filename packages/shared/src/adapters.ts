@@ -87,6 +87,7 @@ export const supplierFromRow = (r: DB.SupplierRow): D.Supplier => ({
   leadTime: r.lead_time,
   kind: r.kind,
   catCovered: r.cat_covered,
+  slug: r.slug,
 });
 
 export const partnerFromRow = (r: DB.DeliveryPartnerRow): D.DeliveryPartner => ({

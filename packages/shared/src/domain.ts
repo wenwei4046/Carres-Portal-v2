@@ -89,6 +89,9 @@ export interface Supplier {
   leadTime: string | null;
   kind: "own_logistics" | "factory_pickup";
   catCovered: string[];
+  // Stable slug (migration 0032, v3-S4) — NOT NULL post-migration. Seeded as
+  // 'hookka' / 'nice-future'; used by SUPPLIER_SOP routing in sops.ts.
+  slug: string;
 }
 
 export interface DeliveryPartner {

@@ -142,6 +142,11 @@ export interface SupplierRow {
   lead_time: string | null;
   kind: "own_logistics" | "factory_pickup";
   cat_covered: string[];
+  // Stable slug for cross-env supplier identification (migration 0032, v3-S4).
+  // NOT NULL UNIQUE in DB. Seeded values: 'hookka' (HoOKkA), 'nice-future'
+  // (Nice Future). Used by SUPPLIER_SOP keying in `sops.ts` so SOP routing
+  // survives env reseeds where supplier UUIDs differ.
+  slug: string;
 }
 
 export interface DeliveryPartnerRow {
@@ -253,6 +258,33 @@ export interface OrderHistoryRow {
   by_role: Role | null;
   by_user_id: string | null;
   occurred_at: string;
+}
+
+/**
+ * `order_supplier_threads` (migration 0033, v3-S4). One row per
+ * (order, supplier, category) — UNIQUE constraint enforces this. Drives the
+ * v3 logistics pipeline so each fulfillment slice of an order has its own
+ * SOP-driven kanban presence (a single order with mattress + sofa lines from
+ * different suppliers spawns 2 threads, one per supplier×category).
+ *
+ * `po_id` is `text` because `purchase_orders.id` is `text` (not uuid). `sop_name`
+ * mirrors `SopName` from `sops.ts` ('STANDARD' | 'SOFA_SPECIAL'). `history` is
+ * a jsonb append log defaulting to `[]`.
+ */
+export interface OrderSupplierThreadRow {
+  id: string;
+  order_id: string;
+  supplier_id: string;
+  category: string;
+  sop_name: "STANDARD" | "SOFA_SPECIAL";
+  logistics_stage: LogisticsStage;
+  po_id: string | null;
+  warehouse_id: string | null;
+  reserved_at: string | null;
+  delivered_at: string | null;
+  history: unknown[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PurchaseOrderRow {
