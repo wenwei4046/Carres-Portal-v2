@@ -413,8 +413,7 @@ export default function LogisticsMovements({ initialFilters, setTab, clearInitia
           <div
             className="font-mono text-[28px] font-semibold mt-0.5 leading-none"
             style={{
-              color:
-                netUnits >= 0 ? "var(--success)" : "var(--destructive)",
+              color: netUnits >= 0 ? "var(--success)" : "var(--danger)",
             }}
           >
             {netUnits >= 0 ? "+" : ""}

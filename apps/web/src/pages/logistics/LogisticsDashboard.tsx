@@ -84,10 +84,10 @@ export default function LogisticsDashboard({ setTab }: Props) {
   // KPI accent rules — mirror proto lines 41-43.
   // Today  > 0 → primary (terracotta) ; 0 → muted (base-400)
   // Open POs > 0 → warning ; 0 → success
-  // Overdue > 0 → destructive ; 0 → success
+  // Overdue > 0 → danger (vivid red, proto #b91c1c) ; 0 → success
   const todayAccent = kpis.today_deliveries > 0 ? "primary" : "muted";
   const poAccent = kpis.open_pos > 0 ? "warning" : "success";
-  const overdueAccent = kpis.overdue_orders > 0 ? "destructive" : "success";
+  const overdueAccent = kpis.overdue_orders > 0 ? "danger" : "success";
 
   return (
     <div className="px-9 py-8 pb-14">

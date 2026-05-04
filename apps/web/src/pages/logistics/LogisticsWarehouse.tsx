@@ -30,7 +30,7 @@ import AdjustStockModal from "./components/AdjustStockModal";
  *     opens AdjustStockModal pre-filled with sku + warehouseId + current qty.
  *   - Status badge: outline-style 9px UPPERCASE, color from low_stock_status.
  *     Plan §18.5 + comment in queries.ts:988-993:
- *       - "out" → destructive (wine red)
+ *       - "out" → danger (vivid red, proto #b91c1c)
  *       - "low" → warning (honey)
  *       - "ok"  → success (sage)
  *
@@ -70,7 +70,7 @@ function categoryForSku(sku: string): string | null {
 }
 
 function statusColor(status: LowStockStatus): string {
-  if (status === "out") return "var(--destructive)";
+  if (status === "out") return "var(--danger)";
   if (status === "low") return "var(--warning)";
   return "var(--success)";
 }

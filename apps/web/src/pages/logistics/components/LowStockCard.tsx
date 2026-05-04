@@ -7,8 +7,8 @@ import type { LogisticsLowStockRow } from "@/lib/queries";
  * 109-118: white card, hairline borders, per-row 1fr/auto grid:
  *   - Left: SKU name (proto uses stock dictionary lookup; we show the SKU
  *     code itself until M5 task 3 wires the SKU ↔ name map)
- *   - Right: "{N} units" in mono, colored destructive (proto `--danger`) when
- *     available is 0, warning (proto `--warning`) when available is 1
+ *   - Right: "{N} units" in mono, colored danger (proto `--danger` #b91c1c)
+ *     when available is 0, warning (proto `--warning`) when available is 1
  *
  * Empty state mirrors proto: "All SKUs healthy."
  */
@@ -51,7 +51,7 @@ export default function LowStockCard({ lowStock, onViewAll }: Props) {
             const available = row.available;
             // Proto: 0 → --danger (red), 1 → --warning (honey).
             const tone =
-              available === 0 ? "text-destructive" : "text-warning";
+              available === 0 ? "text-danger" : "text-warning";
             return (
               <div
                 key={`${row.sku}-${row.warehouse_id}`}

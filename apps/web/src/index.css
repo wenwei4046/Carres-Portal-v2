@@ -34,6 +34,13 @@
     --destructive: 0 64% 33%;
     --destructive-foreground: 0 0% 100%;
 
+    /* --danger: vivid red (Tailwind red-700, proto #b91c1c) — for "out of stock" /
+       "overdue" / "negative net" accents. Distinct from --destructive (wine
+       --error) which is for error pills + form validation. Both come from
+       reference/shared/styles.css warm-linen palette. */
+    --danger: 0 79% 41%;
+    --danger-foreground: 0 0% 98%;
+
     --border: 30 12% 87%;
     --input: 30 12% 87%;
     --ring: 15 74% 48%;

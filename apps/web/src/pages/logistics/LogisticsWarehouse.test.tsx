@@ -271,7 +271,7 @@ describe("LogisticsWarehouse page", () => {
     fireEvent.click(screen.getByTestId("warehouse-cat-bedframe"));
     const outBadge = screen.getByTestId(`warehouse-badge-${SKU_BEDFRAME}`);
     expect(outBadge.textContent).toBe("Out");
-    expect(outBadge.getAttribute("style")).toContain("var(--destructive)");
+    expect(outBadge.getAttribute("style")).toContain("var(--danger)");
   });
 
   it("6. empty category shows the empty-state hint", () => {

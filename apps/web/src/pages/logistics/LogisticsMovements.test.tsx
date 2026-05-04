@@ -166,8 +166,8 @@ describe("LogisticsMovements page", () => {
     expect(net.textContent).toContain("+12");
   });
 
-  it("2. KPI tiles have proto color tokens (success / terracotta / destructive)", () => {
-    // Net = -2 (in:1 out:3) → destructive.
+  it("2. KPI tiles have proto color tokens (success / terracotta / danger)", () => {
+    // Net = -2 (in:1 out:3) → danger.
     setLoaded([
       {
         id: "a",
@@ -198,7 +198,7 @@ describe("LogisticsMovements page", () => {
     const tout = screen.getByTestId("movements-kpi-out");
     expect(tout.innerHTML).toContain("var(--terracotta)");
     const net = screen.getByTestId("movements-kpi-net");
-    expect(net.innerHTML).toContain("var(--destructive)");
+    expect(net.innerHTML).toContain("var(--danger)");
   });
 
   it("3. clicking a period chip re-fires the hook with that period in filters", () => {

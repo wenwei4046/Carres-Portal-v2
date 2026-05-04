@@ -9,11 +9,11 @@
  *   - Hint: 12px base-600 body
  *
  * Accent palette is driven by warm-linen tokens (index.css):
- *   - "primary"     → terracotta `--primary` (Today's deliveries when > 0)
- *   - "warning"     → honey `--warning`     (Open POs when > 0)
- *   - "destructive" → wine `--destructive`  (Overdue when > 0)
- *   - "success"     → olive `--success`     (counters at zero / "all clear")
- *   - "muted"       → `--base-400`          (Today when zero)
+ *   - "primary" → terracotta `--primary` (Today's deliveries when > 0)
+ *   - "warning" → honey `--warning`     (Open POs when > 0)
+ *   - "danger"  → vivid red `--danger`  (Overdue when > 0; proto #b91c1c)
+ *   - "success" → olive `--success`     (counters at zero / "all clear")
+ *   - "muted"   → `--base-400`          (Today when zero)
  *
  * onClick is optional — when omitted the tile renders as a non-interactive
  * div (so a11y + tab order skip past inert tiles). The proto always renders
@@ -23,7 +23,7 @@
 export type LogisticsKpiAccent =
   | "primary"
   | "warning"
-  | "destructive"
+  | "danger"
   | "success"
   | "muted";
 
@@ -40,7 +40,7 @@ interface Props {
 const accentToBorder: Record<LogisticsKpiAccent, string> = {
   primary: "border-l-primary",
   warning: "border-l-warning",
-  destructive: "border-l-destructive",
+  danger: "border-l-danger",
   success: "border-l-success",
   muted: "border-l-base-400",
 };
@@ -48,7 +48,7 @@ const accentToBorder: Record<LogisticsKpiAccent, string> = {
 const accentToLabel: Record<LogisticsKpiAccent, string> = {
   primary: "text-primary",
   warning: "text-warning",
-  destructive: "text-destructive",
+  danger: "text-danger",
   success: "text-success",
   muted: "text-base-400",
 };
