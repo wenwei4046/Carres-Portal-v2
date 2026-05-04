@@ -170,7 +170,6 @@ export function useCreateOrder(
       // signature-agnostic across TanStack versions.
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -191,6 +190,7 @@ export function useProceedOrder(
   const qc = useQueryClient();
   return useMutation<Order, ApiError, string>({
     mutationFn: (id) => apiFetch<Order>(`/api/orders/${id}/proceed`, { method: "POST" }),
+    ...opts,
     onSuccess: async (...args) => {
       const [order, mutateOrderId] = args;
       // mutateOrderId is the id we passed to mutate(id) — guaranteed to
@@ -200,7 +200,6 @@ export function useProceedOrder(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -223,6 +222,7 @@ export function useTopUpOrder(
         method: "POST",
         body: JSON.stringify(input),
       }),
+    ...opts,
     onSuccess: async (...args) => {
       const [order] = args;
       // Prime the detail cache with the freshly-mutated row so the page
@@ -242,7 +242,6 @@ export function useTopUpOrder(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -259,6 +258,7 @@ export function useSetOrderAddress(
         method: "POST",
         body: JSON.stringify(input),
       }),
+    ...opts,
     onSuccess: async (...args) => {
       const [order] = args;
       // Prime the detail cache with the freshly-mutated row so the page
@@ -278,7 +278,6 @@ export function useSetOrderAddress(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -294,6 +293,7 @@ export function useSetOrderDate(
         method: "POST",
         body: JSON.stringify(input),
       }),
+    ...opts,
     onSuccess: async (...args) => {
       const [order] = args;
       // Prime the detail cache with the freshly-mutated row so the page
@@ -313,7 +313,6 @@ export function useSetOrderDate(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -331,6 +330,7 @@ export function useUpdateOrder(
         method: "PATCH",
         body: JSON.stringify(input),
       }),
+    ...opts,
     onSuccess: async (...args) => {
       const [order] = args;
       // Prime the detail cache with the freshly-mutated row so the page
@@ -350,7 +350,6 @@ export function useUpdateOrder(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -368,6 +367,7 @@ export function useCancelOrder(
         method: "POST",
         body: JSON.stringify(input),
       }),
+    ...opts,
     onSuccess: async (...args) => {
       const [order] = args;
       // Prime the detail cache with the freshly-mutated row so the page
@@ -387,7 +387,6 @@ export function useCancelOrder(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -656,6 +655,7 @@ export function useDecideApproval(
         `/api/approvals/${approvalId}/decide`,
         { method: "POST", body: JSON.stringify(input) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["principal", "approvals"] });
       await qc.invalidateQueries({
@@ -667,7 +667,6 @@ export function useDecideApproval(
         ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
       );
     },
-    ...opts,
   });
 }
 
@@ -705,6 +704,7 @@ export function useInviteDealer(
         method: "POST",
         body: JSON.stringify(input),
       }),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["principal", "dealers"] });
       await qc.invalidateQueries({ queryKey: ["principal", "approvals"] });
@@ -716,7 +716,6 @@ export function useInviteDealer(
         ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
       );
     },
-    ...opts,
   });
 }
 
@@ -743,6 +742,7 @@ export function useDealerSetStatus(
         `/api/principal/dealers/${dealerId}/status`,
         { method: "POST", body: JSON.stringify(input) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({
         queryKey: qk.principal.dealer(dealerId),
@@ -757,7 +757,6 @@ export function useDealerSetStatus(
         ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
       );
     },
-    ...opts,
   });
 }
 
@@ -1248,13 +1247,13 @@ export function useAssignPartnerMutation(
         `/api/logistics/orders/${orderId}/assign-partner`,
         { method: "POST", body: JSON.stringify(input) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1273,6 +1272,7 @@ export function useAttachDoMutation(
         `/api/logistics/orders/${orderId}/attach-do`,
         { method: "POST", body: JSON.stringify(input) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
@@ -1281,7 +1281,6 @@ export function useAttachDoMutation(
       await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1299,6 +1298,7 @@ export function useAbandonOrderMutation(
         `/api/logistics/orders/${orderId}/abandon`,
         { method: "POST", body: JSON.stringify(input) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
@@ -1306,7 +1306,6 @@ export function useAbandonOrderMutation(
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1324,13 +1323,13 @@ export function useWarehousePickMutation(
         `/api/logistics/orders/${orderId}/warehouse`,
         { method: "POST", body: JSON.stringify(input) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1348,12 +1347,12 @@ export function useRecheckStockMutation(
         `/api/logistics/orders/${orderId}/recheck-stock`,
         { method: "POST", body: JSON.stringify({}) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1371,6 +1370,7 @@ export function useIssuePosForOrderMutation(
         `/api/logistics/orders/${orderId}/issue-pos`,
         { method: "POST", body: JSON.stringify({}) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
@@ -1378,7 +1378,6 @@ export function useIssuePosForOrderMutation(
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1395,6 +1394,7 @@ export function useCreatePoMutation(
         method: "POST",
         body: JSON.stringify(input),
       }),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
@@ -1403,7 +1403,6 @@ export function useCreatePoMutation(
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1421,6 +1420,7 @@ export function useReceivePoLineMutation(
         `/api/logistics/pos/${poId}/receive`,
         { method: "POST", body: JSON.stringify(input) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
@@ -1431,7 +1431,6 @@ export function useReceivePoLineMutation(
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1449,13 +1448,13 @@ export function useCancelPoMutation(
         `/api/logistics/pos/${poId}/cancel`,
         { method: "POST", body: JSON.stringify(input) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1473,13 +1472,13 @@ export function useAssignPickupPartnerMutation(
         `/api/logistics/pos/${poId}/assign-pickup-partner`,
         { method: "POST", body: JSON.stringify(input) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1497,6 +1496,7 @@ export function useReassignPoWarehouseMutation(
         `/api/logistics/pos/${poId}/reassign-warehouse`,
         { method: "POST", body: JSON.stringify(input) },
       ),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
@@ -1504,7 +1504,6 @@ export function useReassignPoWarehouseMutation(
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
@@ -1522,13 +1521,13 @@ export function useAdjustStockMutation(
         method: "POST",
         body: JSON.stringify(input),
       }),
+    ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
-    ...opts,
   });
 }
 
