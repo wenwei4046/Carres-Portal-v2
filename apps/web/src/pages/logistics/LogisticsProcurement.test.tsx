@@ -852,4 +852,71 @@ describe("LogisticsProcurement page", () => {
     // Lines stay untouched (no override happened).
     expect(screen.getByDisplayValue("Carres Cloud · King")).toBeInTheDocument();
   });
+
+  // ---- v3-S2.2 — Drop Receive button gate on sup_status='delivered' ----
+  // Per v3 spec §7.3 (Q5 reform): Receive button shows for any open PO unless
+  // it's mid-pickup (ready_for_pickup / pickup_assigned / pickup_accepted /
+  // picked_up). HoOKkA own_logistics flow was stuck because sup_status never
+  // reaches 'delivered' — supplier ships direct to WH and nobody flips a
+  // "delivered to WH" toggle. New rule: catch-all = "Receive →".
+
+  it("27. v3-S2.2: shows Receive button when sup_status is in_production", () => {
+    setLoaded([
+      makePo({ id: "PO-3001", sup_status: "in_production" }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.getByTestId("receive-po-PO-3001")).toBeInTheDocument();
+  });
+
+  it("28. v3-S2.2: shows Receive button when sup_status is acknowledged", () => {
+    setLoaded([
+      makePo({ id: "PO-3002", sup_status: "acknowledged" }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.getByTestId("receive-po-PO-3002")).toBeInTheDocument();
+  });
+
+  it("29. v3-S2.2: shows Receive button when sup_status is pending", () => {
+    setLoaded([
+      makePo({ id: "PO-3003", sup_status: "pending" }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.getByTestId("receive-po-PO-3003")).toBeInTheDocument();
+  });
+
+  it("30. v3-S2.2: shows Receive button when sup_status is delivered (regression guard)", () => {
+    setLoaded([
+      makePo({ id: "PO-3004", sup_status: "delivered" }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.getByTestId("receive-po-PO-3004")).toBeInTheDocument();
+  });
+
+  it("31. v3-S2.2: shows Assign partner button (NOT Receive) when sup_status is ready_for_pickup", () => {
+    setLoaded([
+      makePo({
+        id: "PO-3005",
+        sup_status: "ready_for_pickup",
+        supplier_id: SUPPLIER_B.id,
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.getByTestId("assign-pickup-PO-3005")).toBeInTheDocument();
+    expect(screen.queryByTestId("receive-po-PO-3005")).not.toBeInTheDocument();
+  });
+
+  it("32. v3-S2.2: shows pickup-flight text (NOT Receive) when sup_status is pickup_assigned", () => {
+    setLoaded([
+      makePo({
+        id: "PO-3006",
+        sup_status: "pickup_assigned",
+        supplier_id: SUPPLIER_B.id,
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.queryByTestId("receive-po-PO-3006")).not.toBeInTheDocument();
+    // The row must exist + render the "awaiting accept" status text.
+    const row = screen.getByTestId("po-row-PO-3006");
+    expect(row.textContent).toContain("awaiting accept");
+  });
 });

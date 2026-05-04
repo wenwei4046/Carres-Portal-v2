@@ -27,10 +27,11 @@ import ReceivePOModal from "./components/ReceivePOModal";
  *   - Card-style table of POs with PO# / Items / Supplier / Warehouse / ETA /
  *     Status / Action columns
  *   - Per-row Action column reflects sup_status — primary actions are
- *     "Receive →" (when sup_status='delivered'), "Assign partner" (when
- *     sup_status='ready_for_pickup'), or status text. ReassignWarehouseDialog
- *     is intentionally NOT wired here (D3=A — see ReassignWarehouseDialog.tsx
- *     header for explanation).
+ *     "Receive →" (default for any open PO; Q5 reform per v3 spec §7.3,
+ *     applied by v3-S2.2), "Assign partner" (when sup_status='ready_for_pickup'),
+ *     or pickup-flight status text (pickup_assigned / pickup_accepted /
+ *     picked_up). ReassignWarehouseDialog is intentionally NOT wired here
+ *     (D3=A — see ReassignWarehouseDialog.tsx header for explanation).
  *   - Modals open inline: CreatePOModal (`+ New PO`), ReceivePOModal (per
  *     row), AssignPickupDialog (per row).
  *
@@ -421,7 +422,24 @@ export default function LogisticsProcurement() {
   );
 }
 
-// Per-row action cell — picks the right CTA based on sup_status.
+// Per-row action cell — picks the right CTA for an open PO.
+//
+// Default for any open PO is "Receive →" — Logistics can always press Receive,
+// which opens ReceivePOModal (Q5 reform per v3 spec §7.3, applied by v3-S2.2).
+// The previous gate on `sup_status === 'delivered'` blocked the own_logistics
+// flow (HoOKkA Bedframe etc.) because supplier ships direct to WH and nobody
+// flips a "delivered to WH" toggle, so sup_status never advances past
+// in_production / shipped.
+//
+// The factory_pickup pickup-flight states keep their dedicated UI because
+// Receive doesn't apply mid-pickup:
+//   ready_for_pickup → "Assign partner" button (open AssignPickupDialog)
+//   pickup_assigned  → "awaiting accept" text
+//   pickup_accepted  → "pickup scheduled" text
+//   picked_up        → "in transit" text
+// Once the partner delivers the PO returns to the catch-all and Logistics
+// presses Receive. Partner-side Receive (Phase 4.5 / v3-S7) will share the
+// same RPC; this gate-drop is the v3-S2 logistics-only step.
 function ActionCell({
   po,
   onReceive,
@@ -458,23 +476,6 @@ function ActionCell({
       </button>
     );
   }
-  if (ss === "delivered") {
-    return (
-      <button
-        type="button"
-        className="btn-secondary text-[11px] py-1 px-2.5"
-        style={{ borderColor: "var(--success)", color: "var(--success)" }}
-        onClick={(e) => {
-          // Don't bubble to the row's onClick (opens PoDetailModal — C5.1).
-          e.stopPropagation();
-          onReceive();
-        }}
-        data-testid={`receive-po-${po.id}`}
-      >
-        Receive →
-      </button>
-    );
-  }
   if (ss === "pickup_assigned" || ss === "pickup_accepted") {
     return (
       <span className="font-mono text-[10px] text-base-500">
@@ -487,11 +488,23 @@ function ActionCell({
       <span className="font-mono text-[10px] text-base-500">in transit</span>
     );
   }
-  // Pre-pickup states (pending / acknowledged / in_production)
+  // v3-S2.2 catch-all: every other open-PO state (pending / acknowledged /
+  // in_production / shipped / delivered / reassign_needed / null) gets the
+  // Receive button. Was previously gated to sup_status === 'delivered' only.
   return (
-    <span className="font-mono text-[10px] text-base-500">
-      {ss?.replace(/_/g, " ") ?? "in production"}
-    </span>
+    <button
+      type="button"
+      className="btn-secondary text-[11px] py-1 px-2.5"
+      style={{ borderColor: "var(--success)", color: "var(--success)" }}
+      onClick={(e) => {
+        // Don't bubble to the row's onClick (opens PoDetailModal — C5.1).
+        e.stopPropagation();
+        onReceive();
+      }}
+      data-testid={`receive-po-${po.id}`}
+    >
+      Receive →
+    </button>
   );
 }
 
