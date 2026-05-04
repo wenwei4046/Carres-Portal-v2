@@ -919,4 +919,39 @@ describe("LogisticsProcurement page", () => {
     const row = screen.getByTestId("po-row-PO-3006");
     expect(row.textContent).toContain("awaiting accept");
   });
+
+  // ---- v3-S2.2 review I1 — carve-out regression guard for the remaining 2
+  // factory_pickup states (pickup_accepted + picked_up). Tests 31-32 already
+  // cover ready_for_pickup + pickup_assigned. Without 33-34 a future refactor
+  // could accidentally drop these branches into the catch-all "Receive →"
+  // button and slip past CI.
+  it("33. v3-S2.2: shows \"pickup scheduled\" text (not Receive button) when sup_status is pickup_accepted (regression guard)", () => {
+    setLoaded([
+      makePo({
+        id: "PO-3007",
+        sup_status: "pickup_accepted",
+        supplier_id: SUPPLIER_B.id,
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.queryByTestId("receive-po-PO-3007")).not.toBeInTheDocument();
+    // The row must exist + render the "pickup scheduled" status text.
+    const row = screen.getByTestId("po-row-PO-3007");
+    expect(row.textContent).toContain("pickup scheduled");
+  });
+
+  it("34. v3-S2.2: shows \"in transit\" text (not Receive button) when sup_status is picked_up (regression guard)", () => {
+    setLoaded([
+      makePo({
+        id: "PO-3008",
+        sup_status: "picked_up",
+        supplier_id: SUPPLIER_B.id,
+      }),
+    ]);
+    render(wrap(<LogisticsProcurement />));
+    expect(screen.queryByTestId("receive-po-PO-3008")).not.toBeInTheDocument();
+    // The row must exist + render the "in transit" status text.
+    const row = screen.getByTestId("po-row-PO-3008");
+    expect(row.textContent).toContain("in transit");
+  });
 });
