@@ -899,17 +899,29 @@ describe("POST /api/logistics/pos/:id/reassign-warehouse", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C5.3 — GET /api/logistics/pos/awaiting-stock-shortage (auto-fill feed)
+// C5.3 / v3-S4.6 — GET /api/logistics/pos/awaiting-stock-shortage (auto-fill feed)
 // ---------------------------------------------------------------------------
+// Mock matrix (4 tables touched by the dual-path route):
+//   - order_supplier_threads (v3-S4.6 PRIMARY): rows where
+//     logistics_stage='awaiting_logistics_action' AND po_id IS NULL identify
+//     not-yet-procured slices. The mock returns ALL thread rows; the route
+//     narrows in TS so tests can supply a mix of stages / po_id values.
+//   - orders (v3-S4.6 LEGACY fallback): orders in awaiting_logistics_action
+//     OR awaiting_stock that have NO thread row (pre-v3 / unsplit). The mock
+//     resolves on .in("logistics_stage", [...]).
+//   - purchase_orders (v2-style coverage filter on legacy fallback): only
+//     open POs gate orders. Received/cancelled don't count.
+//   - order_lines + stock_balances: same as before.
 describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
-  // Wire up a per-table .from() chain mock similar to orders.test.ts
-  // mockDetailQueries — each table call returns its own thenable chain.
-  //
-  // v3-S2.1 update: also stubs purchase_orders for the "exclude orders already
-  // covered by an open PO" filter. The mock applies the route's
-  // `.eq("status", X)` filter to `opts.pos` so that tests can supply a mix of
-  // open/received/cancelled rows and verify the route filters correctly.
   function mockShortageQueries(opts: {
+    // v3-S4.6: thread rows. Each row tagged with logistics_stage + po_id so
+    // tests can verify primary-path filtering. Default: empty (no v3 split
+    // has happened — tests fall back to the legacy path).
+    threads?: {
+      order_id: string;
+      logistics_stage: string;
+      po_id: string | null;
+    }[];
     awaitingOrders?: { id: string; dl?: number | null }[];
     // v3-S2.1: lines may optionally carry `order_id` so the mock can mirror
     // `.in("order_id", [...])` filtering — tests supply lines for ALL orders
@@ -925,13 +937,24 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         in: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const promise = (data: any) => Promise.resolve({ data, error: null });
       switch (table) {
+        case "order_supplier_threads":
+          // v3-S4.6: route calls .from('order_supplier_threads').select('order_id, logistics_stage, po_id')
+          // — no filters, the route does the narrowing in TS so a single fetch
+          // serves both "primary path" and "has any thread" lookups. The mock
+          // resolves at .select() (which is the awaitable thenable).
+          chain.select = vi.fn(() => promise(opts.threads ?? []));
+          break;
         case "orders":
-          // The route filters on logistics_stage='awaiting_stock' via .eq().
-          // Resolve at .eq(...) by overriding it with a thenable.
+          // v3-S4.6: route calls `.in("logistics_stage", ["awaiting_logistics_action", "awaiting_stock"])`.
+          // The mock resolves at .in() (chosen by the route as the trailing
+          // filter). The .eq() fallback below is kept as a safety net so a
+          // future single-stage variant doesn't silently break this mock.
+          chain.in = vi.fn(() => promise(opts.awaitingOrders ?? []));
           chain.eq = vi.fn(() => promise(opts.awaitingOrders ?? []));
           break;
         case "order_lines":
@@ -1261,6 +1284,243 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     };
     expect(body.shortage).toEqual([
       { sku: "sofa:nordic:3s", need: 2, available: 0, shortage: 2 },
+    ]);
+  });
+
+  // -------------------------------------------------------------------------
+  // v3-S4.6 — primary path: order_supplier_threads.po_id IS NULL
+  //
+  // After v3-S4 (migration 0033) every confirmed order is split into per-
+  // (supplier, category) threads. A thread with logistics_stage =
+  // 'awaiting_logistics_action' AND po_id IS NULL is the "not yet covered by
+  // a PO" auto-fill target. The dl/dl_refs join from v3-S2.1 is now the
+  // SECONDARY (legacy) path for orders that exist but have no thread rows
+  // (pre-v3 data, or confirm_proceed_request_v3 not yet called).
+  // -------------------------------------------------------------------------
+  it("v3 primary: thread with po_id NULL contributes its order's lines to shortage", async () => {
+    // Order A has been split into a thread at awaiting_logistics_action with
+    // po_id NULL → its lines must surface. The order itself does NOT need to
+    // be in `awaitingOrders` because the primary path keys off threads, not
+    // the orders.logistics_stage column.
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    mockShortageQueries({
+      threads: [
+        { order_id: ID_A, logistics_stage: "awaiting_logistics_action", po_id: null },
+      ],
+      // No row in awaitingOrders — proves the primary path is doing the work.
+      awaitingOrders: [],
+      orderLines: [
+        { order_id: ID_A, sku: "mattress:cloud:King", qty: 4 },
+      ],
+      stockBalances: [
+        { sku: "mattress:cloud:King", qty: 1, reserved: 0 },
+      ],
+      pos: [],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; need: number; available: number; shortage: number }[];
+    };
+    expect(body.shortage).toEqual([
+      { sku: "mattress:cloud:King", need: 4, available: 1, shortage: 3 },
+    ]);
+  });
+
+  it("v3 primary: thread with po_id NOT NULL is excluded (already covered)", async () => {
+    // Order A has a thread already pointing at PO-2050. It must NOT surface in
+    // the auto-fill list — even though logistics_stage on the thread is still
+    // 'awaiting_logistics_action' (which can happen briefly between PO insert
+    // and stage advance). The po_id IS NULL gate is the discriminator.
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    mockShortageQueries({
+      threads: [
+        { order_id: ID_A, logistics_stage: "awaiting_logistics_action", po_id: "PO-2050" },
+      ],
+      awaitingOrders: [],
+      orderLines: [
+        { order_id: ID_A, sku: "mattress:cloud:King", qty: 4 },
+      ],
+      stockBalances: [{ sku: "mattress:cloud:King", qty: 0, reserved: 0 }],
+      pos: [],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { shortage: unknown[] };
+    expect(body.shortage).toEqual([]);
+  });
+
+  it("v3 primary: thread with logistics_stage past awaiting_logistics_action is excluded", async () => {
+    // Even with po_id NULL, a thread that has moved past awaiting_logistics_action
+    // is no longer a procurement target — the stage filter narrows to that
+    // exact value. (po_id NULL + stage='dispatched' wouldn't normally happen
+    // — the schema can't easily express it — but we test the stage filter is
+    // applied so a future enum addition doesn't accidentally widen the surface.)
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    mockShortageQueries({
+      threads: [
+        { order_id: ID_A, logistics_stage: "ready_to_dispatch", po_id: null },
+      ],
+      awaitingOrders: [],
+      orderLines: [
+        { order_id: ID_A, sku: "mattress:cloud:King", qty: 4 },
+      ],
+      stockBalances: [{ sku: "mattress:cloud:King", qty: 0, reserved: 0 }],
+      pos: [],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { shortage: unknown[] };
+    expect(body.shortage).toEqual([]);
+  });
+
+  it("v3 legacy fallback: order in awaiting_stock with no thread + no covering open PO contributes lines", async () => {
+    // Order A is pre-v3 / unsplit data: orders.logistics_stage='awaiting_stock'
+    // but no row exists in order_supplier_threads. The dl/dl_refs filter
+    // against open POs runs as v2 did and leaves the order in play.
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    mockShortageQueries({
+      threads: [],
+      awaitingOrders: [{ id: ID_A, dl: 4001 }],
+      orderLines: [
+        { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
+      ],
+      stockBalances: [{ sku: "sofa:nordic:3s", qty: 0, reserved: 0 }],
+      pos: [],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; need: number; available: number; shortage: number }[];
+    };
+    expect(body.shortage).toEqual([
+      { sku: "sofa:nordic:3s", need: 2, available: 0, shortage: 2 },
+    ]);
+  });
+
+  it("v3 legacy fallback: order WITH any thread is excluded from legacy path (split orders go through primary only)", async () => {
+    // Order A has a thread (in dispatched stage, no po_id yet — unusual but
+    // possible mid-pipeline). The fact that it has ANY thread means it has
+    // been split, so the legacy path should NOT pick it up by orders.dl.
+    // The primary path won't pick it up either (stage != awaiting_logistics_action).
+    // Net: order A contributes nothing — it's mid-pipeline, not a procurement target.
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    mockShortageQueries({
+      threads: [
+        { order_id: ID_A, logistics_stage: "dispatched", po_id: null },
+      ],
+      awaitingOrders: [{ id: ID_A, dl: 4001 }], // orders.logistics_stage rolled up to awaiting_logistics_action
+      orderLines: [
+        { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
+      ],
+      stockBalances: [{ sku: "sofa:nordic:3s", qty: 0, reserved: 0 }],
+      pos: [],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { shortage: unknown[] };
+    expect(body.shortage).toEqual([]);
+  });
+
+  it("v3 union: same order surfaced by both paths is counted once (no double-aggregation)", async () => {
+    // Pathological / migration overlap case: a thread at
+    // awaiting_logistics_action + po_id NULL exists (primary), AND the orders
+    // row is in awaiting_logistics_action (legacy fallback would also pick it
+    // up if not for the "has any thread" gate). Even if the gate were
+    // bypassed, the route must dedupe order_ids before aggregating order_lines
+    // — order A's lines should contribute exactly once to `need`.
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    mockShortageQueries({
+      threads: [
+        { order_id: ID_A, logistics_stage: "awaiting_logistics_action", po_id: null },
+      ],
+      awaitingOrders: [{ id: ID_A, dl: 4001 }],
+      orderLines: [
+        { order_id: ID_A, sku: "mattress:cloud:King", qty: 3 },
+      ],
+      stockBalances: [{ sku: "mattress:cloud:King", qty: 0, reserved: 0 }],
+      pos: [],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; need: number; available: number; shortage: number }[];
+    };
+    // need = 3 (NOT 6 — no double count from the two paths).
+    expect(body.shortage).toEqual([
+      { sku: "mattress:cloud:King", need: 3, available: 0, shortage: 3 },
+    ]);
+  });
+
+  it("v3 union: primary thread + separate legacy order both contribute to aggregated shortage", async () => {
+    // Real-world v3 transition: order A has been split (thread, primary path
+    // active), order B is pre-v3 legacy data (no thread, falls through to the
+    // dl/dl_refs filter against open POs which matches nothing). Both should
+    // surface and their lines aggregated by SKU.
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    const ID_B = "00000000-0000-0000-0000-000000000a02";
+    mockShortageQueries({
+      threads: [
+        { order_id: ID_A, logistics_stage: "awaiting_logistics_action", po_id: null },
+      ],
+      awaitingOrders: [{ id: ID_B, dl: 4002 }],
+      orderLines: [
+        { order_id: ID_A, sku: "mattress:cloud:King", qty: 2 },
+        { order_id: ID_B, sku: "mattress:cloud:King", qty: 3 },
+      ],
+      stockBalances: [{ sku: "mattress:cloud:King", qty: 1, reserved: 0 }],
+      pos: [],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; need: number; available: number; shortage: number }[];
+    };
+    // need = 5 (2 from A primary + 3 from B legacy), available = 1, shortage = 4.
+    expect(body.shortage).toEqual([
+      { sku: "mattress:cloud:King", need: 5, available: 1, shortage: 4 },
     ]);
   });
 });

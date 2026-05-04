@@ -77,45 +77,66 @@ logisticsPosRouter.get("/", async (c) => {
 });
 
 // ----- GET /awaiting-stock-shortage -----
-// C5.3: SKU-level shortage feed for "Auto-fill from awaiting stock" button on
-// CreatePOModal. Aggregates demand across every order currently sitting in
-// `logistics_stage='awaiting_stock'`, compares against the cross-warehouse
-// stock pool, and returns only SKUs where avail < need. The button replaces
-// the modal's lines state with this list so logistics can issue one PO that
-// covers the whole pending order book.
+// C5.3 + v3-S4.6: SKU-level shortage feed for the "Auto-fill" button on
+// CreatePOModal. Aggregates demand across every order currently sitting in a
+// procurement-needed state, compares against the cross-warehouse stock pool,
+// and returns only SKUs where avail < need.
 //
-// Q1=B (server-side aggregation, no new RPC). Existing tables only:
-//   - orders (logistics_stage filter — also fetches `dl` for v3-S2.1 join)
-//   - purchase_orders (status='open' filter — v3-S2.1 covered-orders filter)
-//   - order_lines (in-list by order_id)
+// DUAL-PATH: the auto-fill target population is the union of two paths.
+//
+// 1. PRIMARY (v3-S4.6): order_supplier_threads where
+//    logistics_stage='awaiting_logistics_action' AND po_id IS NULL. After
+//    confirm_proceed_request_v3 (migration 0034) every order is split into
+//    per-(supplier, category) threads; a thread with po_id NULL is the exact
+//    "not yet covered by a PO" target. This filter is correct by construction
+//    (no dl/dl_refs string matching against open POs), and the v3-S4 batch
+//    RPC closes the race window with SELECT ... FOR UPDATE on the same rows.
+//
+// 2. LEGACY FALLBACK (v3-S2.1 dl/dl_refs filter): orders in
+//    logistics_stage='awaiting_logistics_action' OR 'awaiting_stock' (the
+//    pre-v3 alias still in the enum per migration 0028) that have NO row in
+//    order_supplier_threads — i.e. legacy/unsplit data, or orders where
+//    confirm_proceed_request_v3 has not yet been called. For these we apply
+//    the v3-S2.1 v2-style filter: drop orders whose `dl` matches an OPEN PO's
+//    `dl` or appears in `dl_refs`. status='open' is the discriminator;
+//    received/cancelled POs leave the order in play.
+//
+// The two order_id sets are union-ed (Set dedupes natively) before the
+// order_lines fetch, so a row that surfaces in both paths contributes its
+// `qty` to `need` exactly once. order_lines + stock_balances aggregation is
+// unchanged from C5.3.
+//
+// Tables touched (one round-trip each, all in parallel):
+//   - order_supplier_threads (no filter — TS narrows by stage + po_id)
+//   - orders (.in("logistics_stage", [awaiting_logistics_action, awaiting_stock]))
+//   - purchase_orders (.eq("status", "open") for the legacy coverage filter)
+//   - order_lines (.in("order_id", [...]) on the union set)
 //   - stock_balances (no filter — sum across all warehouses per Q2=A)
 //
-// v3-S2.1 (Bug 7 partial fix, defensive): before computing shortages, drop
-// orders whose `dl` matches an OPEN PO's `dl` or appears in `dl_refs`. This
-// stops repeated Auto-fill presses from re-suggesting orders that already
-// have a procurement-in-flight. Without this, two logistics users pressing
-// Auto-fill near-simultaneously would both see the same shortage list and
-// both submit duplicate POs covering the same orders. Race-window protection
-// (atomic SELECT FOR UPDATE on order_supplier_threads + concurrent_claim
-// error) is deferred to v3-S4 — that needs a new table this phase doesn't
-// have. Status discrimination: only `status='open'` POs gate orders. Done
-// (`received`) or dead (`cancelled`) POs leave the order in play.
-//
-// RLS: the inline role guard above plus the user JWT covers this; no
-// policy changes needed.
+// RLS: the inline role guard above plus the user JWT covers this; no policy
+// changes needed.
 //
 // Path is registered before `/:id/print` so the static segment wins over the
 // :id pattern in Hono's matcher.
 logisticsPosRouter.get("/awaiting-stock-shortage", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  // Step 1 — fetch awaiting_stock orders (id + dl for the PO-coverage join)
-  // AND the set of OPEN POs (dl + dl_refs) in parallel. Same Promise.all
-  // pattern as below; both queries are cheap and independent.
-  const [ordersRes, posRes] = await Promise.all([
-    sb.from("orders").select("id, dl").eq("logistics_stage", "awaiting_stock"),
+  // Step 1 — three parallel fetches: threads (primary path source), legacy
+  // candidate orders (alias-aware), and open POs (for the legacy
+  // dl/dl_refs filter). All independent; Promise.all is the same pattern as
+  // the order_lines + stock_balances pair below.
+  const [threadsRes, ordersRes, posRes] = await Promise.all([
+    sb.from("order_supplier_threads").select("order_id, logistics_stage, po_id"),
+    sb
+      .from("orders")
+      .select("id, dl")
+      .in("logistics_stage", ["awaiting_logistics_action", "awaiting_stock"]),
     sb.from("purchase_orders").select("dl, dl_refs").eq("status", "open"),
   ]);
+  if (threadsRes.error) {
+    const m = mapPgError(threadsRes.error);
+    return c.json(m.body, m.status);
+  }
   if (ordersRes.error) {
     const m = mapPgError(ordersRes.error);
     return c.json(m.body, m.status);
@@ -125,9 +146,27 @@ logisticsPosRouter.get("/awaiting-stock-shortage", async (c) => {
     return c.json(m.body, m.status);
   }
 
-  // Build a Set of `dl` values that are already covered by an open PO. A PO
-  // covers a dl if (po.dl = dl) OR (dl = ANY(po.dl_refs)). We flatten both
-  // sides into one Set<number> for an O(1) per-order lookup.
+  // Primary path: threads where stage='awaiting_logistics_action' AND po_id
+  // IS NULL. Each such thread maps its order_id into the union — multiple
+  // threads on the same order (different supplier/category) collapse to one
+  // entry in the Set, but their lines all show up later via order_lines (the
+  // SKU split happens in the modal's grouping, not here).
+  const primaryOrderIds = new Set<string>();
+  // "Has any thread" gate for the legacy fallback — an order with at least
+  // one thread row has been split, so it should NOT enter the legacy path
+  // even if its orders.logistics_stage is still awaiting_logistics_action.
+  const orderIdsWithAnyThread = new Set<string>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const t of (threadsRes.data ?? []) as any[]) {
+    const oid = String(t.order_id);
+    orderIdsWithAnyThread.add(oid);
+    if (t.logistics_stage === "awaiting_logistics_action" && t.po_id == null) {
+      primaryOrderIds.add(oid);
+    }
+  }
+
+  // Legacy fallback path: build the dl-coverage Set from open POs the same
+  // way v3-S2.1 did. A PO covers a dl if (po.dl = dl) OR (dl = ANY(po.dl_refs)).
   const coveredDls = new Set<number>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const p of (posRes.data ?? []) as any[]) {
@@ -139,21 +178,26 @@ logisticsPosRouter.get("/awaiting-stock-shortage", async (c) => {
     }
   }
 
-  // Filter the awaiting_stock orders to only those NOT covered by an open
-  // PO. Orders with a null `dl` (shouldn't happen in practice — dl is the
-  // customer-facing order number — but be defensive) keep through, since
-  // null can't be in a covered Set<number>.
+  // Legacy candidate orders → keep only those that (a) have NO thread row
+  // (i.e. unsplit / pre-v3) AND (b) are NOT covered by any open PO. The
+  // null-`dl` defensive branch from v3-S2.1 is preserved.
+  const legacyOrderIds = new Set<string>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const orderIds = ((ordersRes.data ?? []) as any[])
-    .filter((o) => {
-      const dl = o.dl;
-      if (dl == null) return true;
-      return !coveredDls.has(Number(dl));
-    })
-    .map((o) => o.id);
+  for (const o of (ordersRes.data ?? []) as any[]) {
+    const oid = String(o.id);
+    if (orderIdsWithAnyThread.has(oid)) continue; // split — handled by primary
+    const dl = o.dl;
+    if (dl != null && coveredDls.has(Number(dl))) continue; // already covered by an open PO
+    legacyOrderIds.add(oid);
+  }
 
-  // Short-circuit when no awaiting_stock orders need procurement — either
-  // none exist OR all of them are already covered. Returns `{shortage: []}`.
+  // Union — Set semantics dedupe automatically. If a future invariant
+  // violation surfaces the same order in both paths, its lines still
+  // aggregate to `need` exactly once.
+  const orderIdsUnion = new Set<string>([...primaryOrderIds, ...legacyOrderIds]);
+  const orderIds = [...orderIdsUnion];
+
+  // Short-circuit when nothing needs procurement.
   if (orderIds.length === 0) {
     const empty: AwaitingStockShortageResponse = { shortage: [] };
     return c.json(empty);
