@@ -1,0 +1,26 @@
+-- =============================================================================
+-- 0023_logistics_stage_enum_extend.sql — Phase 4 Pipeline v2 C1.1: extend
+-- logistics_stage enum with two pre-triage values
+-- =============================================================================
+-- Source: docs/superpowers/specs/2026-05-04-phase-4-pipeline-v2-spec.md §4.1
+--
+-- Why: The original logistics_stage enum (0001_init.sql:27) only models the
+-- 4 post-triage states (awaiting_stock → ready_to_dispatch → dispatched →
+-- delivered). It cannot represent (a) orders the dealer has created but not
+-- yet pushed to logistics, nor (b) orders the dealer has pushed but logistics
+-- has not yet triaged. The Phase 4 v2 pipeline plan needs both of those
+-- visible as distinct columns on the logistics kanban, so we prepend two
+-- new values: 'placed' (dealer-only, pre-push) and 'proceed_request' (pushed,
+-- awaiting logistics triage). Existing 4 values remain unchanged in name and
+-- order — purely additive.
+--
+-- Note for future readers: Postgres' `ALTER TYPE ... ADD VALUE` cannot run
+-- inside an explicit transaction block (PG limitation). If applying this via
+-- a tool that wraps statements in a BEGIN/COMMIT, you must execute the two
+-- ALTER TYPE statements one at a time outside a transaction. Each statement
+-- below is idempotent (`IF NOT EXISTS`), so re-running this file is safe.
+-- =============================================================================
+-- Final enum order: placed, proceed_request, awaiting_stock, ready_to_dispatch,
+--                   dispatched, delivered.
+alter type public.logistics_stage add value if not exists 'placed' before 'awaiting_stock';
+alter type public.logistics_stage add value if not exists 'proceed_request' before 'awaiting_stock';
