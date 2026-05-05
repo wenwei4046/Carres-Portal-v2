@@ -75,18 +75,30 @@ recentCostRouter.get("/:sku/recent-cost", async (c) => {
 
   const sb = userClient(c.env, auth.jwt);
 
-  // PostgREST `!inner` foreign-table filter — restricts the parent rows by a
-  // child column. Equivalent to: SELECT pol.cost, pol.po_id, po.updated_at
-  // FROM purchase_order_lines pol JOIN purchase_orders po ON po.id = pol.po_id
-  // WHERE pol.sku = $1 AND po.status = 'received' AND pol.cost IS NOT NULL
+  // T42-C6 — query `purchase_orders` (parent) with `!inner` embed of the
+  // matching child line, NOT `purchase_order_lines` with foreignTable order.
+  //
+  // The previous shape — `from('purchase_order_lines').order(..., {
+  // foreignTable: 'purchase_orders' })` — is a known PostgREST gotcha:
+  // `foreignTable` only orders the EMBEDDED relation (which is 1:1 here so
+  // it's a no-op anyway), NOT the parent rows. The top-level `.limit(1)`
+  // therefore picked an arbitrary row from `purchase_order_lines` filtered
+  // by sku + the inner-join, which silently returned the WRONG cost when a
+  // SKU had multiple historical received POs (codex re-review T42).
+  //
+  // The corrected query: SELECT id, updated_at, purchase_order_lines!inner(...)
+  // FROM purchase_orders po JOIN purchase_order_lines pol ON pol.po_id = po.id
+  // WHERE po.status = 'received' AND pol.sku = $1 AND pol.cost IS NOT NULL
   // ORDER BY po.updated_at DESC LIMIT 1.
+  // The top-level ORDER + LIMIT now sit on the parent (`purchase_orders`),
+  // so they actually pick the most recently received PO for this SKU.
   const { data, error } = await sb
-    .from("purchase_order_lines")
-    .select("cost, po_id, purchase_orders!inner(status, updated_at)")
-    .eq("sku", sku)
-    .eq("purchase_orders.status", "received")
-    .not("cost", "is", null)
-    .order("updated_at", { foreignTable: "purchase_orders", ascending: false })
+    .from("purchase_orders")
+    .select("id, updated_at, purchase_order_lines!inner(cost, sku)")
+    .eq("status", "received")
+    .eq("purchase_order_lines.sku", sku)
+    .not("purchase_order_lines.cost", "is", null)
+    .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -99,20 +111,21 @@ recentCostRouter.get("/:sku/recent-cost", async (c) => {
     return c.json({ cost: null, lastPoId: null, lastReceivedAt: null });
   }
 
-  // PostgREST returns the joined row as an object (or array — supabase-js
-  // normalizes to object for 1:1 fk). Defensively narrow either shape.
-  const joined = data.purchase_orders as
-    | { status: string; updated_at: string }
-    | { status: string; updated_at: string }[]
+  // PostgREST returns the embedded `purchase_order_lines` as an array
+  // (1-to-many fk). Filtered by sku + cost-not-null, so element 0 carries the
+  // cost we want. Defensively handle the 1:1-normalized object shape too in
+  // case supabase-js's normalization changes; either way pluck `cost`.
+  const lines = data.purchase_order_lines as
+    | { cost: number | string | null; sku: string }
+    | { cost: number | string | null; sku: string }[]
     | null;
-  const lastReceivedAt = Array.isArray(joined)
-    ? (joined[0]?.updated_at ?? null)
-    : (joined?.updated_at ?? null);
+  const firstLine = Array.isArray(lines) ? (lines[0] ?? null) : lines;
+  const rawCost = firstLine?.cost ?? null;
 
   return c.json({
-    cost: typeof data.cost === "number" ? data.cost : data.cost == null ? null : Number(data.cost),
-    lastPoId: data.po_id ?? null,
-    lastReceivedAt,
+    cost: typeof rawCost === "number" ? rawCost : rawCost == null ? null : Number(rawCost),
+    lastPoId: data.id ?? null,
+    lastReceivedAt: data.updated_at ?? null,
   });
 });
 

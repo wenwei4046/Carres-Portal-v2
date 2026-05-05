@@ -42,15 +42,19 @@ beforeEach(() => {
 afterAll(() => _setJwksForTesting(null));
 
 /**
- * The route chains:
- *   sb.from('purchase_order_lines')
- *     .select(...)
- *     .eq('sku', sku)
- *     .eq('purchase_orders.status', 'received')
- *     .not('cost', 'is', null)
- *     .order(..., { foreignTable: 'purchase_orders', ascending: false })
+ * T42-C6 — the route now chains (post-codex-re-review fix):
+ *   sb.from('purchase_orders')
+ *     .select('id, updated_at, purchase_order_lines!inner(cost, sku)')
+ *     .eq('status', 'received')
+ *     .eq('purchase_order_lines.sku', sku)
+ *     .not('purchase_order_lines.cost', 'is', null)
+ *     .order('updated_at', { ascending: false })
  *     .limit(1)
  *     .maybeSingle()
+ *
+ * Was previously chained from `purchase_order_lines` with a foreignTable
+ * order — that only sorts the embedded relation (no-op on 1:1) and the
+ * top-level limit picked an arbitrary parent row. Codex re-review caught it.
  *
  * We make every chained method `mockReturnThis()` except `.maybeSingle()`
  * which is the awaited terminal — that one resolves to `{ data, error }`.
@@ -75,9 +79,11 @@ describe("GET /api/logistics/skus/:sku/recent-cost", () => {
   it("happy path — historical received PO line returns 200 + cost/lastPoId/lastReceivedAt", async () => {
     const m = makeChain({
       data: {
-        cost: 12.5,
-        po_id: "PO-2050",
-        purchase_orders: { status: "received", updated_at: "2026-01-15T08:30:00Z" },
+        id: "PO-2050",
+        updated_at: "2026-01-15T08:30:00Z",
+        // PostgREST embeds the inner-joined child as an array; filtered by
+        // sku + cost-not-null so element 0 carries the cost we want.
+        purchase_order_lines: [{ cost: 12.5, sku: SKU }],
       },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,13 +100,14 @@ describe("GET /api/logistics/skus/:sku/recent-cost", () => {
       lastPoId: "PO-2050",
       lastReceivedAt: "2026-01-15T08:30:00Z",
     });
-    // Verify the chain was wired correctly.
-    expect(m.from).toHaveBeenCalledWith("purchase_order_lines");
-    expect(m.chain.eq).toHaveBeenCalledWith("sku", SKU);
-    expect(m.chain.eq).toHaveBeenCalledWith("purchase_orders.status", "received");
-    expect(m.chain.not).toHaveBeenCalledWith("cost", "is", null);
+    // Verify the chain was wired correctly — T42-C6 re-pivot: parent table
+    // is now `purchase_orders`; ORDER + LIMIT sit on the parent so the most
+    // recently received PO wins (foreignTable order is no-op on 1:1).
+    expect(m.from).toHaveBeenCalledWith("purchase_orders");
+    expect(m.chain.eq).toHaveBeenCalledWith("status", "received");
+    expect(m.chain.eq).toHaveBeenCalledWith("purchase_order_lines.sku", SKU);
+    expect(m.chain.not).toHaveBeenCalledWith("purchase_order_lines.cost", "is", null);
     expect(m.chain.order).toHaveBeenCalledWith("updated_at", {
-      foreignTable: "purchase_orders",
       ascending: false,
     });
     expect(m.chain.limit).toHaveBeenCalledWith(1);
@@ -119,7 +126,7 @@ describe("GET /api/logistics/skus/:sku/recent-cost", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { cost: number | null; lastPoId: string | null; lastReceivedAt: string | null };
     expect(body).toEqual({ cost: null, lastPoId: null, lastReceivedAt: null });
-    expect(m.from).toHaveBeenCalledWith("purchase_order_lines");
+    expect(m.from).toHaveBeenCalledWith("purchase_orders");
   });
 
   it("rejects dealer with 403 (role gate fires before any DB call)", async () => {
@@ -162,13 +169,16 @@ describe("GET /api/logistics/skus/:sku/recent-cost", () => {
     expect(body.code).toBe("forbidden");
   });
 
-  it("joined row as array (fk normalizer variation) — picks updated_at off element 0", async () => {
+  it("embedded child as singular object (defensive normalizer fallback) — still picks cost", async () => {
+    // T42-C6 — the embedded relation is normally an array (1-to-many fk
+    // direction), but in case supabase-js's normalization ever returns a
+    // singular object on a filtered 1:1-narrowed embed, the route still
+    // picks `cost` off it. This is the defensive fallback branch.
     const m = makeChain({
       data: {
-        cost: 9.99,
-        po_id: "PO-2099",
-        // some supabase-js versions return the joined row as an array.
-        purchase_orders: [{ status: "received", updated_at: "2025-12-01T00:00:00Z" }],
+        id: "PO-2099",
+        updated_at: "2025-12-01T00:00:00Z",
+        purchase_order_lines: { cost: 9.99, sku: SKU },
       },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -61,19 +61,53 @@ type SbBuilder = {
   insert: ReturnType<typeof vi.fn>;
 };
 
-function makeBuilder(opts: { rowsHit: number; insertError?: { code?: string; message?: string } | null }) {
+function makeBuilder(opts: {
+  rowsHit: number;
+  insertError?: { code?: string; message?: string } | null;
+  // T42-C7 — when set, the SECOND update call (the race-retry) resolves to
+  // this error. The first update keeps using `rowsHit` semantics.
+  retryUpdateError?: { code?: string; message?: string } | null;
+}) {
   const updatePayloads: unknown[] = [];
   const insertPayloads: unknown[] = [];
 
-  const updateChain = {
-    eq: vi.fn().mockReturnThis(),
-    select: vi.fn().mockResolvedValue({
-      data: opts.rowsHit > 0 ? Array(opts.rowsHit).fill({ sku: "x" }) : [],
-      error: null,
-    }),
-  };
+  // The first UPDATE goes through `.update().eq().eq().select()` — `.select`
+  // is the awaited terminal carrying `rowsHit` semantics. The retry UPDATE
+  // (T42-C7) goes through `.update().eq().eq()` — no `.select()`, awaited
+  // directly. The retry path doesn't need `.select` data, only the resolved
+  // `{ error }` shape — so the chained `.eq` returns a thenable that
+  // resolves to `{ data: null, error: retryUpdateError ?? null }`.
+  let updateCallIndex = 0;
   const update = vi.fn((payload: unknown) => {
     updatePayloads.push(payload);
+    const isRetry = updateCallIndex > 0;
+    updateCallIndex += 1;
+
+    if (isRetry) {
+      // Retry path — chain returns a thenable so `await sb.from().update().eq().eq()`
+      // resolves with `{ data, error }` shape.
+      const retryResult = {
+        data: null,
+        error: opts.retryUpdateError ?? null,
+      };
+      const retryChain: {
+        eq: ReturnType<typeof vi.fn>;
+        then: <T>(onFulfilled: (v: typeof retryResult) => T) => Promise<T>;
+      } = {
+        eq: vi.fn().mockReturnThis(),
+        then: (onFulfilled) => Promise.resolve(retryResult).then(onFulfilled),
+      };
+      return retryChain;
+    }
+
+    // First-call path — terminal is `.select()`.
+    const updateChain = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({
+        data: opts.rowsHit > 0 ? Array(opts.rowsHit).fill({ sku: "x" }) : [],
+        error: null,
+      }),
+    };
     return updateChain;
   });
   const insert = vi.fn((payload: unknown) => {
@@ -82,7 +116,7 @@ function makeBuilder(opts: { rowsHit: number; insertError?: { code?: string; mes
   });
 
   const from = vi.fn((_table: string) => ({ update, insert } satisfies SbBuilder));
-  return { from, update, insert, updatePayloads, insertPayloads, updateChain };
+  return { from, update, insert, updatePayloads, insertPayloads };
 }
 
 const WH = "11111111-1111-1111-1111-111111111111";
@@ -249,5 +283,86 @@ describe("POST /api/logistics/warehouses/:warehouseId/skus/:sku/threshold", () =
     expect(res.status).toBe(422);
     expect(m.update).not.toHaveBeenCalled();
     expect(m.insert).not.toHaveBeenCalled();
+  });
+
+  // T42-C7 — race retry: concurrent writers both miss UPDATE then both
+  // attempt INSERT. The loser hits 23505 (unique_violation on the
+  // composite PK `(sku, warehouse_id)`); the route catches it and retries
+  // the UPDATE on the now-existing row.
+  it("23505 race on INSERT → retry UPDATE succeeds → 200 (no 500 surfaces)", async () => {
+    const m = makeBuilder({
+      rowsHit: 0,
+      insertError: { code: "23505", message: 'duplicate key value violates unique constraint "stock_balances_pkey"' },
+      retryUpdateError: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: m.from } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ low: 5, high: 20 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; low: number | null; high: number | null };
+    expect(body).toMatchObject({ ok: true, low: 5, high: 20 });
+    // Sequence: update (miss) → insert (23505) → update (retry, success).
+    expect(m.update).toHaveBeenCalledTimes(2);
+    expect(m.insert).toHaveBeenCalledTimes(1);
+    // Both updates carry the same threshold payload — first writes were
+    // wasted by the conflicting INSERT, retry re-applies them.
+    expect(m.updatePayloads[0]).toEqual({ low_threshold: 5, high_threshold: 20 });
+    expect(m.updatePayloads[1]).toEqual({ low_threshold: 5, high_threshold: 20 });
+  });
+
+  // Defensive: if the race-retry UPDATE itself fails for some other reason
+  // (e.g. RLS revocation mid-request), surface that error rather than
+  // looping. Falls through to mapPgError → 500 (generic) by default.
+  it("23505 race + retry UPDATE fails → maps the retry error", async () => {
+    const m = makeBuilder({
+      rowsHit: 0,
+      insertError: { code: "23505", message: "duplicate key" },
+      retryUpdateError: { code: "42501", message: "rls denied on retry" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: m.from } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ low: 5, high: 20 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(m.update).toHaveBeenCalledTimes(2);
+    expect(m.insert).toHaveBeenCalledTimes(1);
+  });
+
+  // Non-23505 INSERT error path — still routed through mapPgError without
+  // retry. Confirms the retry branch is gated specifically on 23505.
+  it("non-23505 INSERT error → maps directly without retry (no second UPDATE)", async () => {
+    const m = makeBuilder({
+      rowsHit: 0,
+      insertError: { code: "23514", message: "check constraint violation" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: m.from } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ low: 5, high: 20 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(500);
+    expect(m.update).toHaveBeenCalledTimes(1);
+    expect(m.insert).toHaveBeenCalledTimes(1);
   });
 });

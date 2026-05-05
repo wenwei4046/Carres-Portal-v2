@@ -7,27 +7,36 @@ import type { AppEnv } from "../../types";
 
 /**
  * POST /api/logistics/warehouses/:warehouseId/skus/:sku/threshold
- * — Phase 4.5 Chunk 2 Sprint D Task 19.
+ * — Phase 4.5 Chunk 2 Sprint D Task 19 + T42-C7 (race-retry).
  *
  * Inline-edit Save target on the `LogisticsWarehouse` page. Writes the
  * `low_threshold` + `high_threshold` pair on a single (sku, warehouse_id)
  * `stock_balances` row.
  *
- * Behavior — UPDATE-first, INSERT-on-miss:
+ * Behavior — UPDATE-first, INSERT-on-miss, with 23505 race retry:
  *   1. UPDATE stock_balances SET low_threshold, high_threshold WHERE sku +
  *      warehouse_id match. `.select()` returns the touched rows.
  *   2. If 0 rows matched (the warehouse has never carried this SKU), INSERT
  *      a new row with `qty=0, reserved=0` and the supplied thresholds.
+ *   3. T42-C7 — if the INSERT raises 23505 (unique_violation on the
+ *      composite PK `(sku, warehouse_id)`), another writer slipped in
+ *      between our UPDATE and INSERT. Retry the UPDATE: their INSERT
+ *      created the row, our UPDATE now lands on it.
  *
  * Why not `.upsert()` with qty/reserved in payload? supabase-js upsert sends
  * the full payload to the SET clause on conflict — that would clobber an
- * existing row's qty/reserved back to 0. The two-step UPDATE-then-INSERT
- * preserves stock counts (only qty/reserved RPCs in 0019/0024/0034/0045
- * mutate those columns). Race window between the two steps is benign:
- *   - Two concurrent threshold edits → one wins, both end up with same final
- *     state for `low_threshold` + `high_threshold`.
+ * existing row's qty/reserved back to 0. The UPDATE-first / INSERT-on-miss
+ * pattern preserves stock counts (only qty/reserved RPCs in 0019/0024/
+ * 0034/0045 mutate those columns).
+ *
+ * Race scenarios after the T42-C7 retry path:
+ *   - Two concurrent threshold edits, row exists → both UPDATE; last writer
+ *     wins on both threshold columns. Fine.
+ *   - Two concurrent threshold edits, row missing → both UPDATE returns 0,
+ *     both attempt INSERT. One wins (200). Loser hits 23505, falls back to
+ *     UPDATE on the now-existing row, also returns 200. No 500 surfaces.
  *   - Concurrent stock movement RPC → it locks the row FOR UPDATE; our
- *     UPDATE serializes after it on the same key, no count clobber.
+ *     threshold UPDATE serializes after it on the same key, no clobber.
  *
  * `null` is a valid value for either threshold — it clears the alert / the
  * replenishment ceiling. Per migration 0054 a NULL `low_threshold` means "no
@@ -46,7 +55,8 @@ import type { AppEnv } from "../../types";
  * any Supabase round-trip.
  *
  * Errors map via `mapPgError` (42501 → 403, 23514 → 500 fallback for any
- * leftover CHECK violations the zod refinement didn't catch).
+ * leftover CHECK violations the zod refinement didn't catch). 23505 is
+ * specifically caught + retried before falling back to mapPgError.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -104,8 +114,32 @@ thresholdsRouter.post("/warehouses/:warehouseId/skus/:sku/threshold", async (c) 
       high_threshold: parsed.data.high,
     });
     if (insertRes.error) {
-      const m = mapPgError(insertRes.error);
-      return c.json(m.body, m.status);
+      // T42-C7 — race: another writer INSERTed the row between our Step 1
+      // UPDATE and this INSERT. Postgres raises 23505 (unique_violation) on
+      // the composite PK `(sku, warehouse_id)`. Recover by retrying the
+      // UPDATE — the row now exists. Retry-once is sufficient: a third
+      // writer's INSERT can't race us on UPDATE because the row exists from
+      // here on out. If retry's UPDATE fails for any other reason, we
+      // surface that error (don't loop further).
+      const insertCode = (insertRes.error as { code?: string }).code;
+      if (insertCode === "23505") {
+        const retryRes = await sb
+          .from("stock_balances")
+          .update({
+            low_threshold: parsed.data.low,
+            high_threshold: parsed.data.high,
+          })
+          .eq("sku", sku)
+          .eq("warehouse_id", warehouseId);
+        if (retryRes.error) {
+          const m = mapPgError(retryRes.error);
+          return c.json(m.body, m.status);
+        }
+        // Retry UPDATE succeeded — fall through to the 200 response below.
+      } else {
+        const m = mapPgError(insertRes.error);
+        return c.json(m.body, m.status);
+      }
     }
   }
 
