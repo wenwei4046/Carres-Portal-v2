@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import {
-  useReceivePoLineMutation,
+  useReceivePoWithDoMutation,
   type LogisticsPoListRow,
   type SupplierRow,
 } from "@/lib/queries";
@@ -32,11 +32,13 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  *     (when only some) — disabled until DO# ≥ 3 chars + signed + total > 0
  *     + a real DO file path is captured from the upload field
  *
- * Wires to `POST /api/logistics/pos/:id/receive` per checked line — the
- * `useReceivePoLineMutation` operates per (sku, receivedQty) so we loop. Errors
- * mid-loop surface as a toast and stop the loop (the partial state is already
- * reflected on the server; the modal closes either way and the cache is
- * refetched on success).
+ * Wires to `POST /api/logistics/pos/:id/receive` with a SINGLE batched payload
+ * carrying every ticked line plus the captured DO file path and number. Server
+ * calls v3 RPC `logistics_receive_po_with_do` (0045) atomically — any line
+ * failure rolls back the whole receive (closes carry-forward
+ * `phase-4.5-chunk-1-receive-rpc-v3-swap`). The `receivedQty` per line is the
+ * NEW TOTAL after this DO (existing.received_qty + recv[sku]); the RPC
+ * computes delta internally and rejects decreases.
  */
 interface Props {
   po: LogisticsPoListRow;
@@ -68,15 +70,13 @@ export default function ReceivePOModal({
   const [doNumber, setDoNumber] = useState(suggestDoNumber);
   const [doNote, setDoNote] = useState("");
   const [signed, setSigned] = useState(false);
-  // Task 38 — real DO file path captured from DOFileUploadField. The previous
-  // "simulated" UI placeholder showed a hard-coded `.pdf · 184 KB` mock and
-  // submitted nothing about the file. Now the field uploads to Supabase
-  // Storage first; the canonical path comes back here and the receive
-  // mutation can be flipped to the v3 RPC (logistics_receive_po_with_do)
-  // by a follow-up task without touching the UI again.
+  // Real DO file path captured from DOFileUploadField. The field uploads to
+  // Supabase Storage first; the canonical path comes back here and rides the
+  // single receive mutation call to the v3 RPC `logistics_receive_po_with_do`
+  // alongside the per-line received_qty totals.
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
 
-  const receive = useReceivePoLineMutation(po.id);
+  const receive = useReceivePoWithDoMutation(po.id);
 
   const totalReceiving = Object.values(recv).reduce((s, n) => s + (n || 0), 0);
   const totalPending = lines.reduce(
@@ -105,18 +105,27 @@ export default function ReceivePOModal({
   }
 
   async function submit() {
-    if (!valid) return;
+    if (!valid || !doFilePath) return;
     try {
-      // The mutation hook accepts one (sku, receivedQty) per call; loop over
-      // ticked lines. Server is idempotent per receive_po_line RPC — partial
-      // success state still ends up reflected. Errors mid-loop surface a
-      // toast and stop further calls.
-      const ticked = lines
-        .map((l) => ({ sku: l.sku, qty: recv[l.sku] || 0 }))
-        .filter((x) => x.qty > 0);
-      for (const { sku, qty } of ticked) {
-        await receive.mutateAsync({ sku, receivedQty: qty });
-      }
+      // v3 batched call: build lines as { sku, receivedQty: NEW TOTAL }. The
+      // recv[sku] state holds "qty to add on this DO" (a delta from existing
+      // received_qty); the v3 RPC expects the new total after this DO and
+      // computes delta internally. Submit only ticked lines (qty > 0); the
+      // RPC rejects empty arrays with detail='lines_empty', which we already
+      // guard via `totalReceiving > 0` in `valid`.
+      const tickedLines = lines
+        .map((l) => ({
+          sku: l.sku,
+          receivedQty: Number(l.received_qty || 0) + (recv[l.sku] || 0),
+          delta: recv[l.sku] || 0,
+        }))
+        .filter((x) => x.delta > 0)
+        .map(({ sku, receivedQty }) => ({ sku, receivedQty }));
+      await receive.mutateAsync({
+        doNumber: doNumber.trim(),
+        doFilePath,
+        lines: tickedLines,
+      });
       const allReceived = totalReceiving === totalPending;
       toast.success(
         allReceived

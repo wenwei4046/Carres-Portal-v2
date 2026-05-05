@@ -36,17 +36,32 @@ export const attachDoInput = z.object({
 export type AttachDoInput = z.infer<typeof attachDoInput>;
 
 /**
- * `receivePoLineInput` — POST /api/logistics/pos/:id/receive (per-line body
- * inside the request payload). Maps to `logistics_receive_po_line(po_id, sku,
- * received_qty)` RPC. `po_id` is the path param; `sku` + `receivedQty` are the
- * body. The frontend ReceivePOModal (§18.4 F5) sends one of these per ticked
- * line in the modal.
+ * `receivePoWithDoInput` — POST /api/logistics/pos/:id/receive (Phase 4.5
+ * Chunk 1 carry-forward `phase-4.5-chunk-1-receive-rpc-v3-swap`). Maps to
+ * `logistics_receive_po_with_do(p_po_id, p_do_file_path, p_do_number, p_lines)`
+ * RPC defined in migration 0045. Replaces the v2 per-line shape (one call per
+ * sku) with a single batched call carrying all ticked lines plus the DO file
+ * path captured by `DOFileUploadField` and the supplier DO number.
+ *
+ * Semantic shift v2 → v3: `receivedQty` per line is now the NEW TOTAL
+ * received_qty for that line (RPC computes delta internally and rejects
+ * decreases with `received_qty_decrease`), NOT a delta added to the existing
+ * value. The frontend ReceivePOModal builds this as
+ * `existing.received_qty + recv[sku]` before sending.
+ *
+ * Atomic semantics: the RPC processes every line in one transaction — any
+ * line failure rolls back the whole receive, including stock_balances bumps
+ * and thread advancement. No more "did this PO partial-write half its lines?"
  */
-export const receivePoLineInput = z.object({
-  sku: z.string().min(1),
-  receivedQty: z.number().int().positive(),
+export const receivePoWithDoInput = z.object({
+  doNumber: z.string().min(3),
+  doFilePath: z.string().min(1),
+  lines: z.array(z.object({
+    sku: z.string().min(1),
+    receivedQty: z.number().int().nonnegative(),
+  })).min(1),
 }).strict();
-export type ReceivePoLineInput = z.infer<typeof receivePoLineInput>;
+export type ReceivePoWithDoInput = z.infer<typeof receivePoWithDoInput>;
 
 /**
  * `adjustStockInput` — POST /api/logistics/warehouse/adjust.

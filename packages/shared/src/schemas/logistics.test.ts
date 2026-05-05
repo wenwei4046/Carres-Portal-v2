@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   assignPartnerInput,
   attachDoInput,
-  receivePoLineInput,
+  receivePoWithDoInput,
   adjustStockInput,
   abandonOrderInput,
   createPoInput,
@@ -53,20 +53,49 @@ describe('attachDoInput', () => {
   });
 });
 
-describe('receivePoLineInput', () => {
-  it('accepts sku + positive int qty', () => {
+describe('receivePoWithDoInput', () => {
+  const VALID = {
+    doNumber: 'DO-5210',
+    doFilePath: 'PO-2050/abc-DO-5210.pdf',
+    lines: [{ sku: 'SOFA-OAK-3S', receivedQty: 2 }],
+  };
+  it('accepts doNumber + doFilePath + non-empty lines', () => {
+    expect(receivePoWithDoInput.safeParse(VALID).success).toBe(true);
+  });
+  it('accepts receivedQty=0 (RPC handles same-as-current as no-op delta)', () => {
     expect(
-      receivePoLineInput.safeParse({ sku: 'SOFA-OAK-3S', receivedQty: 2 }).success,
+      receivePoWithDoInput.safeParse({
+        ...VALID,
+        lines: [{ sku: 'SOFA-OAK-3S', receivedQty: 0 }],
+      }).success,
     ).toBe(true);
   });
-  it('rejects zero or non-integer qty', () => {
+  it('rejects negative receivedQty', () => {
     expect(
-      receivePoLineInput.safeParse({ sku: 'SOFA-OAK-3S', receivedQty: 0 }).success,
+      receivePoWithDoInput.safeParse({
+        ...VALID,
+        lines: [{ sku: 'SOFA-OAK-3S', receivedQty: -1 }],
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects doNumber shorter than 3 chars', () => {
+    expect(
+      receivePoWithDoInput.safeParse({ ...VALID, doNumber: 'DO' }).success,
+    ).toBe(false);
+  });
+  it('rejects empty doFilePath', () => {
+    expect(
+      receivePoWithDoInput.safeParse({ ...VALID, doFilePath: '' }).success,
+    ).toBe(false);
+  });
+  it('rejects empty lines array', () => {
+    expect(
+      receivePoWithDoInput.safeParse({ ...VALID, lines: [] }).success,
     ).toBe(false);
   });
   it('rejects extra keys (strict mode)', () => {
     expect(
-      receivePoLineInput.safeParse({ sku: 'SOFA-OAK-3S', receivedQty: 2, extraField: 'x' }).success,
+      receivePoWithDoInput.safeParse({ ...VALID, extraField: 'x' }).success,
     ).toBe(false);
   });
 });

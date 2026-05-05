@@ -111,7 +111,7 @@ export {
 export {
   assignPartnerInput,
   attachDoInput,
-  receivePoLineInput,
+  receivePoWithDoInput,
   adjustStockInput,
   abandonOrderInput,
   createPoInput,
@@ -133,7 +133,7 @@ export {
   awaitingStockShortageResponse,
   type AssignPartnerInput,
   type AttachDoInput,
-  type ReceivePoLineInput,
+  type ReceivePoWithDoInput,
   type AdjustStockInput,
   type AbandonOrderInput,
   type CreatePoInput,

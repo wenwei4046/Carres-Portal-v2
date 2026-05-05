@@ -29,7 +29,7 @@ import {
   type OrderStatus,
   type OutletsListResponse,
   type ReassignPoWarehouseInput,
-  type ReceivePoLineInput,
+  type ReceivePoWithDoInput,
   type ReservedDrilldownResponse,
   type SalespersonsListResponse,
   type SetOrderAddressInput,
@@ -1097,9 +1097,15 @@ export interface LogisticsAdjustStockResponse {
   qty: number;
   reserved: number;
 }
-export interface LogisticsReceivePoLineResponse {
-  po: unknown;
-  line: { po_id: string; sku: string; qty: number; received_qty: number };
+export interface LogisticsReceivePoWithDoResponse {
+  po_id: string;
+  do_file_path: string;
+  do_number: string;
+  lines_updated: number;
+  threads_advanced: number;
+  po_status: "open" | "received" | "cancelled";
+  sup_status: string;
+  was_relocated: boolean;
 }
 
 // --- Filter → query string helpers -----------------------------------------
@@ -1646,17 +1652,22 @@ export function useCreatePosBatch(
   });
 }
 
-/** Receive a PO line — increments stock + may flip PO to received. */
-export function useReceivePoLineMutation(
+/**
+ * Receive a PO with DO upload — single batched call carrying all ticked lines
+ * plus the uploaded DO file path and supplier DO number. Maps to v3 RPC
+ * `logistics_receive_po_with_do` (migration 0045) per Phase 4.5 Chunk 1
+ * carry-forward `phase-4.5-chunk-1-receive-rpc-v3-swap`.
+ */
+export function useReceivePoWithDoMutation(
   poId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsReceivePoLineResponse, ApiError, ReceivePoLineInput>
+    UseMutationOptions<LogisticsReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsReceivePoLineResponse, ApiError, ReceivePoLineInput>({
+  return useMutation<LogisticsReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsReceivePoLineResponse>(
+      apiFetch<LogisticsReceivePoWithDoResponse>(
         `/api/logistics/pos/${poId}/receive`,
         { method: "POST", body: JSON.stringify(input) },
       ),

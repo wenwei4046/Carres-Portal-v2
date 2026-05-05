@@ -7,7 +7,7 @@ import {
   createPosBatchInput,
   listPurchaseOrdersQuery,
   reassignPoWarehouseInput,
-  receivePoLineInput,
+  receivePoWithDoInput,
   type AwaitingStockShortageResponse,
 } from "@carres/shared";
 import { renderPoPdf } from "../../lib/pdf/render";
@@ -490,14 +490,37 @@ logisticsPosRouter.post("/batch", async (c) => {
 });
 
 // ----- POST /:id/receive -----
+//
+// Phase 4.5 Chunk 1 carry-forward `phase-4.5-chunk-1-receive-rpc-v3-swap` —
+// the API now calls v3 batched RPC `logistics_receive_po_with_do` (migration
+// 0045:614) which persists the uploaded DO file path and DO number on the PO
+// row in the same transaction as the per-line received_qty bumps. The legacy
+// v2 `logistics_receive_po_line` RPC is still in the DB but unused from this
+// route — the Sofa Reject branch and thread/stock advancement live entirely
+// inside the v3 RPC.
+//
+// Body shape: { doNumber, doFilePath, lines: [{sku, receivedQty}] }. The
+// `receivedQty` field is the NEW TOTAL received_qty for that line (not a
+// delta) — the modal reshapes existing.received_qty + recv[sku] before
+// sending. The RPC computes delta internally and rejects decreases with
+// P0001 detail='received_qty_decrease'.
+//
+// Reshape at the boundary: the wire schema is camelCase to match every other
+// route, but `p_lines` jsonb expects snake_case `received_qty` (RPC reads
+// `v_line->>'received_qty'` at 0045:688). Same pattern as POST /batch
+// reshapes camelCase → snake_case for the RPC payload.
 logisticsPosRouter.post("/:id/receive", async (c) => {
-  const parsed = await parseJsonBody(c, receivePoLineInput);
+  const parsed = await parseJsonBody(c, receivePoWithDoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("logistics_receive_po_line", {
+  const { data, error } = await sb.rpc("logistics_receive_po_with_do", {
     p_po_id: c.req.param("id"),
-    p_sku: parsed.data.sku,
-    p_received_qty: parsed.data.receivedQty,
+    p_do_file_path: parsed.data.doFilePath,
+    p_do_number: parsed.data.doNumber,
+    p_lines: parsed.data.lines.map((l) => ({
+      sku: l.sku,
+      received_qty: l.receivedQty,
+    })),
   });
   if (error) {
     const m = mapPgError(error);

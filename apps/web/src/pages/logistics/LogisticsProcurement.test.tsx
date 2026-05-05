@@ -106,7 +106,7 @@ vi.mock("@/lib/queries", async () => {
       mutateAsync: createBatchMutateAsync,
       isPending: false,
     }),
-    useReceivePoLineMutation: () => ({
+    useReceivePoWithDoMutation: () => ({
       mutateAsync: receiveMutateAsync,
       isPending: false,
     }),
@@ -371,7 +371,7 @@ describe("LogisticsProcurement page", () => {
     expect(screen.getByText(/Σ 2 units this DO/)).toBeInTheDocument();
   });
 
-  it("8. ReceivePOModal submit loops one mutation call per ticked line", async () => {
+  it("8. ReceivePOModal submit fires one batched mutation call carrying every ticked line", async () => {
     setLoaded([
       makePo({
         id: "PO-2051",
@@ -405,8 +405,19 @@ describe("LogisticsProcurement page", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /Mark received/ }));
     await waitFor(() => {
-      expect(receiveMutateAsync).toHaveBeenCalledTimes(2);
+      expect(receiveMutateAsync).toHaveBeenCalledTimes(1);
     });
+    // v3 batched call: payload carries doNumber, doFilePath, and both lines
+    // with their NEW TOTAL receivedQty (existing.received_qty + recv[sku]).
+    const payload = receiveMutateAsync.mock.calls[0]?.[0];
+    expect(payload).toMatchObject({
+      doFilePath: "PO-2051/abc-DO-1.pdf",
+      lines: expect.arrayContaining([
+        { sku: "sofa:nordic:3s", receivedQty: 2 },
+        { sku: "mattress:carres-cloud:King", receivedQty: 1 },
+      ]),
+    });
+    expect(payload.doNumber).toMatch(/^DO-\d+/);
   });
 
   it("9. clicking 'Assign partner' on a ready_for_pickup PO opens AssignPickupDialog", () => {

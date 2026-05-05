@@ -32,7 +32,7 @@ vi.mock("@/lib/queries", async () => {
     await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
     ...actual,
-    useReceivePoLineMutation: () => ({
+    useReceivePoWithDoMutation: () => ({
       mutateAsync: receiveMutateAsync,
       isPending: false,
     }),
@@ -186,7 +186,7 @@ describe("ReceivePOModal — Task 38 DO file upload", () => {
     );
   });
 
-  it("Submit calls the receive mutation per ticked line after a file is uploaded", async () => {
+  it("Submit makes one batched receive call carrying both lines + DO file path", async () => {
     vi.mocked(apiFetch).mockResolvedValue({
       token: "sign-tok",
       path: "PO-2050/abc-DO-1.pdf",
@@ -225,9 +225,18 @@ describe("ReceivePOModal — Task 38 DO file upload", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /Mark received|Receive partial/ }),
     );
-    // 2 ticked lines (default) → 2 mutation calls.
+    // v3 batched call: 1 mutation call with all ticked lines + DO metadata.
     await waitFor(() =>
-      expect(receiveMutateAsync).toHaveBeenCalledTimes(2),
+      expect(receiveMutateAsync).toHaveBeenCalledTimes(1),
     );
+    const payload = receiveMutateAsync.mock.calls[0]?.[0];
+    expect(payload).toMatchObject({
+      doFilePath: "PO-2050/abc-DO-1.pdf",
+      lines: expect.arrayContaining([
+        { sku: "mattress:carres-cloud:King", receivedQty: 2 },
+        { sku: "sofa:nordic:3s", receivedQty: 1 },
+      ]),
+    });
+    expect(payload.doNumber).toMatch(/^DO-\d+/);
   });
 });

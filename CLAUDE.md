@@ -305,11 +305,11 @@ Don't burn an hour spinning. Surface and ask.
 ## 17. Project status (update as we progress)
 
 ```
-Current phase: Phase 4.5 Chunk 1 IMPLEMENTATION COMPLETE — LP role tenancy + DO upload + Sofa flow. Awaiting Loo's manual verification (seed LP test user + run E2E + tag). Implementation work (Tasks 1-48) landed across `f888cca..f9154d8` (49 commits). 7 migrations landed and applied to staging Supabase project_id `kfprgpjpaffedghytstl`: 0041 (app_users.partner_id CHECK + INDEX), 0042 (delivery-orders Storage bucket + RLS), 0043 (at_warehouse_waiting enum value), 0044 (4 PO RFD/dispatch columns + partial INDEX), 0045 (5 NEW + 2 EXTENDED + 1 MODIFIED RPCs), 0046 (LP role RLS + column whitelist VOLATILE trigger), 0047 (orders_rollup_stage Codex F2 amend). Plan + spec amended in-flight at `f87ef4e` for 2 Loo-approved fixes (Bug 1: `'dispatched'` enum drift → narrow policy to `sup_status = 'pickup_assigned'`; Bug 2: trigger NEW.sku/NEW.qty drop — columns live on purchase_order_lines).
+Current phase: Phase 4.5 Chunk 1 SHIPPED + post-tag receive-rpc-v3-swap. Tag `phase-4.5-chunk-1-complete @ 210e222` created and pushed. Working through Chunk 1 medium carry-forwards before Chunk 2 starts. Latest: `phase-4.5-chunk-1-receive-rpc-v3-swap` closed — POST /api/logistics/pos/:id/receive now calls v3 batched RPC `logistics_receive_po_with_do` (0045:614) with single payload `{doNumber, doFilePath, lines: [{sku, receivedQty}]}` instead of v2 per-line loop, so the uploaded DO file path actually persists on the PO row. Implementation work (Tasks 1-48) landed across `f888cca..f9154d8` (49 commits). 7 migrations landed and applied to staging Supabase project_id `kfprgpjpaffedghytstl`: 0041 (app_users.partner_id CHECK + INDEX), 0042 (delivery-orders Storage bucket + RLS), 0043 (at_warehouse_waiting enum value), 0044 (4 PO RFD/dispatch columns + partial INDEX), 0045 (5 NEW + 2 EXTENDED + 1 MODIFIED RPCs), 0046 (LP role RLS + column whitelist VOLATILE trigger), 0047 (orders_rollup_stage Codex F2 amend). Plan + spec amended in-flight at `f87ef4e` for 2 Loo-approved fixes (Bug 1: `'dispatched'` enum drift → narrow policy to `sup_status = 'pickup_assigned'`; Bug 2: trigger NEW.sku/NEW.qty drop — columns live on purchase_order_lines).
 Project started: 2026-05-02
-Last phase completed: Phase 4.5a v3 wake — 2026-05-05, tag phase-4.5a-v3-wake-complete @ `6721471`. Phase 4.5 Chunk 1 implementation work landed post-tag awaiting `phase-4.5-chunk-1-complete` tag (Task 49).
-Tags so far: phase-0/1/2a/2b/2c/3/4-complete (7 tags) · `phase-4-v3-complete` annotated `2e6fdae` on commit `d4ba236` created + pushed 2026-05-05 · `phase-4.5a-v3-wake-complete` annotated on commit `6721471` created + pushed 2026-05-05 · `phase-4.5-chunk-1-complete` TBD (Task 49 pending Loo's local verification)
-Test count: 725/725 green (shared 113 + api 336 + web 276) — net +62 from Phase 4.5a baseline 663 across Sprint 1-5 of Chunk 1. 7 Playwright E2E specs added (`mattress-full-happy`, `bed-frame-full-happy`, `sofa-accept-happy`, `sofa-reject-relocate`, `lp-update-column-whitelist`, `concurrent-rfd-race`, `lp-creation-and-login` extended) — all `test.fixme()` pending Loo's local seed + run.
+Last phase completed: Phase 4.5 Chunk 1 — 2026-05-05, tag `phase-4.5-chunk-1-complete @ 210e222`. Post-tag carry-forward `receive-rpc-v3-swap` closed in this session.
+Tags so far: phase-0/1/2a/2b/2c/3/4-complete (7 tags) · `phase-4-v3-complete` annotated `2e6fdae` on commit `d4ba236` created + pushed 2026-05-05 · `phase-4.5a-v3-wake-complete` annotated on commit `6721471` created + pushed 2026-05-05 · `phase-4.5-chunk-1-complete` annotated on commit `210e222` created + pushed 2026-05-05
+Test count: 731/731 green (shared 117 + api 338 + web 276) — net +6 from Chunk 1 baseline 725 (4 new shared schema tests for receivePoWithDoInput shape + 2 new api tests for doNumber/lines empty-array validation). 7 Playwright E2E specs added during Chunk 1 (`mattress-full-happy`, `bed-frame-full-happy`, `sofa-accept-happy`, `sofa-reject-relocate`, `lp-update-column-whitelist`, `concurrent-rfd-race`, `lp-creation-and-login` extended) — all `test.fixme()` pending Loo's local seed + run.
 Migrations applied: 49 files (0001-0040 baseline 42 + 0041/0042/0043/0044/0045/0046/0047 = 49 distinct files; latest = 0047_orders_rollup_stage_amend applied to staging Supabase project_id `kfprgpjpaffedghytstl` 2026-05-05).
 F-11 (Workers bundle size) status: unchanged from Phase 4.5a — 1034 KiB raw / 197 KiB gzipped after @react-pdf/renderer landed.
 Biz model locked (per Loo 2026-05-03):
@@ -327,16 +327,17 @@ Next decision pending:
   1. Loo runs `pnpm seed:lp-test-user` against staging + dev server + un-fixme E2E specs one by one
   2. Loo creates + pushes annotated tag `phase-4.5-chunk-1-complete` on the post-Task-49 commit
   3. Phase 4.5b/4.5c/4.5d sub-phases per Loo's pick — partner role activation deeper, DO photo retention, Sofa Ready Confirm UI rewrite (or pivot directly to Phase 5 Finance kickoff)
-Carry-forward TODOs (close 5, open 10):
+Carry-forward TODOs (close 6, open 9):
   ## CLOSED in Chunk 1
   • phase-4.5-partner-role-tenancy ✅ closed (LP role + JWT + RLS + portal + Principal create-LP form all landed)
   • phase-4.5-do-file-storage-upload ✅ closed (`delivery-orders` Storage bucket + RLS + USER-JWT sign-upload endpoint + DOFileUploadField + ReceivePOModal wire-up)
   • phase-4.5-sofa-relocate-ui ✅ closed (`LpInboundConfirmDialog` + `WarehouseRelocateDialog` + `ResumeFromWaitingDialog` all landed)
   • phase-4-v3-print-do-toast-test ✅ closed (covered by `DOFileUploadField.test.tsx` upload-success path)
   • phase-4-v3-confirm-auto-skip-from-stock ✅ closed in Phase 4.5a wake
-  ## NEW (10 opened)
+  ## CLOSED post-tag (Chunk 1.5)
+  • phase-4.5-chunk-1-receive-rpc-v3-swap ✅ closed — `POST /:id/receive` now calls v3 batched `logistics_receive_po_with_do` (0045:614) with `{doNumber, doFilePath, lines}` payload; modal sends one atomic call carrying every ticked line + uploaded DO path. Semantic shift: `receivedQty` is now NEW TOTAL not delta (RPC computes delta + rejects decreases). 9 files touched across packages/shared, apps/api, apps/web.
+  ## NEW (9 opened)
   • phase-4.5-chunk-1-lp-address-column (medium) — `delivery_partners` has no `address` column; Task 19 hack concatenates phone+address into `contact`. Schema migration to split needed.
-  • phase-4.5-chunk-1-receive-rpc-v3-swap (medium) — Task 38 wires `DOFileUploadField` into `ReceivePOModal` but the API receive route still uses v2 `logistics_receive_po_line` (no `do_file_path` arg). Swap to v3 `logistics_receive_po_with_do` so uploaded path actually persists.
   • phase-4.5-chunk-1-lp-whitelist-tighten (low) — Task 6 trigger covers 20 of 29 PO columns; 5 unprotected (`dl_refs`, `do_number`, `created_at`, `updated_at`, `placed_at`) — switch from deny-list to allow-list pattern.
   • phase-4.5-cleanup-at-own-wh-waiting-rename (low) — irreversible enum recreate to drop deprecated `at_own_wh_waiting` once `at_warehouse_waiting` is fully adopted.
   • phase-4.5-do-storage-retention-policy (low) — TTL or archive policy for `delivery-orders` bucket files.

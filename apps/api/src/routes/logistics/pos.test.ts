@@ -341,10 +341,24 @@ describe("POST /api/logistics/pos", () => {
 
 describe("POST /api/logistics/pos/:id/receive", () => {
   const PO_ID = "PO-2030";
+  const VALID_BODY = {
+    doNumber: "DO-5210",
+    doFilePath: `${PO_ID}/abc-DO-5210.pdf`,
+    lines: [{ sku: "MAT-K-001", receivedQty: 2 }],
+  };
 
-  it("returns 200 on success and calls RPC with snake_case args", async () => {
+  it("returns 200 on success and calls v3 RPC with snake_case-reshaped lines", async () => {
     const rpc = vi.fn().mockResolvedValue({
-      data: { po_status: "received", orders_promoted: ["00000000-0000-0000-0000-000000000a01"] },
+      data: {
+        po_id: PO_ID,
+        do_file_path: VALID_BODY.doFilePath,
+        do_number: VALID_BODY.doNumber,
+        lines_updated: 1,
+        threads_advanced: 0,
+        po_status: "received",
+        sup_status: "delivered",
+        was_relocated: false,
+      },
       error: null,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -354,20 +368,29 @@ describe("POST /api/logistics/pos/:id/receive", () => {
       new Request(`http://t/api/logistics/pos/${PO_ID}/receive`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: "MAT-K-001", receivedQty: 2 }),
+        body: JSON.stringify(VALID_BODY),
       }),
       env,
     );
     expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("logistics_receive_po_line", {
+    expect(rpc).toHaveBeenCalledWith("logistics_receive_po_with_do", {
       p_po_id: PO_ID,
-      p_sku: "MAT-K-001",
-      p_received_qty: 2,
+      p_do_file_path: VALID_BODY.doFilePath,
+      p_do_number: VALID_BODY.doNumber,
+      // jsonb payload uses snake_case received_qty (RPC reads
+      // v_line->>'received_qty' at 0045:688). camelCase → snake_case
+      // reshape happens at the route boundary.
+      p_lines: [{ sku: "MAT-K-001", received_qty: 2 }],
     });
-    assertRpcCallShape(rpc, "logistics_receive_po_line", ["p_po_id", "p_sku", "p_received_qty"]);
+    assertRpcCallShape(rpc, "logistics_receive_po_with_do", [
+      "p_po_id",
+      "p_do_file_path",
+      "p_do_number",
+      "p_lines",
+    ]);
   });
 
-  it("returns 422 when receivedQty is zero or negative", async () => {
+  it("returns 422 when receivedQty is negative", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
     const jwt = await makeJwt("logistics");
@@ -375,7 +398,10 @@ describe("POST /api/logistics/pos/:id/receive", () => {
       new Request(`http://t/api/logistics/pos/${PO_ID}/receive`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: "MAT-K-001", receivedQty: 0 }),
+        body: JSON.stringify({
+          ...VALID_BODY,
+          lines: [{ sku: "MAT-K-001", receivedQty: -1 }],
+        }),
       }),
       env,
     );
@@ -390,7 +416,40 @@ describe("POST /api/logistics/pos/:id/receive", () => {
       new Request(`http://t/api/logistics/pos/${PO_ID}/receive`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: "", receivedQty: 2 }),
+        body: JSON.stringify({
+          ...VALID_BODY,
+          lines: [{ sku: "", receivedQty: 2 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("returns 422 when doNumber is too short", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/receive`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...VALID_BODY, doNumber: "DO" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("returns 422 when lines is empty", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/receive`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...VALID_BODY, lines: [] }),
       }),
       env,
     );
@@ -398,7 +457,10 @@ describe("POST /api/logistics/pos/:id/receive", () => {
   });
 
   it("maps P0001 over_received → 422 with code", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "over receipt", details: "over_received" } });
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "P0001", message: "over receipt", details: "over_received" },
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("logistics");
@@ -406,7 +468,10 @@ describe("POST /api/logistics/pos/:id/receive", () => {
       new Request(`http://t/api/logistics/pos/${PO_ID}/receive`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: "MAT-K-001", receivedQty: 99 }),
+        body: JSON.stringify({
+          ...VALID_BODY,
+          lines: [{ sku: "MAT-K-001", receivedQty: 99 }],
+        }),
       }),
       env,
     );
@@ -425,7 +490,7 @@ describe("POST /api/logistics/pos/:id/receive", () => {
       new Request(`http://t/api/logistics/pos/${PO_ID}/receive`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: "MAT-K-001", receivedQty: 2 }),
+        body: JSON.stringify(VALID_BODY),
       }),
       env,
     );
