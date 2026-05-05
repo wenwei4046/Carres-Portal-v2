@@ -3,7 +3,13 @@
  * convert from snake_case DB rows to these.
  */
 
-import type { LogisticsStage } from "./db-types";
+import type { CostSource, LogisticsStage } from "./db-types";
+
+// Re-exported so UI code can write `import type { CostSource } from
+// "@carres/shared/domain"` alongside the rest of the camelCase surface.
+// The enum labels themselves are 1:1 with DB (snake-cased like the other DB
+// enums consumed in domain types — see Order.status, PartnerStage, etc.).
+export type { CostSource };
 
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
@@ -299,12 +305,20 @@ export interface PurchaseOrder {
   lines?: PurchaseOrderLine[];
 }
 
-/** Child rows of a PO (migration 0017). */
+/**
+ * Child rows of a PO (migration 0017). Phase 4.5 Chunk 2 Sprint E migration
+ * 0055 added `cost` + `costSource` — both nullable because legacy rows have
+ * no historical cost recorded (CQ3 backfill NULL).
+ */
 export interface PurchaseOrderLine {
   poId: string;
   sku: string;
   qty: number;
   receivedQty: number;
+  // Migration 0055. numeric(14,2) → number passthrough; null on legacy rows.
+  cost: number | null;
+  // Migration 0055. Mirrors `PurchaseOrderLineRow.cost_source` 1:1.
+  costSource: CostSource | null;
 }
 
 export interface Payment {

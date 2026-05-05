@@ -52,6 +52,16 @@ export type StockMovementKind = "in" | "out" | "adjust";
 // rows). 'logistics_partner' = partner-owned WH; pairs with owning_partner_id
 // on warehouses (CHECK constraint warehouses_partner_kind_check).
 export type WarehouseKind     = "own" | "logistics_partner";
+// Phase 4.5 Chunk 2 Sprint E migration 0055 (T24). Enum labels matching
+// `cost_source_enum` in DB. Drives `purchase_order_lines.cost_source`:
+//   - 'hand_entered'      logistics user typed the cost manually.
+//   - 'prev_po'           auto-filled from the most-recent received PO for the
+//                         same SKU (logistics_recent_po_cost RPC, T27).
+//   - 'system_suggested'  heuristic suggestion (e.g. 110% of prev_po).
+// Both `cost` + `cost_source` are NULLABLE on the row (legacy rows pre-0055
+// have no historical cost recorded — CQ3: backfill NULL, do not invent). New
+// PO creates enforce non-NULL via zod (T25) + RPC validation (T26).
+export type CostSource        = "hand_entered" | "prev_po" | "system_suggested";
 
 export interface DealerRow {
   id: string;
@@ -365,12 +375,23 @@ export interface PurchaseOrderRow {
  * `purchase_order_lines` child table (migration 0017). Composite PK on
  * (po_id, sku); CHECK constraint enforces received_qty <= qty so over-receipt
  * is impossible at the DB layer.
+ *
+ * Phase 4.5 Chunk 2 Sprint E migration 0055 added `cost` + `cost_source`. Both
+ * NULLABLE because legacy rows from 0019/0025-era PO creates have no historical
+ * cost recorded (CQ3 locked: backfill NULL, do not invent). New PO creates
+ * enforce non-NULL via zod schema (T25) + RPC validation (T26).
  */
 export interface PurchaseOrderLineRow {
   po_id: string;
   sku: string;
   qty: number;
   received_qty: number;
+  // Migration 0055. numeric(14,2) — passed through as `number`; CHECK enforces
+  // non-negative when set (NULL allowed for legacy rows).
+  cost: number | null;
+  // Migration 0055. cost_source_enum — which heuristic produced the cost
+  // value above (see `CostSource` definition for label semantics).
+  cost_source: CostSource | null;
 }
 
 export interface POHistoryRow {

@@ -250,6 +250,12 @@ export const purchaseOrderLineFromRow = (
   sku: r.sku,
   qty: r.qty,
   receivedQty: r.received_qty,
+  // Migration 0055 (Phase 4.5 Chunk 2 Sprint E). `cost` is numeric(14,2) so
+  // PostgREST may surface it as either string or number depending on driver
+  // settings; coerce via Number() but preserve null for legacy rows. `?? null`
+  // keeps the adapter safe against rows fetched before the migration shipped.
+  cost: r.cost === null || r.cost === undefined ? null : Number(r.cost),
+  costSource: r.cost_source ?? null,
 });
 
 export const purchaseOrderFromRow = (

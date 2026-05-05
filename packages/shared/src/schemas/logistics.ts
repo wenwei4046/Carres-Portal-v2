@@ -95,6 +95,17 @@ export type AbandonOrderInput = z.infer<typeof abandonOrderInput>;
  * RPC. Used by NewPODialog for both single-order POs (`dl` set) and combined
  * cross-order bundles (`dlRefs` array, per A7). At least one line required;
  * each line's qty must be a positive integer.
+ *
+ * Phase 4.5 Chunk 2 Sprint E (T25) migration 0055 — each line carries
+ * `cost` (per-unit numeric, non-negative) + `costSource` (enum) that get
+ * persisted to `purchase_order_lines.cost` + `.cost_source`. Required on input
+ * even though the DB columns are nullable, because:
+ *   - Legacy rows pre-0055 are NULL (CQ3 backfill).
+ *   - New PO creates MUST capture the cost — RPC validation (T26) raises
+ *     ERRCODE 22023 DETAIL 'cost_required' if either is NULL on insert.
+ *   - The frontend (T28 CogsLineEditor) drives a value into both fields
+ *     before the user can submit, so the input edge contract enforces
+ *     non-NULL too.
  */
 export const createPoInput = z.object({
   supplierId: z.string().uuid(),
@@ -102,6 +113,15 @@ export const createPoInput = z.object({
   lines: z.array(z.object({
     sku: z.string().min(1),
     qty: z.number().int().positive(),
+    // Migration 0055. Per-unit cost; CHECK on the column enforces >= 0 — we
+    // mirror that here so 422 surfaces at the API edge rather than 500ing on
+    // SQLSTATE 23514 from Postgres.
+    cost: z.number().nonnegative(),
+    // Migration 0055. Enum labels match `cost_source_enum` 1:1; the FE drives
+    // this via CogsLineEditor (T28) — `hand_entered` when the user types,
+    // `prev_po` when the auto-fill button populates from
+    // logistics_recent_po_cost (T27), `system_suggested` for heuristics.
+    costSource: z.enum(['hand_entered', 'prev_po', 'system_suggested']),
   })).min(1),
   dl: z.number().int().positive().optional(),
   dlRefs: z.array(z.number().int().positive()).optional(),

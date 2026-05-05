@@ -9,6 +9,14 @@ export * as DB       from "./db-types";
 export * as Domain   from "./domain";
 export * as Adapters from "./adapters";
 
+// Phase 4.5 Chunk 2 Sprint E migration 0055 (T25). Top-level type re-export
+// so consumers can `import type { CostSource } from "@carres/shared"` without
+// having to dip into the DB.* namespace. Mirrors how Role + LogisticsStage are
+// implicitly available via DB.* — but CostSource is referenced widely enough
+// (CreatePoInput line shape, CogsLineEditor T28, recent-cost RPC T27) to
+// warrant the top-level alias.
+export type { CostSource } from "./db-types";
+
 export {
   loginSchema,
   meResponseSchema,

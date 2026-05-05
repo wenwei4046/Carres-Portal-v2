@@ -153,12 +153,20 @@ describe('abandonOrderInput', () => {
 });
 
 describe('createPoInput', () => {
-  it('accepts supplier + warehouse + at least one line', () => {
+  // Phase 4.5 Chunk 2 Sprint E (T25, migration 0055) — every line carries
+  // cost (>= 0) + costSource ('hand_entered'|'prev_po'|'system_suggested').
+  const VALID_LINE = {
+    sku: 'SOFA-OAK-3S',
+    qty: 1,
+    cost: 1500,
+    costSource: 'hand_entered' as const,
+  };
+  it('accepts supplier + warehouse + at least one line with cost+costSource', () => {
     expect(
       createPoInput.safeParse({
         supplierId: UUID,
         warehouseId: UUID2,
-        lines: [{ sku: 'SOFA-OAK-3S', qty: 1 }],
+        lines: [VALID_LINE],
       }).success,
     ).toBe(true);
   });
@@ -176,10 +184,66 @@ describe('createPoInput', () => {
       createPoInput.safeParse({
         supplierId: UUID,
         warehouseId: UUID2,
-        lines: [{ sku: 'SOFA-OAK-3S', qty: 1 }],
+        lines: [VALID_LINE],
         extraField: 'x',
       }).success,
     ).toBe(false);
+  });
+  it('rejects a line missing cost (T25 — required for new POs)', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [{ sku: 'SOFA-OAK-3S', qty: 1, costSource: 'hand_entered' }],
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects a line missing costSource (T25 — required for new POs)', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [{ sku: 'SOFA-OAK-3S', qty: 1, cost: 1500 }],
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects a negative cost (mirrors DB CHECK cost >= 0)', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [{ ...VALID_LINE, cost: -1 }],
+      }).success,
+    ).toBe(false);
+  });
+  it('accepts cost = 0 (zero is non-negative)', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [{ ...VALID_LINE, cost: 0 }],
+      }).success,
+    ).toBe(true);
+  });
+  it('rejects an unknown costSource label', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [{ ...VALID_LINE, costSource: 'made_up' }],
+      }).success,
+    ).toBe(false);
+  });
+  it('accepts each known costSource label', () => {
+    for (const cs of ['hand_entered', 'prev_po', 'system_suggested'] as const) {
+      expect(
+        createPoInput.safeParse({
+          supplierId: UUID,
+          warehouseId: UUID2,
+          lines: [{ ...VALID_LINE, costSource: cs }],
+        }).success,
+      ).toBe(true);
+    }
   });
 });
 
@@ -187,7 +251,14 @@ describe('createPosBatchInput', () => {
   const VALID_PO = {
     supplierId: UUID,
     warehouseId: UUID2,
-    lines: [{ sku: 'SOFA-OAK-3S', qty: 1 }],
+    lines: [
+      {
+        sku: 'SOFA-OAK-3S',
+        qty: 1,
+        cost: 1500,
+        costSource: 'hand_entered' as const,
+      },
+    ],
   };
   it('accepts an array with one valid PO entry', () => {
     expect(
@@ -216,6 +287,21 @@ describe('createPosBatchInput', () => {
     expect(
       createPosBatchInput.safeParse({
         pos: [VALID_PO, { ...VALID_PO, warehouseId: 'nope' }],
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects when one entry has a line missing cost (T25 propagation)', () => {
+    expect(
+      createPosBatchInput.safeParse({
+        pos: [
+          VALID_PO,
+          {
+            ...VALID_PO,
+            lines: [
+              { sku: 'BED-PINE-K', qty: 2, costSource: 'hand_entered' },
+            ],
+          },
+        ],
       }).success,
     ).toBe(false);
   });
