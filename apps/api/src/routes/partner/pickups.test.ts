@@ -158,6 +158,30 @@ describe("POST /api/partner/pickups/accept-rfd", () => {
     expect(res.status).toBe(422);
     expect(sb.rpc).not.toHaveBeenCalled();
   });
+
+  it("maps SQLSTATE 42501 (LP not assigned) to 403", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "42501", message: "partner not assigned to this thread" },
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", "p1");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/accept-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: THREAD_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_accept_rfd", {
+      p_thread_id: THREAD_ID,
+    });
+  });
 });
 
 describe("POST /api/partner/pickups/reject-rfd", () => {
@@ -225,6 +249,57 @@ describe("POST /api/partner/pickups/reject-rfd", () => {
       env,
     );
     expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing threadId with 422", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", "p1");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/reject-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "capacity full" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects reason exceeding 500 chars with 422", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", "p1");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/reject-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: THREAD_ID, reason: "x".repeat(501) }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-partner role with 403", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/reject-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: THREAD_ID, reason: "x" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 });

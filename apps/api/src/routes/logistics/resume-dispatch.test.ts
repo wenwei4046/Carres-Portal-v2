@@ -121,4 +121,21 @@ describe("POST /api/logistics/orders/resume-dispatch", () => {
     expect(res.status).toBe(422);
     expect(sb.rpc).not.toHaveBeenCalled();
   });
+
+  it("rejects missing threadId with 422", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/orders/resume-dispatch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
 });

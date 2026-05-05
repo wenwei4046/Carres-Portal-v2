@@ -144,4 +144,42 @@ describe("POST /api/logistics/pos/dispatch-customer-leg", () => {
     expect(res.status).toBe(422);
     expect(sb.rpc).not.toHaveBeenCalled();
   });
+
+  it("rejects partner role with 403", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/dispatch-customer-leg", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: THREAD_ID, partnerId: LP_ID, confirmDeliveryDate: "2026-05-20" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid confirmDeliveryDate format with 422", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/dispatch-customer-leg", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId: THREAD_ID,
+          partnerId: LP_ID,
+          confirmDeliveryDate: "20-05-2026",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
 });
