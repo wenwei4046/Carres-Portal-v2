@@ -19,6 +19,7 @@ import dispatchCustomerLegRouter from "./routes/logistics/dispatch-customer-leg"
 import lpInboundRouter from "./routes/logistics/lp-inbound";
 import resumeDispatchRouter from "./routes/logistics/resume-dispatch";
 import stockAlertsRouter from "./routes/logistics/stock-alerts";
+import thresholdsRouter from "./routes/logistics/thresholds";
 import logisticsSuppliersRouter from "./routes/logistics/suppliers";
 import logisticsWarehouseRouter from "./routes/logistics/warehouse";
 import partnerDashboardRouter from "./routes/partner/dashboard";
@@ -59,6 +60,7 @@ api.route("/logistics/pos", logisticsPosRouter);
 api.route("/logistics/pos", lpInboundRouter);
 api.route("/logistics/pos", dispatchCustomerLegRouter);
 api.route("/logistics/stock-alerts", stockAlertsRouter);
+api.route("/logistics", thresholdsRouter);
 api.route("/logistics/suppliers", logisticsSuppliersRouter);
 api.route("/logistics/warehouse", logisticsWarehouseRouter);
 api.route("/partner/dashboard", partnerDashboardRouter);

@@ -460,6 +460,35 @@ export const awaitingStockShortageResponse = z.object({
 export type AwaitingStockShortageResponse = z.infer<typeof awaitingStockShortageResponse>;
 
 /**
+ * `setThresholdInput` — POST /api/logistics/warehouses/:warehouseId/skus/:sku/threshold
+ * (Phase 4.5 Chunk 2 Sprint D Task 19). Body shape for the inline-edit Save
+ * button on `LogisticsWarehouse` rows. UPDATEs (or UPSERTs if the row is
+ * absent) the matching `stock_balances.low_threshold` + `high_threshold` pair.
+ *
+ * Per migration 0054:
+ *   - `low_threshold` fires the alert pill when `(qty - reserved) < low_threshold`.
+ *     NULL means "no alert configured".
+ *   - `high_threshold` is the replenishment ceiling used by CreatePOModal's
+ *     "Suggest from alerts" button. NULL means "fall back to low * 2".
+ *   - Per-column CHECK enforces `>= 0 (or NULL)`.
+ *   - Table-level CHECK `stock_balances_threshold_order` enforces
+ *     `high_threshold >= low_threshold` whenever both are non-NULL.
+ *
+ * The zod refinement here mirrors the SQL CHECK so we 422 at the API edge
+ * instead of bouncing off Postgres at 500/SQLSTATE 23514. Path params
+ * (`:warehouseId` uuid + `:sku` text) are NOT part of the body schema —
+ * they live on the route.
+ */
+export const setThresholdInput = z.object({
+  low: z.number().int().nonnegative().nullable(),
+  high: z.number().int().nonnegative().nullable(),
+}).strict().refine(
+  (data) => data.low === null || data.high === null || data.high >= data.low,
+  { message: "high must be >= low when both are set", path: ["high"] },
+);
+export type SetThresholdInput = z.infer<typeof setThresholdInput>;
+
+/**
  * `listMovementsQuery` — GET /api/logistics/movements query string (M4 Task 3).
  *
  * Filters per spec §18.6 (LogisticsMovements page F3):

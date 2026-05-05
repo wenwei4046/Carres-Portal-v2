@@ -135,6 +135,7 @@ export {
   partnerRejectRfdInput,
   dispatchCustomerLegInput,
   resumeDispatchInput,
+  setThresholdInput,
   type AssignPartnerInput,
   type AttachDoInput,
   type ReceivePoWithDoInput,
@@ -161,4 +162,5 @@ export {
   type PartnerRejectRfdInput,
   type DispatchCustomerLegInput,
   type ResumeDispatchInput,
+  type SetThresholdInput,
 } from "./schemas/logistics";
