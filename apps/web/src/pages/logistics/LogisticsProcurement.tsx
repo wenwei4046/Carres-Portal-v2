@@ -12,6 +12,7 @@ import AssignPickupDialog from "./components/AssignPickupDialog";
 import CreatePOModal, {
   type CreatePoPrefill,
 } from "./components/CreatePOModal";
+import LpInboundConfirmDialog from "./components/LpInboundConfirmDialog";
 import PoDetailModal from "./components/PoDetailModal";
 import ReceivePOModal from "./components/ReceivePOModal";
 
@@ -91,6 +92,11 @@ export default function LogisticsProcurement() {
   );
   const [receivePoId, setReceivePoId] = useState<string | null>(null);
   const [assignPickupPoId, setAssignPickupPoId] = useState<string | null>(null);
+  // Phase 4.5 Chunk 1 / Task 30 — LP Pre-flight 代按 dialog. Opens on Sofa POs
+  // with sup_status='ready_confirm_sent'; lets Logistics-Procurement stand in
+  // for the customer to Accept (→ partner_confirmed) or Reject (→ relocate
+  // branch in Task 31). State holds just the PO id; dialog reads only the id.
+  const [lpInboundFor, setLpInboundFor] = useState<string | null>(null);
   // C5.1 — selected PO row to show in the read-only detail modal. We hold the
   // full row (not just id) so the modal doesn't need a new GET /:id endpoint;
   // it reads everything from the list cache.
@@ -358,6 +364,7 @@ export default function LogisticsProcurement() {
                   po={po}
                   onReceive={() => setReceivePoId(po.id)}
                   onAssignPickup={() => setAssignPickupPoId(po.id)}
+                  onLpInboundConfirm={() => setLpInboundFor(po.id)}
                 />
               </div>
             </div>
@@ -402,6 +409,12 @@ export default function LogisticsProcurement() {
             />
           );
         })()}
+      {lpInboundFor && (
+        <LpInboundConfirmDialog
+          poId={lpInboundFor}
+          onClose={() => setLpInboundFor(null)}
+        />
+      )}
       {detailPo && (
         <PoDetailModal
           po={detailPo}
@@ -452,10 +465,12 @@ function ActionCell({
   po,
   onReceive,
   onAssignPickup,
+  onLpInboundConfirm,
 }: {
   po: LogisticsPoListRow;
   onReceive: () => void;
   onAssignPickup: () => void;
+  onLpInboundConfirm: () => void;
 }) {
   const st = poDisplayStatus(po);
   const ss = po.sup_status;
@@ -466,6 +481,25 @@ function ActionCell({
   if (st === "cancelled") {
     return (
       <span className="font-mono text-[10px] text-base-500">cancelled</span>
+    );
+  }
+  // Phase 4.5 Chunk 1 / Task 30 — Sofa pre-flight 代按. When supplier marks the
+  // PO `ready_confirm_sent`, Logistics-Procurement stands in for the customer
+  // to Accept (→ partner_confirmed) or Reject (→ relocate flow in Task 31).
+  if (ss === "ready_confirm_sent") {
+    return (
+      <button
+        type="button"
+        className="btn-primary text-[11px] py-1 px-2.5"
+        onClick={(e) => {
+          // Don't bubble to the row's onClick (opens PoDetailModal — C5.1).
+          e.stopPropagation();
+          onLpInboundConfirm();
+        }}
+        data-testid={`lp-inbound-confirm-${po.id}`}
+      >
+        LP Pre-flight 代按
+      </button>
     );
   }
   if (ss === "ready_for_pickup") {
