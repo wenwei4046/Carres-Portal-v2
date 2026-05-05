@@ -295,6 +295,19 @@ export interface OrderSupplierThreadRow {
   warehouse_id: string | null;
   reserved_at: string | null;
   delivered_at: string | null;
+  // Phase 4.5 Chunk 2 customer-leg LP fields (migration 0049). Per-leg split
+  // per Chunk 2 design spec §3 (CQ1 = option (b)): customer-leg LP +
+  // RFD/accept/reject timestamps live on the thread, while the procurement-leg
+  // LP stays on `purchase_orders.delivery_partner_id` (renamed to
+  // `procurement_partner_id` in Sprint C migration 0052). Closes carry-forward
+  // `phase-4.5-procurement-vs-delivery-partner-field-split`. Backfilled from
+  // PO columns by migration 0050; partial index `ost_partner_rfd_pending_idx`
+  // backs the "RFD pending" LP queue.
+  delivery_partner_id: string | null;
+  confirm_delivery_date: string | null;
+  request_for_delivery_at: string | null;
+  partner_accepted_at: string | null;
+  partner_rejected_at: string | null;
   history: unknown[];
   created_at: string;
   updated_at: string;
