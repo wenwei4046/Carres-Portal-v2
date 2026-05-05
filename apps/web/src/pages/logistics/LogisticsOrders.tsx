@@ -9,6 +9,7 @@ import CreatePOModal, {
 import OrderColumn from "./components/OrderColumn";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import CrossOrderBundleSheet from "./components/CrossOrderBundleSheet";
+import ResumeFromWaitingDialog from "./components/ResumeFromWaitingDialog";
 import type { LogisticsStage } from "./components/StageChip";
 
 /**
@@ -66,6 +67,19 @@ export default function LogisticsOrders() {
   // while the others compress (flex:0.4). Click again to collapse. Clicking a
   // different column flips focus instantly (no need to collapse first).
   const [expandedStage, setExpandedStage] = useState<LogisticsStage | null>(null);
+  // Phase 4.5 Chunk 1 (Task 36): "At Warehouse Waiting" filter mode. When on,
+  // narrows the kanban to orders whose threads are parked at
+  // `at_warehouse_waiting` (post partner-rejection ⇢ relocate). The list-row
+  // payload doesn't carry per-PO `sup_status`, so we approximate by using the
+  // order-level rollup `logistics_stage='ready_to_dispatch'` (per migration
+  // 0047 amend, 'waiting' threads roll up to that stage). Clicking a card in
+  // this mode opens ResumeFromWaitingDialog instead of the detail drawer.
+  // Deviation noted: this is a superset filter — orders that legitimately sit
+  // at `ready_to_dispatch` (no waiting threads) will also surface here. The RPC
+  // itself is a no-op when no threads are in 'waiting', so the worst-case is a
+  // harmless click (no audit-log entry, no state change).
+  const [resumeMode, setResumeMode] = useState(false);
+  const [resumeFor, setResumeFor] = useState<number | null>(null);
 
   // The server applies stage + channel + search; we still fetch the full list
   // for the per-column filter chips (which need ALL stage counts even when a
@@ -108,9 +122,15 @@ export default function LogisticsOrders() {
   }, [allOrders]);
 
   const visibleOrders = useMemo(() => {
+    // Resume mode (Task 36) takes precedence over stage chips: narrow to the
+    // ready_to_dispatch rollup, where orders with `waiting` threads surface
+    // (per migration 0047 rollup amend). See `resumeMode` comment above.
+    if (resumeMode) {
+      return allOrders.filter((o) => stageOf(o) === "ready_to_dispatch");
+    }
     if (stage === "all") return allOrders;
     return allOrders.filter((o) => stageOf(o) === stage);
-  }, [allOrders, stage]);
+  }, [allOrders, stage, resumeMode]);
 
   const ordersByStage = useMemo(() => {
     const buckets: Record<LogisticsStage, LogisticsOrderListRow[]> = {
@@ -231,18 +251,32 @@ export default function LogisticsOrders() {
         aria-label="Stage filter"
       >
         <FilterChip
-          active={stage === "all"}
+          active={!resumeMode && stage === "all"}
           label={`All · ${totalIncoming}`}
-          onClick={() => setStage("all")}
+          onClick={() => {
+            setResumeMode(false);
+            setStage("all");
+          }}
         />
         {LOGISTICS_FLOW.map((s) => (
           <FilterChip
             key={s.key}
-            active={stage === s.key}
+            active={!resumeMode && stage === s.key}
             label={`${s.label} · ${stageCounts[s.key]}`}
-            onClick={() => setStage(s.key)}
+            onClick={() => {
+              setResumeMode(false);
+              setStage(s.key);
+            }}
           />
         ))}
+        {/* Phase 4.5 Chunk 1 (Task 36) — At Warehouse Waiting resume chip.
+            See `resumeMode` state comment above for filter rationale. When
+            active, kanban rows route clicks to ResumeFromWaitingDialog. */}
+        <FilterChip
+          active={resumeMode}
+          label="At Warehouse Waiting"
+          onClick={() => setResumeMode((prev) => !prev)}
+        />
       </div>
 
       {/* Bulk-select action bar */}
@@ -280,7 +314,17 @@ export default function LogisticsOrders() {
             orders={ordersByStage[s.key]}
             selectedDls={selectedDls}
             onToggleSelect={toggleSelect}
-            onOpenOrder={setOpenOrderId}
+            onOpenOrder={(id) => {
+              // Task 36: in resume mode, clicking a card opens the resume
+              // dialog (keyed by `dl`) instead of the detail drawer (keyed by
+              // `id`). Look up the dl from the loaded list.
+              if (resumeMode) {
+                const o = allOrders.find((x) => x.id === id);
+                if (o) setResumeFor(o.dl);
+                return;
+              }
+              setOpenOrderId(id);
+            }}
             onSelectAll={() => selectAllInColumn(s.key)}
             expanded={expandedStage === s.key}
             anyExpanded={expandedStage !== null}
@@ -304,6 +348,12 @@ export default function LogisticsOrders() {
             setBundlePrefill(null);
             clearSelected();
           }}
+        />
+      )}
+      {resumeFor !== null && (
+        <ResumeFromWaitingDialog
+          dl={resumeFor}
+          onClose={() => setResumeFor(null)}
         />
       )}
     </div>
