@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.fixme("LP login lands at /delivery-partner/dashboard", async ({ page }) => {
+test("LP login lands at /delivery-partner/dashboard", async ({ page }) => {
   // Pre-condition: an LP test user exists (seed adds via Sprint 3 Task 23 once
   // CreateLpAccountForm lands; this fixme un-fixme'd in Task 45).
   await page.goto("/login");

@@ -65,6 +65,26 @@ insert into delivery_partners (id, name, contact, zones, onboarded_date, rate_ca
      jsonb_build_object('base',70,'per_floor_walk_up',30,'per_km',2.0)))
 on conflict (id) do nothing;
 
+-- Phase 4.5 Chunk 1: seed an LP test user for E2E
+-- Note: this seed only runs on local dev / staging reset. Production LP accounts
+-- are created via Principal UI (Task 19-22).
+-- Schema reminder (from 0001:99): delivery_partners has columns
+--   id, name, contact, zones text, onboarded_date, rate_card
+-- No `address` column → store concatenated in contact (per Task 19 carry-forward).
+-- `zones` is text (singular), not text[].
+insert into delivery_partners (id, name, contact, zones)
+values (
+  '00000000-0000-0000-0000-0000000001f1'::uuid,
+  'Test LP Alpha',
+  '0123456789 · 1 Test St, KL',
+  ''
+)
+on conflict (id) do nothing;
+
+-- The auth.users row + app_users row are created via Principal flow at runtime.
+-- For E2E, run `pnpm seed:lp-test-user` (script in scripts/) which calls
+-- supabase.auth.admin.createUser + inserts app_users.
+
 insert into partner_fleet (partner_id, plate, vehicle_type, capacity, driver_name, driver_phone) values
   ('00000000-0000-0000-0000-0000000000f1', 'WPK 8821', '1-tonne van',   '8m³',  'Lim Kok Wei', '012-1144 778'),
   ('00000000-0000-0000-0000-0000000000f1', 'WTM 4452', '3-tonne lorry', '20m³', 'Rajiv Singh', '016-3344 991'),

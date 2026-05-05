@@ -10,7 +10,8 @@
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
     "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install chromium"
+    "test:e2e:install": "playwright install chromium",
+    "seed:lp-test-user": "tsx scripts/seed-lp-test-user.ts"
   },
   "engines": {
     "node": ">=20",
