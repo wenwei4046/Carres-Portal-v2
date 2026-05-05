@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { createLpAccountSchema } from "@carres/shared";
-import { adminClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
@@ -145,6 +145,27 @@ principalPartnersRouter.post("/", async (c) => {
   });
 
   return c.json({ partner_id: partnerId, auth_user_id: authUserId, email }, 201);
+});
+
+/**
+ * GET / — list LP accounts.
+ *
+ * Read path uses `userClient` (forwards caller JWT) so RLS on
+ * `delivery_partners` applies. Per migration 0001 the table schema is:
+ *   id, name, contact, zones text, onboarded_date, rate_card
+ * No `address` column exists yet (carry-forward
+ * phase-4.5-chunk-1-lp-address-column) — Task 19 stores address concatenated
+ * into `contact`.
+ */
+principalPartnersRouter.get("/", async (c) => {
+  const auth = c.var.auth;
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("delivery_partners")
+    .select("id,name,contact,zones,onboarded_date,rate_card");
+
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json(data ?? []);
 });
 
 export default principalPartnersRouter;

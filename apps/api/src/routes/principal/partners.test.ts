@@ -150,3 +150,40 @@ describe("POST /api/principal/partners", () => {
     expect(res.status).toBe(422);
   });
 });
+
+describe("GET /api/principal/partners", () => {
+  it("returns LP list for principal", async () => {
+    const sb = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockResolvedValue({
+          data: [
+            { id: "p1", name: "LP-A", contact: "0123", zones: "north", onboarded_date: null, rate_card: null },
+            { id: "p2", name: "LP-B", contact: "0456", zones: "south", onboarded_date: null, rate_card: null },
+          ],
+          error: null,
+        }),
+      })),
+    };
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/principal/partners", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(2);
+  });
+
+  it("rejects non-principal with 403", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/principal/partners", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
