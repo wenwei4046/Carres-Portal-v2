@@ -6,6 +6,7 @@ import {
   type LogisticsPoListRow,
   type SupplierRow,
 } from "@/lib/queries";
+import DOFileUploadField from "../../../components/DOFileUploadField";
 import { INPUT_CLS, Modal, ModalActions } from "./Modal";
 
 /**
@@ -21,10 +22,15 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  *     pending qty + receive-now qty input
  *   - "Receive all pending" + "Clear" ghost buttons + Σ total footer
  *   - Required Supplier DO number input + optional receiving note textarea
- *   - Simulated DO PDF attachment placeholder
+ *   - Real DO file upload (PDF/JPG/PNG ≤ 10 MB) via DOFileUploadField, which
+ *     hits POST /api/storage/dos/sign-upload and streams to the
+ *     `delivery-orders` Supabase Storage bucket. The Phase-4-era
+ *     "simulated DO PDF placeholder" was retired by Phase 4.5 Chunk 1
+ *     Task 38 (spec §8.6 + §0.1).
  *   - Required "Goods inspected and DO signed by warehouse" checkbox
  *   - Primary CTA: "Mark received" (when all pending) / "Receive partial"
- *     (when only some) — disabled until DO# >= 3 chars + signed + total > 0
+ *     (when only some) — disabled until DO# ≥ 3 chars + signed + total > 0
+ *     + a real DO file path is captured from the upload field
  *
  * Wires to `POST /api/logistics/pos/:id/receive` per checked line — the
  * `useReceivePoLineMutation` operates per (sku, receivedQty) so we loop. Errors
@@ -62,6 +68,13 @@ export default function ReceivePOModal({
   const [doNumber, setDoNumber] = useState(suggestDoNumber);
   const [doNote, setDoNote] = useState("");
   const [signed, setSigned] = useState(false);
+  // Task 38 — real DO file path captured from DOFileUploadField. The previous
+  // "simulated" UI placeholder showed a hard-coded `.pdf · 184 KB` mock and
+  // submitted nothing about the file. Now the field uploads to Supabase
+  // Storage first; the canonical path comes back here and the receive
+  // mutation can be flipped to the v3 RPC (logistics_receive_po_with_do)
+  // by a follow-up task without touching the UI again.
+  const [doFilePath, setDoFilePath] = useState<string | null>(null);
 
   const receive = useReceivePoLineMutation(po.id);
 
@@ -74,6 +87,7 @@ export default function ReceivePOModal({
     doNumber.trim().length >= 3 &&
     signed &&
     totalReceiving > 0 &&
+    !!doFilePath &&
     !receive.isPending;
 
   function setLine(sku: string, val: number, max: number) {
@@ -240,12 +254,14 @@ export default function ReceivePOModal({
         </div>
         <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
           <div className="text-[11px] text-base-600 mb-2 font-body">
-            Attach signed DO PDF{" "}
-            <span className="text-base-400">(simulated)</span>
+            Attach signed DO file{" "}
+            <span className="text-base-400">(PDF/JPG/PNG · ≤10 MB)</span>
           </div>
-          <div className="font-mono text-[10px] text-base-500">
-            {doNumber || "DO-…"}.pdf · 184 KB
-          </div>
+          <DOFileUploadField
+            poId={po.id}
+            doNumber={doNumber}
+            onUploaded={(path) => setDoFilePath(path)}
+          />
         </div>
         <label className="flex gap-2 items-center px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] cursor-pointer">
           <input

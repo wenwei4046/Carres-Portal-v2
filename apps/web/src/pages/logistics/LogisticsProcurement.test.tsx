@@ -13,6 +13,25 @@ import type {
   WarehouseListResponse,
 } from "@/lib/queries";
 
+// Phase 4.5 Chunk 1 Task 38 — ReceivePOModal now mounts DOFileUploadField,
+// which calls apiFetch + supabase.storage.from("delivery-orders").
+// Mock both so test #8 (the existing receive-flow happy-path) and any other
+// receive-related test can drive a file upload deterministically.
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return { ...actual, apiFetch: vi.fn() };
+});
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    storage: {
+      from: vi.fn(() => ({
+        uploadToSignedUrl: vi.fn().mockResolvedValue({ error: null }),
+      })),
+    },
+  },
+}));
+import { apiFetch } from "@/lib/api";
+
 // C5.3 — mock sonner so the auto-fill failure path can assert which toast
 // variant fires. The default `toast(...)` call is the empty-state notice;
 // `toast.error(...)` is the failure notice. The bug we fixed silently routed
@@ -232,6 +251,7 @@ beforeEach(() => {
   sonnerMocks.success.mockClear();
   sonnerMocks.error.mockClear();
   sonnerMocks.defaultFn.mockClear();
+  vi.mocked(apiFetch).mockReset();
 });
 
 describe("LogisticsProcurement page", () => {
@@ -362,6 +382,12 @@ describe("LogisticsProcurement page", () => {
         ],
       }),
     ]);
+    // Task 38 — DOFileUploadField now gates Submit. Drive the upload
+    // deterministically by mocking the sign-upload API response.
+    vi.mocked(apiFetch).mockResolvedValue({
+      token: "sign-tok",
+      path: "PO-2051/abc-DO-1.pdf",
+    });
     render(wrap(<LogisticsProcurement />));
     fireEvent.click(screen.getByTestId("receive-po-PO-2051"));
     // Tick the signed checkbox (DO# is auto-suggested already)
@@ -369,6 +395,14 @@ describe("LogisticsProcurement page", () => {
       /Goods inspected and DO signed by warehouse/,
     );
     fireEvent.click(signedLabel.previousSibling as Element);
+    // Upload a valid PDF — populates doFilePath state and unblocks Submit.
+    const file = new File(["%PDF-1.4"], "do.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByLabelText(/^do file$/i), {
+      target: { files: [file] },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Mark received/ })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: /Mark received/ }));
     await waitFor(() => {
       expect(receiveMutateAsync).toHaveBeenCalledTimes(2);
