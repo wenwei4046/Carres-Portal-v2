@@ -47,12 +47,22 @@ export const SOP_STANDARD: SopDef = {
 
 export const SOP_SOFA_SPECIAL: SopDef = {
   name: 'SOFA_SPECIAL',
-  stages: ['awaiting_logistics_action', 'dispatched', 'waiting', 'delivered'],
+  stages: ['awaiting_logistics_action', 'ready_to_dispatch', 'waiting', 'dispatched', 'delivered'],
+  // Transitions are advisory: (from, to, rpc) tuples document allowed paths.
+  // Two transitions sharing (from, rpc) with different `to` is intentional —
+  // the receive RPC branches on previous PO sup_status (relocated → waiting,
+  // else → ready_to_dispatch). Keeps RPC dispatch consistent with one UI button.
   transitions: [
-    { from: 'awaiting_logistics_action', to: 'dispatched', rpc: 'partner_confirm_receive' },
-    { from: 'awaiting_logistics_action', to: 'waiting',    rpc: 'logistics_relocate_warehouse' },
-    { from: 'dispatched',                to: 'delivered',  rpc: 'logistics_attach_pod_do' },
-    { from: 'waiting',                   to: 'delivered',  rpc: 'logistics_attach_pod_do' },
+    // LP Accept happy path: previous sup_status was ready_confirm_sent or partner_confirmed
+    { from: 'awaiting_logistics_action', to: 'ready_to_dispatch', rpc: 'logistics_receive_po_with_do' },
+    // LP Reject + Relocate path: previous sup_status was 'relocated'
+    { from: 'awaiting_logistics_action', to: 'waiting',           rpc: 'logistics_receive_po_with_do' },
+    // Resume after customer reschedules
+    { from: 'waiting',                   to: 'ready_to_dispatch', rpc: 'logistics_resume_from_waiting' },
+    // Customer-delivery dispatch (RFD or Force)
+    { from: 'ready_to_dispatch',         to: 'dispatched',        rpc: 'logistics_dispatch_customer_leg' },
+    // Final delivery
+    { from: 'dispatched',                to: 'delivered',         rpc: 'logistics_attach_pod_do' },
   ],
 };
 

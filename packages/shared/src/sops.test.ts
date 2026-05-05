@@ -90,4 +90,13 @@ describe('SOP shape invariants', () => {
       expect(t.rpc.length).toBeGreaterThan(0);
     }
   });
+
+  it('SOP_SOFA_SPECIAL allows two transitions from awaiting_logistics_action via receive RPC', () => {
+    const matches = SOP_SOFA_SPECIAL.transitions.filter(
+      t => t.from === 'awaiting_logistics_action' && t.rpc === 'logistics_receive_po_with_do'
+    );
+    expect(matches).toHaveLength(2);
+    const tos = matches.map(t => t.to).sort();
+    expect(tos).toEqual(['ready_to_dispatch', 'waiting']);
+  });
 });
