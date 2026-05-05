@@ -1199,6 +1199,9 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
       expect(t.stage).toBe("ready_to_dispatch");
       expect(t.po_id).toBeNull();
     }
+    // Pin the v3 RPC name so T4's API callsite swap (orders.ts:471) is
+    // caught by this test if it regresses to the v2 RPC.
+    assertRpcCallShape(rpc, "logistics_confirm_proceed_request_v3", ["p_order_id"]);
   });
 
   it("stays at awaiting_logistics_action when any thread has shortage", async () => {

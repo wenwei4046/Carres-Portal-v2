@@ -72,6 +72,10 @@
 --     • kind='out'                  -- buffer is leaving the warehouse for
 --                                      this customer order (paired with the
 --                                      receive-time decrement at delivery)
+--     • qty = -demand               -- NEGATIVE qty for kind='out' (matching
+--                                      codebase convention from 0019/0024/0034
+--                                      where SUM(qty) GROUP BY (sku, wh) gives
+--                                      net flow: + for in, - for out)
 --     • ref = order_id::text        -- audit trail back to consuming order
 --     • note='reserve_from_buffer'  -- distinguishes from PO-receive 'in's
 --                                      (which have ref=po_id, no note marker)
@@ -326,7 +330,8 @@ begin
     from wh_coverage
    where covered_skus = v_demand_skus
    order by case when warehouse_id = v_order.warehouse_id then 0 else 1 end,
-            warehouse_name asc
+            warehouse_name asc,
+            warehouse_id asc
    limit 1;
 
   -- 4c. If no warehouse covers all SKUs -> stay at awaiting_logistics_action.
@@ -444,13 +449,12 @@ begin
     -- consistent because we BUMP reserved here (qty stays) and only
     -- DECREMENT qty at delivery.
     --
-    -- TODO (carry-forward): the kind='out' choice here means a naive
-    -- "qty-running-total" view would double-count the auto-skip out + the
-    -- delivery out. Real consumers should use the (kind, note) pair to
-    -- distinguish. If reporting needs simplification, consider a future
-    -- migration to add a `stage` discriminator column on stock_movements.
+    -- Sign convention: qty is NEGATIVE for kind='out' (matches 0019/0024/0034
+    -- across the codebase). SUM(qty) GROUP BY (sku, warehouse_id) gives net
+    -- flow: + for kind='in', - for kind='out'. The (kind, note) pair still
+    -- distinguishes auto-skip rows from delivery rows for audit queries.
     insert into stock_movements (sku, warehouse_id, qty, kind, ref, note, by_role, by_user_id)
-    select td.sku, v_chosen_wh, td.demand, 'out',
+    select td.sku, v_chosen_wh, -td.demand, 'out',
            p_order_id::text, 'reserve_from_buffer', 'logistics', v_uid
       from (
         select ol.sku as sku, sum(ol.qty)::int as demand
