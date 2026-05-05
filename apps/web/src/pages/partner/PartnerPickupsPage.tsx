@@ -1,8 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
-import PartnerRequestForDeliveryDialog from "./components/PartnerRequestForDeliveryDialog";
 
 /**
  * PartnerPickupsPage — the LP's per-leg work queue. Replaces the Task 18
@@ -12,11 +10,16 @@ import PartnerRequestForDeliveryDialog from "./components/PartnerRequestForDeliv
  *   - PO id
  *   - `sup_status` chip (low-effort styling for now — Task 28+ may swap in a
  *     dedicated chip component if the LP-side enum diverges from logistics)
- *   - "RFD pending" amber indicator when logistics has fired the RFD but the
- *     LP hasn't accepted/rejected yet (`request_for_delivery_at IS NOT NULL`
- *     AND both `partner_accepted_at` AND `partner_rejected_at` are NULL)
- *   - Action button that opens `PartnerRequestForDeliveryDialog` (a stub in
- *     Task 26; real Accept/Reject UI lands in Task 28)
+ *
+ * Phase 4.5 Chunk 2 Sprint C (migrations 0052/0053): the 4 customer-leg
+ * columns (`confirm_delivery_date`, `request_for_delivery_at`,
+ * `partner_accepted_at`, `partner_rejected_at`) were dropped from
+ * `purchase_orders` — they live on `order_supplier_threads` now. The partner
+ * role is procurement-leg only; the prior PO-sourced "RFD pending" indicator
+ * + Accept/Reject dialog launcher were removed in T8'. Customer-leg RFD UI
+ * for partners is a Chunk 2 carry-forward — when it lands, it must read
+ * thread state via the thread-aware accept-rfd / reject-rfd endpoints
+ * (`{ threadId }` body), not from this PO list.
  *
  * Note: `qty` does NOT exist on `purchase_orders` — Task 6 confirmed this.
  * The Row type below intentionally omits it.
@@ -24,10 +27,6 @@ import PartnerRequestForDeliveryDialog from "./components/PartnerRequestForDeliv
 type Row = {
   id: string;
   sup_status: string;
-  request_for_delivery_at: string | null;
-  partner_accepted_at: string | null;
-  partner_rejected_at: string | null;
-  confirm_delivery_date: string | null;
 };
 
 export default function PartnerPickupsPage() {
@@ -35,7 +34,6 @@ export default function PartnerPickupsPage() {
     queryKey: qk.partner.pickups(),
     queryFn: () => apiFetch<Row[]>("/api/partner/pickups"),
   });
-  const [openId, setOpenId] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -62,60 +60,24 @@ export default function PartnerPickupsPage() {
               <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
                 Status
               </th>
-              <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
-                RFD
-              </th>
-              <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
-                Action
-              </th>
             </tr>
           </thead>
           <tbody>
-            {(rows ?? []).map((r) => {
-              const rfdPending =
-                !!r.request_for_delivery_at &&
-                !r.partner_accepted_at &&
-                !r.partner_rejected_at;
-              return (
-                <tr key={r.id} className="border-b border-base-200 last:border-0">
-                  <td className="p-3 text-[13px] font-medium text-base-900">
-                    {r.id}
-                  </td>
-                  <td className="p-3">
-                    <span className="inline-block text-[9px] font-bold uppercase tracking-[0.12em] py-[3px] px-[7px] border border-base-300 rounded-[3px] text-base-600">
-                      {r.sup_status}
-                    </span>
-                  </td>
-                  <td className="p-3 text-[12px]">
-                    {rfdPending && (
-                      <span className="text-warning font-semibold">
-                        RFD pending
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-[12px]">
-                    {rfdPending && (
-                      <button
-                        className="underline text-base-700 hover:text-base-900"
-                        onClick={() => setOpenId(r.id)}
-                      >
-                        Accept / Reject
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {(rows ?? []).map((r) => (
+              <tr key={r.id} className="border-b border-base-200 last:border-0">
+                <td className="p-3 text-[13px] font-medium text-base-900">
+                  {r.id}
+                </td>
+                <td className="p-3">
+                  <span className="inline-block text-[9px] font-bold uppercase tracking-[0.12em] py-[3px] px-[7px] border border-base-300 rounded-[3px] text-base-600">
+                    {r.sup_status}
+                  </span>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-
-      {openId && (
-        <PartnerRequestForDeliveryDialog
-          poId={openId}
-          onClose={() => setOpenId(null)}
-        />
-      )}
     </div>
   );
 }

@@ -11,11 +11,17 @@ import type { AppEnv } from "../../types";
  *   - accepted   : sup_status = 'pickup_accepted'
  *   - in_transit : sup_status = 'picked_up'
  *   - delivered  : sup_status = 'delivered'
- *   - total      : all POs assigned to this LP (delivery_partner_id = auth.partnerId)
+ *   - total      : all POs assigned to this LP (procurement_partner_id = auth.partnerId)
  *
  * Read path uses `userClient` (forwards caller JWT) so RLS on `purchase_orders`
  * applies. The migration 0046 LP-role RLS policy restricts the LP to rows
- * where delivery_partner_id matches their partner_id JWT claim.
+ * where procurement_partner_id matches their partner_id JWT claim.
+ *
+ * Phase 4.5 Chunk 2 Sprint C (migration 0052): PO column
+ * `delivery_partner_id` renamed to `procurement_partner_id` to disambiguate
+ * from the customer-leg LP that now lives on
+ * `order_supplier_threads.delivery_partner_id` (migration 0049). The PO holds
+ * ONLY procurement-leg state from 0052 forward.
  *
  * NOTE: `purchase_orders` does NOT have a `qty` column — line-item quantities
  * live on `purchase_order_lines`. This route only needs id + sup_status for
@@ -33,7 +39,7 @@ partnerDashboardRouter.get("/", async (c) => {
   const { data, error } = await sb
     .from("purchase_orders")
     .select("id,sup_status")
-    .eq("delivery_partner_id", auth.partnerId);
+    .eq("procurement_partner_id", auth.partnerId);
 
   if (error) throw new HTTPException(500, { message: error.message });
 

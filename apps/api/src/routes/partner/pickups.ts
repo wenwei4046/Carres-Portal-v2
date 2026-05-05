@@ -13,13 +13,20 @@ import type { AppEnv } from "../../types";
  *
  * Read path uses `userClient` (forwards caller JWT) so RLS on `purchase_orders`
  * applies. Migration 0046 LP-role RLS restricts to rows where
- * delivery_partner_id = auth.partnerId.
+ * procurement_partner_id = auth.partnerId (column renamed from
+ * `delivery_partner_id` in migration 0052; PO holds procurement-leg LP only).
+ *
+ * Phase 4.5 Chunk 2 Sprint C (migrations 0052/0053): the 4 customer-leg
+ * columns (`confirm_delivery_date`, `request_for_delivery_at`,
+ * `partner_accepted_at`, `partner_rejected_at`) were dropped from
+ * `purchase_orders` — they now live on `order_supplier_threads` (added by
+ * 0049, backfilled by 0050). The partner role is procurement-leg only;
+ * customer-leg RFD UI for partners must source state from threads via
+ * dedicated endpoints, not from this PO row.
  *
  * SELECT shape (NO `qty` — that column does not exist on purchase_orders;
  * line-item quantities live on purchase_order_lines):
  *   id, dl, supplier_id, warehouse_id, sup_status,
- *   confirm_delivery_date, request_for_delivery_at,
- *   partner_accepted_at, partner_rejected_at,
  *   delivery_partners(name)
  */
 const partnerPickupsRouter = new Hono<AppEnv>();
@@ -36,12 +43,10 @@ partnerPickupsRouter.get("/", async (c) => {
     .select(
       `
       id, dl, supplier_id, warehouse_id, sup_status,
-      confirm_delivery_date, request_for_delivery_at,
-      partner_accepted_at, partner_rejected_at,
       delivery_partners(name)
     `,
     )
-    .eq("delivery_partner_id", auth.partnerId)
+    .eq("procurement_partner_id", auth.partnerId)
     .order("placed_at", { ascending: false });
 
   if (error) throw new HTTPException(500, { message: error.message });
