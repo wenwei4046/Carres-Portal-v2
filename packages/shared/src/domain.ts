@@ -225,6 +225,46 @@ export interface Order {
   history?: OrderHistory[];
 }
 
+/**
+ * camelCase mirror of `OrderSupplierThreadRow` (migration 0033, v3-S4). One row
+ * per (order, supplier, category). Drives the v3 logistics pipeline so each
+ * fulfillment slice of an order has its own SOP-driven kanban presence.
+ *
+ * `sopName` mirrors `SopName` from `sops.ts` ('STANDARD' | 'SOFA_SPECIAL').
+ * `history` is a jsonb append log defaulting to `[]`.
+ */
+export interface OrderSupplierThread {
+  id: string;
+  orderId: string;
+  supplierId: string;
+  category: string;
+  sopName: "STANDARD" | "SOFA_SPECIAL";
+  logisticsStage:
+    | "placed" | "proceed_request"
+    | "awaiting_logistics_action"
+    | "ready_to_dispatch" | "dispatched"
+    | "waiting" | "delivered"
+    | null;
+  poId: string | null;
+  warehouseId: string | null;
+  reservedAt: string | null;
+  deliveredAt: string | null;
+  // Phase 4.5 Chunk 2 customer-leg LP fields (migration 0049). Per-leg split
+  // per Chunk 2 design spec §3 (CQ1 = option (b)): customer-leg LP +
+  // RFD/accept/reject timestamps live on the thread, while the procurement-leg
+  // LP stays on `purchase_orders.delivery_partner_id` (renamed to
+  // `procurement_partner_id` in Sprint C migration 0052). Mirrors
+  // `OrderSupplierThreadRow` snake_case fields 1:1.
+  deliveryPartnerId: string | null;
+  confirmDeliveryDate: string | null;
+  requestForDeliveryAt: string | null;
+  partnerAcceptedAt: string | null;
+  partnerRejectedAt: string | null;
+  history: unknown[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PurchaseOrder {
   id: string;
   dl: number | null;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { orderInputToRpcPayload } from "./adapters";
+import { orderInputToRpcPayload, orderSupplierThreadFromRow } from "./adapters";
+import type { OrderSupplierThreadRow } from "./db-types";
 import type { CreateOrderInput } from "./schemas/orders";
 
 const DEALER_ID = "00000000-0000-0000-0000-000000000d01";
@@ -182,5 +183,67 @@ describe("orderInputToRpcPayload", () => {
     expect(out.payment_method).toBe("online");
     expect(out.approval_code).toBeNull();
     expect(out.installment_months).toBeNull();
+  });
+});
+
+describe("orderSupplierThreadFromRow", () => {
+  function baseThreadRow(
+    over: Partial<OrderSupplierThreadRow> = {},
+  ): OrderSupplierThreadRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000a0001",
+      order_id: "00000000-0000-0000-0000-0000000a0002",
+      supplier_id: "00000000-0000-0000-0000-0000000a0003",
+      category: "mattress",
+      sop_name: "STANDARD",
+      logistics_stage: "ready_to_dispatch",
+      po_id: "PO-2026-0001",
+      warehouse_id: "00000000-0000-0000-0000-0000000a0004",
+      reserved_at: "2026-05-06T10:00:00.000Z",
+      delivered_at: null,
+      delivery_partner_id: null,
+      confirm_delivery_date: null,
+      request_for_delivery_at: null,
+      partner_accepted_at: null,
+      partner_rejected_at: null,
+      history: [],
+      created_at: "2026-05-06T08:00:00.000Z",
+      updated_at: "2026-05-06T10:00:00.000Z",
+      ...over,
+    };
+  }
+
+  it("camelCases the snake_case columns including customer-leg fields (0049)", () => {
+    const out = orderSupplierThreadFromRow(
+      baseThreadRow({
+        delivery_partner_id: "00000000-0000-0000-0000-0000000b0001",
+        confirm_delivery_date: "2026-05-15",
+        request_for_delivery_at: "2026-05-06T11:00:00.000Z",
+        partner_accepted_at: "2026-05-06T12:30:00.000Z",
+        partner_rejected_at: null,
+      }),
+    );
+    expect(out.id).toBe("00000000-0000-0000-0000-0000000a0001");
+    expect(out.orderId).toBe("00000000-0000-0000-0000-0000000a0002");
+    expect(out.supplierId).toBe("00000000-0000-0000-0000-0000000a0003");
+    expect(out.sopName).toBe("STANDARD");
+    expect(out.logisticsStage).toBe("ready_to_dispatch");
+    expect(out.poId).toBe("PO-2026-0001");
+    expect(out.deliveryPartnerId).toBe("00000000-0000-0000-0000-0000000b0001");
+    expect(out.confirmDeliveryDate).toBe("2026-05-15");
+    expect(out.requestForDeliveryAt).toBe("2026-05-06T11:00:00.000Z");
+    expect(out.partnerAcceptedAt).toBe("2026-05-06T12:30:00.000Z");
+    expect(out.partnerRejectedAt).toBeNull();
+    expect(out.createdAt).toBe("2026-05-06T08:00:00.000Z");
+    expect(out.updatedAt).toBe("2026-05-06T10:00:00.000Z");
+  });
+
+  it("preserves null for unset customer-leg fields on a fresh thread", () => {
+    const out = orderSupplierThreadFromRow(baseThreadRow());
+    expect(out.deliveryPartnerId).toBeNull();
+    expect(out.confirmDeliveryDate).toBeNull();
+    expect(out.requestForDeliveryAt).toBeNull();
+    expect(out.partnerAcceptedAt).toBeNull();
+    expect(out.partnerRejectedAt).toBeNull();
   });
 });

@@ -217,6 +217,32 @@ export const orderFromRow = (
   history: rels?.history?.map(orderHistoryFromRow),
 });
 
+export const orderSupplierThreadFromRow = (
+  r: DB.OrderSupplierThreadRow,
+): D.OrderSupplierThread => ({
+  id: r.id,
+  orderId: r.order_id,
+  supplierId: r.supplier_id,
+  category: r.category,
+  sopName: r.sop_name,
+  logisticsStage: r.logistics_stage,
+  poId: r.po_id,
+  warehouseId: r.warehouse_id,
+  reservedAt: r.reserved_at,
+  deliveredAt: r.delivered_at,
+  // Phase 4.5 Chunk 2 customer-leg LP fields (migration 0049). Per-leg split
+  // per Chunk 2 design spec §3 (CQ1 = option (b)). Procurement-leg LP stays
+  // on `purchase_orders.delivery_partner_id` (renamed in Sprint C 0052).
+  deliveryPartnerId: r.delivery_partner_id,
+  confirmDeliveryDate: r.confirm_delivery_date,
+  requestForDeliveryAt: r.request_for_delivery_at,
+  partnerAcceptedAt: r.partner_accepted_at,
+  partnerRejectedAt: r.partner_rejected_at,
+  history: r.history,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
 export const purchaseOrderLineFromRow = (
   r: DB.PurchaseOrderLineRow,
 ): D.PurchaseOrderLine => ({
