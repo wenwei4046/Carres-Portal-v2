@@ -17,6 +17,8 @@ import logisticsPartnersRouter from "./routes/logistics/partners";
 import logisticsPosRouter from "./routes/logistics/pos";
 import logisticsSuppliersRouter from "./routes/logistics/suppliers";
 import logisticsWarehouseRouter from "./routes/logistics/warehouse";
+import partnerDashboardRouter from "./routes/partner/dashboard";
+import partnerPickupsRouter from "./routes/partner/pickups";
 import salespersonsRouter from "./routes/salespersons";
 import type { AppEnv } from "./types";
 
@@ -50,6 +52,8 @@ api.route("/logistics/partners", logisticsPartnersRouter);
 api.route("/logistics/pos", logisticsPosRouter);
 api.route("/logistics/suppliers", logisticsSuppliersRouter);
 api.route("/logistics/warehouse", logisticsWarehouseRouter);
+api.route("/partner/dashboard", partnerDashboardRouter);
+api.route("/partner/pickups", partnerPickupsRouter);
 
 app.route("/api", api);
 
