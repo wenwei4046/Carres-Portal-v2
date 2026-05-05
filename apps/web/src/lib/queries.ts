@@ -28,6 +28,7 @@ import {
   type OrdersListResponse,
   type OrderStatus,
   type OutletsListResponse,
+  type ProcurementTabSlug,
   type ReassignPoWarehouseInput,
   type ReceivePoWithDoInput,
   type ReservedDrilldownResponse,
@@ -84,6 +85,13 @@ export const qk = {
     pos:       (filters?: LogisticsPoFilters) =>
       ["logistics", "pos", filters ?? {}] as const,
     po:        (id: string) => ["logistics", "pos", id] as const,
+    /** Phase 4.5 Chunk 2 (T34) — per-supplier procurement tab list. Keyed by
+     *  `slug` so each tab's cache stays distinct (otherwise switching tabs
+     *  would thrash the same key). Nested under `pos` so a future blunt
+     *  invalidation on `["logistics","pos"]` (e.g. after a CreatePO) reaches
+     *  every tab too. */
+    procurementTab: (slug: ProcurementTabSlug) =>
+      ["logistics", "pos", "tab", slug] as const,
     /** Pipeline v2 (C5.3) — SKU-level shortage feed for the "Auto-fill from
      *  awaiting stock" button on CreatePOModal. Lazy: fired only on click via
      *  the hook's `refetch()`. Nested under `pos` so future blunt
@@ -1326,6 +1334,27 @@ export function useLogisticsPo(
     },
     enabled: false,
     staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/** Phase 4.5 Chunk 2 (T34) — per-tab procurement listing.
+ *  Wraps `GET /api/logistics/procurement/:slug` (T33). Each tab on the
+ *  TabbedProcurementShell mounts a child component that calls this hook with
+ *  its own slug, so the active tab's data fetches lazily on mount. The
+ *  response shape mirrors `LogisticsPosListResponse` (`{ pos: [...] }`) so
+ *  child tabs can reuse the existing PO row rendering verbatim. */
+export function useProcurementTab(
+  slug: ProcurementTabSlug,
+  opts?: Partial<UseQueryOptions<LogisticsPosListResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.procurementTab(slug),
+    queryFn: () =>
+      apiFetch<LogisticsPosListResponse>(
+        `/api/logistics/procurement/${encodeURIComponent(slug)}`,
+      ),
+    staleTime: 30_000,
     ...opts,
   });
 }
