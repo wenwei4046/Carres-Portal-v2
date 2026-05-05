@@ -40,6 +40,12 @@ interface Props {
   setTab: (t: string) => void;
 }
 
+// T42-C3: thread the parent's tab-switch hook into StockAlertsTile so its
+// "View alerts" button flips both the URL AND the tab-state. The dashboard
+// itself doesn't read from the URL — `LogisticsApp` does — so we just hand
+// the tile a small "go to warehouse" callback and let it call both that and
+// `navigate("/logistics/warehouse?alert=true")` when clicked.
+
 const RM = (n: number) => `RM ${Math.round(Number(n) || 0).toLocaleString()}`;
 
 export default function LogisticsDashboard({ setTab }: Props) {
@@ -199,7 +205,7 @@ export default function LogisticsDashboard({ setTab }: Props) {
       <div className="grid grid-cols-3 gap-3.5">
         <OpenPOsCard pos={open_pos} onViewAll={() => setTab("procurement")} />
         <LowStockCard lowStock={low_stock} onViewAll={() => setTab("warehouse")} />
-        <StockAlertsTile />
+        <StockAlertsTile onJumpToWarehouse={() => setTab("warehouse")} />
       </div>
     </div>
   );

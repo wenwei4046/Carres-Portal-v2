@@ -18,6 +18,14 @@ import { useStockAlerts } from "@/lib/queries";
  *   - tile shows the alert count + the top-3 alert SKUs
  *   - clicking the tile navigates to `/logistics/warehouse?alert=true`
  *
+ * T42-C3 (codex review fix): `LogisticsApp` is tab-state-driven, so a bare
+ * `navigate(...)` only changes the URL but leaves the dashboard tab selected.
+ * The `onJumpToWarehouse` prop lets the parent flip its `useState` tab in
+ * lockstep so the warehouse view actually mounts. Kept optional for
+ * backward compatibility — when omitted (e.g. tests rendering the tile in
+ * isolation, or future callers outside `LogisticsApp`), only the URL
+ * navigation runs and the test assertions still hold.
+ *
  * Empty / loading / error states all render in-place rather than hiding the
  * tile — the dashboard grid expects a fixed slot, and a "No alerts" badge
  * is the right reassurance signal at zero. The proto convention for empty
@@ -25,11 +33,20 @@ import { useStockAlerts } from "@/lib/queries";
  */
 const MAX_ROWS = 3;
 
-export default function StockAlertsTile() {
+interface Props {
+  onJumpToWarehouse?: () => void;
+}
+
+export default function StockAlertsTile({ onJumpToWarehouse }: Props = {}) {
   const navigate = useNavigate();
   const { data, isLoading, isError } = useStockAlerts();
 
   const handleOpen = () => {
+    // Flip the parent's tab state FIRST (synchronous setState) so the
+    // warehouse slot mounts on the same React commit that consumes the new
+    // URL. Reversing the order would race the conditional render in
+    // `LogisticsApp` against the next event-loop tick.
+    onJumpToWarehouse?.();
     navigate("/logistics/warehouse?alert=true");
   };
 

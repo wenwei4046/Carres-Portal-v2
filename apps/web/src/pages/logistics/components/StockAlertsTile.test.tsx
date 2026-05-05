@@ -122,12 +122,42 @@ describe("StockAlertsTile", () => {
     expect(screen.queryByTestId("stock-alerts-count")).not.toBeInTheDocument();
   });
 
-  it("clicking the open button navigates to /logistics/warehouse?alert=true", async () => {
+  it("clicking the open button navigates to /logistics/warehouse?alert=true AND calls onJumpToWarehouse", async () => {
+    // T42-C3: the parent (`LogisticsApp`) keeps the active tab in `useState`,
+    // so URL change alone leaves the dashboard tab selected. The tile has to
+    // tell the parent to flip its state via `onJumpToWarehouse` while ALSO
+    // changing the URL (so refresh / share / back / forward all keep the
+    // alert filter applied via `?alert=true`).
     vi.mocked(apiFetch).mockResolvedValue({ alerts: [] });
-    render(wrap(<StockAlertsTile />));
+    const onJumpToWarehouse = vi.fn();
+    render(wrap(<StockAlertsTile onJumpToWarehouse={onJumpToWarehouse} />));
 
     // Wait for the empty state so the button is fully rendered (the header
     // is always present, but waiting on settled state avoids fragile races).
+    await waitFor(() =>
+      expect(screen.getByTestId("stock-alerts-empty")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId("stock-alerts-open"));
+
+    // Both effects must fire on a single click: the tab-state flip AND the
+    // URL navigation. Order is enforced inside `handleOpen` (state first,
+    // navigate second), but at the assertion level we only require both
+    // happened by the time React has flushed.
+    expect(onJumpToWarehouse).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      const probe = screen.getByTestId("location");
+      expect(probe.textContent).toBe("/logistics/warehouse?alert=true");
+    });
+  });
+
+  it("clicking the open button still navigates when onJumpToWarehouse is omitted (backward compat)", async () => {
+    // The prop is optional — the tile can still be mounted standalone (e.g.
+    // future placement outside `LogisticsApp`'s tab shell) and the URL-only
+    // path must keep working without crashing.
+    vi.mocked(apiFetch).mockResolvedValue({ alerts: [] });
+    render(wrap(<StockAlertsTile />));
+
     await waitFor(() =>
       expect(screen.getByTestId("stock-alerts-empty")).toBeInTheDocument(),
     );
