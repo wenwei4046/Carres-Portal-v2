@@ -80,3 +80,63 @@ describe("GET /api/partner/pickups", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("POST /api/partner/pickups/:id/accept-rfd", () => {
+  it("calls partner_accept_dispatch RPC", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({ data: { po_id: "PO-001", threads_advanced: 1 }, error: null }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("partner", "p1");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/PO-001/accept-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm_delivery_date: "2026-05-15" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("partner_accept_dispatch", {
+      p_po_id: "PO-001",
+      p_confirm_delivery_date: "2026-05-15",
+    });
+  });
+
+  it("maps SQLSTATE 22023 to 422", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "22023", message: "RFD not pending" } }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", "p1");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/PO-001/accept-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("POST /api/partner/pickups/:id/reject-rfd", () => {
+  it("calls partner_reject_dispatch RPC", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { po_id: "PO-001", rfd_cleared: true }, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", "p1");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/PO-001/reject-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "capacity full" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("partner_reject_dispatch", { p_po_id: "PO-001", p_reason: "capacity full" });
+  });
+});
