@@ -8,7 +8,7 @@ import { Modal, ModalActions } from "./Modal";
 
 /**
  * IssuePOsModal — confirms auto-issuing one or more POs to cover the
- * shortages on an `awaiting_stock` order. Shortages are grouped by supplier
+ * shortages on an `awaiting_logistics_action` order. Shortages are grouped by supplier
  * server-side (per `logistics_issue_pos_for_order` RPC), so the preview is
  * "you'll create N POs across M suppliers".
  *

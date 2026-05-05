@@ -13,7 +13,7 @@ import type { LogisticsStage } from "./StageChip";
  *     - Label: 11px font-ui bold uppercase tracking 0.14em colored to match accent
  *     - Count: mono 13px bold, right-aligned
  *     - Hint: 11px base-500 (e.g. "PO open with supplier")
- *     - Select-all checkbox (awaiting_stock only): "Select all to combine PO"
+ *     - Select-all checkbox (awaiting_logistics_action only): "Select all to combine PO"
  *   - Body: 8px padding, contains OrderCards
  *   - Empty state: centered "—"
  *
@@ -29,7 +29,7 @@ import type { LogisticsStage } from "./StageChip";
 const STAGE_ACCENT_BORDER: Record<LogisticsStage, string> = {
   placed: "border-t-base-300",
   proceed_request: "border-t-warning",
-  awaiting_stock: "border-t-warning",
+  awaiting_logistics_action: "border-t-warning",
   ready_to_dispatch: "border-t-info",
   dispatched: "border-t-primary",
   delivered: "border-t-success",
@@ -38,7 +38,7 @@ const STAGE_ACCENT_BORDER: Record<LogisticsStage, string> = {
 const STAGE_ACCENT_TEXT: Record<LogisticsStage, string> = {
   placed: "text-base-500",
   proceed_request: "text-warning",
-  awaiting_stock: "text-warning",
+  awaiting_logistics_action: "text-warning",
   ready_to_dispatch: "text-info",
   dispatched: "text-primary",
   delivered: "text-success",
@@ -78,7 +78,7 @@ export default function OrderColumn({
 }: Props) {
   const accentText = STAGE_ACCENT_TEXT[stage];
   const accentBorder = STAGE_ACCENT_BORDER[stage];
-  const selectable = stage === "awaiting_stock";
+  const selectable = stage === "awaiting_logistics_action";
   const itemDls = orders.map((o) => o.dl);
   const allSelected =
     selectable && itemDls.length > 0 && itemDls.every((dl) => selectedDls.has(dl));
@@ -139,7 +139,7 @@ export default function OrderColumn({
               onChange={onSelectAll}
               onClick={(e) => e.stopPropagation()}
               className="cursor-pointer accent-primary"
-              aria-label="Select all awaiting-stock orders to combine PO"
+              aria-label="Select all awaiting-logistics-action orders to combine PO"
             />
             <span className="font-body">Select all to combine PO</span>
           </span>

@@ -18,19 +18,19 @@ import type { LogisticsStage } from "./components/StageChip";
  * (lines 1-138) with Pipeline v2 (Phase 4 C3) extensions:
  *   - Header (Pipeline kicker + count strap + search + dealer/showroom select)
  *   - Stage filter chips (All + 6 stage chips with counts)
- *   - Bulk action bar when ≥1 awaiting_stock orders selected
- *   - 6-column kanban (placed / proceed_request / awaiting_stock /
+ *   - Bulk action bar when ≥1 awaiting_logistics_action orders selected
+ *   - 6-column kanban (placed / proceed_request / awaiting_logistics_action /
  *     ready_to_dispatch / dispatched / delivered) with click-to-expand
  *     (the active column gets `flex: 4`, others compress to `flex: 0.4`)
  *   - OrderDetailDrawer overlay when an order is opened
  *
  * Pipeline v2 LOGISTICS_FLOW (mirrors proto + C1 enum extension):
- *   placed             → "Awaiting request"        · action null
- *   proceed_request    → "Awaiting your decision"  · action "Confirm"
- *   awaiting_stock     → "PO open with supplier"   · action "Check stock"
- *   ready_to_dispatch  → "Stock secured"           · action "Assign delivery"
- *   dispatched         → "With delivery partner"   · action "Attach DO"
- *   delivered          → "DO on file"              · action null
+ *   placed                       → "Awaiting request"        · action null
+ *   proceed_request              → "Awaiting your decision"  · action "Confirm"
+ *   awaiting_logistics_action    → "PO open with supplier"   · action "Check stock"
+ *   ready_to_dispatch            → "Stock secured"           · action "Assign delivery"
+ *   dispatched                   → "With delivery partner"   · action "Attach DO"
+ *   delivered                    → "DO on file"              · action null
  *
  * Filtering: stage + channel both go to the server (cache key respects them);
  * `search` also goes to the server (the route's regex-whitelisted search field
@@ -44,7 +44,7 @@ const LOGISTICS_FLOW: ReadonlyArray<{
 }> = [
   { key: "placed",            label: "Placed",            hint: "Awaiting request",        action: null },
   { key: "proceed_request",   label: "Proceed Request",   hint: "Awaiting your decision",  action: "Confirm" },
-  { key: "awaiting_stock",    label: "Awaiting Stock",    hint: "PO open with supplier",   action: "Check stock" },
+  { key: "awaiting_logistics_action", label: "Awaiting Logistics Action", hint: "PO open with supplier", action: "Check stock" },
   { key: "ready_to_dispatch", label: "Ready to Dispatch", hint: "Stock secured",           action: "Assign delivery" },
   { key: "dispatched",        label: "Dispatched",        hint: "With delivery partner",   action: "Attach DO" },
   { key: "delivered",         label: "Delivered",         hint: "DO on file",              action: null },
@@ -83,21 +83,22 @@ export default function LogisticsOrders() {
   //                          hasn't been pushed to logistics yet)
   //   - logistics_stage    → use it directly when set
   //   - else status='delivered' → delivered (legacy seed safety net)
-  //   - else                → awaiting_stock (legacy proceed_order rows
-  //                          without a logistics_stage value still exist in
-  //                          older seed data; default them to the work bucket)
+  //   - else                → awaiting_logistics_action (legacy proceed_order
+  //                          rows without a logistics_stage value still exist
+  //                          in older seed data; default them to the work
+  //                          bucket)
   const stageOf = (o: LogisticsOrderListRow): LogisticsStage => {
     if (o.status === "place") return "placed";
     if (o.logistics_stage) return o.logistics_stage as LogisticsStage;
     if (o.status === "delivered") return "delivered";
-    return "awaiting_stock";
+    return "awaiting_logistics_action";
   };
 
   const stageCounts = useMemo(() => {
     const counts: Record<LogisticsStage, number> = {
       placed: 0,
       proceed_request: 0,
-      awaiting_stock: 0,
+      awaiting_logistics_action: 0,
       ready_to_dispatch: 0,
       dispatched: 0,
       delivered: 0,
@@ -115,7 +116,7 @@ export default function LogisticsOrders() {
     const buckets: Record<LogisticsStage, LogisticsOrderListRow[]> = {
       placed: [],
       proceed_request: [],
-      awaiting_stock: [],
+      awaiting_logistics_action: [],
       ready_to_dispatch: [],
       dispatched: [],
       delivered: [],
@@ -136,13 +137,13 @@ export default function LogisticsOrders() {
 
   const selectedOrderIds = useMemo(() => {
     return allOrders
-      .filter((o) => selectedDls.has(o.dl) && stageOf(o) === "awaiting_stock")
+      .filter((o) => selectedDls.has(o.dl) && stageOf(o) === "awaiting_logistics_action")
       .map((o) => o.id);
   }, [allOrders, selectedDls]);
 
   function selectAllInColumn(stageKey: LogisticsStage) {
-    if (stageKey !== "awaiting_stock") return;
-    const stageOrders = ordersByStage.awaiting_stock;
+    if (stageKey !== "awaiting_logistics_action") return;
+    const stageOrders = ordersByStage.awaiting_logistics_action;
     const stageDls = stageOrders.map((o) => o.dl);
     const allSelected = stageDls.every((dl) => selectedDls.has(dl));
     setSelectedDls((prev) => {

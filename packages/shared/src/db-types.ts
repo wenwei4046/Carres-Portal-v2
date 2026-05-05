@@ -9,10 +9,13 @@ export type Role =
 
 export type OrderStatus       = "place" | "proceed_order" | "delivered" | "cancelled";
 // `awaiting_logistics_action` and `waiting` added in migration 0028 (v3-S3).
-// `awaiting_stock` retained as alias for legacy code paths still matching against it.
+// Phase 4.5a T5 (2026-05-05): legacy `awaiting_stock` alias removed from FE
+// vocabulary in lockstep with migrations 0038/0038b/0039 (RPC body sweep) and
+// in preparation for migration 0040 (enum DROP TYPE … CASCADE recreate without
+// the legacy value). DB-side enum still carries 'awaiting_stock' until 0040.
 export type LogisticsStage    =
   | "placed" | "proceed_request"
-  | "awaiting_logistics_action" | "awaiting_stock"
+  | "awaiting_logistics_action"
   | "ready_to_dispatch" | "dispatched"
   | "waiting" | "delivered";
 export type PartnerStage      = "assigned" | "picked_from_wh" | "en_route" | "delivered";

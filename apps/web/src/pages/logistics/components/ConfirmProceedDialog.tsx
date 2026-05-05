@@ -17,7 +17,7 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  * RPC (`logistics_confirm_proceed_request`) decides:
  *   - If all lines covered at the chosen warehouse → reserve stock + flip to
  *     `ready_to_dispatch` (atomic).
- *   - If any line short → flip to `awaiting_stock`, no reserve. The user
+ *   - If any line short → flip to `awaiting_logistics_action`, no reserve. The user
  *     must `Issue POs` next.
  *
  * The dialog computes a client-side pre-flight hint from the order's lines
@@ -122,7 +122,7 @@ export default function ConfirmProceedDialog({
     <Modal title={`Confirm proceed · #${order.dl}`} onClose={onClose}>
       <div className="text-[12px] text-base-600 mb-3.5 font-body">
         Pick a source warehouse. The system will reserve stock if all lines are
-        covered, otherwise the order moves to <strong>Awaiting Stock</strong>{" "}
+        covered, otherwise the order moves to <strong>Awaiting Logistics Action</strong>{" "}
         and you&rsquo;ll need to issue POs next.
       </div>
 
@@ -197,7 +197,7 @@ export default function ConfirmProceedDialog({
           ) : (
             <>
               <strong>Some lines short</strong> — order will move to{" "}
-              <strong>Awaiting stock</strong>; you&rsquo;ll need to issue POs
+              <strong>Awaiting logistics action</strong>; you&rsquo;ll need to issue POs
               next.
               <div className="font-mono text-[11px] mt-1">
                 {preflight.shortages

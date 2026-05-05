@@ -939,8 +939,9 @@ describe("POST /api/logistics/pos/:id/reassign-warehouse", () => {
 //     not-yet-procured slices. The mock returns ALL thread rows; the route
 //     narrows in TS so tests can supply a mix of stages / po_id values.
 //   - orders (v3-S4.6 LEGACY fallback): orders in awaiting_logistics_action
-//     OR awaiting_stock that have NO thread row (pre-v3 / unsplit). The mock
-//     resolves on .in("logistics_stage", [...]).
+//     that have NO thread row (pre-v3 / unsplit). The mock resolves on
+//     .eq("logistics_stage", "awaiting_logistics_action") (T5 collapsed the
+//     prior IN-list filter to a single-value .eq()).
 //   - purchase_orders (v2-style coverage filter on legacy fallback): only
 //     open POs gate orders. Received/cancelled don't count.
 //   - order_lines + stock_balances: same as before.
@@ -982,12 +983,13 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
           chain.select = vi.fn(() => promise(opts.threads ?? []));
           break;
         case "orders":
-          // v3-S4.6: route calls `.in("logistics_stage", ["awaiting_logistics_action", "awaiting_stock"])`.
-          // The mock resolves at .in() (chosen by the route as the trailing
-          // filter). The .eq() fallback below is kept as a safety net so a
-          // future single-stage variant doesn't silently break this mock.
-          chain.in = vi.fn(() => promise(opts.awaitingOrders ?? []));
+          // T5 (Phase 4.5a): route now calls
+          // `.eq("logistics_stage", "awaiting_logistics_action")` (the legacy
+          // IN-list aliasing was dropped). The mock resolves at .eq(); the
+          // .in() variant is kept as a safety net so an older v2 fallback
+          // path (or a future re-widening) doesn't silently break this mock.
           chain.eq = vi.fn(() => promise(opts.awaitingOrders ?? []));
+          chain.in = vi.fn(() => promise(opts.awaitingOrders ?? []));
           break;
         case "order_lines":
           // Resolves at .in('order_id', [...]). Mock applies the same filter
@@ -1042,7 +1044,7 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     expect(from).not.toHaveBeenCalled();
   });
 
-  it("returns {shortage: []} when no awaiting_stock orders exist", async () => {
+  it("returns {shortage: []} when no awaiting_logistics_action orders exist", async () => {
     mockShortageQueries({ awaitingOrders: [] });
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
@@ -1057,7 +1059,7 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
   });
 
   it("returns aggregated shortage when avail < need (3 orders, 2 SKUs, 1 in shortage)", async () => {
-    // Three awaiting_stock orders. Two SKUs hit. avail < need on MAT only.
+    // Three awaiting_logistics_action orders. Two SKUs hit. avail < need on MAT only.
     mockShortageQueries({
       awaitingOrders: [
         { id: "00000000-0000-0000-0000-000000000a01" },
@@ -1157,8 +1159,8 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
   // -------------------------------------------------------------------------
   // v3-S2.1 — exclude orders already covered by an open PO (Bug 7 partial fix)
   // -------------------------------------------------------------------------
-  it("filters out awaiting_stock orders covered by open POs via dl", async () => {
-    // Two awaiting_stock orders. Order A (dl=4001) is covered by an open PO
+  it("filters out awaiting_logistics_action orders covered by open POs via dl", async () => {
+    // Two awaiting_logistics_action orders. Order A (dl=4001) is covered by an open PO
     // that targets dl=4001 directly → its lines must NOT contribute to
     // shortage. Order B (dl=4002) is uncovered → its lines DO contribute.
     // Lines for BOTH orders are supplied to the mock; the mock filters by
@@ -1202,7 +1204,7 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     ]);
   });
 
-  it("filters out awaiting_stock orders covered by open POs via dl_refs array", async () => {
+  it("filters out awaiting_logistics_action orders covered by open POs via dl_refs array", async () => {
     // Order A (dl=4001) and Order B (dl=4002) are both covered by ONE batch
     // PO with dl=null and dl_refs=[4001, 4002]. Order C (dl=4003) is not.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
@@ -1246,7 +1248,7 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
 
   it("received POs do NOT exclude orders (only open POs count)", async () => {
     // Order A's PO is `received` — the PO is done, but the order is still
-    // in awaiting_stock somehow (e.g. PO partially received and a new
+    // in awaiting_logistics_action somehow (e.g. PO partially received and a new
     // shortage emerged). The route must NOT exclude this order on the
     // basis of the received PO. The mock applies the route's
     // `.eq("status", "open")` filter, so a received row returns []
@@ -1287,7 +1289,7 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
 
   it("cancelled POs do NOT exclude orders (only open POs count)", async () => {
     // Same shape as the received case — a cancelled PO is a dead PO; the
-    // order is back in play if it's still in awaiting_stock.
+    // order is back in play if it's still in awaiting_logistics_action.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     mockShortageQueries({
       awaitingOrders: [
@@ -1424,8 +1426,8 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     expect(body.shortage).toEqual([]);
   });
 
-  it("v3 legacy fallback: order in awaiting_stock with no thread + no covering open PO contributes lines", async () => {
-    // Order A is pre-v3 / unsplit data: orders.logistics_stage='awaiting_stock'
+  it("v3 legacy fallback: order in awaiting_logistics_action with no thread + no covering open PO contributes lines", async () => {
+    // Order A is pre-v3 / unsplit data: orders.logistics_stage='awaiting_logistics_action'
     // but no row exists in order_supplier_threads. The dl/dl_refs filter
     // against open POs runs as v2 did and leaves the order in play.
     const ID_A = "00000000-0000-0000-0000-000000000a01";

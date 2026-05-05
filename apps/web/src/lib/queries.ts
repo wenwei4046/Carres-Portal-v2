@@ -80,7 +80,7 @@ export const qk = {
      *  awaiting stock" button on CreatePOModal. Lazy: fired only on click via
      *  the hook's `refetch()`. Nested under `pos` so future blunt
      *  invalidations on `["logistics","pos"]` reach this cache too (e.g. when
-     *  a PO is issued, the awaiting_stock pool changes). */
+     *  a PO is issued, the awaiting_logistics_action pool changes). */
     awaitingStockShortage: () =>
       ["logistics", "pos", "awaiting-stock-shortage"] as const,
     warehouse: () => ["logistics", "warehouse"] as const,
@@ -815,7 +815,7 @@ export interface LogisticsPipelineCounts {
   /** Pipeline v2 (C3): orders with `logistics_stage='proceed_request'` —
    *  awaiting HQ logistics triage decision. */
   proceed_request: number;
-  awaiting_stock: number;
+  awaiting_logistics_action: number;
   ready_to_dispatch: number;
   dispatched: number;
 }
@@ -901,7 +901,7 @@ export interface LogisticsOrderListRow {
   logistics_stage:
     | "placed"
     | "proceed_request"
-    | "awaiting_stock"
+    | "awaiting_logistics_action"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered"
@@ -930,7 +930,7 @@ export interface LogisticsOrderDetailOrder {
   logistics_stage:
     | "placed"
     | "proceed_request"
-    | "awaiting_stock"
+    | "awaiting_logistics_action"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered"
@@ -1292,7 +1292,7 @@ export function useReservedDrilldown(
  *  "Auto-fill from awaiting stock" button. Lazy: `enabled: false` so the
  *  query only fires when the user clicks the button (via `refetch()`). The
  *  result replaces the modal's `lines` state. staleTime is 0 so a fresh
- *  refetch is always triggered — the awaiting_stock pool can change between
+ *  refetch is always triggered — the awaiting_logistics_action pool can change between
  *  clicks (e.g. user dispatches an order, abandons one). */
 export function useAwaitingStockShortage(
   opts?: Partial<UseQueryOptions<LogisticsAwaitingStockShortageResponse>>,
@@ -1413,7 +1413,7 @@ export function useAbandonOrderMutation(
   });
 }
 
-/** Manual override of the auto-picked source warehouse (E1 awaiting_stock). */
+/** Manual override of the auto-picked source warehouse (E1 awaiting_logistics_action). */
 export function useWarehousePickMutation(
   orderId: string,
   opts?: Partial<
@@ -1438,7 +1438,7 @@ export function useWarehousePickMutation(
 }
 
 /** Pipeline v2 (C2 / migration 0024) — confirm a `proceed_request` order.
- *  RPC `logistics_confirm_proceed_request` decides awaiting_stock vs
+ *  RPC `logistics_confirm_proceed_request` decides awaiting_logistics_action vs
  *  ready_to_dispatch based on shortage at the chosen warehouse. `warehouseId`
  *  is optional — RPC accepts NULL when the order already has a warehouse_id.
  *
@@ -1487,7 +1487,7 @@ export function useConfirmProceedRequest(
 }
 
 /** Pipeline v2 (C2 / migration 0024) — flip a `proceed_request` or
- *  `awaiting_stock` order directly to `ready_to_dispatch`. Wraps
+ *  `awaiting_logistics_action` order directly to `ready_to_dispatch`. Wraps
  *  `logistics_warehouse_pick` whose source-stage guard widens to permit both
  *  stages. `warehouseId` is REQUIRED here (the RPC raises 22023
  *  `warehouse_required` on NULL — confirm-proceed accepts NULL via a different
@@ -1548,7 +1548,7 @@ export function useRecheckStockMutation(
   });
 }
 
-/** Auto-issue POs for an awaiting_stock order's shortages. Body empty. */
+/** Auto-issue POs for an awaiting_logistics_action order's shortages. Body empty. */
 export function useIssuePosForOrderMutation(
   orderId: string,
   opts?: Partial<
@@ -1590,7 +1590,7 @@ export function useCreatePoMutation(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
-      // If the PO is tied to a DL (single or via dl_refs), the awaiting_stock
+      // If the PO is tied to a DL (single or via dl_refs), the awaiting_logistics_action
       // drawer for those orders should refresh. Bust the orders sub-tree too.
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
@@ -1608,7 +1608,7 @@ export function useCreatePoMutation(
  * (say) the 3rd supplier validation fails.
  *
  * Cache invalidation matches useCreatePoMutation (pos / dashboard / warehouse
- * / orders sub-trees) so the procurement list, KPI strip, awaiting_stock
+ * / orders sub-trees) so the procurement list, KPI strip, awaiting_logistics_action
  * drawers, and the warehouse stock view all refresh after the batch lands.
  *
  * de8bf4e pattern: spread `...opts` BEFORE `onSuccess` so caller-supplied
@@ -1658,7 +1658,7 @@ export function useReceivePoLineMutation(
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
-      // Receiving stock can unblock awaiting_stock orders → invalidate orders.
+      // Receiving stock can unblock awaiting_logistics_action orders → invalidate orders.
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));

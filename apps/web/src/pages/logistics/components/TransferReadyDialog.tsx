@@ -12,14 +12,14 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
 /**
  * TransferReadyDialog — Pipeline v2 (Phase 4 C3) manual stock-on-hand transfer.
  *
- * Surfaces from the `awaiting_stock` ActionBar when logistics realises the
+ * Surfaces from the `awaiting_logistics_action` ActionBar when logistics realises the
  * stock is already on the floor (e.g. located outside the tracked PO flow)
  * and wants to push the order straight to `ready_to_dispatch` without going
  * through the Procurement receive path.
  *
  * Wraps `useTransferReady` → POST /api/logistics/orders/:id/transfer-ready,
  * which calls RPC `logistics_warehouse_pick`. That RPC's source-stage guard
- * widens to IN ('proceed_request', 'awaiting_stock') AND requires a non-NULL
+ * widens to IN ('proceed_request', 'awaiting_logistics_action') AND requires a non-NULL
  * warehouse — see `transferReadyInputSchema` (warehouseId required).
  *
  * Pre-flight: client-side shortage check at the chosen warehouse. If any

@@ -92,7 +92,7 @@ function makeOrder(overrides: Partial<LogisticsOrderListRow> = {}): LogisticsOrd
     id: "ord-" + Math.random().toString(36).slice(2, 10),
     dl: 9000 + Math.floor(Math.random() * 999),
     status: "proceed_order",
-    logistics_stage: "awaiting_stock",
+    logistics_stage: "awaiting_logistics_action",
     warehouse_id: "wh-1",
     customer_name: "Alice Tan",
     placed_at: "2026-04-28T08:00:00Z",
@@ -191,7 +191,7 @@ beforeEach(() => {
 describe("LogisticsOrders — kanban", () => {
   it("1. renders all 6 Pipeline v2 stage columns including Placed and Proceed Request", () => {
     setLoaded([
-      makeOrder({ id: "a", logistics_stage: "awaiting_stock" }),
+      makeOrder({ id: "a", logistics_stage: "awaiting_logistics_action" }),
       makeOrder({ id: "b", logistics_stage: "ready_to_dispatch" }),
       makeOrder({ id: "c", logistics_stage: "dispatched" }),
       makeOrder({ id: "d", logistics_stage: "delivered" }),
@@ -200,7 +200,7 @@ describe("LogisticsOrders — kanban", () => {
 
     expect(screen.getByTestId("stage-column-placed")).toBeInTheDocument();
     expect(screen.getByTestId("stage-column-proceed_request")).toBeInTheDocument();
-    expect(screen.getByTestId("stage-column-awaiting_stock")).toBeInTheDocument();
+    expect(screen.getByTestId("stage-column-awaiting_logistics_action")).toBeInTheDocument();
     expect(screen.getByTestId("stage-column-ready_to_dispatch")).toBeInTheDocument();
     expect(screen.getByTestId("stage-column-dispatched")).toBeInTheDocument();
     expect(screen.getByTestId("stage-column-delivered")).toBeInTheDocument();
@@ -208,7 +208,7 @@ describe("LogisticsOrders — kanban", () => {
 
   it("2. stage filter chip narrows visible orders to that stage", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 1, logistics_stage: "awaiting_stock", customer_name: "Awaiting" }),
+      makeOrder({ id: "a", dl: 1, logistics_stage: "awaiting_logistics_action", customer_name: "Awaiting" }),
       makeOrder({ id: "b", dl: 2, logistics_stage: "ready_to_dispatch", customer_name: "Ready" }),
     ]);
     render(wrap(<LogisticsOrders />));
@@ -267,17 +267,17 @@ describe("LogisticsOrders — kanban", () => {
     ).toBeInTheDocument();
   });
 
-  it("7. multi-select awaiting_stock orders → bundle sheet appears", () => {
+  it("7. multi-select awaiting_logistics_action orders → bundle sheet appears", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 1, logistics_stage: "awaiting_stock" }),
-      makeOrder({ id: "b", dl: 2, logistics_stage: "awaiting_stock" }),
+      makeOrder({ id: "a", dl: 1, logistics_stage: "awaiting_logistics_action" }),
+      makeOrder({ id: "b", dl: 2, logistics_stage: "awaiting_logistics_action" }),
     ]);
     render(wrap(<LogisticsOrders />));
     expect(screen.queryByTestId("cross-order-bundle-sheet")).not.toBeInTheDocument();
 
     // Find the two checkboxes (filter for the order-card ones — the column
     // also has a "select all" checkbox).
-    const awaitingCol = screen.getByTestId("stage-column-awaiting_stock");
+    const awaitingCol = screen.getByTestId("stage-column-awaiting_logistics_action");
     const checkboxes = awaitingCol.querySelectorAll('input[type="checkbox"]');
     // [select-all, card1, card2]
     expect(checkboxes).toHaveLength(3);
@@ -289,10 +289,10 @@ describe("LogisticsOrders — kanban", () => {
 
   it("8. Bundle 'Clear' resets the selection and hides the sheet", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 1, logistics_stage: "awaiting_stock" }),
+      makeOrder({ id: "a", dl: 1, logistics_stage: "awaiting_logistics_action" }),
     ]);
     render(wrap(<LogisticsOrders />));
-    const awaitingCol = screen.getByTestId("stage-column-awaiting_stock");
+    const awaitingCol = screen.getByTestId("stage-column-awaiting_logistics_action");
     const checkboxes = awaitingCol.querySelectorAll('input[type="checkbox"]');
     fireEvent.click(checkboxes[1].parentElement!);
     expect(screen.getByTestId("cross-order-bundle-sheet")).toBeInTheDocument();
@@ -300,15 +300,15 @@ describe("LogisticsOrders — kanban", () => {
     expect(screen.queryByTestId("cross-order-bundle-sheet")).not.toBeInTheDocument();
   });
 
-  it("9. checkbox is rendered ONLY on awaiting_stock cards", () => {
+  it("9. checkbox is rendered ONLY on awaiting_logistics_action cards", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 1, logistics_stage: "awaiting_stock" }),
+      makeOrder({ id: "a", dl: 1, logistics_stage: "awaiting_logistics_action" }),
       makeOrder({ id: "b", dl: 2, logistics_stage: "ready_to_dispatch" }),
       makeOrder({ id: "c", dl: 3, logistics_stage: "dispatched" }),
       makeOrder({ id: "d", dl: 4, logistics_stage: "delivered" }),
     ]);
     render(wrap(<LogisticsOrders />));
-    const awaitingCol = screen.getByTestId("stage-column-awaiting_stock");
+    const awaitingCol = screen.getByTestId("stage-column-awaiting_logistics_action");
     const readyCol = screen.getByTestId("stage-column-ready_to_dispatch");
     const dispatchedCol = screen.getByTestId("stage-column-dispatched");
     const deliveredCol = screen.getByTestId("stage-column-delivered");
@@ -323,7 +323,7 @@ describe("LogisticsOrders — kanban", () => {
 
   it("10. CJK customer name receives font-cjk class on the card", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 1, customer_name: "王小明", logistics_stage: "awaiting_stock" }),
+      makeOrder({ id: "a", dl: 1, customer_name: "王小明", logistics_stage: "awaiting_logistics_action" }),
     ]);
     render(wrap(<LogisticsOrders />));
     const node = screen.getByText("王小明");
@@ -422,9 +422,9 @@ describe("LogisticsOrders — kanban", () => {
     expect(screen.getByRole("button", { name: /Print DO/ })).toBeInTheDocument();
   });
 
-  it("16. drawer awaiting_stock action bar shows Re-check stock + Issue POs + Abandon", () => {
+  it("16. drawer awaiting_logistics_action action bar shows Re-check stock + Issue POs + Abandon", () => {
     setLoaded([
-      makeOrder({ id: "ord-1", dl: 9001, customer_name: "Alice", logistics_stage: "awaiting_stock" }),
+      makeOrder({ id: "ord-1", dl: 9001, customer_name: "Alice", logistics_stage: "awaiting_logistics_action" }),
     ]);
     detailHookState = {
       ...detailHookState,
@@ -432,7 +432,7 @@ describe("LogisticsOrders — kanban", () => {
         ...makeDetail(),
         order: {
           ...makeDetail().order,
-          logistics_stage: "awaiting_stock",
+          logistics_stage: "awaiting_logistics_action",
         },
         // Force a shortage so "Issue POs" surfaces.
         stockBalances: [
@@ -496,7 +496,7 @@ describe("LogisticsOrders — kanban", () => {
     expect(placedCol).toContainElement(screen.getByText("Pending Push"));
     // Sanity: not in any other column.
     expect(
-      screen.getByTestId("stage-column-awaiting_stock"),
+      screen.getByTestId("stage-column-awaiting_logistics_action"),
     ).not.toContainElement(screen.queryByText("Pending Push"));
   });
 
@@ -566,12 +566,12 @@ describe("LogisticsOrders — kanban", () => {
 
   it("21. clicking a column header toggles its expanded state", () => {
     setLoaded([
-      makeOrder({ id: "a", logistics_stage: "awaiting_stock" }),
+      makeOrder({ id: "a", logistics_stage: "awaiting_logistics_action" }),
       makeOrder({ id: "b", logistics_stage: "ready_to_dispatch" }),
     ]);
     render(wrap(<LogisticsOrders />));
 
-    const awaitingCol = screen.getByTestId("stage-column-awaiting_stock");
+    const awaitingCol = screen.getByTestId("stage-column-awaiting_logistics_action");
     expect(awaitingCol).toHaveAttribute("data-expanded", "false");
 
     // Header is the column-toggle button (first button inside the column wrapper).
@@ -587,12 +587,12 @@ describe("LogisticsOrders — kanban", () => {
 
   it("22. clicking a different column header transfers expansion focus instantly", () => {
     setLoaded([
-      makeOrder({ id: "a", logistics_stage: "awaiting_stock" }),
+      makeOrder({ id: "a", logistics_stage: "awaiting_logistics_action" }),
       makeOrder({ id: "b", logistics_stage: "ready_to_dispatch" }),
     ]);
     render(wrap(<LogisticsOrders />));
 
-    const awaitingCol = screen.getByTestId("stage-column-awaiting_stock");
+    const awaitingCol = screen.getByTestId("stage-column-awaiting_logistics_action");
     const readyCol = screen.getByTestId("stage-column-ready_to_dispatch");
     const awaitingHeader = awaitingCol.querySelector("button[aria-expanded]") as HTMLElement;
     const readyHeader = readyCol.querySelector("button[aria-expanded]") as HTMLElement;
@@ -607,13 +607,13 @@ describe("LogisticsOrders — kanban", () => {
     expect(readyCol).toHaveAttribute("data-expanded", "true");
   });
 
-  it("23. drawer awaiting_stock action bar exposes Transfer to ready (stock on-hand)", () => {
+  it("23. drawer awaiting_logistics_action action bar exposes Transfer to ready (stock on-hand)", () => {
     setLoaded([
       makeOrder({
         id: "ord-1",
         dl: 9001,
         customer_name: "Alice",
-        logistics_stage: "awaiting_stock",
+        logistics_stage: "awaiting_logistics_action",
       }),
     ]);
     detailHookState = {
@@ -622,7 +622,7 @@ describe("LogisticsOrders — kanban", () => {
         ...makeDetail(),
         order: {
           ...makeDetail().order,
-          logistics_stage: "awaiting_stock",
+          logistics_stage: "awaiting_logistics_action",
         },
       },
     };
@@ -639,7 +639,7 @@ describe("LogisticsOrders — kanban", () => {
         id: "ord-1",
         dl: 9001,
         customer_name: "Alice",
-        logistics_stage: "awaiting_stock",
+        logistics_stage: "awaiting_logistics_action",
       }),
     ]);
     detailHookState = {
@@ -648,7 +648,7 @@ describe("LogisticsOrders — kanban", () => {
         ...makeDetail(),
         order: {
           ...makeDetail().order,
-          logistics_stage: "awaiting_stock",
+          logistics_stage: "awaiting_logistics_action",
         },
         // Drawer-side shortage list also needs to be empty so calcShortages
         // doesn't surface "Issue POs" only — but the dialog itself reads from

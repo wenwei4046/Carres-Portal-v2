@@ -123,7 +123,7 @@ export type CreatePosBatchResponse = z.infer<typeof createPosBatchResponse>;
  * `warehousePickInput` — POST /api/logistics/orders/:id/warehouse.
  * Maps to `logistics_warehouse_pick(order_id, warehouse_id)` RPC. Manual
  * override of the auto-picked source warehouse. Only allowed when
- * `logistics_stage = awaiting_stock` AND no open POs (P0001 has_open_pos).
+ * `logistics_stage = awaiting_logistics_action` AND no open POs (P0001 has_open_pos).
  */
 export const warehousePickInput = z.object({
   warehouseId: z.string().uuid(),
@@ -135,9 +135,9 @@ export type WarehousePickInput = z.infer<typeof warehousePickInput>;
  * (Pipeline v2, C2 / migration 0024). Maps to RPC
  * `logistics_confirm_proceed_request(p_order_id, p_warehouse_id)`. Logistics'
  * manual triage entry point: confirms a `proceed_request` order and decides
- * `awaiting_stock` vs `ready_to_dispatch` based on shortage at the chosen
- * warehouse. `warehouseId` is optional — RPC accepts NULL when the order
- * already has `warehouse_id`. `nullable()` is included so callers can be
+ * `awaiting_logistics_action` vs `ready_to_dispatch` based on shortage at the
+ * chosen warehouse. `warehouseId` is optional — RPC accepts NULL when the
+ * order already has `warehouse_id`. `nullable()` is included so callers can be
  * explicit with `{ warehouseId: null }`.
  */
 export const confirmProceedRequestInputSchema = z.object({
@@ -149,8 +149,8 @@ export type ConfirmProceedRequestInput = z.infer<typeof confirmProceedRequestInp
  * `transferReadyInputSchema` — POST /api/logistics/orders/:id/transfer-ready
  * (Pipeline v2, C2 / migration 0024). Maps to RPC
  * `logistics_warehouse_pick(p_order_id, p_warehouse_id)` — the RPC's
- * source-stage guard widens to IN ('proceed_request', 'awaiting_stock'), so
- * this same RPC powers both warehouse-override and the v2 transfer flow.
+ * source-stage guard widens to IN ('proceed_request', 'awaiting_logistics_action'),
+ * so this same RPC powers both warehouse-override and the v2 transfer flow.
  * Naming kept distinct from `warehousePickInput` because the FE entry points
  * are conceptually different (one is "change warehouse", the other is
  * "mark ready"). `warehouseId` is required — the RPC `logistics_warehouse_pick`
@@ -174,8 +174,8 @@ export type IssuePosForOrderInput = z.infer<typeof issuePosForOrderInput>;
 /**
  * `recheckStockInput` — POST /api/logistics/orders/:id/recheck-stock.
  * Re-runs `logistics_pick_warehouse` + `logistics_calc_shortages` for an
- * `awaiting_stock` order in case stock landed via transfer between visits
- * (proto E1, §17.3). Body is empty; `.strict()` rejects extras.
+ * `awaiting_logistics_action` order in case stock landed via transfer between
+ * visits (proto E1, §17.3). Body is empty; `.strict()` rejects extras.
  */
 export const recheckStockInput = z.object({}).strict();
 export type RecheckStockInput = z.infer<typeof recheckStockInput>;
@@ -262,7 +262,7 @@ export type ReassignPoWarehouseInput = z.infer<typeof reassignPoWarehouseInput>;
  * search: free-text matched against customer_name (ILIKE) AND parsed as int for dl exact match.
  */
 export const listLogisticsOrdersQuery = z.object({
-  stage: z.enum(['all', 'placed', 'proceed_request', 'awaiting_stock', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
+  stage: z.enum(['all', 'placed', 'proceed_request', 'awaiting_logistics_action', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
   channel: z.enum(['all', 'dealers', 'showrooms']).default('all'),
   search: z.string().trim().max(100).optional(),
 }).strict();
@@ -326,19 +326,20 @@ export type ReservedDrilldownResponse = z.infer<typeof reservedDrilldownResponse
 /**
  * `awaitingStockShortageResponse` — GET /api/logistics/pos/awaiting-stock-shortage
  * (Pipeline v2, C5.3). Server-side aggregation of SKU-level shortages across
- * every order currently in `logistics_stage='awaiting_stock'`.
+ * every order currently in `logistics_stage='awaiting_logistics_action'`.
  *
  * Shape per row:
  *   - `sku`: the product SKU.
- *   - `need`: sum of `order_lines.qty` across awaiting_stock orders for this SKU.
+ *   - `need`: sum of `order_lines.qty` across awaiting orders for this SKU.
  *   - `available`: cross-warehouse total (sum of `qty - reserved` across every
  *      `stock_balances` row for this SKU). Q2=A — we treat one big national
  *      pool because the modal will route to suppliers, not specific warehouses.
  *   - `shortage`: `need - available`. Always > 0; rows where avail >= need are
  *      filtered out server-side.
  *
- * The route returns `{shortage: []}` when no awaiting_stock orders or every
- * SKU is fully covered. Sorted by `sku` ascending for stable test snapshots.
+ * The route returns `{shortage: []}` when no awaiting_logistics_action orders
+ * or every SKU is fully covered. Sorted by `sku` ascending for stable test
+ * snapshots.
  *
  * Frontend consumes this from `CreatePOModal`'s "Auto-fill from awaiting stock"
  * button — Q3=A semantic: the returned `shortage` value is what becomes each

@@ -59,7 +59,7 @@ const baseSummary: LogisticsDashboardResponse = {
   pipeline: {
     placed: 5,
     proceed_request: 3,
-    awaiting_stock: 4,
+    awaiting_logistics_action: 4,
     ready_to_dispatch: 2,
     dispatched: 1,
   },
@@ -103,7 +103,7 @@ function makeOrder(
     id: "ord-" + Math.random().toString(36).slice(2, 10),
     dl: 9000 + Math.floor(Math.random() * 999),
     status: "proceed_order",
-    logistics_stage: "awaiting_stock",
+    logistics_stage: "awaiting_logistics_action",
     warehouse_id: "wh-1",
     customer_name: "Alice Tan",
     placed_at: "2026-04-28T08:00:00Z",
@@ -166,13 +166,13 @@ describe("LogisticsDashboard", () => {
   });
 
   it("pipeline column renders top 5 most recent orders, slicing the rest", () => {
-    // Make 7 awaiting_stock orders — only 5 should render.
+    // Make 7 awaiting_logistics_action orders — only 5 should render.
     const orders = Array.from({ length: 7 }, (_, i) =>
       makeOrder({
         id: `ord-${i}`,
         dl: 9100 + i,
         customer_name: `Customer ${i}`,
-        logistics_stage: "awaiting_stock",
+        logistics_stage: "awaiting_logistics_action",
       }),
     );
     setLoaded(baseSummary, orders);
@@ -192,7 +192,7 @@ describe("LogisticsDashboard", () => {
       makeOrder({
         id: "ord-cjk",
         customer_name: "王小明",
-        logistics_stage: "awaiting_stock",
+        logistics_stage: "awaiting_logistics_action",
       }),
     ];
     setLoaded(baseSummary, orders);
@@ -209,7 +209,7 @@ describe("LogisticsDashboard", () => {
         pipeline: {
           placed: 0,
           proceed_request: 0,
-          awaiting_stock: 0,
+          awaiting_logistics_action: 0,
           ready_to_dispatch: 0,
           dispatched: 0,
         },
@@ -297,7 +297,7 @@ describe("LogisticsDashboard", () => {
     // hero strap line ("ready to ship") or KPI hints.
     expect(screen.getByText("Placed")).toBeInTheDocument();
     expect(screen.getByText("Proceed Request")).toBeInTheDocument();
-    expect(screen.getByText("Awaiting stock")).toBeInTheDocument();
+    expect(screen.getByText("Awaiting logistics action")).toBeInTheDocument();
     expect(screen.getByText("Ready to dispatch")).toBeInTheDocument();
     expect(screen.getByText("Dispatched")).toBeInTheDocument();
   });

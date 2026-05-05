@@ -147,12 +147,14 @@ describe("Phase 4.5a T2 — v2 RPC v3-vocabulary sweep (migration 0038)", () => 
   // quoted literal in code position is not (those are stage-write targets).
   //
   // 0038b ADDITIONAL TOLERANCE: the body of logistics_dashboard_summary
-  // intentionally retains the JSON KEY 'awaiting_stock' inside a
-  // jsonb_build_object call -- that's a payload key the FE consumers depend
-  // on and will be renamed in T5 alongside the matching FE update. We
-  // allowlist that single occurrence by stripping the line `'awaiting_stock',`
-  // (the jsonb key syntax) from the code-only scan; any OTHER occurrence
-  // of the quoted literal will still fail the assertion.
+  // intentionally retained the JSON KEY 'awaiting_stock' inside a
+  // jsonb_build_object call -- that was a payload key the FE consumers
+  // depended on, scheduled for rename in T5 alongside the matching FE update.
+  // Migration 0039b (Phase 4.5a T5) re-emits logistics_dashboard_summary with
+  // the JSON key renamed to 'awaiting_logistics_action'. CLAUDE.md §14 #6
+  // forbids editing committed migration history (so 0038b still contains the
+  // old key); the allowlist stays in place so the static-grep assertion
+  // against the immutable 0038b file body still passes after T5.
   function readMigration(filename: string): Promise<string> {
     return (async () => {
       const fs = await import("node:fs/promises");
@@ -215,6 +217,34 @@ describe("Phase 4.5a T2 — v2 RPC v3-vocabulary sweep (migration 0038)", () => 
     // jsonb_build_object KEY in logistics_dashboard_summary) is allowlisted
     // by stripCommentsAndAllowlistedJsonKey so it does not trip this scan.
     const codeOnly = stripCommentsAndAllowlistedJsonKey(text);
+    expect(codeOnly).not.toContain("'awaiting_stock'");
+  });
+
+  // Phase 4.5a T5: 0039b re-emits logistics_dashboard_summary with the JSON
+  // KEY renamed to 'awaiting_logistics_action' (lockstep with the FE rename).
+  // The full file body — even WITHOUT the JSON-key allowlist — must contain
+  // ZERO quoted-literal 'awaiting_stock' occurrences in non-comment lines.
+  it("migration 0039b file body uses v3 vocabulary throughout (JSON key renamed; no allowlist needed)", async () => {
+    const text = await readMigration(
+      "0039b_logistics_dashboard_summary_v3_key_rename.sql",
+    );
+
+    // Must contain v3 vocabulary somewhere in body (both as enum literal and
+    // as the renamed JSON key).
+    expect(text).toContain("awaiting_logistics_action");
+
+    // T5 scope: the JSON key has been renamed in lockstep with the FE. Strip
+    // comments only (NOT the allowlist) and assert ZERO surviving
+    // 'awaiting_stock' literals.
+    const stripCommentsOnly = (raw: string): string =>
+      raw
+        .split("\n")
+        .map((line) => {
+          const idx = line.indexOf("--");
+          return idx >= 0 ? line.slice(0, idx) : line;
+        })
+        .join("\n");
+    const codeOnly = stripCommentsOnly(text);
     expect(codeOnly).not.toContain("'awaiting_stock'");
   });
 });

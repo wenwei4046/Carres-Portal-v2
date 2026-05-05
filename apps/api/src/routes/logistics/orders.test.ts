@@ -56,7 +56,7 @@ describe("GET /api/logistics/orders", () => {
     id: "00000000-0000-0000-0000-000000000a01",
     dl: 4001,
     status: "proceed_order",
-    logistics_stage: "awaiting_stock",
+    logistics_stage: "awaiting_logistics_action",
     warehouse_id: "00000000-0000-0000-0000-000000000w01",
     customer_name: "Tan Ah Kow",
     placed_at: "2026-05-03T10:00:00Z",
@@ -307,10 +307,10 @@ describe("GET /api/logistics/orders/:id", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns aggregated detail for an awaiting_stock order", async () => {
+  it("returns aggregated detail for an awaiting_logistics_action order", async () => {
     mockDetailQueries({
       order: {
-        id: ORDER_ID, dl: 4001, status: "proceed_order", logistics_stage: "awaiting_stock",
+        id: ORDER_ID, dl: 4001, status: "proceed_order", logistics_stage: "awaiting_logistics_action",
         warehouse_id: "00000000-0000-0000-0000-000000000w01",
         customer_name: "Tan Ah Kow", customer_phone: "+60123456789", customer_address: "...",
         delivery_date: "2026-05-10", placed_at: "2026-05-03T10:00:00Z",
@@ -931,27 +931,13 @@ describe("POST /api/logistics/orders/:id/confirm-proceed", () => {
     expect(body.code).toBe("wrong_stage");
   });
 
-  it("returns 422 with code='warehouse_required' when no warehouse provided and order has none", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "22023", message: "warehouse must be assigned before confirming", details: "warehouse_required" },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("logistics");
-    const res = await app.fetch(
-      new Request(`http://t/api/logistics/orders/${ORDER_ID}/confirm-proceed`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("warehouse_required");
-  });
+  // Phase 4.5a T5 (2026-05-05): the stale `warehouse_required` test that
+  // previously sat between the wrong_stage and insufficient_stock cases was
+  // removed. After T4 swapped /confirm-proceed to v3 RPC
+  // `logistics_confirm_proceed_request_v3` (single arg p_order_id), the
+  // 22023 warehouse_required error path is no longer reachable from this
+  // endpoint — the v3 RPC auto-picks an `own` warehouse internally and
+  // never raises that condition.
 
   it("returns 422 with code='insufficient_stock_for_reserve' + hint passthrough", async () => {
     const rpc = vi.fn().mockResolvedValue({
@@ -1067,10 +1053,10 @@ describe("POST /api/logistics/orders/:id/transfer-ready", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("returns 422 with code='wrong_stage' when not in proceed_request/awaiting_stock", async () => {
+  it("returns 422 with code='wrong_stage' when not in proceed_request/awaiting_logistics_action", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: null,
-      error: { code: "22023", message: "order not in proceed_request/awaiting_stock state", details: "wrong_stage" },
+      error: { code: "22023", message: "order not in proceed_request/awaiting_logistics_action state", details: "wrong_stage" },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);

@@ -147,7 +147,7 @@ export default function LogisticsDashboard({ setTab }: Props) {
           at-a-glance row from the proto's 3 to mirror the kanban's 6-stage
           shape (delivered is the side-card / drawer surface, not a column).
           Order matches the kanban: Placed → Proceed Request → Awaiting
-          Stock → Ready to Dispatch → Dispatched. */}
+          Logistics Action → Ready to Dispatch → Dispatched. */}
       <div className="grid grid-cols-5 gap-3.5 mb-7">
         <PipelineColumn
           stage="placed"
@@ -166,10 +166,10 @@ export default function LogisticsDashboard({ setTab }: Props) {
           onOpenOrder={() => setTab("orders")}
         />
         <PipelineColumn
-          stage="awaiting_stock"
-          label="Awaiting stock"
+          stage="awaiting_logistics_action"
+          label="Awaiting logistics action"
           hint="auto-PO issued"
-          count={pipeline.awaiting_stock}
+          count={pipeline.awaiting_logistics_action}
           orders={orders}
           onOpenOrder={() => setTab("orders")}
         />
@@ -224,7 +224,7 @@ function Hero({ kpis, pipeline }: HeroProps) {
         {kpis.today_deliveries} deliveries today.
         <br />
         <span className="text-base-600 font-medium">
-          {pipeline.awaiting_stock} waiting on stock,{" "}
+          {pipeline.awaiting_logistics_action} waiting on stock,{" "}
           {pipeline.ready_to_dispatch} ready to ship.
         </span>
       </h1>

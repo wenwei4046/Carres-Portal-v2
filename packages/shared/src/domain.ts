@@ -194,10 +194,12 @@ export interface Order {
   installmentMonths: 6 | 12 | null;
 
   // v3-S3 (migration 0028) added `awaiting_logistics_action` + `waiting`.
-  // `awaiting_stock` retained as alias for legacy code paths still matching it.
+  // Phase 4.5a T5 (2026-05-05): legacy `awaiting_stock` alias removed in
+  // lockstep with migrations 0038/0038b/0039 (RPC vocab sweep) ahead of 0040
+  // (enum recreate). DB-side enum still carries the legacy value until 0040.
   logisticsStage:
     | "placed" | "proceed_request"
-    | "awaiting_logistics_action" | "awaiting_stock"
+    | "awaiting_logistics_action"
     | "ready_to_dispatch" | "dispatched"
     | "waiting" | "delivered"
     | null;

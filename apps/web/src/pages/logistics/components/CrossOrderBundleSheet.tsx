@@ -1,6 +1,6 @@
 /**
  * CrossOrderBundleSheet — bottom action bar that appears when one or more
- * awaiting_stock orders are checkbox-selected on the kanban. Lets logistics
+ * awaiting_logistics_action orders are checkbox-selected on the kanban. Lets logistics
  * combine all the shortages into one PO.
  *
  * Mirrors `reference/proto/logistics-orders.jsx` lines 78-126 (the

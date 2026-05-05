@@ -282,12 +282,12 @@ function DrawerBody({
   const { order, lines, addons, total, warehouse, stockBalances, pos, history } = data;
   // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
   // new placed/proceed_request enum values without falling through to a
-  // bogus awaiting_stock default.
+  // bogus awaiting_logistics_action default.
   const stage: LogisticsStage = (() => {
     if (order.status === "place") return "placed";
     if (order.logistics_stage) return order.logistics_stage as LogisticsStage;
     if (order.status === "delivered") return "delivered";
-    return "awaiting_stock";
+    return "awaiting_logistics_action";
   })();
   const shortages = calcShortages(lines, stockBalances);
   const dealerName = order.dealers?.name ?? "—";
@@ -550,7 +550,7 @@ function ActionBar({
       </div>
     );
   }
-  if (stage === "awaiting_stock") {
+  if (stage === "awaiting_logistics_action") {
     return (
       <div>
         <div className="text-[12px] text-warning mb-2 font-body">

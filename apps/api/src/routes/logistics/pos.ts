@@ -93,8 +93,7 @@ logisticsPosRouter.get("/", async (c) => {
 //    RPC closes the race window with SELECT ... FOR UPDATE on the same rows.
 //
 // 2. LEGACY FALLBACK (v3-S2.1 dl/dl_refs filter): orders in
-//    logistics_stage='awaiting_logistics_action' OR 'awaiting_stock' (the
-//    pre-v3 alias still in the enum per migration 0028) that have NO row in
+//    logistics_stage='awaiting_logistics_action' that have NO row in
 //    order_supplier_threads — i.e. legacy/unsplit data, or orders where
 //    confirm_proceed_request_v3 has not yet been called. For these we apply
 //    the v3-S2.1 v2-style filter: drop orders whose `dl` matches an OPEN PO's
@@ -108,7 +107,7 @@ logisticsPosRouter.get("/", async (c) => {
 //
 // Tables touched (one round-trip each, all in parallel):
 //   - order_supplier_threads (no filter — TS narrows by stage + po_id)
-//   - orders (.in("logistics_stage", [awaiting_logistics_action, awaiting_stock]))
+//   - orders (.eq("logistics_stage", "awaiting_logistics_action"))
 //   - purchase_orders (.eq("status", "open") for the legacy coverage filter)
 //   - order_lines (.in("order_id", [...]) on the union set)
 //   - stock_balances (no filter — sum across all warehouses per Q2=A)
@@ -130,7 +129,7 @@ logisticsPosRouter.get("/awaiting-stock-shortage", async (c) => {
     sb
       .from("orders")
       .select("id, dl")
-      .in("logistics_stage", ["awaiting_logistics_action", "awaiting_stock"]),
+      .eq("logistics_stage", "awaiting_logistics_action"),
     sb.from("purchase_orders").select("dl, dl_refs").eq("status", "open"),
   ]);
   if (threadsRes.error) {

@@ -8,7 +8,7 @@ import { cjkClassName } from "@/lib/cjk";
  * card inside `OrderColumn`):
  *   - White card, 1px base-100 border, 4px radius, 6px bottom margin
  *   - Hover: border swaps to terracotta
- *   - Selected (awaiting_stock + checkbox checked): peach signature-50 fill
+ *   - Selected (awaiting_logistics_action + checkbox checked): peach signature-50 fill
  *     + terracotta border
  *   - Top row: `#DL` (mono 11px bold) and placed-at date (mono 10px base-500)
  *   - Customer name (CJK detect, 13px)
@@ -23,13 +23,13 @@ import { cjkClassName } from "@/lib/cjk";
  * the drawer fetch; for the kanban we just show "via partner assigned" if the
  * id is set. (Could enrich the list later — out of scope for M5.2.)
  *
- * Selectable: only awaiting_stock orders surface a checkbox. The whole card
+ * Selectable: only awaiting_logistics_action orders surface a checkbox. The whole card
  * is the click target for opening the drawer; the checkbox region uses
  * stopPropagation so toggling doesn't accidentally open the drawer.
  */
 interface Props {
   order: LogisticsOrderListRow;
-  /** When true, render the leading checkbox column (awaiting_stock only). */
+  /** When true, render the leading checkbox column (awaiting_logistics_action only). */
   selectable: boolean;
   selected: boolean;
   onToggleSelect: () => void;

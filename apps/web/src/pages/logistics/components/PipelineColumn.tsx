@@ -23,7 +23,7 @@ import { cjkClassName } from "@/lib/cjk";
  * Stage → accent token map mirrors proto lines 203:
  *   placed            → base-500 (muted — read-only, not yet proceeded)
  *   proceed_request   → warning  (honey, action-needed)
- *   awaiting_stock    → warning  (honey)
+ *   awaiting_logistics_action    → warning  (honey)
  *   ready_to_dispatch → info     (slate blue)
  *   dispatched        → success  (olive)
  *
@@ -33,7 +33,7 @@ import { cjkClassName } from "@/lib/cjk";
 export type PipelineStage =
   | "placed"
   | "proceed_request"
-  | "awaiting_stock"
+  | "awaiting_logistics_action"
   | "ready_to_dispatch"
   | "dispatched";
 
@@ -49,7 +49,7 @@ interface Props {
 const stageToText: Record<PipelineStage, string> = {
   placed: "text-base-500",
   proceed_request: "text-warning",
-  awaiting_stock: "text-warning",
+  awaiting_logistics_action: "text-warning",
   ready_to_dispatch: "text-info",
   dispatched: "text-success",
 };
@@ -64,7 +64,7 @@ const MAX_ORDERS = 5;
 function derivePipelineStage(o: LogisticsOrderListRow): PipelineStage | null {
   if (o.status === "place") return "placed";
   const s = o.logistics_stage;
-  if (s === "proceed_request" || s === "awaiting_stock" || s === "ready_to_dispatch" || s === "dispatched") {
+  if (s === "proceed_request" || s === "awaiting_logistics_action" || s === "ready_to_dispatch" || s === "dispatched") {
     return s;
   }
   return null;

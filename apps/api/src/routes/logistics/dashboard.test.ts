@@ -36,7 +36,7 @@ async function makeJwt(role: string) {
 
 const SUMMARY_PAYLOAD = {
   kpis: { today_deliveries: 3, open_pos: 7, overdue: 1, active_orders: 12, active_gmv: 45000 },
-  pipeline: { awaiting_stock: [], ready_to_dispatch: [], dispatched: [] },
+  pipeline: { awaiting_logistics_action: [], ready_to_dispatch: [], dispatched: [] },
   open_pos: [],
   low_stock: [],
 };
@@ -131,7 +131,7 @@ describe("GET /api/logistics/dashboard", () => {
     expect(body.pipeline.placed).toBe(4);
     expect(body.pipeline.proceed_request).toBe(2);
     // Existing 0019 RPC counts must still be present.
-    expect(body.pipeline.awaiting_stock).toEqual([]);
+    expect(body.pipeline.awaiting_logistics_action).toEqual([]);
     expect(body.pipeline.ready_to_dispatch).toEqual([]);
     expect(body.pipeline.dispatched).toEqual([]);
   });
@@ -148,7 +148,7 @@ describe("GET /api/logistics/dashboard", () => {
       pipeline: {
         placed: 999,
         proceed_request: 999,
-        awaiting_stock: [],
+        awaiting_logistics_action: [],
         ready_to_dispatch: [],
         dispatched: [],
       },

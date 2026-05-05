@@ -222,7 +222,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       const data = res.data;
       if (!data || data.shortage.length === 0) {
         toast(
-          "No shortages — all awaiting_stock orders covered by stock",
+          "No shortages — all awaiting orders covered by stock",
           { duration: 3000 },
         );
         return;

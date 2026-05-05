@@ -465,12 +465,18 @@ logisticsOrdersRouter.post("/:id/warehouse", async (c) => {
 // specific UI codes):
 //   • 42501                → 403 forbidden
 //   • 22023 wrong_stage    → 422 with code='wrong_stage'
-//   • 22023 warehouse_required → 422 with code='warehouse_required'
 //   • P0001 insufficient_stock_for_reserve → 422 with code +
 //                            hint passthrough (sku=... warehouse_id=...) so
 //                            the UI can name the offending pair.
 //   • 40001                → 409 with code='concurrent_reserve' (v3 auto-skip
 //                            FOR UPDATE race; mapPgError covers this)
+//
+// Phase 4.5a T5 (2026-05-05): the legacy 22023 `warehouse_required` mapping
+// was dropped here. v3 RPC `logistics_confirm_proceed_request_v3` takes only
+// `p_order_id` (auto-skip-from-stock picks an `own` warehouse internally), so
+// the no-warehouse-supplied error path is no longer reachable from this
+// endpoint. The orders.test.ts test that asserted the mapping has also been
+// removed.
 logisticsOrdersRouter.post("/:id/confirm-proceed", async (c) => {
   const parsed = await parseJsonBody(c, confirmProceedRequestInputSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
@@ -487,7 +493,7 @@ logisticsOrdersRouter.post("/:id/confirm-proceed", async (c) => {
 
 // ----- POST /:id/transfer-ready -----
 // Pipeline v2 (C2 / migration 0024). Wraps `logistics_warehouse_pick` whose
-// source-stage guard now permits IN ('proceed_request', 'awaiting_stock').
+// source-stage guard now permits IN ('proceed_request', 'awaiting_logistics_action').
 // Same error contract as /confirm-proceed. Note: warehouseId is REQUIRED here
 // (the RPC raises 22023 `warehouse_required` on NULL). confirm-proceed
 // accepts NULL via a different RPC; do not conflate.

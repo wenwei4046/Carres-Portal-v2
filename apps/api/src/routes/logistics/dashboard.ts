@@ -13,10 +13,10 @@ import type { AppEnv } from "../../types";
  * same-role check here for fast 403s without a Supabase round-trip.
  *
  * Pipeline v2 augmentation (C3): the 0019 RPC's `pipeline` only contains
- * counts for awaiting_stock / ready_to_dispatch / dispatched. The kanban
- * also needs `placed` (status='place') and `proceed_request` columns, so the
- * route layers two thin count queries over the RPC output. Done at the API
- * layer because migration 0019 is frozen — see CLAUDE.md §7.
+ * counts for awaiting_logistics_action / ready_to_dispatch / dispatched. The
+ * kanban also needs `placed` (status='place') and `proceed_request` columns,
+ * so the route layers two thin count queries over the RPC output. Done at the
+ * API layer because migration 0019 is frozen — see CLAUDE.md §7.
  *
  * Error contract matches sibling logistics/principal handlers via shared
  * mapPgError (SQLSTATE → HTTP) from lib/route-helpers.
