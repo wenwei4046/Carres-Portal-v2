@@ -488,3 +488,109 @@ $$;
 
 REVOKE ALL ON FUNCTION public.logistics_resume_from_waiting(uuid) FROM public;
 GRANT EXECUTE ON FUNCTION public.logistics_resume_from_waiting(uuid) TO authenticated;
+
+-- -----------------------------------------------------------------------------
+-- 7. logistics_dispatch_customer_leg(...)
+-- -----------------------------------------------------------------------------
+-- Logistics dispatches the customer-delivery leg.
+-- p_force_dispatch=true → skip RFD, go directly to dispatched (advances threads)
+-- p_force_dispatch=false → set RFD timestamp, threads stay at ready_to_dispatch
+-- Does NOT replace 0034 logistics_assign_partner_and_dispatch (which handles
+-- Mattress factory-pickup leg).
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.logistics_dispatch_customer_leg(
+  p_po_id                text,
+  p_partner_id           uuid,
+  p_confirm_delivery_date date,
+  p_force_dispatch       boolean DEFAULT false
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_po           purchase_orders;
+  v_role         app_role;
+  v_actor        text;
+  v_thread_count int;
+  v_threads_at_rtd boolean;
+BEGIN
+  v_role := public.app_role();
+
+  IF v_role NOT IN ('logistics', 'principal') THEN
+    RAISE EXCEPTION 'forbidden: logistics or principal only'
+      USING ERRCODE = '42501', DETAIL = 'forbidden';
+  END IF;
+
+  SELECT * INTO v_po FROM purchase_orders WHERE id = p_po_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'PO not found' USING ERRCODE = '42P01', DETAIL = 'po_not_found';
+  END IF;
+
+  -- Validate partner exists.
+  IF NOT EXISTS (SELECT 1 FROM delivery_partners WHERE id = p_partner_id) THEN
+    RAISE EXCEPTION 'delivery_partner not found' USING ERRCODE = '42P01', DETAIL = 'partner_not_found';
+  END IF;
+
+  -- State guard: at least one thread must be ready_to_dispatch.
+  SELECT bool_or(logistics_stage = 'ready_to_dispatch') INTO v_threads_at_rtd
+    FROM order_supplier_threads
+   WHERE po_id = p_po_id;
+  IF NOT COALESCE(v_threads_at_rtd, false) THEN
+    RAISE EXCEPTION 'no ready_to_dispatch threads for PO'
+      USING ERRCODE = '22023', DETAIL = 'no_ready_threads';
+  END IF;
+
+  v_actor := COALESCE((SELECT name FROM app_users WHERE id = (SELECT auth.uid())), INITCAP(v_role::text));
+
+  IF p_force_dispatch THEN
+    -- Force path: skip RFD, advance threads immediately.
+    UPDATE purchase_orders
+       SET delivery_partner_id   = p_partner_id,
+           confirm_delivery_date = p_confirm_delivery_date,
+           partner_accepted_at   = now(),  -- record dispatch time
+           updated_at            = now()
+     WHERE id = p_po_id;
+
+    UPDATE order_supplier_threads
+       SET logistics_stage = 'dispatched', updated_at = now()
+     WHERE po_id = p_po_id AND logistics_stage = 'ready_to_dispatch';
+    GET DIAGNOSTICS v_thread_count = ROW_COUNT;
+
+    INSERT INTO po_history (po_id, text, by_role)
+    VALUES (p_po_id,
+            format('Force-dispatched to LP %s on %s — %s thread(s)', p_partner_id, p_confirm_delivery_date, v_thread_count),
+            v_role);
+
+    INSERT INTO audit_log (role, actor_text, action, ref)
+    VALUES (v_role, v_actor, format('Force-dispatch PO %s to LP %s', p_po_id, p_partner_id), p_po_id);
+
+    RETURN jsonb_build_object('po_id', p_po_id, 'mode', 'force', 'threads_advanced', v_thread_count,
+                              'partner_id', p_partner_id, 'confirm_delivery_date', p_confirm_delivery_date);
+  ELSE
+    -- RFD path: set timestamp, threads stay at ready_to_dispatch.
+    UPDATE purchase_orders
+       SET delivery_partner_id    = p_partner_id,
+           confirm_delivery_date  = p_confirm_delivery_date,
+           request_for_delivery_at = now(),
+           partner_accepted_at    = NULL,  -- reset if re-RFD
+           partner_rejected_at    = NULL,
+           updated_at             = now()
+     WHERE id = p_po_id;
+
+    INSERT INTO po_history (po_id, text, by_role)
+    VALUES (p_po_id,
+            format('RFD sent to LP %s for %s', p_partner_id, p_confirm_delivery_date),
+            v_role);
+
+    INSERT INTO audit_log (role, actor_text, action, ref)
+    VALUES (v_role, v_actor, format('RFD PO %s -> LP %s', p_po_id, p_partner_id), p_po_id);
+
+    RETURN jsonb_build_object('po_id', p_po_id, 'mode', 'rfd',
+                              'partner_id', p_partner_id, 'confirm_delivery_date', p_confirm_delivery_date,
+                              'rfd_sent_at', now());
+  END IF;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.logistics_dispatch_customer_leg(text, uuid, date, boolean) FROM public;
+GRANT EXECUTE ON FUNCTION public.logistics_dispatch_customer_leg(text, uuid, date, boolean) TO authenticated;
