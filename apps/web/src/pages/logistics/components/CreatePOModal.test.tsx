@@ -662,6 +662,59 @@ describe("CreatePOModal — Suggest from alerts (T22)", () => {
       expect(qtyInputs[0].value).toBe("1");
     });
   });
+
+  it("coalesces duplicate SKUs across warehouses + sums gaps (T42-pass3-C3)", async () => {
+    // Codex pass-3 comment 3: `logistics_stock_alerts()` returns one row per
+    // (sku, warehouse_id), so the same SKU below threshold in 2 warehouses
+    // produces 2 alert rows. The submit path groups lines by supplier into
+    // ONE PO and `purchase_order_lines (po_id, sku) PRIMARY KEY` would crash
+    // the insert with 23505 unique_violation. Modal must coalesce on sku
+    // before building lines, summing the gaps so the suggested qty replenishes
+    // the system-wide shortage.
+    alertsHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch: vi.fn().mockResolvedValue({
+        data: {
+          alerts: [
+            // Same SKU below threshold in 2 warehouses; gap should sum.
+            //   wh A: low=10 effective=2 → gap 18
+            //   wh B: low=10 effective=4 → gap 16
+            //   summed → 34
+            makeAlertRow(SKU_KING, { low_threshold: 10, effective: 2 }),
+            makeAlertRow(SKU_KING, { low_threshold: 10, effective: 4 }),
+            // Distinct SKU survives untouched: gap = 8*2 - 3 = 13.
+            makeAlertRow("sofa:nordic:3s", { low_threshold: 8, effective: 3 }),
+          ],
+        },
+      }),
+    };
+
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    fireEvent.click(screen.getByTestId("suggest-from-alerts-button"));
+
+    await waitFor(() => {
+      const qtyInputs = screen.getAllByLabelText(
+        /Line \d+ qty/,
+      ) as HTMLInputElement[];
+      // 2 lines (not 3) — the duplicate SKU collapsed into one.
+      expect(qtyInputs).toHaveLength(2);
+    });
+
+    const qtyInputs = screen.getAllByLabelText(
+      /Line \d+ qty/,
+    ) as HTMLInputElement[];
+    // Insertion order = first-seen-sku order, so SKU_KING (gap 18+16=34)
+    // is line 0; sofa is line 1.
+    expect(qtyInputs[0].value).toBe("34");
+    expect(qtyInputs[1].value).toBe("13");
+    // Toast count uses the coalesced length so the user isn't lied to about
+    // how many SKUs land in the PO.
+    expect(sonnerMocks.success).toHaveBeenCalledWith(
+      expect.stringMatching(/Suggested 2 SKUs/),
+    );
+  });
 });
 
 /**

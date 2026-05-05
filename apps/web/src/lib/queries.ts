@@ -1106,6 +1106,12 @@ export interface WarehouseStockEntry {
   qty: number;
   reserved: number;
   low_stock_status: LowStockStatus;
+  /** T42-pass3-C1 — current `stock_balances.low_threshold`. NULL = no alert
+   *  configured. Used by `SetThresholdDialog` prefill from LogisticsWarehouse. */
+  low_threshold: number | null;
+  /** T42-pass3-C1 — current `stock_balances.high_threshold`. NULL = use low * 2
+   *  fallback. Same prefill purpose as low_threshold. */
+  high_threshold: number | null;
 }
 export interface WarehouseSkuTotals {
   total_qty: number;
@@ -1511,6 +1517,10 @@ export function useAttachDoMutation(
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
+      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
+      // alerts" stay stale for up to 30s after qty/reserved change.
+      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -1537,6 +1547,10 @@ export function useAbandonOrderMutation(
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
+      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
+      // alerts" stay stale for up to 30s after qty/reserved change.
+      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -1609,6 +1623,10 @@ export function useConfirmProceedRequest(
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
+      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
+      // alerts" stay stale for up to 30s after qty/reserved change.
+      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -1648,6 +1666,10 @@ export function useTransferReady(
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
+      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
+      // alerts" stay stale for up to 30s after qty/reserved change.
+      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -1761,6 +1783,10 @@ export function useCreatePosBatch(
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
+      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
+      // alerts" stay stale for up to 30s after qty/reserved change.
+      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -1791,6 +1817,10 @@ export function useReceivePoWithDoMutation(
       await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
+      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
+      // alerts" stay stale for up to 30s after qty/reserved change.
+      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
       // Receiving stock can unblock awaiting_logistics_action orders → invalidate orders.
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
@@ -1867,6 +1897,10 @@ export function useReassignPoWarehouseMutation(
       await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
+      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
+      // alerts" stay stale for up to 30s after qty/reserved change.
+      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
@@ -1890,6 +1924,10 @@ export function useAdjustStockMutation(
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
+      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
+      // alerts" stay stale for up to 30s after qty/reserved change.
+      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));

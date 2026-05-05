@@ -63,6 +63,12 @@ interface PerWarehouseStockEntry {
   qty: number;
   reserved: number;
   low_stock_status: LowStockStatus;
+  /** T42-pass3-C1 — surfaces stock_balances.low_threshold so the warehouse UI
+   *  can prefill `SetThresholdDialog` instead of opening blank (which would
+   *  imply clearing existing thresholds on save). NULL = no threshold set. */
+  low_threshold: number | null;
+  /** T42-pass3-C1 — same rationale as low_threshold. */
+  high_threshold: number | null;
 }
 
 interface SkuTotals {
@@ -75,7 +81,10 @@ logisticsWarehouseRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const [whRes, sbRes] = await Promise.all([
     sb.from("warehouses").select("id, name, address").order("name"),
-    sb.from("stock_balances").select("sku, warehouse_id, qty, reserved"),
+    sb
+      .from("stock_balances")
+      // T42-pass3-C1 — include thresholds so the FE can prefill SetThresholdDialog.
+      .select("sku, warehouse_id, qty, reserved, low_threshold, high_threshold"),
   ]);
   if (whRes.error) {
     const m = mapPgError(whRes.error);
@@ -110,6 +119,9 @@ logisticsWarehouseRouter.get("/", async (c) => {
       qty,
       reserved,
       low_stock_status: statusFor(qty),
+      // T42-pass3-C1 — surface raw thresholds for SetThresholdDialog prefill.
+      low_threshold: b.low_threshold ?? null,
+      high_threshold: b.high_threshold ?? null,
     });
 
     const t = (totalsAccum[b.sku] ??= { total_qty: 0, total_reserved: 0 });

@@ -346,18 +346,29 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       }
       // Replace lines (override) — same convention as auto-fill from shortage.
       // T29: cost + costSource start null — operator picks via CogsLineEditor.
-      const nextLines = data.alerts.map((a) => {
+      //
+      // T42-pass3-C3 — `logistics_stock_alerts()` returns one row per
+      // (sku, warehouse_id), so the same SKU can appear multiple times when
+      // it's below threshold across multiple warehouses. The submit path groups
+      // lines by supplier into ONE PO and `purchase_order_lines` has a
+      // (po_id, sku) PRIMARY KEY — duplicate skus would crash the insert with
+      // 23505 unique_violation. Coalesce here BEFORE building lines: sum the
+      // gap across warehouses so the suggested qty replenishes the system-wide
+      // shortage, not just one warehouse's slice.
+      const gapBySku = new Map<string, number>();
+      for (const a of data.alerts) {
         const target = a.low_threshold * 2;
-        const gap = target - a.effective;
-        return {
-          sku: a.sku,
-          qty: Math.max(1, gap),
-          cost: null,
-          costSource: null,
-        };
-      });
+        const gap = Math.max(1, target - a.effective);
+        gapBySku.set(a.sku, (gapBySku.get(a.sku) ?? 0) + gap);
+      }
+      const nextLines = Array.from(gapBySku.entries()).map(([sku, qty]) => ({
+        sku,
+        qty,
+        cost: null,
+        costSource: null,
+      }));
       setLines(nextLines);
-      const count = data.alerts.length;
+      const count = nextLines.length;
       toast.success(
         `Suggested ${count} SKU${count === 1 ? "" : "s"} from stock alerts`,
       );

@@ -36,11 +36,18 @@ async function makeJwt(role: string) {
     .sign(signKey);
 }
 
-// The route only reads sku/warehouse_id/qty/reserved off stock_balances rows;
-// updated_at (present on DB.StockBalanceRow) is irrelevant for these fixtures,
-// so we use a column-Pick to keep test fixtures minimal while still typing
-// against the shared schema.
-type StockBalanceFixture = Pick<DB.StockBalanceRow, "sku" | "warehouse_id" | "qty" | "reserved">;
+// The route reads sku/warehouse_id/qty/reserved/low_threshold/high_threshold
+// off stock_balances rows; updated_at (present on DB.StockBalanceRow) is
+// irrelevant for these fixtures, so we use a column-Pick to keep test fixtures
+// minimal while still typing against the shared schema. T42-pass3-C1 added the
+// threshold fields to the route's select clause.
+type StockBalanceFixture = Pick<
+  DB.StockBalanceRow,
+  "sku" | "warehouse_id" | "qty" | "reserved"
+> & {
+  low_threshold?: number | null;
+  high_threshold?: number | null;
+};
 // Likewise for warehouses: the route's GET only reads id/name/address; v3-S3
 // fields kind + owning_partner_id (added in migration 0027) aren't surfaced
 // here, so we Pick to keep fixtures minimal while still typing against shared.
@@ -263,6 +270,45 @@ describe("GET /api/logistics/warehouse", () => {
       total_reserved: 0,
       low_stock_status_aggregate: "ok",
     });
+  });
+
+  it("surfaces low_threshold + high_threshold per row (T42-pass3-C1 wiring)", async () => {
+    // The warehouse page wires `+ Threshold` button → SetThresholdDialog
+    // prefilled with these values. Without them the dialog opens blank and a
+    // "Save" with empty inputs would clear existing thresholds (parseField
+    // returns null for empty text). The route must surface the raw column
+    // values; NULLs propagate as null (not 0/undefined).
+    mockWarehouseQueries({
+      warehouses: [{ id: WH1, name: "ThresholdsWH", address: null }],
+      balances: [
+        { sku: "WITH-LH", warehouse_id: WH1, qty: 10, reserved: 0, low_threshold: 5, high_threshold: 15 },
+        { sku: "ONLY-LOW", warehouse_id: WH1, qty: 8, reserved: 0, low_threshold: 3, high_threshold: null },
+        { sku: "NO-THRESH", warehouse_id: WH1, qty: 4, reserved: 0, low_threshold: null, high_threshold: null },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/warehouse", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      byWarehouse: Record<
+        string,
+        Array<{ sku: string; low_threshold: number | null; high_threshold: number | null }>
+      >;
+    };
+    const bySku = Object.fromEntries(
+      (body.byWarehouse[WH1] ?? []).map((r) => [r.sku, r]),
+    );
+    expect(bySku["WITH-LH"]?.low_threshold).toBe(5);
+    expect(bySku["WITH-LH"]?.high_threshold).toBe(15);
+    expect(bySku["ONLY-LOW"]?.low_threshold).toBe(3);
+    expect(bySku["ONLY-LOW"]?.high_threshold).toBeNull();
+    expect(bySku["NO-THRESH"]?.low_threshold).toBeNull();
+    expect(bySku["NO-THRESH"]?.high_threshold).toBeNull();
   });
 
   it("returns 403 for dealer role (no Supabase round-trip)", async () => {

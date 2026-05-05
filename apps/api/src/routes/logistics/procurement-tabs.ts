@@ -85,28 +85,65 @@ procurementTabsRouter.get("/:slug", async (c) => {
 
   // 2. Build the query. Same column set as GET /api/logistics/pos so the FE
   //    can render either response with shared components. We add
-  //    `suppliers!inner(slug, name)` for the supplier-slug filter and (for the
-  //    hookka tabs) `purchase_order_lines!inner(...)` for the category
-  //    prefix filter on the line's SKU. The lines column comes back inside
-  //    the embedded shape regardless of the inner-filter.
-  let q = sb
-    .from("purchase_orders")
-    .select(
-      "id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines!inner(sku, qty, received_qty)",
-    )
-    .eq("suppliers.slug", supplierSlug);
-
-  // 3. For the two hookka tabs, narrow further by category via SKU prefix
-  //    on the inner-joined line. This mirrors movements.ts:98 — the project
-  //    SKU convention is `cat:model[:variant]`, so a `category:%` LIKE on
-  //    the line SKU isolates the right channel.
+  //    `suppliers!inner(slug, name)` for the supplier-slug filter so the
+  //    parent rows narrow to the supplier this tab represents.
+  //
+  // T42-pass3-C4 — DO NOT use `purchase_order_lines!inner(...)` with an
+  // embedded `.like()` filter to narrow by category. PostgREST applies the
+  // embedded filter to the EMBEDDED ARRAY too, so a mixed-category Hookka PO
+  // (sofa + bedframe lines) would show in `hookka-sofa` but its embedded
+  // lines array would be truncated to only sofa rows. Receive/Detail modals
+  // would then operate on an incomplete PO.
+  //
+  // Two-pass query instead:
+  //   Pass A — find parent PO IDs whose lines match category prefix
+  //   Pass B — refetch full POs by id with the FULL embedded line array
   if (category !== null) {
-    q = q.like("purchase_order_lines.sku", `${category}:%`);
+    // Pass A: narrow ids via the lines table directly.
+    const { data: lineRows, error: lineErr } = await sb
+      .from("purchase_order_lines")
+      .select(
+        "po_id, purchase_orders!inner(suppliers!inner(slug))",
+      )
+      .like("sku", `${category}:%`)
+      .eq("purchase_orders.suppliers.slug", supplierSlug);
+    if (lineErr) {
+      const m = mapPgError(lineErr);
+      return c.json(m.body, m.status);
+    }
+    const matchedIds = Array.from(
+      new Set(((lineRows ?? []) as Array<{ po_id: string }>).map((r) => r.po_id)),
+    );
+    if (matchedIds.length === 0) {
+      return c.json({ pos: [] });
+    }
+    // Pass B: refetch parent rows by id with FULL line array (no embedded
+    // filter) so Receive/Detail modals see every line on the PO.
+    const { data, error } = await sb
+      .from("purchase_orders")
+      .select(
+        "id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(sku, qty, received_qty)",
+      )
+      .in("id", matchedIds)
+      .order("placed_at", { ascending: false })
+      .limit(200);
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json({ pos: data ?? [] });
   }
 
-  q = q.order("placed_at", { ascending: false }).limit(200);
-
-  const { data, error } = await q;
+  // 3. No category filter — single-pass query. Embed lines without inner so
+  //    POs with zero lines still surface.
+  const { data, error } = await sb
+    .from("purchase_orders")
+    .select(
+      "id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(sku, qty, received_qty)",
+    )
+    .eq("suppliers.slug", supplierSlug)
+    .order("placed_at", { ascending: false })
+    .limit(200);
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);

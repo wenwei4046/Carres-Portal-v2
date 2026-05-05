@@ -9,6 +9,7 @@ import {
 import type { ProductCategory, ProductSkuDto } from "@carres/shared";
 import AdjustStockModal from "./components/AdjustStockModal";
 import ReserveDrilldownDialog from "./components/ReserveDrilldownDialog";
+import SetThresholdDialog from "./components/SetThresholdDialog";
 
 /**
  * LogisticsWarehouse — HQ stock balance per warehouse with category tabs +
@@ -114,6 +115,17 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
     warehouseId: string;
     warehouseName: string;
     skuLabel?: string;
+  } | null>(null);
+  // T42-pass3-C1 — threshold editor target. Opens SetThresholdDialog with the
+  // row's current low/high so the user can update without accidentally clearing
+  // existing values (the dialog's empty-text → null parsing means a blind open
+  // would imply "clear both" on save).
+  const [thresholdTarget, setThresholdTarget] = useState<{
+    sku: string;
+    warehouseId: string;
+    warehouseName: string;
+    currentLow: number | null;
+    currentHigh: number | null;
   } | null>(null);
 
   // Default the active warehouse to the first one as soon as data arrives.
@@ -459,7 +471,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
           <div
             className="grid items-center gap-4 px-[18px] py-3 bg-base-50 border-b border-base-200"
             style={{
-              gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 96px",
+              gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 168px",
             }}
           >
             <div className="label">Product</div>
@@ -501,7 +513,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
                   data-testid={`warehouse-row-${row.sku}`}
                   className="grid items-center gap-4 px-[18px] py-3 border-t border-base-100"
                   style={{
-                    gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 96px",
+                    gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 168px",
                   }}
                 >
                   <div className="min-w-0">
@@ -551,7 +563,31 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
                       {statusLabel(aggStatus)}
                     </span>
                   </div>
-                  <div className="text-right">
+                  <div className="flex justify-end gap-1.5 flex-wrap">
+                    {/* T42-pass3-C1 — opens SetThresholdDialog with row's
+                        current low/high prefilled (NULLs are fine; the dialog
+                        renders empty inputs only when both are NULL). */}
+                    <button
+                      type="button"
+                      className="btn-secondary text-[11px] py-1 px-2.5"
+                      onClick={() =>
+                        setThresholdTarget({
+                          sku: row.sku,
+                          warehouseId: activeWarehouse.id,
+                          warehouseName: activeWarehouse.name,
+                          currentLow: row.low_threshold,
+                          currentHigh: row.high_threshold,
+                        })
+                      }
+                      data-testid={`warehouse-threshold-${row.sku}`}
+                      title={
+                        row.low_threshold === null && row.high_threshold === null
+                          ? "No threshold set — click to configure"
+                          : `Low ${row.low_threshold ?? "—"} / High ${row.high_threshold ?? "—"}`
+                      }
+                    >
+                      ⚙ Threshold
+                    </button>
                     <button
                       type="button"
                       className="btn-secondary text-[11px] py-1 px-2.5"
@@ -596,6 +632,24 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
           warehouseName={drilldownTarget.warehouseName}
           skuLabel={drilldownTarget.skuLabel}
           onClose={() => setDrilldownTarget(null)}
+        />
+      )}
+
+      {/* T42-pass3-C1 — threshold editor. Opens with current low/high so the
+           user sees + edits the existing values instead of accidentally
+           clearing them. Cache invalidation lives inside SetThresholdDialog
+           (warehouse + stockAlerts queries). */}
+      {thresholdTarget && (
+        <SetThresholdDialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setThresholdTarget(null);
+          }}
+          warehouseId={thresholdTarget.warehouseId}
+          warehouseName={thresholdTarget.warehouseName}
+          sku={thresholdTarget.sku}
+          currentLow={thresholdTarget.currentLow}
+          currentHigh={thresholdTarget.currentHigh}
         />
       )}
     </div>

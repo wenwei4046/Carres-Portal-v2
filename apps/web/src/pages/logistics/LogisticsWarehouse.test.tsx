@@ -85,24 +85,34 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
             qty: 8,
             reserved: 2,
             low_stock_status: "ok",
+            // T42-pass3-C1 — fixtures default both thresholds to null;
+            // tests that exercise the SetThresholdDialog button override.
+            low_threshold: null,
+            high_threshold: null,
           },
           {
             sku: SKU_MATTRESS_QUEEN,
             qty: 1,
             reserved: 0,
             low_stock_status: "low",
+            low_threshold: null,
+            high_threshold: null,
           },
           {
             sku: SKU_BEDFRAME,
             qty: 0,
             reserved: 0,
             low_stock_status: "out",
+            low_threshold: null,
+            high_threshold: null,
           },
           {
             sku: SKU_SOFA,
             qty: 4,
             reserved: 1,
             low_stock_status: "ok",
+            low_threshold: null,
+            high_threshold: null,
           },
         ],
         [WAREHOUSE_PG.id]: [
@@ -111,6 +121,8 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
             qty: 3,
             reserved: 0,
             low_stock_status: "ok",
+            low_threshold: null,
+            high_threshold: null,
           },
         ],
       },
@@ -306,6 +318,8 @@ describe("LogisticsWarehouse page", () => {
             qty: 4,
             reserved: 1,
             low_stock_status: "ok",
+            low_threshold: null,
+            high_threshold: null,
           },
         ],
         [WAREHOUSE_PG.id]: [],
@@ -528,8 +542,8 @@ describe("LogisticsWarehouse page", () => {
       byWarehouse: {
         [WAREHOUSE_KL.id]: [
           // All zero reserves at KL.
-          { sku: SKU_MATTRESS_KING, qty: 8, reserved: 0, low_stock_status: "ok" },
-          { sku: SKU_SOFA, qty: 4, reserved: 0, low_stock_status: "ok" },
+          { sku: SKU_MATTRESS_KING, qty: 8, reserved: 0, low_stock_status: "ok", low_threshold: null, high_threshold: null },
+          { sku: SKU_SOFA, qty: 4, reserved: 0, low_stock_status: "ok", low_threshold: null, high_threshold: null },
         ],
         [WAREHOUSE_PG.id]: [],
       },
@@ -689,5 +703,67 @@ describe("LogisticsWarehouse page", () => {
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith("#DL4007");
     });
+  });
+
+  it("23. ⚙ Threshold button per row opens SetThresholdDialog prefilled (T42-pass3-C1)", () => {
+    // Codex pass-3 comment 1 wiring: SetThresholdDialog must be reachable from
+    // the warehouse page so logistics users can configure low/high WITHOUT
+    // touching SQL. The button passes the row's current thresholds so opening
+    // an already-configured row pre-populates the inputs (a blank-open save
+    // would clear existing values per parseField's empty→null contract).
+    //
+    // Both fixtures live in the default `mattress` category so the test sees
+    // both rows without a tab click — King has thresholds set, Queen has none.
+    setLoaded({
+      byWarehouse: {
+        [WAREHOUSE_KL.id]: [
+          {
+            sku: SKU_MATTRESS_KING,
+            qty: 8,
+            reserved: 0,
+            low_stock_status: "ok",
+            low_threshold: 5,
+            high_threshold: 12,
+          },
+          {
+            sku: SKU_MATTRESS_QUEEN,
+            qty: 4,
+            reserved: 0,
+            low_stock_status: "ok",
+            low_threshold: null,
+            high_threshold: null,
+          },
+        ],
+        [WAREHOUSE_PG.id]: [],
+      },
+      totalsBySku: {
+        [SKU_MATTRESS_KING]: { total_qty: 8, total_reserved: 0, low_stock_status_aggregate: "ok" },
+        [SKU_MATTRESS_QUEEN]: { total_qty: 4, total_reserved: 0, low_stock_status_aggregate: "ok" },
+      },
+    });
+    render(wrap(<LogisticsWarehouse />));
+    // Per-row Threshold button is present.
+    const threshBtn = screen.getByTestId(`warehouse-threshold-${SKU_MATTRESS_KING}`);
+    expect(threshBtn).toBeInTheDocument();
+    // Title shows current values so the user can sanity-check before opening.
+    expect(threshBtn.getAttribute("title")).toBe("Low 5 / High 12");
+    // Queen row has no threshold yet — title hints at empty state.
+    expect(
+      screen.getByTestId(`warehouse-threshold-${SKU_MATTRESS_QUEEN}`).getAttribute("title"),
+    ).toBe("No threshold set — click to configure");
+    // Click opens the dialog (Modal renders inline — header text is the
+    // SetThresholdDialog title prefix).
+    fireEvent.click(threshBtn);
+    expect(
+      screen.getByText(/Set thresholds/),
+    ).toBeInTheDocument();
+    // Inputs are pre-populated with the row's current thresholds, so saving
+    // unchanged values doesn't accidentally clear them.
+    expect(
+      (screen.getByTestId("set-threshold-low-input") as HTMLInputElement).value,
+    ).toBe("5");
+    expect(
+      (screen.getByTestId("set-threshold-high-input") as HTMLInputElement).value,
+    ).toBe("12");
   });
 });

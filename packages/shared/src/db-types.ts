@@ -214,6 +214,13 @@ export interface StockBalanceRow {
   qty: number;
   reserved: number;
   updated_at: string;
+  /** Migration 0054 (Phase 4.5 Chunk 2 Sprint D Task 17). NULL = no alert
+   *  configured for this (sku, warehouse) pair. Alert fires when
+   *  (qty - reserved) < low_threshold. */
+  low_threshold: number | null;
+  /** Migration 0054. Replenishment ceiling used by CreatePOModal "Suggest from
+   *  alerts" — gap = high_threshold - effective. NULL = use low * 2 fallback. */
+  high_threshold: number | null;
 }
 
 export interface StockMovementRow {
