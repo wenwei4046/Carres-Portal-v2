@@ -289,6 +289,38 @@ describe("POST /api/logistics/pos", () => {
     expect(body.code).toBe("supplier_not_found");
   });
 
+  // v3-active.1 (migration 0037): logistics_create_po now calls
+  // _v3_claim_threads_for_po after the PO insert. If a concurrent transaction
+  // already claimed one of the matching threads, the helper raises 40001
+  // (serialization_failure). mapPgError surfaces it as 409 Conflict.
+  it("maps 40001 concurrent_claim → 409 conflict", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "40001",
+        message: "concurrent_claim: 1 thread(s) already claimed",
+        details: "concurrent_claim",
+        hint:
+          "Another logistics user has already issued a PO for these threads. Refresh and try again.",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("concurrent_claim");
+  });
+
   it("returns 403 for non-logistics", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1703,6 +1735,41 @@ describe("POST /api/logistics/pos/batch", () => {
     const body = (await res.json()) as any;
     expect(body.code).toBe("warehouse_required");
     expect(body.pos_index).toBe(1);
+  });
+
+  // v3-active.1 (migration 0037): logistics_create_pos_batch now calls
+  // _v3_claim_threads_for_po after each helper insert inside the loop. If a
+  // concurrent transaction already claimed one of the matching threads, the
+  // helper raises 40001 (serialization_failure). mapPgError surfaces it as
+  // 409 Conflict so the FE can show "Refresh and try again" — distinct from
+  // 422 validation failures (warehouse_required, invalid_batch_size).
+  it("maps 40001 concurrent_claim from RPC → 409 conflict", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "40001",
+        message: "concurrent_claim: 2 thread(s) already claimed",
+        details: "concurrent_claim",
+        hint:
+          "Another logistics user has already issued a PO for these threads. Refresh and try again.",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(TWO_POS),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("concurrent_claim");
+    expect(body.message).toContain("concurrent_claim");
   });
 
   it("returns 403 for dealer caller (no rpc)", async () => {

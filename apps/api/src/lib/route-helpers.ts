@@ -7,7 +7,14 @@ import type { ZodTypeAny, infer as ZodInfer } from "zod";
  *   42P01 → 404 not_found
  *   22023 → 422 invalid_param
  *   P0001 → 422 with detail code
+ *   40001 → 409 conflict (serialization_failure — concurrent_claim guard)
  *   else  → 500 rpc_failed
+ *
+ * 40001 is raised by v3 RPCs that take a SELECT ... FOR UPDATE lock and find
+ * the protected invariant already broken (e.g. _v3_claim_threads_for_po in
+ * migration 0037 — two logistics users issued POs for the same threads).
+ * Surfaces as 409 Conflict so the FE can show "Refresh and try again"
+ * distinctly from generic 422 validation failures.
  *
  * TODO (Pipeline v2 follow-up): v2 detail-passthrough is currently scoped to
  * `mapPipelineV2Error` in routes/logistics/orders.ts (it forwards the RPC's
@@ -25,6 +32,8 @@ export function mapPgError(error: { code?: string; message?: string; details?: s
       return { status: 422 as const, body: { error: "invalid_param", code: "invalid_param", message: error.message ?? "invalid param" } };
     case "P0001":
       return { status: 422 as const, body: { error: "rule_violation", code: error.details ?? "invalid_param", message: error.message ?? "rule violation" } };
+    case "40001":
+      return { status: 409 as const, body: { error: "conflict", code: error.details ?? "concurrent_claim", message: error.message ?? "conflict" } };
     default:
       return { status: 500 as const, body: { error: "rpc_failed", code: "rpc_failed", message: error.message ?? "rpc failed" } };
   }

@@ -86,6 +86,32 @@ describe("mapPgError", () => {
     });
   });
 
+  // v3-active.1 (migration 0037): the batch RPC's _v3_claim_threads_for_po
+  // helper raises 40001 (serialization_failure) when a concurrent PO has
+  // already claimed one of the candidate threads. mapPgError surfaces it as
+  // 409 Conflict so the FE can show "Refresh and try again" without confusing
+  // it with a 422 validation failure.
+  it("maps SQLSTATE 40001 to 409 conflict (concurrent_claim)", () => {
+    const m = mapPgError({
+      code: "40001",
+      message: "concurrent_claim: 1 thread(s) already claimed",
+      details: "concurrent_claim",
+    });
+    expect(m.status).toBe(409);
+    expect(m.body).toEqual({
+      error: "conflict",
+      code: "concurrent_claim",
+      message: "concurrent_claim: 1 thread(s) already claimed",
+    });
+  });
+
+  it("falls back to 'concurrent_claim' code when 40001 has no details", () => {
+    const m = mapPgError({ code: "40001" });
+    expect(m.status).toBe(409);
+    expect(m.body.message).toBe("conflict");
+    expect(m.body.code).toBe("concurrent_claim");
+  });
+
   it("maps undefined code to 500 rpc_failed with fallback message", () => {
     const m = mapPgError({});
     expect(m.status).toBe(500);
