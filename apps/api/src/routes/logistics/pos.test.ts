@@ -197,7 +197,9 @@ describe("POST /api/logistics/pos", () => {
     expect(rpc).toHaveBeenCalledWith("logistics_create_po", {
       p_supplier_id: SUPPLIER_ID,
       p_warehouse_id: WAREHOUSE_ID,
-      p_lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" }],
+      // T29: per-line `costSource` is reshaped to snake_case `cost_source` at
+      // the API edge before handing to the RPC (matches DB JSONB convention).
+      p_lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, cost_source: "hand_entered" }],
       p_dl: 4001,
       p_dl_refs: null,
     });
@@ -231,7 +233,8 @@ describe("POST /api/logistics/pos", () => {
     expect(rpc).toHaveBeenCalledWith("logistics_create_po", {
       p_supplier_id: SUPPLIER_ID,
       p_warehouse_id: WAREHOUSE_ID,
-      p_lines: [{ sku: "MAT-K-001", qty: 5, cost: 1500, costSource: "hand_entered" }],
+      // T29: per-line `costSource` reshaped to snake_case `cost_source` at API edge.
+      p_lines: [{ sku: "MAT-K-001", qty: 5, cost: 1500, cost_source: "hand_entered" }],
       p_dl: null,
       p_dl_refs: [4001, 4002, 4003],
     });
@@ -1680,7 +1683,8 @@ describe("POST /api/logistics/pos/batch", () => {
         {
           supplier_id: SUPPLIER_A,
           warehouse_id: WH_KLANG,
-          lines: [{ sku: "mattress:carres-cloud:King", qty: 2, cost: 1500, costSource: "hand_entered" }],
+          // T29: per-line `costSource` reshaped to snake_case `cost_source` at API edge.
+          lines: [{ sku: "mattress:carres-cloud:King", qty: 2, cost: 1500, cost_source: "hand_entered" }],
           eta_date: null,
           dl_refs: null,
           note: null,
@@ -1688,7 +1692,7 @@ describe("POST /api/logistics/pos/batch", () => {
         {
           supplier_id: SUPPLIER_B,
           warehouse_id: WH_PJ,
-          lines: [{ sku: "sofa:oak:3-seater", qty: 1, cost: 2200, costSource: "prev_po" }],
+          lines: [{ sku: "sofa:oak:3-seater", qty: 1, cost: 2200, cost_source: "prev_po" }],
           eta_date: null,
           dl_refs: null,
           note: null,

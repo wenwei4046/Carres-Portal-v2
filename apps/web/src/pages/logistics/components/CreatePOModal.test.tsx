@@ -214,6 +214,16 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
       target: { value: WAREHOUSE_KL.id },
     });
 
+    // T29 — fill cost + costSource on the seeded line via the per-line
+    // CogsLineEditor sub-component. The valid-form gate now requires both.
+    const SKU_KING = "mattress:carres-cloud:King";
+    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
+      target: { value: "1500" },
+    });
+    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
+      target: { value: "hand_entered" },
+    });
+
     // Submit
     const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
     expect(issueBtn).not.toBeDisabled();
@@ -225,13 +235,16 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
     const callArg = createMutateAsync.mock.calls[0][0] as {
       supplierId: string;
       warehouseId: string;
-      lines: { sku: string; qty: number }[];
+      lines: { sku: string; qty: number; cost: number; costSource: string }[];
       dl?: number | null;
       dlRefs?: number[] | null;
     };
     expect(callArg.supplierId).toBe(SUPPLIER_A.id);
     expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
     expect(callArg.lines.length).toBeGreaterThan(0);
+    // T29 — every emitted line carries cost + costSource.
+    expect(callArg.lines[0].cost).toBe(1500);
+    expect(callArg.lines[0].costSource).toBe("hand_entered");
     // The contract: stockpile mode forces dl/dlRefs out of the payload.
     // Either omitted or explicitly null is acceptable per the API zod
     // (dl/dlRefs are .optional()), but neither must carry a value.
@@ -289,11 +302,52 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
     fireEvent.click(screen.getByTestId("stockpile-po-toggle"));
     expect(issueBtn).toBeDisabled();
 
-    // Pick warehouse — now the form is valid even though dl is unset.
+    // Pick warehouse — still not enough now that T29 requires per-line
+    // cost + costSource on every line. Submit stays gated.
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
     });
+    expect(issueBtn).toBeDisabled();
+
+    // T29 — fill cost + costSource via CogsLineEditor.
+    const SKU_KING = "mattress:carres-cloud:King";
+    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
+      target: { value: "1500" },
+    });
+    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
+      target: { value: "hand_entered" },
+    });
     expect(issueBtn).not.toBeDisabled();
+  });
+
+  it("submit blocked when any line is missing cost or costSource", () => {
+    // T29 — explicit invariant test: a line without cost OR costSource
+    // disables submit, even when warehouse is picked + stockpile mode on.
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    fireEvent.click(screen.getByTestId("stockpile-po-toggle"));
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
+    const SKU_KING = "mattress:carres-cloud:King";
+
+    // Pick costSource only — cost still null → blocked.
+    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
+      target: { value: "hand_entered" },
+    });
+    expect(issueBtn).toBeDisabled();
+
+    // Add cost — now both filled → unblocked.
+    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
+      target: { value: "1500" },
+    });
+    expect(issueBtn).not.toBeDisabled();
+
+    // Clear cost again — back to blocked.
+    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
+      target: { value: "" },
+    });
+    expect(issueBtn).toBeDisabled();
   });
 });
 

@@ -351,6 +351,14 @@ describe("LogisticsProcurement page", () => {
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
     });
+    // T29 — fill cost + costSource on the seeded line via CogsLineEditor.
+    const SKU_KING = "mattress:carres-cloud:King";
+    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
+      target: { value: "1500" },
+    });
+    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
+      target: { value: "hand_entered" },
+    });
     expect(issueBtn).not.toBeDisabled();
     fireEvent.click(issueBtn);
     await waitFor(() => {
@@ -359,11 +367,14 @@ describe("LogisticsProcurement page", () => {
     const callArg = createMutateAsync.mock.calls[0][0] as {
       supplierId: string;
       warehouseId: string;
-      lines: { sku: string; qty: number }[];
+      lines: { sku: string; qty: number; cost: number; costSource: string }[];
     };
     expect(callArg.supplierId).toBe(SUPPLIER_A.id);
     expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
     expect(callArg.lines.length).toBeGreaterThan(0);
+    // T29 — every emitted line carries cost + costSource.
+    expect(callArg.lines[0].cost).toBe(1500);
+    expect(callArg.lines[0].costSource).toBe("hand_entered");
   });
 
   it("6. clicking 'Receive →' on a delivered PO opens ReceivePOModal", () => {
@@ -854,6 +865,16 @@ describe("LogisticsProcurement page", () => {
       isFetched: false,
       refetch,
     };
+    // T29 — CogsLineEditor's `prev_po` path triggers `apiFetch` for the
+    // recent-cost endpoint. Stub a benign `null` cost so React Query has a
+    // defined value (otherwise warns about "Query data cannot be undefined").
+    // The component's null-cost path is "keep prior cost" → the user-typed
+    // 2200 stays in place, which the test asserts on.
+    vi.mocked(apiFetch).mockResolvedValue({
+      cost: null,
+      lastPoId: null,
+      lastReceivedAt: null,
+    });
     render(wrap(<LogisticsProcurement />));
     fireEvent.click(screen.getByTestId("new-po-button"));
     fireEvent.click(screen.getByTestId("auto-fill-shortage-button"));
@@ -870,7 +891,8 @@ describe("LogisticsProcurement page", () => {
     expect(
       screen.getByTestId(`po-supplier-group-${SUPPLIER_B.id}`),
     ).toBeInTheDocument();
-    // Issue button gates on per-supplier warehouse picks (Q4=A).
+    // Issue button gates on per-supplier warehouse picks (Q4=A) and (T29)
+    // per-line cost + costSource.
     const issueBtn = screen.getByRole("button", { name: /Issue 2 POs/ });
     expect(issueBtn).toBeDisabled();
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
@@ -878,6 +900,23 @@ describe("LogisticsProcurement page", () => {
     });
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_B.id}`), {
       target: { value: WAREHOUSE_PG.id },
+    });
+    // T29 — fill cost + costSource on each auto-filled line via the
+    // CogsLineEditor sub-component. The valid-form gate now requires both
+    // fields per line (mirrors `createPoInput.lines[]` zod refinement).
+    fireEvent.change(
+      screen.getByTestId(`cogs-cost-input-mattress:carres-cloud:King`),
+      { target: { value: "1500" } },
+    );
+    fireEvent.change(
+      screen.getByTestId(`cogs-source-select-mattress:carres-cloud:King`),
+      { target: { value: "hand_entered" } },
+    );
+    fireEvent.change(screen.getByTestId(`cogs-cost-input-sofa:nordic:3s`), {
+      target: { value: "2200" },
+    });
+    fireEvent.change(screen.getByTestId(`cogs-source-select-sofa:nordic:3s`), {
+      target: { value: "prev_po" },
     });
     expect(issueBtn).not.toBeDisabled();
     fireEvent.click(issueBtn);
@@ -887,7 +926,11 @@ describe("LogisticsProcurement page", () => {
     });
     expect(createMutateAsync).not.toHaveBeenCalled();
     const callArg = createBatchMutateAsync.mock.calls[0][0] as {
-      pos: { supplierId: string; warehouseId: string; lines: { sku: string; qty: number }[] }[];
+      pos: {
+        supplierId: string;
+        warehouseId: string;
+        lines: { sku: string; qty: number; cost: number; costSource: string }[];
+      }[];
     };
     expect(callArg.pos).toHaveLength(2);
     const aGroup = callArg.pos.find((p) => p.supplierId === SUPPLIER_A.id);
@@ -895,9 +938,21 @@ describe("LogisticsProcurement page", () => {
     expect(aGroup?.warehouseId).toBe(WAREHOUSE_KL.id);
     expect(bGroup?.warehouseId).toBe(WAREHOUSE_PG.id);
     expect(aGroup?.lines).toEqual([
-      { sku: "mattress:carres-cloud:King", qty: 5 },
+      {
+        sku: "mattress:carres-cloud:King",
+        qty: 5,
+        cost: 1500,
+        costSource: "hand_entered",
+      },
     ]);
-    expect(bGroup?.lines).toEqual([{ sku: "sofa:nordic:3s", qty: 3 }]);
+    expect(bGroup?.lines).toEqual([
+      {
+        sku: "sofa:nordic:3s",
+        qty: 3,
+        cost: 2200,
+        costSource: "prev_po",
+      },
+    ]);
   });
 
   it("26. auto-fill failure surfaces toast.error and does NOT show the misleading 'No shortages' notice", async () => {

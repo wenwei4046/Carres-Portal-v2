@@ -395,14 +395,28 @@ logisticsPosRouter.get("/:id/print", async (c) => {
 });
 
 // ----- POST / create -----
+//
+// T29 — reshape per-line `costSource` (camelCase wire) → `cost_source`
+// (snake_case JSONB) before handing to the RPC. The RPC reads
+// `(v_line->>'cost_source')::cost_source_enum` at migration 0055b, so the
+// field name must match the snake_case DB convention. Same boundary-
+// transform pattern as POST /batch below — the wire contract stays
+// camelCase (parity with every other route), and the snake_case translation
+// happens once at the DB edge.
 logisticsPosRouter.post("/", async (c) => {
   const parsed = await parseJsonBody(c, createPoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
+  const linesForRpc = parsed.data.lines.map((l) => ({
+    sku: l.sku,
+    qty: l.qty,
+    cost: l.cost,
+    cost_source: l.costSource,
+  }));
   const { data, error } = await sb.rpc("logistics_create_po", {
     p_supplier_id: parsed.data.supplierId,
     p_warehouse_id: parsed.data.warehouseId,
-    p_lines: parsed.data.lines,
+    p_lines: linesForRpc,
     p_dl: parsed.data.dl ?? null,
     p_dl_refs: parsed.data.dlRefs ?? null,
   });
@@ -434,11 +448,18 @@ logisticsPosRouter.post("/batch", async (c) => {
 
   // Reshape camelCase pos[] entries into the snake_case shape expected by the
   // RPC's JSONB array argument. Done at the boundary, not in shared schemas,
-  // so the wire contract stays camelCase like every other route.
+  // so the wire contract stays camelCase like every other route. T29: each
+  // line's `costSource` (camelCase wire) → `cost_source` (snake_case DB) per
+  // migration 0055b RPC contract.
   const payload = parsed.data.pos.map((p) => ({
     supplier_id: p.supplierId,
     warehouse_id: p.warehouseId,
-    lines: p.lines,
+    lines: p.lines.map((l) => ({
+      sku: l.sku,
+      qty: l.qty,
+      cost: l.cost,
+      cost_source: l.costSource,
+    })),
     eta_date: null as string | null,
     dl_refs: p.dlRefs ?? null,
     note: null as string | null,

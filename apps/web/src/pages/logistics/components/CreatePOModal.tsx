@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import type { CostSource } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
   useAwaitingStockShortage,
@@ -12,6 +13,7 @@ import {
   useStockAlerts,
   type SupplierRow,
 } from "@/lib/queries";
+import CogsLineEditor from "./CogsLineEditor";
 import { INPUT_CLS, Modal, ModalActions } from "./Modal";
 
 /**
@@ -73,6 +75,12 @@ interface Props {
 interface DraftLine {
   sku: string;
   qty: number;
+  // T29 — per-line COGS fields. Driven by `<CogsLineEditor>` (T28). Both
+  // start as null on a fresh row and must be non-null at submit time
+  // (validated below). Mirrors `createPoInput.lines[]` zod shape; the API
+  // edge transforms `costSource` → `cost_source` before the RPC call.
+  cost: number | null;
+  costSource: CostSource | null;
 }
 
 // Convention: SKUs are formatted `category:model:variant`. The first segment
@@ -146,9 +154,19 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   const partners = partnersQ.data?.partners ?? [];
 
   // ---- Lines ----
+  // T29: every line carries `cost` + `costSource` driven by CogsLineEditor.
+  // Both start null — the user fills them via the editor before submit (the
+  // valid-form gate enforces non-null per line). Auto-fill / suggest paths
+  // also leave them null so the operator picks the cost source explicitly per
+  // line.
   const initialLines: DraftLine[] = useMemo(() => {
     if (prefill.lines && prefill.lines.length > 0) {
-      return prefill.lines.map((l) => ({ sku: l.sku, qty: l.qty }));
+      return prefill.lines.map((l) => ({
+        sku: l.sku,
+        qty: l.qty,
+        cost: null,
+        costSource: null,
+      }));
     }
     return [];
   }, [prefill.lines]);
@@ -159,7 +177,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // qty: 5 }]` default.
   useEffect(() => {
     if (lines.length === 0 && skuOptions.length > 0 && initialLines.length === 0) {
-      setLines([{ sku: skuOptions[0].sku, qty: 5 }]);
+      setLines([{ sku: skuOptions[0].sku, qty: 5, cost: null, costSource: null }]);
     }
   }, [lines.length, skuOptions, initialLines.length]);
 
@@ -261,7 +279,15 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       }
       // Q3=A — override (replace), not append. Q2-extended — line.qty equals
       // the literal shortfall (need - available), as returned by the server.
-      setLines(data.shortage.map((s) => ({ sku: s.sku, qty: s.shortage })));
+      // T29: cost + costSource start null — operator picks via CogsLineEditor.
+      setLines(
+        data.shortage.map((s) => ({
+          sku: s.sku,
+          qty: s.shortage,
+          cost: null,
+          costSource: null,
+        })),
+      );
       const totalUnits = data.shortage.reduce((acc, s) => acc + s.need, 0);
       toast.success(
         `Auto-filled ${data.shortage.length} SKU${data.shortage.length === 1 ? "" : "s"} from ${totalUnits} unit${totalUnits === 1 ? "" : "s"} pending`,
@@ -307,10 +333,16 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         return;
       }
       // Replace lines (override) — same convention as auto-fill from shortage.
+      // T29: cost + costSource start null — operator picks via CogsLineEditor.
       const nextLines = data.alerts.map((a) => {
         const target = a.low_threshold * 2;
         const gap = target - a.effective;
-        return { sku: a.sku, qty: Math.max(1, gap) };
+        return {
+          sku: a.sku,
+          qty: Math.max(1, gap),
+          cost: null,
+          costSource: null,
+        };
       });
       setLines(nextLines);
       const count = data.alerts.length;
@@ -333,7 +365,8 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     const fallback = skuOptions[0];
     const sku = next?.sku ?? fallback?.sku ?? "";
     if (!sku) return;
-    setLines((ls) => [...ls, { sku, qty: 1 }]);
+    // T29: cost + costSource start null — populated via CogsLineEditor below.
+    setLines((ls) => [...ls, { sku, qty: 1, cost: null, costSource: null }]);
   }
   function removeLine(idx: number) {
     setLines((ls) => (ls.length > 1 ? ls.filter((_, i) => i !== idx) : ls));
@@ -354,8 +387,20 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   }
 
   // ---- Validation ----
+  // T29: each line MUST carry cost (non-null, non-negative) AND costSource
+  // before submit. The shared zod `createPoInput.lines[]` requires both;
+  // we mirror it here so the user gets immediate per-row feedback via the
+  // CogsLineEditor inline hint instead of a 422 round-trip.
   const allLinesOk =
-    lines.length > 0 && lines.every((l) => l.sku && l.qty > 0);
+    lines.length > 0 &&
+    lines.every(
+      (l) =>
+        l.sku &&
+        l.qty > 0 &&
+        l.cost != null &&
+        l.cost >= 0 &&
+        l.costSource != null,
+    );
   const partnersOk = groups.groups.every(
     (g) => g.supplier.kind !== "factory_pickup" || !!partnerFor(g.supplier),
   );
@@ -380,6 +425,11 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     if (!valid) return;
     try {
       const n = groups.groups.length;
+      // T29: emit cost + costSource per line. valid-form gate ensures both
+      // are non-null at this point — `!` non-null assertion mirrors the
+      // submit-time invariant (validation guard above blocks submit otherwise).
+      // The API edge reshapes camelCase `costSource` → snake_case `cost_source`
+      // before the RPC call.
       if (n === 1) {
         // Single supplier group → keep using the existing single-PO RPC.
         // This preserves the legacy contract (logistics_create_po) for the
@@ -391,7 +441,12 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         await create.mutateAsync({
           supplierId: g.supplier.id,
           warehouseId: warehouseFor(g.supplier),
-          lines: g.lines.map((l) => ({ sku: l.sku, qty: l.qty })),
+          lines: g.lines.map((l) => ({
+            sku: l.sku,
+            qty: l.qty,
+            cost: l.cost!,
+            costSource: l.costSource!,
+          })),
           ...(!stockpile && prefill.dl ? { dl: prefill.dl } : {}),
           ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
             ? { dlRefs: prefill.dlRefs }
@@ -410,7 +465,12 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           pos: groups.groups.map((g) => ({
             supplierId: g.supplier.id,
             warehouseId: warehouseFor(g.supplier),
-            lines: g.lines.map((l) => ({ sku: l.sku, qty: l.qty })),
+            lines: g.lines.map((l) => ({
+              sku: l.sku,
+              qty: l.qty,
+              cost: l.cost!,
+              costSource: l.costSource!,
+            })),
             ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
               ? { dlRefs: prefill.dlRefs }
               : {}),
@@ -582,72 +642,94 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           return (
             <div
               key={i}
-              className="grid items-center gap-2 px-3.5 py-2 border-t border-base-100"
-              style={{ gridTemplateColumns: "1fr 130px 90px 32px" }}
+              className="px-3.5 py-2 border-t border-base-100 flex flex-col gap-1.5"
+              data-testid={`po-line-row-${i}`}
             >
-              <select
-                value={l.sku}
-                onChange={(e) => setLine(i, { sku: e.target.value })}
-                aria-label={`Line ${i + 1} SKU`}
-                className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
-              >
-                {skuOptions.map((s) => (
-                  <option key={s.sku} value={s.sku}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
               <div
-                className="text-[11px] leading-[1.3] font-medium"
-                style={{
-                  color: sup ? "var(--base-700)" : "var(--brand-signature)",
-                }}
+                className="grid items-center gap-2"
+                style={{ gridTemplateColumns: "1fr 130px 90px 32px" }}
               >
-                {sup ? (
-                  <>
-                    <div>{sup.name}</div>
-                    <div
-                      className="mt-0.5"
-                      style={{
-                        fontSize: "9.5px",
-                        color: "var(--base-500)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                      }}
-                    >
-                      {sup.kind === "factory_pickup"
-                        ? "Factory pickup"
-                        : "Own logistics"}
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-[10.5px]">
-                    no supplier covers {categoryForSku(l.sku)}
-                  </span>
-                )}
+                <select
+                  value={l.sku}
+                  onChange={(e) => setLine(i, { sku: e.target.value })}
+                  aria-label={`Line ${i + 1} SKU`}
+                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                >
+                  {skuOptions.map((s) => (
+                    <option key={s.sku} value={s.sku}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <div
+                  className="text-[11px] leading-[1.3] font-medium"
+                  style={{
+                    color: sup ? "var(--base-700)" : "var(--brand-signature)",
+                  }}
+                >
+                  {sup ? (
+                    <>
+                      <div>{sup.name}</div>
+                      <div
+                        className="mt-0.5"
+                        style={{
+                          fontSize: "9.5px",
+                          color: "var(--base-500)",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        {sup.kind === "factory_pickup"
+                          ? "Factory pickup"
+                          : "Own logistics"}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-[10.5px]">
+                      no supplier covers {categoryForSku(l.sku)}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  value={l.qty}
+                  onChange={(e) =>
+                    setLine(i, {
+                      qty: Math.max(1, parseInt(e.target.value, 10) || 0),
+                    })
+                  }
+                  aria-label={`Line ${i + 1} qty`}
+                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeLine(i)}
+                  disabled={lines.length === 1}
+                  aria-label={`Remove line ${i + 1}`}
+                  className="btn-ghost text-[14px]"
+                  style={{ opacity: lines.length === 1 ? 0.3 : 1 }}
+                >
+                  ×
+                </button>
               </div>
-              <input
-                type="number"
-                min={1}
-                value={l.qty}
-                onChange={(e) =>
-                  setLine(i, {
-                    qty: Math.max(1, parseInt(e.target.value, 10) || 0),
-                  })
-                }
-                aria-label={`Line ${i + 1} qty`}
-                className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"
-              />
-              <button
-                type="button"
-                onClick={() => removeLine(i)}
-                disabled={lines.length === 1}
-                aria-label={`Remove line ${i + 1}`}
-                className="btn-ghost text-[14px]"
-                style={{ opacity: lines.length === 1 ? 0.3 : 1 }}
-              >
-                ×
-              </button>
+              {/* T29 — per-line COGS editor (cost + cost_source). Sub-row
+                  spans the full width below the SKU/qty grid; renders as a
+                  2-cell layout (cost input + dropdown). The shared zod
+                  schema `createPoInput.lines[]` requires both fields, and the
+                  modal's submit gate (`allLinesOk`) blocks submit until every
+                  line has both. */}
+              <div className="pl-0">
+                <CogsLineEditor
+                  sku={l.sku}
+                  cost={l.cost}
+                  costSource={l.costSource}
+                  onChange={(cost, costSource) =>
+                    setLine(i, { cost, costSource })
+                  }
+                  disabled={isPending}
+                />
+              </div>
             </div>
           );
         })}
