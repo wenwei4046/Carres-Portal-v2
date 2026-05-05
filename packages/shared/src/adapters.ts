@@ -263,7 +263,12 @@ export const purchaseOrderFromRow = (
   warehouseId: r.warehouse_id,
   status: r.status,
   supStatus: r.sup_status,
-  deliveryPartnerId: r.delivery_partner_id,
+  // Procurement-leg LP — renamed from `delivery_partner_id` in Phase 4.5 Chunk 2
+  // Sprint C migration 0052. Customer-leg LP fields previously on the PO
+  // (confirm_delivery_date / request_for_delivery_at / partner_accepted_at /
+  // partner_rejected_at) were dropped by 0052 — they live on
+  // `order_supplier_threads` and surface via `orderSupplierThreadFromRow`.
+  procurementPartnerId: r.procurement_partner_id,
   expectedReadyDate: r.expected_ready_date,
   pickupDate: r.pickup_date,
   etaDate: r.eta_date,

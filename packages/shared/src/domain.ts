@@ -253,8 +253,8 @@ export interface OrderSupplierThread {
   // Phase 4.5 Chunk 2 customer-leg LP fields (migration 0049). Per-leg split
   // per Chunk 2 design spec §3 (CQ1 = option (b)): customer-leg LP +
   // RFD/accept/reject timestamps live on the thread, while the procurement-leg
-  // LP stays on `purchase_orders.delivery_partner_id` (renamed to
-  // `procurement_partner_id` in Sprint C migration 0052). Mirrors
+  // LP lives on `purchase_orders.procurement_partner_id` (renamed from
+  // `delivery_partner_id` in Sprint C migration 0052). Mirrors
   // `OrderSupplierThreadRow` snake_case fields 1:1.
   deliveryPartnerId: string | null;
   confirmDeliveryDate: string | null;
@@ -285,7 +285,11 @@ export interface PurchaseOrder {
     | "ready_confirm_sent" | "partner_confirmed" | "customer_rejected"
     | "relocated" | "at_partner_wh" | "at_own_wh_waiting"
     | "at_warehouse_waiting";
-  deliveryPartnerId: string | null;
+  // Procurement-leg LP — renamed from `deliveryPartnerId` in Phase 4.5 Chunk 2
+  // Sprint C migration 0052. Customer-leg LP now lives on
+  // `OrderSupplierThread.deliveryPartnerId` (per-leg split). Mirrors
+  // `PurchaseOrderRow.procurement_partner_id`.
+  procurementPartnerId: string | null;
   expectedReadyDate: string | null;
   pickupDate: string | null;
   etaDate: string | null;

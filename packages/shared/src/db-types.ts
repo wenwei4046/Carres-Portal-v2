@@ -298,10 +298,11 @@ export interface OrderSupplierThreadRow {
   // Phase 4.5 Chunk 2 customer-leg LP fields (migration 0049). Per-leg split
   // per Chunk 2 design spec §3 (CQ1 = option (b)): customer-leg LP +
   // RFD/accept/reject timestamps live on the thread, while the procurement-leg
-  // LP stays on `purchase_orders.delivery_partner_id` (renamed to
-  // `procurement_partner_id` in Sprint C migration 0052). Closes carry-forward
+  // LP lives on `purchase_orders.procurement_partner_id` (renamed from
+  // `delivery_partner_id` in Sprint C migration 0052). Closes carry-forward
   // `phase-4.5-procurement-vs-delivery-partner-field-split`. Backfilled from
-  // PO columns by migration 0050; partial index `ost_partner_rfd_pending_idx`
+  // PO columns by migration 0050; the legacy PO customer-leg columns were
+  // dropped by migration 0052. Partial index `ost_partner_rfd_pending_idx`
   // backs the "RFD pending" LP queue.
   delivery_partner_id: string | null;
   confirm_delivery_date: string | null;
@@ -326,7 +327,12 @@ export interface PurchaseOrderRow {
   // now live in the `purchase_order_lines` child table — see PurchaseOrderLineRow.
   status: POStatus;
   sup_status: POSupStatus;
-  delivery_partner_id: string | null;
+  // Procurement-leg LP — the supplier→warehouse pickup partner.
+  // Renamed from `delivery_partner_id` → `procurement_partner_id` in Phase 4.5
+  // Chunk 2 Sprint C migration 0052 to disambiguate from the customer-leg LP,
+  // which now lives on `order_supplier_threads.delivery_partner_id` (migration
+  // 0049). The PO holds ONLY procurement-leg state from 0052 forward.
+  procurement_partner_id: string | null;
   expected_ready_date: string | null;
   pickup_date: string | null;
   eta_date: string | null;
@@ -343,21 +349,14 @@ export interface PurchaseOrderRow {
   // v3-S3 outsource fields (migration 0030). Used when a PO is delivered by a
   // one-shot outsourced partner (not a registered delivery_partners row); the
   // CHECK constraint po_outsource_xor_partner enforces these are mutually
-  // exclusive with delivery_partner_id.
+  // exclusive with procurement_partner_id (renamed in 0052).
   outsource_partner_name: string | null;
   outsource_partner_contact: string | null;
   outsource_partner_zones: string | null;
-  // Phase 4.5 Chunk 1 customer-leg RFD/dispatch fields (migration 0044).
-  // confirm_delivery_date: date filled by Logistics or LP for the customer leg.
-  // request_for_delivery_at: timestamp set when Logistics presses Send RFD.
-  // partner_accepted_at / partner_rejected_at: LP response to the RFD.
-  // partner_rejection_reason intentionally absent — audit_log text is the
-  // persistence (Codex F10 fix). Partial index po_partner_rfd_pending_idx
-  // backs the "RFD pending" LP queue.
-  confirm_delivery_date: string | null;
-  request_for_delivery_at: string | null;
-  partner_accepted_at: string | null;
-  partner_rejected_at: string | null;
+  // Phase 4.5 Chunk 2 Sprint C migration 0052 DROPPED the 4 customer-leg fields
+  // (`confirm_delivery_date`, `request_for_delivery_at`, `partner_accepted_at`,
+  // `partner_rejected_at`) from `purchase_orders` — they were backfilled to
+  // `order_supplier_threads` by migration 0050 and now live there exclusively.
   pay_status: POPayStatus;
   placed_at: string;
 }
