@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import CreatePOModal from "./CreatePOModal";
+import { ApiError } from "@/lib/api";
 import type { CatalogResponse } from "@carres/shared";
 import type {
   DeliveryPartnersListResponse,
@@ -10,17 +11,29 @@ import type {
 } from "@/lib/queries";
 
 /**
- * CreatePOModal — focused tests for v3-S4.5 Stockpile PO mode.
+ * CreatePOModal — full modal coverage.
  *
- * The bulk of CreatePOModal coverage lives in LogisticsProcurement.test.tsx
- * (auto-fill, supplier groups, batch RPC, etc.). This file isolates the new
- * stockpile-mode toggle so the behavior contract is asserted independently
- * of the parent page wiring.
+ * Phase 4.5 Chunk 2 Sprint F Task 36 — auto-fill / supplier groups / batch RPC
+ * tests migrated from `LogisticsProcurement.test.tsx` when the legacy
+ * single-page list was retired in favor of the per-supplier tab UI. The shared
+ * fixtures below grew SUPPLIER_B + WAREHOUSE_PG for the 2-supplier auto-fill
+ * test. The original v3-S4.5 stockpile + T22 alerts coverage stays as-is.
  *
  * Stockpile PO = a PO with no `dl` / `dlRefs` — pure inventory replenishment
  * ahead of customer demand. v3 spec §17.1 A3 promotes this from an audit-trail
  * edge case to a 1st-class flow with explicit UI.
  */
+
+// Phase 4.5 Chunk 1 Task 38 — ReceivePOModal no longer mounts here, but the
+// auto-fill / 2-supplier flow drives `CogsLineEditor`'s `prev_po` source path
+// which calls `apiFetch` for the recent-cost endpoint. Mock `apiFetch` so
+// React Query has a defined value (otherwise warns about "Query data cannot
+// be undefined").
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return { ...actual, apiFetch: vi.fn() };
+});
+import { apiFetch } from "@/lib/api";
 
 const sonnerMocks = vi.hoisted(() => {
   const success = vi.fn();
@@ -107,11 +120,27 @@ const SUPPLIER_A = {
   lead_time: "5–7 days",
   contact: "+60 3-1111 1111",
 };
+// Added in T36 migration — the auto-split + 2-supplier batch tests need a 2nd
+// supplier whose `cat_covered` covers `sofa` so the modal routes a sofa SKU
+// to a separate supplier group.
+const SUPPLIER_B = {
+  id: "11111111-1111-1111-1111-000000000002",
+  name: "Sofa Factory Co",
+  kind: "factory_pickup" as const,
+  cat_covered: ["sofa"],
+  lead_time: "10–14 days",
+  contact: "+60 3-2222 2222",
+};
 
 const WAREHOUSE_KL = {
   id: "22222222-2222-2222-2222-000000000001",
   name: "KL Warehouse",
   address: "Subang Jaya",
+};
+const WAREHOUSE_PG = {
+  id: "22222222-2222-2222-2222-000000000002",
+  name: "Penang Warehouse",
+  address: "George Town",
 };
 
 const PARTNER_A = {
@@ -122,10 +151,10 @@ const PARTNER_A = {
 };
 
 function setLoaded() {
-  suppliersHookState = { data: { suppliers: [SUPPLIER_A] } };
+  suppliersHookState = { data: { suppliers: [SUPPLIER_A, SUPPLIER_B] } };
   warehouseHookState = {
     data: {
-      warehouses: [WAREHOUSE_KL],
+      warehouses: [WAREHOUSE_KL, WAREHOUSE_PG],
       byWarehouse: {},
       totalsBySku: {},
     },
@@ -155,6 +184,22 @@ function setLoaded() {
           variantKind: "size",
           price: 3500,
         },
+        {
+          id: "s2",
+          modelId: "m2",
+          sku: "sofa:nordic:3s",
+          variant: "Nordic Sofa · 3 seater",
+          variantKind: "preset",
+          price: 4500,
+        },
+        {
+          id: "s3",
+          modelId: "m1",
+          sku: "mattress:carres-cloud:Queen",
+          variant: "Carres Cloud · Queen",
+          variantKind: "size",
+          price: 3000,
+        },
       ],
       sofaFabrics: [],
       addons: [],
@@ -169,6 +214,7 @@ beforeEach(() => {
   sonnerMocks.success.mockClear();
   sonnerMocks.error.mockClear();
   sonnerMocks.defaultFn.mockClear();
+  vi.mocked(apiFetch).mockReset();
   setLoaded();
 });
 
@@ -375,16 +421,25 @@ describe("CreatePOModal — Suggest from alerts (T22)", () => {
   function withCatalog(
     extra: { id: string; modelId: string; sku: string; variant: string }[],
   ) {
+    // T36 — dedupe by sku since the shared `setLoaded()` seed already carries
+    // some of the SKUs the alerts tests want (sofa:nordic:3s, Queen, etc.). A
+    // duplicate `<option key={sku}>` in the SKU select triggers React's "two
+    // children with the same key" warning, which gates strict mode.
+    const existing = new Set(
+      (catalogHookState.data?.skus ?? []).map((s) => s.sku),
+    );
     catalogHookState = {
       data: {
         models: [],
         skus: [
           ...(catalogHookState.data?.skus ?? []),
-          ...extra.map((e) => ({
-            ...e,
-            variantKind: "size" as const,
-            price: 0,
-          })),
+          ...extra
+            .filter((e) => !existing.has(e.sku))
+            .map((e) => ({
+              ...e,
+              variantKind: "size" as const,
+              price: 0,
+            })),
         ],
         sofaFabrics: [],
         addons: [],
@@ -606,5 +661,321 @@ describe("CreatePOModal — Suggest from alerts (T22)", () => {
       expect(qtyInputs).toHaveLength(1);
       expect(qtyInputs[0].value).toBe("1");
     });
+  });
+});
+
+/**
+ * Phase 4.5 Chunk 2 Sprint F Task 36 — base modal coverage migrated from
+ * `LogisticsProcurement.test.tsx`.
+ *
+ * The legacy single-page list opened the modal via a `+ New PO` button on the
+ * page. The new tab UI doesn't have that button yet (T36 only restructures
+ * tests; the entry point lands later), so these tests render `CreatePOModal`
+ * directly with explicit props — the same pattern T22 alerts + stockpile
+ * tests above already use.
+ */
+describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement)", () => {
+  const SKU_KING = "mattress:carres-cloud:King";
+
+  it("renders the lines table + heading on mount", () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    expect(screen.getByText(/New purchase order/)).toBeInTheDocument();
+    expect(screen.getByTestId("po-lines-table")).toBeInTheDocument();
+  });
+
+  it("disables 'Issue PO' when no warehouse picked", () => {
+    // Empty warehouses → the supplier-group warehouse select has no valid
+    // option, so submit stays gated.
+    warehouseHookState = {
+      data: { warehouses: [], byWarehouse: {}, totalsBySku: {} },
+    };
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
+    expect(issueBtn).toBeDisabled();
+  });
+
+  it("submit calls useCreatePoMutation per supplier group with cost + costSource", async () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    // Default first SKU is `mattress:carres-cloud:King` which maps to SUPPLIER_A.
+    // C5.2 — warehouse defaults blank per supplier group, so the button is
+    // disabled until the user picks one.
+    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
+    expect(issueBtn).toBeDisabled();
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    // T29 — fill cost + costSource on the seeded line via CogsLineEditor.
+    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
+      target: { value: "1500" },
+    });
+    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
+      target: { value: "hand_entered" },
+    });
+    expect(issueBtn).not.toBeDisabled();
+    fireEvent.click(issueBtn);
+    await waitFor(() => {
+      expect(createMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    const callArg = createMutateAsync.mock.calls[0][0] as {
+      supplierId: string;
+      warehouseId: string;
+      lines: { sku: string; qty: number; cost: number; costSource: string }[];
+    };
+    expect(callArg.supplierId).toBe(SUPPLIER_A.id);
+    expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
+    expect(callArg.lines.length).toBeGreaterThan(0);
+    // T29 — every emitted line carries cost + costSource.
+    expect(callArg.lines[0].cost).toBe(1500);
+    expect(callArg.lines[0].costSource).toBe("hand_entered");
+  });
+
+  it("warns when 2 suppliers match → auto-split notice", () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    // Add a second SKU mapped to SUPPLIER_B (sofa:...)
+    fireEvent.click(screen.getByRole("button", { name: /\+ Add SKU/ }));
+    const skuSelects = screen.getAllByLabelText(/Line \d+ SKU/);
+    expect(skuSelects.length).toBe(2);
+    fireEvent.change(skuSelects[1], { target: { value: "sofa:nordic:3s" } });
+    // The notice has "Auto-split:" followed by N separate POs in a <strong>;
+    // grab the parent of "Auto-split:" and check its text.
+    const autoSplitLabel = screen.getByText(/Auto-split:/);
+    expect(autoSplitLabel.parentElement?.textContent).toContain(
+      "2 separate POs",
+    );
+    // Both supplier names should also be in the same notice.
+    expect(autoSplitLabel.parentElement?.textContent).toContain(
+      "Carres Manufacturing",
+    );
+    expect(autoSplitLabel.parentElement?.textContent).toContain(
+      "Sofa Factory Co",
+    );
+  });
+});
+
+/**
+ * Phase 4.5 Chunk 2 Sprint F Task 36 — auto-fill from awaiting stock
+ * (C5.3 → 5.2 chain) migrated from `LogisticsProcurement.test.tsx`. The
+ * test 21/22 visibility guards above already covered the prefill cases; these
+ * round out the click-side behavior (refetch / override / batch RPC / error).
+ */
+describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
+  const SKU_KING = "mattress:carres-cloud:King";
+
+  it("button is visible when no prefill.dl and no prefill.dlRefs", () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    expect(screen.getByTestId("auto-fill-shortage-button")).toBeInTheDocument();
+  });
+
+  it("button is HIDDEN when prefill.dl is set (single-order shortage flow)", () => {
+    render(wrap(<CreatePOModal prefill={{ dl: 1234 }} onClose={() => {}} />));
+    expect(
+      screen.queryByTestId("auto-fill-shortage-button"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("button is HIDDEN when prefill.dlRefs is non-empty (bundle flow)", () => {
+    render(
+      wrap(
+        <CreatePOModal
+          prefill={{ dlRefs: [4001, 4002, 4003] }}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    expect(
+      screen.queryByTestId("auto-fill-shortage-button"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("clicking auto-fill triggers refetch and replaces lines (override behavior)", async () => {
+    const refetch = vi.fn().mockResolvedValue({
+      data: {
+        shortage: [
+          { sku: "sofa:nordic:3s", need: 5, available: 1, shortage: 4 },
+          {
+            sku: "mattress:carres-cloud:Queen",
+            need: 3,
+            available: 0,
+            shortage: 3,
+          },
+        ],
+      },
+    });
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch,
+    };
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    // Modal default seeds first line with first SKU = "mattress:carres-cloud:King".
+    expect(screen.getByDisplayValue("Carres Cloud · King")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("auto-fill-shortage-button"));
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+    // Override behavior — the previous default King line is gone, replaced by
+    // the two SKUs returned from the server (Queen + Nordic).
+    await waitFor(() => {
+      expect(screen.queryByDisplayValue("Carres Cloud · King")).toBeNull();
+    });
+    expect(
+      screen.getAllByDisplayValue("Nordic Sofa · 3 seater").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByDisplayValue("Carres Cloud · Queen").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("empty shortage result disables the button + shows the empty label", () => {
+    const refetch = vi.fn().mockResolvedValue({ data: { shortage: [] } });
+    // Simulate the post-fetch state: isFetched=true, data is empty.
+    shortageHookState = {
+      data: { shortage: [] },
+      isFetching: false,
+      isFetched: true,
+      refetch,
+    };
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    const btn = screen.getByTestId("auto-fill-shortage-button");
+    expect(btn).toBeDisabled();
+    expect(btn.textContent ?? "").toMatch(/No shortages/i);
+  });
+
+  it("auto-fill across 2 suppliers → user picks per-PO warehouse for each → batch RPC fires (5.3 → 5.2 chain)", async () => {
+    // Program refetch with two SKUs whose categories map to two different
+    // suppliers (mattress → SUPPLIER_A, sofa → SUPPLIER_B). After click the
+    // modal must render BOTH supplier-group cards, accept a warehouse pick
+    // for each, and submit via the batch RPC (NOT the single-PO RPC).
+    const refetch = vi.fn().mockResolvedValue({
+      data: {
+        shortage: [
+          { sku: SKU_KING, need: 5, available: 0, shortage: 5 },
+          { sku: "sofa:nordic:3s", need: 3, available: 0, shortage: 3 },
+        ],
+      },
+    });
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch,
+    };
+    // T29 — CogsLineEditor's `prev_po` path triggers `apiFetch` for the
+    // recent-cost endpoint. Stub a benign `null` cost so React Query has a
+    // defined value (otherwise warns about "Query data cannot be undefined").
+    // The component's null-cost path is "keep prior cost" → the user-typed
+    // 2200 stays in place, which the test asserts on.
+    vi.mocked(apiFetch).mockResolvedValue({
+      cost: null,
+      lastPoId: null,
+      lastReceivedAt: null,
+    });
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    fireEvent.click(screen.getByTestId("auto-fill-shortage-button"));
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+    // Both supplier groups render — verifies setLines triggered the
+    // auto-grouping side-effect and per-PO warehouse pickers appear.
+    await waitFor(() => {
+      expect(
+        screen.getByTestId(`po-supplier-group-${SUPPLIER_A.id}`),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByTestId(`po-supplier-group-${SUPPLIER_B.id}`),
+    ).toBeInTheDocument();
+    // Issue button gates on per-supplier warehouse picks (Q4=A) and (T29)
+    // per-line cost + costSource.
+    const issueBtn = screen.getByRole("button", { name: /Issue 2 POs/ });
+    expect(issueBtn).toBeDisabled();
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_B.id}`), {
+      target: { value: WAREHOUSE_PG.id },
+    });
+    // T29 — fill cost + costSource on each auto-filled line via the
+    // CogsLineEditor sub-component. The valid-form gate now requires both
+    // fields per line (mirrors `createPoInput.lines[]` zod refinement).
+    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
+      target: { value: "1500" },
+    });
+    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
+      target: { value: "hand_entered" },
+    });
+    fireEvent.change(screen.getByTestId(`cogs-cost-input-sofa:nordic:3s`), {
+      target: { value: "2200" },
+    });
+    fireEvent.change(screen.getByTestId(`cogs-source-select-sofa:nordic:3s`), {
+      target: { value: "prev_po" },
+    });
+    expect(issueBtn).not.toBeDisabled();
+    fireEvent.click(issueBtn);
+    // Batch RPC fires (NOT the single-PO RPC) — atomic 2-PO commit.
+    await waitFor(() => {
+      expect(createBatchMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    expect(createMutateAsync).not.toHaveBeenCalled();
+    const callArg = createBatchMutateAsync.mock.calls[0][0] as {
+      pos: {
+        supplierId: string;
+        warehouseId: string;
+        lines: { sku: string; qty: number; cost: number; costSource: string }[];
+      }[];
+    };
+    expect(callArg.pos).toHaveLength(2);
+    const aGroup = callArg.pos.find((p) => p.supplierId === SUPPLIER_A.id);
+    const bGroup = callArg.pos.find((p) => p.supplierId === SUPPLIER_B.id);
+    expect(aGroup?.warehouseId).toBe(WAREHOUSE_KL.id);
+    expect(bGroup?.warehouseId).toBe(WAREHOUSE_PG.id);
+    expect(aGroup?.lines).toEqual([
+      {
+        sku: SKU_KING,
+        qty: 5,
+        cost: 1500,
+        costSource: "hand_entered",
+      },
+    ]);
+    expect(bGroup?.lines).toEqual([
+      {
+        sku: "sofa:nordic:3s",
+        qty: 3,
+        cost: 2200,
+        costSource: "prev_po",
+      },
+    ]);
+  });
+
+  it("auto-fill failure surfaces toast.error and does NOT show the misleading 'No shortages' notice", async () => {
+    // refetch resolves with React Query's `{data, error}` shape — `error` set,
+    // `data` undefined. Pre-fix this fell through to the empty-state toast,
+    // claiming "no shortages" while the endpoint was actually 5xx-ing.
+    const refetch = vi.fn().mockResolvedValue({
+      data: undefined,
+      error: new ApiError(500, "Internal Server Error", null),
+    });
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch,
+    };
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    fireEvent.click(screen.getByTestId("auto-fill-shortage-button"));
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+    // Failure routes through toast.error with the ApiError message…
+    await waitFor(() => {
+      expect(sonnerMocks.error).toHaveBeenCalled();
+    });
+    expect(sonnerMocks.error).toHaveBeenCalledWith("Internal Server Error");
+    // …and crucially does NOT fire the empty-state toast (`toast(...)`).
+    expect(sonnerMocks.defaultFn).not.toHaveBeenCalled();
+    // Lines stay untouched (no override happened).
+    expect(screen.getByDisplayValue("Carres Cloud · King")).toBeInTheDocument();
   });
 });
