@@ -162,6 +162,10 @@ export interface DeliveryPartnerRow {
   id: string;
   name: string;
   contact: string | null;
+  // Postal address — added in migration 0048 (Phase 4.5 Chunk 1 carry-forward
+  // `lp-address-column`). NULL for legacy rows that pre-date the LP creation
+  // form; new rows from POST /api/principal/partners always populate it.
+  address: string | null;
   zones: string | null;
   onboarded_date: string | null;
   rate_card: Record<string, { base: number; per_floor_walk_up: number; per_km: number }> | null;

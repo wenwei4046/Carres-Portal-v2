@@ -20,11 +20,11 @@ import type { AppEnv } from "../../types";
  *   - step 2 fails → DELETE delivery_partners (1)
  *   - step 3 fails → DELETE auth.user (2) + DELETE delivery_partners (1)
  *
- * Address handling: `delivery_partners` schema has no dedicated `address`
- * column today (see 0001_init.sql:99 → `id, name, contact, zones text,
- * onboarded_date, rate_card`). We fold `${contactNumber} · ${address}` into
- * the `contact` column to preserve both data points until a future migration
- * splits them out (carry-forward: phase-4.5-chunk-1-lp-address-column).
+ * Address handling: `delivery_partners.address` is a dedicated nullable
+ * column added in migration 0048 (closes carry-forward
+ * `phase-4.5-chunk-1-lp-address-column`). The pre-0048 hack of folding
+ * `${contactNumber} · ${address}` into `contact` was retired with that
+ * migration's idempotent backfill, which split any concat'd rows back apart.
  *
  * RED LINE: this is one of the few routes that uses `adminClient` (service_role).
  * Per CLAUDE.md §4.4, the service-role key never touches the user JWT path —
@@ -65,13 +65,14 @@ principalPartnersRouter.post("/", async (c) => {
   const sb = adminClient(c.env);
   const auth = c.var.auth;
 
-  // Step 1: insert delivery_partners row.
-  // contact = "${contactNumber} · ${address}" (no dedicated address column yet).
+  // Step 1: insert delivery_partners row. Migration 0048 split phone +
+  // address into separate columns; both go into the row directly.
   const dpInsert = await sb
     .from("delivery_partners")
     .insert({
       name: body.companyName,
-      contact: `${body.contactNumber} · ${body.address}`,
+      contact: body.contactNumber,
+      address: body.address,
     })
     .select()
     .single();
@@ -151,18 +152,16 @@ principalPartnersRouter.post("/", async (c) => {
  * GET / — list LP accounts.
  *
  * Read path uses `userClient` (forwards caller JWT) so RLS on
- * `delivery_partners` applies. Per migration 0001 the table schema is:
- *   id, name, contact, zones text, onboarded_date, rate_card
- * No `address` column exists yet (carry-forward
- * phase-4.5-chunk-1-lp-address-column) — Task 19 stores address concatenated
- * into `contact`.
+ * `delivery_partners` applies. Schema (post-0048): id, name, contact,
+ * address, zones, onboarded_date, rate_card. The `address` column is
+ * nullable — legacy rows pre-Task-19 may not have one.
  */
 principalPartnersRouter.get("/", async (c) => {
   const auth = c.var.auth;
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb
     .from("delivery_partners")
-    .select("id,name,contact,zones,onboarded_date,rate_card");
+    .select("id,name,contact,address,zones,onboarded_date,rate_card");
 
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json(data ?? []);

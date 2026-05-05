@@ -13,16 +13,16 @@ import CreateLpAccountForm from "./components/CreateLpAccountForm";
  * On successful creation, the form's `onCreated` callback invalidates the
  * `principal.partners` query so the list refreshes without a manual reload.
  *
- * NOTE on `contact` display: `delivery_partners` has no separate `address`
- * column — the address is concatenated into the `contact` field by the LP
- * creation route (e.g. `"0123 · 1 Demo St"`). We render it as-is. Carry-forward
- * `phase-4.5-chunk-1-lp-address-column` tracks splitting these fields later.
+ * `contact` and `address` are separate columns (migration 0048 — closes
+ * carry-forward `lp-address-column`). The list renders them on consecutive
+ * lines: phone above, address below. Either may be NULL for legacy rows.
  */
 type LpRow = {
   id: string;
   name: string;
-  contact: string;
-  zones: string;
+  contact: string | null;
+  address: string | null;
+  zones: string | null;
   onboarded_date?: string | null;
   rate_card?: unknown;
 };
@@ -66,12 +66,25 @@ export default function PrincipalPartners() {
           <ul className="divide-y divide-base-200 border border-base-200 rounded">
             {lps.map((lp) => (
               <li key={lp.id} className="py-3 px-3.5 flex items-baseline gap-3">
-                <strong className="text-[13px] text-base-900">
-                  {lp.name}
-                </strong>
-                <span className="text-[12px] text-base-500">{lp.contact}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-3">
+                    <strong className="text-[13px] text-base-900">
+                      {lp.name}
+                    </strong>
+                    {lp.contact && (
+                      <span className="text-[12px] text-base-500">
+                        {lp.contact}
+                      </span>
+                    )}
+                  </div>
+                  {lp.address && (
+                    <div className="text-[11px] text-base-500 mt-0.5">
+                      {lp.address}
+                    </div>
+                  )}
+                </div>
                 {lp.zones && (
-                  <span className="ml-auto text-[10px] uppercase tracking-wider text-base-400">
+                  <span className="text-[10px] uppercase tracking-wider text-base-400">
                     {lp.zones}
                   </span>
                 )}

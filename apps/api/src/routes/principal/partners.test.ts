@@ -120,12 +120,15 @@ describe("POST /api/principal/partners", () => {
     expect(body.partner_id).toBe(newPartnerId);
     expect(body.auth_user_id).toBe(newAuthUserId);
     expect(sb.auth.admin.createUser).toHaveBeenCalledOnce();
-    // delivery_partners insert receives companyName as name + contact embeds address
+    // delivery_partners insert: name=companyName, contact=phone, address=address.
+    // Migration 0048 split address out of the concat'd contact hack.
     expect(dpInsert).toHaveBeenCalledOnce();
     const dpArg = dpInsert.mock.calls[0]?.[0];
-    expect(dpArg).toMatchObject({ name: "LP-A Logistics" });
-    expect(String(dpArg.contact)).toContain("0123456789");
-    expect(String(dpArg.contact)).toContain("1 Demo St");
+    expect(dpArg).toMatchObject({
+      name: "LP-A Logistics",
+      contact: "0123456789",
+      address: "1 Demo St",
+    });
     // app_users insert links partner_id and role='partner'
     expect(auInsert).toHaveBeenCalledOnce();
     const auArg = auInsert.mock.calls[0]?.[0];
