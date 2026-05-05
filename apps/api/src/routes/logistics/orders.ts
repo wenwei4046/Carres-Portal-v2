@@ -101,10 +101,17 @@ logisticsOrdersRouter.get("/", async (c) => {
   const { stage, channel, search } = parsed.data;
 
   const sb = userClient(c.env, c.var.auth.jwt);
+  // Phase 4.5 Chunk 2 (T9): customer-leg LP fields now live on
+  // `order_supplier_threads` (migration 0049 added the columns; 0050 backfilled
+  // them from PO). FE OrderCard reads `threads[].delivery_partner_id` instead
+  // of order-level `delivery_partner_id` to surface the LP pill. Embedding via
+  // PostgREST nested fetch keeps the round-trip count at 1; threads come back
+  // as an array per order. The order-level `delivery_partner_id` is kept for
+  // print-DO + legacy callers (no change here).
   let q = sb
     .from("orders")
     .select(
-      "id, dl, status, logistics_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name)",
+      "id, dl, status, logistics_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), order_supplier_threads(id, supplier_id, category, logistics_stage, po_id, delivery_partner_id, confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -161,14 +168,26 @@ logisticsOrdersRouter.get("/:id", async (c) => {
     return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
   }
 
-  const [linesRes, addonsRes, historyRes] = await Promise.all([
+  // Phase 4.5 Chunk 2 (T9): fetch per-supplier threads for customer-leg LP
+  // surfacing. Threads carry the customer-leg fields (`delivery_partner_id`,
+  // `confirm_delivery_date`, `request_for_delivery_at`, `partner_accepted_at`,
+  // `partner_rejected_at`) that previously lived on the PO. Drawer reads
+  // `threads[].delivery_partner_id` for the partner-assignment hint.
+  const [linesRes, addonsRes, historyRes, threadsRes] = await Promise.all([
     sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", id),
     sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
     sb.from("order_history").select("text, by_role, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
+    sb
+      .from("order_supplier_threads")
+      .select(
+        "id, supplier_id, category, logistics_stage, po_id, delivery_partner_id, confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at",
+      )
+      .eq("order_id", id),
   ]);
   if (linesRes.error) { const m = mapPgError(linesRes.error); return c.json(m.body, m.status); }
   if (addonsRes.error) { const m = mapPgError(addonsRes.error); return c.json(m.body, m.status); }
   if (historyRes.error) { const m = mapPgError(historyRes.error); return c.json(m.body, m.status); }
+  if (threadsRes.error) { const m = mapPgError(threadsRes.error); return c.json(m.body, m.status); }
 
   const lines = linesRes.data ?? [];
   const addons = addonsRes.data ?? [];
@@ -234,6 +253,7 @@ logisticsOrdersRouter.get("/:id", async (c) => {
     stockBalances,
     pos: posWithLines,
     history: historyRes.data ?? [],
+    threads: threadsRes.data ?? [],
   });
 });
 

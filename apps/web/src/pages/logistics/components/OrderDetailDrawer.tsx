@@ -279,7 +279,16 @@ function DrawerBody({
   onConfirmProceedClick,
   onTransferReadyClick,
 }: DrawerBodyProps) {
-  const { order, lines, addons, total, warehouse, stockBalances, pos, history } = data;
+  const { order, lines, addons, total, warehouse, stockBalances, pos, history, threads } = data;
+  // Phase 4.5 Chunk 2 (T9) — partner-assignment hint sourced from threads
+  // (`order_supplier_threads.delivery_partner_id`) rather than the order-level
+  // column, per design spec §CQ1 option (b). True when ANY thread has a
+  // customer-leg LP assigned (multi-supplier orders may have N partners; the
+  // ActionBar only needs a boolean cue and the user opens the drill-down for
+  // detail).
+  const anyThreadPartnerAssigned = threads.some(
+    (t) => t.delivery_partner_id !== null,
+  );
   // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
   // new placed/proceed_request enum values without falling through to a
   // bogus awaiting_logistics_action default.
@@ -333,7 +342,7 @@ function DrawerBody({
           dl={order.dl}
           warehouseName={warehouse?.name ?? null}
           shortageCount={shortages.length}
-          partnerAssigned={order.delivery_partner_id !== null}
+          partnerAssigned={anyThreadPartnerAssigned}
           doNumber={order.do_number}
           onDispatchClick={onDispatchClick}
           onDOClick={onDOClick}

@@ -104,6 +104,9 @@ function makeOrder(overrides: Partial<LogisticsOrderListRow> = {}): LogisticsOrd
     outlet_id: null,
     dealer_id: "d-1",
     dealers: { name: "ComfortBeds" },
+    // Phase 4.5 Chunk 2 (T9) — embedded threads default to empty array. Tests
+    // that exercise the LP pill path override with realistic thread fixtures.
+    order_supplier_threads: [],
     ...overrides,
   };
 }
@@ -144,6 +147,10 @@ function makeDetail(): LogisticsOrderDetailResponse {
     history: [
       { text: "Order placed", by_role: "dealer", occurred_at: "2026-04-28T08:00:00Z" },
     ],
+    // Phase 4.5 Chunk 2 (T9) — drawer detail now exposes thread customer-leg
+    // LP fields. Default to empty array; tests that exercise the partner-
+    // assignment ActionBar branches override with assigned threads.
+    threads: [],
   };
 }
 
@@ -688,5 +695,140 @@ describe("LogisticsOrders — kanban", () => {
     // The dialog's primary submit button is disabled.
     const submit = screen.getByRole("button", { name: /Transfer to ready$/ });
     expect(submit).toBeDisabled();
+  });
+
+  // -----------------------------------------------------------------------
+  // Phase 4.5 Chunk 2 (T9) — LP pill is sourced from
+  // `order_supplier_threads[].delivery_partner_id`, not the order-level
+  // `delivery_partner_id`. Three cases: no threads, single LP, multi-LP.
+  // -----------------------------------------------------------------------
+
+  it("25. (Chunk 2 T9) hides the LP pill when no thread has an assigned partner", () => {
+    setLoaded([
+      makeOrder({
+        id: "ord-no-lp",
+        dl: 9100,
+        customer_name: "Unassigned Anya",
+        logistics_stage: "ready_to_dispatch",
+        // Order-level delivery_partner_id deliberately set; Chunk 2 ignores it
+        // and reads from threads. With empty threads, no pill should render.
+        delivery_partner_id: "00000000-0000-0000-0000-000000000fff",
+        order_supplier_threads: [],
+      }),
+    ]);
+    render(wrap(<LogisticsOrders />));
+
+    const card = screen.getByTestId("order-card-9100");
+    expect(card.textContent).toContain("Unassigned Anya");
+    expect(
+      card.querySelector('[data-testid="order-card-lp-pill"]'),
+    ).toBeNull();
+  });
+
+  it("26. (Chunk 2 T9) renders single LP pill when all threads share the same delivery_partner_id", () => {
+    const PARTNER_ID = "00000000-0000-0000-0000-0000000abcde";
+    setLoaded([
+      makeOrder({
+        id: "ord-single-lp",
+        dl: 9101,
+        customer_name: "Single Sam",
+        logistics_stage: "ready_to_dispatch",
+        delivery_partner_id: null,
+        order_supplier_threads: [
+          {
+            id: "thread-1",
+            supplier_id: "sup-1",
+            category: "mattress",
+            logistics_stage: "ready_to_dispatch",
+            po_id: "PO-1",
+            delivery_partner_id: PARTNER_ID,
+            confirm_delivery_date: "2026-05-08",
+            request_for_delivery_at: "2026-05-04T08:00:00Z",
+            partner_accepted_at: "2026-05-04T09:00:00Z",
+            partner_rejected_at: null,
+          },
+          {
+            id: "thread-2",
+            supplier_id: "sup-2",
+            category: "bed_frame",
+            logistics_stage: "ready_to_dispatch",
+            po_id: "PO-2",
+            // Same partner across both threads → pill is single.
+            delivery_partner_id: PARTNER_ID,
+            confirm_delivery_date: "2026-05-08",
+            request_for_delivery_at: "2026-05-04T08:00:00Z",
+            partner_accepted_at: "2026-05-04T09:00:00Z",
+            partner_rejected_at: null,
+          },
+        ],
+      }),
+    ]);
+    render(wrap(<LogisticsOrders />));
+
+    const card = screen.getByTestId("order-card-9101");
+    const pill = card.querySelector('[data-testid="order-card-lp-pill"]');
+    expect(pill).not.toBeNull();
+    const partnerPill = card.querySelector(
+      '[data-testid="order-card-lp-pill-partner"]',
+    );
+    expect(partnerPill).not.toBeNull();
+    // Pill renders an 8-char slug of the partner id (no name join in list endpoint).
+    expect(partnerPill?.textContent).toContain(PARTNER_ID.slice(0, 8));
+    // The "multi" variant is mutually exclusive with single.
+    expect(
+      card.querySelector('[data-testid="order-card-lp-pill-multi"]'),
+    ).toBeNull();
+  });
+
+  it("27. (Chunk 2 T9) renders Multi-LP hint when threads disagree on delivery_partner_id", () => {
+    setLoaded([
+      makeOrder({
+        id: "ord-multi-lp",
+        dl: 9102,
+        customer_name: "Multi Mei",
+        logistics_stage: "ready_to_dispatch",
+        delivery_partner_id: null,
+        order_supplier_threads: [
+          {
+            id: "thread-A",
+            supplier_id: "sup-1",
+            category: "mattress",
+            logistics_stage: "ready_to_dispatch",
+            po_id: "PO-A",
+            delivery_partner_id: "00000000-0000-0000-0000-000000000aaa",
+            confirm_delivery_date: "2026-05-08",
+            request_for_delivery_at: "2026-05-04T08:00:00Z",
+            partner_accepted_at: "2026-05-04T09:00:00Z",
+            partner_rejected_at: null,
+          },
+          {
+            id: "thread-B",
+            supplier_id: "sup-2",
+            category: "sofa",
+            logistics_stage: "ready_to_dispatch",
+            po_id: "PO-B",
+            // Different partner → multi-LP summary.
+            delivery_partner_id: "00000000-0000-0000-0000-000000000bbb",
+            confirm_delivery_date: "2026-05-09",
+            request_for_delivery_at: "2026-05-04T08:00:00Z",
+            partner_accepted_at: "2026-05-04T10:00:00Z",
+            partner_rejected_at: null,
+          },
+        ],
+      }),
+    ]);
+    render(wrap(<LogisticsOrders />));
+
+    const card = screen.getByTestId("order-card-9102");
+    const multi = card.querySelector(
+      '[data-testid="order-card-lp-pill-multi"]',
+    );
+    expect(multi).not.toBeNull();
+    expect(multi?.textContent).toMatch(/Multi-LP/);
+    expect(multi?.textContent).toContain("2");
+    // Single-partner pill must NOT render in this case.
+    expect(
+      card.querySelector('[data-testid="order-card-lp-pill-partner"]'),
+    ).toBeNull();
   });
 });

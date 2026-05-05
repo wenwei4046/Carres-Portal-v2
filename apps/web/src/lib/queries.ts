@@ -895,13 +895,46 @@ export interface SuppliersListResponse {
   suppliers: SupplierRow[];
 }
 
+/** Phase 4.5 Chunk 2 (T9) — embedded `order_supplier_threads` row shape on
+ *  logistics order list/detail responses. Carries the per-leg customer-side LP
+ *  fields that migrated off `purchase_orders` per design spec §CQ1 option (b).
+ *  One row per (order, supplier, category); a multi-supplier order spawns N
+ *  threads, each with its own customer-leg LP assignment. */
+export interface LogisticsOrderThreadRow {
+  id: string;
+  supplier_id: string;
+  category: string;
+  logistics_stage:
+    | "placed"
+    | "proceed_request"
+    | "awaiting_logistics_action"
+    | "ready_to_dispatch"
+    | "dispatched"
+    | "delivered";
+  po_id: string | null;
+  /** Phase 4.5 Chunk 2 customer-leg LP source (migration 0049). FE OrderCard
+   *  reads this to render the LP pill; an order may have heterogeneous LPs
+   *  across threads (different supplier legs picked different partners). */
+  delivery_partner_id: string | null;
+  confirm_delivery_date: string | null;
+  request_for_delivery_at: string | null;
+  partner_accepted_at: string | null;
+  partner_rejected_at: string | null;
+}
+
 /** Row in GET /api/logistics/orders. Embedded `dealers(name)` is a PostgREST
  *  nested fetch shape — the route forwards it verbatim.
  *
  *  Pipeline v2 (C1/C2): adds `'placed'` + `'proceed_request'` to logistics_stage
  *  and widens status to include the dealer-side `'place'` value (orders that
  *  haven't been pushed to logistics yet still surface in the kanban so HQ can
- *  see what's coming). */
+ *  see what's coming).
+ *
+ *  Phase 4.5 Chunk 2 (T9): adds embedded `order_supplier_threads` array
+ *  (PostgREST nested fetch) — exposes per-thread customer-leg LP for the
+ *  OrderCard pill. The order-level `delivery_partner_id` is kept for backward
+ *  compat (print-DO and other legacy callers) — but the kanban now reads from
+ *  threads to honor multi-supplier scenarios. */
 export interface LogisticsOrderListRow {
   id: string;
   dl: number;
@@ -925,6 +958,11 @@ export interface LogisticsOrderListRow {
   outlet_id: string | null;
   dealer_id: string;
   dealers: { name: string } | null;
+  /** Phase 4.5 Chunk 2 (T9) embedded customer-leg LP per thread. `null` only
+   *  on legacy/seed orders that pre-date migration 0033 — modern orders carry
+   *  `[]` (empty pre-confirm-proceed) or one row per supplier leg. The FE
+   *  treats `null` and `[]` as "no thread state available" (omit pill). */
+  order_supplier_threads: LogisticsOrderThreadRow[] | null;
 }
 export interface LogisticsOrdersListResponse {
   orders: LogisticsOrderListRow[];
@@ -1013,6 +1051,11 @@ export interface LogisticsOrderDetailResponse {
   stockBalances: LogisticsOrderDetailStockBalance[];
   pos: LogisticsOrderDetailPo[];
   history: LogisticsOrderDetailHistoryRow[];
+  /** Phase 4.5 Chunk 2 (T9) — per-supplier thread rows carrying customer-leg
+   *  LP state. Drawer reads `threads[].delivery_partner_id` to compute partner
+   *  assignment instead of order-level `delivery_partner_id`, since per design
+   *  spec §CQ1 option (b) the customer-leg LP lives on the thread now. */
+  threads: LogisticsOrderThreadRow[];
 }
 
 /** Row in GET /api/logistics/pos. `purchase_order_lines(...)` is the embedded

@@ -14,19 +14,49 @@ import { cjkClassName } from "@/lib/cjk";
  *   - Customer name (CJK detect, 13px)
  *   - Channel: showroom badge (uppercase, slate outline) + dealer/showroom name
  *   - Delivery date or "Date TBD"
- *   - Partner via line (only if assigned)
+ *   - LP pill (only if any thread has a customer-leg LP assigned)
  *   - Bottom row: total (we omit — list endpoint doesn't return total) +
  *     bucket-action hint (terracotta arrow)
  *
- * The proto reads delivery_partner from `state.deliveryPartners`. v2 list
- * endpoint returns `delivery_partner_id` only — partner name shows up only on
- * the drawer fetch; for the kanban we just show "via partner assigned" if the
- * id is set. (Could enrich the list later — out of scope for M5.2.)
+ * Phase 4.5 Chunk 2 (T9) — LP pill source pivoted from order-level
+ * `delivery_partner_id` to `order_supplier_threads[].delivery_partner_id` per
+ * design spec §CQ1 option (b). Multi-supplier orders may have N threads with
+ * different partners; we summarise:
+ *   - 0 assignments → omit pill (unassigned state)
+ *   - 1 distinct partner across all assigned threads → pill = partner short id
+ *   - ≥2 distinct partners → pill = "Multi-LP" hint (drawer surfaces detail)
+ * The order-level `delivery_partner_id` is still populated for legacy callers
+ * (print-DO, etc.) but no longer drives the kanban presentation.
  *
  * Selectable: only awaiting_logistics_action orders surface a checkbox. The whole card
  * is the click target for opening the drawer; the checkbox region uses
  * stopPropagation so toggling doesn't accidentally open the drawer.
  */
+
+/** Phase 4.5 Chunk 2 (T9) — derive a kanban-friendly LP summary from the
+ *  embedded threads. Returns `null` when no thread has an assigned partner so
+ *  the caller can omit the pill entirely. When threads disagree, returns a
+ *  "Multi-LP" sentinel so the user knows to open the drawer for detail. */
+type LpSummary =
+  | { kind: "none" }
+  | { kind: "single"; partnerId: string }
+  | { kind: "multi"; count: number };
+
+function summariseThreadLps(
+  threads: LogisticsOrderListRow["order_supplier_threads"],
+): LpSummary {
+  if (!threads || threads.length === 0) return { kind: "none" };
+  const assigned = threads.filter((t) => t.delivery_partner_id !== null);
+  if (assigned.length === 0) return { kind: "none" };
+  const distinct = new Set(
+    assigned.map((t) => t.delivery_partner_id as string),
+  );
+  if (distinct.size === 1) {
+    return { kind: "single", partnerId: distinct.values().next().value as string };
+  }
+  return { kind: "multi", count: distinct.size };
+}
+
 interface Props {
   order: LogisticsOrderListRow;
   /** When true, render the leading checkbox column (awaiting_logistics_action only). */
@@ -63,6 +93,9 @@ export default function OrderCard({
     : "Date TBD";
 
   const placedShort = order.placed_at?.slice(0, 10) ?? "";
+
+  // Phase 4.5 Chunk 2 (T9) — LP pill driven by thread.delivery_partner_id.
+  const lpSummary = summariseThreadLps(order.order_supplier_threads);
 
   const containerCls = [
     "flex w-full box-border cursor-pointer rounded-[4px] mb-1.5 last:mb-0 transition-colors",
@@ -154,9 +187,36 @@ export default function OrderCard({
               </span>
             </div>
             <div className="text-[11px] text-base-500 mt-0.5">{dateLabel}</div>
-            {/* Partner name needs the drawer-fetch join to surface here — list
-                endpoint returns id only. Keep this line off until the M5.0
-                phase-4-detail-partner-name-join TODO lands. */}
+            {/* Phase 4.5 Chunk 2 (T9) — LP pill from thread.delivery_partner_id.
+                The list endpoint returns the partner uuid only (no name join);
+                we surface a short id slug + open the drawer for full detail.
+                Multi-LP threads collapse to "Multi-LP · N" so the chip stays
+                scannable at kanban density. */}
+            {lpSummary.kind !== "none" && (
+              <div
+                className="flex items-center gap-1 mt-1"
+                data-testid="order-card-lp-pill"
+              >
+                <span className="text-[9px] uppercase tracking-[0.1em] font-semibold text-base-500">
+                  via
+                </span>
+                {lpSummary.kind === "single" ? (
+                  <span
+                    className="font-mono text-[10px] text-base-700"
+                    data-testid="order-card-lp-pill-partner"
+                  >
+                    LP-{lpSummary.partnerId.slice(0, 8)}
+                  </span>
+                ) : (
+                  <span
+                    className="font-mono text-[10px] text-warning"
+                    data-testid="order-card-lp-pill-multi"
+                  >
+                    Multi-LP &middot; {lpSummary.count}
+                  </span>
+                )}
+              </div>
+            )}
             <div className="flex items-baseline justify-end mt-1.5">
               {actionHint && (
                 <span className="text-[10px] text-primary font-semibold">
