@@ -594,3 +594,243 @@ $$;
 
 REVOKE ALL ON FUNCTION public.logistics_dispatch_customer_leg(text, uuid, date, boolean) FROM public;
 GRANT EXECUTE ON FUNCTION public.logistics_dispatch_customer_leg(text, uuid, date, boolean) TO authenticated;
+
+-- -----------------------------------------------------------------------------
+-- 8. logistics_receive_po_with_do (MODIFIED from 0034:730)
+-- -----------------------------------------------------------------------------
+-- Codex F3 fix: po_sup_status enum has no 'received' value; existing 0034:938
+-- correctly sets sup_status='delivered' on full receive. v3 keeps that for the
+-- normal path; Sofa Reject path (prev sup_status='relocated') sets
+-- sup_status='at_warehouse_waiting' (new value from 0043).
+--
+-- Thread state branch matches PO state branch:
+--   prev='relocated' → thread.logistics_stage='waiting'
+--   else → thread.logistics_stage = (SOP_SOFA_SPECIAL ? 'dispatched' : 'ready_to_dispatch')
+--          [matches existing 0034:881-885 SOP-aware logic]
+--
+-- This RPC is a CREATE OR REPLACE of 0034:730. Full ~250-line body inlined here
+-- so the migration is self-contained.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.logistics_receive_po_with_do(
+  p_po_id        text,
+  p_do_file_path text,
+  p_do_number    text,
+  p_lines        jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_po                 purchase_orders;
+  v_role               app_role;
+  v_partner_id         uuid;
+  v_actor              text;
+  v_line               jsonb;
+  v_sku                text;
+  v_received_qty       int;
+  v_existing_line      purchase_order_lines;
+  v_delta              int;
+  v_outstanding        int;
+  v_lines_updated      int := 0;
+  v_threads_advanced   int := 0;
+  v_thread             record;
+  v_reserve            record;
+  v_uid                uuid;
+  v_was_relocated      boolean;
+  v_target_thread_stage logistics_stage;
+  v_target_sup_status  po_sup_status;
+BEGIN
+  v_role := public.app_role();
+  v_partner_id := public.app_partner_id();
+  v_uid := (SELECT auth.uid());
+
+  -- Role gate: logistics OR partner.
+  IF v_role NOT IN ('logistics', 'partner') THEN
+    RAISE EXCEPTION 'forbidden: logistics or partner only'
+      USING ERRCODE = '42501', DETAIL = 'forbidden';
+  END IF;
+
+  -- Validate inputs.
+  IF p_do_file_path IS NULL OR length(btrim(p_do_file_path)) = 0 THEN
+    RAISE EXCEPTION 'DO file path is required' USING ERRCODE = '22023', DETAIL = 'do_file_path_required';
+  END IF;
+  IF p_do_number IS NULL OR length(btrim(p_do_number)) < 3 THEN
+    RAISE EXCEPTION 'DO number must be at least 3 characters' USING ERRCODE = '22023', DETAIL = 'do_number_too_short';
+  END IF;
+  IF p_lines IS NULL OR jsonb_typeof(p_lines) <> 'array' OR jsonb_array_length(p_lines) = 0 THEN
+    RAISE EXCEPTION 'lines must be a non-empty array' USING ERRCODE = '22023', DETAIL = 'lines_empty';
+  END IF;
+
+  -- Lock PO row.
+  SELECT * INTO v_po FROM purchase_orders WHERE id = p_po_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'PO not found' USING ERRCODE = '42P01', DETAIL = 'po_not_found';
+  END IF;
+
+  IF v_role = 'partner' THEN
+    IF v_partner_id IS NULL OR v_po.delivery_partner_id IS DISTINCT FROM v_partner_id THEN
+      RAISE EXCEPTION 'forbidden: cross-partner receive' USING ERRCODE = '42501', DETAIL = 'forbidden';
+    END IF;
+  END IF;
+
+  IF v_po.status IS DISTINCT FROM 'open' THEN
+    RAISE EXCEPTION 'PO is not open (status=%)', v_po.status USING ERRCODE = '22023', DETAIL = 'po_not_open';
+  END IF;
+
+  -- v3 BRANCH: detect Sofa Reject + Relocate path.
+  v_was_relocated := (v_po.sup_status = 'relocated');
+
+  v_actor := COALESCE((SELECT name FROM app_users WHERE id = v_uid), INITCAP(v_role::text));
+
+  -- Apply per-line received_qty + bump stock_balances (unchanged from 0034:806-927).
+  FOR v_line IN SELECT * FROM jsonb_array_elements(p_lines) LOOP
+    v_sku := v_line->>'sku';
+    v_received_qty := nullif(v_line->>'received_qty', '')::int;
+
+    IF v_sku IS NULL OR v_received_qty IS NULL OR v_received_qty < 0 THEN
+      RAISE EXCEPTION 'invalid line: sku=%, received_qty=%', v_sku, v_received_qty
+        USING ERRCODE = '22023', DETAIL = 'invalid_line';
+    END IF;
+
+    SELECT * INTO v_existing_line FROM purchase_order_lines
+     WHERE po_id = p_po_id AND sku = v_sku FOR UPDATE;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'PO line not found for sku=%', v_sku USING ERRCODE = '42P01', DETAIL = 'po_line_not_found';
+    END IF;
+
+    IF v_received_qty > v_existing_line.qty THEN
+      RAISE EXCEPTION 'over-received: % > ordered %', v_received_qty, v_existing_line.qty
+        USING ERRCODE = 'P0001', DETAIL = 'over_received';
+    END IF;
+
+    v_delta := v_received_qty - v_existing_line.received_qty;
+    IF v_delta < 0 THEN
+      RAISE EXCEPTION 'received_qty must be >= currently received (%)', v_existing_line.received_qty
+        USING ERRCODE = 'P0001', DETAIL = 'received_qty_decrease';
+    END IF;
+
+    UPDATE purchase_order_lines SET received_qty = v_received_qty
+     WHERE po_id = p_po_id AND sku = v_sku;
+
+    IF v_delta > 0 THEN
+      INSERT INTO stock_balances (sku, warehouse_id, qty)
+        VALUES (v_sku, v_po.warehouse_id, v_delta)
+        ON CONFLICT (sku, warehouse_id)
+        DO UPDATE SET qty = stock_balances.qty + v_delta, updated_at = now();
+
+      INSERT INTO stock_movements (sku, warehouse_id, qty, kind, ref, by_role, by_user_id)
+      VALUES (v_sku, v_po.warehouse_id, v_delta, 'in', p_po_id, v_role, v_uid);
+
+      v_lines_updated := v_lines_updated + 1;
+    END IF;
+  END LOOP;
+
+  -- Advance threads + reserve. v3 BRANCH on v_was_relocated:
+  FOR v_thread IN
+    SELECT * FROM order_supplier_threads
+     WHERE po_id = p_po_id AND logistics_stage = 'awaiting_logistics_action'
+  LOOP
+    -- Determine target thread stage per branch.
+    IF v_was_relocated THEN
+      v_target_thread_stage := 'waiting';  -- Sofa Reject path
+    ELSE
+      v_target_thread_stage := CASE WHEN v_thread.sop_name = 'SOFA_SPECIAL'
+                                    THEN 'dispatched'
+                                    ELSE 'ready_to_dispatch'
+                               END;
+    END IF;
+
+    UPDATE order_supplier_threads
+       SET logistics_stage = v_target_thread_stage,
+           warehouse_id    = v_po.warehouse_id,
+           reserved_at     = now(),
+           updated_at      = now()
+     WHERE id = v_thread.id;
+
+    v_threads_advanced := v_threads_advanced + 1;
+
+    -- Reserve stock for thread's slice (unchanged from 0034:893-927).
+    FOR v_reserve IN
+      SELECT ol.sku AS sku, ol.qty AS qty
+        FROM order_lines ol
+        JOIN product_skus ps ON ps.sku = ol.sku
+        JOIN product_models pm ON pm.id = ps.model_id
+       WHERE ol.order_id = v_thread.order_id
+         AND ps.supplier_id = v_thread.supplier_id
+         AND pm.category::text = v_thread.category
+    LOOP
+      BEGIN
+        UPDATE stock_balances
+           SET reserved   = reserved + v_reserve.qty, updated_at = now()
+         WHERE sku = v_reserve.sku AND warehouse_id = v_po.warehouse_id;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'no stock_balances row for sku=% wh=%', v_reserve.sku, v_po.warehouse_id
+            USING ERRCODE = 'P0001', DETAIL = 'insufficient_stock_for_reserve';
+        END IF;
+      EXCEPTION
+        WHEN check_violation THEN
+          RAISE EXCEPTION 'cannot reserve sku=% at wh=% (qty < reserved + %)',
+                          v_reserve.sku, v_po.warehouse_id, v_reserve.qty
+            USING ERRCODE = 'P0001', DETAIL = 'insufficient_stock_for_reserve';
+      END;
+    END LOOP;
+  END LOOP;
+
+  -- Determine target PO sup_status per branch.
+  SELECT count(*) INTO v_outstanding
+    FROM purchase_order_lines WHERE po_id = p_po_id AND received_qty < qty;
+
+  IF v_outstanding = 0 THEN
+    -- Full receive. Branch on relocated flag.
+    IF v_was_relocated THEN
+      v_target_sup_status := 'at_warehouse_waiting';  -- Codex F3: new value from 0043
+    ELSE
+      v_target_sup_status := 'delivered';  -- Codex F3: existing valid value (0034:938)
+    END IF;
+
+    UPDATE purchase_orders
+       SET status         = 'received',
+           sup_status     = v_target_sup_status,
+           do_file_path   = p_do_file_path,
+           do_uploaded_at = now(),
+           do_uploaded_by = v_uid,
+           updated_at     = now()
+     WHERE id = p_po_id;
+  ELSE
+    -- Partial receive: persist DO + sup_status remains current.
+    UPDATE purchase_orders
+       SET do_file_path   = p_do_file_path,
+           do_uploaded_at = now(),
+           do_uploaded_by = v_uid,
+           updated_at     = now()
+     WHERE id = p_po_id;
+  END IF;
+
+  -- Audit + history.
+  INSERT INTO po_history (po_id, text, by_role)
+  VALUES (p_po_id,
+          format('Received with DO %s (%s path) — %s line(s), %s thread(s)',
+                 btrim(p_do_number),
+                 CASE WHEN v_was_relocated THEN 'relocated→at_warehouse_waiting' ELSE 'normal→delivered' END,
+                 v_lines_updated, v_threads_advanced),
+          v_role);
+
+  INSERT INTO audit_log (role, actor_text, action, ref)
+  VALUES (v_role, v_actor,
+          format('Received PO %s with DO %s', p_po_id, btrim(p_do_number)), p_po_id);
+
+  RETURN jsonb_build_object(
+    'po_id',             p_po_id,
+    'do_file_path',      p_do_file_path,
+    'do_number',         btrim(p_do_number),
+    'lines_updated',     v_lines_updated,
+    'threads_advanced',  v_threads_advanced,
+    'po_status',         (SELECT status FROM purchase_orders WHERE id = p_po_id),
+    'sup_status',        (SELECT sup_status FROM purchase_orders WHERE id = p_po_id),
+    'was_relocated',     v_was_relocated
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.logistics_receive_po_with_do(text, text, text, jsonb) FROM public;
+GRANT EXECUTE ON FUNCTION public.logistics_receive_po_with_do(text, text, text, jsonb) TO authenticated;
