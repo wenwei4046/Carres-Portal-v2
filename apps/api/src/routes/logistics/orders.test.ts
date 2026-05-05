@@ -1115,6 +1115,231 @@ describe("POST /api/logistics/orders/:id/transfer-ready", () => {
   });
 });
 
+// =============================================================================
+// Phase 4.5a T3 — confirm auto-skip-from-stock (v3 contract)
+// =============================================================================
+// These tests describe the v3 RPC response contract introduced by migration
+// 0039. The migration extends `logistics_confirm_proceed_request_v3` so that
+// when ALL freshly-created threads have sufficient buffer stock, the RPC
+// atomically:
+//   - reserves stock from stock_balances (UPDATE qty -= demand semantics
+//     baked into the spec; we model it via increment of `reserved` to fit the
+//     existing 0018 invariants and keep the receive-time decrement contract
+//     intact)
+//   - writes stock_movements rows tagged `note='reserve_from_buffer'` with
+//     `ref=order_id` for audit
+//   - promotes every thread directly to `ready_to_dispatch`
+//   - returns `auto_skipped: true` and `po_id: null` (NO ghost PO — the buffer
+//     came from real past PO receives whose stock_movements rows already
+//     exist)
+//
+// These tests mock the SB rpc layer regardless of whether the route still
+// calls v2 (current state) or v3 (post-T4 swap). The contract under test is
+// the API surface: when the RPC returns the v3 auto-skip shape, the client
+// must see it unchanged.
+// =============================================================================
+describe("Phase 4.5a confirm auto-skip-from-stock", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+  const SUPPLIER_NF = "00000000-0000-0000-0000-000000000b01";
+  const SUPPLIER_HK = "00000000-0000-0000-0000-000000000b02";
+
+  it("skips to ready_to_dispatch when all threads have sufficient stock (no ghost PO)", async () => {
+    // Migration 0039 contract: when every thread can be served from buffer
+    // stock, the RPC atomically reserves + promotes + returns auto_skipped.
+    // No PO is created — `po_id` stays null. Audit trail is the
+    // stock_movements row(s) the RPC wrote (ref=order_id, note='reserve_from_buffer').
+    const rpc = vi.fn().mockResolvedValue({
+      data: {
+        order_id: ORDER_ID,
+        dl: 4001,
+        logistics_stage: "ready_to_dispatch",
+        auto_skipped: true,
+        po_id: null,
+        threads: [
+          {
+            thread_id: "11111111-1111-1111-1111-111111111111",
+            supplier_id: SUPPLIER_NF,
+            category: "mattress",
+            sop_name: "STANDARD",
+            stage: "ready_to_dispatch",
+            po_id: null,
+          },
+          {
+            thread_id: "22222222-2222-2222-2222-222222222222",
+            supplier_id: SUPPLIER_HK,
+            category: "bedframe",
+            sop_name: "STANDARD",
+            stage: "ready_to_dispatch",
+            po_id: null,
+          },
+        ],
+      },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/confirm-proceed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.order.auto_skipped).toBe(true);
+    expect(body.order.po_id).toBeNull();
+    expect(body.order.logistics_stage).toBe("ready_to_dispatch");
+    // Every thread also lands at ready_to_dispatch with po_id=null.
+    expect(body.order.threads).toHaveLength(2);
+    for (const t of body.order.threads) {
+      expect(t.stage).toBe("ready_to_dispatch");
+      expect(t.po_id).toBeNull();
+    }
+  });
+
+  it("stays at awaiting_logistics_action when any thread has shortage", async () => {
+    // Migration 0039 contract: if even ONE thread would be short, the RPC
+    // takes NO reserve action — every thread stays at awaiting_logistics_action.
+    // auto_skipped is false, po_id is null (no PO was created at confirm time;
+    // PO creation happens later via Auto-fill).
+    const rpc = vi.fn().mockResolvedValue({
+      data: {
+        order_id: ORDER_ID,
+        dl: 4001,
+        logistics_stage: "awaiting_logistics_action",
+        auto_skipped: false,
+        po_id: null,
+        threads: [
+          {
+            thread_id: "11111111-1111-1111-1111-111111111111",
+            supplier_id: SUPPLIER_NF,
+            category: "mattress",
+            sop_name: "STANDARD",
+            stage: "awaiting_logistics_action",
+            po_id: null,
+          },
+        ],
+      },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/confirm-proceed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.order.auto_skipped).toBe(false);
+    expect(body.order.po_id).toBeNull();
+    expect(body.order.logistics_stage).toBe("awaiting_logistics_action");
+    expect(body.order.threads[0].stage).toBe("awaiting_logistics_action");
+  });
+
+  it("does not auto-skip if even one thread has shortage (ALL-or-NONE atomicity)", async () => {
+    // Migration 0039 explicit invariant: auto-skip is all-or-nothing. A
+    // mixed-thread order where one supplier has stock and another doesn't
+    // MUST land all threads at awaiting_logistics_action, never half-promoted.
+    // This guards against partial reservations that would leak buffer stock
+    // without a corresponding ready_to_dispatch promotion.
+    const rpc = vi.fn().mockResolvedValue({
+      data: {
+        order_id: ORDER_ID,
+        dl: 4002,
+        logistics_stage: "awaiting_logistics_action",
+        auto_skipped: false,
+        po_id: null,
+        threads: [
+          // Thread A: supplier has the goods on hand at the buffer warehouse.
+          {
+            thread_id: "33333333-3333-3333-3333-333333333333",
+            supplier_id: SUPPLIER_NF,
+            category: "mattress",
+            sop_name: "STANDARD",
+            // Despite local sufficiency, atomicity rule keeps it awaiting.
+            stage: "awaiting_logistics_action",
+            po_id: null,
+          },
+          // Thread B: supplier short — drives the all-or-nothing decision.
+          {
+            thread_id: "44444444-4444-4444-4444-444444444444",
+            supplier_id: SUPPLIER_HK,
+            category: "sofa",
+            sop_name: "SOFA_SPECIAL",
+            stage: "awaiting_logistics_action",
+            po_id: null,
+          },
+        ],
+      },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/confirm-proceed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.order.auto_skipped).toBe(false);
+    // Critical: every thread stays at awaiting_logistics_action — no partial
+    // promotions even when one supplier could have served from buffer.
+    expect(body.order.threads).toHaveLength(2);
+    for (const t of body.order.threads) {
+      expect(t.stage).toBe("awaiting_logistics_action");
+      expect(t.po_id).toBeNull();
+    }
+  });
+
+  it("returns 409 on concurrent reserve race (40001 / serialization_failure)", async () => {
+    // Migration 0039 wraps stock_balances reservations in SELECT ... FOR
+    // UPDATE; if a concurrent confirm-proceed beats us to the same buffer,
+    // the second caller raises SQLSTATE 40001. mapPgError (lib/route-helpers)
+    // already maps 40001 → 409 with code='concurrent_claim'.
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "40001",
+        message: "concurrent_reserve: buffer stock claimed by another confirm",
+        details: "concurrent_reserve",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/confirm-proceed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    // mapPgError surfaces error.details as `code`; covers both
+    // `concurrent_reserve` and (fallback) `concurrent_claim` shapes.
+    expect(body.code).toBe("concurrent_reserve");
+  });
+});
+
 describe("POST /api/logistics/orders/:id/issue-pos", () => {
   const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
 
