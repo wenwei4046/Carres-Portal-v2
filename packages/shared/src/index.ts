@@ -104,6 +104,11 @@ export {
 } from "./schemas/principal-dealers";
 
 export {
+  createLpAccountSchema,
+  type CreateLpAccountInput,
+} from "./schemas/lp-account";
+
+export {
   assignPartnerInput,
   attachDoInput,
   receivePoLineInput,
