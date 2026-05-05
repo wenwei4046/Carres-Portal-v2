@@ -423,3 +423,68 @@ $$;
 
 REVOKE ALL ON FUNCTION public.logistics_relocate_warehouse(text, uuid) FROM public;
 GRANT EXECUTE ON FUNCTION public.logistics_relocate_warehouse(text, uuid) TO authenticated;
+
+-- -----------------------------------------------------------------------------
+-- 6. logistics_resume_from_waiting(p_order_id uuid)
+-- -----------------------------------------------------------------------------
+-- After at_warehouse_waiting customer reschedule, Logistics resumes dispatch.
+-- Effect: threads waiting → ready_to_dispatch; PO sup_status at_warehouse_waiting → delivered.
+-- Trigger orders_rollup_stage fires via 0036+0047 amended rollup.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.logistics_resume_from_waiting(p_order_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_role            app_role;
+  v_actor           text;
+  v_threads_resumed int;
+  v_pos_resumed     int;
+BEGIN
+  v_role := public.app_role();
+
+  IF v_role NOT IN ('logistics', 'principal') THEN
+    RAISE EXCEPTION 'forbidden: logistics or principal only'
+      USING ERRCODE = '42501', DETAIL = 'forbidden';
+  END IF;
+
+  v_actor := COALESCE((SELECT name FROM app_users WHERE id = (SELECT auth.uid())), INITCAP(v_role::text));
+
+  -- Resume threads.
+  UPDATE order_supplier_threads
+     SET logistics_stage = 'ready_to_dispatch', updated_at = now()
+   WHERE order_id = p_order_id AND logistics_stage = 'waiting';
+  GET DIAGNOSTICS v_threads_resumed = ROW_COUNT;
+
+  IF v_threads_resumed = 0 THEN
+    RAISE EXCEPTION 'no waiting threads found for order %', p_order_id
+      USING ERRCODE = '22023', DETAIL = 'no_waiting_threads';
+  END IF;
+
+  -- Flip PO sup_status from at_warehouse_waiting back to delivered (supplier-side).
+  UPDATE purchase_orders po
+     SET sup_status = 'delivered', updated_at = now()
+   WHERE po.dl IN (SELECT dl FROM orders WHERE id = p_order_id)
+     AND po.sup_status = 'at_warehouse_waiting';
+  GET DIAGNOSTICS v_pos_resumed = ROW_COUNT;
+
+  -- Trigger orders_rollup_stage_after_thread_change fires automatically via thread UPDATE.
+
+  INSERT INTO order_history (order_id, text, by_role)
+  VALUES (p_order_id, format('Resume from at_warehouse_waiting — %s thread(s) advanced', v_threads_resumed), v_role);
+
+  INSERT INTO audit_log (role, actor_text, action, ref)
+  VALUES (v_role, v_actor,
+          format('Resume order %s from waiting (%s threads, %s POs)', p_order_id, v_threads_resumed, v_pos_resumed),
+          p_order_id::text);
+
+  RETURN jsonb_build_object(
+    'order_id',         p_order_id,
+    'threads_resumed',  v_threads_resumed,
+    'pos_resumed',      v_pos_resumed
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.logistics_resume_from_waiting(uuid) FROM public;
+GRANT EXECUTE ON FUNCTION public.logistics_resume_from_waiting(uuid) TO authenticated;
