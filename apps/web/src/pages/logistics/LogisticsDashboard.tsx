@@ -8,6 +8,7 @@ import LogisticsKpiTile from "./components/LogisticsKpiTile";
 import PipelineColumn from "./components/PipelineColumn";
 import OpenPOsCard from "./components/OpenPOsCard";
 import LowStockCard from "./components/LowStockCard";
+import StockAlertsTile from "./components/StockAlertsTile";
 
 /**
  * Logistics landing page — hero summary + 3 KPI tiles + 3-column pipeline +
@@ -191,10 +192,14 @@ export default function LogisticsDashboard({ setTab }: Props) {
         />
       </div>
 
-      {/* Side cards — proto lines 88-118. */}
-      <div className="grid grid-cols-2 gap-3.5">
+      {/* Side cards — proto lines 88-118. Phase 4.5 Chunk 2 (T21) widens the
+          row from 2 to 3 columns to seat the new StockAlertsTile alongside
+          OpenPOsCard + LowStockCard. The StockAlertsTile is self-contained
+          (fetches its own alerts feed via TanStack Query). */}
+      <div className="grid grid-cols-3 gap-3.5">
         <OpenPOsCard pos={open_pos} onViewAll={() => setTab("procurement")} />
         <LowStockCard lowStock={low_stock} onViewAll={() => setTab("warehouse")} />
+        <StockAlertsTile />
       </div>
     </div>
   );

@@ -89,9 +89,10 @@ export default function SetThresholdDialog({
       ),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
-      // Stock-alerts cache (T18) — broad invalidation so the dashboard tile
-      // re-derives once the new threshold lands.
-      await qc.invalidateQueries({ queryKey: ["logistics", "stock-alerts"] });
+      // Stock-alerts cache (T18/T21) — broad invalidation so the dashboard
+      // tile re-derives once the new threshold lands. Uses the centralized
+      // query key per CLAUDE.md §9.6 (no magic strings).
+      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
       onSuccess?.();
       onOpenChange(false);
     },

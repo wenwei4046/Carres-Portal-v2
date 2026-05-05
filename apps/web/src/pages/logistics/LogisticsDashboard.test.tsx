@@ -1,11 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import LogisticsDashboard from "./LogisticsDashboard";
 import type {
   LogisticsDashboardResponse,
   LogisticsOrdersListResponse,
   LogisticsOrderListRow,
+  LogisticsStockAlertsResponse,
 } from "@/lib/queries";
 
 /**
@@ -31,6 +33,11 @@ let hookState: {
   refetch: ReturnType<typeof vi.fn>;
 };
 let ordersHookState: { data: LogisticsOrdersListResponse | undefined };
+let stockAlertsHookState: {
+  data: LogisticsStockAlertsResponse | undefined;
+  isLoading: boolean;
+  isError: boolean;
+};
 const refetchSpy = vi.fn();
 
 vi.mock("@/lib/queries", async () => {
@@ -40,12 +47,24 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     useLogisticsDashboard: () => hookState,
     useLogisticsOrders: () => ordersHookState,
+    // T21 — `StockAlertsTile` (rendered alongside the other side cards) calls
+    // `useStockAlerts` directly. Mock returns a benign empty-list state by
+    // default so the dashboard tests stay focused on KPI / pipeline / side
+    // card rendering rather than alert behavior (covered in
+    // `StockAlertsTile.test.tsx`).
+    useStockAlerts: () => stockAlertsHookState,
   };
 });
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={qc}>{node}</QueryClientProvider>;
+  // T21 — `StockAlertsTile` calls `useNavigate`, which requires a Router
+  // ancestor. MemoryRouter keeps the tests hermetic (no real history stack).
+  return (
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>{node}</MemoryRouter>
+    </QueryClientProvider>
+  );
 }
 
 const baseSummary: LogisticsDashboardResponse = {
@@ -135,6 +154,14 @@ function setLoaded(
     refetch: refetchSpy,
   };
   ordersHookState = { data: { orders } };
+  // T21 — default: empty-alerts state (tile shows the "All SKUs above
+  // threshold" empty body). Each test that needs a different StockAlertsTile
+  // payload can overwrite `stockAlertsHookState` directly.
+  stockAlertsHookState = {
+    data: { alerts: [] },
+    isLoading: false,
+    isError: false,
+  };
 }
 
 describe("LogisticsDashboard", () => {
@@ -236,6 +263,14 @@ describe("LogisticsDashboard", () => {
       refetch: refetchSpy,
     };
     ordersHookState = { data: undefined };
+    // T21 — `LogisticsDashboard` returns early on loading so StockAlertsTile
+    // is never rendered, but we still keep the alert hook stub defined so the
+    // mock factory always has a value to hand back.
+    stockAlertsHookState = {
+      data: { alerts: [] },
+      isLoading: false,
+      isError: false,
+    };
     render(wrap(<LogisticsDashboard setTab={() => {}} />));
     expect(
       screen.getByTestId("logistics-dashboard-skeleton"),
@@ -252,6 +287,11 @@ describe("LogisticsDashboard", () => {
       refetch: refetchSpy,
     };
     ordersHookState = { data: undefined };
+    stockAlertsHookState = {
+      data: { alerts: [] },
+      isLoading: false,
+      isError: false,
+    };
     render(wrap(<LogisticsDashboard setTab={() => {}} />));
 
     expect(screen.getByText(/Couldn’t load dashboard/)).toBeInTheDocument();

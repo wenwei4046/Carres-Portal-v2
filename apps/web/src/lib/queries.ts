@@ -91,6 +91,12 @@ export const qk = {
      *  a PO is issued, the awaiting_logistics_action pool changes). */
     awaitingStockShortage: () =>
       ["logistics", "pos", "awaiting-stock-shortage"] as const,
+    /** Phase 4.5 Chunk 2 (T18/T21) — stock alerts derived from
+     *  `(qty - reserved) < low_threshold`. Read by `StockAlertsTile` on the
+     *  dashboard and (later) the warehouse red-dot indicator. The
+     *  `SetThresholdDialog` invalidates this key on save so the tile
+     *  re-derives. */
+    stockAlerts: () => ["logistics", "stock-alerts"] as const,
     warehouse: () => ["logistics", "warehouse"] as const,
     /** Pipeline v2 (C4) — reserve drill-down per (warehouse, sku). Nested under
      *  warehouse so future blunt invalidations on `["logistics","warehouse"]`
@@ -1141,6 +1147,23 @@ export interface LogisticsAdjustStockResponse {
   qty: number;
   reserved: number;
 }
+/** Phase 4.5 Chunk 2 (T18/T21) — `GET /api/logistics/stock-alerts` row shape.
+ *  RPC `logistics_stock_alerts()` returns rows where `(qty - reserved) <
+ *  low_threshold`. The dashboard tile slices the top-3 by shortage; the
+ *  warehouse page (Sprint D follow-up) drives a red-dot indicator off the
+ *  count. `effective = qty - reserved`; `shortage = low_threshold - effective`. */
+export interface LogisticsStockAlertRow {
+  sku: string;
+  warehouse_id: string;
+  qty: number;
+  reserved: number;
+  effective: number;
+  low_threshold: number;
+  shortage: number;
+}
+export interface LogisticsStockAlertsResponse {
+  alerts: LogisticsStockAlertRow[];
+}
 export interface LogisticsReceivePoWithDoResponse {
   po_id: string;
   do_file_path: string;
@@ -1363,6 +1386,25 @@ export function useAwaitingStockShortage(
       ),
     enabled: false,
     staleTime: 0,
+    ...opts,
+  });
+}
+
+/** Phase 4.5 Chunk 2 (T18/T21) — Stock alerts feed. Used by the dashboard
+ *  `StockAlertsTile` (count + top-3) and the warehouse page red-dot indicator.
+ *  Cache key `["logistics","stock-alerts"]` is invalidated by
+ *  `SetThresholdDialog` on save so a freshly-cleared low threshold removes the
+ *  tile entry without a manual refetch. staleTime mirrors the dashboard
+ *  surface (30s) — alerts only shift when stock or thresholds change, both of
+ *  which already trigger broader invalidations on their own mutation paths. */
+export function useStockAlerts(
+  opts?: Partial<UseQueryOptions<LogisticsStockAlertsResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.stockAlerts(),
+    queryFn: () =>
+      apiFetch<LogisticsStockAlertsResponse>("/api/logistics/stock-alerts"),
+    staleTime: 30_000,
     ...opts,
   });
 }
