@@ -3,6 +3,8 @@
  * convert from snake_case DB rows to these.
  */
 
+import type { LogisticsStage } from "./db-types";
+
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
   | "logistics" | "supplier" | "partner" | "finance" | "bd";
@@ -239,12 +241,11 @@ export interface OrderSupplierThread {
   supplierId: string;
   category: string;
   sopName: "STANDARD" | "SOFA_SPECIAL";
-  logisticsStage:
-    | "placed" | "proceed_request"
-    | "awaiting_logistics_action"
-    | "ready_to_dispatch" | "dispatched"
-    | "waiting" | "delivered"
-    | null;
+  // Mirrors `OrderSupplierThreadRow.logistics_stage` which is non-null
+  // (migration 0033 line 51 declares the column NOT NULL). Reuses the named
+  // `LogisticsStage` type from db-types.ts so FE and DB stay 1:1 if the enum
+  // changes.
+  logisticsStage: LogisticsStage;
   poId: string | null;
   warehouseId: string | null;
   reservedAt: string | null;
