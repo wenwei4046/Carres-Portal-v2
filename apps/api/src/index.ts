@@ -23,6 +23,7 @@ import logisticsWarehouseRouter from "./routes/logistics/warehouse";
 import partnerDashboardRouter from "./routes/partner/dashboard";
 import partnerPickupsRouter from "./routes/partner/pickups";
 import salespersonsRouter from "./routes/salespersons";
+import dosRouter from "./routes/storage/dos";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -60,6 +61,7 @@ api.route("/logistics/suppliers", logisticsSuppliersRouter);
 api.route("/logistics/warehouse", logisticsWarehouseRouter);
 api.route("/partner/dashboard", partnerDashboardRouter);
 api.route("/partner/pickups", partnerPickupsRouter);
+api.route("/storage/dos", dosRouter);
 
 app.route("/api", api);
 
