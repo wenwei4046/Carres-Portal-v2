@@ -58,10 +58,17 @@ export type WarehouseKind     = "own" | "logistics_partner";
 //   - 'prev_po'           auto-filled from the most-recent received PO for the
 //                         same SKU (logistics_recent_po_cost RPC, T27).
 //   - 'system_suggested'  heuristic suggestion (e.g. 110% of prev_po).
+//   - 'auto_issued'       sentinel for system-issued PO lines from
+//                         logistics_issue_pos_for_order when no historical cost
+//                         existed (migration 0057 — T42 codex C1 fix). When a
+//                         recent received-PO cost IS found, the auto-issue RPC
+//                         persists 'prev_po' instead. 'auto_issued' rows always
+//                         have cost = NULL and surface for Finance reconciliation.
 // Both `cost` + `cost_source` are NULLABLE on the row (legacy rows pre-0055
 // have no historical cost recorded — CQ3: backfill NULL, do not invent). New
-// PO creates enforce non-NULL via zod (T25) + RPC validation (T26).
-export type CostSource        = "hand_entered" | "prev_po" | "system_suggested";
+// PO creates enforce non-NULL via zod (T25) + RPC validation (T26). The
+// auto-issue path predates that gate and uses 'auto_issued' instead.
+export type CostSource        = "hand_entered" | "prev_po" | "system_suggested" | "auto_issued";
 
 export interface DealerRow {
   id: string;

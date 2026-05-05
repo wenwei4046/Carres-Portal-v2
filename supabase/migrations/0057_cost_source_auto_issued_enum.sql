@@ -1,0 +1,48 @@
+-- =============================================================================
+-- 0057_cost_source_auto_issued_enum.sql -- Phase 4.5 Chunk 2 T42 codex review fix C1
+-- =============================================================================
+-- Pre-approval: 2026-05-06 autonomous-run agenda §1 (CLAUDE.md §14 #7) — "all
+-- red lines for Chunk 2 scope" includes additive enum extensions.
+--
+-- Source spec:  docs/superpowers/specs/2026-05-05-phase-4.5-chunk-2-design.md
+--               §6 M4.6 (CQ3 -- "PO COGS source")
+-- Source review: T42 codex review cluster C1 (P1 finding) — auto-issue
+--                bypasses CQ3 COGS validation.
+--
+-- Why this migration exists:
+--   T42 codex review found that `logistics_issue_pos_for_order` (0038:363+)
+--   inserts purchase_order_lines with NULL `cost` + NULL `cost_source`. After
+--   migration 0055b landed, manual PO creation requires both fields non-NULL
+--   via the `_logistics_create_po_inner` validation guard — but the auto-issue
+--   path from awaiting-stock orders has no UI gate (it is a system action
+--   triggered server-side, not user-driven). So the auto-issue path silently
+--   bypassed CQ3.
+--
+--   This migration extends `cost_source_enum` with a fourth label
+--   `'auto_issued'` to act as a sentinel for lines created by the
+--   auto-issue RPC. Companion migration 0058 rewrites
+--   `logistics_issue_pos_for_order` to:
+--     a. Look up the most-recent received-PO cost for each SKU (mirrors the
+--        T27 recent-cost route's query pattern).
+--     b. If a recent cost exists, persist it with cost_source = 'prev_po'.
+--     c. If no recent cost is found, persist NULL with
+--        cost_source = 'auto_issued' as a sentinel for Finance to reconcile
+--        later. Distinguishing this from legacy NULL/NULL rows preserves the
+--        "no historical cost recorded" signal for pre-0055 rows while flagging
+--        the new gap for follow-up.
+--
+-- Why this is its own migration file (not combined with 0058):
+--   PG14+ rejects `ALTER TYPE ADD VALUE` inside a transaction block with
+--   ERRCODE 25001 ("ALTER TYPE ... ADD cannot run inside a transaction block").
+--   Supabase's apply_migration MCP wraps each migration call in a single
+--   transaction. To stay within the platform's transactional discipline AND
+--   add the enum value, we split:
+--     0057 -- this file -- ONLY the ALTER TYPE statement.
+--     0058 -- the CREATE OR REPLACE FUNCTION rewrite.
+--   Each file applies as its own transaction; the enum is committed before
+--   the function rewrite references the new label.
+--
+-- Idempotency: `ADD VALUE IF NOT EXISTS` is safe to re-run.
+-- =============================================================================
+
+ALTER TYPE cost_source_enum ADD VALUE IF NOT EXISTS 'auto_issued';
