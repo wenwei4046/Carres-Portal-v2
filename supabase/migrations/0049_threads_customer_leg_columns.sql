@@ -5,7 +5,7 @@
 -- `purchase_orders` to `order_supplier_threads`. PO retains only the
 -- procurement-leg partner (renamed `procurement_partner_id` in Sprint C
 -- migration 0052). This migration is the additive foundation: ADD COLUMNS
--- on threads + a partial index that mirrors 0044's `po_rfd_pending_idx`
+-- on threads + a partial index that mirrors 0044's `po_partner_rfd_pending_idx`
 -- shape so the Logistics "RFD pending" queue can run partner-scoped queries
 -- against threads instead of POs.
 --
