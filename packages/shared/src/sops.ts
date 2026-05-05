@@ -57,8 +57,8 @@ export const SOP_SOFA_SPECIAL: SopDef = {
     { from: 'awaiting_logistics_action', to: 'ready_to_dispatch', rpc: 'logistics_receive_po_with_do' },
     // LP Reject + Relocate path: previous sup_status was 'relocated'
     { from: 'awaiting_logistics_action', to: 'waiting',           rpc: 'logistics_receive_po_with_do' },
-    // Resume after customer reschedules
-    { from: 'waiting',                   to: 'ready_to_dispatch', rpc: 'logistics_resume_from_waiting' },
+    // Resume after customer reschedules (Phase 4.5 Chunk 2: thread-scoped, was order-scoped logistics_resume_from_waiting in 0045 / Chunk 1)
+    { from: 'waiting',                   to: 'ready_to_dispatch', rpc: 'logistics_resume_dispatch_from_waiting' },
     // Customer-delivery dispatch (RFD or Force)
     { from: 'ready_to_dispatch',         to: 'dispatched',        rpc: 'logistics_dispatch_customer_leg' },
     // Final delivery

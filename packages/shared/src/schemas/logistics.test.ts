@@ -18,6 +18,10 @@ import {
   listMovementsQuery,
   confirmProceedRequestInputSchema,
   transferReadyInputSchema,
+  partnerAcceptRfdInput,
+  partnerRejectRfdInput,
+  dispatchCustomerLegInput,
+  resumeDispatchInput,
 } from './logistics';
 
 const UUID = '00000000-0000-4000-8000-000000000000';
@@ -442,5 +446,123 @@ describe('transferReadyInputSchema', () => {
   });
   it('rejects extra keys (strict mode)', () => {
     expect(transferReadyInputSchema.safeParse({ warehouseId: UUID, extraField: 'x' }).success).toBe(false);
+  });
+});
+
+describe('partnerAcceptRfdInput (Phase 4.5 Chunk 2 Sprint B)', () => {
+  it('accepts a valid uuid threadId', () => {
+    expect(partnerAcceptRfdInput.safeParse({ threadId: UUID }).success).toBe(true);
+  });
+  it('rejects a non-uuid threadId (e.g. legacy text PO id)', () => {
+    expect(partnerAcceptRfdInput.safeParse({ threadId: 'PO-001' }).success).toBe(false);
+  });
+  it('rejects an empty body (threadId required)', () => {
+    expect(partnerAcceptRfdInput.safeParse({}).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(partnerAcceptRfdInput.safeParse({ threadId: UUID, extraField: 'x' }).success).toBe(false);
+  });
+});
+
+describe('partnerRejectRfdInput (Phase 4.5 Chunk 2 Sprint B)', () => {
+  it('accepts a valid uuid threadId without reason', () => {
+    expect(partnerRejectRfdInput.safeParse({ threadId: UUID }).success).toBe(true);
+  });
+  it('accepts a valid uuid threadId with reason', () => {
+    expect(
+      partnerRejectRfdInput.safeParse({ threadId: UUID, reason: 'capacity full' }).success,
+    ).toBe(true);
+  });
+  it('rejects a non-uuid threadId', () => {
+    expect(partnerRejectRfdInput.safeParse({ threadId: 'PO-001' }).success).toBe(false);
+  });
+  it('rejects reason longer than 500 chars', () => {
+    expect(
+      partnerRejectRfdInput.safeParse({ threadId: UUID, reason: 'x'.repeat(501) }).success,
+    ).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      partnerRejectRfdInput.safeParse({ threadId: UUID, reason: 'x', extraField: 'x' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('dispatchCustomerLegInput (Phase 4.5 Chunk 2 Sprint B)', () => {
+  it('accepts a valid full body with forceDispatch defaulting to false', () => {
+    const r = dispatchCustomerLegInput.safeParse({
+      threadId: UUID,
+      partnerId: UUID2,
+      confirmDeliveryDate: '2026-05-20',
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.forceDispatch).toBe(false);
+    }
+  });
+  it('accepts forceDispatch=true', () => {
+    expect(
+      dispatchCustomerLegInput.safeParse({
+        threadId: UUID,
+        partnerId: UUID2,
+        confirmDeliveryDate: '2026-05-20',
+        forceDispatch: true,
+      }).success,
+    ).toBe(true);
+  });
+  it('rejects a non-uuid threadId', () => {
+    expect(
+      dispatchCustomerLegInput.safeParse({
+        threadId: 'PO-200',
+        partnerId: UUID2,
+        confirmDeliveryDate: '2026-05-20',
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects a non-uuid partnerId', () => {
+    expect(
+      dispatchCustomerLegInput.safeParse({
+        threadId: UUID,
+        partnerId: 'P-1',
+        confirmDeliveryDate: '2026-05-20',
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects an invalid date string', () => {
+    expect(
+      dispatchCustomerLegInput.safeParse({
+        threadId: UUID,
+        partnerId: UUID2,
+        confirmDeliveryDate: '2026-13-99',
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects missing required fields', () => {
+    expect(dispatchCustomerLegInput.safeParse({ threadId: UUID }).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      dispatchCustomerLegInput.safeParse({
+        threadId: UUID,
+        partnerId: UUID2,
+        confirmDeliveryDate: '2026-05-20',
+        extraField: 'x',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('resumeDispatchInput (Phase 4.5 Chunk 2 Sprint B)', () => {
+  it('accepts a valid uuid threadId', () => {
+    expect(resumeDispatchInput.safeParse({ threadId: UUID }).success).toBe(true);
+  });
+  it('rejects a non-uuid threadId (e.g. legacy order dl int)', () => {
+    expect(resumeDispatchInput.safeParse({ threadId: '4001' }).success).toBe(false);
+  });
+  it('rejects an empty body (threadId required)', () => {
+    expect(resumeDispatchInput.safeParse({}).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(resumeDispatchInput.safeParse({ threadId: UUID, extraField: 'x' }).success).toBe(false);
   });
 });

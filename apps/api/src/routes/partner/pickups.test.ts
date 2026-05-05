@@ -81,27 +81,31 @@ describe("GET /api/partner/pickups", () => {
   });
 });
 
-describe("POST /api/partner/pickups/:id/accept-rfd", () => {
-  it("calls partner_accept_dispatch RPC", async () => {
+const THREAD_ID = "00000000-0000-0000-0000-00000000beef";
+
+describe("POST /api/partner/pickups/accept-rfd", () => {
+  it("calls logistics_partner_accept_rfd RPC with p_thread_id", async () => {
     const sb = {
-      rpc: vi.fn().mockResolvedValue({ data: { po_id: "PO-001", threads_advanced: 1 }, error: null }),
+      rpc: vi.fn().mockResolvedValue({
+        data: { thread_id: THREAD_ID, partner_accepted_at: "2026-05-15T00:00:00Z", logistics_stage: "dispatched" },
+        error: null,
+      }),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
     const jwt = await makeJwt("partner", "p1");
     const res = await app.fetch(
-      new Request("http://t/api/partner/pickups/PO-001/accept-rfd", {
+      new Request("http://t/api/partner/pickups/accept-rfd", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm_delivery_date: "2026-05-15" }),
+        body: JSON.stringify({ threadId: THREAD_ID }),
       }),
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("partner_accept_dispatch", {
-      p_po_id: "PO-001",
-      p_confirm_delivery_date: "2026-05-15",
+    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_accept_rfd", {
+      p_thread_id: THREAD_ID,
     });
   });
 
@@ -111,7 +115,40 @@ describe("POST /api/partner/pickups/:id/accept-rfd", () => {
     vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("partner", "p1");
     const res = await app.fetch(
-      new Request("http://t/api/partner/pickups/PO-001/accept-rfd", {
+      new Request("http://t/api/partner/pickups/accept-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: THREAD_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects non-uuid threadId with 422", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", "p1");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/accept-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: "PO-001" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing threadId with 422", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", "p1");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/accept-rfd", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -119,24 +156,75 @@ describe("POST /api/partner/pickups/:id/accept-rfd", () => {
       env,
     );
     expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 });
 
-describe("POST /api/partner/pickups/:id/reject-rfd", () => {
-  it("calls partner_reject_dispatch RPC", async () => {
-    const sb = { rpc: vi.fn().mockResolvedValue({ data: { po_id: "PO-001", rfd_cleared: true }, error: null }) };
+describe("POST /api/partner/pickups/reject-rfd", () => {
+  it("calls logistics_partner_reject_rfd RPC with p_thread_id + p_reason", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: { thread_id: THREAD_ID, rfd_cleared: true, lp_kept_assigned: true },
+        error: null,
+      }),
+    };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("partner", "p1");
     const res = await app.fetch(
-      new Request("http://t/api/partner/pickups/PO-001/reject-rfd", {
+      new Request("http://t/api/partner/pickups/reject-rfd", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "capacity full" }),
+        body: JSON.stringify({ threadId: THREAD_ID, reason: "capacity full" }),
       }),
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("partner_reject_dispatch", { p_po_id: "PO-001", p_reason: "capacity full" });
+    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_reject_rfd", {
+      p_thread_id: THREAD_ID,
+      p_reason: "capacity full",
+    });
+  });
+
+  it("defaults p_reason to empty string when omitted", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: { thread_id: THREAD_ID, rfd_cleared: true, lp_kept_assigned: true },
+        error: null,
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", "p1");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/reject-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: THREAD_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_reject_rfd", {
+      p_thread_id: THREAD_ID,
+      p_reason: "",
+    });
+  });
+
+  it("rejects non-uuid threadId with 422", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", "p1");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/reject-rfd", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: "PO-001", reason: "x" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 });

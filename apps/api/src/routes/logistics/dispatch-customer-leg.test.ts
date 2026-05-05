@@ -42,50 +42,52 @@ beforeEach(() => {
 afterAll(() => _setJwksForTesting(null));
 
 const LP_ID = "00000000-0000-0000-0000-0000000001f1";
+const THREAD_ID = "00000000-0000-0000-0000-0000000200a1";
 
-describe("POST /api/logistics/pos/:id/dispatch-customer-leg", () => {
-  it("Force=true → calls RPC with p_force_dispatch=true", async () => {
+describe("POST /api/logistics/pos/dispatch-customer-leg", () => {
+  it("Force=true → calls RPC with p_thread_id + p_force_dispatch=true", async () => {
     const sb = { rpc: vi.fn().mockResolvedValue({ data: { mode: "force" }, error: null }) };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
-      new Request("http://t/api/logistics/pos/PO-200/dispatch-customer-leg", {
+      new Request("http://t/api/logistics/pos/dispatch-customer-leg", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          partner_id: LP_ID,
-          confirm_delivery_date: "2026-05-20",
-          force_dispatch: true,
+          threadId: THREAD_ID,
+          partnerId: LP_ID,
+          confirmDeliveryDate: "2026-05-20",
+          forceDispatch: true,
         }),
       }),
       env,
     );
     expect(res.status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith("logistics_dispatch_customer_leg", {
-      p_po_id: "PO-200",
+      p_thread_id: THREAD_ID,
       p_partner_id: LP_ID,
       p_confirm_delivery_date: "2026-05-20",
       p_force_dispatch: true,
     });
   });
 
-  it("RFD path: force_dispatch defaults to false", async () => {
+  it("RFD path: forceDispatch defaults to false", async () => {
     const sb = { rpc: vi.fn().mockResolvedValue({ data: { mode: "rfd" }, error: null }) };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
-      new Request("http://t/api/logistics/pos/PO-200/dispatch-customer-leg", {
+      new Request("http://t/api/logistics/pos/dispatch-customer-leg", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ partner_id: LP_ID, confirm_delivery_date: "2026-05-20" }),
+        body: JSON.stringify({ threadId: THREAD_ID, partnerId: LP_ID, confirmDeliveryDate: "2026-05-20" }),
       }),
       env,
     );
     expect(res.status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith("logistics_dispatch_customer_leg", {
-      p_po_id: "PO-200",
+      p_thread_id: THREAD_ID,
       p_partner_id: LP_ID,
       p_confirm_delivery_date: "2026-05-20",
       p_force_dispatch: false,
@@ -95,13 +97,51 @@ describe("POST /api/logistics/pos/:id/dispatch-customer-leg", () => {
   it("rejects dealer with 403", async () => {
     const jwt = await makeJwt("dealer");
     const res = await app.fetch(
-      new Request("http://t/api/logistics/pos/PO-200/dispatch-customer-leg", {
+      new Request("http://t/api/logistics/pos/dispatch-customer-leg", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ partner_id: LP_ID, confirm_delivery_date: "2026-05-20" }),
+        body: JSON.stringify({ threadId: THREAD_ID, partnerId: LP_ID, confirmDeliveryDate: "2026-05-20" }),
       }),
       env,
     );
     expect(res.status).toBe(403);
+  });
+
+  it("rejects non-uuid threadId with 422", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/dispatch-customer-leg", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId: "PO-200",
+          partnerId: LP_ID,
+          confirmDeliveryDate: "2026-05-20",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing partnerId with 422", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/dispatch-customer-leg", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: THREAD_ID, confirmDeliveryDate: "2026-05-20" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 });

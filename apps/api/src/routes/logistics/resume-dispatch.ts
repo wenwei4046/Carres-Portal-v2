@@ -1,46 +1,52 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { resumeDispatchInput } from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * POST /api/logistics/orders/:dl/resume-dispatch — Phase 4.5 Chunk 1 (Task 35).
+ * POST /api/logistics/resume-dispatch — Phase 4.5 Chunk 2 Sprint B (Task 7).
  *
- * Resumes dispatch on an order that was parked in `at_warehouse_waiting` after a
- * partner-rejection. Looks up the order by its display number `dl` (integer),
- * resolves the underlying UUID `id`, then invokes RPC
- * `logistics_resume_from_waiting` (migration 0045, Task 14) to revive the
- * supplier threads and bring the order back into the active dispatch flow.
+ * Resumes dispatch on a single supplier thread that was parked in
+ * `logistics_stage = 'waiting'` after a partner-rejection or warehouse
+ * relocation. Pivoted from Chunk 1's order-scoped flow — the resume entry
+ * point now operates per-thread so multi-thread orders (e.g. mattress + sofa
+ * in one order) can resume independently.
  *
- * Mounted as a sibling sub-router on `/logistics/orders` (alongside
- * `logisticsOrdersRouter`) — Hono allows multiple sibling routers on the same
- * prefix. This keeps Task 35 isolated from the M2/M3/M4 orders router.
+ * Wraps RPC `logistics_resume_dispatch_from_waiting(p_thread_id uuid)`
+ * (migration 0051) which:
+ *   - State guard: thread.logistics_stage must be 'waiting'.
+ *   - Effect: thread → 'ready_to_dispatch'. If all sibling threads on the
+ *     same PO are no longer in 'waiting' AND the PO is still
+ *     'at_warehouse_waiting', flips PO sup_status to 'delivered' (preserves
+ *     Chunk-1 single-thread Sofa behaviour).
  *
- * Role-gated: logistics + principal only. Partners cannot resume an order.
+ * Body shape changed from `{}` (with :dl = order display number path param)
+ * to `{ threadId }`. Path param dropped — the thread uuid is now in the body.
+ *
+ * Mounted as a sibling sub-router; role-gated to logistics + principal only.
+ * Partners cannot resume a thread.
  */
 const resumeDispatchRouter = new Hono<AppEnv>();
 
-resumeDispatchRouter.post("/:dl/resume-dispatch", async (c) => {
+resumeDispatchRouter.post("/resume-dispatch", async (c) => {
   const auth = c.var.auth;
   if (!["logistics", "principal"].includes(auth.role)) {
     throw new HTTPException(403, { message: "Logistics or principal only" });
   }
-  const dlParam = c.req.param("dl");
-  const dl = parseInt(dlParam, 10);
-  if (isNaN(dl)) throw new HTTPException(400, { message: "invalid dl" });
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = resumeDispatchInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
 
   const sb = userClient(c.env, auth.jwt);
-  const { data: order, error: lookupErr } = await sb
-    .from("orders")
-    .select("id")
-    .eq("dl", dl)
-    .maybeSingle();
-  if (lookupErr) throw new HTTPException(500, { message: lookupErr.message });
-  if (!order) throw new HTTPException(404, { message: "order not found" });
-
-  const { data, error } = await sb.rpc("logistics_resume_from_waiting", {
-    p_order_id: order.id,
+  const { data, error } = await sb.rpc("logistics_resume_dispatch_from_waiting", {
+    p_thread_id: parsed.data.threadId,
   });
   if (error) {
     const m = mapPgError(error);

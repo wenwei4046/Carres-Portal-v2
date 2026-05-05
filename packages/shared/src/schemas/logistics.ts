@@ -295,6 +295,95 @@ export const listPurchaseOrdersQuery = z.object({
 export type ListPurchaseOrdersQuery = z.infer<typeof listPurchaseOrdersQuery>;
 
 /**
+ * `partnerAcceptRfdInput` — POST /api/partner/pickups/:threadId/accept-rfd
+ * (Phase 4.5 Chunk 2 Sprint B). Maps to RPC `logistics_partner_accept_rfd(p_thread_id uuid)`
+ * defined in migration 0051. The customer-leg RFD pivoted from PO-scoped to
+ * thread-scoped: the LP accepts on a single `order_supplier_threads` row
+ * (one supplier × one order). Body carries the thread uuid only — the RPC
+ * stamps `partner_accepted_at` and advances `logistics_stage = 'dispatched'`
+ * with no further parameters (the confirm date was already set at dispatch
+ * time via `dispatchCustomerLegInput`).
+ *
+ * Replaces the Chunk 1 PO-scoped `acceptRfd` body (`{ confirm_delivery_date? }`
+ * + path :id = po_id) which referenced the now-dropped 0045
+ * `partner_accept_dispatch(p_po_id, p_confirm_delivery_date)` RPC.
+ */
+export const partnerAcceptRfdInput = z.object({
+  threadId: z.string().uuid(),
+}).strict();
+export type PartnerAcceptRfdInput = z.infer<typeof partnerAcceptRfdInput>;
+
+/**
+ * `partnerRejectRfdInput` — POST /api/partner/pickups/:threadId/reject-rfd
+ * (Phase 4.5 Chunk 2 Sprint B). Maps to RPC
+ * `logistics_partner_reject_rfd(p_thread_id uuid, p_reason text DEFAULT '')`
+ * defined in migration 0051. Reason is audit-only (free text up to 500 chars),
+ * matching the F9 invariant from Chunk 1 — `delivery_partner_id` stays
+ * assigned on the thread so logistics can re-RFD or pick a different LP via
+ * DispatchPartnerDialog without a re-assignment step.
+ *
+ * Replaces the Chunk 1 PO-scoped `rejectRfd` body (`{ reason? }` + path :id =
+ * po_id) which referenced the now-dropped 0045
+ * `partner_reject_dispatch(p_po_id, p_reason)` RPC.
+ */
+export const partnerRejectRfdInput = z.object({
+  threadId: z.string().uuid(),
+  reason: z.string().max(500).optional(),
+}).strict();
+export type PartnerRejectRfdInput = z.infer<typeof partnerRejectRfdInput>;
+
+/**
+ * `dispatchCustomerLegInput` — POST /api/logistics/pos/:threadId/dispatch-customer-leg
+ * (Phase 4.5 Chunk 2 Sprint B). Maps to RPC
+ * `logistics_dispatch_customer_leg(p_thread_id uuid, p_partner_id uuid,
+ *  p_confirm_delivery_date date, p_force_dispatch boolean DEFAULT false)`
+ * defined in migration 0051. The dispatch entry-point pivoted from PO-scoped
+ * to thread-scoped: customer-leg state (delivery_partner_id, request_for_delivery_at,
+ * confirm_delivery_date, partner_accepted_at, partner_rejected_at) now lives on
+ * `order_supplier_threads`, not `purchase_orders`.
+ *
+ * Two paths (RFD vs Force) per migration 0051:
+ *   - `forceDispatch=false` (default): standard request-for-delivery flow. LP
+ *     must accept via `partnerAcceptRfdInput` to advance the thread to
+ *     'dispatched'.
+ *   - `forceDispatch=true`: logistics overrides RFD and stamps
+ *     `partner_accepted_at = now()` immediately, advancing thread.logistics_stage
+ *     to 'dispatched' without LP intervention.
+ *
+ * Replaces the Chunk 1 PO-scoped `dispatchCustomerLegInput` (path :id = po_id +
+ * body `{ partner_id, confirm_delivery_date, force_dispatch }`) which
+ * referenced the now-dropped 0045
+ * `logistics_dispatch_customer_leg(text, uuid, date, boolean)` RPC.
+ */
+export const dispatchCustomerLegInput = z.object({
+  threadId: z.string().uuid(),
+  partnerId: z.string().uuid(),
+  confirmDeliveryDate: z.string().date(),
+  forceDispatch: z.boolean().default(false),
+}).strict();
+export type DispatchCustomerLegInput = z.infer<typeof dispatchCustomerLegInput>;
+
+/**
+ * `resumeDispatchInput` — POST /api/logistics/threads/:threadId/resume-dispatch
+ * (Phase 4.5 Chunk 2 Sprint B). Maps to RPC
+ * `logistics_resume_dispatch_from_waiting(p_thread_id uuid)` defined in
+ * migration 0051. Replaces the Chunk 1 order-scoped
+ * `logistics_resume_from_waiting(p_order_id uuid)` RPC — the resume entry
+ * point pivoted from order-scoped to thread-scoped so multi-thread orders
+ * (e.g. mattress + sofa in one order) can resume independently per supplier
+ * thread.
+ *
+ * State guard at the RPC: thread.logistics_stage must be 'waiting'. Effect:
+ * thread → 'ready_to_dispatch'; if all sibling threads on the same PO are no
+ * longer waiting AND the PO is still 'at_warehouse_waiting', the PO sup_status
+ * flips to 'delivered' (preserves Chunk-1 single-thread Sofa behaviour).
+ */
+export const resumeDispatchInput = z.object({
+  threadId: z.string().uuid(),
+}).strict();
+export type ResumeDispatchInput = z.infer<typeof resumeDispatchInput>;
+
+/**
  * `cancelPoInput` — POST /api/logistics/pos/:id/cancel.
  * Maps to `logistics_cancel_po(po_id, reason)` RPC (0020 migration). Reason is
  * required for the audit trail (mirrors abandonOrderInput shape).

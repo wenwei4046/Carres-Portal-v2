@@ -41,74 +41,84 @@ beforeEach(() => {
 
 afterAll(() => _setJwksForTesting(null));
 
-describe("POST /api/logistics/orders/:dl/resume-dispatch", () => {
-  it("calls logistics_resume_from_waiting RPC", async () => {
-    const ORDER_UUID = "00000000-0000-0000-0000-00000000a001";
+const THREAD_ID = "00000000-0000-0000-0000-00000000a001";
+
+describe("POST /api/logistics/orders/resume-dispatch", () => {
+  it("calls logistics_resume_dispatch_from_waiting RPC with p_thread_id", async () => {
     const sb = {
-      from: vi.fn(() => ({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: { id: ORDER_UUID }, error: null }),
-          }),
-        }),
-      })),
-      rpc: vi.fn().mockResolvedValue({ data: { threads_resumed: 2 }, error: null }),
+      rpc: vi.fn().mockResolvedValue({
+        data: { thread_id: THREAD_ID, logistics_stage: "ready_to_dispatch", po_status_changed: true },
+        error: null,
+      }),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
-      new Request("http://t/api/logistics/orders/4001/resume-dispatch", {
+      new Request("http://t/api/logistics/orders/resume-dispatch", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ threadId: THREAD_ID }),
       }),
       env,
     );
     expect(res.status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith(
-      "logistics_resume_from_waiting",
-      expect.objectContaining({ p_order_id: ORDER_UUID }),
+      "logistics_resume_dispatch_from_waiting",
+      { p_thread_id: THREAD_ID },
     );
   });
 
-  it("returns 404 when order not found", async () => {
+  it("maps SQLSTATE 22023 (wrong stage) to 422", async () => {
     const sb = {
-      from: vi.fn(() => ({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      })),
-      rpc: vi.fn(),
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "22023", message: "thread is not in waiting" },
+      }),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
-      new Request("http://t/api/logistics/orders/9999/resume-dispatch", {
+      new Request("http://t/api/logistics/orders/resume-dispatch", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ threadId: THREAD_ID }),
       }),
       env,
     );
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(422);
   });
 
   it("rejects dealer with 403", async () => {
     const jwt = await makeJwt("dealer");
     const res = await app.fetch(
-      new Request("http://t/api/logistics/orders/4001/resume-dispatch", {
+      new Request("http://t/api/logistics/orders/resume-dispatch", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ threadId: THREAD_ID }),
       }),
       env,
     );
     expect(res.status).toBe(403);
+  });
+
+  it("rejects non-uuid threadId with 422", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/orders/resume-dispatch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: "4001" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 });
