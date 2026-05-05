@@ -3,6 +3,7 @@ import PrincipalSidebar from "./PrincipalSidebar";
 import PrincipalDashboard from "./PrincipalDashboard";
 import PrincipalApprovals from "./PrincipalApprovals";
 import PrincipalDealers from "./PrincipalDealers";
+import PrincipalPartners from "./PrincipalPartners";
 import { usePrincipalDashboard } from "@/lib/queries";
 
 /**
@@ -38,6 +39,7 @@ export default function PrincipalApp() {
         {tab === "dashboard" && <PrincipalDashboard setTab={setTab} />}
         {tab === "approvals" && <PrincipalApprovals />}
         {tab === "dealers" && <PrincipalDealers />}
+        {tab === "partners" && <PrincipalPartners />}
       </main>
     </div>
   );

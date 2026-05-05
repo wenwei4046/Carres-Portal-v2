@@ -32,6 +32,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Network",
     items: [
       { k: "dealers", t: "Dealers", icon: "▤", enabled: true },
+      { k: "partners", t: "Logistics Partners", icon: "▦", enabled: true },
       { k: "suppliers", t: "Suppliers", icon: "▥", enabled: false, phase: "Phase 6" },
     ],
   },

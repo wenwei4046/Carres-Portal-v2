@@ -59,6 +59,7 @@ export const qk = {
     dealers:   (filters?: PrincipalDealerFilters) =>
       ["principal", "dealers", filters ?? {}] as const,
     dealer:    (id: string) => ["principal", "dealers", id] as const,
+    partners:  () => ["principal", "partners"] as const,
   },
   // Phase 4 — HQ Logistics namespace. Same nested-key strategy as `principal`
   // so M5 mutation hooks can blast `["logistics"]` (or a sub-tree) on each
