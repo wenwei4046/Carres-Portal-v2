@@ -61,6 +61,13 @@ export const qk = {
     dealer:    (id: string) => ["principal", "dealers", id] as const,
     partners:  () => ["principal", "partners"] as const,
   },
+  // Phase 4.5 Chunk 1 — Logistics Partner (LP) namespace. Nested keys mirror
+  // `principal` so we can blast `["partner"]` to invalidate the whole sub-tree
+  // (e.g. after accept/reject RFD ripples to dashboard counts + pickups list).
+  partner: {
+    dashboard: () => ["partner", "dashboard"] as const,
+    pickups:   () => ["partner", "pickups"] as const,
+  },
   // Phase 4 — HQ Logistics namespace. Same nested-key strategy as `principal`
   // so M5 mutation hooks can blast `["logistics"]` (or a sub-tree) on each
   // ripple — e.g. assign-partner invalidates orders + dashboard; PO receive
