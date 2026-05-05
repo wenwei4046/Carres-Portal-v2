@@ -104,3 +104,82 @@ $$;
 
 REVOKE ALL ON FUNCTION public.partner_accept_dispatch(text, date) FROM public;
 GRANT EXECUTE ON FUNCTION public.partner_accept_dispatch(text, date) TO authenticated;
+
+-- -----------------------------------------------------------------------------
+-- 2. partner_reject_dispatch(p_po_id text, p_reason text DEFAULT '')
+-- -----------------------------------------------------------------------------
+-- LP rejects the customer-leg RFD.
+-- Codex F9: keep delivery_partner_id (do NOT clear). Logistics may re-RFD or
+-- DispatchPartnerDialog the same or different LP.
+-- Effect: clear request_for_delivery_at, stamp partner_rejected_at.
+-- p_reason → audit_log only (per C1.9, NOT a column).
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.partner_reject_dispatch(
+  p_po_id text,
+  p_reason text DEFAULT ''
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_po         purchase_orders;
+  v_role       app_role;
+  v_partner_id uuid;
+  v_actor      text;
+BEGIN
+  v_role := public.app_role();
+  v_partner_id := public.app_partner_id();
+
+  IF v_role IS DISTINCT FROM 'partner' THEN
+    RAISE EXCEPTION 'forbidden: partner only'
+      USING ERRCODE = '42501', DETAIL = 'forbidden';
+  END IF;
+
+  SELECT * INTO v_po FROM purchase_orders WHERE id = p_po_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'PO not found' USING ERRCODE = '42P01', DETAIL = 'po_not_found';
+  END IF;
+
+  IF v_po.delivery_partner_id IS DISTINCT FROM v_partner_id THEN
+    RAISE EXCEPTION 'forbidden: cross-partner reject'
+      USING ERRCODE = '42501', DETAIL = 'forbidden';
+  END IF;
+
+  IF v_po.request_for_delivery_at IS NULL
+     OR v_po.partner_accepted_at IS NOT NULL
+     OR v_po.partner_rejected_at IS NOT NULL THEN
+    RAISE EXCEPTION 'RFD not pending'
+      USING ERRCODE = '22023', DETAIL = 'rfd_not_pending';
+  END IF;
+
+  v_actor := COALESCE((SELECT name FROM app_users WHERE id = (SELECT auth.uid())), 'Partner');
+
+  -- Mutate PO: clear RFD, stamp rejected. Codex F9: keep delivery_partner_id.
+  UPDATE purchase_orders
+     SET request_for_delivery_at = NULL,
+         partner_rejected_at     = now(),
+         updated_at              = now()
+   WHERE id = p_po_id;
+
+  INSERT INTO po_history (po_id, text, by_role)
+  VALUES (p_po_id,
+          format('LP rejected RFD%s', CASE WHEN p_reason <> '' THEN ': ' || p_reason ELSE '' END),
+          'partner');
+
+  INSERT INTO audit_log (role, actor_text, action, ref)
+  VALUES ('partner', v_actor,
+          format('LP rejected RFD on PO %s%s', p_po_id,
+                 CASE WHEN p_reason <> '' THEN format(' (reason: %s)', p_reason) ELSE '' END),
+          p_po_id);
+
+  RETURN jsonb_build_object(
+    'po_id',              p_po_id,
+    'partner_rejected_at', now(),
+    'rfd_cleared',        true,
+    'lp_kept_assigned',   true
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.partner_reject_dispatch(text, text) FROM public;
+GRANT EXECUTE ON FUNCTION public.partner_reject_dispatch(text, text) TO authenticated;
