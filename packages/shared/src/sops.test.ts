@@ -4,8 +4,11 @@ import {
   SOP_SOFA_SPECIAL,
   SUPPLIER_SOP,
   sopFor,
+  PROCUREMENT_TAB_SLUGS,
+  deriveProcurementSlug,
   type SopDef,
   type LogisticsStageV3,
+  type ProcurementTabSlug,
 } from './sops';
 
 describe('SUPPLIER_SOP / sopFor', () => {
@@ -98,5 +101,70 @@ describe('SOP shape invariants', () => {
     expect(matches).toHaveLength(2);
     const tos = matches.map(t => t.to).sort();
     expect(tos).toEqual(['ready_to_dispatch', 'waiting']);
+  });
+});
+
+describe('PROCUREMENT_TAB_SLUGS / deriveProcurementSlug', () => {
+  it('PROCUREMENT_TAB_SLUGS has exactly 3 members in the expected order', () => {
+    expect(PROCUREMENT_TAB_SLUGS).toEqual([
+      'nice-future',
+      'hookka-sofa',
+      'hookka-bedframe',
+    ]);
+    expect(PROCUREMENT_TAB_SLUGS).toHaveLength(3);
+  });
+
+  it('PROCUREMENT_TAB_SLUGS is a readonly tuple type at compile + runtime', () => {
+    // Compile-time: the const assertion narrows each element to its literal
+    // string type, so this assignment must typecheck.
+    const niceFuture: ProcurementTabSlug = PROCUREMENT_TAB_SLUGS[0];
+    const sofa: ProcurementTabSlug = PROCUREMENT_TAB_SLUGS[1];
+    const bedframe: ProcurementTabSlug = PROCUREMENT_TAB_SLUGS[2];
+    expect(niceFuture).toBe('nice-future');
+    expect(sofa).toBe('hookka-sofa');
+    expect(bedframe).toBe('hookka-bedframe');
+  });
+
+  it('deriveProcurementSlug returns nice-future for nice-future supplier regardless of category', () => {
+    expect(deriveProcurementSlug('nice-future', 'mattress')).toBe('nice-future');
+    expect(deriveProcurementSlug('nice-future', 'sofa')).toBe('nice-future');
+    expect(deriveProcurementSlug('nice-future', 'bedframe')).toBe('nice-future');
+    expect(deriveProcurementSlug('nice-future', '')).toBe('nice-future');
+  });
+
+  it('deriveProcurementSlug maps hookka + sofa to hookka-sofa', () => {
+    expect(deriveProcurementSlug('hookka', 'sofa')).toBe('hookka-sofa');
+  });
+
+  it('deriveProcurementSlug maps hookka + bedframe to hookka-bedframe', () => {
+    expect(deriveProcurementSlug('hookka', 'bedframe')).toBe('hookka-bedframe');
+  });
+
+  it('deriveProcurementSlug returns null for hookka + unknown category (e.g. mattress)', () => {
+    expect(deriveProcurementSlug('hookka', 'mattress')).toBeNull();
+    expect(deriveProcurementSlug('hookka', '')).toBeNull();
+    expect(deriveProcurementSlug('hookka', 'pillow')).toBeNull();
+  });
+
+  it('deriveProcurementSlug returns null for unknown suppliers', () => {
+    expect(deriveProcurementSlug('legacy-supplier', 'sofa')).toBeNull();
+    expect(deriveProcurementSlug('', 'sofa')).toBeNull();
+    expect(deriveProcurementSlug('NICE-FUTURE', 'mattress')).toBeNull(); // case-sensitive
+  });
+
+  it('deriveProcurementSlug return value is always one of PROCUREMENT_TAB_SLUGS or null', () => {
+    const cases: Array<[string, string]> = [
+      ['nice-future', 'mattress'],
+      ['hookka', 'sofa'],
+      ['hookka', 'bedframe'],
+      ['hookka', 'mattress'],
+      ['legacy', 'sofa'],
+    ];
+    for (const [supplier, category] of cases) {
+      const slug = deriveProcurementSlug(supplier, category);
+      if (slug !== null) {
+        expect(PROCUREMENT_TAB_SLUGS).toContain(slug);
+      }
+    }
   });
 });

@@ -89,3 +89,25 @@ export function sopFor(supplierSlug: string, category: string): SopDef {
   }
   return cfg;
 }
+
+/**
+ * Procurement tab slugs for the per-supplier kanban shell (Phase 4.5 Chunk 2 Sprint F).
+ * Each slug maps to one tab on `/logistics/procurement/{slug}`.
+ */
+export const PROCUREMENT_TAB_SLUGS = ['nice-future', 'hookka-sofa', 'hookka-bedframe'] as const;
+export type ProcurementTabSlug = (typeof PROCUREMENT_TAB_SLUGS)[number];
+
+/**
+ * Derive the procurement tab slug from a (supplierSlug, category) pair.
+ * Returns null if the combination doesn't map to any procurement tab
+ * (e.g., legacy supplier or category outside the 3 known channels).
+ */
+export function deriveProcurementSlug(
+  supplierSlug: string,
+  category: string,
+): ProcurementTabSlug | null {
+  if (supplierSlug === 'nice-future') return 'nice-future';
+  if (supplierSlug === 'hookka' && category === 'sofa') return 'hookka-sofa';
+  if (supplierSlug === 'hookka' && category === 'bedframe') return 'hookka-bedframe';
+  return null;
+}

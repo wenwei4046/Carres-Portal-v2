@@ -65,9 +65,12 @@ export {
   SOP_SOFA_SPECIAL,
   SUPPLIER_SOP,
   sopFor,
+  PROCUREMENT_TAB_SLUGS,
+  deriveProcurementSlug,
   type LogisticsStageV3,
   type SopName,
   type SopDef,
+  type ProcurementTabSlug,
 } from "./sops";
 
 export {
