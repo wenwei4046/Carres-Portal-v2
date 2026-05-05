@@ -140,44 +140,81 @@ describe("Phase 4.5a T2 — v2 RPC v3-vocabulary sweep (migration 0038)", () => 
     expect(body.message).not.toContain("awaiting_stock");
   });
 
-  // Migration-file static check. The five RPC bodies in 0038 must contain
+  // Migration-file static check. The RPC bodies in 0038 + 0038b must contain
   // 'awaiting_logistics_action' and must NOT contain a writable
-  // 'awaiting_stock' literal. We do a coarse text grep -- comments containing
-  // "awaiting_stock" inside `--` lines are tolerated, but any quoted literal
-  // string is not (those are stage-write targets).
+  // 'awaiting_stock' enum literal. We do a coarse text grep -- comments
+  // containing "awaiting_stock" inside `--` lines are tolerated, but any
+  // quoted literal in code position is not (those are stage-write targets).
+  //
+  // 0038b ADDITIONAL TOLERANCE: the body of logistics_dashboard_summary
+  // intentionally retains the JSON KEY 'awaiting_stock' inside a
+  // jsonb_build_object call -- that's a payload key the FE consumers depend
+  // on and will be renamed in T5 alongside the matching FE update. We
+  // allowlist that single occurrence by stripping the line `'awaiting_stock',`
+  // (the jsonb key syntax) from the code-only scan; any OTHER occurrence
+  // of the quoted literal will still fail the assertion.
+  function readMigration(filename: string): Promise<string> {
+    return (async () => {
+      const fs = await import("node:fs/promises");
+      const path = await import("node:path");
+      const { fileURLToPath } = await import("node:url");
+      // Resolve from this test file -> repo root -> supabase/migrations/...
+      // Use fileURLToPath to handle Windows file:// URLs correctly (the bare
+      // URL.pathname property leaves a leading slash in front of the drive
+      // letter on win32, which path.resolve then mangles).
+      const here = path.dirname(fileURLToPath(import.meta.url));
+      const repoRoot = path.resolve(here, "..", "..", "..", "..", "..");
+      const migrationPath = path.join(
+        repoRoot,
+        "supabase",
+        "migrations",
+        filename,
+      );
+      return fs.readFile(migrationPath, "utf8");
+    })();
+  }
+
+  function stripCommentsAndAllowlistedJsonKey(text: string): string {
+    return text
+      .split("\n")
+      .map((line) => {
+        // Strip `-- ...` comment tails so the file's prose mentions of
+        // 'awaiting_stock' don't trip the assertion.
+        const commentIdx = line.indexOf("--");
+        const codeLine = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
+        // Allowlist: jsonb_build_object KEY position. Match `<ws>'awaiting_stock',`
+        // exactly. T5 will rename DB+FE in lockstep; until then the JSON key
+        // must remain to keep FE consumers working.
+        if (/^\s*'awaiting_stock',\s*$/.test(codeLine)) return "";
+        return codeLine;
+      })
+      .join("\n");
+  }
+
   it("migration 0038 file body uses v3 vocabulary (no v2 stage-string literal writes)", async () => {
-    const fs = await import("node:fs/promises");
-    const path = await import("node:path");
-    const { fileURLToPath } = await import("node:url");
-    // Resolve from this test file -> repo root -> supabase/migrations/0038...
-    // Use fileURLToPath to handle Windows file:// URLs correctly (the bare
-    // URL.pathname property leaves a leading slash in front of the drive
-    // letter on win32, which path.resolve then mangles).
-    const here = path.dirname(fileURLToPath(import.meta.url));
-    const repoRoot = path.resolve(here, "..", "..", "..", "..", "..");
-    const migrationPath = path.join(
-      repoRoot,
-      "supabase",
-      "migrations",
-      "0038_logistics_v2_rpc_v3_vocab_sweep.sql",
-    );
-    const text = await fs.readFile(migrationPath, "utf8");
+    const text = await readMigration("0038_logistics_v2_rpc_v3_vocab_sweep.sql");
 
     // Must contain v3 vocabulary somewhere in body.
     expect(text).toContain("awaiting_logistics_action");
 
     // Must NOT contain the quoted-literal v2 vocabulary in any non-comment
-    // line. Strip out `-- ...` comment tails before scanning so the file
-    // header banner's mentions of `awaiting_stock` (in prose) don't trip
-    // this assertion.
-    const codeOnly = text
-      .split("\n")
-      .map((line) => {
-        const idx = line.indexOf("--");
-        return idx >= 0 ? line.slice(0, idx) : line;
-      })
-      .join("\n");
+    // line. (0038 has no JSON-key occurrence, so the allowlist is moot here
+    // but kept for symmetry with the 0038b assertion.)
+    const codeOnly = stripCommentsAndAllowlistedJsonKey(text);
+    expect(codeOnly).not.toContain("'awaiting_stock'");
+  });
 
+  it("migration 0038b file body uses v3 vocabulary (no v2 stage-string enum literals; JSON key allowlisted)", async () => {
+    const text = await readMigration("0038b_logistics_v2_residual_rpc_sweep.sql");
+
+    // Must contain v3 vocabulary somewhere in body.
+    expect(text).toContain("awaiting_logistics_action");
+
+    // Must NOT contain the quoted-literal v2 enum vocabulary in any non-
+    // comment, non-JSON-key line. The single legitimate occurrence (the
+    // jsonb_build_object KEY in logistics_dashboard_summary) is allowlisted
+    // by stripCommentsAndAllowlistedJsonKey so it does not trip this scan.
+    const codeOnly = stripCommentsAndAllowlistedJsonKey(text);
     expect(codeOnly).not.toContain("'awaiting_stock'");
   });
 });
