@@ -729,6 +729,56 @@ describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement
     expect(callArg.lines[0].costSource).toBe("hand_entered");
   });
 
+  it("changing SKU on a line clears that line's cost + costSource (T42-C4)", () => {
+    // T42-C4 — codex P2 fix. Without the reset, an operator who picks
+    // `prev_po` for SKU-A (auto-fills cost = 1500) and then switches the
+    // dropdown to SKU-B would persist SKU-A's 1500 against SKU-B (submit
+    // only checks non-null, not "matches the current SKU"). This test
+    // pins down the reset side-effect of the SKU select onChange.
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+
+    const SKU_QUEEN = "mattress:carres-cloud:Queen";
+
+    // Fill cost + costSource for the seeded line (King).
+    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
+      target: { value: "1500" },
+    });
+    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
+      target: { value: "hand_entered" },
+    });
+
+    // Sanity: King editor shows the typed values BEFORE the SKU swap.
+    expect(
+      (screen.getByTestId(`cogs-cost-input-${SKU_KING}`) as HTMLInputElement)
+        .value,
+    ).toBe("1500");
+    expect(
+      (
+        screen.getByTestId(`cogs-source-select-${SKU_KING}`) as HTMLSelectElement
+      ).value,
+    ).toBe("hand_entered");
+
+    // Switch SKU on line 0 from King → Queen.
+    const skuSelects = screen.getAllByLabelText(/Line \d+ SKU/);
+    fireEvent.change(skuSelects[0], { target: { value: SKU_QUEEN } });
+
+    // After the switch, the new line's CogsLineEditor (keyed by Queen) should
+    // mount fresh — both cost AND costSource are cleared so SKU-A's stale
+    // values don't bleed onto SKU-B.
+    const newCostInput = screen.getByTestId(
+      `cogs-cost-input-${SKU_QUEEN}`,
+    ) as HTMLInputElement;
+    const newSourceSelect = screen.getByTestId(
+      `cogs-source-select-${SKU_QUEEN}`,
+    ) as HTMLSelectElement;
+    expect(newCostInput.value).toBe("");
+    expect(newSourceSelect.value).toBe("");
+
+    // Submit gate is back to disabled — line is incomplete again.
+    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
+    expect(issueBtn).toBeDisabled();
+  });
+
   it("warns when 2 suppliers match → auto-split notice", () => {
     render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
     // Add a second SKU mapped to SUPPLIER_B (sofa:...)

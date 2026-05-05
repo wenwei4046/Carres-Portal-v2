@@ -70,6 +70,16 @@ export type WarehouseKind     = "own" | "logistics_partner";
 // auto-issue path predates that gate and uses 'auto_issued' instead.
 export type CostSource        = "hand_entered" | "prev_po" | "system_suggested" | "auto_issued";
 
+// T42-C1 — narrower form-state variant excluding the server-only `auto_issued`
+// label. The auto-issue path predates the Sprint E (T25) manual-create gating
+// and emits `auto_issued` to mark cost values inferred at PO-issue time. The
+// FE manual-create surface (`CreatePOModal` + `CogsLineEditor`) must NOT
+// originate `auto_issued` — `createPoInput.lines[].costSource` zod is locked
+// to the 3 manual values, so leaking `auto_issued` through the form would
+// 422 at the API edge. Use this type at the form-state layer to enforce that
+// invariant at compile time instead of runtime.
+export type ManualCostSource  = Exclude<CostSource, "auto_issued">;
+
 export interface DealerRow {
   id: string;
   name: string;

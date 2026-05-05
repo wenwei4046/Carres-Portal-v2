@@ -2,7 +2,7 @@ import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { CostSource } from "@carres/shared";
+import type { ManualCostSource } from "@carres/shared";
 import CogsLineEditor from "./CogsLineEditor";
 
 /**
@@ -35,10 +35,10 @@ function Harness({
 }: {
   onChangeSpy: ReturnType<typeof vi.fn>;
   initialCost?: number | null;
-  initialSource?: CostSource | null;
+  initialSource?: ManualCostSource | null;
 }) {
   const [cost, setCost] = useState<number | null>(initialCost);
-  const [source, setSource] = useState<CostSource | null>(initialSource);
+  const [source, setSource] = useState<ManualCostSource | null>(initialSource);
   return (
     <CogsLineEditor
       sku={SKU}

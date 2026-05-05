@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { CostSource } from "@carres/shared";
+import type { ManualCostSource } from "@carres/shared";
+
+// T42-C1 — Form state uses `ManualCostSource` (3-value, no `auto_issued`)
+// rather than the wider DB-level `CostSource` (4-value). The `auto_issued`
+// label is server-only — emitted by the auto-issue path that predates
+// manual create gating. This modal is the MANUAL create surface, so the
+// form state must NOT originate `auto_issued`. Aligning the form-state type
+// with the `createPoInput.lines[].costSource` zod (3-value enum) closes the
+// typecheck regression introduced when 0055's `auto_issued` was added to
+// the DB enum.
 import { ApiError } from "@/lib/api";
 import {
   useAwaitingStockShortage,
@@ -79,8 +88,11 @@ interface DraftLine {
   // start as null on a fresh row and must be non-null at submit time
   // (validated below). Mirrors `createPoInput.lines[]` zod shape; the API
   // edge transforms `costSource` → `cost_source` before the RPC call.
+  // T42-C1 — narrowed to `ManualCostSource` (3-value) to match the API
+  // contract — `auto_issued` is server-only and never originates from this
+  // form.
   cost: number | null;
-  costSource: CostSource | null;
+  costSource: ManualCostSource | null;
 }
 
 // Convention: SKUs are formatted `category:model:variant`. The first segment
@@ -651,7 +663,18 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
               >
                 <select
                   value={l.sku}
-                  onChange={(e) => setLine(i, { sku: e.target.value })}
+                  onChange={(e) =>
+                    // T42-C4 — when the operator switches the SKU on a line,
+                    // reset cost + costSource. Otherwise the previous SKU's
+                    // cost (e.g. fetched via `prev_po` for SKU-A) persists
+                    // against SKU-B even though they are unrelated. Submit
+                    // only checks non-null, not "matches the current SKU".
+                    setLine(i, {
+                      sku: e.target.value,
+                      cost: null,
+                      costSource: null,
+                    })
+                  }
                   aria-label={`Line ${i + 1} SKU`}
                   className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
                 >

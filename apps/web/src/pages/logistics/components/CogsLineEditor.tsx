@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { CostSource } from "@carres/shared";
+import type { ManualCostSource } from "@carres/shared";
 import { ApiError, apiFetch } from "@/lib/api";
 
 /**
@@ -47,10 +47,16 @@ export interface CogsLineEditorProps {
   sku: string;
   /** Current cost value in the parent's draft state; null = "not yet set". */
   cost: number | null;
-  /** Current cost-source selection in the parent's draft state. */
-  costSource: CostSource | null;
+  /**
+   * Current cost-source selection in the parent's draft state.
+   *
+   * T42-C1 — narrowed to `ManualCostSource` (3-value: `hand_entered | prev_po
+   * | system_suggested`). The DB-level `CostSource` includes `auto_issued`,
+   * which is a server-only label this manual-edit dropdown cannot produce.
+   */
+  costSource: ManualCostSource | null;
   /** Bubble both fields up on every meaningful change. */
-  onChange: (cost: number | null, costSource: CostSource | null) => void;
+  onChange: (cost: number | null, costSource: ManualCostSource | null) => void;
   /** When true, all inputs are disabled (e.g. while the parent is submitting). */
   disabled?: boolean;
 }
@@ -91,7 +97,7 @@ export default function CogsLineEditor({
   // Track the dropdown's last-known auto-fill state so we can flip back to
   // `hand_entered` when the user types a manual override. A ref (not state)
   // avoids re-render churn — the value is read inside the input handler only.
-  const lastAutoFillRef = useRef<CostSource | null>(null);
+  const lastAutoFillRef = useRef<ManualCostSource | null>(null);
   useEffect(() => {
     if (costSource === "prev_po" || costSource === "system_suggested") {
       lastAutoFillRef.current = costSource;
@@ -109,7 +115,7 @@ export default function CogsLineEditor({
    * On a null recent-cost, surface "no historical data" inline AND keep the
    * previous cost (i.e. don't clobber the user's prior entry).
    */
-  async function handleSourceChange(next: CostSource) {
+  async function handleSourceChange(next: ManualCostSource) {
     if (next === "hand_entered") {
       onChange(cost, "hand_entered");
       return;
@@ -136,7 +142,7 @@ export default function CogsLineEditor({
    */
   function handleCostChange(text: string) {
     const parsed = parseCost(text);
-    const nextSource: CostSource | null =
+    const nextSource: ManualCostSource | null =
       lastAutoFillRef.current !== null
         ? "hand_entered"
         : costSource ?? (parsed === null ? null : "hand_entered");
@@ -185,7 +191,7 @@ export default function CogsLineEditor({
           onChange={(e) => {
             const v = e.target.value;
             if (v === "") return;
-            void handleSourceChange(v as CostSource);
+            void handleSourceChange(v as ManualCostSource);
           }}
           disabled={disabled}
           aria-label={`Cost source for ${sku}`}

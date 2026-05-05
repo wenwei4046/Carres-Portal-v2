@@ -15,7 +15,11 @@ export * as Adapters from "./adapters";
 // implicitly available via DB.* — but CostSource is referenced widely enough
 // (CreatePoInput line shape, CogsLineEditor T28, recent-cost RPC T27) to
 // warrant the top-level alias.
-export type { CostSource } from "./db-types";
+//
+// T42-C1 — `ManualCostSource` is the narrower 3-value variant for the FE
+// manual-create surface (CreatePOModal form state + CogsLineEditor prop).
+// Excludes the server-only `auto_issued` label.
+export type { CostSource, ManualCostSource } from "./db-types";
 
 export {
   loginSchema,
