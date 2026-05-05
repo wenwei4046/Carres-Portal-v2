@@ -235,12 +235,15 @@ export interface PurchaseOrder {
   // Single-sku/qty columns dropped in 0017 — lines live in purchase_order_lines.
   status: "open" | "received" | "cancelled";
   // v3-S3 (migration 0030) added 6 values for the HoOKkA Sofa flow.
+  // Phase 4.5 Chunk 1 (migration 0043) appended `at_warehouse_waiting` for the
+  // Sofa Reject + Relocate + Receive flow; mirrors DB.POSupStatus.
   supStatus:
     | "pending" | "acknowledged" | "in_production"
     | "shipped" | "delivered"
     | "ready_for_pickup" | "pickup_assigned" | "pickup_accepted" | "picked_up" | "reassign_needed"
     | "ready_confirm_sent" | "partner_confirmed" | "customer_rejected"
-    | "relocated" | "at_partner_wh" | "at_own_wh_waiting";
+    | "relocated" | "at_partner_wh" | "at_own_wh_waiting"
+    | "at_warehouse_waiting";
   deliveryPartnerId: string | null;
   expectedReadyDate: string | null;
   pickupDate: string | null;

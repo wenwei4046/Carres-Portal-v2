@@ -24,12 +24,17 @@ export type POStatus          = "open" | "received" | "cancelled";
 // 6 new values appended in migration 0030 (v3-S3) for the HoOKkA Sofa flow:
 // ready_confirm -> partner confirm -> (customer_rejected -> relocated)? ->
 // at_partner_wh | at_own_wh_waiting.
+// Phase 4.5 Chunk 1 (migration 0043): `at_warehouse_waiting` appended for the
+// Sofa Reject + Relocate + Receive flow. The earlier v3 value `at_own_wh_waiting`
+// stays in the enum (deprecated) — cleanup deferred per carry-forward
+// `phase-4.5-cleanup-at-own-wh-waiting-rename`.
 export type POSupStatus       =
   | "pending" | "acknowledged" | "in_production"
   | "shipped" | "delivered"
   | "ready_for_pickup" | "pickup_assigned" | "pickup_accepted" | "picked_up" | "reassign_needed"
   | "ready_confirm_sent" | "partner_confirmed" | "customer_rejected"
-  | "relocated" | "at_partner_wh" | "at_own_wh_waiting";
+  | "relocated" | "at_partner_wh" | "at_own_wh_waiting"
+  | "at_warehouse_waiting";
 export type POPayStatus       = "unpaid" | "scheduled" | "paid";
 export type PaymentMethod     =
   | "cash" | "bank_transfer" | "cheque" | "credit_card"
@@ -325,6 +330,17 @@ export interface PurchaseOrderRow {
   outsource_partner_name: string | null;
   outsource_partner_contact: string | null;
   outsource_partner_zones: string | null;
+  // Phase 4.5 Chunk 1 customer-leg RFD/dispatch fields (migration 0044).
+  // confirm_delivery_date: date filled by Logistics or LP for the customer leg.
+  // request_for_delivery_at: timestamp set when Logistics presses Send RFD.
+  // partner_accepted_at / partner_rejected_at: LP response to the RFD.
+  // partner_rejection_reason intentionally absent — audit_log text is the
+  // persistence (Codex F10 fix). Partial index po_partner_rfd_pending_idx
+  // backs the "RFD pending" LP queue.
+  confirm_delivery_date: string | null;
+  request_for_delivery_at: string | null;
+  partner_accepted_at: string | null;
+  partner_rejected_at: string | null;
   pay_status: POPayStatus;
   placed_at: string;
 }
