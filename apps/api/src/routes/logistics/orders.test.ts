@@ -842,9 +842,21 @@ describe("POST /api/logistics/orders/:id/confirm-proceed", () => {
   const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
   const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000c02";
 
-  it("returns 200 on happy path with warehouseId", async () => {
+  it("returns 200 on happy path with warehouseId (v3: warehouseId accepted by zod, ignored at RPC)", async () => {
+    // Phase 4.5a T4: route now calls logistics_confirm_proceed_request_v3
+    // (p_order_id only). The v2 p_warehouse_id arg is dropped — warehouse
+    // selection moved into the RPC body via auto-skip-from-stock. The FE
+    // may still pass `warehouseId` in the request body for backward compat,
+    // but it's silently ignored at the RPC layer.
     const rpc = vi.fn().mockResolvedValue({
-      data: { status: "proceed_order", logistics_stage: "ready_to_dispatch", warehouse_id: WAREHOUSE_ID, reserved: true },
+      data: {
+        order_id: ORDER_ID,
+        dl: 4001,
+        logistics_stage: "awaiting_logistics_action",
+        auto_skipped: false,
+        po_id: null,
+        threads: [],
+      },
       error: null,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -859,16 +871,24 @@ describe("POST /api/logistics/orders/:id/confirm-proceed", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("logistics_confirm_proceed_request", {
+    expect(rpc).toHaveBeenCalledWith("logistics_confirm_proceed_request_v3", {
       p_order_id: ORDER_ID,
-      p_warehouse_id: WAREHOUSE_ID,
     });
-    assertRpcCallShape(rpc, "logistics_confirm_proceed_request", ["p_order_id", "p_warehouse_id"]);
+    assertRpcCallShape(rpc, "logistics_confirm_proceed_request_v3", ["p_order_id"]);
   });
 
-  it("returns 200 with empty body (uses order's existing warehouse_id; passes null)", async () => {
+  it("returns 200 with empty body (v3: no warehouse arg forwarded)", async () => {
+    // v3 contract: RPC receives only p_order_id. Warehouse choice is made
+    // internally (auto-skip vs awaiting_logistics_action).
     const rpc = vi.fn().mockResolvedValue({
-      data: { status: "proceed_order", logistics_stage: "awaiting_stock", warehouse_id: WAREHOUSE_ID, reserved: false },
+      data: {
+        order_id: ORDER_ID,
+        dl: 4001,
+        logistics_stage: "awaiting_logistics_action",
+        auto_skipped: false,
+        po_id: null,
+        threads: [],
+      },
       error: null,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -883,10 +903,10 @@ describe("POST /api/logistics/orders/:id/confirm-proceed", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("logistics_confirm_proceed_request", {
+    expect(rpc).toHaveBeenCalledWith("logistics_confirm_proceed_request_v3", {
       p_order_id: ORDER_ID,
-      p_warehouse_id: null,
     });
+    assertRpcCallShape(rpc, "logistics_confirm_proceed_request_v3", ["p_order_id"]);
   });
 
   it("returns 422 with code='wrong_stage' when called on non-proceed_request order", async () => {
@@ -1247,6 +1267,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     expect(body.order.po_id).toBeNull();
     expect(body.order.logistics_stage).toBe("awaiting_logistics_action");
     expect(body.order.threads[0].stage).toBe("awaiting_logistics_action");
+    assertRpcCallShape(rpc, "logistics_confirm_proceed_request_v3", ["p_order_id"]);
   });
 
   it("does not auto-skip if even one thread has shortage (ALL-or-NONE atomicity)", async () => {
@@ -1308,6 +1329,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
       expect(t.stage).toBe("awaiting_logistics_action");
       expect(t.po_id).toBeNull();
     }
+    assertRpcCallShape(rpc, "logistics_confirm_proceed_request_v3", ["p_order_id"]);
   });
 
   it("returns 409 on concurrent reserve race (40001 / serialization_failure)", async () => {
@@ -1340,6 +1362,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     // mapPgError surfaces error.details as `code`; covers both
     // `concurrent_reserve` and (fallback) `concurrent_claim` shapes.
     expect(body.code).toBe("concurrent_reserve");
+    assertRpcCallShape(rpc, "logistics_confirm_proceed_request_v3", ["p_order_id"]);
   });
 });
 

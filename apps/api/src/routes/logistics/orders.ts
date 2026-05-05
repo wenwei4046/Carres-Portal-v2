@@ -450,10 +450,15 @@ logisticsOrdersRouter.post("/:id/warehouse", async (c) => {
 });
 
 // ----- POST /:id/confirm-proceed -----
-// Pipeline v2 (C2 / migration 0024). Logistics' manual triage entry point:
-// confirms a `proceed_request` order and decides awaiting_stock vs
-// ready_to_dispatch based on shortage. RPC accepts a NULL warehouseId when
-// the order already has one assigned.
+// Phase 4.5a T4 (v3 swap): now calls `logistics_confirm_proceed_request_v3`
+// (migrations 0034 + 0039). v3 takes ONLY `p_order_id` — the warehouse
+// decision moved into the RPC body (auto-skip-from-stock picks an `own`
+// warehouse, else threads stay at awaiting_logistics_action).
+//
+// `warehouseId` stays in the request schema for backward-compat with FE
+// callers built against the v2 contract; the field is intentionally ignored
+// at the RPC layer (Option A in the T4 plan). T5 (FE rename) may remove it
+// from the schema once no caller forwards it.
 //
 // Error mapping (overrides the generic mapPgError for the 22023 cases that
 // carry a meaningful detail code, since spec §5 / 0024:354-414 promises
@@ -464,13 +469,14 @@ logisticsOrdersRouter.post("/:id/warehouse", async (c) => {
 //   • P0001 insufficient_stock_for_reserve → 422 with code +
 //                            hint passthrough (sku=... warehouse_id=...) so
 //                            the UI can name the offending pair.
+//   • 40001                → 409 with code='concurrent_reserve' (v3 auto-skip
+//                            FOR UPDATE race; mapPgError covers this)
 logisticsOrdersRouter.post("/:id/confirm-proceed", async (c) => {
   const parsed = await parseJsonBody(c, confirmProceedRequestInputSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("logistics_confirm_proceed_request", {
+  const { data, error } = await sb.rpc("logistics_confirm_proceed_request_v3", {
     p_order_id: c.req.param("id"),
-    p_warehouse_id: parsed.data.warehouseId ?? null,
   });
   if (error) {
     const m = mapPipelineV2Error(error);
