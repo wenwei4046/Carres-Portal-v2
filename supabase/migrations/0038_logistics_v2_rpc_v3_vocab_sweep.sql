@@ -163,10 +163,10 @@ begin
 
   insert into audit_log (role, actor_text, action, ref)
   values ('logistics', v_actor,
-          format('Created PO %s -- %s lines%s',
+          format('Created PO %s · %s lines%s',
                  v_po_id, v_line_count,
                  case when p_note is not null and btrim(p_note) <> ''
-                      then ' -- ' || btrim(p_note)
+                      then ' · ' || btrim(p_note)
                       else '' end),
           v_po_id);
 
@@ -449,7 +449,7 @@ begin
 
         insert into audit_log (role, actor_text, action, dealer_id, ref)
         values ('logistics', v_actor,
-                format('Issued PO %s -- sofa split (qty=1)', v_po_id),
+                format('Issued PO %s · sofa split (qty=1)', v_po_id),
                 v_order.dealer_id, v_po_id);
 
         v_pos_created := v_pos_created || jsonb_build_object(
@@ -484,7 +484,7 @@ begin
 
       insert into audit_log (role, actor_text, action, dealer_id, ref)
       values ('logistics', v_actor,
-              format('Issued PO %s -- combined (%s lines)', v_po_id, v_combined_count),
+              format('Issued PO %s · combined (%s lines)', v_po_id, v_combined_count),
               v_order.dealer_id, v_po_id);
 
       v_pos_created := v_pos_created || jsonb_build_object(
@@ -572,7 +572,7 @@ begin
   values (
     'logistics',
     v_actor,
-    format('Cancelled PO %s -- %s', p_po_id, p_reason),
+    format('Cancelled PO %s · %s', p_po_id, p_reason),
     v_dealer_id,
     p_po_id
   );

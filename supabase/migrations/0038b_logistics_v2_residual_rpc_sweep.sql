@@ -196,7 +196,7 @@ begin
     insert into order_history (order_id, text, by_role)
     values (
       p_order_id,
-      format('Confirmed at %s -- ready to dispatch -- reserved: %s',
+      format('Confirmed at %s · ready to dispatch · reserved: %s',
              coalesce(v_warehouse_name, 'warehouse'),
              v_reserved_skus),
       v_role
@@ -214,7 +214,7 @@ begin
     insert into order_history (order_id, text, by_role)
     values (
       p_order_id,
-      format('Confirmed at %s -- awaiting stock for %s SKU(s): %s',
+      format('Confirmed at %s · awaiting stock for %s SKU(s): %s',
              coalesce(v_warehouse_name, 'warehouse'),
              v_short_count,
              v_short_skus),
@@ -224,7 +224,7 @@ begin
 
   insert into audit_log (role, actor_text, action, dealer_id, ref)
   values (v_role, v_actor,
-          format('Confirmed proceed-request DL-%s -- %s',
+          format('Confirmed proceed-request DL-%s · %s',
                  v_order.dl, v_new_stage::text),
           v_order.dealer_id, 'DL-' || v_order.dl::text);
 
@@ -335,7 +335,7 @@ begin
     insert into order_history (order_id, text, by_role)
     values (
       p_order_id,
-      format('Warehouse changed to %s -- ready to dispatch (auto)',
+      format('Warehouse changed to %s · ready to dispatch (auto)',
              coalesce(v_warehouse_name, 'warehouse')),
       'logistics'
     );
@@ -350,7 +350,7 @@ begin
     insert into order_history (order_id, text, by_role)
     values (
       p_order_id,
-      format('Warehouse changed to %s -- awaiting stock for %s SKUs',
+      format('Warehouse changed to %s · awaiting stock for %s SKUs',
              coalesce(v_warehouse_name, 'warehouse'),
              v_shortage_count),
       'logistics'
@@ -359,7 +359,7 @@ begin
 
   insert into audit_log (role, actor_text, action, dealer_id, ref)
   values ('logistics', v_actor,
-          format('Warehouse pick -- DL-%s -- %s', v_order.dl,
+          format('Warehouse pick · DL-%s · %s', v_order.dl,
                  coalesce(v_warehouse_name, 'warehouse')),
           v_order.dealer_id, 'DL-' || v_order.dl::text);
 
@@ -523,14 +523,14 @@ begin
       insert into order_history (order_id, text, by_role)
       values (
         v_target_order.id,
-        format('Stock confirmed at %s -- ready to dispatch (auto)',
+        format('Stock confirmed at %s · ready to dispatch (auto)',
                coalesce(v_warehouse_name, 'warehouse')),
         'logistics'
       );
 
       insert into audit_log (role, actor_text, action, dealer_id, ref)
       values ('logistics', v_actor,
-              format('Auto-promoted DL-%s -- ready to dispatch', v_target_order.dl),
+              format('Auto-promoted DL-%s · ready to dispatch', v_target_order.dl),
               v_target_order.dealer_id, 'DL-' || v_target_order.dl::text);
 
       v_orders_promoted := v_orders_promoted || jsonb_build_object(
