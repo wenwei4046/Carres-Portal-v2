@@ -10,9 +10,10 @@ export type Role =
 export type OrderStatus       = "place" | "proceed_order" | "delivered" | "cancelled";
 // `awaiting_logistics_action` and `waiting` added in migration 0028 (v3-S3).
 // Phase 4.5a T5 (2026-05-05): legacy `awaiting_stock` alias removed from FE
-// vocabulary in lockstep with migrations 0038/0038b/0039 (RPC body sweep) and
-// in preparation for migration 0040 (enum DROP TYPE … CASCADE recreate without
-// the legacy value). DB-side enum still carries 'awaiting_stock' until 0040.
+// vocabulary in lockstep with migrations 0038/0038b/0039 (RPC body sweep).
+// Phase 4.5a T6 (2026-05-05): migration 0040 dropped `awaiting_stock` from the
+// DB-side enum via DROP TYPE … CASCADE recreate. DB and FE vocabularies are
+// now back in sync. Tuple matches Supabase-generated types verbatim.
 export type LogisticsStage    =
   | "placed" | "proceed_request"
   | "awaiting_logistics_action"
