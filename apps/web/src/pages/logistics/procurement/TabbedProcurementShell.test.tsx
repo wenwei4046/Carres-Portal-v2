@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import TabbedProcurementShell from "./TabbedProcurementShell";
@@ -7,11 +7,14 @@ import TabbedProcurementShell from "./TabbedProcurementShell";
 /**
  * TabbedProcurementShell — Phase 4.5 Chunk 2 Sprint F Task 34.
  *
- * The shell only renders tab nav + the active child component. The child
- * tabs (NiceFutureMattressTab / HoOKkASofaTab / HoOKkABedFrameTab) all wrap
- * `ProcurementTabContent`, which calls `useProcurementTab(slug)` plus the
- * three reference hooks (suppliers / warehouse / catalog). Mock all four so
- * each test stays hermetic — no MSW, no real fetch.
+ * The shell renders tab nav + the active child component + the page-level
+ * "+ New PO" button (T42-C2 restore). The child tabs (NiceFutureMattressTab
+ * / HoOKkASofaTab / HoOKkABedFrameTab) all wrap `ProcurementTabContent`,
+ * which calls `useProcurementTab(slug)` plus the three reference hooks
+ * (suppliers / warehouse / catalog). The modal is `CreatePOModal`, which
+ * additionally calls useDeliveryPartners + the create mutations + the
+ * shortage/alerts lazy hooks. Mock all of them so the suite stays hermetic
+ * — no MSW, no real fetch.
  */
 vi.mock("@/lib/queries", async () => {
   const actual =
@@ -37,6 +40,31 @@ vi.mock("@/lib/queries", async () => {
         addons: [],
         floorConfig: { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 },
       },
+    }),
+    // CreatePOModal-only hooks — defaults are benign empty states so the
+    // modal renders without crashing when the "+ New PO" test opens it.
+    useDeliveryPartners: () => ({ data: { partners: [] } }),
+    useCreatePoMutation: () => ({
+      mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: false,
+    }),
+    useCreatePosBatch: () => ({
+      mutateAsync: vi.fn().mockResolvedValue({ poIds: [] }),
+      isPending: false,
+    }),
+    useAwaitingStockShortage: () => ({
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      isError: false,
+      refetch: vi.fn(),
+    }),
+    useStockAlerts: () => ({
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      isError: false,
+      refetch: vi.fn(),
     }),
   };
 });
@@ -140,5 +168,20 @@ describe("TabbedProcurementShell", () => {
     expect(screen.getByTestId("location").textContent).toBe(
       "/logistics/procurement/nice-future",
     );
+  });
+
+  it("'+ New PO' button opens CreatePOModal (T42-C2 restore)", () => {
+    // The shell-level button replaces the entry point that lived on the
+    // deleted LogisticsProcurement.tsx. Default click → empty prefill, so
+    // the modal title is "New purchase order" (no order/bundle suffix).
+    renderShell("/logistics/procurement/nice-future");
+    expect(screen.queryByText(/New purchase order/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("new-po-button"));
+    // Modal is mounted: header + the lines table the modal scaffolds on
+    // first paint both render. We don't drive submit — that's covered by
+    // CreatePOModal's own suite — only the open path that codex flagged as
+    // unreachable.
+    expect(screen.getByText(/New purchase order/)).toBeInTheDocument();
+    expect(screen.getByTestId("po-lines-table")).toBeInTheDocument();
   });
 });

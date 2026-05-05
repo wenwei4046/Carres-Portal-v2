@@ -26,10 +26,10 @@ import ReceivePOModal from "../components/ReceivePOModal";
  *   - Modals (Receive / AssignPickup / LpInbound / Detail) live here too so
  *     they always open against the active tab's PO list.
  *
- * The page-level "+ New PO" button + filter chips + auto-fill hooks stay on
- * `LogisticsProcurement.tsx` (the legacy single page) for now — T34 only
- * carves out the per-tab read view + per-row actions. CreatePO entry stays
- * accessible via the legacy page until T35/T36 finish migrating.
+ * The page-level "+ New PO" button + CreatePOModal mount live on the parent
+ * `TabbedProcurementShell` (restored in T42-C2 after the legacy
+ * `LogisticsProcurement.tsx` was removed in T36). Per-tab content keeps only
+ * the filter chips + the row-level Receive/Assign/Detail actions.
  */
 type FilterKey = "all" | "open" | "pickup" | "received";
 

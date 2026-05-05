@@ -1,5 +1,9 @@
+import { useState } from "react";
 import { Navigate, NavLink, useParams } from "react-router-dom";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
+import CreatePOModal, {
+  type CreatePoPrefill,
+} from "../components/CreatePOModal";
 import HoOKkABedFrameTab from "./HoOKkABedFrameTab";
 import HoOKkASofaTab from "./HoOKkASofaTab";
 import NiceFutureMattressTab from "./NiceFutureMattressTab";
@@ -55,6 +59,16 @@ export default function TabbedProcurementShell() {
   const params = useParams<{ slug?: string }>();
   const rawSlug = params.slug;
 
+  // T42-C2 — restore the "+ New PO" entry point that lived on the deleted
+  // LogisticsProcurement.tsx (T36). The shell is now the only mount point for
+  // the procurement section, so the create-PO button + CreatePOModal mount
+  // belong here. Stockpile mode (no `dl` / `dlRefs` prefill) is the default;
+  // the user can still tick the in-modal stockpile toggle or use the
+  // "Suggest from alerts" / auto-fill buttons inside the modal.
+  const [createPrefill, setCreatePrefill] = useState<CreatePoPrefill | null>(
+    null,
+  );
+
   // Invalid or missing slug → redirect to the default tab. `replace` keeps
   // history clean (a typo doesn't pollute the back stack).
   if (!isValidSlug(rawSlug)) {
@@ -72,17 +86,30 @@ export default function TabbedProcurementShell() {
   return (
     <div className="pb-14" data-testid="tabbed-procurement-shell">
       {/* Page header — persists across tabs so the procurement section feels
-          coherent. Mirrors the kicker/title from LogisticsProcurement.tsx. */}
-      <div className="px-9 pt-7 pb-3">
-        <div className="kicker">Procurement</div>
-        <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
-          Purchase orders
-        </h1>
-        <div className="font-body text-[13px] text-base-600 mt-1 max-w-[780px]">
-          Per-supplier channels for purchase orders. Each tab loads its own PO
-          list (server-filtered by supplier slug + category) so the view stays
-          focused on the channel the user is working on.
+          coherent. Mirrors the kicker/title from LogisticsProcurement.tsx.
+          The "+ New PO" button lives in the header (T42-C2 restore) rather
+          than per-tab so it's visible regardless of which channel the user
+          is currently viewing. */}
+      <div className="px-9 pt-7 pb-3 flex justify-between items-start gap-4">
+        <div>
+          <div className="kicker">Procurement</div>
+          <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
+            Purchase orders
+          </h1>
+          <div className="font-body text-[13px] text-base-600 mt-1 max-w-[780px]">
+            Per-supplier channels for purchase orders. Each tab loads its own PO
+            list (server-filtered by supplier slug + category) so the view stays
+            focused on the channel the user is working on.
+          </div>
         </div>
+        <button
+          type="button"
+          className="btn-primary text-[12px]"
+          onClick={() => setCreatePrefill({})}
+          data-testid="new-po-button"
+        >
+          + New PO
+        </button>
       </div>
 
       {/* Tab strip — sticks to the warm-linen palette per CLAUDE.md §10. The
@@ -121,6 +148,19 @@ export default function TabbedProcurementShell() {
       {/* Active tab body — child mounts on slug change so each tab's
           TanStack query runs against its own slug-keyed cache. */}
       <ActiveTab />
+
+      {/* T42-C2 — CreatePOModal mount. Empty prefill (`{}`) opens the modal
+          in its default mode: user can tick stockpile, paste lines manually,
+          or hit "Suggest from alerts" / "Auto-fill from awaiting stock"
+          inside the modal. Order-pinned prefill flows still flow through
+          their own callers (e.g. the awaiting-stock dialog on the dashboard)
+          — this is the manual-entry / stockpile entry point. */}
+      {createPrefill !== null && (
+        <CreatePOModal
+          prefill={createPrefill}
+          onClose={() => setCreatePrefill(null)}
+        />
+      )}
     </div>
   );
 }
