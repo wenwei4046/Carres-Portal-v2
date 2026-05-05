@@ -22,14 +22,18 @@ export default function Login() {
     if (session && role) {
       const from = (location.state as { from?: string } | null)?.from;
       // Role-aware default home. As more roles ship (Phase 3+), extend here.
+      // Partner lands on /delivery-partner/dashboard explicitly (rather than
+      // the bare /delivery-partner) so deep-link tests can assert the leaf URL.
       const defaultHome =
         role === "principal"
           ? "/principal"
           : role === "logistics"
             ? "/logistics"
-            : role === "dealer" || role === "salesperson"
-              ? "/dealer"
-              : "/me";
+            : role === "partner"
+              ? "/delivery-partner/dashboard"
+              : role === "dealer" || role === "salesperson"
+                ? "/dealer"
+                : "/me";
       navigate(from && from !== "/login" ? from : defaultHome, { replace: true });
     }
   }, [session, role, location.state, navigate]);

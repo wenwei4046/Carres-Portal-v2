@@ -8,6 +8,7 @@ import Me from "@/pages/Me";
 import DealerApp from "@/pages/dealer/DealerApp";
 import PrincipalApp from "@/pages/principal/PrincipalApp";
 import LogisticsApp from "@/pages/logistics/LogisticsApp";
+import PartnerApp from "@/pages/partner/PartnerApp";
 
 function HomeRedirect() {
   const session = useAuth((s) => s.session);
@@ -23,6 +24,7 @@ function HomeRedirect() {
   if (!session) return <Navigate to="/login" replace />;
   if (role === "principal") return <Navigate to="/principal" replace />;
   if (role === "logistics") return <Navigate to="/logistics" replace />;
+  if (role === "partner") return <Navigate to="/delivery-partner" replace />;
   if (role === "dealer" || role === "salesperson") return <Navigate to="/dealer" replace />;
   return <Navigate to="/me" replace />;
 }
@@ -82,6 +84,16 @@ export default function App() {
             <RequireAuth>
               <RequireRole roles={["logistics"]}>
                 <LogisticsApp />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/delivery-partner/*"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["partner"]}>
+                <PartnerApp />
               </RequireRole>
             </RequireAuth>
           }
