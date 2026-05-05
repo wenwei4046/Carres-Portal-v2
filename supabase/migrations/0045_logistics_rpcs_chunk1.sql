@@ -339,3 +339,87 @@ $$;
 
 REVOKE ALL ON FUNCTION public.partner_reject_customer(text, text) FROM public;
 GRANT EXECUTE ON FUNCTION public.partner_reject_customer(text, text) TO authenticated;
+
+-- -----------------------------------------------------------------------------
+-- 5. logistics_relocate_warehouse (EXTENDED from 0034:584)
+-- -----------------------------------------------------------------------------
+-- v3 changes vs 0034:
+--   - Semantic clarified: pre-receive only (state guard sup_status='customer_rejected')
+--   - F9 invariant: delivery_partner_id rewrites only when new wh has DIFFERENT
+--     owning_partner_id. Avoids null-clearing on relocate to own_wh.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.logistics_relocate_warehouse(
+  p_po_id            text,
+  p_new_warehouse_id uuid
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_po                  purchase_orders;
+  v_role                app_role;
+  v_actor               text;
+  v_new_owning_partner  uuid;
+  v_new_delivery_partner uuid;
+BEGIN
+  v_role := public.app_role();
+
+  IF v_role NOT IN ('logistics', 'principal') THEN
+    RAISE EXCEPTION 'forbidden: logistics or principal only'
+      USING ERRCODE = '42501', DETAIL = 'forbidden';
+  END IF;
+
+  SELECT * INTO v_po FROM purchase_orders WHERE id = p_po_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'PO not found' USING ERRCODE = '42P01', DETAIL = 'po_not_found';
+  END IF;
+
+  -- State guard: pre-receive only.
+  IF v_po.sup_status IS DISTINCT FROM 'customer_rejected' THEN
+    RAISE EXCEPTION 'PO not in customer_rejected state (got %)', v_po.sup_status
+      USING ERRCODE = '22023', DETAIL = 'wrong_sup_status';
+  END IF;
+
+  -- Lookup new wh owning partner.
+  SELECT owning_partner_id INTO v_new_owning_partner
+    FROM warehouses WHERE id = p_new_warehouse_id;
+  IF v_new_owning_partner IS NULL AND NOT EXISTS (SELECT 1 FROM warehouses WHERE id = p_new_warehouse_id) THEN
+    RAISE EXCEPTION 'warehouse not found' USING ERRCODE = '42P01', DETAIL = 'warehouse_not_found';
+  END IF;
+
+  -- F9 invariant: keep current delivery_partner_id when new wh is own_wh (NULL owning_partner).
+  v_new_delivery_partner := COALESCE(v_new_owning_partner, v_po.delivery_partner_id);
+
+  v_actor := COALESCE((SELECT name FROM app_users WHERE id = (SELECT auth.uid())), INITCAP(v_role::text));
+
+  UPDATE purchase_orders
+     SET warehouse_id        = p_new_warehouse_id,
+         sup_status          = 'relocated',
+         delivery_partner_id = v_new_delivery_partner,
+         updated_at          = now()
+   WHERE id = p_po_id;
+
+  INSERT INTO po_history (po_id, text, by_role)
+  VALUES (p_po_id,
+          format('Logistics relocated PO to wh %s (delivery_partner_id %s)',
+                 p_new_warehouse_id,
+                 CASE WHEN v_new_delivery_partner IS DISTINCT FROM v_po.delivery_partner_id
+                      THEN 'reassigned' ELSE 'kept' END),
+          v_role);
+
+  INSERT INTO audit_log (role, actor_text, action, ref)
+  VALUES (v_role, v_actor,
+          format('Relocate PO %s -> wh %s', p_po_id, p_new_warehouse_id), p_po_id);
+
+  RETURN jsonb_build_object(
+    'po_id',                p_po_id,
+    'sup_status',           'relocated',
+    'new_warehouse_id',     p_new_warehouse_id,
+    'new_delivery_partner_id', v_new_delivery_partner,
+    'lp_reassigned',        v_new_delivery_partner IS DISTINCT FROM v_po.delivery_partner_id
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.logistics_relocate_warehouse(text, uuid) FROM public;
+GRANT EXECUTE ON FUNCTION public.logistics_relocate_warehouse(text, uuid) TO authenticated;
