@@ -46,6 +46,28 @@ let shortageHookState: {
   isError?: boolean;
   refetch: ReturnType<typeof vi.fn>;
 };
+// T22 — `useStockAlerts` hook state. Mirrors the lazy / refetch-on-click
+// pattern of `shortageHookState` above so each test can program the click
+// resolution (success / empty / error) deterministically.
+let alertsHookState: {
+  data:
+    | {
+        alerts: {
+          sku: string;
+          warehouse_id: string;
+          qty: number;
+          reserved: number;
+          effective: number;
+          low_threshold: number;
+          shortage: number;
+        }[];
+      }
+    | undefined;
+  isFetching: boolean;
+  isFetched: boolean;
+  isError?: boolean;
+  refetch: ReturnType<typeof vi.fn>;
+};
 
 const createMutateAsync = vi.fn().mockResolvedValue({});
 const createBatchMutateAsync = vi.fn().mockResolvedValue({ poIds: [] });
@@ -68,6 +90,7 @@ vi.mock("@/lib/queries", async () => {
       isPending: false,
     }),
     useAwaitingStockShortage: () => shortageHookState,
+    useStockAlerts: () => alertsHookState,
   };
 });
 
@@ -113,6 +136,12 @@ function setLoaded() {
     isFetching: false,
     isFetched: false,
     refetch: vi.fn().mockResolvedValue({ data: { shortage: [] } }),
+  };
+  alertsHookState = {
+    data: undefined,
+    isFetching: false,
+    isFetched: false,
+    refetch: vi.fn().mockResolvedValue({ data: { alerts: [] } }),
   };
   catalogHookState = {
     data: {
@@ -265,5 +294,263 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
       target: { value: WAREHOUSE_KL.id },
     });
     expect(issueBtn).not.toBeDisabled();
+  });
+});
+
+/**
+ * Phase 4.5 Chunk 2 Sprint D Task 22 — "Suggest from alerts" button.
+ *
+ * The button lives next to the existing "Auto-fill from awaiting stock" CTA
+ * and pre-populates the lines list using `(low_threshold * 2) - effective`
+ * (the master plan formula `(high_threshold || low_threshold * 2) - effective`
+ * collapses to this since the alerts feed only carries `low_threshold` today —
+ * see comment on `alertsQ` in CreatePOModal.tsx).
+ *
+ * Tests cover:
+ *   1. Happy path: alerts return 3 SKUs → 3 lines populated with the formula
+ *   2. Empty alerts: refetch returns [] → button shows "No stock alerts" copy
+ *      and disables; lines untouched
+ *   3. Override semantics: existing lines are replaced (Q3=A) on click
+ *   4. Visibility: hidden when modal opened with order-prefill (`prefill.dl`)
+ *   5. Qty clamp: a degenerate alert row where the gap rounds non-positive
+ *      still produces qty=1 (defensive `Math.max(1, …)`)
+ */
+describe("CreatePOModal — Suggest from alerts (T22)", () => {
+  const SKU_KING = "mattress:carres-cloud:King";
+
+  function withCatalog(
+    extra: { id: string; modelId: string; sku: string; variant: string }[],
+  ) {
+    catalogHookState = {
+      data: {
+        models: [],
+        skus: [
+          ...(catalogHookState.data?.skus ?? []),
+          ...extra.map((e) => ({
+            ...e,
+            variantKind: "size" as const,
+            price: 0,
+          })),
+        ],
+        sofaFabrics: [],
+        addons: [],
+        floorConfig: { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 },
+      },
+    };
+  }
+
+  function makeAlertRow(
+    sku: string,
+    overrides: Partial<{
+      effective: number;
+      low_threshold: number;
+      qty: number;
+      reserved: number;
+      shortage: number;
+    }> = {},
+  ) {
+    const low_threshold = overrides.low_threshold ?? 10;
+    const effective = overrides.effective ?? 2;
+    return {
+      sku,
+      warehouse_id: WAREHOUSE_KL.id,
+      qty: overrides.qty ?? effective,
+      reserved: overrides.reserved ?? 0,
+      effective,
+      low_threshold,
+      shortage: overrides.shortage ?? Math.max(low_threshold - effective, 1),
+    };
+  }
+
+  it("happy path — clicking 'Suggest from alerts' replaces lines with one row per alert", async () => {
+    // Catalog needs to carry every alert SKU so the lines `<select>` has a
+    // matching `<option>` for each. Add 2 extra SKUs (the default seed
+    // already includes `mattress:carres-cloud:King`).
+    withCatalog([
+      {
+        id: "s2",
+        modelId: "m2",
+        sku: "sofa:nordic:3s",
+        variant: "Nordic Sofa · 3 seater",
+      },
+      {
+        id: "s3",
+        modelId: "m1",
+        sku: "mattress:carres-cloud:Queen",
+        variant: "Carres Cloud · Queen",
+      },
+    ]);
+
+    // 3 alerts:
+    //   row 1: low=10 effective=2 → qty = 10*2 - 2 = 18
+    //   row 2: low=8  effective=3 → qty = 8*2  - 3 = 13
+    //   row 3: low=5  effective=1 → qty = 5*2  - 1 = 9
+    const ALERT_ROWS = [
+      makeAlertRow(SKU_KING, { low_threshold: 10, effective: 2 }),
+      makeAlertRow("sofa:nordic:3s", { low_threshold: 8, effective: 3 }),
+      makeAlertRow("mattress:carres-cloud:Queen", {
+        low_threshold: 5,
+        effective: 1,
+      }),
+    ];
+    alertsHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch: vi.fn().mockResolvedValue({ data: { alerts: ALERT_ROWS } }),
+    };
+
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+
+    // Default lines start with 1 row (catalog seed). Click the button.
+    fireEvent.click(screen.getByTestId("suggest-from-alerts-button"));
+
+    await waitFor(() => {
+      // The 3 alert SKUs each yield a line with the computed qty.
+      const qtyInputs = screen.getAllByLabelText(
+        /Line \d+ qty/,
+      ) as HTMLInputElement[];
+      expect(qtyInputs).toHaveLength(3);
+    });
+
+    const qtyInputs = screen.getAllByLabelText(
+      /Line \d+ qty/,
+    ) as HTMLInputElement[];
+    expect(qtyInputs[0].value).toBe("18");
+    expect(qtyInputs[1].value).toBe("13");
+    expect(qtyInputs[2].value).toBe("9");
+
+    // Success toast fires with the count.
+    expect(sonnerMocks.success).toHaveBeenCalledWith(
+      expect.stringMatching(/Suggested 3 SKUs/),
+    );
+  });
+
+  it("empty alerts — clicking the button surfaces a 'No stock alerts' toast and disables the button", async () => {
+    alertsHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch: vi.fn().mockResolvedValue({ data: { alerts: [] } }),
+    };
+
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    const btn = screen.getByTestId("suggest-from-alerts-button");
+
+    // Initially enabled (no result yet).
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      expect(sonnerMocks.defaultFn).toHaveBeenCalledWith(
+        expect.stringMatching(/No stock alerts/i),
+        expect.objectContaining({ duration: 3000 }),
+      );
+    });
+
+    // Sticky empty: after a known-empty fetch, the button locks down.
+    alertsHookState = {
+      ...alertsHookState,
+      data: { alerts: [] },
+      isFetched: true,
+    };
+    // Re-render to flush the new hook state. Easiest: unmount + remount.
+    // (Mocking the hook means the component reads the fresh `alertsHookState`
+    // on the next render.)
+    const { unmount } = render(
+      wrap(<CreatePOModal prefill={{}} onClose={() => {}} />),
+    );
+    const buttons = screen.getAllByTestId("suggest-from-alerts-button");
+    const last = buttons[buttons.length - 1];
+    expect(last).toBeDisabled();
+    expect(last.textContent).toMatch(/No stock alerts/i);
+    unmount();
+  });
+
+  it("override — clicking the button replaces user-entered lines (Q3=A)", async () => {
+    alertsHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch: vi.fn().mockResolvedValue({
+        data: {
+          alerts: [
+            makeAlertRow(SKU_KING, { low_threshold: 4, effective: 1 }),
+          ],
+        },
+      }),
+    };
+
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+
+    // User pre-edits the seeded line to qty=99 — to verify the click does
+    // an override (replace) rather than an append/merge.
+    const qtyInputs = screen.getAllByLabelText(
+      /Line \d+ qty/,
+    ) as HTMLInputElement[];
+    fireEvent.change(qtyInputs[0], { target: { value: "99" } });
+    expect(qtyInputs[0].value).toBe("99");
+
+    fireEvent.click(screen.getByTestId("suggest-from-alerts-button"));
+
+    await waitFor(() => {
+      const after = screen.getAllByLabelText(
+        /Line \d+ qty/,
+      ) as HTMLInputElement[];
+      expect(after).toHaveLength(1);
+      // qty = 4 * 2 - 1 = 7. The user's 99 was clobbered.
+      expect(after[0].value).toBe("7");
+    });
+  });
+
+  it("hidden when modal opened with prefill.dl (order-driven flow already knows the lines)", () => {
+    render(
+      wrap(
+        <CreatePOModal
+          prefill={{
+            dl: 4321,
+            lines: [{ sku: SKU_KING, qty: 3 }],
+          }}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    expect(
+      screen.queryByTestId("suggest-from-alerts-button"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("qty clamps to ≥1 even when low_threshold * 2 - effective rounds non-positive", async () => {
+    // Defensive case: a future or odd row where effective ≥ low_threshold * 2.
+    // Today the alerts RPC filter (effective < low_threshold) makes this
+    // unreachable, but the modal still clamps with Math.max(1, gap).
+    alertsHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch: vi.fn().mockResolvedValue({
+        data: {
+          alerts: [
+            // gap = 1 * 2 - 5 = -3 → clamps to 1
+            makeAlertRow(SKU_KING, {
+              low_threshold: 1,
+              effective: 5,
+              shortage: 1,
+            }),
+          ],
+        },
+      }),
+    };
+
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    fireEvent.click(screen.getByTestId("suggest-from-alerts-button"));
+
+    await waitFor(() => {
+      const qtyInputs = screen.getAllByLabelText(
+        /Line \d+ qty/,
+      ) as HTMLInputElement[];
+      expect(qtyInputs).toHaveLength(1);
+      expect(qtyInputs[0].value).toBe("1");
+    });
   });
 });

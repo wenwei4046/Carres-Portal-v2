@@ -9,6 +9,7 @@ import {
   useDeliveryPartners,
   useLogisticsSuppliers,
   useLogisticsWarehouse,
+  useStockAlerts,
   type SupplierRow,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "./Modal";
@@ -103,6 +104,23 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // want to clobber them).
   const shortageQ = useAwaitingStockShortage();
 
+  // Phase 4.5 Chunk 2 T22 — "Suggest from alerts" button. Same lazy pattern as
+  // the shortage hook above: `enabled: false` so the network call only fires
+  // on the button's onClick → refetch(). Source: GET /api/logistics/stock-alerts
+  // (T18 route → RPC `logistics_stock_alerts()` migration 0054).
+  //
+  // Suggested qty per alert row uses the master plan T22 formula
+  //   qty = (high_threshold || low_threshold * 2) - effective
+  // The alerts feed only carries `low_threshold` today (the RPC return columns
+  // are frozen by migration 0054 — adding `high_threshold` would need a new
+  // migration), so the formula reduces to `low_threshold * 2 - effective`.
+  // Tracking as carry-forward `phase-4.5-chunk-2-stock-alerts-high-threshold-
+  // expose` for a follow-up RPC bump if Loo wants the per-row override wired
+  // through. By construction (alerts only fire when `effective < low_threshold`)
+  // the suggested qty is always > low_threshold, so the `Math.max(1, …)` clamp
+  // below is a defensive guard rather than a hot path.
+  const alertsQ = useStockAlerts({ enabled: false });
+
   // v3-S4.5 — Stockpile PO mode. When the user wants to procure inventory
   // ahead of demand (no specific customer order to cover), they tick this
   // toggle. The submission then drops `dl` / `dlRefs` from the payload —
@@ -190,6 +208,20 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   const showAutoFill =
     !stockpile &&
     prefill.dl == null && (prefill.dlRefs == null || prefill.dlRefs.length === 0);
+
+  // T22 — "Suggest from alerts" visibility. Same prefill-guard as auto-fill
+  // (don't clobber order-driven flows), but stays visible in stockpile mode —
+  // stockpile + alerts is the canonical use case ("replenish based on what's
+  // currently below threshold").
+  const showSuggestAlerts = !autoFillPrefilled;
+  // Empty result is sticky once known (mirrors auto-fill UX) — disable the
+  // button until a refetch returns rows OR the modal is closed/reopened. The
+  // `!isError` guard avoids a stuck "no alerts" disabled state when the last
+  // refetch actually 5xx'd (data is undefined for the wrong reason).
+  const lastAlertsEmpty =
+    alertsQ.isFetched && !alertsQ.isError &&
+    (alertsQ.data?.alerts.length ?? 0) === 0;
+  const suggestAlertsDisabled = alertsQ.isFetching || lastAlertsEmpty;
   // Empty result is sticky once known — disable the button until the user
   // closes/reopens or until refetched data shows shortages. The `!isError`
   // guard prevents the button from getting stuck in the "No shortages found"
@@ -237,6 +269,58 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     } catch (e: unknown) {
       if (e instanceof ApiError) toast.error(e.message || "Auto-fill failed");
       else toast.error(e instanceof Error ? e.message : "Auto-fill failed");
+    }
+  }
+
+  /**
+   * T22 — Pre-populate the lines list from `logistics_stock_alerts`. Mirrors
+   * `autoFillFromShortage` UX: refetch on click, replace `lines` on success
+   * (Q3=A "override, not append"), surface a count toast, map 5xx onto an
+   * explicit error toast rather than falling through to "no alerts found".
+   *
+   * Suggested qty per alert: `(high_threshold || low_threshold * 2) - effective`.
+   * `high_threshold` isn't carried by the current alerts row (see comment on
+   * `alertsQ` declaration), so we collapse to `low_threshold * 2 - effective`.
+   * Defensive `Math.max(1, …)` keeps qty ≥1 even if a future row shape lands
+   * with thresholds set such that the gap rounds non-positive.
+   */
+  async function suggestFromAlerts() {
+    try {
+      const res = await alertsQ.refetch();
+      if (res.error) {
+        const err: unknown = res.error;
+        toast.error(
+          err instanceof ApiError && err.message
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Suggest from alerts failed",
+        );
+        return;
+      }
+      const data = res.data;
+      if (!data || data.alerts.length === 0) {
+        toast(
+          "No stock alerts — all configured SKUs are above threshold",
+          { duration: 3000 },
+        );
+        return;
+      }
+      // Replace lines (override) — same convention as auto-fill from shortage.
+      const nextLines = data.alerts.map((a) => {
+        const target = a.low_threshold * 2;
+        const gap = target - a.effective;
+        return { sku: a.sku, qty: Math.max(1, gap) };
+      });
+      setLines(nextLines);
+      const count = data.alerts.length;
+      toast.success(
+        `Suggested ${count} SKU${count === 1 ? "" : "s"} from stock alerts`,
+      );
+    } catch (e: unknown) {
+      if (e instanceof ApiError)
+        toast.error(e.message || "Suggest from alerts failed");
+      else toast.error(e instanceof Error ? e.message : "Suggest from alerts failed");
     }
   }
 
@@ -441,23 +525,44 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
 
       {/* C5.3 — Auto-fill from awaiting stock. Hidden when a specific order
           or bundle prefill is set (lines already known). Override behavior:
-          on success the modal's `lines` state is fully replaced. */}
-      {showAutoFill && (
-        <div className="mb-3">
-          <button
-            type="button"
-            onClick={autoFillFromShortage}
-            disabled={autoFillDisabled}
-            data-testid="auto-fill-shortage-button"
-            className="btn-ghost text-[12px] py-1.5 px-3"
-            style={{ opacity: autoFillDisabled ? 0.45 : 1 }}
-          >
-            {shortageQ.isFetching
-              ? "Loading awaiting stock..."
-              : lastShortageEmpty
-                ? "⚡ No shortages found"
-                : "⚡ Auto-fill from awaiting stock"}
-          </button>
+          on success the modal's `lines` state is fully replaced.
+
+          T22 — "Suggest from alerts" lives in the same prefill-guarded row.
+          Both buttons replace `lines` on success. */}
+      {(showAutoFill || showSuggestAlerts) && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {showAutoFill && (
+            <button
+              type="button"
+              onClick={autoFillFromShortage}
+              disabled={autoFillDisabled}
+              data-testid="auto-fill-shortage-button"
+              className="btn-ghost text-[12px] py-1.5 px-3"
+              style={{ opacity: autoFillDisabled ? 0.45 : 1 }}
+            >
+              {shortageQ.isFetching
+                ? "Loading awaiting stock..."
+                : lastShortageEmpty
+                  ? "⚡ No shortages found"
+                  : "⚡ Auto-fill from awaiting stock"}
+            </button>
+          )}
+          {showSuggestAlerts && (
+            <button
+              type="button"
+              onClick={suggestFromAlerts}
+              disabled={suggestAlertsDisabled}
+              data-testid="suggest-from-alerts-button"
+              className="btn-ghost text-[12px] py-1.5 px-3"
+              style={{ opacity: suggestAlertsDisabled ? 0.45 : 1 }}
+            >
+              {alertsQ.isFetching
+                ? "Loading alerts..."
+                : lastAlertsEmpty
+                  ? "⚡ No stock alerts"
+                  : "⚡ Suggest from alerts"}
+            </button>
+          )}
         </div>
       )}
 

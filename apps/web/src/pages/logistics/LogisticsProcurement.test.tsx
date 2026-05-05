@@ -81,6 +81,30 @@ let shortageHookState: {
   isError?: boolean;
   refetch: ReturnType<typeof vi.fn>;
 };
+// T22 — `useStockAlerts` hook state. Lazy refetch-on-click pattern (mirrors
+// `shortageHookState` above). The page-level test suite doesn't drive the
+// "Suggest from alerts" click handler directly (those assertions live in
+// CreatePOModal.test.tsx), so a benign empty-state default keeps the modal
+// renderable without surfacing a "No alerts" toast.
+let alertsHookState: {
+  data:
+    | {
+        alerts: {
+          sku: string;
+          warehouse_id: string;
+          qty: number;
+          reserved: number;
+          effective: number;
+          low_threshold: number;
+          shortage: number;
+        }[];
+      }
+    | undefined;
+  isFetching: boolean;
+  isFetched: boolean;
+  isError?: boolean;
+  refetch: ReturnType<typeof vi.fn>;
+};
 const refetchSpy = vi.fn();
 const createMutateAsync = vi.fn().mockResolvedValue({});
 const createBatchMutateAsync = vi.fn().mockResolvedValue({ poIds: [] });
@@ -119,6 +143,7 @@ vi.mock("@/lib/queries", async () => {
       isPending: false,
     }),
     useAwaitingStockShortage: () => shortageHookState,
+    useStockAlerts: () => alertsHookState,
   };
 });
 
@@ -204,6 +229,12 @@ function setLoaded(pos: LogisticsPoListRow[]) {
     isFetching: false,
     isFetched: false,
     refetch: vi.fn().mockResolvedValue({ data: { shortage: [] } }),
+  };
+  alertsHookState = {
+    data: undefined,
+    isFetching: false,
+    isFetched: false,
+    refetch: vi.fn().mockResolvedValue({ data: { alerts: [] } }),
   };
   catalogHookState = {
     data: {
