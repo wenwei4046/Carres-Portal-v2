@@ -78,3 +78,40 @@ describe("POST /api/logistics/pos/:id/lp-accept-inbound", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("POST /api/logistics/pos/:id/lp-reject-inbound", () => {
+  it("calls partner_reject_customer with empty p_reason default", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { po_id: "PO-100" }, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/PO-100/lp-reject-inbound", {
+        method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }), env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("partner_reject_customer", { p_po_id: "PO-100", p_reason: "" });
+  });
+});
+
+describe("POST /api/logistics/pos/:id/relocate-inbound", () => {
+  it("calls logistics_relocate_warehouse RPC", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { po_id: "PO-100", new_warehouse_id: "00000000-0000-0000-0000-0000000000a2" }, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/PO-100/relocate-inbound", {
+        method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ new_warehouse_id: "00000000-0000-0000-0000-0000000000a2" }),
+      }), env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("logistics_relocate_warehouse", {
+      p_po_id: "PO-100",
+      p_new_warehouse_id: "00000000-0000-0000-0000-0000000000a2",
+    });
+  });
+});
