@@ -253,3 +253,89 @@ $$;
 
 REVOKE ALL ON FUNCTION public.lp_accept_inbound_delivery(text) FROM public;
 GRANT EXECUTE ON FUNCTION public.lp_accept_inbound_delivery(text) TO authenticated;
+
+-- -----------------------------------------------------------------------------
+-- 4. partner_reject_customer (EXTENDED from 0034:467)
+-- -----------------------------------------------------------------------------
+-- v3 changes vs 0034:
+--   - p_reason DEFAULT '' (was strict ≥4 chars per 0034:498-499)
+--   - Caller role: 'partner' OR 'logistics' (代按 per C1.3 Q4)
+--   - Effect unchanged: sup_status='customer_rejected'; customer_rejection jsonb stamp
+-- Note: CREATE OR REPLACE replaces the 0034 body. Old behavior available via
+-- git history if a caller still depends on the strict reason check (none exist).
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.partner_reject_customer(
+  p_po_id  text,
+  p_reason text DEFAULT ''
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_po         purchase_orders;
+  v_role       app_role;
+  v_partner_id uuid;
+  v_actor      text;
+  v_rejection  jsonb;
+BEGIN
+  v_role := public.app_role();
+  v_partner_id := public.app_partner_id();
+
+  IF v_role NOT IN ('partner', 'logistics', 'principal') THEN
+    RAISE EXCEPTION 'forbidden: partner or logistics only'
+      USING ERRCODE = '42501', DETAIL = 'forbidden';
+  END IF;
+
+  SELECT * INTO v_po FROM purchase_orders WHERE id = p_po_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'PO not found' USING ERRCODE = '42P01', DETAIL = 'po_not_found';
+  END IF;
+
+  IF v_role = 'partner' AND v_po.delivery_partner_id IS DISTINCT FROM v_partner_id THEN
+    RAISE EXCEPTION 'forbidden: cross-partner reject'
+      USING ERRCODE = '42501', DETAIL = 'forbidden';
+  END IF;
+
+  IF v_po.sup_status NOT IN ('ready_confirm_sent', 'partner_confirmed') THEN
+    RAISE EXCEPTION 'PO not in pre-flight state (got %)', v_po.sup_status
+      USING ERRCODE = '22023', DETAIL = 'wrong_sup_status';
+  END IF;
+
+  v_actor := COALESCE((SELECT name FROM app_users WHERE id = (SELECT auth.uid())), INITCAP(v_role::text));
+
+  v_rejection := jsonb_build_object(
+    'at',                  now(),
+    'rejected_by',         'lp',
+    'original_warehouse_id', v_po.warehouse_id
+  );
+  IF p_reason <> '' THEN
+    v_rejection := v_rejection || jsonb_build_object('reason_audit_only', p_reason);
+  END IF;
+
+  UPDATE purchase_orders
+     SET sup_status         = 'customer_rejected',
+         customer_rejection = v_rejection,
+         updated_at         = now()
+   WHERE id = p_po_id;
+
+  INSERT INTO po_history (po_id, text, by_role)
+  VALUES (p_po_id,
+          format('LP rejected inbound%s', CASE WHEN p_reason <> '' THEN ': ' || p_reason ELSE '' END),
+          v_role);
+
+  INSERT INTO audit_log (role, actor_text, action, ref)
+  VALUES (v_role, v_actor,
+          format('LP rejected inbound on PO %s%s', p_po_id,
+                 CASE WHEN p_reason <> '' THEN format(' (reason: %s)', p_reason) ELSE '' END),
+          p_po_id);
+
+  RETURN jsonb_build_object(
+    'po_id',      p_po_id,
+    'sup_status', 'customer_rejected',
+    'rejected_at', now()
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.partner_reject_customer(text, text) FROM public;
+GRANT EXECUTE ON FUNCTION public.partner_reject_customer(text, text) TO authenticated;
