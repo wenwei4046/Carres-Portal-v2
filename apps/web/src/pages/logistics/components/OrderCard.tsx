@@ -1,4 +1,7 @@
-import type { LogisticsOrderListRow } from "@/lib/queries";
+import type {
+  LogisticsOrderListRow,
+  LogisticsOrderThreadRow,
+} from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 
 /**
@@ -43,16 +46,21 @@ type LpSummary =
   | { kind: "multi"; count: number };
 
 function summariseThreadLps(
-  threads: LogisticsOrderListRow["order_supplier_threads"],
+  threads: LogisticsOrderThreadRow[],
 ): LpSummary {
-  if (!threads || threads.length === 0) return { kind: "none" };
-  const assigned = threads.filter((t) => t.delivery_partner_id !== null);
-  if (assigned.length === 0) return { kind: "none" };
-  const distinct = new Set(
-    assigned.map((t) => t.delivery_partner_id as string),
+  if (threads.length === 0) return { kind: "none" };
+  // Type predicate narrows `delivery_partner_id` from `string | null` to
+  // `string` so downstream `Set` / pill render don't need `as string` casts
+  // (CLAUDE.md §9 — no avoidable type assertions).
+  const assigned = threads.filter(
+    (t): t is LogisticsOrderThreadRow & { delivery_partner_id: string } =>
+      t.delivery_partner_id !== null,
   );
+  if (assigned.length === 0) return { kind: "none" };
+  const distinct = new Set(assigned.map((t) => t.delivery_partner_id));
   if (distinct.size === 1) {
-    return { kind: "single", partnerId: distinct.values().next().value as string };
+    const [partnerId] = distinct;
+    return { kind: "single", partnerId };
   }
   return { kind: "multi", count: distinct.size };
 }

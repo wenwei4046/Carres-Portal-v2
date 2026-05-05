@@ -831,4 +831,61 @@ describe("LogisticsOrders — kanban", () => {
       card.querySelector('[data-testid="order-card-lp-pill-partner"]'),
     ).toBeNull();
   });
+
+  it("28. (Chunk 2 T9) hides the LP pill when threads exist but every delivery_partner_id is null", () => {
+    // Realistic post-confirm-proceed, pre-RFD kanban state: threads have been
+    // spawned (one per supplier leg) but no LP has been assigned yet, so
+    // every `delivery_partner_id` is still `null`. The pill must stay hidden
+    // — non-empty threads alone don't justify rendering a partner chip.
+    setLoaded([
+      makeOrder({
+        id: "ord-threads-no-lp",
+        dl: 9103,
+        customer_name: "Pending Priya",
+        logistics_stage: "awaiting_logistics_action",
+        delivery_partner_id: null,
+        order_supplier_threads: [
+          {
+            id: "thread-X",
+            supplier_id: "sup-1",
+            category: "mattress",
+            logistics_stage: "awaiting_logistics_action",
+            po_id: "PO-X",
+            delivery_partner_id: null,
+            confirm_delivery_date: null,
+            request_for_delivery_at: null,
+            partner_accepted_at: null,
+            partner_rejected_at: null,
+          },
+          {
+            id: "thread-Y",
+            supplier_id: "sup-2",
+            category: "bed_frame",
+            logistics_stage: "awaiting_logistics_action",
+            po_id: "PO-Y",
+            delivery_partner_id: null,
+            confirm_delivery_date: null,
+            request_for_delivery_at: null,
+            partner_accepted_at: null,
+            partner_rejected_at: null,
+          },
+        ],
+      }),
+    ]);
+    render(wrap(<LogisticsOrders />));
+
+    const card = screen.getByTestId("order-card-9103");
+    expect(card.textContent).toContain("Pending Priya");
+    // None of the three pill testids should be rendered when every
+    // thread's `delivery_partner_id` is still null.
+    expect(
+      card.querySelector('[data-testid="order-card-lp-pill"]'),
+    ).toBeNull();
+    expect(
+      card.querySelector('[data-testid="order-card-lp-pill-partner"]'),
+    ).toBeNull();
+    expect(
+      card.querySelector('[data-testid="order-card-lp-pill-multi"]'),
+    ).toBeNull();
+  });
 });

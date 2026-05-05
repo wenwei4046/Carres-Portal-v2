@@ -958,11 +958,12 @@ export interface LogisticsOrderListRow {
   outlet_id: string | null;
   dealer_id: string;
   dealers: { name: string } | null;
-  /** Phase 4.5 Chunk 2 (T9) embedded customer-leg LP per thread. `null` only
-   *  on legacy/seed orders that pre-date migration 0033 — modern orders carry
-   *  `[]` (empty pre-confirm-proceed) or one row per supplier leg. The FE
-   *  treats `null` and `[]` as "no thread state available" (omit pill). */
-  order_supplier_threads: LogisticsOrderThreadRow[] | null;
+  /** Phase 4.5 Chunk 2 (T9) embedded customer-leg LP per thread. PostgREST
+   *  nested fetches always return an array shape — never `null` — so this
+   *  field is non-nullable. An empty array means no threads have been spawned
+   *  yet (pre-confirm-proceed orders); the FE treats `[]` as "no thread state
+   *  available" and omits the LP pill. */
+  order_supplier_threads: LogisticsOrderThreadRow[];
 }
 export interface LogisticsOrdersListResponse {
   orders: LogisticsOrderListRow[];
