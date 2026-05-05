@@ -167,10 +167,14 @@ describe("GET /api/logistics/pos", () => {
 describe("POST /api/logistics/pos", () => {
   const SUPPLIER_ID = "00000000-0000-0000-0000-000000000a01";
   const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000b01";
+  // T25/T26 (migration 0055/0055b): every PO line now requires cost +
+  // costSource on input — zod schema enforces non-NULL at the api edge,
+  // RPC validates again for defense-in-depth (raises 22023
+  // DETAIL='cost_required' if missing).
   const VALID = {
     supplierId: SUPPLIER_ID,
     warehouseId: WAREHOUSE_ID,
-    lines: [{ sku: "MAT-K-001", qty: 2 }],
+    lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" as const }],
     dl: 4001,
   };
 
@@ -193,7 +197,7 @@ describe("POST /api/logistics/pos", () => {
     expect(rpc).toHaveBeenCalledWith("logistics_create_po", {
       p_supplier_id: SUPPLIER_ID,
       p_warehouse_id: WAREHOUSE_ID,
-      p_lines: [{ sku: "MAT-K-001", qty: 2 }],
+      p_lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" }],
       p_dl: 4001,
       p_dl_refs: null,
     });
@@ -218,7 +222,7 @@ describe("POST /api/logistics/pos", () => {
         body: JSON.stringify({
           supplierId: SUPPLIER_ID,
           warehouseId: WAREHOUSE_ID,
-          lines: [{ sku: "MAT-K-001", qty: 5 }],
+          lines: [{ sku: "MAT-K-001", qty: 5, cost: 1500, costSource: "hand_entered" }],
           dlRefs: [4001, 4002, 4003],
         }),
       }),
@@ -227,7 +231,7 @@ describe("POST /api/logistics/pos", () => {
     expect(rpc).toHaveBeenCalledWith("logistics_create_po", {
       p_supplier_id: SUPPLIER_ID,
       p_warehouse_id: WAREHOUSE_ID,
-      p_lines: [{ sku: "MAT-K-001", qty: 5 }],
+      p_lines: [{ sku: "MAT-K-001", qty: 5, cost: 1500, costSource: "hand_entered" }],
       p_dl: null,
       p_dl_refs: [4001, 4002, 4003],
     });
@@ -1633,17 +1637,20 @@ describe("POST /api/logistics/pos/batch", () => {
   const WH_KLANG = "00000000-0000-0000-0000-000000000b01";
   const WH_PJ = "00000000-0000-0000-0000-000000000b02";
 
+  // T25/T26 (migration 0055/0055b): every PO line now requires cost +
+  // costSource on input — see POST /api/logistics/pos block above for the
+  // full rationale.
   const TWO_POS = {
     pos: [
       {
         supplierId: SUPPLIER_A,
         warehouseId: WH_KLANG,
-        lines: [{ sku: "mattress:carres-cloud:King", qty: 2 }],
+        lines: [{ sku: "mattress:carres-cloud:King", qty: 2, cost: 1500, costSource: "hand_entered" as const }],
       },
       {
         supplierId: SUPPLIER_B,
         warehouseId: WH_PJ,
-        lines: [{ sku: "sofa:oak:3-seater", qty: 1 }],
+        lines: [{ sku: "sofa:oak:3-seater", qty: 1, cost: 2200, costSource: "prev_po" as const }],
       },
     ],
   };
@@ -1673,7 +1680,7 @@ describe("POST /api/logistics/pos/batch", () => {
         {
           supplier_id: SUPPLIER_A,
           warehouse_id: WH_KLANG,
-          lines: [{ sku: "mattress:carres-cloud:King", qty: 2 }],
+          lines: [{ sku: "mattress:carres-cloud:King", qty: 2, cost: 1500, costSource: "hand_entered" }],
           eta_date: null,
           dl_refs: null,
           note: null,
@@ -1681,7 +1688,7 @@ describe("POST /api/logistics/pos/batch", () => {
         {
           supplier_id: SUPPLIER_B,
           warehouse_id: WH_PJ,
-          lines: [{ sku: "sofa:oak:3-seater", qty: 1 }],
+          lines: [{ sku: "sofa:oak:3-seater", qty: 1, cost: 2200, costSource: "prev_po" }],
           eta_date: null,
           dl_refs: null,
           note: null,
@@ -1740,7 +1747,7 @@ describe("POST /api/logistics/pos/batch", () => {
     const onePo = {
       supplierId: SUPPLIER_A,
       warehouseId: WH_KLANG,
-      lines: [{ sku: "mattress:carres-cloud:King", qty: 1 }],
+      lines: [{ sku: "mattress:carres-cloud:King", qty: 1, cost: 1500, costSource: "hand_entered" as const }],
     };
     const res = await app.fetch(
       new Request("http://t/api/logistics/pos/batch", {
