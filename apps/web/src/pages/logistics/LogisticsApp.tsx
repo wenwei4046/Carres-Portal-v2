@@ -112,13 +112,17 @@ export default function LogisticsApp() {
           // bare and slugged paths mount the same shell — the shell internally
           // dispatches on `useParams<{ slug? }>()` and `<Navigate replace>`
           // sends invalid/missing slugs to the default tab (`nice-future`).
+          //
+          // Paths are RELATIVE because this is a descendant `<Routes>` mounted
+          // inside App.tsx's `<Route path="/logistics/*">`. React Router 7
+          // matches descendant route paths relative to the parent route's
+          // matched portion. Absolute paths (`/logistics/procurement`) silently
+          // fail to match here even though the URL string is identical — the
+          // result is the main area renders nothing while the URL stays put.
           <Routes>
+            <Route path="procurement" element={<TabbedProcurementShell />} />
             <Route
-              path="/logistics/procurement"
-              element={<TabbedProcurementShell />}
-            />
-            <Route
-              path="/logistics/procurement/:slug"
+              path="procurement/:slug"
               element={<TabbedProcurementShell />}
             />
           </Routes>
