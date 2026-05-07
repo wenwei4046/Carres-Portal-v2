@@ -12,9 +12,10 @@ function wrap(ui: React.ReactNode) {
 }
 
 const LP_ID = "00000000-0000-0000-0000-0000000001f1";
+const THREAD_ID = "00000000-0000-0000-0000-0000000200a1";
 
 describe("DispatchPartnerDialog", () => {
-  it("submits with force_dispatch=true when Force toggle on", async () => {
+  it("submits with forceDispatch=true when Force toggle on", async () => {
     vi.mocked(apiFetch).mockImplementation(async (path) => {
       if (typeof path === "string" && path.includes("/partners")) {
         return [{ id: LP_ID, name: "LP-A" }];
@@ -22,7 +23,7 @@ describe("DispatchPartnerDialog", () => {
       return { mode: "force" };
     });
     const onClose = vi.fn();
-    render(wrap(<DispatchPartnerDialog poId="PO-200" onClose={onClose} />));
+    render(wrap(<DispatchPartnerDialog threadId={THREAD_ID} poLabel="PO-200" onClose={onClose} />));
 
     await waitFor(() => expect(screen.getByText("LP-A")).toBeInTheDocument());
     fireEvent.click(screen.getByLabelText(/LP-A/i));
@@ -32,23 +33,33 @@ describe("DispatchPartnerDialog", () => {
 
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith(
-        "/api/logistics/pos/PO-200/dispatch-customer-leg",
+        "/api/logistics/pos/dispatch-customer-leg",
         expect.objectContaining({
           method: "POST",
-          body: expect.stringContaining('"force_dispatch":true'),
+          body: expect.stringContaining('"forceDispatch":true'),
         }),
       );
     });
+    const dispatchCall = vi
+      .mocked(apiFetch)
+      .mock.calls.find(([p]) => typeof p === "string" && p.endsWith("/dispatch-customer-leg"));
+    const body = JSON.parse((dispatchCall?.[1] as RequestInit).body as string);
+    expect(body).toEqual({
+      threadId: THREAD_ID,
+      partnerId: LP_ID,
+      confirmDeliveryDate: "2026-05-20",
+      forceDispatch: true,
+    });
   });
 
-  it("submits with force_dispatch=false (RFD path) by default", async () => {
+  it("submits with forceDispatch=false (RFD path) by default", async () => {
     vi.mocked(apiFetch).mockImplementation(async (path) => {
       if (typeof path === "string" && path.includes("/partners")) {
         return [{ id: LP_ID, name: "LP-A" }];
       }
       return { mode: "rfd" };
     });
-    render(wrap(<DispatchPartnerDialog poId="PO-200" onClose={() => {}} />));
+    render(wrap(<DispatchPartnerDialog threadId={THREAD_ID} poLabel="PO-200" onClose={() => {}} />));
 
     await waitFor(() => expect(screen.getByText("LP-A")).toBeInTheDocument());
     fireEvent.click(screen.getByLabelText(/LP-A/i));
@@ -57,12 +68,18 @@ describe("DispatchPartnerDialog", () => {
 
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith(
-        "/api/logistics/pos/PO-200/dispatch-customer-leg",
+        "/api/logistics/pos/dispatch-customer-leg",
         expect.objectContaining({
           method: "POST",
-          body: expect.stringContaining('"force_dispatch":false'),
+          body: expect.stringContaining('"forceDispatch":false'),
         }),
       );
     });
+  });
+
+  it("title falls back to threadId slice when poLabel omitted", async () => {
+    vi.mocked(apiFetch).mockResolvedValue([{ id: LP_ID, name: "LP-A" }]);
+    render(wrap(<DispatchPartnerDialog threadId={THREAD_ID} onClose={() => {}} />));
+    await waitFor(() => expect(screen.getByText(/Dispatch — 00000000/)).toBeInTheDocument());
   });
 });

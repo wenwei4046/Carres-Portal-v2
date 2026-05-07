@@ -4,7 +4,8 @@ import { apiFetch } from "../../../lib/api";
 import { qk } from "../../../lib/queries";
 
 /**
- * DispatchPartnerDialog — Phase 4.5 Chunk 1 (Task 34).
+ * DispatchPartnerDialog — Phase 4.5 Chunk 1 (Task 34), rewired for Chunk 2
+ * Sprint B threading (migration 0051).
  *
  * Customer-leg dispatch surface. The logistics user picks a delivery partner,
  * sets the confirm-delivery-date, and chooses between two paths:
@@ -15,8 +16,18 @@ import { qk } from "../../../lib/queries";
  *
  * Wired against:
  *   - GET  /api/logistics/partners                  — flat partner list
- *   - POST /api/logistics/pos/:id/dispatch-customer-leg
- *     body: { partner_id, confirm_delivery_date, force_dispatch }
+ *   - POST /api/logistics/pos/dispatch-customer-leg
+ *     body: { threadId, partnerId, confirmDeliveryDate, forceDispatch }
+ *
+ * Pivoted in Chunk 2 Sprint B from PO-scoped (`:id` path param + snake_case
+ * body) to thread-scoped (no path param + camelCase body with `threadId`).
+ * Customer-leg state now lives on `order_supplier_threads`, not
+ * `purchase_orders`.
+ *
+ * Props:
+ *   - threadId: required, the supplier thread to dispatch.
+ *   - poLabel: optional display-only string for the title (e.g. "PO-200").
+ *     Falls back to the first 8 chars of threadId when omitted.
  *
  * Visual conventions match `WarehouseRelocateDialog` (Task 32):
  *   - Modal panel uses `bg-card` (HSL 40 53% 97% — Loo's three-layer cream
@@ -38,10 +49,12 @@ import { qk } from "../../../lib/queries";
 type Partner = { id: string; name: string };
 
 export default function DispatchPartnerDialog({
-  poId,
+  threadId,
+  poLabel,
   onClose,
 }: {
-  poId: string;
+  threadId: string;
+  poLabel?: string;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
@@ -56,12 +69,13 @@ export default function DispatchPartnerDialog({
 
   const dispatch = useMutation({
     mutationFn: () =>
-      apiFetch(`/api/logistics/pos/${poId}/dispatch-customer-leg`, {
+      apiFetch("/api/logistics/pos/dispatch-customer-leg", {
         method: "POST",
         body: JSON.stringify({
-          partner_id: partnerId!,
-          confirm_delivery_date: date,
-          force_dispatch: force,
+          threadId,
+          partnerId: partnerId!,
+          confirmDeliveryDate: date,
+          forceDispatch: force,
         }),
       }),
     onSuccess: () => {
@@ -74,7 +88,7 @@ export default function DispatchPartnerDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
-        <h2 className="text-lg font-semibold mb-4">Dispatch — {poId}</h2>
+        <h2 className="text-lg font-semibold mb-4">Dispatch — {poLabel ?? threadId.slice(0, 8)}</h2>
 
         <div className="mb-3">
           <label className="block text-sm font-medium mb-1">Logistics Partner</label>

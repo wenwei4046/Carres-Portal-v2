@@ -5,39 +5,55 @@ import { qk } from "../../../lib/queries";
 
 /**
  * PartnerRequestForDeliveryDialog — LP-side Accept / Reject for an RFD-pending
- * pickup. Replaces the Task 26 stub.
+ * pickup. Replaces the Task 26 stub; rewired for Chunk 2 Sprint B threading
+ * (migration 0051).
  *
- * Wired against Task 27 endpoints:
- *   - POST /api/partner/pickups/:po/accept-rfd  (optional confirm_delivery_date)
- *   - POST /api/partner/pickups/:po/reject-rfd  (no body fields per C1.9 — the
- *     RPC writes the audit_log entry without a free-text reason)
+ * Wired against:
+ *   - POST /api/partner/pickups/accept-rfd  body: { threadId }
+ *   - POST /api/partner/pickups/reject-rfd  body: { threadId }
+ *     (No reason field per C1.9 — audit_log captures intent. Schema accepts
+ *     optional `reason` (max 500) for future expansion if Loo reverses C1.9.)
+ *
+ * Pivoted in Chunk 2 Sprint B from PO-scoped (`:po` path param + optional
+ * snake_case `confirm_delivery_date`) to thread-scoped (no path param +
+ * camelCase body with `threadId`). Customer-leg state (request_for_delivery_at,
+ * partner_accepted_at, partner_rejected_at) now lives on
+ * `order_supplier_threads`, not `purchase_orders`.
+ *
+ * The accept-rfd RPC takes `threadId` only — there is no longer a
+ * partner-supplied confirm-delivery-date on the accept path. Logistics sets
+ * the date on the RFD origin (DispatchPartnerDialog), not the partner reply.
+ *
+ * Props:
+ *   - threadId: required, the supplier thread to accept/reject the RFD for.
+ *   - poLabel: optional display-only string for the title (e.g. "PO-001").
+ *     Falls back to the first 8 chars of threadId when omitted.
  *
  * Visual conventions:
  *   - Modal panel uses `bg-card` (HSL 40 53% 97% — Loo's three-layer cream
  *     intentional offset from proto white). See Modal.tsx for the canonical
  *     overlay/panel pattern; this dialog is intentionally simpler because the
  *     Partner pages don't share the logistics Modal primitive yet.
- *   - Raw HTML inputs styled with warm-linen Tailwind tokens (no shadcn).
+ *   - Raw HTML buttons styled with warm-linen Tailwind tokens (no shadcn).
  */
 export default function PartnerRequestForDeliveryDialog({
-  poId,
+  threadId,
+  poLabel,
   onClose,
 }: {
-  poId: string;
+  threadId: string;
+  poLabel?: string;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
-  const [date, setDate] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const accept = useMutation({
-    mutationFn: async () => {
-      const body = date ? { confirm_delivery_date: date } : {};
-      return apiFetch(`/api/partner/pickups/${poId}/accept-rfd`, {
+    mutationFn: () =>
+      apiFetch("/api/partner/pickups/accept-rfd", {
         method: "POST",
-        body: JSON.stringify(body),
-      });
-    },
+        body: JSON.stringify({ threadId }),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.partner.pickups() });
       qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
@@ -48,9 +64,9 @@ export default function PartnerRequestForDeliveryDialog({
 
   const reject = useMutation({
     mutationFn: () =>
-      apiFetch(`/api/partner/pickups/${poId}/reject-rfd`, {
+      apiFetch("/api/partner/pickups/reject-rfd", {
         method: "POST",
-        body: JSON.stringify({}), // no reason per C1.9 — audit_log captures intent
+        body: JSON.stringify({ threadId }), // no reason per C1.9 — audit_log captures intent
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.partner.pickups() });
@@ -62,19 +78,9 @@ export default function PartnerRequestForDeliveryDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
-        <h2 className="text-lg font-semibold mb-4">Request for Delivery — {poId}</h2>
-        <div className="mb-4">
-          <label htmlFor="confirmDate" className="block text-sm font-medium mb-1">
-            Confirm delivery date
-          </label>
-          <input
-            id="confirmDate"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full border border-base-200 rounded px-3 py-2 text-sm"
-          />
-        </div>
+        <h2 className="text-lg font-semibold mb-4">
+          Request for Delivery — {poLabel ?? threadId.slice(0, 8)}
+        </h2>
         {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 border border-base-200 rounded">Cancel</button>
