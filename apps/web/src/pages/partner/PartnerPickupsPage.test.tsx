@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import PartnerPickupsPage from "./PartnerPickupsPage";
 
@@ -23,29 +23,126 @@ function wrap(ui: React.ReactNode) {
   return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
 }
 
+const THREAD_ID = "00000000-0000-0000-0000-0000000200a1";
+
+// Phase 4.5 Chunk 2 carry-forward `phase-4.5-chunk-2-partner-rfd-page-rebuild`
+// rebuilt this page with two sections — RFD Pending (customer-leg, sourced
+// from `GET /api/partner/pickups/rfd-pending` via RPC `logistics_partner_rfd_pending`)
+// and All Pickups (procurement-leg, sourced from `GET /api/partner/pickups`).
+// Customer-leg state lives on `order_supplier_threads` post-0052; the
+// PO-sourced indicator that disappeared with the column drop is now restored
+// from threads via the new endpoint.
+function mockApi(rfdRows: unknown[], poRows: unknown[]) {
+  vi.mocked(apiFetch).mockImplementation(async (path) => {
+    if (typeof path === "string" && path.includes("/rfd-pending")) {
+      return rfdRows;
+    }
+    return poRows;
+  });
+}
+
 describe("PartnerPickupsPage", () => {
-  it("renders rows with sup_status chips", async () => {
-    // Phase 4.5 Chunk 2 Sprint C T8' — the 4 customer-leg fields
-    // (confirm_delivery_date, request_for_delivery_at, partner_accepted_at,
-    // partner_rejected_at) were dropped from `purchase_orders` (migration
-    // 0052/0053) — they live on `order_supplier_threads` now. The
-    // PO-sourced RFD-pending indicator + Accept/Reject button were removed
-    // from PartnerPickupsPage; customer-leg RFD UI for partners is a Chunk 2
-    // carry-forward and must source state from threads when it lands.
-    vi.mocked(apiFetch).mockResolvedValue([
-      {
-        id: "PO-001",
-        sup_status: "pickup_assigned",
-      },
-      {
-        id: "PO-002",
-        sup_status: "delivered",
-      },
-    ]);
+  it("renders procurement-leg PO rows with sup_status chips", async () => {
+    mockApi(
+      [],
+      [
+        { id: "PO-001", sup_status: "pickup_assigned" },
+        { id: "PO-002", sup_status: "delivered" },
+      ],
+    );
     render(wrap(<PartnerPickupsPage />));
     await waitFor(() => expect(screen.getByText("PO-001")).toBeInTheDocument());
     expect(screen.getByText(/pickup_assigned/i)).toBeInTheDocument();
     expect(screen.getByText("PO-002")).toBeInTheDocument();
     expect(screen.getByText(/delivered/i)).toBeInTheDocument();
+  });
+
+  it("renders empty-state when no RFD-pending threads", async () => {
+    mockApi([], [{ id: "PO-001", sup_status: "delivered" }]);
+    render(wrap(<PartnerPickupsPage />));
+    await waitFor(() =>
+      expect(
+        screen.getByText(/No RFD requests waiting for your response/i),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("renders RFD-pending row with customer name + dates + View RFD button", async () => {
+    mockApi(
+      [
+        {
+          thread_id: THREAD_ID,
+          order_id: "00000000-0000-0000-0000-0000000300a1",
+          po_id: "PO-001",
+          customer_name: "Loo's Living Room",
+          request_for_delivery_at: "2026-05-08T08:30:00Z",
+          confirm_delivery_date: "2026-05-15",
+        },
+      ],
+      [],
+    );
+    render(wrap(<PartnerPickupsPage />));
+    await waitFor(() =>
+      expect(screen.getByText("Loo's Living Room")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("2026-05-15")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /view rfd/i })).toBeInTheDocument();
+  });
+
+  it("clicking View RFD opens the dialog scoped to that thread", async () => {
+    mockApi(
+      [
+        {
+          thread_id: THREAD_ID,
+          order_id: "00000000-0000-0000-0000-0000000300a1",
+          po_id: "PO-007",
+          customer_name: "Acme Sdn Bhd",
+          request_for_delivery_at: "2026-05-08T08:30:00Z",
+          confirm_delivery_date: "2026-05-15",
+        },
+      ],
+      [],
+    );
+    render(wrap(<PartnerPickupsPage />));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /view rfd/i })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /view rfd/i }));
+    // Dialog title uses poLabel — confirms threadId + poLabel were both passed.
+    await waitFor(() =>
+      expect(screen.getByText(/Request for Delivery — PO-007/)).toBeInTheDocument(),
+    );
+    // Dialog has Accept + Reject buttons (poLabel header confirms it's the one
+    // we just opened, not stale state).
+    expect(screen.getByRole("button", { name: /^accept$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reject/i })).toBeInTheDocument();
+  });
+
+  it("closing the dialog (Cancel) hides it", async () => {
+    mockApi(
+      [
+        {
+          thread_id: THREAD_ID,
+          order_id: "00000000-0000-0000-0000-0000000300a1",
+          po_id: "PO-007",
+          customer_name: "Acme Sdn Bhd",
+          request_for_delivery_at: "2026-05-08T08:30:00Z",
+          confirm_delivery_date: "2026-05-15",
+        },
+      ],
+      [],
+    );
+    render(wrap(<PartnerPickupsPage />));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /view rfd/i })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /view rfd/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/Request for Delivery — PO-007/)).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    await waitFor(() =>
+      expect(screen.queryByText(/Request for Delivery — PO-007/)).toBeNull(),
+    );
   });
 });

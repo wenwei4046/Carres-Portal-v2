@@ -81,6 +81,65 @@ describe("GET /api/partner/pickups", () => {
   });
 });
 
+describe("GET /api/partner/pickups/rfd-pending", () => {
+  it("calls logistics_partner_rfd_pending RPC and returns rows", async () => {
+    const rows = [
+      {
+        thread_id: "00000000-0000-0000-0000-0000000200a1",
+        order_id: "00000000-0000-0000-0000-0000000300a1",
+        po_id: "PO-001",
+        customer_name: "Loo's Living Room",
+        request_for_delivery_at: "2026-05-08T08:00:00Z",
+        confirm_delivery_date: "2026-05-15",
+      },
+    ];
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: rows, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/rfd-pending", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_rfd_pending");
+    expect(await res.json()).toEqual(rows);
+  });
+
+  it("returns empty array when no RFD-pending threads", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: [], error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/rfd-pending", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+  });
+
+  it("rejects dealer with 403", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/rfd-pending", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects partner without partner_id with 403", async () => {
+    const jwt = await makeJwt("partner"); // no partnerId
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/rfd-pending", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
 const THREAD_ID = "00000000-0000-0000-0000-00000000beef";
 
 describe("POST /api/partner/pickups/accept-rfd", () => {

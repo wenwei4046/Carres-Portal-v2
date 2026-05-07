@@ -66,8 +66,9 @@ export const qk = {
   // `principal` so we can blast `["partner"]` to invalidate the whole sub-tree
   // (e.g. after accept/reject RFD ripples to dashboard counts + pickups list).
   partner: {
-    dashboard: () => ["partner", "dashboard"] as const,
-    pickups:   () => ["partner", "pickups"] as const,
+    dashboard:  () => ["partner", "dashboard"] as const,
+    pickups:    () => ["partner", "pickups"] as const,
+    rfdPending: () => ["partner", "rfd-pending"] as const,
   },
   // Phase 4 — HQ Logistics namespace. Same nested-key strategy as `principal`
   // so M5 mutation hooks can blast `["logistics"]` (or a sub-tree) on each

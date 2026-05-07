@@ -54,6 +54,43 @@ partnerPickupsRouter.get("/", async (c) => {
 });
 
 /**
+ * GET /api/partner/pickups/rfd-pending — carry-forward
+ * `phase-4.5-chunk-2-partner-rfd-page-rebuild`.
+ *
+ * Lists customer-leg threads where Logistics has raised an RFD against this
+ * partner and the partner has not yet accepted or rejected. Wraps the
+ * SECURITY DEFINER RPC `logistics_partner_rfd_pending` (migration 0059)
+ * which self-filters by `app_partner_id()` and joins `orders.customer_name`.
+ *
+ * Why an RPC and not a raw select: the existing `ost_partner_read` policy
+ * on `order_supplier_threads` (0033:96-107) only admits rows on POs where
+ * the partner is the procurement-leg LP (`purchase_orders.procurement_partner_id`).
+ * A pure customer-leg LP cannot read their own threads via raw select —
+ * the RPC is the one channel that surfaces them. See migration 0059
+ * docstring for the full rationale.
+ *
+ * Returns array of:
+ *   { thread_id, order_id, po_id, customer_name,
+ *     request_for_delivery_at, confirm_delivery_date }
+ *
+ * Sort: most-recently-raised RFD first.
+ *
+ * Role guard: partner with partnerId only. Logistics / dealer / principal
+ * receive 403.
+ */
+partnerPickupsRouter.get("/rfd-pending", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Only partner role with partner_id" });
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("logistics_partner_rfd_pending");
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json(data ?? []);
+});
+
+/**
  * POST /api/partner/pickups/accept-rfd — Phase 4.5 Chunk 2 Sprint B (Task 7).
  *
  * LP accepts a Request-For-Delivery (RFD) raised by Logistics on an
