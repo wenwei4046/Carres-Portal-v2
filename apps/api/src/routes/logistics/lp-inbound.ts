@@ -17,14 +17,15 @@ import type { AppEnv } from "../../types";
  * advance threads** — it only moves PO `sup_status` to `partner_confirmed`.
  * Thread advancement happens later via the customer-leg dispatch path.
  *
- * Mounted as a separate sub-router under `/logistics/pos` (rather than
- * extending `logisticsPosRouter`) because that router pins access to
- * `role === 'logistics'` via blanket `use("*", ...)` middleware. This route
- * legitimately needs to admit `partner` and `principal` too.
- *
- * Hono routes from sibling sub-routers register independently on the parent
- * app, so this mount path coexists with `logisticsPosRouter` without
- * inheriting its 403 guard.
+ * Mounted as a separate sub-router under `/logistics/pos`. The inline
+ * allowlists below legitimately admit `partner` and `principal` in addition
+ * to `logistics`. Carry-forward `phase-4.5-chunk-2-route-mount-middleware-leak`
+ * (closed) made these allowlists effective: previously `logisticsPosRouter`
+ * exported a blanket `use("*", ...)` middleware that — due to Hono v4's
+ * flatten-into-parent semantics — leaked across siblings and silently 403'd
+ * partner and principal traffic here. `logisticsPosRouter` now uses
+ * per-route `requireLogistics` guards (see `lib/auth-guards.ts`), so
+ * siblings see clean middleware boundaries.
  */
 const lpInboundRouter = new Hono<AppEnv>();
 

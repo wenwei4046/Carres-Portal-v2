@@ -162,6 +162,27 @@ describe("POST /api/logistics/pos/dispatch-customer-leg", () => {
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 
+  it("admits principal role (carry-forward route-mount-middleware-leak fix)", async () => {
+    // Pre-fix this returned 403 because logisticsPosRouter's blanket
+    // `use("*", ...)` middleware leaked across siblings; the post-fix per-route
+    // requireLogistics guard on logisticsPosRouter no longer touches this
+    // sibling, so the inline allowlist `["logistics","principal"]` is the gate.
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { mode: "rfd" }, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/dispatch-customer-leg", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: THREAD_ID, partnerId: LP_ID, confirmDeliveryDate: "2026-05-20" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("logistics_dispatch_customer_leg", expect.any(Object));
+  });
+
   it("rejects invalid confirmDeliveryDate format with 422", async () => {
     const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -77,6 +77,47 @@ describe("POST /api/logistics/pos/:id/lp-accept-inbound", () => {
     );
     expect(res.status).toBe(403);
   });
+
+  it("admits principal role (carry-forward route-mount-middleware-leak fix)", async () => {
+    // Pre-fix this returned 403 because logisticsPosRouter's blanket
+    // `use("*", ...)` middleware leaked across siblings. Inline allowlist
+    // here is ["logistics","principal","partner"]; the post-fix per-route
+    // requireLogistics guard on logisticsPosRouter no longer leaks.
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { po_id: "PO-100" }, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/PO-100/lp-accept-inbound", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("lp_accept_inbound_delivery", { p_po_id: "PO-100" });
+  });
+
+  it("admits partner role (carry-forward route-mount-middleware-leak fix)", async () => {
+    // Same fix as above. Partner self-accept of inbound delivery is the
+    // primary use case the inline allowlist was written for; until the leak
+    // was fixed, partners could not actually reach this route.
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { po_id: "PO-100" }, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/PO-100/lp-accept-inbound", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("lp_accept_inbound_delivery", { p_po_id: "PO-100" });
+  });
 });
 
 describe("POST /api/logistics/pos/:id/lp-reject-inbound", () => {

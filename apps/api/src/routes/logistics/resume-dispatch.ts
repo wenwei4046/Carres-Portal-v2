@@ -25,8 +25,12 @@ import type { AppEnv } from "../../types";
  * Body shape changed from `{}` (with :dl = order display number path param)
  * to `{ threadId }`. Path param dropped — the thread uuid is now in the body.
  *
- * Mounted as a sibling sub-router; role-gated to logistics + principal only.
- * Partners cannot resume a thread.
+ * Mounted as a sibling sub-router under `/logistics/orders`; the inline
+ * allowlist below admits logistics + principal (partners cannot resume a
+ * thread). Carry-forward `phase-4.5-chunk-2-route-mount-middleware-leak`
+ * (closed) made this allowlist effective by switching `logisticsOrdersRouter`
+ * from a blanket `use("*", ...)` to per-route `requireLogistics` guards
+ * (see `lib/auth-guards.ts`).
  */
 const resumeDispatchRouter = new Hono<AppEnv>();
 

@@ -105,6 +105,29 @@ describe("POST /api/logistics/orders/resume-dispatch", () => {
     expect(res.status).toBe(403);
   });
 
+  it("admits principal role (carry-forward route-mount-middleware-leak fix)", async () => {
+    // Pre-fix this returned 403 because logisticsOrdersRouter's blanket
+    // `use("*", ...)` middleware leaked across siblings. Inline allowlist
+    // here is ["logistics","principal"]; the post-fix per-route
+    // requireLogistics guard on logisticsOrdersRouter no longer leaks.
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({ data: { thread_id: THREAD_ID, logistics_stage: "ready_to_dispatch" }, error: null }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/orders/resume-dispatch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: THREAD_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("logistics_resume_dispatch_from_waiting", { p_thread_id: THREAD_ID });
+  });
+
   it("rejects non-uuid threadId with 422", async () => {
     const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

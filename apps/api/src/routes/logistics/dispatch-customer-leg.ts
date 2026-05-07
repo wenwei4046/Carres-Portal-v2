@@ -21,10 +21,15 @@ import type { AppEnv } from "../../types";
  *     directly (stamps partner_accepted_at + advances thread to 'dispatched').
  *     Used when partner is non-responsive or for urgent timing.
  *
- * Mounted as a separate sub-router (not on `logisticsPosRouter`) because
- * `logisticsPosRouter` pins access to logistics-only via blanket middleware.
- * This route only admits HQ roles (logistics + principal) — partners do NOT
- * dispatch customer legs themselves.
+ * Mounted as a separate sub-router under `/logistics/pos`. The inline
+ * allowlist below admits HQ roles (logistics + principal); partners do NOT
+ * dispatch customer legs themselves. Carry-forward
+ * `phase-4.5-chunk-2-route-mount-middleware-leak` (closed) made this allowlist
+ * effective: previously `logisticsPosRouter` exported a blanket `use("*", ...)`
+ * middleware that — due to Hono v4's flatten-into-parent semantics — leaked
+ * across siblings and silently 403'd principals here. `logisticsPosRouter`
+ * now uses per-route `requireLogistics` guards (see `lib/auth-guards.ts`),
+ * so siblings see clean middleware boundaries.
  *
  * Body shape changed from `{ partner_id, confirm_delivery_date, force_dispatch }`
  * (with :id = po_id path param) to `{ threadId, partnerId, confirmDeliveryDate,

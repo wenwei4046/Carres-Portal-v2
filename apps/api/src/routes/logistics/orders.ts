@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
 import {
   abandonOrderInput,
   assignPartnerInput,
@@ -13,6 +12,7 @@ import {
 } from "@carres/shared";
 import { renderDoPdf } from "../../lib/pdf/render";
 import type { DoTemplateData } from "../../lib/pdf/types";
+import { requireLogistics } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -35,20 +35,18 @@ import type { AppEnv } from "../../types";
  * M4 endpoint:
  *   GET    /:id/print-do           — server-side DO PDF (E2 / spec §17.3)
  *
+ * Auth: every route guards with `requireLogistics` per-route — NOT a blanket
+ * `use("*", ...)` middleware. The blanket pattern leaks across sibling sub-
+ * routers mounted at the same path (`resumeDispatchRouter`) and silently
+ * 403's traffic the sibling intends to admit (principal). See
+ * `lib/auth-guards.ts` docstring + carry-forward
+ * `phase-4.5-chunk-2-route-mount-middleware-leak` for the full rationale.
+ *
  * Pattern: matches apps/api/src/routes/principal/dealers.ts (multi-endpoint
- * router with role-only middleware + shared mapPgError/parseJsonBody from
+ * router with per-route role guard + shared mapPgError/parseJsonBody from
  * lib/route-helpers).
  */
 const logisticsOrdersRouter = new Hono<AppEnv>();
-
-// Inline logistics-only guard — fast 403 before any Supabase round-trip.
-logisticsOrdersRouter.use("*", async (c, next) => {
-  const role = c.var.auth?.role;
-  if (role !== "logistics") {
-    throw new HTTPException(403, { message: "Logistics only" });
-  }
-  await next();
-});
 
 /**
  * Pipeline v2 error mapping. Wraps the generic `mapPgError` to expose the
@@ -86,7 +84,7 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
 }
 
 // ----- GET / list -----
-logisticsOrdersRouter.get("/", async (c) => {
+logisticsOrdersRouter.get("/", requireLogistics, async (c) => {
   const parsed = listLogisticsOrdersQuery.safeParse({
     stage: c.req.query("stage") ?? undefined,
     channel: c.req.query("channel") ?? undefined,
@@ -149,7 +147,7 @@ logisticsOrdersRouter.get("/", async (c) => {
 });
 
 // ----- GET /:id detail -----
-logisticsOrdersRouter.get("/:id", async (c) => {
+logisticsOrdersRouter.get("/:id", requireLogistics, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
 
@@ -261,7 +259,7 @@ logisticsOrdersRouter.get("/:id", async (c) => {
 // Server-side DO PDF (E2 / spec §17.3). Only callable on delivered orders
 // (those have a signed DO attached via logistics_attach_do_and_deliver).
 // Returns application/pdf with attachment Content-Disposition.
-logisticsOrdersRouter.get("/:id/print-do", async (c) => {
+logisticsOrdersRouter.get("/:id/print-do", requireLogistics, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
 
@@ -404,7 +402,7 @@ logisticsOrdersRouter.get("/:id/print-do", async (c) => {
 });
 
 // ----- POST /:id/assign-partner -----
-logisticsOrdersRouter.post("/:id/assign-partner", async (c) => {
+logisticsOrdersRouter.post("/:id/assign-partner", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, assignPartnerInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -420,7 +418,7 @@ logisticsOrdersRouter.post("/:id/assign-partner", async (c) => {
 });
 
 // ----- POST /:id/attach-do -----
-logisticsOrdersRouter.post("/:id/attach-do", async (c) => {
+logisticsOrdersRouter.post("/:id/attach-do", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, attachDoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -438,7 +436,7 @@ logisticsOrdersRouter.post("/:id/attach-do", async (c) => {
 });
 
 // ----- POST /:id/abandon -----
-logisticsOrdersRouter.post("/:id/abandon", async (c) => {
+logisticsOrdersRouter.post("/:id/abandon", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, abandonOrderInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -454,7 +452,7 @@ logisticsOrdersRouter.post("/:id/abandon", async (c) => {
 });
 
 // ----- POST /:id/warehouse -----
-logisticsOrdersRouter.post("/:id/warehouse", async (c) => {
+logisticsOrdersRouter.post("/:id/warehouse", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, warehousePickInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -497,7 +495,7 @@ logisticsOrdersRouter.post("/:id/warehouse", async (c) => {
 // the no-warehouse-supplied error path is no longer reachable from this
 // endpoint. The orders.test.ts test that asserted the mapping has also been
 // removed.
-logisticsOrdersRouter.post("/:id/confirm-proceed", async (c) => {
+logisticsOrdersRouter.post("/:id/confirm-proceed", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, confirmProceedRequestInputSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -517,7 +515,7 @@ logisticsOrdersRouter.post("/:id/confirm-proceed", async (c) => {
 // Same error contract as /confirm-proceed. Note: warehouseId is REQUIRED here
 // (the RPC raises 22023 `warehouse_required` on NULL). confirm-proceed
 // accepts NULL via a different RPC; do not conflate.
-logisticsOrdersRouter.post("/:id/transfer-ready", async (c) => {
+logisticsOrdersRouter.post("/:id/transfer-ready", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, transferReadyInputSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -533,7 +531,7 @@ logisticsOrdersRouter.post("/:id/transfer-ready", async (c) => {
 });
 
 // ----- POST /:id/recheck-stock -----
-logisticsOrdersRouter.post("/:id/recheck-stock", async (c) => {
+logisticsOrdersRouter.post("/:id/recheck-stock", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, recheckStockInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -556,7 +554,7 @@ logisticsOrdersRouter.post("/:id/recheck-stock", async (c) => {
 });
 
 // ----- POST /:id/issue-pos -----
-logisticsOrdersRouter.post("/:id/issue-pos", async (c) => {
+logisticsOrdersRouter.post("/:id/issue-pos", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, issuePosForOrderInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);

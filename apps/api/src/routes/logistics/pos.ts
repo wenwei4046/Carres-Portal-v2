@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
 import {
   assignPickupPartnerInput,
   cancelPoInput,
@@ -12,6 +11,7 @@ import {
 } from "@carres/shared";
 import { renderPoPdf } from "../../lib/pdf/render";
 import type { PoTemplateData } from "../../lib/pdf/types";
+import { requireLogistics } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -28,23 +28,22 @@ import type { AppEnv } from "../../types";
  *   POST   /:id/reassign-warehouse    — F1.A reassign WH (M3)
  *   GET    /:id/print                 — server-side PO PDF (M4 / spec §18.4 F6)
  *
+ * Auth: every route guards with `requireLogistics` per-route — NOT a blanket
+ * `use("*", ...)` middleware. The blanket pattern leaks across sibling sub-
+ * routers mounted at the same path (`lpInboundRouter`,
+ * `dispatchCustomerLegRouter`) and silently 403's traffic those siblings
+ * intend to admit (principal, partner). See `lib/auth-guards.ts` docstring
+ * + carry-forward `phase-4.5-chunk-2-route-mount-middleware-leak` for the
+ * full rationale.
+ *
  * Pattern: matches apps/api/src/routes/logistics/orders.ts (multi-endpoint
- * router with role-only middleware + shared mapPgError/parseJsonBody from
+ * router with per-route role guard + shared mapPgError/parseJsonBody from
  * lib/route-helpers + RPC wraps).
  */
 const logisticsPosRouter = new Hono<AppEnv>();
 
-// Inline logistics-only guard — fast 403 before any Supabase round-trip.
-logisticsPosRouter.use("*", async (c, next) => {
-  const role = c.var.auth?.role;
-  if (role !== "logistics") {
-    throw new HTTPException(403, { message: "Logistics only" });
-  }
-  await next();
-});
-
 // ----- GET / list -----
-logisticsPosRouter.get("/", async (c) => {
+logisticsPosRouter.get("/", requireLogistics, async (c) => {
   const parsed = listPurchaseOrdersQuery.safeParse({
     status: c.req.query("status") ?? undefined,
     supplierId: c.req.query("supplierId") ?? undefined,
@@ -117,7 +116,7 @@ logisticsPosRouter.get("/", async (c) => {
 //
 // Path is registered before `/:id/print` so the static segment wins over the
 // :id pattern in Hono's matcher.
-logisticsPosRouter.get("/awaiting-stock-shortage", async (c) => {
+logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   // Step 1 — three parallel fetches: threads (primary path source), legacy
@@ -258,7 +257,7 @@ logisticsPosRouter.get("/awaiting-stock-shortage", async (c) => {
 // also supplies the SKU description (variant text). When a line's SKU isn't
 // found in product_skus (legacy PO), unit_price falls back to 0 and the SKU
 // itself is used as the description — the PDF still renders.
-logisticsPosRouter.get("/:id/print", async (c) => {
+logisticsPosRouter.get("/:id/print", requireLogistics, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
 
@@ -403,7 +402,7 @@ logisticsPosRouter.get("/:id/print", async (c) => {
 // transform pattern as POST /batch below — the wire contract stays
 // camelCase (parity with every other route), and the snake_case translation
 // happens once at the DB edge.
-logisticsPosRouter.post("/", async (c) => {
+logisticsPosRouter.post("/", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, createPoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -441,7 +440,7 @@ logisticsPosRouter.post("/", async (c) => {
 //                                            the RPC's hint ("pos_index=N")
 //   • 42501                                → 403
 //   • Other PG errors                      → mapPgError fallback
-logisticsPosRouter.post("/batch", async (c) => {
+logisticsPosRouter.post("/batch", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, createPosBatchInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -530,7 +529,7 @@ logisticsPosRouter.post("/batch", async (c) => {
 // route, but `p_lines` jsonb expects snake_case `received_qty` (RPC reads
 // `v_line->>'received_qty'` at 0045:688). Same pattern as POST /batch
 // reshapes camelCase → snake_case for the RPC payload.
-logisticsPosRouter.post("/:id/receive", async (c) => {
+logisticsPosRouter.post("/:id/receive", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, receivePoWithDoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -551,7 +550,7 @@ logisticsPosRouter.post("/:id/receive", async (c) => {
 });
 
 // ----- POST /:id/cancel -----
-logisticsPosRouter.post("/:id/cancel", async (c) => {
+logisticsPosRouter.post("/:id/cancel", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, cancelPoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -592,7 +591,7 @@ logisticsPosRouter.post("/:id/cancel", async (c) => {
 // other 22023s (wrong_sup_status, warehouse_not_found, etc).
 //
 // Closes carry-forward `phase-4-v3-outsource-audit-gap`.
-logisticsPosRouter.post("/:id/assign-pickup-partner", async (c) => {
+logisticsPosRouter.post("/:id/assign-pickup-partner", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, assignPickupPartnerInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -635,7 +634,7 @@ logisticsPosRouter.post("/:id/assign-pickup-partner", async (c) => {
 });
 
 // ----- POST /:id/reassign-warehouse -----
-logisticsPosRouter.post("/:id/reassign-warehouse", async (c) => {
+logisticsPosRouter.post("/:id/reassign-warehouse", requireLogistics, async (c) => {
   const parsed = await parseJsonBody(c, reassignPoWarehouseInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
