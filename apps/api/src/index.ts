@@ -28,6 +28,8 @@ import partnerDashboardRouter from "./routes/partner/dashboard";
 import partnerPickupsRouter from "./routes/partner/pickups";
 import financePaymentsRouter from "./routes/finance/payments";
 import financeReportsRouter from "./routes/finance/reports";
+import financeInvoicesRouter from "./routes/finance/invoices";
+import financeRefundsRouter from "./routes/finance/refunds";
 import salespersonsRouter from "./routes/salespersons";
 import dosRouter from "./routes/storage/dos";
 import type { AppEnv } from "./types";
@@ -73,6 +75,8 @@ api.route("/partner/dashboard", partnerDashboardRouter);
 api.route("/partner/pickups", partnerPickupsRouter);
 api.route("/finance/payments", financePaymentsRouter);
 api.route("/finance/reports", financeReportsRouter);
+api.route("/finance/invoices", financeInvoicesRouter);
+api.route("/finance/refunds", financeRefundsRouter);
 api.route("/storage/dos", dosRouter);
 
 app.route("/api", api);

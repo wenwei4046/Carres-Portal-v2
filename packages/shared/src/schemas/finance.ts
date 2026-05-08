@@ -88,3 +88,90 @@ export const paymentsListQuery = z.object({
   limit:      z.coerce.number().int().min(1).max(500).optional(),
 }).strict();
 export type PaymentsListQuery = z.infer<typeof paymentsListQuery>;
+
+/**
+ * `financeInvoiceIssueInput` — POST /api/finance/invoices/issue.
+ * Wraps the existing `invoice_issue(order_id, amount, tax_amount)` RPC
+ * (0003:289). Q2=A locked 2026-05-08: manual click only, NOT auto on
+ * order_advance. The route additionally gates on `orders.status =
+ * 'delivered'` before calling the RPC (returns 422 otherwise) — proto
+ * AR drawer also gates the "Download invoice" button on
+ * delivered + paid >= total.
+ *
+ * SST 8% inclusive (per proto finance-invoices.jsx:34): caller passes the
+ * GROSS amount (incl. tax) and the tax portion separately. Server stores
+ * both on `invoices.amount` (gross) and `invoices.tax_amount` (the SST).
+ */
+export const financeInvoiceIssueInput = z.object({
+  orderId:    z.string().uuid(),
+  amount:     z.number().positive().finite(),
+  taxAmount:  z.number().nonnegative().finite().optional(),
+}).strict();
+export type FinanceInvoiceIssueInput = z.infer<typeof financeInvoiceIssueInput>;
+
+/**
+ * `financeInvoiceVoidInput` — POST /api/finance/invoices/:id/void.
+ * Marks an issued invoice as voided by stamping `voided_at`. Reason is
+ * captured for audit; the RPC layer doesn't enforce a reason length, but
+ * the route requires non-empty since proto's void modal demands a reason.
+ */
+export const financeInvoiceVoidInput = z.object({
+  reason: z.string().min(1).max(500),
+}).strict();
+export type FinanceInvoiceVoidInput = z.infer<typeof financeInvoiceVoidInput>;
+
+/**
+ * `invoicesListQuery` — GET /api/finance/invoices?status&dealerId&from&to.
+ * Status is the derived field (paid|partial|unpaid|void) computed by the
+ * route from `invoices.voided_at` + `orders.paid` vs `invoices.amount`.
+ * The DB doesn't store derived status, so the filter is applied
+ * post-fetch in the route handler.
+ */
+export const invoicesListQuery = z.object({
+  status:    z.enum(['all', 'unpaid', 'partial', 'paid', 'voided']).optional(),
+  dealerId:  z.string().uuid().optional(),
+  from:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  limit:     z.coerce.number().int().min(1).max(500).optional(),
+}).strict();
+export type InvoicesListQuery = z.infer<typeof invoicesListQuery>;
+
+/**
+ * `refundCreateInput` — POST /api/finance/refunds/create.
+ * Q5=A locked 2026-05-08: kind is `credit` (CN-{N}) or `refund` (RF-{N}).
+ *
+ * Behavior (matches proto finance-refunds.jsx:13-46):
+ *   - Always inserts a refunds row with reason + amount.
+ *   - For `kind=refund` AND amount > RM 1000, ALSO inserts an approvals
+ *     row with kind='refund', refers_to=`DL-{dl}`, dealer_id, amount.
+ *     Refunds row stays at status='pending' until approval_decide
+ *     (existing 0016 RPC) flips it via the kind=refund side-effect.
+ *   - For `kind=refund` AND amount <= RM 1000, refunds row is created
+ *     directly at status='approved' (no approval gate per proto).
+ *   - For `kind=credit`, refunds row is created at status='issued' (the
+ *     credit-note path uses `status='issued'` semantics; `apply` later
+ *     deducts from a target order).
+ */
+export const refundCreateInput = z.object({
+  orderId:  z.string().uuid(),
+  amount:   z.number().positive().finite(),
+  reason:   z.string().min(1).max(500),
+  kind:     z.enum(['credit', 'refund']),
+}).strict();
+export type RefundCreateInput = z.infer<typeof refundCreateInput>;
+
+/**
+ * `refundsListQuery` — GET /api/finance/refunds?status&dealerId&from&to.
+ * Status filter accepts the actual `refund_status` enum values
+ * (pending/approved/rejected/paid) plus the credit-note pseudo-status
+ * `issued` (which maps to the `refunds.status='issued'` if we choose
+ * to extend the enum, OR a synthetic value for credit-note rows).
+ */
+export const refundsListQuery = z.object({
+  status:    z.enum(['all', 'pending', 'approved', 'rejected', 'paid', 'issued', 'applied']).optional(),
+  dealerId:  z.string().uuid().optional(),
+  from:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  limit:     z.coerce.number().int().min(1).max(500).optional(),
+}).strict();
+export type RefundsListQuery = z.infer<typeof refundsListQuery>;
