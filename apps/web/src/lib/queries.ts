@@ -21,6 +21,10 @@ import {
   type CreatePosBatchInput,
   type CreatePosBatchResponse,
   type DealerSelf,
+  type FinanceInvoiceIssueInput,
+  type FinanceInvoiceVoidInput,
+  type FinanceRecordReceiptInput,
+  type FinanceTopupApproveInput,
   type ListLogisticsOrdersQuery,
   type ListMovementsQuery,
   type ListPurchaseOrdersQuery,
@@ -31,6 +35,8 @@ import {
   type ProcurementTabSlug,
   type ReassignPoWarehouseInput,
   type ReceivePoWithDoInput,
+  type RefundCreateInput,
+  type RefundPayInput,
   type ReservedDrilldownResponse,
   type SalespersonsListResponse,
   type SetOrderAddressInput,
@@ -115,6 +121,20 @@ export const qk = {
     movements: (filters?: MovementsFilters) =>
       ["logistics", "movements", filters ?? {}] as const,
   },
+  // Phase 5 — HQ Finance namespace. Same nested-key strategy as `principal`
+  // and `logistics` so mutations can blast `["finance"]` (e.g. topup-approve
+  // ripples to dashboard summary + payments list + AR aging) or a tighter
+  // sub-tree.
+  finance: {
+    dashboardSummary: () => ["finance", "dashboard-summary"] as const,
+    arAging:          () => ["finance", "ar-aging"] as const,
+    payments:         (filters?: FinancePaymentsFilters) =>
+      ["finance", "payments", filters ?? {}] as const,
+    invoices:         (filters?: FinanceInvoicesFilters) =>
+      ["finance", "invoices", filters ?? {}] as const,
+    refunds:          (filters?: FinanceRefundsFilters) =>
+      ["finance", "refunds", filters ?? {}] as const,
+  },
 };
 
 export interface OrderFilters {
@@ -135,6 +155,83 @@ export interface ApprovalFilters {
 export interface PrincipalDealerFilters {
   status?: "active" | "suspended" | "pending";
   search?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — Finance filter shapes (kept as plain interfaces so the qk keys
+// stay structurally typed without dragging the zod schema into every cache
+// key build site).
+// ---------------------------------------------------------------------------
+export interface FinancePaymentsFilters {
+  orderId?:   string;
+  dealerId?:  string;
+  direction?: "in" | "out";
+  from?:      string;
+  to?:        string;
+  limit?:     number;
+}
+export interface FinanceInvoicesFilters {
+  status?:   "all" | "unpaid" | "partial" | "paid" | "voided";
+  dealerId?: string;
+  from?:     string;
+  to?:       string;
+  limit?:    number;
+}
+export interface FinanceRefundsFilters {
+  status?:   "all" | "pending" | "approved" | "rejected" | "paid" | "issued" | "applied";
+  dealerId?: string;
+  from?:     string;
+  to?:       string;
+  limit?:    number;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — Finance response shapes (inline types matching the SQL RPC
+// payloads; no need for a domain layer for these aggregates since they're
+// read-only dashboard data, never round-tripped through adapters).
+// ---------------------------------------------------------------------------
+export interface FinanceArAgingRow {
+  order_id:      string;
+  dl:            number;
+  customer_name: string;
+  dealer_id:     string | null;
+  dealer_name:   string | null;
+  placed_at:     string;
+  days:          number;
+  aging:         "0-30" | "31-60" | "61-90" | "90+";
+  total:         number;
+  paid:          number;
+  outstanding:   number;
+  invoice_no:    string;
+  status:        string;
+}
+export interface FinanceArAgingBucket {
+  amount: number;
+  count:  number;
+}
+export interface FinanceArAgingResponse {
+  rows:    FinanceArAgingRow[];
+  buckets: Record<"0-30" | "31-60" | "61-90" | "90+", FinanceArAgingBucket>;
+}
+export interface FinanceDashboardSummary {
+  ar:           { outstanding: number; count: number; overdueAmt: number; overdueCount: number };
+  ap:           { dueAmt: number; count: number };
+  cashflow12w:  { inflow: number; outflow: number; net: number };
+  agingBuckets: Record<"0-30" | "31-60" | "61-90" | "90+", FinanceArAgingBucket>;
+}
+export interface FinancePaymentRow {
+  id:           string;
+  direction:    "in" | "out";
+  amount:       number;
+  method:       string;
+  reference:    string | null;
+  paid_at:      string;
+  order_id:     string | null;
+  po_id:        string | null;
+  refund_id:    string | null;
+  receipt_url:  string | null;
+  recorded_by:  string | null;
+  created_at:   string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1931,6 +2028,243 @@ export function useAdjustStockMutation(
       await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — Finance hooks (queries + mutations)
+// ---------------------------------------------------------------------------
+// Server contract:
+//   GET   /api/finance/reports/dashboard-summary  -> FinanceDashboardSummary
+//   GET   /api/finance/reports/ar-aging           -> FinanceArAgingResponse
+//   GET   /api/finance/payments?filter            -> FinancePaymentRow[]
+//   POST  /api/finance/payments/topup-approve     mutation -> payments row
+//   POST  /api/finance/payments/order-receipt     mutation -> payments row
+//   POST  /api/finance/invoices/issue             mutation -> invoices row
+//   POST  /api/finance/invoices/:id/void          mutation -> invoices row
+//   POST  /api/finance/refunds/create             mutation -> { refund, needsApproval }
+//   POST  /api/finance/refunds/:id/pay            mutation -> refunds row
+//
+// Each mutation invalidates the relevant qk.finance.* keys + ripples to
+// related namespaces (e.g. topup-approve invalidates principal.approvals
+// since it mutates an approval row, plus dealer caches since deposit_balance
+// changes).
+
+function toFinancePaymentsSearch(f?: FinancePaymentsFilters): string {
+  if (!f) return "";
+  const p = new URLSearchParams();
+  if (f.orderId)   p.set("orderId",   f.orderId);
+  if (f.dealerId)  p.set("dealerId",  f.dealerId);
+  if (f.direction) p.set("direction", f.direction);
+  if (f.from)      p.set("from",      f.from);
+  if (f.to)        p.set("to",        f.to);
+  if (f.limit)     p.set("limit",     String(f.limit));
+  const qs = p.toString();
+  return qs ? `?${qs}` : "";
+}
+
+function toFinanceInvoicesSearch(f?: FinanceInvoicesFilters): string {
+  if (!f) return "";
+  const p = new URLSearchParams();
+  if (f.status)   p.set("status",   f.status);
+  if (f.dealerId) p.set("dealerId", f.dealerId);
+  if (f.from)     p.set("from",     f.from);
+  if (f.to)       p.set("to",       f.to);
+  if (f.limit)    p.set("limit",    String(f.limit));
+  const qs = p.toString();
+  return qs ? `?${qs}` : "";
+}
+
+function toFinanceRefundsSearch(f?: FinanceRefundsFilters): string {
+  if (!f) return "";
+  const p = new URLSearchParams();
+  if (f.status)   p.set("status",   f.status);
+  if (f.dealerId) p.set("dealerId", f.dealerId);
+  if (f.from)     p.set("from",     f.from);
+  if (f.to)       p.set("to",       f.to);
+  if (f.limit)    p.set("limit",    String(f.limit));
+  const qs = p.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export function useFinanceDashboardSummary(
+  opts?: Partial<UseQueryOptions<FinanceDashboardSummary>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.dashboardSummary(),
+    queryFn: () => apiFetch<FinanceDashboardSummary>("/api/finance/reports/dashboard-summary"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useFinanceArAging(
+  opts?: Partial<UseQueryOptions<FinanceArAgingResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.arAging(),
+    queryFn: () => apiFetch<FinanceArAgingResponse>("/api/finance/reports/ar-aging"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useFinancePayments(
+  filters?: FinancePaymentsFilters,
+  opts?: Partial<UseQueryOptions<FinancePaymentRow[]>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.payments(filters),
+    queryFn: () => apiFetch<FinancePaymentRow[]>(`/api/finance/payments${toFinancePaymentsSearch(filters)}`),
+    staleTime: 15_000,
+    ...opts,
+  });
+}
+
+export function useFinanceInvoices(
+  filters?: FinanceInvoicesFilters,
+  opts?: Partial<UseQueryOptions<unknown[]>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.invoices(filters),
+    queryFn: () => apiFetch<unknown[]>(`/api/finance/invoices${toFinanceInvoicesSearch(filters)}`),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useFinanceRefunds(
+  filters?: FinanceRefundsFilters,
+  opts?: Partial<UseQueryOptions<unknown[]>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.refunds(filters),
+    queryFn: () => apiFetch<unknown[]>(`/api/finance/refunds${toFinanceRefundsSearch(filters)}`),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useTopupApprove(
+  opts?: Partial<UseMutationOptions<FinancePaymentRow, ApiError, FinanceTopupApproveInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<FinancePaymentRow, ApiError, FinanceTopupApproveInput>({
+    mutationFn: (input) =>
+      apiFetch<FinancePaymentRow>("/api/finance/payments/topup-approve", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // Approval row decided + payment row inserted + deposit_balance bumped.
+      // Invalidate everything that depends on these.
+      await qc.invalidateQueries({ queryKey: ["finance"] });
+      await qc.invalidateQueries({ queryKey: ["principal", "approvals"] });
+      await qc.invalidateQueries({ queryKey: ["dealers"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useRecordReceipt(
+  opts?: Partial<UseMutationOptions<FinancePaymentRow, ApiError, FinanceRecordReceiptInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<FinancePaymentRow, ApiError, FinanceRecordReceiptInput>({
+    mutationFn: (input) =>
+      apiFetch<FinancePaymentRow>("/api/finance/payments/order-receipt", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // orders.paid bumped + new payment inserted. AR aging shifts.
+      await qc.invalidateQueries({ queryKey: ["finance"] });
+      await qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useIssueInvoice(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, FinanceInvoiceIssueInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, FinanceInvoiceIssueInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>("/api/finance/invoices/issue", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // orders.invoice_no + invoiced_at set; new invoices row.
+      await qc.invalidateQueries({ queryKey: qk.finance.invoices() });
+      await qc.invalidateQueries({ queryKey: qk.finance.arAging() });
+      await qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useVoidInvoice(
+  invoiceId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, FinanceInvoiceVoidInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, FinanceInvoiceVoidInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>(`/api/finance/invoices/${invoiceId}/void`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.finance.invoices() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useCreateRefund(
+  opts?: Partial<UseMutationOptions<{ refund: unknown; needsApproval: boolean }, ApiError, RefundCreateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ refund: unknown; needsApproval: boolean }, ApiError, RefundCreateInput>({
+    mutationFn: (input) =>
+      apiFetch<{ refund: unknown; needsApproval: boolean }>("/api/finance/refunds/create", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.finance.refunds() });
+      // amount > 1000 path also creates an approval row
+      await qc.invalidateQueries({ queryKey: ["principal", "approvals"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useRefundPay(
+  refundId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, RefundPayInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, RefundPayInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>(`/api/finance/refunds/${refundId}/pay`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // refunds.status='paid' + paid_at + outbound payments row
+      await qc.invalidateQueries({ queryKey: qk.finance.refunds() });
+      await qc.invalidateQueries({ queryKey: qk.finance.payments() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
