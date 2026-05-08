@@ -208,3 +208,145 @@ describe("GET /api/finance/reports/ap-aging", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("GET /api/finance/reports/cashflow", () => {
+  it("calls finance_cashflow_series with default 12 weeks", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: { labels: [], inflow: [], outflow: [] },
+        error: null,
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/reports/cashflow", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_cashflow_series", { p_weeks: 12 });
+  });
+
+  it("passes weeks param when provided", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: {}, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    await app.fetch(
+      new Request("http://t/api/finance/reports/cashflow?weeks=24", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(sb.rpc).toHaveBeenCalledWith("finance_cashflow_series", { p_weeks: 24 });
+  });
+
+  it("rejects out-of-range weeks with 422", async () => {
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/reports/cashflow?weeks=999", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("GET /api/finance/reports/monthly-pl", () => {
+  it("calls finance_monthly_pl with default 6 months", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({ data: { rows: [] }, error: null }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/reports/monthly-pl", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_monthly_pl", { p_months: 6 });
+  });
+
+  it("admits principal", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: {}, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/reports/monthly-pl?months=12", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_monthly_pl", { p_months: 12 });
+  });
+
+  it("rejects partner with 403", async () => {
+    const jwt = await makeJwt("partner");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/reports/monthly-pl", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("GET /api/finance/reports/top-skus", () => {
+  it("calls finance_top_skus with default 8", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({ data: { rows: [] }, error: null }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/reports/top-skus", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_top_skus", { p_limit: 8 });
+  });
+
+  it("passes limit param when provided", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: {}, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    await app.fetch(
+      new Request("http://t/api/finance/reports/top-skus?limit=20", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(sb.rpc).toHaveBeenCalledWith("finance_top_skus", { p_limit: 20 });
+  });
+
+  it("rejects dealer with 403", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/reports/top-skus", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
