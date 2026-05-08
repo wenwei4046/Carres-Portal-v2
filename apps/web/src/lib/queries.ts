@@ -151,6 +151,15 @@ export const qk = {
     refunds:          (filters?: FinanceRefundsFilters) =>
       ["finance", "refunds", filters ?? {}] as const,
   },
+  // Phase 6 — Supplier namespace. Same nested-key strategy so mutations can
+  // blast `["supplier"]` (e.g. ack/start-production ripples to PO list +
+  // dashboard counts) or a tighter sub-tree.
+  supplier: {
+    pos:      (bucket?: SupplierBucket) => ["supplier", "pos", bucket ?? "all"] as const,
+    po:       (id: string) => ["supplier", "pos", id] as const,
+    products: () => ["supplier", "products"] as const,
+    demand:   () => ["supplier", "products", "demand"] as const,
+  },
 };
 
 export interface OrderFilters {
@@ -2653,3 +2662,177 @@ export function useDeleteReconciliation(
   });
 }
 
+
+// ---------------------------------------------------------------------------
+// Phase 6 — Supplier namespace. Mirrors finance pattern: typed row interfaces
+// + 4 GET query hooks + 4 POST mutation hooks. Mutations invalidate the
+// relevant qk.supplier.* keys to keep dashboard counts + PO lists in sync.
+// ---------------------------------------------------------------------------
+
+export type SupplierBucket = "po" | "ready" | "delivered";
+
+export type SupplierSupStatus =
+  | "pending"
+  | "acknowledged"
+  | "in_production"
+  | "ready_for_pickup"
+  | "ready_confirm_sent"
+  | "pickup_assigned"
+  | "pickup_accepted"
+  | "shipped"
+  | "picked_up"
+  | "delivered"
+  | "reassign_needed";
+
+/** Mirror of `purchase_orders` row visible to a supplier (RLS-scoped to
+ *  own supplier_id). Keep fields aligned with API response from
+ *  GET /api/supplier/pos. */
+export interface SupplierPoRow {
+  id: string;
+  dl: number | null;
+  supplier_id: string;
+  warehouse_id: string;
+  sku: string;
+  qty: number;
+  status: "open" | "received" | "cancelled";
+  sup_status: SupplierSupStatus;
+  delivery_partner_id: string | null;
+  expected_ready_date: string | null;
+  pickup_date: string | null;
+  eta_date: string | null;
+  customer_rejection: unknown;
+  pay_status: "unpaid" | "scheduled" | "paid";
+  do_number: string | null;
+  placed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupplierProductRow {
+  sku: string;
+  category: string;
+  model_key: string;
+  variant: string;
+  price: number;
+  model: { name: string; blurb: string | null } | null;
+}
+
+export interface SupplierDemandRow {
+  sku: string;
+  openQty: number;
+  poCount: number;
+}
+
+export function useSupplierPos(
+  bucket?: SupplierBucket,
+  opts?: Partial<UseQueryOptions<SupplierPoRow[], ApiError>>,
+) {
+  return useQuery<SupplierPoRow[], ApiError>({
+    queryKey: qk.supplier.pos(bucket),
+    queryFn: () => {
+      const path = bucket
+        ? `/api/supplier/pos?bucket=${encodeURIComponent(bucket)}`
+        : "/api/supplier/pos";
+      return apiFetch<SupplierPoRow[]>(path);
+    },
+    placeholderData: keepPreviousData,
+    ...opts,
+  });
+}
+
+export function useSupplierPo(
+  id: string,
+  opts?: Partial<UseQueryOptions<SupplierPoRow, ApiError>>,
+) {
+  return useQuery<SupplierPoRow, ApiError>({
+    queryKey: qk.supplier.po(id),
+    queryFn: () => apiFetch<SupplierPoRow>(`/api/supplier/pos/${id}`),
+    enabled: !!id,
+    ...opts,
+  });
+}
+
+export function useSupplierProducts(
+  opts?: Partial<UseQueryOptions<SupplierProductRow[], ApiError>>,
+) {
+  return useQuery<SupplierProductRow[], ApiError>({
+    queryKey: qk.supplier.products(),
+    queryFn: () => apiFetch<SupplierProductRow[]>("/api/supplier/products"),
+    ...opts,
+  });
+}
+
+export function useSupplierDemand(
+  opts?: Partial<UseQueryOptions<SupplierDemandRow[], ApiError>>,
+) {
+  return useQuery<SupplierDemandRow[], ApiError>({
+    queryKey: qk.supplier.demand(),
+    queryFn: () => apiFetch<SupplierDemandRow[]>("/api/supplier/products/demand"),
+    ...opts,
+  });
+}
+
+export function useAcknowledgePo(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, string>({
+    mutationFn: (poId) =>
+      apiFetch(`/api/supplier/pos/${poId}/acknowledge`, { method: "POST" }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["supplier"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useStartProduction(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, string>({
+    mutationFn: (poId) =>
+      apiFetch(`/api/supplier/pos/${poId}/start-production`, { method: "POST" }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["supplier"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useReadyForPickup(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, string>({
+    mutationFn: (poId) =>
+      apiFetch(`/api/supplier/pos/${poId}/ready-for-pickup`, { method: "POST" }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["supplier"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useMarkDelivered(
+  opts?: Partial<
+    UseMutationOptions<unknown, ApiError, { poId: string; doNumber: string; doNote?: string }>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { poId: string; doNumber: string; doNote?: string }>({
+    mutationFn: ({ poId, doNumber, doNote }) =>
+      apiFetch(`/api/supplier/pos/${poId}/mark-delivered`, {
+        method: "POST",
+        body: JSON.stringify({ doNumber, doNote }),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["supplier"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
