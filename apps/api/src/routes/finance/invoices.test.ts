@@ -323,3 +323,168 @@ describe("POST /api/finance/invoices/:id/void", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
+  // Mocks both the invoice / order / lines / sku selects.
+  type Row = Record<string, unknown>;
+  function mockChain(invoice: Row | null, order: Row | null, lines: Row[] | null = [], skuRows: Row[] | null = []) {
+    return {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === "invoices") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({ data: invoice, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === "orders") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({ data: order, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === "order_lines") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: lines, error: null }),
+            }),
+          };
+        }
+        if (table === "product_skus") {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({ data: skuRows, error: null }),
+            }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+  }
+
+  it("renders application/pdf when invoice + order + lines all valid", async () => {
+    const sb = mockChain(
+      { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
+      { id: ORDER_ID, dl: 1240, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "10 Lorong KL", dealer_id: "d1", paid: 5970, dealers: { name: "KL Showroom", contact: "Aisha" } },
+      [{ sku: "SKU-A", qty: 1, unit_price: 5970 }],
+      [{ sku: "SKU-A", variant: "Mattress · Queen" }],
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
+    const body = await res.arrayBuffer();
+    // %PDF- magic header
+    expect(new Uint8Array(body).slice(0, 5)).toEqual(new Uint8Array([37, 80, 68, 70, 45]));
+  }, 15000);
+
+  it("returns 404 when invoice not found", async () => {
+    const sb = mockChain(null, null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 422 when order not delivered", async () => {
+    const sb = mockChain(
+      { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
+      { id: ORDER_ID, dl: 1240, status: "logistics", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: 5970, dealers: null },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("order_not_delivered");
+  });
+
+  it("returns 422 when paid < amount", async () => {
+    const sb = mockChain(
+      { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
+      { id: ORDER_ID, dl: 1240, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: 1000, dealers: null },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("not_fully_paid");
+  });
+
+  it("returns 422 when invoice voided", async () => {
+    const sb = mockChain(
+      { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: "2026-05-01" },
+      null,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("invoice_voided");
+  });
+
+  it("rejects invalid uuid with 422", async () => {
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/invoices/not-a-uuid/pdf", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects dealer with 403", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});

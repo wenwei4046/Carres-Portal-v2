@@ -103,7 +103,9 @@ function mockSb(opts: {
       }
       return { insert: auditInsert };
     }),
-    rpc: vi.fn(),
+    // Default RPC mock returns a CN string for next_credit_note_no — kind=credit
+    // path needs this to set credit_note_no on the inserted row (Chunk C).
+    rpc: vi.fn().mockResolvedValue({ data: "CN-0001", error: null }),
   };
   return { sb, approvalsInsert, auditInsert };
 }
@@ -336,6 +338,97 @@ describe("POST /api/finance/refunds/:id/pay", () => {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({ method: "cash" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/finance/refunds/:id/apply (Chunk C)", () => {
+  const TARGET_ORDER_ID = "00000000-0000-0000-0000-000000bb2001";
+
+  it("calls finance_apply_credit_note RPC with mapped args", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: { id: REFUND_ID, status: "paid", credit_note_no: "CN-0042", applied_to_order_id: TARGET_ORDER_ID },
+        error: null,
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/refunds/${REFUND_ID}/apply`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ targetOrderId: TARGET_ORDER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_apply_credit_note", {
+      p_refund_id:       REFUND_ID,
+      p_target_order_id: TARGET_ORDER_ID,
+    });
+  });
+
+  it("maps SQLSTATE 22023 (not a credit note / wrong status) to 422", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "22023", message: "not a credit note (use refund_pay for refunds)" },
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/refunds/${REFUND_ID}/apply`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ targetOrderId: TARGET_ORDER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects invalid uuid id with 422", async () => {
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/refunds/not-a-uuid/apply", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ targetOrderId: TARGET_ORDER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects bad targetOrderId with 422", async () => {
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/refunds/${REFUND_ID}/apply`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ targetOrderId: "not-a-uuid" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects dealer with 403", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/refunds/${REFUND_ID}/apply`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ targetOrderId: TARGET_ORDER_ID }),
       }),
       env,
     );
