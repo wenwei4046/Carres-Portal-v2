@@ -328,7 +328,7 @@ Phase 4.5 Chunk 2 plan execution (per `docs/superpowers/plans/2026-05-06-phase-4
   • T43 annotated tag phase-4.5-chunk-2-complete (autonomous, pushed 2026-05-07)
 Next decision pending:
   1. Verify Chunk 1 carry-forwards (LP seed + un-fixme E2E specs) — still pending from Chunk 1; un-fixme 3 new Chunk 2 Playwright specs (`per-leg-lp-split`, `tab-routing`, `stockpile-alert-to-po`) after seeding
-  2. Decide Phase 5 Finance kickoff timing
+  2. Phase 5 Finance — spec drafted 2026-05-08 21:42 GMT+8 at `docs/superpowers/specs/2026-05-08-phase-5-finance-spec.md` (~480 lines, 12 sections); 9 Q's locked in-conversation per Loo (Q1=A new RPC `finance_topup_approve` wrapper / Q2=A manual invoice issue / Q3=B CSV import day 1 / Q3.1=Maybank2u format / Q4=B auto-suggest top-6 recon candidates / Q5=A keep CN/RF distinction / Q6=A single AR aging RPC / Q7=A server-side @react-pdf invoice / Q8=A Chunk A/B/C split). Net new for Phase 5: migrations 0061 (bank_statements + reconciliations tables) + 0062 (~11 new RPCs); 5 Hono router files; 8 web pages; ~98 net new tests. Next: `/plan-eng-review` on the spec → `/make-plan docs/superpowers/plans/2026-05-09-phase-5-finance-chunk-A.md` for Chunk A (foundation: A1+A2 acceptance) → execute
 Carry-forward TODOs (Chunk 2 close 9, open 3):
   ## CLOSED in Chunk 2
   • phase-4.5-procurement-vs-delivery-partner-field-split ✅ closed (Sprint A-C — CQ1: 0049+0051 thread customer-leg + 0052 PO column rename + 0053 procurement-leg RPCs)
