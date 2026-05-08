@@ -43,6 +43,7 @@ afterAll(() => _setJwksForTesting(null));
 
 const APPROVAL_ID = "00000000-0000-0000-0000-000000a99001";
 const ORDER_ID    = "00000000-0000-0000-0000-000000a99002";
+const PO_ID       = "PO-2046";
 
 describe("GET /api/finance/payments", () => {
   it("returns payments list with default order by paid_at desc", async () => {
@@ -329,6 +330,221 @@ describe("POST /api/finance/payments/order-receipt", () => {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: ORDER_ID, amount: 100, method: "cash" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/finance/payments/po-pay", () => {
+  it("calls finance_po_pay RPC with mapped args", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: { id: "p77", direction: "out", amount: 12500, po_id: PO_ID },
+        error: null,
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/po-pay", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          poId:      PO_ID,
+          amount:    12500,
+          method:    "bank_transfer",
+          reference: "MAYBANK-998812",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_po_pay", {
+      p_po_id:     PO_ID,
+      p_amount:    12500,
+      p_method:    "bank_transfer",
+      p_reference: "MAYBANK-998812",
+    });
+  });
+
+  it("nulls reference when omitted", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: { id: "p78", direction: "out", amount: 5000 },
+        error: null,
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/po-pay", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ poId: PO_ID, amount: 5000, method: "cheque" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_po_pay", {
+      p_po_id:     PO_ID,
+      p_amount:    5000,
+      p_method:    "cheque",
+      p_reference: null,
+    });
+  });
+
+  it("maps SQLSTATE 22023 (po already paid) to 422", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "22023", message: "po already paid" },
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/po-pay", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ poId: PO_ID, amount: 5000, method: "bank_transfer" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects negative amount with 422 (zod gate)", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/po-pay", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ poId: PO_ID, amount: -1, method: "cash" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects dealer with 403", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/po-pay", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ poId: PO_ID, amount: 5000, method: "cash" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/finance/payments/po-schedule", () => {
+  it("calls finance_po_schedule RPC with mapped args", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: { id: PO_ID, pay_status: "scheduled" },
+        error: null,
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/po-schedule", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ poId: PO_ID, scheduledFor: "2026-05-15" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_po_schedule", {
+      p_po_id:         PO_ID,
+      p_scheduled_for: "2026-05-15",
+    });
+  });
+
+  it("nulls scheduledFor when omitted", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: { id: PO_ID, pay_status: "scheduled" },
+        error: null,
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/po-schedule", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ poId: PO_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_po_schedule", {
+      p_po_id:         PO_ID,
+      p_scheduled_for: null,
+    });
+  });
+
+  it("maps SQLSTATE 22023 (already scheduled / paid) to 422", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "22023", message: "cannot schedule (current pay_status: scheduled)" },
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/po-schedule", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ poId: PO_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects logistics role with 403", async () => {
+    const sb = { rpc: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/po-schedule", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ poId: PO_ID }),
       }),
       env,
     );

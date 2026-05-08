@@ -143,3 +143,68 @@ describe("GET /api/finance/reports/ar-aging", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("GET /api/finance/reports/ap-aging", () => {
+  it("calls finance_ap_aging RPC and returns rows + byPayStatus", async () => {
+    const payload = {
+      rows: [
+        {
+          po_id: "PO-2046", supplier_id: "s1", supplier_name: "Acme",
+          placed_at: "2026-04-29T00:00:00Z", eta_date: "2026-05-15",
+          status: "open", sup_status: "in_production", pay_status: "unpaid",
+          pay_status_ui: "in_production", qty: 10, total: 12500,
+          do_number: null, has_do: false, due_in: 7,
+          lines: [{ sku: "SKU-A", sku_name: "Bed Frame · Queen", qty: 10, unit_cost: 1250, line_total: 12500 }],
+          history: [],
+        },
+      ],
+      byPayStatus: {
+        matched:       { amount: 0,     count: 0 },
+        scheduled:     { amount: 0,     count: 0 },
+        paid:          { amount: 0,     count: 0 },
+        in_transit:    { amount: 0,     count: 0 },
+        in_production: { amount: 12500, count: 1 },
+      },
+    };
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: payload, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/reports/ap-aging", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_ap_aging");
+    expect(await res.json()).toEqual(payload);
+  });
+
+  it("admits principal role", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: {}, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/reports/ap-aging", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects dealer with 403", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/finance/reports/ap-aging", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
