@@ -31,6 +31,8 @@ import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
 import financeRefundsRouter from "./routes/finance/refunds";
 import financeReconciliationRouter from "./routes/finance/reconciliation";
+import supplierPosRouter from "./routes/supplier/pos";
+import supplierProductsRouter from "./routes/supplier/products";
 import salespersonsRouter from "./routes/salespersons";
 import dosRouter from "./routes/storage/dos";
 import type { AppEnv } from "./types";
@@ -79,6 +81,8 @@ api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
 api.route("/finance/refunds", financeRefundsRouter);
 api.route("/finance", financeReconciliationRouter);
+api.route("/supplier/pos", supplierPosRouter);
+api.route("/supplier/products", supplierProductsRouter);
 api.route("/storage/dos", dosRouter);
 
 app.route("/api", api);

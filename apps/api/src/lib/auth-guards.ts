@@ -45,3 +45,16 @@ export const requireFinance: MiddlewareHandler<AppEnv> = async (c, next) => {
   }
   await next();
 };
+
+/**
+ * Phase 6 — admits `supplier` only. Mirrors the role gate inside every
+ * Phase 6 supplier RPC (migration 0066: `if app_role() <> 'supplier' then
+ * raise '42501'`). RLS plus the cross-supplier guard inside the RPCs
+ * provide the second-layer scope check (po.supplier_id = app_supplier_id()).
+ */
+export const requireSupplier: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.var.auth?.role !== "supplier") {
+    throw new HTTPException(403, { message: "Supplier only" });
+  }
+  await next();
+};
