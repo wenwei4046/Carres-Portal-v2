@@ -373,7 +373,10 @@ insert into auth.users (
    jsonb_build_object('name','Hannah · BD'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000009', 'authenticated', 'authenticated',
    'showroom@carres.com',   crypt('111', gen_salt('bf')), now(),
-   jsonb_build_object('name','Carres KL Bangsar'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now())
+   jsonb_build_object('name','Carres KL Bangsar'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-00000000000a', 'authenticated', 'authenticated',
+   'supplier-nf@carres.com',crypt('111', gen_salt('bf')), now(),
+   jsonb_build_object('name','Lim · Nice Future'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now())
 on conflict (id) do nothing;
 
 -- GoTrue (Supabase Auth, written in Go) cannot scan NULL into a Go string —
@@ -402,7 +405,8 @@ insert into app_users (id, email, name, role, status, dealer_id, supplier_id, pa
   ('11111111-1111-1111-1111-000000000006','supplier@carres.com',  'Alex · HoOKkA',                   'supplier',    'active', null,                                     '00000000-0000-0000-0000-0000000000e1',   null,                                     null),
   ('11111111-1111-1111-1111-000000000007','partner@carres.com',   'JT Express dispatcher',           'partner',     'active', null,                                     null,                                     '00000000-0000-0000-0000-0000000000f1',   null),
   ('11111111-1111-1111-1111-000000000008','bd@carres.com',        'Hannah · BD',                     'bd',          'active', null,                                     null,                                     null,                                     null),
-  ('11111111-1111-1111-1111-000000000009','showroom@carres.com',  'Carres KL Bangsar',               'showroom',    'active', '00000000-0000-0000-0000-000000000d99',   null,                                     null,                                     '00000000-0000-0000-0000-0000000000a9')
+  ('11111111-1111-1111-1111-000000000009','showroom@carres.com',  'Carres KL Bangsar',               'showroom',    'active', '00000000-0000-0000-0000-000000000d99',   null,                                     null,                                     '00000000-0000-0000-0000-0000000000a9'),
+  ('11111111-1111-1111-1111-00000000000a','supplier-nf@carres.com','Lim · Nice Future',               'supplier',    'active', null,                                     '00000000-0000-0000-0000-0000000000e2',   null,                                     null)
 on conflict (id) do update
   set role        = excluded.role,
       status      = excluded.status,
@@ -416,3 +420,13 @@ on conflict (id) do update
 update salespersons
    set user_id = '11111111-1111-1111-1111-000000000003'
  where id = '00000000-0000-0000-0000-0000000000b1';
+
+-- Phase 6 supplier portal: enable both suppliers + bind contact_email
+update suppliers
+   set portal_enabled = true,
+       contact_email  = 'supplier@carres.com'
+ where id = '00000000-0000-0000-0000-0000000000e1';
+update suppliers
+   set portal_enabled = true,
+       contact_email  = 'supplier-nf@carres.com'
+ where id = '00000000-0000-0000-0000-0000000000e2';
