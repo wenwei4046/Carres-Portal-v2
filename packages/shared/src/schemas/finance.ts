@@ -218,3 +218,72 @@ export const financePoScheduleInput = z.object({
   scheduledFor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 }).strict();
 export type FinancePoScheduleInput = z.infer<typeof financePoScheduleInput>;
+
+/**
+ * `bankStatementCreateInput` — POST /api/finance/bank-statements.
+ * Manual single-row insert. CSV bulk import (Q3=B Maybank2u) is deferred
+ * to Chunk C / Phase 9. Amount is signed: positive = inflow, negative =
+ * outflow (matches the bank_statements column convention from 0061).
+ */
+export const bankStatementCreateInput = z.object({
+  statementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  description:   z.string().min(1).max(500),
+  amount:        z.number().finite(),
+  reference:     z.string().min(1).max(255).nullable().optional(),
+  currency:      z.string().min(3).max(3).default('MYR'),
+}).strict();
+export type BankStatementCreateInput = z.infer<typeof bankStatementCreateInput>;
+
+/**
+ * `bankStatementsListQuery` — GET /api/finance/bank-statements.
+ * Filters: from/to date range, matched=true|false (post-fetch derive via
+ * left join check on reconciliations).
+ */
+export const bankStatementsListQuery = z.object({
+  from:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  matched: z.enum(['true', 'false']).optional(),
+  limit:   z.coerce.number().int().min(1).max(500).optional(),
+}).strict();
+export type BankStatementsListQuery = z.infer<typeof bankStatementsListQuery>;
+
+/**
+ * `reconciliationCreateInput` — POST /api/finance/reconciliations.
+ * Links a bank_statements row to ONE OF: payment / invoice / refund /
+ * manual_ref. Server enforces the same check constraint as the table
+ * (at least one target). manual_ref is the escape hatch for lines that
+ * don't have a clean record match (proto: customer transferred without
+ * quoting DL).
+ */
+export const reconciliationCreateInput = z.object({
+  bankStatementId: z.string().uuid(),
+  paymentId:       z.string().uuid().nullable().optional(),
+  invoiceId:       z.string().uuid().nullable().optional(),
+  refundId:        z.string().uuid().nullable().optional(),
+  manualRef:       z.string().min(1).max(255).nullable().optional(),
+  note:            z.string().min(1).max(1000).nullable().optional(),
+}).strict().refine(
+  (v) => !!(v.paymentId || v.invoiceId || v.refundId || v.manualRef),
+  { message: 'At least one of paymentId / invoiceId / refundId / manualRef is required' },
+);
+export type ReconciliationCreateInput = z.infer<typeof reconciliationCreateInput>;
+
+/**
+ * `cashflowSeriesQuery` / `monthlyPlQuery` / `topSkusQuery` — report params.
+ * Each clamps the period parameter to a sensible range before passing to
+ * the SQL RPC (which also clamps server-side).
+ */
+export const cashflowSeriesQuery = z.object({
+  weeks: z.coerce.number().int().min(1).max(52).optional(),
+}).strict();
+export type CashflowSeriesQuery = z.infer<typeof cashflowSeriesQuery>;
+
+export const monthlyPlQuery = z.object({
+  months: z.coerce.number().int().min(1).max(24).optional(),
+}).strict();
+export type MonthlyPlQuery = z.infer<typeof monthlyPlQuery>;
+
+export const topSkusQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+}).strict();
+export type TopSkusQuery = z.infer<typeof topSkusQuery>;
