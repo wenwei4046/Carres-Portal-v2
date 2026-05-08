@@ -3,6 +3,7 @@ import {
   useFinanceDashboardSummary,
   type FinanceArAgingBucket,
 } from "@/lib/queries";
+import { rm, rmCompact } from "@/lib/format-currency";
 
 const BUCKET_KEYS = ["0-30", "31-60", "61-90", "90+"] as const;
 
@@ -287,18 +288,6 @@ function PayablesStubCard({ apCount, apAmt }: { apCount: number; apAmt: number }
   );
 }
 
-// ---------- helpers ----------
-function rm(n: number): string {
-  return "RM " + (n || 0).toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-function rmCompact(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return `RM ${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000)     return `RM ${(n / 1_000).toFixed(1)}k`;
-  return rm(n);
-}
 function defaultBuckets(): Record<string, FinanceArAgingBucket> {
   return {
     "0-30":  { amount: 0, count: 0 },

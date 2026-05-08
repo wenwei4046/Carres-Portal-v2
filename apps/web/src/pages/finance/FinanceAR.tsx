@@ -3,6 +3,7 @@ import {
   useFinanceArAging,
   type FinanceArAgingRow,
 } from "@/lib/queries";
+import { rm, rmCompact } from "@/lib/format-currency";
 import ARDrawer from "./ARDrawer";
 
 type StatusFilter = "open" | "settled" | "all";
@@ -251,16 +252,3 @@ function Kpi({
   );
 }
 
-// ---------- helpers (duplicate of FinanceDashboard's helpers; will hoist
-// to a shared file once the second copy lands) ----------
-function rm(n: number): string {
-  return "RM " + (n || 0).toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-function rmCompact(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return `RM ${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000)     return `RM ${(n / 1_000).toFixed(1)}k`;
-  return rm(n);
-}

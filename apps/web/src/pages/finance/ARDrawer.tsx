@@ -7,6 +7,7 @@ import {
   type FinanceArAgingRow,
   type FinancePaymentRow,
 } from "@/lib/queries";
+import { rm } from "@/lib/format-currency";
 import type { PaymentMethod } from "@carres/shared";
 
 const METHODS: { value: PaymentMethod; label: string }[] = [
@@ -286,9 +287,3 @@ function Mini({
   );
 }
 
-function rm(n: number): string {
-  return "RM " + (n || 0).toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}

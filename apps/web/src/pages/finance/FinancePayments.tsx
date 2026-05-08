@@ -3,6 +3,7 @@ import {
   useFinanceArAging,
   type FinanceArAgingRow,
 } from "@/lib/queries";
+import { rm, rmCompact } from "@/lib/format-currency";
 
 type PaidBucket = "all" | "unpaid" | "deposit_low" | "deposit_ok" | "fully_paid";
 
@@ -213,14 +214,3 @@ function Kpi({
   );
 }
 
-function rm(n: number): string {
-  return "RM " + (n || 0).toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-function rmCompact(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return `RM ${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000)     return `RM ${(n / 1_000).toFixed(1)}k`;
-  return rm(n);
-}
