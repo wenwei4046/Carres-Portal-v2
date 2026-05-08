@@ -54,7 +54,11 @@ const PAYLOAD = {
 
 describe("FinanceInvoices page", () => {
   it("renders 3 KPIs + 4 tabs with status counts derived from outstanding/paid", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(PAYLOAD);
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/ar-aging")) return PAYLOAD;
+      if (url.includes("/invoices")) return [];
+      throw new Error(`unexpected fetch ${url}`);
+    });
     render(wrap(<FinanceInvoices />));
 
     await waitFor(() => {
@@ -73,7 +77,11 @@ describe("FinanceInvoices page", () => {
   });
 
   it("filters table by status tab (Paid -> only paid invoice visible)", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(PAYLOAD);
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/ar-aging")) return PAYLOAD;
+      if (url.includes("/invoices")) return [];
+      throw new Error(`unexpected fetch ${url}`);
+    });
     render(wrap(<FinanceInvoices />));
 
     await waitFor(() => {
@@ -88,7 +96,11 @@ describe("FinanceInvoices page", () => {
   });
 
   it("PDF button on unpaid row warns instead of downloading", async () => {
-    vi.mocked(apiFetch).mockResolvedValue(PAYLOAD);
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/ar-aging")) return PAYLOAD;
+      if (url.includes("/invoices")) return [];
+      throw new Error(`unexpected fetch ${url}`);
+    });
     render(wrap(<FinanceInvoices />));
 
     await waitFor(() => {

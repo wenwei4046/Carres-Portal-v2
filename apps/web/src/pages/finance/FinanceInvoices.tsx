@@ -2,8 +2,10 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   useFinanceArAging,
+  useFinanceInvoices,
   type FinanceArAgingRow,
 } from "@/lib/queries";
+import { apiFetchBlob, ApiError } from "@/lib/api";
 import { rm, rmCompact } from "@/lib/format-currency";
 
 type InvoiceStatus = "unpaid" | "partial" | "paid";
@@ -35,8 +37,16 @@ interface InvoiceRow extends FinanceArAgingRow {
  *     @react-pdf/renderer for tax compliance, deferred to Chunk C.
  */
 export default function FinanceInvoices() {
-  const aging = useFinanceArAging();
-  const rows  = aging.data?.rows ?? [];
+  const aging    = useFinanceArAging();
+  const invoices = useFinanceInvoices();
+  const rows     = aging.data?.rows ?? [];
+
+  // Lookup map: invoice_no -> invoice.id for PDF download.
+  const invoiceIdByNo = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const inv of invoices.data ?? []) m.set(inv.invoice_no, inv.id);
+    return m;
+  }, [invoices.data]);
 
   const [tab, setTab] = useState<InvoiceTab>("all");
 
@@ -82,12 +92,26 @@ export default function FinanceInvoices() {
     );
   }
 
-  function handleDownloadPdf(row: InvoiceRow) {
+  async function handleDownloadPdf(row: InvoiceRow) {
     if (row.status !== "paid") {
-      toast.warning(`${row.invoice_no} not yet finalised — invoice issues only after delivery + full payment`);
+      toast.warning(`${row.invoice_no} not yet finalised — invoice PDF only after delivery + full payment`);
       return;
     }
-    toast.info("Server-side PDF render lands in Chunk C (@react-pdf/renderer + signed Storage URL).");
+    const invId = invoiceIdByNo.get(row.invoice_no);
+    if (!invId) {
+      toast.warning(`${row.invoice_no} not yet issued by finance — open AR drawer → Issue invoice first`);
+      return;
+    }
+    try {
+      const blob = await apiFetchBlob(`/api/finance/invoices/${invId}/pdf`);
+      const url  = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      // Revoke after a short delay so the new tab has time to load.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : String(e);
+      toast.error(`PDF download failed: ${msg}`);
+    }
   }
 
   return (
