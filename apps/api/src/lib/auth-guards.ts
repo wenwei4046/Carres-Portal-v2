@@ -30,3 +30,18 @@ export const requireLogistics: MiddlewareHandler<AppEnv> = async (c, next) => {
   }
   await next();
 };
+
+/**
+ * Phase 5 — admits `finance` OR `principal` roles. Mirrors the role gate
+ * inside every Phase 5 RPC (`if app_role() not in ('finance','principal')
+ * then raise '42501'`). The principal role is admitted because the
+ * principal account is the de-facto fallback during Go-live before a
+ * dedicated finance staff account exists.
+ */
+export const requireFinance: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const role = c.var.auth?.role;
+  if (role !== "finance" && role !== "principal") {
+    throw new HTTPException(403, { message: "Finance or Principal only" });
+  }
+  await next();
+};
