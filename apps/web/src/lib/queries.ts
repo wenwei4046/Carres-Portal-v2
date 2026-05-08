@@ -29,6 +29,7 @@ import {
   type FinanceRecordReceiptInput,
   type FinanceTopupApproveInput,
   type ReconciliationCreateInput,
+  type RefundApplyInput,
   type ListLogisticsOrdersQuery,
   type ListMovementsQuery,
   type ListPurchaseOrdersQuery,
@@ -326,6 +327,28 @@ export interface FinanceBankStatementRow {
   imported_from:  string;
   created_at:     string;
   matched_ref:    string | null;  // server-side derived
+}
+
+// Refund row (Chunk C) — credit_note_no IS NOT NULL discriminates a credit
+// note from a refund. UI label derivation:
+//   credit_note_no IS NULL  + status='pending'   -> "RF pending"
+//   credit_note_no IS NULL  + status='approved'  -> "RF approved"
+//   credit_note_no IS NULL  + status='paid'      -> "RF paid"
+//   credit_note_no NOT NULL + status='approved'  -> "CN issued"
+//   credit_note_no NOT NULL + status='paid'      -> "CN applied"
+export interface FinanceRefundRow {
+  id:                    string;
+  order_id:              string;
+  dealer_id:             string | null;
+  amount:                number;
+  reason:                string | null;
+  status:                "pending" | "approved" | "rejected" | "paid";
+  approval_id:           string | null;
+  approved_at:           string | null;
+  paid_at:               string | null;
+  credit_note_no:        string | null;
+  applied_to_order_id:   string | null;
+  created_at:            string;
 }
 
 // finance_recon_suggest_matches RPC payload.
@@ -2351,13 +2374,26 @@ export function useFinancePayments(
   });
 }
 
+// Invoice row shape (matches the `invoices` table in 0001:409-420).
+export interface FinanceInvoiceRow {
+  id:         string;
+  invoice_no: string;
+  order_id:   string;
+  amount:     number;
+  tax_amount: number;
+  issued_at:  string;
+  voided_at:  string | null;
+  pdf_url:    string | null;
+  created_at: string;
+}
+
 export function useFinanceInvoices(
   filters?: FinanceInvoicesFilters,
-  opts?: Partial<UseQueryOptions<unknown[]>>,
+  opts?: Partial<UseQueryOptions<FinanceInvoiceRow[]>>,
 ) {
   return useQuery({
     queryKey: qk.finance.invoices(filters),
-    queryFn: () => apiFetch<unknown[]>(`/api/finance/invoices${toFinanceInvoicesSearch(filters)}`),
+    queryFn: () => apiFetch<FinanceInvoiceRow[]>(`/api/finance/invoices${toFinanceInvoicesSearch(filters)}`),
     staleTime: 30_000,
     ...opts,
   });
@@ -2365,11 +2401,11 @@ export function useFinanceInvoices(
 
 export function useFinanceRefunds(
   filters?: FinanceRefundsFilters,
-  opts?: Partial<UseQueryOptions<unknown[]>>,
+  opts?: Partial<UseQueryOptions<FinanceRefundRow[]>>,
 ) {
   return useQuery({
     queryKey: qk.finance.refunds(filters),
-    queryFn: () => apiFetch<unknown[]>(`/api/finance/refunds${toFinanceRefundsSearch(filters)}`),
+    queryFn: () => apiFetch<FinanceRefundRow[]>(`/api/finance/refunds${toFinanceRefundsSearch(filters)}`),
     staleTime: 30_000,
     ...opts,
   });
@@ -2570,6 +2606,31 @@ export function useCreateReconciliation(
     onSuccess: async (...args) => {
       // matched_ref derivation flips on the bank-statements list.
       await qc.invalidateQueries({ queryKey: qk.finance.bankStatements() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useApplyCreditNote(
+  refundId: string,
+  opts?: Partial<UseMutationOptions<FinanceRefundRow, ApiError, RefundApplyInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<FinanceRefundRow, ApiError, RefundApplyInput>({
+    mutationFn: (input) =>
+      apiFetch<FinanceRefundRow>(`/api/finance/refunds/${refundId}/apply`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // refund row flips status='paid' + applied_to_order_id set.
+      // The target order's outstanding balance is conceptually reduced
+      // but Phase 5 V1 doesn't auto-deduct on the order side — that
+      // happens on next checkout / dealer ack. Invalidate the refunds
+      // list + AR aging so finance sees the CN move to "applied".
+      await qc.invalidateQueries({ queryKey: qk.finance.refunds() });
+      await qc.invalidateQueries({ queryKey: qk.finance.arAging() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
