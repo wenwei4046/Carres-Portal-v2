@@ -22,8 +22,8 @@ import type { AppEnv } from "../../types";
  * RPC sees the right session role; the per-route `requireFinance` guard
  * is the HTTP-layer mirror.
  *
- * Chunk B will add: ap-aging, cashflow (per-week series), monthly-pl,
- * top-skus.
+ * ap-aging added in migration 0063. Chunk B still owes: cashflow
+ * (per-week series), monthly-pl, top-skus.
  */
 const financeReportsRouter = new Hono<AppEnv>();
 
@@ -39,6 +39,14 @@ financeReportsRouter.get("/ar-aging", requireFinance, async (c) => {
   const auth = c.var.auth;
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("finance_ar_aging");
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json(data);
+});
+
+financeReportsRouter.get("/ap-aging", requireFinance, async (c) => {
+  const auth = c.var.auth;
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("finance_ap_aging");
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json(data);
 });

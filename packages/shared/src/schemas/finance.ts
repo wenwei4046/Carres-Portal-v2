@@ -175,3 +175,46 @@ export const refundsListQuery = z.object({
   limit:     z.coerce.number().int().min(1).max(500).optional(),
 }).strict();
 export type RefundsListQuery = z.infer<typeof refundsListQuery>;
+
+/**
+ * `financePoPayInput` — POST /api/finance/payments/po-pay.
+ *
+ * Spec: §5.1. Inserts a payments row (direction='out', po_id=...,
+ * amount=...) AND flips purchase_orders.pay_status to 'paid' atomically.
+ * The route runs both writes via userClient — RLS allows finance/principal
+ * to write payments + update pay_status (per 0046 partner_role_rls trigger
+ * which whitelists pay_status as a finance-mutable column).
+ *
+ * Amount is required so finance can pay partial / rounded amounts even
+ * when the PO total is computed. Reference is bank ref no., audit only.
+ *
+ * APDrawer "Mark paid" button is gated on derived pay_status_ui='matched'
+ * client-side; the API does NOT enforce that gate (V1) — server trusts the
+ * caller to only fire this on matched POs. Finance can in theory pay
+ * earlier (advance payment) and the row will jump to 'paid'.
+ */
+export const financePoPayInput = z.object({
+  poId:      z.string().min(1).max(64),
+  amount:    z.number().positive().finite(),
+  method:    paymentMethodEnum,
+  reference: z.string().min(1).max(255).nullable().optional(),
+}).strict();
+export type FinancePoPayInput = z.infer<typeof financePoPayInput>;
+
+/**
+ * `financePoScheduleInput` — POST /api/finance/payments/po-schedule.
+ *
+ * Spec: §5.1. Flips purchase_orders.pay_status from 'unpaid' to
+ * 'scheduled'. There is NO scheduled_for column on purchase_orders (V1
+ * doesn't store the planned date) — `scheduledFor` is captured in the
+ * audit_log entry only. Phase 9 may add a real schedule table for batch
+ * payment runs.
+ *
+ * No payments row is inserted at this step; the actual outbound payment
+ * lands when finance fires po-pay.
+ */
+export const financePoScheduleInput = z.object({
+  poId:         z.string().min(1).max(64),
+  scheduledFor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).strict();
+export type FinancePoScheduleInput = z.infer<typeof financePoScheduleInput>;

@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
+  financePoPayInput,
+  financePoScheduleInput,
   financeRecordReceiptInput,
   financeTopupApproveInput,
   paymentsListQuery,
@@ -33,6 +35,15 @@ import type { AppEnv } from "../../types";
  *   POST /order-receipt     finance_record_receipt(order_id, amount, ...)
  *                           AR drawer "Record receipt" panel. Inserts
  *                           inbound payment + bumps orders.paid.
+ *   POST /po-pay            finance_po_pay(po_id, amount, method, reference)
+ *                           AP drawer "Mark paid" / "Release payment".
+ *                           Inserts outbound payment + flips
+ *                           purchase_orders.pay_status='paid'. Migration
+ *                           0063.
+ *   POST /po-schedule       finance_po_schedule(po_id, scheduled_for)
+ *                           AP drawer "Schedule payment". Flips
+ *                           pay_status='unpaid' -> 'scheduled'. Migration
+ *                           0063.
  */
 const financePaymentsRouter = new Hono<AppEnv>();
 
@@ -106,6 +117,42 @@ financePaymentsRouter.post("/order-receipt", requireFinance, async (c) => {
     p_amount:    body.data.amount,
     p_method:    body.data.method,
     p_reference: body.data.reference ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+financePaymentsRouter.post("/po-pay", requireFinance, async (c) => {
+  const auth = c.var.auth;
+  const body = await parseJsonBody(c, financePoPayInput);
+  if (!body.ok) return c.json(body.body, body.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("finance_po_pay", {
+    p_po_id:     body.data.poId,
+    p_amount:    body.data.amount,
+    p_method:    body.data.method,
+    p_reference: body.data.reference ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+financePaymentsRouter.post("/po-schedule", requireFinance, async (c) => {
+  const auth = c.var.auth;
+  const body = await parseJsonBody(c, financePoScheduleInput);
+  if (!body.ok) return c.json(body.body, body.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("finance_po_schedule", {
+    p_po_id:         body.data.poId,
+    p_scheduled_for: body.data.scheduledFor ?? null,
   });
   if (error) {
     const m = mapPgError(error);

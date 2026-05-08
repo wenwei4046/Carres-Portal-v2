@@ -191,6 +191,8 @@ export {
   invoicesListQuery,
   refundCreateInput,
   refundsListQuery,
+  financePoPayInput,
+  financePoScheduleInput,
   type PaymentMethod,
   type FinanceTopupApproveInput,
   type FinanceRecordReceiptInput,
@@ -201,4 +203,6 @@ export {
   type InvoicesListQuery,
   type RefundCreateInput,
   type RefundsListQuery,
+  type FinancePoPayInput,
+  type FinancePoScheduleInput,
 } from "./schemas/finance";
