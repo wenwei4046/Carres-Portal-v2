@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import FinanceSidebar from "./FinanceSidebar";
 import FinanceDashboard from "./FinanceDashboard";
 import FinanceAR from "./FinanceAR";
+import FinanceAP from "./FinanceAP";
 import FinancePayments from "./FinancePayments";
 
 /**
@@ -25,7 +26,7 @@ export default function FinanceApp() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<FinanceDashboard />} />
           <Route path="ar"        element={<FinanceAR />} />
-          <Route path="ap"        element={<ChunkAStub label="AP · Payables" />} />
+          <Route path="ap"        element={<FinanceAP />} />
           <Route path="payments"  element={<FinancePayments />} />
           <Route path="invoices"  element={<ChunkAStub label="Invoices" />} />
           <Route path="refunds"   element={<ChunkBCStub label="Refunds & Credits" chunk="C" />} />
