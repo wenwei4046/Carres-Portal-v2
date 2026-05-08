@@ -21,12 +21,14 @@ import {
   type CreatePosBatchInput,
   type CreatePosBatchResponse,
   type DealerSelf,
+  type BankStatementCreateInput,
   type FinanceInvoiceIssueInput,
   type FinanceInvoiceVoidInput,
   type FinancePoPayInput,
   type FinancePoScheduleInput,
   type FinanceRecordReceiptInput,
   type FinanceTopupApproveInput,
+  type ReconciliationCreateInput,
   type ListLogisticsOrdersQuery,
   type ListMovementsQuery,
   type ListPurchaseOrdersQuery,
@@ -131,6 +133,16 @@ export const qk = {
     dashboardSummary: () => ["finance", "dashboard-summary"] as const,
     arAging:          () => ["finance", "ar-aging"] as const,
     apAging:          () => ["finance", "ap-aging"] as const,
+    cashflow:         (weeks?: number) =>
+      ["finance", "cashflow", weeks ?? 12] as const,
+    monthlyPl:        (months?: number) =>
+      ["finance", "monthly-pl", months ?? 6] as const,
+    topSkus:          (limit?: number) =>
+      ["finance", "top-skus", limit ?? 8] as const,
+    bankStatements:   (filters?: { from?: string; to?: string; matched?: "true" | "false" }) =>
+      ["finance", "bank-statements", filters ?? {}] as const,
+    reconSuggest:     (bankStmtId: string) =>
+      ["finance", "recon-suggest", bankStmtId] as const,
     payments:         (filters?: FinancePaymentsFilters) =>
       ["finance", "payments", filters ?? {}] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
@@ -270,6 +282,72 @@ export interface FinanceApAgingBucket {
 export interface FinanceApAgingResponse {
   rows:        FinanceApAgingRow[];
   byPayStatus: Record<FinanceApPayStatusUi, FinanceApAgingBucket>;
+}
+
+// Cashflow series (Chunk B) — finance_cashflow_series RPC payload.
+export interface FinanceCashflowSeries {
+  labels:  string[];   // ["W18", "W19", ...]
+  inflow:  number[];   // positive numbers per week
+  outflow: number[];   // negative numbers per week (proto convention)
+}
+
+// Monthly P&L (Chunk B) — finance_monthly_pl RPC payload.
+export interface FinanceMonthlyPlRow {
+  m:       string;     // "Nov 25"
+  revenue: number;
+  cogs:    number;
+  opex:    number;
+  net:     number;
+}
+export interface FinanceMonthlyPlResponse {
+  rows: FinanceMonthlyPlRow[];
+}
+
+// Top SKUs (Chunk B) — finance_top_skus RPC payload.
+export interface FinanceTopSkuRow {
+  sku:     string;
+  name:    string;
+  qty:     number;
+  revenue: number;
+}
+export interface FinanceTopSkusResponse {
+  rows: FinanceTopSkuRow[];
+}
+
+// Bank statement row (from /api/finance/bank-statements list — augmented
+// with matched_ref derived from reconciliations join).
+export interface FinanceBankStatementRow {
+  id:             string;
+  statement_date: string;
+  description:    string;
+  amount:         number;
+  reference:      string | null;
+  currency:       string;
+  imported_from:  string;
+  created_at:     string;
+  matched_ref:    string | null;  // server-side derived
+}
+
+// finance_recon_suggest_matches RPC payload.
+export interface FinanceReconCandidate {
+  dl:            number;
+  customer_name: string;
+  dealer_name:   string | null;
+  total:         number;
+  paid:          number;
+  outstanding:   number;
+  invoice_no:    string;
+  distance:      number;
+}
+export interface FinanceReconSuggestResponse {
+  bank_statement: {
+    id:             string;
+    statement_date: string;
+    description:    string;
+    amount:         number;
+    reference:      string | null;
+  };
+  candidates: FinanceReconCandidate[];
 }
 export interface FinanceDashboardSummary {
   ar:           { outstanding: number; count: number; overdueAmt: number; overdueCount: number };
@@ -2180,6 +2258,87 @@ export function useFinanceApAging(
   });
 }
 
+export function useFinanceCashflow(
+  weeks?: number,
+  opts?: Partial<UseQueryOptions<FinanceCashflowSeries>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.cashflow(weeks),
+    queryFn: () =>
+      apiFetch<FinanceCashflowSeries>(
+        `/api/finance/reports/cashflow${weeks ? `?weeks=${weeks}` : ""}`,
+      ),
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+export function useFinanceMonthlyPl(
+  months?: number,
+  opts?: Partial<UseQueryOptions<FinanceMonthlyPlResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.monthlyPl(months),
+    queryFn: () =>
+      apiFetch<FinanceMonthlyPlResponse>(
+        `/api/finance/reports/monthly-pl${months ? `?months=${months}` : ""}`,
+      ),
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+export function useFinanceTopSkus(
+  limit?: number,
+  opts?: Partial<UseQueryOptions<FinanceTopSkusResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.topSkus(limit),
+    queryFn: () =>
+      apiFetch<FinanceTopSkusResponse>(
+        `/api/finance/reports/top-skus${limit ? `?limit=${limit}` : ""}`,
+      ),
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+export function useFinanceBankStatements(
+  filters?: { from?: string; to?: string; matched?: "true" | "false" },
+  opts?: Partial<UseQueryOptions<FinanceBankStatementRow[]>>,
+) {
+  const qs = new URLSearchParams();
+  if (filters?.from)    qs.set("from",    filters.from);
+  if (filters?.to)      qs.set("to",      filters.to);
+  if (filters?.matched) qs.set("matched", filters.matched);
+  const search = qs.toString();
+  return useQuery({
+    queryKey: qk.finance.bankStatements(filters),
+    queryFn: () =>
+      apiFetch<FinanceBankStatementRow[]>(
+        `/api/finance/bank-statements${search ? `?${search}` : ""}`,
+      ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useFinanceReconSuggest(
+  bankStmtId: string,
+  opts?: Partial<UseQueryOptions<FinanceReconSuggestResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.reconSuggest(bankStmtId),
+    queryFn: () =>
+      apiFetch<FinanceReconSuggestResponse>(
+        `/api/finance/reconciliations/suggest/${bankStmtId}`,
+      ),
+    enabled: !!bankStmtId,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 export function useFinancePayments(
   filters?: FinancePaymentsFilters,
   opts?: Partial<UseQueryOptions<FinancePaymentRow[]>>,
@@ -2374,6 +2533,60 @@ export function usePoSchedule(
       // PO.pay_status flips unpaid -> scheduled. Buckets shift.
       await qc.invalidateQueries({ queryKey: qk.finance.apAging() });
       await qc.invalidateQueries({ queryKey: qk.finance.dashboardSummary() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useCreateBankStatement(
+  opts?: Partial<UseMutationOptions<FinanceBankStatementRow, ApiError, BankStatementCreateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<FinanceBankStatementRow, ApiError, BankStatementCreateInput>({
+    mutationFn: (input) =>
+      apiFetch<FinanceBankStatementRow>("/api/finance/bank-statements", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.finance.bankStatements() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useCreateReconciliation(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, ReconciliationCreateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, ReconciliationCreateInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>("/api/finance/reconciliations", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // matched_ref derivation flips on the bank-statements list.
+      await qc.invalidateQueries({ queryKey: qk.finance.bankStatements() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useDeleteReconciliation(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, string>({
+    mutationFn: (recId) =>
+      apiFetch<unknown>(`/api/finance/reconciliations/${recId}`, {
+        method: "DELETE",
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.finance.bankStatements() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
