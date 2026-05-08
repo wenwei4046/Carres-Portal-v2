@@ -23,10 +23,16 @@
 import { pdf } from "@react-pdf/renderer";
 import { DoTemplate } from "./do-template";
 import { PoTemplate } from "./po-template";
+import { InvoiceTemplate } from "./invoice-template";
 import { registerNotoSansSC } from "./fonts/noto";
-import type { DoTemplateData, PoTemplateData } from "./types";
+import type { DoTemplateData, InvoiceTemplateData, PoTemplateData } from "./types";
 
-async function renderElementToBytes(element: ReturnType<typeof DoTemplate> | ReturnType<typeof PoTemplate>): Promise<Uint8Array> {
+async function renderElementToBytes(
+  element:
+    | ReturnType<typeof DoTemplate>
+    | ReturnType<typeof PoTemplate>
+    | ReturnType<typeof InvoiceTemplate>,
+): Promise<Uint8Array> {
   registerNotoSansSC();
   const blob = await pdf(element).toBlob();
   const buffer = await blob.arrayBuffer();
@@ -50,4 +56,12 @@ export async function renderDoPdf(data: DoTemplateData): Promise<Uint8Array> {
  */
 export async function renderPoPdf(data: PoTemplateData): Promise<Uint8Array> {
   return renderElementToBytes(PoTemplate(data));
+}
+
+/**
+ * Render a Tax Invoice to a PDF byte array. Phase 5 Chunk C (Q7=A locked).
+ * See `renderDoPdf` for the Workers vs Node implementation note.
+ */
+export async function renderInvoicePdf(data: InvoiceTemplateData): Promise<Uint8Array> {
+  return renderElementToBytes(InvoiceTemplate(data));
 }

@@ -287,3 +287,17 @@ export const topSkusQuery = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
 }).strict();
 export type TopSkusQuery = z.infer<typeof topSkusQuery>;
+
+/**
+ * `refundApplyInput` — POST /api/finance/refunds/:id/apply.
+ *
+ * Spec: §5.3. Marks a credit-note refund row as applied against a future
+ * order. Wraps the `finance_apply_credit_note` RPC (migration 0065) which
+ * validates the refund is a credit note (credit_note_no IS NOT NULL) AND
+ * status='approved' (UI label "issued") + flips status='paid' (UI label
+ * "applied") + records applied_to_order_id + paid_at=now().
+ */
+export const refundApplyInput = z.object({
+  targetOrderId: z.string().uuid(),
+}).strict();
+export type RefundApplyInput = z.infer<typeof refundApplyInput>;

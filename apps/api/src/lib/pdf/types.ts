@@ -53,6 +53,52 @@ export type DoTemplateData = {
   currency: string;
 };
 
+export type InvoiceTemplateData = {
+  /** Tax invoice number, e.g. "INV-2026-1240". */
+  invoice_no: string;
+  /** Issue date, ISO 8601 yyyy-mm-dd. */
+  issue_date: string;
+  /** Underlying order PK for cross-reference (printed on doc footer). */
+  order_id: string;
+  /** Order code shown on the doc body (the dealer-facing reference, "DL-{dl}"). */
+  order_code: string;
+
+  /** Customer block — buyer at the receiving end. */
+  customer: {
+    name: string;
+    address: string;
+    phone: string | null;
+  };
+
+  /** Dealer block — Carres-side seller. */
+  dealer: {
+    name: string;
+    contact: string | null;
+  };
+
+  /** Line items (qty + unit_price + line_total). */
+  lines: Array<{
+    sku: string;
+    description: string;
+    qty: number;
+    unit: string;
+    /** Unit price including SST (proto's pricing convention is tax-inclusive). */
+    unit_price: number;
+    /** Line subtotal in MYR major units (qty * unit_price). */
+    line_total: number;
+  }>;
+
+  /** Subtotal excluding SST = total - tax_amount. */
+  subtotal: number;
+  /** SST 8% inclusive: tax_amount = total * 0.08 / 1.08. */
+  tax_amount: number;
+  /** Grand total in MYR major units (sum of line_total = subtotal + tax_amount). */
+  total: number;
+
+  /** Currency display code, default "MYR". */
+  currency: string;
+};
+
 export type PoTemplateData = {
   /** Purchase Order document number, e.g. "PO-2026-00007". */
   po_number: string;

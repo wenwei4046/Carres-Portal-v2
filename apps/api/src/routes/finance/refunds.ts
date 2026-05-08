@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
+  refundApplyInput,
   refundCreateInput,
   refundPayInput,
   refundsListQuery,
@@ -19,18 +20,24 @@ import type { AppEnv } from "../../types";
  * list); Chunk B/C will add /apply for credit-note application against
  * future orders.
  *
- * Q5=A locked: keep CN/RF distinction.
- *   - kind=credit  -> CN-{N} prefix; status='approved' immediately (no
- *                     gate). Used to reduce a customer's balance on a
- *                     future order.
- *   - kind=refund  -> RF-{N} prefix; status='pending' if amount > 1000
- *                     (also creates approvals row kind='refund'); status
- *                     ='approved' immediately if amount <= 1000.
+ * Q5=A locked: keep CN/RF distinction. We do NOT extend refund_status
+ * enum; instead use credit_note_no as the discriminator (per migration
+ * 0065 docstring):
+ *   - kind=credit  -> credit_note_no = next_credit_note_no() ('CN-XXXX'),
+ *                     status='approved' immediately (= UI label "issued").
+ *                     /apply later flips status='paid' (= UI label "applied")
+ *                     and sets applied_to_order_id.
+ *   - kind=refund  -> credit_note_no=NULL; standard pending → approved →
+ *                     paid flow. status='pending' if amount > 1000 (also
+ *                     creates approvals row kind='refund'); status
+ *                     ='approved' immediately if amount <= 1000. UI derives
+ *                     "RF-{dl}" prefix for display.
  *
  * Routes:
- *   GET    /          list refunds (status, dealerId, from, to filters)
- *   POST   /create    insert refunds row + (optional) approval row
- *   POST   /:id/pay   call refund_pay RPC (mark paid + outbound payment)
+ *   GET    /            list refunds (status, dealerId, from, to filters)
+ *   POST   /create      insert refunds row + (optional) approval row
+ *   POST   /:id/pay     refund_pay RPC (mark paid + outbound payment)
+ *   POST   /:id/apply   finance_apply_credit_note RPC (Chunk C)
  */
 const financeRefundsRouter = new Hono<AppEnv>();
 
@@ -94,15 +101,29 @@ financeRefundsRouter.post("/create", requireFinance, async (c) => {
   const needsApproval = body.data.kind === "refund" && body.data.amount > 1000;
   const initialStatus: "pending" | "approved" = needsApproval ? "pending" : "approved";
 
+  // Credit notes get an auto-generated CN number from the dedicated
+  // sequence (migration 0065). Refunds keep credit_note_no=NULL — UI
+  // derives "RF-{dl}" for display from the row's order DL number.
+  let creditNoteNo: string | null = null;
+  if (body.data.kind === "credit") {
+    const { data: cn, error: cnErr } = await sb.rpc("next_credit_note_no");
+    if (cnErr) {
+      const m = mapPgError(cnErr);
+      return c.json(m.body, m.status);
+    }
+    creditNoteNo = cn as string;
+  }
+
   const { data: refund, error: refErr } = await sb
     .from("refunds")
     .insert({
-      order_id:    body.data.orderId,
-      dealer_id:   ord.dealer_id,
-      amount:      body.data.amount,
-      reason:      body.data.reason,
-      status:      initialStatus,
-      approved_at: needsApproval ? null : new Date().toISOString(),
+      order_id:       body.data.orderId,
+      dealer_id:      ord.dealer_id,
+      amount:         body.data.amount,
+      reason:         body.data.reason,
+      status:         initialStatus,
+      approved_at:    needsApproval ? null : new Date().toISOString(),
+      credit_note_no: creditNoteNo,
     })
     .select("*")
     .single();
@@ -149,6 +170,31 @@ financeRefundsRouter.post("/create", requireFinance, async (c) => {
     refund,
     needsApproval,
   });
+});
+
+financeRefundsRouter.post("/:id/apply", requireFinance, async (c) => {
+  const auth = c.var.auth;
+  const id = c.req.param("id");
+  if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json(
+      { error: "invalid_id", code: "invalid_param", message: "refund id must be a uuid" },
+      422,
+    );
+  }
+
+  const body = await parseJsonBody(c, refundApplyInput);
+  if (!body.ok) return c.json(body.body, body.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("finance_apply_credit_note", {
+    p_refund_id:       id,
+    p_target_order_id: body.data.targetOrderId,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
 });
 
 financeRefundsRouter.post("/:id/pay", requireFinance, async (c) => {

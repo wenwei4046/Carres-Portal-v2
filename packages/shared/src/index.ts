@@ -199,6 +199,7 @@ export {
   cashflowSeriesQuery,
   monthlyPlQuery,
   topSkusQuery,
+  refundApplyInput,
   type PaymentMethod,
   type FinanceTopupApproveInput,
   type FinanceRecordReceiptInput,
@@ -217,4 +218,5 @@ export {
   type CashflowSeriesQuery,
   type MonthlyPlQuery,
   type TopSkusQuery,
+  type RefundApplyInput,
 } from "./schemas/finance";

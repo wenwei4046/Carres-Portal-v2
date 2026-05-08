@@ -6,8 +6,10 @@ import {
   invoicesListQuery,
 } from "@carres/shared";
 import { requireFinance } from "../../lib/auth-guards";
+import { renderInvoicePdf } from "../../lib/pdf/render";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import type { InvoiceTemplateData } from "../../lib/pdf/types";
 import type { AppEnv } from "../../types";
 
 /**
@@ -31,6 +33,10 @@ import type { AppEnv } from "../../types";
  * check would require a 0017 superseding migration. Route gate lets us
  * stay backward-compatible with dealer-side flows that may still call
  * invoice_issue directly through other paths.
+ *
+ * Chunk C: GET /:id/pdf renders the tax-invoice PDF server-side via
+ * @react-pdf/renderer (Q7=A locked). Gated on invoice issued + order
+ * delivered + paid >= total — same logic as the AR drawer's Issue button.
  */
 const financeInvoicesRouter = new Hono<AppEnv>();
 
@@ -148,6 +154,166 @@ financeInvoicesRouter.post("/:id/void", requireFinance, async (c) => {
   });
 
   return c.json(data);
+});
+
+// ----- GET /:id/pdf -----
+// Server-side tax-invoice PDF (Q7=A locked Phase 5 Chunk C).
+// Returns application/pdf inline. Gated on:
+//   - invoice not voided
+//   - order.status='delivered'
+//   - order.paid >= invoice.amount  (full payment received before tax doc)
+//
+// The "paid >= total" gate is the same one the AR drawer's PDF button
+// pre-checks; mirroring it server-side keeps the rule single-sourced and
+// rejects any client that tries to bypass.
+financeInvoicesRouter.get("/:id/pdf", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json(
+      { error: "invalid_id", code: "invalid_param", message: "invoice id must be a uuid" },
+      422,
+    );
+  }
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: invoice, error: invErr } = await sb
+    .from("invoices")
+    .select("id, invoice_no, order_id, amount, tax_amount, issued_at, voided_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (invErr) {
+    const m = mapPgError(invErr);
+    return c.json(m.body, m.status);
+  }
+  if (!invoice) {
+    return c.json({ error: "not_found", code: "not_found", message: "invoice not found" }, 404);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inv: any = invoice;
+  if (inv.voided_at) {
+    return c.json(
+      { error: "voided", code: "invoice_voided", message: "Cannot generate PDF for a voided invoice" },
+      422,
+    );
+  }
+
+  const { data: order, error: ordErr } = await sb
+    .from("orders")
+    .select(
+      "id, dl, status, customer_name, customer_phone, customer_address, dealer_id, paid, dealers(name, contact)",
+    )
+    .eq("id", inv.order_id)
+    .maybeSingle();
+  if (ordErr) {
+    const m = mapPgError(ordErr);
+    return c.json(m.body, m.status);
+  }
+  if (!order) {
+    return c.json({ error: "not_found", code: "not_found", message: "order not found" }, 404);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ord: any = order;
+
+  if (ord.status !== "delivered") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "order_not_delivered",
+        message: "Tax invoice PDF is only available after delivery",
+      },
+      422,
+    );
+  }
+  const orderPaid = Number(ord.paid ?? 0);
+  const invoiceAmt = Number(inv.amount ?? 0);
+  if (orderPaid + 0.01 < invoiceAmt) {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "not_fully_paid",
+        message: `Customer paid RM ${orderPaid.toFixed(2)} of RM ${invoiceAmt.toFixed(2)} — invoice PDF gates on full payment`,
+      },
+      422,
+    );
+  }
+
+  const { data: lines, error: lineErr } = await sb
+    .from("order_lines")
+    .select("sku, qty, unit_price")
+    .eq("order_id", inv.order_id);
+  if (lineErr) {
+    const m = mapPgError(lineErr);
+    return c.json(m.body, m.status);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lineRows = (lines ?? []) as any[];
+
+  // SKU descriptions (separate query — order_lines.sku is text, not FK'd).
+  const skus: string[] = lineRows.map((l) => String(l.sku));
+  const skuVariantBySku: Record<string, string> = {};
+  if (skus.length > 0) {
+    const { data: skuRows, error: skuErr } = await sb
+      .from("product_skus")
+      .select("sku, variant")
+      .in("sku", skus);
+    if (skuErr) {
+      const m = mapPgError(skuErr);
+      return c.json(m.body, m.status);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of (skuRows ?? []) as any[]) {
+      skuVariantBySku[String(r.sku)] = String(r.variant);
+    }
+  }
+
+  const taxAmount = Number(inv.tax_amount ?? 0);
+  const total = invoiceAmt;
+  const subtotal = +(total - taxAmount).toFixed(2);
+
+  const dealerRow = ord.dealers ?? null;
+  const dealerName = dealerRow?.name ?? "Carres";
+  const dealerContact = dealerRow?.contact ?? null;
+
+  const templateData: InvoiceTemplateData = {
+    invoice_no: String(inv.invoice_no),
+    issue_date: String(inv.issued_at).slice(0, 10),
+    order_id:   String(ord.id),
+    order_code: `DL-${ord.dl}`,
+    customer: {
+      name:    String(ord.customer_name ?? ""),
+      address: String(ord.customer_address ?? "—"),
+      phone:   ord.customer_phone ?? null,
+    },
+    dealer: {
+      name:    dealerName,
+      contact: dealerContact,
+    },
+    lines: lineRows.map((l) => {
+      const qty = Number(l.qty);
+      const unitPrice = Number(l.unit_price);
+      return {
+        sku:         String(l.sku),
+        description: skuVariantBySku[l.sku] ?? String(l.sku),
+        qty,
+        unit:        "pc",
+        unit_price:  unitPrice,
+        line_total:  +(qty * unitPrice).toFixed(2),
+      };
+    }),
+    subtotal,
+    tax_amount: taxAmount,
+    total,
+    currency: "MYR",
+  };
+
+  const pdfBytes = await renderInvoicePdf(templateData);
+
+  return c.body(pdfBytes.buffer as ArrayBuffer, 200, {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `inline; filename="${templateData.invoice_no}.pdf"`,
+    "Cache-Control": "no-store",
+  });
 });
 
 export default financeInvoicesRouter;
