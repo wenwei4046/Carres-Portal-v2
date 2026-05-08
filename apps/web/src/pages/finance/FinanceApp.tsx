@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import FinanceSidebar from "./FinanceSidebar";
 import FinanceDashboard from "./FinanceDashboard";
+import FinanceAR from "./FinanceAR";
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -22,7 +23,7 @@ export default function FinanceApp() {
         <Routes>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<FinanceDashboard />} />
-          <Route path="ar"        element={<ChunkAStub label="AR · Receivables" />} />
+          <Route path="ar"        element={<FinanceAR />} />
           <Route path="ap"        element={<ChunkAStub label="AP · Payables" />} />
           <Route path="payments"  element={<ChunkAStub label="Order Payments" />} />
           <Route path="invoices"  element={<ChunkAStub label="Invoices" />} />
