@@ -23,6 +23,8 @@ import {
   type DealerSelf,
   type FinanceInvoiceIssueInput,
   type FinanceInvoiceVoidInput,
+  type FinancePoPayInput,
+  type FinancePoScheduleInput,
   type FinanceRecordReceiptInput,
   type FinanceTopupApproveInput,
   type ListLogisticsOrdersQuery,
@@ -128,6 +130,7 @@ export const qk = {
   finance: {
     dashboardSummary: () => ["finance", "dashboard-summary"] as const,
     arAging:          () => ["finance", "ar-aging"] as const,
+    apAging:          () => ["finance", "ap-aging"] as const,
     payments:         (filters?: FinancePaymentsFilters) =>
       ["finance", "payments", filters ?? {}] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
@@ -212,6 +215,61 @@ export interface FinanceArAgingBucket {
 export interface FinanceArAgingResponse {
   rows:    FinanceArAgingRow[];
   buckets: Record<"0-30" | "31-60" | "61-90" | "90+", FinanceArAgingBucket>;
+}
+
+// AP aging — finance_ap_aging() RPC payload (migration 0063). Single
+// round-trip returns per-PO rows + bucket aggregates so FinanceAP and the
+// dashboard ready-to-pay tile never disagree. pay_status_ui is a derived
+// 5-value bucket; the raw db enum (pay_status) only has 3 values.
+export type FinanceApPayStatusUi =
+  | "matched"
+  | "scheduled"
+  | "paid"
+  | "in_transit"
+  | "in_production";
+export interface FinanceApAgingLine {
+  sku:          string;
+  sku_name:     string;
+  qty:          number;
+  received_qty: number;
+  unit_cost:    number | null;
+  line_total:   number;
+}
+export interface FinanceApAgingHistoryEntry {
+  text:        string;
+  occurred_at: string;
+  by_role:     string | null;
+}
+export interface FinanceApAgingRow {
+  po_id:               string;
+  dl:                  number | null;
+  supplier_id:         string | null;
+  supplier_name:       string | null;
+  warehouse_id:        string | null;
+  delivery_partner_id: string | null;
+  placed_at:           string;
+  expected_ready_date: string | null;
+  eta_date:            string | null;
+  pickup_date:         string | null;
+  status:              string;
+  sup_status:          string;
+  pay_status:          "unpaid" | "scheduled" | "paid";
+  pay_status_ui:       FinanceApPayStatusUi;
+  qty:                 number;
+  total:               number;
+  do_number:           string | null;
+  has_do:              boolean;
+  due_in:              number | null;
+  lines:               FinanceApAgingLine[];
+  history:             FinanceApAgingHistoryEntry[];
+}
+export interface FinanceApAgingBucket {
+  amount: number;
+  count:  number;
+}
+export interface FinanceApAgingResponse {
+  rows:        FinanceApAgingRow[];
+  byPayStatus: Record<FinanceApPayStatusUi, FinanceApAgingBucket>;
 }
 export interface FinanceDashboardSummary {
   ar:           { outstanding: number; count: number; overdueAmt: number; overdueCount: number };
@@ -2111,6 +2169,17 @@ export function useFinanceArAging(
   });
 }
 
+export function useFinanceApAging(
+  opts?: Partial<UseQueryOptions<FinanceApAgingResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.apAging(),
+    queryFn: () => apiFetch<FinanceApAgingResponse>("/api/finance/reports/ap-aging"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 export function useFinancePayments(
   filters?: FinancePaymentsFilters,
   opts?: Partial<UseQueryOptions<FinancePaymentRow[]>>,
@@ -2265,6 +2334,46 @@ export function useRefundPay(
       // refunds.status='paid' + paid_at + outbound payments row
       await qc.invalidateQueries({ queryKey: qk.finance.refunds() });
       await qc.invalidateQueries({ queryKey: qk.finance.payments() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function usePoPay(
+  opts?: Partial<UseMutationOptions<FinancePaymentRow, ApiError, FinancePoPayInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<FinancePaymentRow, ApiError, FinancePoPayInput>({
+    mutationFn: (input) =>
+      apiFetch<FinancePaymentRow>("/api/finance/payments/po-pay", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // PO.pay_status='paid' + new outbound payments row. Ripples to
+      // ap-aging, dashboard summary, payments list.
+      await qc.invalidateQueries({ queryKey: ["finance"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function usePoSchedule(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, FinancePoScheduleInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, FinancePoScheduleInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>("/api/finance/payments/po-schedule", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // PO.pay_status flips unpaid -> scheduled. Buckets shift.
+      await qc.invalidateQueries({ queryKey: qk.finance.apAging() });
+      await qc.invalidateQueries({ queryKey: qk.finance.dashboardSummary() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
