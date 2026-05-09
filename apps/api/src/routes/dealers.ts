@@ -8,8 +8,8 @@ const dealerRouter = new Hono<AppEnv>();
 
 dealerRouter.get("/me", async (c) => {
   const auth = c.var.auth;
-  if (auth.role !== "dealer" && auth.role !== "salesperson") {
-    throw new HTTPException(403, { message: "Only dealer or salesperson can read /dealers/me" });
+  if (auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom") {
+    throw new HTTPException(403, { message: "Only dealer / salesperson / showroom can read /dealers/me" });
   }
   if (!auth.dealerId) {
     throw new HTTPException(404, { message: "Dealer not found" });

@@ -35,7 +35,7 @@ export default function Login() {
                 ? "/finance"
                 : role === "supplier"
                   ? "/supplier"
-                  : role === "dealer" || role === "salesperson"
+                  : role === "dealer" || role === "salesperson" || role === "showroom"
                     ? "/dealer"
                     : "/me";
       navigate(from && from !== "/login" ? from : defaultHome, { replace: true });

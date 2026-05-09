@@ -29,7 +29,7 @@ function HomeRedirect() {
   if (role === "partner") return <Navigate to="/delivery-partner" replace />;
   if (role === "finance") return <Navigate to="/finance" replace />;
   if (role === "supplier") return <Navigate to="/supplier" replace />;
-  if (role === "dealer" || role === "salesperson") return <Navigate to="/dealer" replace />;
+  if (role === "dealer" || role === "salesperson" || role === "showroom") return <Navigate to="/dealer" replace />;
   return <Navigate to="/me" replace />;
 }
 
@@ -66,7 +66,7 @@ export default function App() {
           path="/dealer/*"
           element={
             <RequireAuth>
-              <RequireRole roles={["dealer", "salesperson"]}>
+              <RequireRole roles={["dealer", "salesperson", "showroom"]}>
                 <DealerApp />
               </RequireRole>
             </RequireAuth>
