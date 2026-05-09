@@ -5,6 +5,7 @@ async function login(page: Page, email: string, password: string) {
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
+  await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 10_000 });
 }
 
 // Pre-condition: Loo runs `pnpm seed:lp-test-user` against staging + dev server
