@@ -207,13 +207,19 @@ function ModelCard({
   onAddFabric: () => void;
 }) {
   const deleteModel = useDeleteCatalogModel();
+  // Loo 2026-05-09 — collapse by default. Click header to expand variants
+  // + fabrics; click again to close. Compact list when there are many
+  // models in the catalog.
+  const [expanded, setExpanded] = useState(false);
 
-  function discontinue() {
+  function discontinue(e: React.MouseEvent) {
+    // Stop the click from bubbling to the header toggle behind it.
+    e.stopPropagation();
     if (!confirm(`Discontinue "${model.name}"? Variants will be hidden from new POs.`)) return;
     deleteModel.mutate(model.id, {
       onSuccess: () => toast.success(`${model.name} discontinued`),
-      onError: (e: unknown) =>
-        toast.error(e instanceof ApiError ? e.message : "Discontinue failed"),
+      onError: (err: unknown) =>
+        toast.error(err instanceof ApiError ? err.message : "Discontinue failed"),
     });
   }
 
@@ -222,26 +228,56 @@ function ModelCard({
       className="bg-white border border-base-200 rounded-[4px] p-4"
       data-testid={`catalog-model-${model.modelKey}`}
     >
-      <div className="flex justify-between items-start mb-2.5 gap-3">
-        <div className="min-w-0">
-          <div className="font-ui text-[14px] font-semibold">{model.name}</div>
-          <div className="text-[11px] text-base-500 mt-0.5 font-body">
-            <span className="font-mono">{model.modelKey}</span>
-            {model.blurb ? <> · {model.blurb}</> : null}
-          </div>
-          {model.category === "bedframe" && (
-            <div className="text-[10.5px] text-base-500 mt-1.5 font-body">
-              Colors:{" "}
-              <span className="font-mono">
-                {model.colors?.join(" / ") || "—"}
-              </span>
+      {/* Clickable header — toggles expand/collapse. Discontinue button
+          stops propagation so it doesn't trigger the toggle. */}
+      <div
+        className="flex justify-between items-start gap-3 cursor-pointer select-none"
+        onClick={() => setExpanded((v) => !v)}
+        role="button"
+        aria-expanded={expanded}
+        data-testid={`catalog-model-toggle-${model.modelKey}`}
+      >
+        <div className="min-w-0 flex items-start gap-2">
+          <span
+            className="text-[12px] text-base-500 mt-[3px]"
+            style={{
+              transition: "transform 120ms",
+              transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
+              display: "inline-block",
+              width: 10,
+            }}
+            aria-hidden="true"
+          >
+            ▶
+          </span>
+          <div className="min-w-0">
+            <div className="font-ui text-[14px] font-semibold">{model.name}</div>
+            <div className="text-[11px] text-base-500 mt-0.5 font-body">
+              <span className="font-mono">{model.modelKey}</span>
+              {model.blurb ? <> · {model.blurb}</> : null}
               {" · "}
-              Gaps:{" "}
-              <span className="font-mono">
-                {model.gaps?.join(" / ") || "—"}
-              </span>
+              {skus.length} variant{skus.length === 1 ? "" : "s"}
+              {model.category === "sofa" && fabrics.length > 0 && (
+                <>
+                  {" · "}
+                  {fabrics.length} fabric{fabrics.length === 1 ? "" : "s"}
+                </>
+              )}
             </div>
-          )}
+            {expanded && model.category === "bedframe" && (
+              <div className="text-[10.5px] text-base-500 mt-1.5 font-body">
+                Colors:{" "}
+                <span className="font-mono">
+                  {model.colors?.join(" / ") || "—"}
+                </span>
+                {" · "}
+                Gaps:{" "}
+                <span className="font-mono">
+                  {model.gaps?.join(" / ") || "—"}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
         <button
           type="button"
@@ -254,8 +290,10 @@ function ModelCard({
         </button>
       </div>
 
+      {expanded && (
+      <>
       {/* Variants table */}
-      <div className="border-t border-base-100 pt-2.5">
+      <div className="border-t border-base-100 pt-2.5 mt-2.5">
         <div
           className="grid items-center gap-3 px-1 py-1.5 bg-base-50 border-b border-base-200 rounded-[3px]"
           style={{ gridTemplateColumns: "1.4fr 110px 110px auto" }}
@@ -310,6 +348,8 @@ function ModelCard({
             </button>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
