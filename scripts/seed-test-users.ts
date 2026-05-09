@@ -77,6 +77,32 @@ const sb = createClient(url, serviceKey);
 const DEALER_ID_BEDHOUSE_KL = "00000000-0000-0000-0000-000000000d01";
 const PARTNER_ID_JT_EXPRESS = "00000000-0000-0000-0000-0000000000f1";
 
+// ----- E2E test partner IDs (synthetic; created via SQL fallback below) -----
+const PARTNER_ID_LP_A = "11111111-aaaa-aaaa-aaaa-000000000001";
+const PARTNER_ID_LP_B = "11111111-bbbb-bbbb-bbbb-000000000002";
+
+async function ensureDeliveryPartner(id: string, name: string): Promise<void> {
+  // Idempotent: insert if missing. supabase-js doesn't have a clean UPSERT
+  // for primary-key conflicts; we just check first.
+  const { data, error: selErr } = await sb
+    .from("delivery_partners")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  if (selErr) throw selErr;
+  if (data) {
+    console.log(`  [exists]  delivery_partner ${name}  id=${id}`);
+    return;
+  }
+  const { error: insErr } = await sb.from("delivery_partners").insert({
+    id,
+    name,
+    contact: `${name} contact`,
+  });
+  if (insErr) throw insErr;
+  console.log(`  [created] delivery_partner ${name}  id=${id}`);
+}
+
 interface TestUser {
   email:      string;
   password:   string;
@@ -112,6 +138,22 @@ const USERS: TestUser[] = [
     name:      "E2E Test · LP",
     role:      "partner",
     partnerId: PARTNER_ID_JT_EXPRESS,
+  },
+  // lp-a / lp-b: cross-tenant isolation tests. Each gets its own
+  // delivery_partner row so RLS scopes them apart.
+  {
+    email:     "lp-a@x.com",
+    password:  "lp-a-password",
+    name:      "E2E Test · LP-A",
+    role:      "partner",
+    partnerId: PARTNER_ID_LP_A,
+  },
+  {
+    email:     "lp-b@x.com",
+    password:  "lp-b-password",
+    name:      "E2E Test · LP-B",
+    role:      "partner",
+    partnerId: PARTNER_ID_LP_B,
   },
 ];
 
@@ -228,6 +270,12 @@ async function patchSeedUsers(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log(`Seeding ${USERS.length} E2E test users into ${url}`);
+
+  // Ensure E2E delivery_partners exist (lp-a + lp-b users link to these).
+  console.log("\nEnsuring E2E delivery_partners rows");
+  await ensureDeliveryPartner(PARTNER_ID_LP_A, "E2E LP-A");
+  await ensureDeliveryPartner(PARTNER_ID_LP_B, "E2E LP-B");
+
   for (const u of USERS) {
     console.log(`\n${u.role.padEnd(10)} ${u.email}`);
     await ensureUser(u);

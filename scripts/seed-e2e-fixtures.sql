@@ -176,6 +176,22 @@ WHERE NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = '99999999-9104-9104
 -- collide with our explicit fixture ids. Idempotent: setval to MAX(9104, current).
 SELECT setval('orders_dl_seq', GREATEST(9104, last_value)) FROM orders_dl_seq;
 
+-- ----- LP cross-tenant fixtures -----
+-- POs assigned to LP-A and LP-B (synthetic E2E partners) for the
+-- lp-creation-and-login cross-tenant test. Each PO is procurement-leg
+-- assigned via procurement_partner_id (renamed from delivery_partner_id
+-- in 0052). RLS scopes LP visibility by procurement_partner_id; LP-A
+-- must NOT see LP-B's PO and vice versa.
+--
+-- Idempotent reset: clear any prior state on these PO ids.
+DELETE FROM purchase_orders WHERE id IN ('PO-LP-A-1', 'PO-LP-B-1');
+
+INSERT INTO purchase_orders (id, supplier_id, warehouse_id, status, sup_status, procurement_partner_id, placed_at)
+VALUES
+  ('PO-LP-A-1', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '11111111-aaaa-aaaa-aaaa-000000000001', now() - interval '2 days'),
+  ('PO-LP-B-1', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '11111111-bbbb-bbbb-bbbb-000000000002', now() - interval '2 days')
+ON CONFLICT (id) DO NOTHING;
+
 -- Stockpile threshold fixture for stockpile-alert-to-po E2E spec.
 -- mattress:carres-cloud:Queen at warehouse c1 has qty=4 in seed (line 200 of
 -- seed.sql). Setting low_threshold=50 guarantees logistics_stock_alerts()
