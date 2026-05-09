@@ -116,7 +116,9 @@ describe("GET /api/logistics/orders", () => {
       logistics_stage: null,
       warehouse_id: null,
     };
-    mockOrdersList([PLACE_ROW]);
+    // PLACE_ROW has nulls for logistics_stage + warehouse_id (real shape for
+     // status='place' rows); the helper's `typeof ORDER_ROW` is over-narrow.
+     mockOrdersList([PLACE_ROW as unknown as typeof ORDER_ROW]);
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
       new Request("http://t/api/logistics/orders", {

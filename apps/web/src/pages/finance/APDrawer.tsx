@@ -172,7 +172,7 @@ export default function APDrawer({
                 Lines
               </div>
               <div className="bg-background/60 rounded-md border border-border px-3 py-2">
-                {row.lines.map((ln, i) => (
+                {row.lines.map((ln) => (
                   <div
                     key={ln.sku}
                     className="flex justify-between py-1.5 text-[12px] border-b border-dashed border-border last:border-0"

@@ -44,19 +44,3 @@ export default function FinanceApp() {
     </div>
   );
 }
-
-function ChunkBCStub({ label, chunk }: { label: string; chunk: "B" | "C" }) {
-  return (
-    <div className="p-9 max-w-[1400px] mx-auto">
-      <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-        Finance · Phase 5
-      </div>
-      <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
-        {label}
-      </h1>
-      <div className="text-[13px] text-muted-foreground">
-        Coming in Chunk {chunk}.
-      </div>
-    </div>
-  );
-}

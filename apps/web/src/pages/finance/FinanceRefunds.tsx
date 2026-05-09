@@ -6,7 +6,7 @@ import {
   useFinanceArAging,
   type FinanceRefundRow,
 } from "@/lib/queries";
-import { rm, rmCompact } from "@/lib/format-currency";
+import { rm } from "@/lib/format-currency";
 
 type RefundKind = "credit" | "refund";
 
