@@ -102,11 +102,12 @@ ordersRouter.get("/", async (c) => {
 ordersRouter.post("/", async (c) => {
   const auth = c.var.auth;
 
-  if (auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "principal" &&
-      auth.role !== "logistics" && auth.role !== "finance" && auth.role !== "bd") {
+  if (auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
+      auth.role !== "principal" && auth.role !== "logistics" &&
+      auth.role !== "finance" && auth.role !== "bd") {
     throw new HTTPException(403, { message: "Role cannot create orders" });
   }
-  if ((auth.role === "dealer" || auth.role === "salesperson") && !auth.dealerId) {
+  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
     throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
   }
 
@@ -316,8 +317,9 @@ ordersRouter.post("/:id/proceed", async (c) => {
   if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
 
   if (
-    auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "principal" &&
-    auth.role !== "logistics" && auth.role !== "finance" && auth.role !== "bd"
+    auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
+    auth.role !== "principal" && auth.role !== "logistics" &&
+    auth.role !== "finance" && auth.role !== "bd"
   ) {
     throw new HTTPException(403, { message: "Role cannot proceed orders" });
   }
@@ -385,12 +387,13 @@ async function dispatchOrderMutation<TBody>(
   const id: string = idCheck.data;
 
   if (
-    auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "principal" &&
-    auth.role !== "logistics" && auth.role !== "finance" && auth.role !== "bd"
+    auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
+    auth.role !== "principal" && auth.role !== "logistics" &&
+    auth.role !== "finance" && auth.role !== "bd"
   ) {
     throw new HTTPException(403, { message: "Role cannot mutate orders" });
   }
-  if ((auth.role === "dealer" || auth.role === "salesperson") && !auth.dealerId) {
+  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
     throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
   }
 
@@ -524,12 +527,13 @@ ordersRouter.patch("/:id", async (c) => {
   const id: string = idCheck.data;
 
   if (
-    auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "principal" &&
-    auth.role !== "logistics" && auth.role !== "finance" && auth.role !== "bd"
+    auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
+    auth.role !== "principal" && auth.role !== "logistics" &&
+    auth.role !== "finance" && auth.role !== "bd"
   ) {
     throw new HTTPException(403, { message: "Role cannot edit orders" });
   }
-  if ((auth.role === "dealer" || auth.role === "salesperson") && !auth.dealerId) {
+  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
     throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
   }
 
