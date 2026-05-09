@@ -28,8 +28,12 @@ const inquiryCreateSchema = z.object({
   note:    z.string().trim().max(2000).optional().nullable(),
 });
 
+// PATCH stage enum INTENTIONALLY excludes 'converted'. Conversion has a
+// side effect (creates a new_dealer approval row) and must go through the
+// dedicated /convert RPC. Allowing PATCH stage='converted' would skip the
+// approval creation and silently violate Phase 8 acceptance #3.
 const inquiryUpdateSchema = z.object({
-  stage:   z.enum(["new", "contacted", "qualified", "converted", "lost"]).optional(),
+  stage:   z.enum(["new", "contacted", "qualified", "lost"]).optional(),
   contact: z.string().trim().max(200).optional().nullable(),
   region:  z.string().trim().max(120).optional().nullable(),
   note:    z.string().trim().max(2000).optional().nullable(),
