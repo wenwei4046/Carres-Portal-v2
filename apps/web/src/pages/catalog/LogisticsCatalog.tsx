@@ -196,10 +196,12 @@ export default function LogisticsCatalog() {
 // Per-model card
 // -----------------------------------------------------------------------------
 
-// 0075 (Loo 2026-05-09) — Animated on/off pill replacing the plain
-// Discontinue text button. Orange (terracotta) when in the discontinued
-// state, gray when active. The thumb slides 14px between states with a
-// 160ms transition.
+// 0075 (Loo 2026-05-09/10) — Animated on/off pill replacing the plain
+// Discontinue text button. The toggle reads as "Is this item active?":
+//   ON  (thumb right, orange/brand)  = Active
+//   OFF (thumb left,  gray)          = Discontinued
+// Mirrors common iOS/Android settings switch UX where the brand color
+// indicates "enabled". Thumb slides 14px (160ms transition).
 function ToggleDiscontinue({
   discontinued,
   onChange,
@@ -211,11 +213,12 @@ function ToggleDiscontinue({
   pending?: boolean;
   ariaLabel: string;
 }) {
+  const active = !discontinued;
   return (
     <button
       type="button"
       role="switch"
-      aria-checked={discontinued}
+      aria-checked={active}
       aria-label={ariaLabel}
       disabled={pending}
       onClick={(e) => {
@@ -230,7 +233,7 @@ function ToggleDiscontinue({
         style={{
           width: 32,
           height: 18,
-          background: discontinued
+          background: active
             ? "var(--brand-signature, #D64F20)"
             : "rgba(34,31,32,.18)",
           transition: "background 160ms",
@@ -242,7 +245,7 @@ function ToggleDiscontinue({
             width: 14,
             height: 14,
             top: 2,
-            left: discontinued ? 16 : 2,
+            left: active ? 16 : 2,
             transition: "left 160ms",
           }}
         />
@@ -251,12 +254,12 @@ function ToggleDiscontinue({
         className="text-[10.5px] font-ui font-semibold uppercase"
         style={{
           letterSpacing: "0.08em",
-          color: discontinued
+          color: active
             ? "var(--brand-signature, #D64F20)"
             : "var(--base-600)",
         }}
       >
-        {discontinued ? "Discontinued" : "Active"}
+        {active ? "Active" : "Discontinued"}
       </span>
     </button>
   );
