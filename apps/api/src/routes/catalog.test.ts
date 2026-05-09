@@ -331,3 +331,345 @@ describe("GET /api/salespersons", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// 0074 catalog admin (Loo 2026-05-09 Q2=c). Principal + logistics manage the
+// SKU catalog. Tests use a small write-aware mock since buildSb above only
+// covers read chains.
+// ---------------------------------------------------------------------------
+
+interface AdminCall {
+  table: string;
+  op: "insert" | "update";
+  payload: unknown;
+}
+
+function buildWriteSb(opts: {
+  /** Pre-baked rows the read paths return (e.g. model lookup before SKU insert). */
+  reads?: Record<string, unknown[]>;
+  /** Row that .single()/.maybeSingle() returns from the write chain. */
+  writeReturn?: Record<string, unknown> | null;
+  recorded?: AdminCall[];
+}): SbStub {
+  const recorded = opts.recorded ?? [];
+  const reads = opts.reads ?? {};
+  const writeReturn = opts.writeReturn ?? null;
+
+  const mk = (table: string) => {
+    let rows: unknown[] = reads[table] ?? [];
+    let mode: "read" | "write" = "read";
+    let writeBody: unknown = null;
+
+    const chain: Record<string, unknown> = {};
+    chain.select = () => chain;
+    chain.insert = (body: unknown) => {
+      mode = "write";
+      writeBody = body;
+      recorded.push({ table, op: "insert", payload: body });
+      return chain;
+    };
+    chain.update = (body: unknown) => {
+      mode = "write";
+      writeBody = body;
+      recorded.push({ table, op: "update", payload: body });
+      return chain;
+    };
+    chain.eq = (col: string, val: unknown) => {
+      if (mode === "read") {
+        rows = rows.filter((r) => (r as Record<string, unknown>)[col] === val);
+      }
+      return chain;
+    };
+    chain.maybeSingle = async () => {
+      if (mode === "write") return { data: writeReturn, error: null };
+      return { data: rows[0] ?? null, error: null };
+    };
+    chain.single = async () => {
+      if (mode === "write") return { data: writeReturn, error: null };
+      return { data: rows[0] ?? null, error: null };
+    };
+    void writeBody; // silenced; the recorded payload is what assertions read
+    return chain;
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { from: (table: string) => mk(table) } as any;
+}
+
+describe("Catalog admin — POST /api/catalog/models", () => {
+  it("inserts a new model and returns 201 with the camelCase DTO", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: MODEL_ID_LIVE,
+          category: "mattress",
+          model_key: "carres-hybrid",
+          name: "Carres Hybrid",
+          blurb: null,
+          colors: null,
+          gaps: null,
+          sofa_mode: null,
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("logistics", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/models", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: "mattress",
+          modelKey: "carres-hybrid",
+          name: "Carres Hybrid",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { model: { name: string; modelKey: string } };
+    expect(body.model.modelKey).toBe("carres-hybrid");
+    expect(recorded[0]?.op).toBe("insert");
+  });
+
+  it("422s on invalid modelKey (not kebab-case)", async () => {
+    const jwt = await makeJwt("logistics", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/models", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: "mattress",
+          modelKey: "Carres Hybrid", // spaces + caps disallowed
+          name: "Carres Hybrid",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("Catalog admin — PATCH /api/catalog/models/:id", () => {
+  it("updates allowed fields and returns the patched DTO", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: MODEL_ID_LIVE,
+          category: "mattress",
+          model_key: "carres-classic",
+          name: "Classic Renamed",
+          blurb: "new blurb",
+          colors: null,
+          gaps: null,
+          sofa_mode: null,
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("logistics", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Classic Renamed", blurb: "new blurb" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const update = recorded.find((r) => r.op === "update");
+    expect(update?.payload).toMatchObject({
+      name: "Classic Renamed",
+      blurb: "new blurb",
+    });
+  });
+
+  it("422s when the patch body is empty", async () => {
+    const jwt = await makeJwt("logistics", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("Catalog admin — DELETE /api/catalog/models/:id (soft-delete)", () => {
+  it("stamps discontinued_at and returns ok", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: { id: MODEL_ID_LIVE },
+      }),
+    );
+    const jwt = await makeJwt("logistics", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({});
+    expect((upd!.payload as { discontinued_at: string }).discontinued_at).toBeTruthy();
+  });
+});
+
+describe("Catalog admin — POST /api/catalog/skus", () => {
+  it("derives sku string from model.category + model_key + variant", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          // Mock filters by .eq("id", modelId) when looking up the model
+          // before deriving the sku string — must include `id` so the eq
+          // filter retains the row.
+          product_models: [
+            {
+              id: MODEL_ID_LIVE,
+              category: "mattress",
+              model_key: "carres-classic",
+            },
+          ],
+        },
+        recorded,
+        writeReturn: {
+          id: "00000000-0000-0000-0000-00000000bb01",
+          model_id: MODEL_ID_LIVE,
+          sku: "mattress:carres-classic:Twin",
+          variant: "Twin",
+          variant_kind: "size",
+          price: 2400,
+          cost: 1300,
+          supplier_id: null,
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("logistics", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Twin",
+          variantKind: "size",
+          price: 2400,
+          cost: 1300,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const insert = recorded.find((r) => r.op === "insert");
+    expect((insert?.payload as { sku: string }).sku).toBe(
+      "mattress:carres-classic:Twin",
+    );
+    expect((insert?.payload as { cost: number }).cost).toBe(1300);
+  });
+});
+
+describe("Catalog admin — PATCH /api/catalog/skus/:id", () => {
+  it("updates cost only when only cost is sent", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: "00000000-0000-0000-0000-00000000bb01",
+          model_id: MODEL_ID_LIVE,
+          sku: "mattress:carres-classic:queen",
+          variant: "queen",
+          variant_kind: "size",
+          price: 1500,
+          cost: 950,
+          supplier_id: null,
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("logistics", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus/00000000-0000-0000-0000-00000000bb01", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: 950 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toEqual({ cost: 950 });
+  });
+});
+
+describe("Catalog admin — sofa fabrics CRUD", () => {
+  it("POST /sofa-fabrics inserts and returns 201", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: "00000000-0000-0000-0000-00000000cc01",
+          model_id: MODEL_ID_LIVE,
+          fabric_name: "Linen Slate",
+          surcharge: 250,
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("logistics", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-fabrics", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          fabricName: "Linen Slate",
+          surcharge: 250,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.payload).toEqual({
+      model_id: MODEL_ID_LIVE,
+      fabric_name: "Linen Slate",
+      surcharge: 250,
+    });
+  });
+
+  it("DELETE /sofa-fabrics/:id soft-deletes via discontinued_at", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: { id: "00000000-0000-0000-0000-00000000cc01" },
+      }),
+    );
+    const jwt = await makeJwt("logistics", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-fabrics/00000000-0000-0000-0000-00000000cc01", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect((upd!.payload as { discontinued_at: string }).discontinued_at).toBeTruthy();
+  });
+});

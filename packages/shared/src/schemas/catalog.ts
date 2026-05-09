@@ -110,6 +110,79 @@ export const salespersonsListResponseSchema = z.object({
 });
 export type SalespersonsListResponse = z.infer<typeof salespersonsListResponseSchema>;
 
+// ---------------------------------------------------------------------------
+// 0074 — Catalog admin CRUD (Loo 2026-05-09 Q2=c, Q3=b, Q4=c).
+// Both principal + logistics can create/patch/soft-delete catalog entities.
+// is_internal() RLS write covers both roles natively, so the API just forwards
+// the user JWT — no extra guard needed beyond the standard auth middleware.
+// ---------------------------------------------------------------------------
+
+const colorOrGapValueRegex = /^[\p{L}\p{N} _\-/'"().+]{1,40}$/u;
+
+export const productModelCreateInput = z
+  .object({
+    category: productCategorySchema,
+    modelKey: z
+      .string()
+      .trim()
+      .min(2)
+      .max(60)
+      .regex(/^[a-z0-9-]+$/, "modelKey must be kebab-case (a-z, 0-9, dash)"),
+    name: z.string().trim().min(2).max(80),
+    blurb: z.string().trim().max(200).nullable().optional(),
+    colors: z.array(z.string().trim().regex(colorOrGapValueRegex)).max(20).nullable().optional(),
+    gaps: z.array(z.string().trim().regex(colorOrGapValueRegex)).max(20).nullable().optional(),
+    sofaMode: z.enum(["preset", "custom", "both"]).nullable().optional(),
+  })
+  .strict();
+export type ProductModelCreateInput = z.infer<typeof productModelCreateInput>;
+
+export const productModelPatchInput = productModelCreateInput
+  .partial()
+  // Re-strict so unknown keys 422 instead of silently dropping.
+  .strict();
+export type ProductModelPatchInput = z.infer<typeof productModelPatchInput>;
+
+export const productSkuCreateInput = z
+  .object({
+    modelId: z.string().uuid(),
+    variant: z.string().trim().min(1).max(60),
+    variantKind: variantKindSchema,
+    price: z.number().nonnegative(),
+    cost: z.number().nonnegative().nullable().optional(),
+    supplierId: z.string().uuid().nullable().optional(),
+  })
+  .strict();
+export type ProductSkuCreateInput = z.infer<typeof productSkuCreateInput>;
+
+export const productSkuPatchInput = z
+  .object({
+    variant: z.string().trim().min(1).max(60).optional(),
+    variantKind: variantKindSchema.optional(),
+    price: z.number().nonnegative().optional(),
+    cost: z.number().nonnegative().nullable().optional(),
+    supplierId: z.string().uuid().nullable().optional(),
+  })
+  .strict();
+export type ProductSkuPatchInput = z.infer<typeof productSkuPatchInput>;
+
+export const sofaFabricCreateInput = z
+  .object({
+    modelId: z.string().uuid(),
+    fabricName: z.string().trim().min(1).max(60),
+    surcharge: z.number().nonnegative(),
+  })
+  .strict();
+export type SofaFabricCreateInput = z.infer<typeof sofaFabricCreateInput>;
+
+export const sofaFabricPatchInput = z
+  .object({
+    fabricName: z.string().trim().min(1).max(60).optional(),
+    surcharge: z.number().nonnegative().optional(),
+  })
+  .strict();
+export type SofaFabricPatchInput = z.infer<typeof sofaFabricPatchInput>;
+
 /**
  * Phase 2D — Dealer/Showroom self-service salesperson CRUD.
  * Dealer/showroom roles can create salesperson rows scoped to their own

@@ -91,6 +91,12 @@ export {
   salespersonCreateInputSchema,
   productCategorySchema,
   variantKindSchema,
+  productModelCreateInput,
+  productModelPatchInput,
+  productSkuCreateInput,
+  productSkuPatchInput,
+  sofaFabricCreateInput,
+  sofaFabricPatchInput,
   type CatalogResponse,
   type ProductModelDto,
   type ProductSkuDto,
@@ -104,6 +110,12 @@ export {
   type SalespersonCreateInput,
   type ProductCategory,
   type VariantKind,
+  type ProductModelCreateInput,
+  type ProductModelPatchInput,
+  type ProductSkuCreateInput,
+  type ProductSkuPatchInput,
+  type SofaFabricCreateInput,
+  type SofaFabricPatchInput,
 } from "./schemas/catalog";
 
 export {
