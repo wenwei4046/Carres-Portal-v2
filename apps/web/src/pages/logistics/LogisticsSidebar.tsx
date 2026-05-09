@@ -35,6 +35,14 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { k: "movements", t: "Movements", icon: "≡" },
     ],
   },
+  {
+    // 0074 catalog admin (Loo 2026-05-09 Q1=b, Q2=c). Same page mounts under
+    // /principal/catalog too — RLS write covers both roles via is_internal().
+    label: "Catalog",
+    items: [
+      { k: "catalog", t: "SKU Catalog", icon: "▭" },
+    ],
+  },
 ];
 
 interface Props {

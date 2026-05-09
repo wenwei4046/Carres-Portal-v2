@@ -15,6 +15,15 @@ import {
   type AwaitingStockShortageResponse,
   type CancelOrderInput,
   type CatalogResponse,
+  type ProductModelDto,
+  type ProductSkuDto,
+  type SofaFabricDto,
+  type ProductModelCreateInput,
+  type ProductModelPatchInput,
+  type ProductSkuCreateInput,
+  type ProductSkuPatchInput,
+  type SofaFabricCreateInput,
+  type SofaFabricPatchInput,
   type ConfirmProceedRequestInput,
   type CreateOrderInput,
   type CreatePoInput,
@@ -3092,5 +3101,100 @@ export function useMarkDelivered(
       await qc.invalidateQueries({ queryKey: ["supplier"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0074 catalog admin mutations (Loo 2026-05-09 Q2=c). Each mutation
+// invalidates qk.catalog() so the public bundle picks up the change on the
+// next consumer mount (Create-PO modal, dealer wizard, etc.).
+// ---------------------------------------------------------------------------
+
+function catalogJson(method: "POST" | "PATCH" | "DELETE", body?: unknown) {
+  return {
+    method,
+    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  };
+}
+
+export function useCreateCatalogModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ProductModelCreateInput) =>
+      apiFetch<{ model: ProductModelDto }>("/api/catalog/models", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.catalog() }),
+  });
+}
+
+export function usePatchCatalogModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: ProductModelPatchInput }) =>
+      apiFetch<{ model: ProductModelDto }>(`/api/catalog/models/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.catalog() }),
+  });
+}
+
+export function useDeleteCatalogModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/models/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.catalog() }),
+  });
+}
+
+export function useCreateCatalogSku() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ProductSkuCreateInput) =>
+      apiFetch<{ sku: ProductSkuDto }>("/api/catalog/skus", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.catalog() }),
+  });
+}
+
+export function usePatchCatalogSku() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: ProductSkuPatchInput }) =>
+      apiFetch<{ sku: ProductSkuDto }>(`/api/catalog/skus/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.catalog() }),
+  });
+}
+
+export function useDeleteCatalogSku() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/skus/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.catalog() }),
+  });
+}
+
+export function useCreateSofaFabric() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SofaFabricCreateInput) =>
+      apiFetch<{ fabric: SofaFabricDto }>("/api/catalog/sofa-fabrics", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.catalog() }),
+  });
+}
+
+export function usePatchSofaFabric() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: SofaFabricPatchInput }) =>
+      apiFetch<{ fabric: SofaFabricDto }>(`/api/catalog/sofa-fabrics/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.catalog() }),
+  });
+}
+
+export function useDeleteSofaFabric() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/sofa-fabrics/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.catalog() }),
   });
 }

@@ -1,0 +1,804 @@
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import type {
+  ProductCategory,
+  ProductModelDto,
+  ProductSkuDto,
+  SofaFabricDto,
+} from "@carres/shared";
+import { ApiError } from "@/lib/api";
+import {
+  useCatalog,
+  useCreateCatalogModel,
+  useCreateCatalogSku,
+  useCreateSofaFabric,
+  useDeleteCatalogModel,
+  useDeleteCatalogSku,
+  useDeleteSofaFabric,
+  usePatchCatalogSku,
+  usePatchSofaFabric,
+} from "@/lib/queries";
+import { INPUT_CLS, Modal, ModalActions } from "@/pages/logistics/components/Modal";
+
+/**
+ * LogisticsCatalog — single CRUD page for principal + logistics to manage
+ * the SKU catalog (Loo 2026-05-09 Q1=b, Q2=c, Q3=b, Q4=c). Mounted at
+ * /logistics/catalog and /principal/catalog; both routes render this same
+ * component since the underlying RLS gate (is_internal()) covers both roles.
+ *
+ * Layout
+ *   • Tabs: Mattress / Bedframe / Sofa
+ *   • Per category: list of models (non-discontinued); each row expands
+ *     to show variants. Inline edit for cost + retail price.
+ *   • + Add model     opens the Add-Model modal (category preset)
+ *   • + Add variant   opens the Add-Variant modal (model preset)
+ *   • + Add fabric    opens the Add-Fabric modal (model preset; sofa only)
+ *   • Each model + variant + fabric carries a Discontinue (soft-delete) button.
+ *
+ * Cost editing rule (Q5=a): cost is the procurement cost auto-fed onto every
+ * Create-PO line. NULL means "not yet set" — UI shows a red ⚠ on those rows
+ * so logistics can fill them in before next PO.
+ */
+
+const CATEGORIES: { key: ProductCategory; label: string; icon: string }[] = [
+  { key: "mattress", label: "Mattress", icon: "▭" },
+  { key: "bedframe", label: "Bed frame", icon: "▤" },
+  { key: "sofa", label: "Sofa", icon: "▦" },
+];
+
+interface AddModelState {
+  category: ProductCategory;
+}
+interface AddVariantState {
+  model: ProductModelDto;
+}
+interface AddFabricState {
+  model: ProductModelDto;
+}
+
+export default function LogisticsCatalog() {
+  const catalogQ = useCatalog();
+  const [activeCat, setActiveCat] = useState<ProductCategory>("mattress");
+  const [addModel, setAddModel] = useState<AddModelState | null>(null);
+  const [addVariant, setAddVariant] = useState<AddVariantState | null>(null);
+  const [addFabric, setAddFabric] = useState<AddFabricState | null>(null);
+
+  const skusByModel = useMemo(() => {
+    const m = new Map<string, ProductSkuDto[]>();
+    for (const s of catalogQ.data?.skus ?? []) {
+      if (s.discontinuedAt) continue;
+      const arr = m.get(s.modelId) ?? [];
+      arr.push(s);
+      m.set(s.modelId, arr);
+    }
+    return m;
+  }, [catalogQ.data]);
+
+  const fabricsByModel = useMemo(() => {
+    const m = new Map<string, SofaFabricDto[]>();
+    for (const f of catalogQ.data?.sofaFabrics ?? []) {
+      if (f.discontinuedAt) continue;
+      const arr = m.get(f.modelId) ?? [];
+      arr.push(f);
+      m.set(f.modelId, arr);
+    }
+    return m;
+  }, [catalogQ.data]);
+
+  const modelsInCat = (catalogQ.data?.models ?? [])
+    .filter((m) => m.category === activeCat && !m.discontinuedAt);
+
+  return (
+    <div className="px-9 py-8 pb-14">
+      <div className="flex justify-between items-end mb-6">
+        <div>
+          <div className="kicker">Catalog</div>
+          <h1
+            className="font-display text-[28px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900"
+          >
+            SKU catalog &amp; cost
+          </h1>
+          <p className="text-[13px] text-base-600 font-body mt-1">
+            Add models, set procurement cost + retail price. Cost feeds every
+            new PO automatically.
+          </p>
+        </div>
+      </div>
+
+      {/* Category tabs */}
+      <div
+        className="flex border-b border-base-200 mb-5"
+        role="tablist"
+        aria-label="Catalog category"
+      >
+        {CATEGORIES.map((c) => {
+          const active = activeCat === c.key;
+          return (
+            <button
+              key={c.key}
+              role="tab"
+              aria-selected={active}
+              data-testid={`catalog-tab-${c.key}`}
+              onClick={() => setActiveCat(c.key)}
+              className={`px-5 py-2.5 text-[13px] border-b-2 transition-colors ${
+                active
+                  ? "border-primary text-base-900 font-semibold"
+                  : "border-transparent text-base-600 hover:text-base-900"
+              }`}
+            >
+              <span className="text-base mr-1.5">{c.icon}</span>
+              {c.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Per-category Add Model */}
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => setAddModel({ category: activeCat })}
+          data-testid="catalog-add-model"
+          className="btn-primary text-[12px]"
+        >
+          + Add {activeCat} model
+        </button>
+      </div>
+
+      {catalogQ.isLoading && (
+        <div className="text-[12px] text-base-500">Loading catalog…</div>
+      )}
+      {!catalogQ.isLoading && modelsInCat.length === 0 && (
+        <div className="text-[12px] text-base-500">
+          No {activeCat} models yet. Click + Add to create one.
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4">
+        {modelsInCat.map((model) => (
+          <ModelCard
+            key={model.id}
+            model={model}
+            skus={skusByModel.get(model.id) ?? []}
+            fabrics={fabricsByModel.get(model.id) ?? []}
+            onAddVariant={() => setAddVariant({ model })}
+            onAddFabric={() => setAddFabric({ model })}
+          />
+        ))}
+      </div>
+
+      {addModel && (
+        <AddModelModal
+          category={addModel.category}
+          onClose={() => setAddModel(null)}
+        />
+      )}
+      {addVariant && (
+        <AddVariantModal
+          model={addVariant.model}
+          onClose={() => setAddVariant(null)}
+        />
+      )}
+      {addFabric && (
+        <AddFabricModal
+          model={addFabric.model}
+          onClose={() => setAddFabric(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Per-model card
+// -----------------------------------------------------------------------------
+
+function ModelCard({
+  model,
+  skus,
+  fabrics,
+  onAddVariant,
+  onAddFabric,
+}: {
+  model: ProductModelDto;
+  skus: ProductSkuDto[];
+  fabrics: SofaFabricDto[];
+  onAddVariant: () => void;
+  onAddFabric: () => void;
+}) {
+  const deleteModel = useDeleteCatalogModel();
+
+  function discontinue() {
+    if (!confirm(`Discontinue "${model.name}"? Variants will be hidden from new POs.`)) return;
+    deleteModel.mutate(model.id, {
+      onSuccess: () => toast.success(`${model.name} discontinued`),
+      onError: (e: unknown) =>
+        toast.error(e instanceof ApiError ? e.message : "Discontinue failed"),
+    });
+  }
+
+  return (
+    <div
+      className="bg-white border border-base-200 rounded-[4px] p-4"
+      data-testid={`catalog-model-${model.modelKey}`}
+    >
+      <div className="flex justify-between items-start mb-2.5 gap-3">
+        <div className="min-w-0">
+          <div className="font-ui text-[14px] font-semibold">{model.name}</div>
+          <div className="text-[11px] text-base-500 mt-0.5 font-body">
+            <span className="font-mono">{model.modelKey}</span>
+            {model.blurb ? <> · {model.blurb}</> : null}
+          </div>
+          {model.category === "bedframe" && (
+            <div className="text-[10.5px] text-base-500 mt-1.5 font-body">
+              Colors:{" "}
+              <span className="font-mono">
+                {model.colors?.join(" / ") || "—"}
+              </span>
+              {" · "}
+              Gaps:{" "}
+              <span className="font-mono">
+                {model.gaps?.join(" / ") || "—"}
+              </span>
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={discontinue}
+          disabled={deleteModel.isPending}
+          data-testid={`catalog-model-discontinue-${model.modelKey}`}
+          className="btn-ghost text-[11px] text-warning"
+        >
+          Discontinue
+        </button>
+      </div>
+
+      {/* Variants table */}
+      <div className="border-t border-base-100 pt-2.5">
+        <div
+          className="grid items-center gap-3 px-1 py-1.5 bg-base-50 border-b border-base-200 rounded-[3px]"
+          style={{ gridTemplateColumns: "1.4fr 110px 110px auto" }}
+        >
+          <div className="label">
+            {model.category === "sofa" ? "Component" : "Variant"}
+          </div>
+          <div className="label text-right">Retail (RM)</div>
+          <div className="label text-right">Cost (RM)</div>
+          <div></div>
+        </div>
+        {skus.length === 0 && (
+          <div className="text-[11px] text-base-500 py-2 px-1">
+            No variants yet. Click + Add variant.
+          </div>
+        )}
+        {skus.map((sku) => (
+          <SkuRow key={sku.id} sku={sku} />
+        ))}
+        <div className="pt-2.5">
+          <button
+            type="button"
+            onClick={onAddVariant}
+            data-testid={`catalog-add-variant-${model.modelKey}`}
+            className="btn-ghost text-[11px]"
+          >
+            + Add variant
+          </button>
+        </div>
+      </div>
+
+      {/* Sofa fabrics */}
+      {model.category === "sofa" && (
+        <div className="border-t border-base-100 mt-3 pt-2.5">
+          <div className="label mb-1.5">Fabrics</div>
+          {fabrics.length === 0 && (
+            <div className="text-[11px] text-base-500 py-1">
+              No fabrics yet.
+            </div>
+          )}
+          {fabrics.map((f) => (
+            <FabricRow key={f.id} fabric={f} />
+          ))}
+          <div className="pt-2.5">
+            <button
+              type="button"
+              onClick={onAddFabric}
+              data-testid={`catalog-add-fabric-${model.modelKey}`}
+              className="btn-ghost text-[11px]"
+            >
+              + Add fabric
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Inline-editable rows
+// -----------------------------------------------------------------------------
+
+function SkuRow({ sku }: { sku: ProductSkuDto }) {
+  const patch = usePatchCatalogSku();
+  const del = useDeleteCatalogSku();
+
+  function commitField(field: "price" | "cost", raw: string) {
+    const trimmed = raw.trim();
+    let val: number | null;
+    if (trimmed === "") {
+      // Cost can be null ("not yet set"); price is required non-null on
+      // the column itself so we treat empty as "no change".
+      if (field === "cost") val = null;
+      else return;
+    } else {
+      const parsed = Number(trimmed);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        toast.error("Enter a non-negative number");
+        return;
+      }
+      val = parsed;
+    }
+    if ((field === "price" && val === sku.price) ||
+        (field === "cost" && val === sku.cost)) {
+      return;
+    }
+    patch.mutate(
+      { id: sku.id, patch: { [field]: val } as { price?: number; cost?: number | null } },
+      {
+        onSuccess: () => toast.success(`${sku.variant} · ${field} updated`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  function discontinue() {
+    if (!confirm(`Discontinue ${sku.variant}? Existing POs/orders keep working; new ones won't see it.`)) return;
+    del.mutate(sku.id, {
+      onSuccess: () => toast.success(`${sku.variant} discontinued`),
+      onError: (e: unknown) =>
+        toast.error(e instanceof ApiError ? e.message : "Discontinue failed"),
+    });
+  }
+
+  return (
+    <div
+      className="grid items-center gap-3 px-1 py-2 border-b border-base-100 last:border-b-0"
+      style={{ gridTemplateColumns: "1.4fr 110px 110px auto" }}
+      data-testid={`catalog-sku-${sku.sku}`}
+    >
+      <div className="text-[12px] font-body">
+        <div>{sku.variant}</div>
+        <div className="font-mono text-[10px] text-base-500 mt-0.5">
+          {sku.sku}
+        </div>
+      </div>
+      <input
+        type="number"
+        min={0}
+        step="0.01"
+        defaultValue={sku.price}
+        onBlur={(e) => commitField("price", e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        aria-label={`${sku.variant} retail price`}
+        className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+      />
+      <input
+        type="number"
+        min={0}
+        step="0.01"
+        defaultValue={sku.cost ?? ""}
+        placeholder="—"
+        onBlur={(e) => commitField("cost", e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        aria-label={`${sku.variant} cost`}
+        className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+        style={
+          sku.cost == null
+            ? { borderColor: "var(--brand-signature)" }
+            : undefined
+        }
+      />
+      <button
+        type="button"
+        onClick={discontinue}
+        disabled={del.isPending}
+        aria-label={`Discontinue ${sku.variant}`}
+        className="btn-ghost text-[14px] text-warning"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+function FabricRow({ fabric }: { fabric: SofaFabricDto }) {
+  const patch = usePatchSofaFabric();
+  const del = useDeleteSofaFabric();
+
+  function commitSurcharge(raw: string) {
+    const trimmed = raw.trim();
+    if (trimmed === "") return;
+    const val = Number(trimmed);
+    if (!Number.isFinite(val) || val < 0) {
+      toast.error("Surcharge must be a non-negative number");
+      return;
+    }
+    if (val === fabric.surcharge) return;
+    patch.mutate(
+      { id: fabric.id, patch: { surcharge: val } },
+      {
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  function discontinue() {
+    if (!confirm(`Discontinue fabric "${fabric.fabricName}"?`)) return;
+    del.mutate(fabric.id, {
+      onError: (e: unknown) =>
+        toast.error(e instanceof ApiError ? e.message : "Discontinue failed"),
+    });
+  }
+
+  return (
+    <div
+      className="grid items-center gap-3 px-1 py-1.5"
+      style={{ gridTemplateColumns: "1.4fr 110px auto" }}
+      data-testid={`catalog-fabric-${fabric.id}`}
+    >
+      <div className="text-[12px] font-body">{fabric.fabricName}</div>
+      <input
+        type="number"
+        min={0}
+        step="0.01"
+        defaultValue={fabric.surcharge}
+        onBlur={(e) => commitSurcharge(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        aria-label={`${fabric.fabricName} surcharge`}
+        className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+      />
+      <button
+        type="button"
+        onClick={discontinue}
+        disabled={del.isPending}
+        aria-label={`Discontinue ${fabric.fabricName}`}
+        className="btn-ghost text-[14px] text-warning"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Modals: Add Model / Variant / Fabric
+// -----------------------------------------------------------------------------
+
+function AddModelModal({
+  category,
+  onClose,
+}: {
+  category: ProductCategory;
+  onClose: () => void;
+}) {
+  const create = useCreateCatalogModel();
+  const [modelKey, setModelKey] = useState("");
+  const [name, setName] = useState("");
+  const [blurb, setBlurb] = useState("");
+  const [colors, setColors] = useState("");
+  const [gaps, setGaps] = useState("");
+  const [sofaMode, setSofaMode] = useState<"preset" | "custom" | "both">("preset");
+
+  const valid = modelKey.length >= 2 && /^[a-z0-9-]+$/.test(modelKey) && name.length >= 2;
+
+  function submit() {
+    if (!valid) return;
+    create.mutate(
+      {
+        category,
+        modelKey,
+        name,
+        blurb: blurb.trim() || null,
+        colors:
+          category === "bedframe" && colors.trim()
+            ? colors.split(",").map((c) => c.trim()).filter(Boolean)
+            : null,
+        gaps:
+          category === "bedframe" && gaps.trim()
+            ? gaps.split(",").map((g) => g.trim()).filter(Boolean)
+            : null,
+        sofaMode: category === "sofa" ? sofaMode : null,
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Added ${name}`);
+          onClose();
+        },
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Add failed"),
+      },
+    );
+  }
+
+  return (
+    <Modal title={`New ${category} model`} onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <FieldRow label="Model key (kebab-case, e.g. carres-hybrid)">
+          <input
+            value={modelKey}
+            onChange={(e) => setModelKey(e.target.value)}
+            placeholder="carres-hybrid"
+            data-testid="add-model-key"
+            className={INPUT_CLS}
+          />
+        </FieldRow>
+        <FieldRow label="Display name">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Carres Hybrid"
+            data-testid="add-model-name"
+            className={INPUT_CLS}
+          />
+        </FieldRow>
+        <FieldRow label="Blurb (optional)">
+          <input
+            value={blurb}
+            onChange={(e) => setBlurb(e.target.value)}
+            placeholder="Premium hybrid coil-and-foam"
+            className={INPUT_CLS}
+          />
+        </FieldRow>
+        {category === "bedframe" && (
+          <>
+            <FieldRow label="Colors (comma-separated)">
+              <input
+                value={colors}
+                onChange={(e) => setColors(e.target.value)}
+                placeholder="Black, Walnut, Natural Oak"
+                className={INPUT_CLS}
+              />
+            </FieldRow>
+            <FieldRow label='Gaps (comma-separated, e.g. 10", 12", 14")'>
+              <input
+                value={gaps}
+                onChange={(e) => setGaps(e.target.value)}
+                placeholder='10", 12", 14"'
+                className={INPUT_CLS}
+              />
+            </FieldRow>
+          </>
+        )}
+        {category === "sofa" && (
+          <FieldRow label="Sofa mode">
+            <select
+              value={sofaMode}
+              onChange={(e) =>
+                setSofaMode(e.target.value as "preset" | "custom" | "both")
+              }
+              className={INPUT_CLS}
+            >
+              <option value="preset">Preset (whole sofa SKUs)</option>
+              <option value="custom">Custom (component pieces)</option>
+              <option value="both">Both</option>
+            </select>
+          </FieldRow>
+        )}
+      </div>
+      <ModalActions
+        onCancel={onClose}
+        onPrimary={submit}
+        primary="Add model"
+        primaryDisabled={!valid}
+        primaryPending={create.isPending}
+      />
+    </Modal>
+  );
+}
+
+function AddVariantModal({
+  model,
+  onClose,
+}: {
+  model: ProductModelDto;
+  onClose: () => void;
+}) {
+  const create = useCreateCatalogSku();
+  const [variant, setVariant] = useState("");
+  const [variantKind, setVariantKind] = useState<"size" | "preset" | "part">(
+    model.category === "sofa"
+      ? model.sofaMode === "custom"
+        ? "part"
+        : "preset"
+      : "size",
+  );
+  const [price, setPrice] = useState("");
+  const [cost, setCost] = useState("");
+
+  const priceNum = Number(price);
+  const costNum = cost.trim() === "" ? null : Number(cost);
+  const valid =
+    variant.length > 0 &&
+    Number.isFinite(priceNum) &&
+    priceNum >= 0 &&
+    (costNum === null || (Number.isFinite(costNum) && costNum >= 0));
+
+  function submit() {
+    if (!valid) return;
+    create.mutate(
+      {
+        modelId: model.id,
+        variant,
+        variantKind,
+        price: priceNum,
+        cost: costNum,
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Added ${variant} to ${model.name}`);
+          onClose();
+        },
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Add failed"),
+      },
+    );
+  }
+
+  return (
+    <Modal title={`Add variant to ${model.name}`} onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <FieldRow
+          label={
+            model.category === "sofa"
+              ? "Component name (e.g. 3-seater, Corner)"
+              : "Size variant (e.g. King, Queen)"
+          }
+        >
+          <input
+            value={variant}
+            onChange={(e) => setVariant(e.target.value)}
+            data-testid="add-variant-name"
+            className={INPUT_CLS}
+          />
+        </FieldRow>
+        {model.category === "sofa" && (
+          <FieldRow label="Variant kind">
+            <select
+              value={variantKind}
+              onChange={(e) =>
+                setVariantKind(e.target.value as "size" | "preset" | "part")
+              }
+              className={INPUT_CLS}
+            >
+              <option value="preset">Preset (complete sofa)</option>
+              <option value="part">Part (component piece)</option>
+            </select>
+          </FieldRow>
+        )}
+        <FieldRow label="Retail price (RM)">
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            data-testid="add-variant-price"
+            className={INPUT_CLS}
+          />
+        </FieldRow>
+        <FieldRow label="Cost (RM, optional — set later if unknown)">
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            placeholder="—"
+            data-testid="add-variant-cost"
+            className={INPUT_CLS}
+          />
+        </FieldRow>
+      </div>
+      <ModalActions
+        onCancel={onClose}
+        onPrimary={submit}
+        primary="Add variant"
+        primaryDisabled={!valid}
+        primaryPending={create.isPending}
+      />
+    </Modal>
+  );
+}
+
+function AddFabricModal({
+  model,
+  onClose,
+}: {
+  model: ProductModelDto;
+  onClose: () => void;
+}) {
+  const create = useCreateSofaFabric();
+  const [name, setName] = useState("");
+  const [surcharge, setSurcharge] = useState("0");
+
+  const surchargeNum = Number(surcharge);
+  const valid =
+    name.length > 0 && Number.isFinite(surchargeNum) && surchargeNum >= 0;
+
+  function submit() {
+    if (!valid) return;
+    create.mutate(
+      {
+        modelId: model.id,
+        fabricName: name,
+        surcharge: surchargeNum,
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Added ${name} fabric`);
+          onClose();
+        },
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Add failed"),
+      },
+    );
+  }
+
+  return (
+    <Modal title={`Add fabric to ${model.name}`} onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <FieldRow label="Fabric name">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Linen Slate"
+            data-testid="add-fabric-name"
+            className={INPUT_CLS}
+          />
+        </FieldRow>
+        <FieldRow label="Surcharge (RM, applied per unit on top of variant price)">
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={surcharge}
+            onChange={(e) => setSurcharge(e.target.value)}
+            data-testid="add-fabric-surcharge"
+            className={INPUT_CLS}
+          />
+        </FieldRow>
+      </div>
+      <ModalActions
+        onCancel={onClose}
+        onPrimary={submit}
+        primary="Add fabric"
+        primaryDisabled={!valid}
+        primaryPending={create.isPending}
+      />
+    </Modal>
+  );
+}
+
+function FieldRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="label block mb-1">{label}</span>
+      {children}
+    </label>
+  );
+}

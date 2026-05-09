@@ -39,7 +39,11 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Catalog",
     items: [
-      { k: "catalog", t: "Catalog & Pricing", icon: "▭", enabled: false, phase: "Phase 5" },
+      // 0074 catalog admin (Loo 2026-05-09 Q1=b, Q2=c) — promoted from
+      // Phase-5 stub to live link; same page also mounts under
+      // /logistics/catalog. RLS write covers principal+logistics via
+      // is_internal().
+      { k: "catalog", t: "Catalog & Pricing", icon: "▭", enabled: true },
     ],
   },
   {

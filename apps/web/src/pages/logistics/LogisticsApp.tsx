@@ -6,6 +6,7 @@ import LogisticsOrders from "./LogisticsOrders";
 import LogisticsWarehouse from "./LogisticsWarehouse";
 import LogisticsMovements from "./LogisticsMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
+import LogisticsCatalog from "@/pages/catalog/LogisticsCatalog";
 import type { MovementsFilters } from "@/lib/queries";
 
 /**
@@ -140,6 +141,7 @@ export default function LogisticsApp() {
                 setTab={changeTab}
               />
             )}
+            {tab === "catalog" && <LogisticsCatalog />}
           </>
         )}
       </main>

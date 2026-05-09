@@ -4,6 +4,7 @@ import PrincipalDashboard from "./PrincipalDashboard";
 import PrincipalApprovals from "./PrincipalApprovals";
 import PrincipalDealers from "./PrincipalDealers";
 import PrincipalPartners from "./PrincipalPartners";
+import LogisticsCatalog from "@/pages/catalog/LogisticsCatalog";
 import { usePrincipalDashboard } from "@/lib/queries";
 
 /**
@@ -40,6 +41,7 @@ export default function PrincipalApp() {
         {tab === "approvals" && <PrincipalApprovals />}
         {tab === "dealers" && <PrincipalDealers />}
         {tab === "partners" && <PrincipalPartners />}
+        {tab === "catalog" && <LogisticsCatalog />}
       </main>
     </div>
   );

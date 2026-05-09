@@ -735,8 +735,6 @@ describe("CreatePOModal — Suggest from alerts (T22)", () => {
  * tests above already use.
  */
 describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement)", () => {
-  const SKU_KING = "mattress:carres-cloud:King";
-
   it("renders the lines table + heading on mount", () => {
     render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
     expect(screen.getByText(/New purchase order/)).toBeInTheDocument();
