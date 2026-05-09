@@ -196,6 +196,44 @@ VALUES
   ('PO-FIXTURE-LP',  '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '00000000-0000-0000-0000-0000000000f1', now() - interval '2 days')
 ON CONFLICT (id) DO NOTHING;
 
+-- ----- Race-condition fixture for concurrent-rfd-race E2E spec -----
+-- A thread at logistics_stage='ready_to_dispatch'. Two concurrent calls to
+-- logistics_dispatch_customer_leg(force=true) should serialize via FOR UPDATE:
+-- first wins (200), second sees state='dispatched' → 22023 → 422 (mapPgError).
+--
+-- Idempotent reset: delete + reinsert. Ensures the thread starts fresh at
+-- ready_to_dispatch even after a prior run flipped it to 'dispatched'.
+DELETE FROM order_supplier_threads WHERE id = '99999999-7777-7777-7777-000000007777';
+DELETE FROM orders WHERE id = '99999999-7000-7000-7000-000000007000';
+
+INSERT INTO orders (
+  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  customer_name, customer_phone, customer_address, customer_address_unknown,
+  delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
+  paid, terms_accepted, placed_at
+)
+VALUES (
+  '99999999-7000-7000-7000-000000007000'::uuid,
+  9070, 'proceed_order', 'dealer',
+  '00000000-0000-0000-0000-000000000d01',
+  '00000000-0000-0000-0000-0000000000a1',
+  '00000000-0000-0000-0000-0000000000b1',
+  'E2E Race Customer', '+60 11 9070 0000', '7 Race St', false,
+  current_date + 7, false, 1, false,
+  0, true, now() - interval '1 day'
+);
+
+INSERT INTO order_supplier_threads (
+  id, order_id, supplier_id, category, sop_name, logistics_stage, history
+)
+VALUES (
+  '99999999-7777-7777-7777-000000007777'::uuid,
+  '99999999-7000-7000-7000-000000007000'::uuid,
+  '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
+  'mattress', 'STANDARD', 'ready_to_dispatch',
+  '[]'::jsonb
+);
+
 -- Stockpile threshold fixture for stockpile-alert-to-po E2E spec.
 -- mattress:carres-cloud:Queen at warehouse c1 has qty=4 in seed (line 200 of
 -- seed.sql). Setting low_threshold=50 guarantees logistics_stock_alerts()
