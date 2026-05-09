@@ -44,10 +44,27 @@ const ME_OWN = {
   slug: "cloud-mattress",
   portal_enabled: true,
 };
+const ACTIVITY = [
+  {
+    id: "h1",
+    po_id: "PO-2050",
+    text: "Acknowledged · production scheduled",
+    by_role: "supplier",
+    occurred_at: new Date(Date.now() - 30 * 60_000).toISOString(),
+  },
+  {
+    id: "h2",
+    po_id: "PO-2049",
+    text: "Production started",
+    by_role: "supplier",
+    occurred_at: new Date(Date.now() - 4 * 60 * 60_000).toISOString(),
+  },
+];
 
 function mockAll() {
   vi.mocked(apiFetch).mockImplementation(async (url: string) => {
     if (url.includes("/api/supplier/me")) return ME_OWN;
+    if (url.includes("/api/supplier/activity")) return ACTIVITY;
     if (url.includes("/products/demand")) return DEMAND;
     if (url.includes("/api/supplier/pos")) return POS;
     throw new Error(`unexpected fetch ${url}`);
@@ -116,6 +133,7 @@ describe("SupplierDashboard", () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.includes("/api/supplier/me"))
         return { ...ME_OWN, kind: "factory_pickup" };
+      if (url.includes("/api/supplier/activity")) return ACTIVITY;
       if (url.includes("/products/demand")) return DEMAND;
       if (url.includes("/api/supplier/pos")) return POS;
       throw new Error(`unexpected fetch ${url}`);
@@ -125,6 +143,44 @@ describe("SupplierDashboard", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Factory pickup")).toBeInTheDocument();
+    });
+  });
+
+  it("renders Recent activity feed from useSupplierActivity", async () => {
+    mockAll();
+
+    render(wrap(<SupplierDashboard />));
+
+    // Wait specifically for the activity data — the section container renders
+    // immediately with a Loading… stub, so getByTestId would resolve before
+    // the useQuery settles.
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Acknowledged.*production scheduled/),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("supplier-recent-activity")).toBeInTheDocument();
+    expect(screen.getByText("Recent activity")).toBeInTheDocument();
+    expect(screen.getByText(/Production started/)).toBeInTheDocument();
+    // PO ids surface as anchors in the feed.
+    expect(screen.getByText("PO-2050")).toBeInTheDocument();
+    expect(screen.getByText("PO-2049")).toBeInTheDocument();
+  });
+
+  it("Recent activity shows empty hint when feed is empty", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/api/supplier/me")) return ME_OWN;
+      if (url.includes("/api/supplier/activity")) return [];
+      if (url.includes("/products/demand")) return DEMAND;
+      if (url.includes("/api/supplier/pos")) return POS;
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<SupplierDashboard />));
+
+    await waitFor(() => {
+      expect(screen.getByText("No recent activity yet.")).toBeInTheDocument();
     });
   });
 });

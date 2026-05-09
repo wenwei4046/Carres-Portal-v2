@@ -2,6 +2,7 @@ import {
   useSupplierPos,
   useSupplierDemand,
   useSupplierMe,
+  useSupplierActivity,
   type SupplierPoRow,
 } from "@/lib/queries";
 
@@ -11,18 +12,18 @@ import {
  * Visual reference: `reference/proto/supplier-pages.jsx:47-198`.
  *
  * Wires `useSupplierPos` (full RLS-scoped list) + `useSupplierDemand`
- * (top SKUs from open POs) + `useSupplierMe` (profile row for Coverage
- * callout — kind / cat_covered / lead_time / contact). KPI row + pipeline
- * overview + Coverage callout + top demand.
+ * (top SKUs from open POs) + `useSupplierMe` (Coverage callout) +
+ * `useSupplierActivity` (last 6 po_history entries). KPI row → pipeline
+ * overview → Coverage → Recent activity → Top demand.
  *
- * Skipped vs proto:
- *   - Recent activity feed (needs po_history endpoint — closes via separate
- *     phase-6-supplier-recent-activity carry-forward)
+ * Closes phase-6-supplier-recent-activity (V1 left this slot empty) and
+ * phase-6-supplier-me-endpoint (Coverage callout was deferred).
  */
 export default function SupplierDashboard() {
   const pos = useSupplierPos();
   const demand = useSupplierDemand();
   const me = useSupplierMe();
+  const activity = useSupplierActivity();
 
   const rows: SupplierPoRow[] = pos.data ?? [];
 
@@ -190,6 +191,45 @@ export default function SupplierDashboard() {
         </div>
       )}
 
+      {/* Recent activity — last 6 po_history entries (RLS-scoped to this
+          supplier via po_history_read policy 0002:256). */}
+      <div
+        className="border border-border rounded-md p-5 mb-5 bg-card"
+        data-testid="supplier-recent-activity"
+      >
+        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-3">
+          Recent activity
+        </div>
+        {activity.isLoading ? (
+          <div className="text-[13px] text-muted-foreground py-2">Loading…</div>
+        ) : (activity.data ?? []).length === 0 ? (
+          <div className="text-[13px] text-muted-foreground py-2">
+            No recent activity yet.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {(activity.data ?? []).map((a) => (
+              <div
+                key={a.id}
+                className="flex items-baseline justify-between py-1 border-b border-dashed border-border last:border-0"
+              >
+                <div className="min-w-0 mr-3">
+                  <span className="font-mono text-[12px] text-foreground mr-2">
+                    {a.po_id}
+                  </span>
+                  <span className="text-[12.5px] text-muted-foreground">
+                    {a.text}
+                  </span>
+                </div>
+                <span className="text-[10.5px] text-muted-foreground font-mono whitespace-nowrap">
+                  {formatRelative(a.occurred_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Top SKUs */}
       <div className="border border-border rounded-md p-5 bg-card">
         <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-4">
@@ -306,4 +346,17 @@ function PipelineArrow() {
       →
     </div>
   );
+}
+
+/** Compact relative time for the activity feed. Stays readable up to a
+ *  week; falls back to ISO date thereafter. */
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return iso;
+  const diff = Date.now() - then;
+  if (diff < 60_000)            return "just now";
+  if (diff < 60 * 60_000)       return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 24 * 60 * 60_000)  return `${Math.floor(diff / (60 * 60_000))}h ago`;
+  if (diff < 7 * 24 * 60 * 60_000) return `${Math.floor(diff / (24 * 60 * 60_000))}d ago`;
+  return iso.slice(0, 10);
 }

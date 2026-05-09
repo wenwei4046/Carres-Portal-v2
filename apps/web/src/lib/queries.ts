@@ -156,6 +156,7 @@ export const qk = {
   // dashboard counts) or a tighter sub-tree.
   supplier: {
     me:       () => ["supplier", "me"] as const,
+    activity: (limit?: number) => ["supplier", "activity", limit ?? 6] as const,
     pos:      (bucket?: SupplierBucket) => ["supplier", "pos", bucket ?? "all"] as const,
     po:       (id: string) => ["supplier", "pos", id] as const,
     products: () => ["supplier", "products"] as const,
@@ -2718,6 +2719,16 @@ export interface SupplierProductRow {
   model: { name: string; blurb: string | null } | null;
 }
 
+/** GET /api/supplier/activity row — closes phase-6-supplier-recent-activity.
+ *  RLS-scoped via po_history_read (0002:256); supplier sees only own rows. */
+export interface SupplierActivityRow {
+  id:          string;
+  po_id:       string;
+  text:        string;
+  by_role:     string | null;
+  occurred_at: string;
+}
+
 /** GET /api/supplier/me payload — closes phase-6-supplier-me-endpoint.
  *  `kind` gates the PO action buttons (factory_pickup skips Acknowledge);
  *  `cat_covered` + `lead_time` + `contact_email` feed the Dashboard
@@ -2747,6 +2758,23 @@ export function useSupplierMe(
     queryKey: qk.supplier.me(),
     queryFn: () => apiFetch<SupplierMe>("/api/supplier/me"),
     staleTime: 5 * 60_000,
+    ...opts,
+  });
+}
+
+export function useSupplierActivity(
+  limit?: number,
+  opts?: Partial<UseQueryOptions<SupplierActivityRow[], ApiError>>,
+) {
+  return useQuery<SupplierActivityRow[], ApiError>({
+    queryKey: qk.supplier.activity(limit),
+    queryFn: () => {
+      const path = limit
+        ? `/api/supplier/activity?limit=${encodeURIComponent(limit)}`
+        : "/api/supplier/activity";
+      return apiFetch<SupplierActivityRow[]>(path);
+    },
+    staleTime: 30_000,
     ...opts,
   });
 }
