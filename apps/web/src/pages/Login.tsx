@@ -31,9 +31,13 @@ export default function Login() {
             ? "/logistics"
             : role === "partner"
               ? "/delivery-partner/dashboard"
-              : role === "dealer" || role === "salesperson"
-                ? "/dealer"
-                : "/me";
+              : role === "finance"
+                ? "/finance"
+                : role === "supplier"
+                  ? "/supplier"
+                  : role === "dealer" || role === "salesperson"
+                    ? "/dealer"
+                    : "/me";
       navigate(from && from !== "/login" ? from : defaultHome, { replace: true });
     }
   }, [session, role, location.state, navigate]);
