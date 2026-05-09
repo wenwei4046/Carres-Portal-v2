@@ -35,6 +35,12 @@ const PIPELINE_BUCKETS = {
   po: ["pending", "acknowledged", "in_production"] as const,
   ready: [
     "ready_for_pickup",
+    // ready_confirm_sent is the actual post-press state for HoOKkA flows
+    // (logistics_supplier_ready_confirm RPC, 0034:270) — it was missing from
+    // the bucket which made the PO disappear from the supplier's view after
+    // pressing "Mark Ready for Pickup". Surfaced 2026-05-09 by phase-6
+    // E2E spec.
+    "ready_confirm_sent",
     "pickup_assigned",
     "pickup_accepted",
     "shipped",

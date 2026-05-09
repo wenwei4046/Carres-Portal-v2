@@ -19,14 +19,11 @@ async function login(page: Page, email: string, password: string) {
 // exercises every supplier-callable RPC. factory_pickup variant for
 // Nice Future is covered by API tests; an E2E variant could be added
 // post-V1 if the path diverges materially.
-// Pre-condition update 2026-05-09 morning: spec is ready to run but blocks
-// on (a) the seed having ≥1 HoOKkA PO in pending sup_status, and (b)
-// `pnpm reset:e2e-state` working — currently blocked by the LP whitelist
-// trigger (0046) firing on service_role connections because
-// `app_role() <> 'partner'` evaluates to NULL not TRUE when auth.uid() is
-// null. Fix needs a new migration: skip trigger when app_role() IS NULL.
-// Tracked: phase-7-lp-whitelist-trigger-service-role-bypass.
-test.fixme("phase-6 happy: supplier acknowledges PO → production → ready → DO upload → delivered", async ({ page }) => {
+// Pre-condition: run `pnpm seed:test-users && pnpm reset:e2e-state` before
+// running this spec — the first ensures the @carres.com seed users have
+// role/entity ids in app_metadata; the second resets HoOKkA POs back to
+// pending sup_status so the spec finds work to do. Both are idempotent.
+test("phase-6 happy: supplier acknowledges PO → production → ready → DO upload → delivered", async ({ page }) => {
   // ----- 1. Supplier login + sees PO list -----------------------------------
   await login(page, "supplier@carres.com", "111");
   await expect(page).toHaveURL(/\/supplier(\/dashboard)?$/);
