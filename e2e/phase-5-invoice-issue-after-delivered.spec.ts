@@ -30,10 +30,11 @@ async function login(page: Page, email: string, password: string) {
 // SST 8% inclusive split: tax = total * 0.08 / 1.08 (proto convention,
 // codified in the invoice_issue RPC consumer).
 // 2026-05-09 partial progress: locator fixes applied (DL-9001 → INV-2026-9001
-// row matcher; "All" exact:true; "Paid · N" regex). Login + AR + Issue button
-// flow ALL work. Fails after toast assertion — likely state-pollution interaction
-// even with seed-e2e-fixtures.sql DELETE/UPDATE reset (some downstream side
-// effect not fully cleaned). Stays test.fixme pending end-to-end debug.
+// row matcher, "All" exact:true, "Paid · N" regex). Login + AR + Issue button
+// all confirmed working in single-step manual run. Full spec hits a 30s test
+// timeout — exact failing assertion unclear (page snapshot shows /finance/dashboard
+// rather than /finance/ar mid-test, possibly a navigation race after issue or
+// reload). Re-fixme'd pending deeper trace investigation.
 test.fixme("phase-5 A2: order delivered → finance issues invoice → AR shows paid + invoice_no", async ({ browser }) => {
   // ----- 0. Pre-condition: a delivered + fully-paid order ------------------
   // Either rely on a seed row OR drive an order through the happy path here.
