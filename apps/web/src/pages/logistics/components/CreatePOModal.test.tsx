@@ -174,7 +174,32 @@ function setLoaded() {
   };
   catalogHookState = {
     data: {
-      models: [],
+      // 0073 — cascade picker (Loo 2026-05-09) needs models indexed by id +
+      // category so each line can render Model → Variant → (color/gap or
+      // fabric). Pre-0073 the modal only consumed `skus`, so the fixture
+      // omitted models — that's why earlier tests passed with `models: []`.
+      models: [
+        {
+          id: "m1",
+          category: "mattress" as const,
+          modelKey: "carres-cloud",
+          name: "Carres Cloud",
+          blurb: null,
+          colors: null,
+          gaps: null,
+          sofaMode: null,
+        },
+        {
+          id: "m2",
+          category: "sofa" as const,
+          modelKey: "nordic",
+          name: "Nordic Sofa",
+          blurb: null,
+          colors: null,
+          gaps: null,
+          sofaMode: "preset" as const,
+        },
+      ],
       skus: [
         {
           id: "s1",
@@ -812,7 +837,9 @@ describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement
     ).toBe("hand_entered");
 
     // Switch SKU on line 0 from King → Queen.
-    const skuSelects = screen.getAllByLabelText(/Line \d+ SKU/);
+    // 0073 cascade picker: SKU swap moved from a single dropdown to the
+    // per-line Variant select (model already chosen by the seeded default).
+    const skuSelects = screen.getAllByLabelText(/Line \d+ variant/);
     fireEvent.change(skuSelects[0], { target: { value: SKU_QUEEN } });
 
     // After the switch, the new line's CogsLineEditor (keyed by Queen) should
@@ -836,7 +863,9 @@ describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement
     render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
     // Add a second SKU mapped to SUPPLIER_B (sofa:...)
     fireEvent.click(screen.getByRole("button", { name: /\+ Add SKU/ }));
-    const skuSelects = screen.getAllByLabelText(/Line \d+ SKU/);
+    // 0073 cascade picker: SKU swap moved from a single dropdown to the
+    // per-line Variant select (model already chosen by the seeded default).
+    const skuSelects = screen.getAllByLabelText(/Line \d+ variant/);
     expect(skuSelects.length).toBe(2);
     fireEvent.change(skuSelects[1], { target: { value: "sofa:nordic:3s" } });
     // The notice has "Auto-split:" followed by N separate POs in a <strong>;
@@ -1026,7 +1055,13 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
       pos: {
         supplierId: string;
         warehouseId: string;
-        lines: { sku: string; qty: number; cost: number; costSource: string }[];
+        lines: {
+          sku: string;
+          qty: number;
+          cost: number;
+          costSource: string;
+          attrs: Record<string, unknown> | null;
+        }[];
       }[];
     };
     expect(callArg.pos).toHaveLength(2);
@@ -1034,12 +1069,14 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
     const bGroup = callArg.pos.find((p) => p.supplierId === SUPPLIER_B.id);
     expect(aGroup?.warehouseId).toBe(WAREHOUSE_KL.id);
     expect(bGroup?.warehouseId).toBe(WAREHOUSE_PG.id);
+    // 0073 cascade picker: mattress + sofa-without-fabric lines emit attrs=null.
     expect(aGroup?.lines).toEqual([
       {
         sku: SKU_KING,
         qty: 5,
         cost: 1500,
         costSource: "hand_entered",
+        attrs: null,
       },
     ]);
     expect(bGroup?.lines).toEqual([
@@ -1048,6 +1085,7 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
         qty: 3,
         cost: 2200,
         costSource: "prev_po",
+        attrs: null,
       },
     ]);
   });

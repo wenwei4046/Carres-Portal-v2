@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { ManualCostSource } from "@carres/shared";
+import type {
+  ManualCostSource,
+  ProductModelDto,
+  ProductSkuDto,
+  SofaFabricDto,
+} from "@carres/shared";
 
 // T42-C1 — Form state uses `ManualCostSource` (3-value, no `auto_issued`)
 // rather than the wider DB-level `CostSource` (4-value). The `auto_issued`
@@ -82,23 +87,62 @@ interface Props {
 }
 
 interface DraftLine {
+  // 0073 cascade picker (Loo 2026-05-09). Track the selected model separately
+  // from the resolved SKU so the user can pick "Elwood" first, then choose
+  // King vs Queen. modelId="" means no model picked yet; sku="" means no
+  // variant picked yet. Submit gate refuses both.
+  modelId: string;
   sku: string;
   qty: number;
   // T29 — per-line COGS fields. Driven by `<CogsLineEditor>` (T28). Both
   // start as null on a fresh row and must be non-null at submit time
   // (validated below). Mirrors `createPoInput.lines[]` zod shape; the API
   // edge transforms `costSource` → `cost_source` before the RPC call.
-  // T42-C1 — narrowed to `ManualCostSource` (3-value) to match the API
-  // contract — `auto_issued` is server-only and never originates from this
-  // form.
   cost: number | null;
   costSource: ManualCostSource | null;
+  // 0073 cascade picker payload. Bedframe={color, gap}, Sofa={fabric_id,
+  // fabric_name, fabric_surcharge}, Mattress=null. Submit gate refuses when
+  // bedframe lacks color/gap or sofa lacks fabric_id.
+  attrs: Record<string, unknown> | null;
 }
 
 // Convention: SKUs are formatted `category:model:variant`. The first segment
 // is the category which `suppliers.cat_covered[]` is keyed by.
 function categoryForSku(sku: string): string {
   return (sku || "").split(":")[0] || "";
+}
+function modelKeyOfSku(sku: string): string {
+  return (sku || "").split(":")[1] || "";
+}
+function modelIdForSku(sku: string, models: ProductModelDto[]): string {
+  const key = modelKeyOfSku(sku);
+  if (!key) return "";
+  return models.find((m) => m.modelKey === key)?.id ?? "";
+}
+function modelById(modelId: string, models: ProductModelDto[]): ProductModelDto | null {
+  return models.find((m) => m.id === modelId) ?? null;
+}
+// True when this line still needs cascade input (bedframe color/gap or sofa
+// fabric). Mattress lines always pass.
+function attrsMissingForLine(
+  line: DraftLine,
+  models: ProductModelDto[],
+  fabricsByModel: Map<string, SofaFabricDto[]>,
+): boolean {
+  if (!line.modelId || !line.sku) return true;
+  const model = modelById(line.modelId, models);
+  if (!model) return true;
+  if (model.category === "bedframe") {
+    const color = (line.attrs as { color?: string } | null)?.color;
+    const gap = (line.attrs as { gap?: string } | null)?.gap;
+    return !color || !gap;
+  }
+  if (model.category === "sofa") {
+    if ((fabricsByModel.get(model.id) ?? []).length === 0) return false;
+    const fid = (line.attrs as { fabric_id?: string } | null)?.fabric_id;
+    return !fid;
+  }
+  return false;
 }
 
 function findSupplierForSku(
@@ -159,9 +203,36 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
 
   const suppliers = suppliersQ.data?.suppliers ?? [];
   const warehouses = warehousesQ.data?.warehouses ?? [];
-  const skuOptions = useMemo(() => {
-    const skus = catalogQ.data?.skus ?? [];
-    return skus.map((s) => ({ sku: s.sku, name: s.variant }));
+  // 0073 cascade picker (Loo 2026-05-09). Three indices over the catalog let
+  // each line render its category-aware cascade in O(1):
+  //   - models                : ordered list grouped by category (for the
+  //                             top-of-line model dropdown).
+  //   - skusByModel           : model.id → ProductSkuDto[] (size variants).
+  //   - fabricsByModel        : model.id → SofaFabricDto[] (sofa fabric chips).
+  // `attrsMissingForLine` reads fabricsByModel to skip the fabric-required
+  // refusal for sofa models with no fabrics configured (defensive — staging
+  // currently always has fabrics).
+  const models = useMemo<ProductModelDto[]>(
+    () => catalogQ.data?.models ?? [],
+    [catalogQ.data],
+  );
+  const skusByModel = useMemo(() => {
+    const m = new Map<string, ProductSkuDto[]>();
+    for (const s of catalogQ.data?.skus ?? []) {
+      const arr = m.get(s.modelId) ?? [];
+      arr.push(s);
+      m.set(s.modelId, arr);
+    }
+    return m;
+  }, [catalogQ.data]);
+  const fabricsByModel = useMemo(() => {
+    const m = new Map<string, SofaFabricDto[]>();
+    for (const f of catalogQ.data?.sofaFabrics ?? []) {
+      const arr = m.get(f.modelId) ?? [];
+      arr.push(f);
+      m.set(f.modelId, arr);
+    }
+    return m;
   }, [catalogQ.data]);
   const partners = partnersQ.data?.partners ?? [];
 
@@ -171,27 +242,48 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // valid-form gate enforces non-null per line). Auto-fill / suggest paths
   // also leave them null so the operator picks the cost source explicitly per
   // line.
+  // 0073 — prefill carries sku only. Derive modelId so the cascade renders
+  // correctly when the modal opens auto-filled from a shortage. attrs starts
+  // null on every line; bedframe/sofa lines flag red until the operator
+  // completes color/gap/fabric inline (Q2=A red-flag pattern).
   const initialLines: DraftLine[] = useMemo(() => {
     if (prefill.lines && prefill.lines.length > 0) {
       return prefill.lines.map((l) => ({
+        modelId: modelIdForSku(l.sku, models),
         sku: l.sku,
         qty: l.qty,
         cost: null,
         costSource: null,
+        attrs: null,
       }));
     }
     return [];
-  }, [prefill.lines]);
+  }, [prefill.lines, models]);
   const [lines, setLines] = useState<DraftLine[]>(initialLines);
 
   // Default the first line to the first SKU once the catalog loads (only when
   // we started with zero prefill lines). This mirrors proto's `[{ sku: stock[0],
-  // qty: 5 }]` default.
+  // qty: 5 }]` default. 0073: derive modelId from the SKU so the cascade sub-
+  // row renders the right Variant/Color/Gap/Fabric combo. attrs starts null;
+  // bedframe/sofa default lines flag red until the operator completes the
+  // cascade (Q2=A red-flag pattern).
   useEffect(() => {
-    if (lines.length === 0 && skuOptions.length > 0 && initialLines.length === 0) {
-      setLines([{ sku: skuOptions[0].sku, qty: 5, cost: null, costSource: null }]);
+    if (lines.length === 0 && initialLines.length === 0) {
+      const firstSku = catalogQ.data?.skus?.[0];
+      if (firstSku) {
+        setLines([
+          {
+            modelId: firstSku.modelId,
+            sku: firstSku.sku,
+            qty: 5,
+            cost: null,
+            costSource: null,
+            attrs: null,
+          },
+        ]);
+      }
     }
-  }, [lines.length, skuOptions, initialLines.length]);
+  }, [lines.length, catalogQ.data, initialLines.length]);
 
   // C5.2 — per-supplier-group warehouse (Q4=A: blank required, no auto-default).
   // `prefill.warehouseId` (when supplied) seeds every group on first paint, so
@@ -292,12 +384,17 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       // Q3=A — override (replace), not append. Q2-extended — line.qty equals
       // the literal shortfall (need - available), as returned by the server.
       // T29: cost + costSource start null — operator picks via CogsLineEditor.
+      // 0073: derive modelId from sku; attrs left null so bedframe/sofa lines
+      // surface as red-flagged "missing color/gap/fabric" until the operator
+      // completes the cascade inline (Loo Q2=A 2026-05-09).
       setLines(
         data.shortage.map((s) => ({
+          modelId: modelIdForSku(s.sku, models),
           sku: s.sku,
           qty: s.shortage,
           cost: null,
           costSource: null,
+          attrs: null,
         })),
       );
       const totalUnits = data.shortage.reduce((acc, s) => acc + s.need, 0);
@@ -361,11 +458,15 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         const gap = Math.max(1, target - a.effective);
         gapBySku.set(a.sku, (gapBySku.get(a.sku) ?? 0) + gap);
       }
+      // 0073: derive modelId per sku; attrs null until operator picks the
+      // bedframe color/gap or sofa fabric inline (red-flagged pattern).
       const nextLines = Array.from(gapBySku.entries()).map(([sku, qty]) => ({
+        modelId: modelIdForSku(sku, models),
         sku,
         qty,
         cost: null,
         costSource: null,
+        attrs: null,
       }));
       setLines(nextLines);
       const count = nextLines.length;
@@ -382,14 +483,39 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   function setLine(idx: number, patch: Partial<DraftLine>) {
     setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   }
+  // 0073 — switching the Model dropdown clears the variant + attrs + COGS
+  // because none of those carry meaningfully across models. Same SKU swap
+  // pattern as T42-C4 below, just lifted up one cascade step.
+  function setLineModel(idx: number, modelId: string) {
+    setLine(idx, {
+      modelId,
+      sku: "",
+      attrs: null,
+      cost: null,
+      costSource: null,
+    });
+  }
   function addLine() {
+    // Seed the first unused SKU so the cascade renders with sensible
+    // defaults (operator can re-pick Model/Variant/etc. inline). Pre-0073
+    // behaviour did the same. attrs starts null — bedframe/sofa lines flag
+    // red until the operator completes the cascade.
     const used = new Set(lines.map((l) => l.sku));
-    const next = skuOptions.find((s) => !used.has(s.sku));
-    const fallback = skuOptions[0];
-    const sku = next?.sku ?? fallback?.sku ?? "";
-    if (!sku) return;
-    // T29: cost + costSource start null — populated via CogsLineEditor below.
-    setLines((ls) => [...ls, { sku, qty: 1, cost: null, costSource: null }]);
+    const next = (catalogQ.data?.skus ?? []).find((s) => !used.has(s.sku));
+    const fallback = catalogQ.data?.skus?.[0];
+    const seed = next ?? fallback;
+    if (!seed) return;
+    setLines((ls) => [
+      ...ls,
+      {
+        modelId: seed.modelId,
+        sku: seed.sku,
+        qty: 1,
+        cost: null,
+        costSource: null,
+        attrs: null,
+      },
+    ]);
   }
   function removeLine(idx: number) {
     setLines((ls) => (ls.length > 1 ? ls.filter((_, i) => i !== idx) : ls));
@@ -414,6 +540,10 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // before submit. The shared zod `createPoInput.lines[]` requires both;
   // we mirror it here so the user gets immediate per-row feedback via the
   // CogsLineEditor inline hint instead of a 422 round-trip.
+  // 0073 — extend the line gate to refuse submit when bedframe lacks
+  // color/gap or sofa lacks fabric_id. Mattress lines pass (no extras).
+  // attrsMissingForLine returns true when the line is incomplete; the gate
+  // accepts only `false` (i.e. no missing extras).
   const allLinesOk =
     lines.length > 0 &&
     lines.every(
@@ -422,7 +552,8 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         l.qty > 0 &&
         l.cost != null &&
         l.cost >= 0 &&
-        l.costSource != null,
+        l.costSource != null &&
+        !attrsMissingForLine(l, models, fabricsByModel),
     );
   const partnersOk = groups.groups.every(
     (g) => g.supplier.kind !== "factory_pickup" || !!partnerFor(g.supplier),
@@ -469,6 +600,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             qty: l.qty,
             cost: l.cost!,
             costSource: l.costSource!,
+            attrs: l.attrs ?? null,
           })),
           ...(!stockpile && prefill.dl ? { dl: prefill.dl } : {}),
           ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
@@ -493,6 +625,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
               qty: l.qty,
               cost: l.cost!,
               costSource: l.costSource!,
+              attrs: l.attrs ?? null,
             })),
             ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
               ? { dlRefs: prefill.dlRefs }
@@ -662,6 +795,26 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         </div>
         {lines.map((l, i) => {
           const sup = findSupplierForSku(l.sku, suppliers);
+          // 0073 cascade picker (Loo 2026-05-09). Per-line we read the model
+          // record + its variant/fabric lookups to render category-aware
+          // sub-row dropdowns. modelId="" means the operator hasn't picked a
+          // model yet → only the top row + a hint render. Once model is
+          // chosen, a sub-row appears with Variant + (color/gap | fabric).
+          const model = l.modelId ? modelById(l.modelId, models) : null;
+          const variants = l.modelId ? (skusByModel.get(l.modelId) ?? []) : [];
+          const fabrics = l.modelId ? (fabricsByModel.get(l.modelId) ?? []) : [];
+          const attrsObj = (l.attrs ?? {}) as {
+            color?: string;
+            gap?: string;
+            fabric_id?: string;
+          };
+          const attrsMissing = attrsMissingForLine(l, models, fabricsByModel);
+          const subGrid =
+            model?.category === "bedframe"
+              ? "1fr 1fr 1fr"
+              : model?.category === "sofa"
+                ? "1fr 1fr"
+                : "1fr";
           return (
             <div
               key={i}
@@ -672,28 +825,44 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                 className="grid items-center gap-2"
                 style={{ gridTemplateColumns: "1fr 130px 90px 32px" }}
               >
+                {/* 0073 — Model dropdown (replaces single-SKU select). Grouped
+                    by category so the operator scans by furniture type first.
+                    Switching model resets variant + attrs + cost (see
+                    setLineModel) since none of those carry across models. */}
                 <select
-                  value={l.sku}
-                  onChange={(e) =>
-                    // T42-C4 — when the operator switches the SKU on a line,
-                    // reset cost + costSource. Otherwise the previous SKU's
-                    // cost (e.g. fetched via `prev_po` for SKU-A) persists
-                    // against SKU-B even though they are unrelated. Submit
-                    // only checks non-null, not "matches the current SKU".
-                    setLine(i, {
-                      sku: e.target.value,
-                      cost: null,
-                      costSource: null,
-                    })
-                  }
-                  aria-label={`Line ${i + 1} SKU`}
+                  value={l.modelId}
+                  onChange={(e) => setLineModel(i, e.target.value)}
+                  aria-label={`Line ${i + 1} model`}
                   className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
                 >
-                  {skuOptions.map((s) => (
-                    <option key={s.sku} value={s.sku}>
-                      {s.name}
-                    </option>
-                  ))}
+                  <option value="">— pick model —</option>
+                  <optgroup label="Mattress">
+                    {models
+                      .filter((m) => m.category === "mattress")
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Bedframe">
+                    {models
+                      .filter((m) => m.category === "bedframe")
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Sofa">
+                    {models
+                      .filter((m) => m.category === "sofa")
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                  </optgroup>
                 </select>
                 <div
                   className="text-[11px] leading-[1.3] font-medium"
@@ -720,7 +889,9 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                     </>
                   ) : (
                     <span className="text-[10.5px]">
-                      no supplier covers {categoryForSku(l.sku)}
+                      {l.modelId
+                        ? "pick variant first"
+                        : "pick a model"}
                     </span>
                   )}
                 </div>
@@ -747,8 +918,134 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                   ×
                 </button>
               </div>
+              {/* 0073 — Cascade sub-row, only when a model is picked. Mattress
+                  shows Variant only. Bedframe adds Color + Gap (from
+                  model.colors/gaps arrays). Sofa adds Fabric (from
+                  sofa_fabrics joined by model_id). Each select carries its
+                  own aria-label so the existing tests + screen-readers can
+                  address them by `Line N <field>` (parallel to the legacy SKU
+                  label). */}
+              {model && (
+                <div
+                  className="grid items-center gap-2"
+                  style={{ gridTemplateColumns: subGrid }}
+                >
+                  <select
+                    value={l.sku}
+                    onChange={(e) =>
+                      // T42-C4 invariant preserved: switching variant resets
+                      // COGS so a stale `prev_po` cost can't ride a different
+                      // SKU. attrs persist (same model = same color/gap menu).
+                      setLine(i, {
+                        sku: e.target.value,
+                        cost: null,
+                        costSource: null,
+                      })
+                    }
+                    aria-label={`Line ${i + 1} variant`}
+                    className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                  >
+                    <option value="">
+                      — pick {model.category === "sofa" ? "component" : "size"} —
+                    </option>
+                    {variants.map((v) => (
+                      <option key={v.id} value={v.sku}>
+                        {v.variant}
+                      </option>
+                    ))}
+                  </select>
+                  {model.category === "bedframe" && (
+                    <>
+                      <select
+                        value={attrsObj.color ?? ""}
+                        onChange={(e) =>
+                          setLine(i, {
+                            attrs: {
+                              ...(l.attrs ?? {}),
+                              color: e.target.value,
+                            },
+                          })
+                        }
+                        aria-label={`Line ${i + 1} color`}
+                        className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                      >
+                        <option value="">— color —</option>
+                        {(model.colors ?? []).map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={attrsObj.gap ?? ""}
+                        onChange={(e) =>
+                          setLine(i, {
+                            attrs: {
+                              ...(l.attrs ?? {}),
+                              gap: e.target.value,
+                            },
+                          })
+                        }
+                        aria-label={`Line ${i + 1} gap`}
+                        className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                      >
+                        <option value="">— gap —</option>
+                        {(model.gaps ?? []).map((g) => (
+                          <option key={g} value={g}>
+                            {g}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                  {model.category === "sofa" && fabrics.length > 0 && (
+                    <select
+                      value={attrsObj.fabric_id ?? ""}
+                      onChange={(e) => {
+                        const f = fabrics.find(
+                          (x) => x.id === e.target.value,
+                        );
+                        setLine(i, {
+                          attrs: f
+                            ? {
+                                fabric_id: f.id,
+                                fabric_name: f.fabricName,
+                                fabric_surcharge: f.surcharge,
+                              }
+                            : null,
+                        });
+                      }}
+                      aria-label={`Line ${i + 1} fabric`}
+                      className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
+                    >
+                      <option value="">— fabric —</option>
+                      {fabrics.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.fabricName}
+                          {f.surcharge > 0 ? ` (+RM ${f.surcharge})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+              {/* 0073 red-flag (Q2=A): bedframe lines without color/gap and
+                  sofa lines without fabric block submit. Inline warning gives
+                  the operator a one-glance "this row is incomplete" cue. */}
+              {model && attrsMissing && (
+                <div
+                  className="text-[10.5px] font-body"
+                  style={{ color: "var(--brand-signature)" }}
+                  data-testid={`po-line-attrs-missing-${i}`}
+                >
+                  ⚠{" "}
+                  {model.category === "bedframe"
+                    ? "Pick color + gap so the supplier knows which version to make."
+                    : "Pick fabric so the supplier knows which version to upholster."}
+                </div>
+              )}
               {/* T29 — per-line COGS editor (cost + cost_source). Sub-row
-                  spans the full width below the SKU/qty grid; renders as a
+                  spans the full width below the cascade; renders as a
                   2-cell layout (cost input + dropdown). The shared zod
                   schema `createPoInput.lines[]` requires both fields, and the
                   modal's submit gate (`allLinesOk`) blocks submit until every

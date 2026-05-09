@@ -122,6 +122,12 @@ export const createPoInput = z.object({
     // `prev_po` when the auto-fill button populates from
     // logistics_recent_po_cost (T27), `system_suggested` for heuristics.
     costSource: z.enum(['hand_entered', 'prev_po', 'system_suggested']),
+    // Migration 0073 cascade picker (Loo 2026-05-09). Optional jsonb payload
+    // per-line: bedframe={color, gap}, sofa={fabric_id, fabric_name,
+    // fabric_surcharge}, mattress=null. Server is a dumb persister; client
+    // (CreatePOModal) refuses submit when bedframe lacks color/gap or sofa
+    // lacks fabric, so the API edge accepts any record shape.
+    attrs: z.record(z.unknown()).nullable().optional(),
   })).min(1),
   dl: z.number().int().positive().optional(),
   dlRefs: z.array(z.number().int().positive()).optional(),

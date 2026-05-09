@@ -267,6 +267,36 @@ export default function PoDetailModal({
                   <div className="font-mono text-[10px] text-base-500 mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
                     {line.sku}
                   </div>
+                  {/* 0073 cascade picker (Loo 2026-05-09): render bedframe
+                      color + gap and sofa fabric so logistics + supplier can
+                      see the exact version being made. */}
+                  {line.attrs && (() => {
+                    const a = line.attrs as {
+                      color?: string;
+                      gap?: string;
+                      fabric_name?: string;
+                      fabric_surcharge?: number;
+                    };
+                    const parts: string[] = [];
+                    if (a.color) parts.push(a.color);
+                    if (a.gap) parts.push(`gap ${a.gap}`);
+                    if (a.fabric_name) {
+                      parts.push(
+                        a.fabric_surcharge && a.fabric_surcharge > 0
+                          ? `${a.fabric_name} (+RM ${a.fabric_surcharge})`
+                          : a.fabric_name,
+                      );
+                    }
+                    if (parts.length === 0) return null;
+                    return (
+                      <div
+                        className="text-[10.5px] text-base-700 mt-0.5"
+                        data-testid={`po-detail-line-attrs-${i}`}
+                      >
+                        {parts.join(" · ")}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="text-right font-mono text-[12px]">
                   {line.qty}

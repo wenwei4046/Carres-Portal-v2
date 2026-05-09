@@ -1400,7 +1400,15 @@ export interface LogisticsPoListRow {
   dl_refs: number[] | null;
   eta_date: string | null;
   placed_at: string;
-  purchase_order_lines: { sku: string; qty: number; received_qty: number }[];
+  purchase_order_lines: {
+    sku: string;
+    qty: number;
+    received_qty: number;
+    // 0073 cascade picker (Loo 2026-05-09). Null for mattress + legacy
+    // pre-0073 lines; bedframe carries {color, gap}; sofa carries
+    // {fabric_id, fabric_name, fabric_surcharge}.
+    attrs?: Record<string, unknown> | null;
+  }[];
 }
 export interface LogisticsPosListResponse {
   pos: LogisticsPoListRow[];

@@ -60,7 +60,7 @@ logisticsPosRouter.get("/", requireLogistics, async (c) => {
   let q = sb
     .from("purchase_orders")
     .select(
-      "id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta_date, placed_at, purchase_order_lines(sku, qty, received_qty)",
+      "id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta_date, placed_at, purchase_order_lines(sku, qty, received_qty, attrs)",
     );
 
   if (status !== "all") q = q.eq("status", status);
@@ -411,6 +411,7 @@ logisticsPosRouter.post("/", requireLogistics, async (c) => {
     qty: l.qty,
     cost: l.cost,
     cost_source: l.costSource,
+    attrs: l.attrs ?? null,
   }));
   const { data, error } = await sb.rpc("logistics_create_po", {
     p_supplier_id: parsed.data.supplierId,
@@ -458,6 +459,7 @@ logisticsPosRouter.post("/batch", requireLogistics, async (c) => {
       qty: l.qty,
       cost: l.cost,
       cost_source: l.costSource,
+      attrs: l.attrs ?? null,
     })),
     eta_date: null as string | null,
     dl_refs: p.dlRefs ?? null,
