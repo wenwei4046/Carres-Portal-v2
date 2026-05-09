@@ -155,6 +155,7 @@ export const qk = {
   // blast `["supplier"]` (e.g. ack/start-production ripples to PO list +
   // dashboard counts) or a tighter sub-tree.
   supplier: {
+    me:       () => ["supplier", "me"] as const,
     pos:      (bucket?: SupplierBucket) => ["supplier", "pos", bucket ?? "all"] as const,
     po:       (id: string) => ["supplier", "pos", id] as const,
     products: () => ["supplier", "products"] as const,
@@ -2717,10 +2718,37 @@ export interface SupplierProductRow {
   model: { name: string; blurb: string | null } | null;
 }
 
+/** GET /api/supplier/me payload — closes phase-6-supplier-me-endpoint.
+ *  `kind` gates the PO action buttons (factory_pickup skips Acknowledge);
+ *  `cat_covered` + `lead_time` + `contact_email` feed the Dashboard
+ *  Coverage callout (proto:supplier-pages.jsx:184-195). */
+export interface SupplierMe {
+  id:             string;
+  name:           string;
+  kind:           "own_logistics" | "factory_pickup";
+  cat_covered:    string[];
+  lead_time:      string | null;
+  contact:        string | null;
+  contact_email:  string | null;
+  slug:           string | null;
+  portal_enabled: boolean;
+}
+
 export interface SupplierDemandRow {
   sku: string;
   openQty: number;
   poCount: number;
+}
+
+export function useSupplierMe(
+  opts?: Partial<UseQueryOptions<SupplierMe, ApiError>>,
+) {
+  return useQuery<SupplierMe, ApiError>({
+    queryKey: qk.supplier.me(),
+    queryFn: () => apiFetch<SupplierMe>("/api/supplier/me"),
+    staleTime: 5 * 60_000,
+    ...opts,
+  });
 }
 
 export function useSupplierPos(

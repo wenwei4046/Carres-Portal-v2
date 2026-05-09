@@ -1,4 +1,9 @@
-import { useSupplierPos, useSupplierDemand, type SupplierPoRow } from "@/lib/queries";
+import {
+  useSupplierPos,
+  useSupplierDemand,
+  useSupplierMe,
+  type SupplierPoRow,
+} from "@/lib/queries";
 
 /**
  * Supplier Dashboard — Phase 6.
@@ -6,17 +11,18 @@ import { useSupplierPos, useSupplierDemand, type SupplierPoRow } from "@/lib/que
  * Visual reference: `reference/proto/supplier-pages.jsx:47-198`.
  *
  * Wires `useSupplierPos` (full RLS-scoped list) + `useSupplierDemand`
- * (top SKUs from open POs). KPI row + pipeline overview + top demand.
+ * (top SKUs from open POs) + `useSupplierMe` (profile row for Coverage
+ * callout — kind / cat_covered / lead_time / contact). KPI row + pipeline
+ * overview + Coverage callout + top demand.
  *
  * Skipped vs proto:
- *   - Recent activity feed (needs po_history endpoint — defer to Phase 9
- *     audit work)
- *   - Coverage callout (cat_covered + lead_time) — needs `/api/supplier/me`
- *     endpoint that surfaces the supplier row. Deferred carry-forward.
+ *   - Recent activity feed (needs po_history endpoint — closes via separate
+ *     phase-6-supplier-recent-activity carry-forward)
  */
 export default function SupplierDashboard() {
   const pos = useSupplierPos();
   const demand = useSupplierDemand();
+  const me = useSupplierMe();
 
   const rows: SupplierPoRow[] = pos.data ?? [];
 
@@ -125,6 +131,64 @@ export default function SupplierDashboard() {
           />
         </div>
       </div>
+
+      {/* Coverage callout — proto:supplier-pages.jsx:184-195. Static profile
+          info from suppliers row. Kind badge tells the supplier at a glance
+          which workflow applies to their POs (skip-ack vs ack-first). */}
+      {me.data && (
+        <div
+          className="border border-border rounded-md p-5 mb-5 bg-card"
+          data-testid="supplier-coverage-callout"
+        >
+          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-3">
+            Coverage
+          </div>
+          <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-5 items-start">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-1">
+                Categories
+              </div>
+              <div className="text-[13px] font-semibold text-foreground">
+                {me.data.cat_covered.length > 0
+                  ? me.data.cat_covered.join(" · ")
+                  : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-1">
+                Lead time
+              </div>
+              <div className="text-[13px] font-semibold text-foreground">
+                {me.data.lead_time ?? "—"}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-1">
+                Contact
+              </div>
+              <div className="text-[13px] text-foreground truncate">
+                {me.data.contact_email ?? me.data.contact ?? "—"}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-1">
+                Workflow
+              </div>
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                  me.data.kind === "factory_pickup"
+                    ? "bg-blue-100 text-blue-800"
+                    : "bg-primary/10 text-primary"
+                }`}
+              >
+                {me.data.kind === "factory_pickup"
+                  ? "Factory pickup"
+                  : "Own logistics"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top SKUs */}
       <div className="border border-border rounded-md p-5 bg-card">

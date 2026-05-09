@@ -40,6 +40,11 @@ const PENDING_PO = {
   do_number: null,
   supplier_id: "e1",
 };
+const ACK_PO = {
+  ...PENDING_PO,
+  id: "PO-2051",
+  sup_status: "acknowledged",
+};
 const PROD_PO = {
   ...PENDING_PO,
   id: "PO-2049",
@@ -51,9 +56,47 @@ const ACCEPTED_PO = {
   sup_status: "pickup_accepted",
 };
 
+const ME_OWN = {
+  id: "e1",
+  name: "Cloud Mattress Sdn Bhd",
+  kind: "own_logistics" as const,
+  cat_covered: ["mattress"],
+  lead_time: "10–14 days",
+  contact: null,
+  contact_email: null,
+  slug: null,
+  portal_enabled: true,
+};
+const ME_FACTORY = { ...ME_OWN, kind: "factory_pickup" as const };
+
+/** Mock /api/supplier/me + /api/supplier/pos. Returns `me` for the me URL,
+ *  `pos` for the pos URL, and forwards POST hits through `onPost` (default
+ *  returns a 200-ish stub). */
+function mockAll(opts: {
+  me: typeof ME_OWN | typeof ME_FACTORY | null;
+  pos: unknown[];
+  onPost?: (url: string) => unknown;
+}) {
+  vi.mocked(apiFetch).mockImplementation(async (url: string, init?: RequestInit) => {
+    if (init?.method === "POST") {
+      return opts.onPost ? opts.onPost(url) : { ok: true };
+    }
+    if (url.includes("/api/supplier/me")) {
+      if (opts.me === null) {
+        // Simulate hidden/missing me. queries.ts surfaces ApiError; tests
+        // use this to assert legacy fallback.
+        throw new Error("supplier me unavailable");
+      }
+      return opts.me;
+    }
+    if (url.includes("/api/supplier/pos")) return opts.pos;
+    throw new Error(`unexpected fetch ${url}`);
+  });
+}
+
 describe("SupplierPOs", () => {
   it("renders the 3 stage tabs", async () => {
-    vi.mocked(apiFetch).mockResolvedValue([]);
+    mockAll({ me: ME_OWN, pos: [] });
 
     render(wrap(<SupplierPOs />));
 
@@ -62,8 +105,8 @@ describe("SupplierPOs", () => {
     expect(screen.getByText("Delivered")).toBeInTheDocument();
   });
 
-  it("renders pending PO card with both Acknowledge and Mark-in-production buttons", async () => {
-    vi.mocked(apiFetch).mockResolvedValue([PENDING_PO]);
+  it("own_logistics + pending: shows Acknowledge only (no Mark-in-production)", async () => {
+    mockAll({ me: ME_OWN, pos: [PENDING_PO] });
 
     render(wrap(<SupplierPOs />));
 
@@ -71,12 +114,36 @@ describe("SupplierPOs", () => {
       expect(screen.getByTestId("po-card-PO-2050")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: /Acknowledge PO/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Mark in production/i })).toBeInTheDocument();
+    // me.data is loaded → kind is own_logistics → Mark-in-production hidden.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Acknowledge PO/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /Mark in production/i })).not.toBeInTheDocument();
+  });
+
+  it("factory_pickup + pending: shows Mark-in-production only (no Acknowledge)", async () => {
+    mockAll({ me: ME_FACTORY, pos: [PENDING_PO] });
+
+    render(wrap(<SupplierPOs />));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Mark in production/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /Acknowledge PO/i })).not.toBeInTheDocument();
+  });
+
+  it("own_logistics + acknowledged: shows Start production", async () => {
+    mockAll({ me: ME_OWN, pos: [ACK_PO] });
+
+    render(wrap(<SupplierPOs />));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Start production/i })).toBeInTheDocument();
+    });
   });
 
   it("opens drawer with DO upload CTA when sup_status=pickup_accepted", async () => {
-    vi.mocked(apiFetch).mockResolvedValue([ACCEPTED_PO]);
+    mockAll({ me: ME_OWN, pos: [ACCEPTED_PO] });
 
     render(wrap(<SupplierPOs />));
 
@@ -96,9 +163,10 @@ describe("SupplierPOs", () => {
   });
 
   it("calls acknowledge mutation when Acknowledge clicked", async () => {
-    vi.mocked(apiFetch).mockImplementation(async (url, init) => {
-      if (init?.method === "POST") return { po_id: "PO-2050", sup_status: "acknowledged" };
-      return [PENDING_PO];
+    mockAll({
+      me: ME_OWN,
+      pos: [PENDING_PO],
+      onPost: () => ({ po_id: "PO-2050", sup_status: "acknowledged" }),
     });
 
     render(wrap(<SupplierPOs />));
@@ -118,7 +186,7 @@ describe("SupplierPOs", () => {
   });
 
   it("renders Mark-Ready-for-Pickup button on in_production PO", async () => {
-    vi.mocked(apiFetch).mockResolvedValue([PROD_PO]);
+    mockAll({ me: ME_OWN, pos: [PROD_PO] });
 
     render(wrap(<SupplierPOs />));
 

@@ -33,14 +33,30 @@ const DEMAND = [
   { sku: "mattress:cloud:Queen", openQty: 12, poCount: 2 },
   { sku: "mattress:cloud:King", openQty: 4, poCount: 1 },
 ];
+const ME_OWN = {
+  id: "e1",
+  name: "Cloud Mattress Sdn Bhd",
+  kind: "own_logistics" as const,
+  cat_covered: ["mattress"],
+  lead_time: "10–14 days",
+  contact: "+60 12 345 6789",
+  contact_email: "ops@cloudmattress.my",
+  slug: "cloud-mattress",
+  portal_enabled: true,
+};
+
+function mockAll() {
+  vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+    if (url.includes("/api/supplier/me")) return ME_OWN;
+    if (url.includes("/products/demand")) return DEMAND;
+    if (url.includes("/api/supplier/pos")) return POS;
+    throw new Error(`unexpected fetch ${url}`);
+  });
+}
 
 describe("SupplierDashboard", () => {
   it("renders 4 KPIs from the supplier PO list", async () => {
-    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
-      if (url.includes("/products/demand")) return DEMAND;
-      if (url.includes("/api/supplier/pos")) return POS;
-      throw new Error(`unexpected fetch ${url}`);
-    });
+    mockAll();
 
     render(wrap(<SupplierDashboard />));
 
@@ -54,11 +70,7 @@ describe("SupplierDashboard", () => {
   });
 
   it("derives pipeline stage counts from sup_status", async () => {
-    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
-      if (url.includes("/products/demand")) return DEMAND;
-      if (url.includes("/api/supplier/pos")) return POS;
-      throw new Error(`unexpected fetch ${url}`);
-    });
+    mockAll();
 
     render(wrap(<SupplierDashboard />));
 
@@ -73,11 +85,7 @@ describe("SupplierDashboard", () => {
   });
 
   it("renders Top demand from useSupplierDemand", async () => {
-    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
-      if (url.includes("/products/demand")) return DEMAND;
-      if (url.includes("/api/supplier/pos")) return POS;
-      throw new Error(`unexpected fetch ${url}`);
-    });
+    mockAll();
 
     render(wrap(<SupplierDashboard />));
 
@@ -86,5 +94,37 @@ describe("SupplierDashboard", () => {
     });
     expect(screen.getByText("mattress:cloud:King")).toBeInTheDocument();
     expect(screen.getByText(/Top demand/i)).toBeInTheDocument();
+  });
+
+  it("renders Coverage callout from useSupplierMe with kind badge", async () => {
+    mockAll();
+
+    render(wrap(<SupplierDashboard />));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("supplier-coverage-callout")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Coverage")).toBeInTheDocument();
+    expect(screen.getByText("mattress")).toBeInTheDocument();
+    expect(screen.getByText("10–14 days")).toBeInTheDocument();
+    expect(screen.getByText("ops@cloudmattress.my")).toBeInTheDocument();
+    expect(screen.getByText("Own logistics")).toBeInTheDocument();
+  });
+
+  it("renders factory_pickup workflow badge when kind=factory_pickup", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/api/supplier/me"))
+        return { ...ME_OWN, kind: "factory_pickup" };
+      if (url.includes("/products/demand")) return DEMAND;
+      if (url.includes("/api/supplier/pos")) return POS;
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<SupplierDashboard />));
+
+    await waitFor(() => {
+      expect(screen.getByText("Factory pickup")).toBeInTheDocument();
+    });
   });
 });

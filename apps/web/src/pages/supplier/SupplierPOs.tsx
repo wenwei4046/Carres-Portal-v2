@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   useSupplierPos,
+  useSupplierMe,
   useAcknowledgePo,
   useStartProduction,
   useReadyForPickup,
@@ -9,6 +10,7 @@ import {
   type SupplierPoRow,
   type SupplierBucket,
   type SupplierSupStatus,
+  type SupplierMe,
 } from "@/lib/queries";
 
 /**
@@ -19,9 +21,12 @@ import {
  * Three-stage pipeline tabs (PO / Ready / Delivered) → POCard list →
  * PODrawer detail with DO upload form (text-only DO number per Q2=A).
  *
- * Action buttons (proto:266-321 minus kind-aware factory_pickup short-circuit
- * — V1 always shows Acknowledge first; factory_pickup users see 422 from the
- * RPC and are prompted to use "Start production" via the secondary action).
+ * Action buttons (proto:266-321) gate by `suppliers.kind` from useSupplierMe:
+ *   - factory_pickup: pending|acknowledged → "Mark in production" (skip Ack)
+ *   - own_logistics:  pending → "Acknowledge PO"; acknowledged → "Start production"
+ *   - both kinds:     in_production → "Mark Ready for Pickup"
+ * While `me` is still loading, fall back to V1 behavior (both buttons on
+ * pending) — non-regressive. Closes phase-6-supplier-me-endpoint.
  */
 
 const SUP_STATUS_LABEL: Record<SupplierSupStatus, string> = {
@@ -49,7 +54,9 @@ export default function SupplierPOs() {
   const [openPo, setOpenPo] = useState<SupplierPoRow | null>(null);
 
   const pos = useSupplierPos(active);
+  const me  = useSupplierMe();
   const rows = pos.data ?? [];
+  const supplierKind = me.data?.kind ?? null;
 
   return (
     <div className="p-9 max-w-[1400px] mx-auto">
@@ -105,7 +112,13 @@ export default function SupplierPOs() {
       ) : (
         <div className="flex flex-col gap-2.5">
           {rows.map((p) => (
-            <POCard key={p.id} po={p} stage={active} onOpen={setOpenPo} />
+            <POCard
+              key={p.id}
+              po={p}
+              stage={active}
+              supplierKind={supplierKind}
+              onOpen={setOpenPo}
+            />
           ))}
         </div>
       )}
@@ -155,10 +168,12 @@ function StatusPill({ ss }: { ss: SupplierSupStatus }) {
 function POCard({
   po,
   stage,
+  supplierKind,
   onOpen,
 }: {
   po: SupplierPoRow;
   stage: SupplierBucket;
+  supplierKind: SupplierMe["kind"] | null;
   onOpen: (p: SupplierPoRow) => void;
 }) {
   const ack = useAcknowledgePo();
@@ -169,6 +184,21 @@ function POCard({
   const isPending = ss === "pending";
   const isAck = ss === "acknowledged";
   const isProd = ss === "in_production";
+
+  // Button gating: factory_pickup skips Acknowledge entirely. own_logistics
+  // gets Acknowledge on pending (no secondary). When `me` is still loading
+  // (kind === null), fall back to V1 behavior — both buttons on pending —
+  // so the page stays interactive during the round-trip.
+  const showAck      = stage === "po" && isPending && supplierKind !== "factory_pickup";
+  const showMarkProd =
+    stage === "po"
+    && (
+      // factory_pickup: pending|acknowledged → straight to in_production
+      (supplierKind === "factory_pickup" && (isPending || isAck))
+      // unknown kind: legacy V1 fallback (secondary on pending)
+      || (supplierKind === null && isPending)
+    );
+  const showStartProd = stage === "po" && supplierKind === "own_logistics" && isAck;
 
   return (
     <div
@@ -210,40 +240,48 @@ function POCard({
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          {stage === "po" && isPending && (
-            <>
-              <button
-                type="button"
-                disabled={ack.isPending}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  ack.mutate(po.id, {
-                    onSuccess: () => toast.success(`${po.id} acknowledged`),
-                    onError: (err) => toast.error(err.message),
-                  });
-                }}
-                className="px-4 py-2 text-[12px] font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
-              >
-                Acknowledge PO
-              </button>
-              <button
-                type="button"
-                disabled={startProd.isPending}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  startProd.mutate(po.id, {
-                    onSuccess: () => toast.success(`${po.id} · production started`),
-                    onError: (err) => toast.error(err.message),
-                  });
-                }}
-                className="px-3 py-2 text-[12px] font-medium rounded-md border border-border"
-                title="Factory pickup suppliers — skip ack and go straight to production"
-              >
-                Mark in production
-              </button>
-            </>
+          {showAck && (
+            <button
+              type="button"
+              disabled={ack.isPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                ack.mutate(po.id, {
+                  onSuccess: () => toast.success(`${po.id} acknowledged`),
+                  onError: (err) => toast.error(err.message),
+                });
+              }}
+              className="px-4 py-2 text-[12px] font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+            >
+              Acknowledge PO
+            </button>
           )}
-          {stage === "po" && isAck && (
+          {showMarkProd && (
+            <button
+              type="button"
+              disabled={startProd.isPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                startProd.mutate(po.id, {
+                  onSuccess: () => toast.success(`${po.id} · production started`),
+                  onError: (err) => toast.error(err.message),
+                });
+              }}
+              className={
+                supplierKind === "factory_pickup"
+                  ? "px-4 py-2 text-[12px] font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+                  : "px-3 py-2 text-[12px] font-medium rounded-md border border-border"
+              }
+              title={
+                supplierKind === "factory_pickup"
+                  ? "Factory pickup — skip ack and go straight to production"
+                  : "Skip ack — pending → in_production"
+              }
+            >
+              Mark in production
+            </button>
+          )}
+          {showStartProd && (
             <button
               type="button"
               disabled={startProd.isPending}
