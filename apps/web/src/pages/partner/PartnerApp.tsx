@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import PartnerSidebar from "./PartnerSidebar";
 import PartnerDashboard from "./PartnerDashboard";
 import PartnerPickupsPage from "./PartnerPickupsPage";
+import PartnerFleet from "./PartnerFleet";
 import PartnerProfile from "./PartnerProfile";
 
 /**
@@ -24,6 +25,7 @@ export default function PartnerApp() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<PartnerDashboard />} />
           <Route path="pickups" element={<PartnerPickupsPage />} />
+          <Route path="fleet" element={<PartnerFleet />} />
           <Route path="profile" element={<PartnerProfile />} />
           <Route path="*" element={<Navigate to="dashboard" replace />} />
         </Routes>

@@ -12,6 +12,7 @@ import CarresLockup from "@/components/CarresLockup";
 const NAV_ITEMS = [
   { to: "/delivery-partner/dashboard", label: "Today", icon: "◆", end: false },
   { to: "/delivery-partner/pickups", label: "Pickups", icon: "▣", end: false },
+  { to: "/delivery-partner/fleet",   label: "Fleet",   icon: "▥", end: false },
   { to: "/delivery-partner/profile", label: "Profile", icon: "◐", end: false },
 ] as const;
 
