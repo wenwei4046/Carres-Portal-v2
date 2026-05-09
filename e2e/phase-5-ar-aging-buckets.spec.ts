@@ -33,6 +33,10 @@ async function login(page: Page, email: string, password: string) {
 //
 // FinanceDashboard's AgingCard + FinanceAR's filter pills + FinanceAR's table
 // all consume the same payload. This spec verifies they don't disagree.
+// 2026-05-09: fixtures DL-9101..9104 seeded successfully (4 aging-bucket
+// orders), but spec uses speculative aria-labels (`getByLabel(/0-30.*aging/i)`)
+// that don't match FinanceDashboard's AgingCard markup. Spec rewrite needed
+// — read AgingCard / FinanceAR DOM and pick real test ids.
 test.fixme("phase-5 A3: AR aging buckets render correctly + dashboard agrees with AR page", async ({ browser }) => {
   const SEED_DLS = [9101, 9102, 9103, 9104];
 

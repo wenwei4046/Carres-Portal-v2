@@ -29,6 +29,11 @@ async function login(page: Page, email: string, password: string) {
 //
 // SST 8% inclusive split: tax = total * 0.08 / 1.08 (proto convention,
 // codified in the invoice_issue RPC consumer).
+// 2026-05-09 partial progress: locator fixes applied (DL-9001 → INV-2026-9001
+// row matcher; "All" exact:true; "Paid · N" regex). Login + AR + Issue button
+// flow ALL work. Fails after toast assertion — likely state-pollution interaction
+// even with seed-e2e-fixtures.sql DELETE/UPDATE reset (some downstream side
+// effect not fully cleaned). Stays test.fixme pending end-to-end debug.
 test.fixme("phase-5 A2: order delivered → finance issues invoice → AR shows paid + invoice_no", async ({ browser }) => {
   // ----- 0. Pre-condition: a delivered + fully-paid order ------------------
   // Either rely on a seed row OR drive an order through the happy path here.
@@ -42,10 +47,12 @@ test.fixme("phase-5 A2: order delivered → finance issues invoice → AR shows 
 
   await fpage.goto("/finance/ar");
   // Switch to All filter (default is Open; settled rows hide).
-  await fpage.getByRole("button", { name: /all/i }).click();
+  await fpage.getByRole("button", { name: "All", exact: true }).click();
 
   // Find the seeded delivered + paid row. Click View to open ARDrawer.
-  const row = fpage.getByText(`DL-${SEED_DL}`).locator("xpath=ancestor::div[contains(@class, 'grid')]").first();
+  // AR row shows invoice_no (synthesized as INV-{YYYY}-{dl}) — DL itself is
+  // not in the row text. Match on the synthesized invoice_no instead.
+  const row = fpage.getByText(new RegExp(`INV-\\d{4}-${SEED_DL}`)).locator("xpath=ancestor::div[contains(@class, 'grid')]").first();
   await row.getByRole("button", { name: /^view$/i }).click();
 
   // ARDrawer renders. The Issue invoice button must be enabled (delivered + paid).
@@ -62,7 +69,7 @@ test.fixme("phase-5 A2: order delivered → finance issues invoice → AR shows 
   // ----- 3. AR row reflects invoice_no populated ---------------------------
   // Drawer auto-closes per ARDrawer.onSuccess; refresh AR list.
   await fpage.reload();
-  await fpage.getByRole("button", { name: /all/i }).click();
+  await fpage.getByRole("button", { name: "All", exact: true }).click();
 
   // The row now shows a non-default invoice_no — server inserted into invoices
   // table + stamped orders.invoice_no via invoice_issue RPC (0003:289).
@@ -78,7 +85,7 @@ test.fixme("phase-5 A2: order delivered → finance issues invoice → AR shows 
   // on invoice_no. This test asserts the toast shows the failure rather than
   // creating a duplicate invoice.)
   // Carry-forward: tighten the client-side gate to hide Issue post-invoice.
-  const row2 = fpage.getByText(`DL-${SEED_DL}`).locator("xpath=ancestor::div[contains(@class, 'grid')]").first();
+  const row2 = fpage.getByText(new RegExp(`INV-\\d{4}-${SEED_DL}`)).locator("xpath=ancestor::div[contains(@class, 'grid')]").first();
   await row2.getByRole("button", { name: /^view$/i }).click();
   const issueBtn2 = fpage.getByRole("button", { name: /issue invoice/i });
   if (await issueBtn2.isEnabled().catch(() => false)) {
@@ -89,7 +96,9 @@ test.fixme("phase-5 A2: order delivered → finance issues invoice → AR shows 
   // ----- 5. PDF download (Q7=A server-side render) ------------------------
   // Navigate to FinanceInvoices, find the row with INV-2026-9001, click PDF.
   await fpage.goto("/finance/invoices");
-  await fpage.getByRole("button", { name: /paid/i }).click();
+  // Tab button accessible name includes count: "Paid · N" (where N is the
+  // invoice count) — use a regex anchored to start, not exact match.
+  await fpage.getByRole("button", { name: /^Paid · \d+$/ }).click();
   const invRow = fpage.getByText("INV-2026-9001").locator("xpath=ancestor::div[contains(@class, 'grid')]").first();
 
   // PDF download triggers apiFetchBlob + window.open. Watch for the new
