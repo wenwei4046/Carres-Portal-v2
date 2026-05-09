@@ -225,28 +225,36 @@ export function clearDraft(): void {
 const PHONE_RE = /^[0-9-+\s]{8,}/;
 
 export function step1Valid(d: WizardDraft): boolean {
+  return step1FirstIssue(d) === null;
+}
+
+/**
+ * Returns the first failing field's user-friendly label, or null if Step 1
+ * is fully valid. Used by the wizard footer to surface "Continue 灰着" reasons
+ * inline so dealers don't have to scroll the form hunting for the missing
+ * field. Order matches the form's visual top-to-bottom layout.
+ */
+export function step1FirstIssue(d: WizardDraft): string | null {
   const c = d.customer;
-  if (c.name.trim().length < 2) return false;
-  if (!PHONE_RE.test(c.phone)) return false;
-  if (c.emergencyName.trim().length < 2) return false;
-  if (!PHONE_RE.test(c.emergencyPhone)) return false;
-  if (!c.emergencyRelationship) return false;
+  if (!d.outletId)        return "Sale info — pick an Outlet";
+  if (!d.salespersonId)   return "Sale info — pick a Salesperson";
+  if (c.name.trim().length < 2)   return "Customer — full name (≥2 chars)";
+  if (!PHONE_RE.test(c.phone))    return "Customer — phone (≥8 digits)";
+  if (c.emergencyName.trim().length < 2)   return "Emergency Contact — name";
+  if (!PHONE_RE.test(c.emergencyPhone))    return "Emergency Contact — phone";
+  if (!c.emergencyRelationship)            return "Emergency Contact — relationship";
   if (c.emergencyRelationship === "__OTHER__" && c.emergencyRelationshipOther.trim().length < 2) {
-    return false;
+    return "Emergency Contact — describe the 'Other' relationship";
   }
-  // Structured address: when not unknown, require Line 1 (≥5 chars) + the
-  // three cascading dropdowns (state → city → postcode) to all be picked.
   if (!c.addressUnknown) {
-    if (c.addressLine1.trim().length < 5) return false;
-    if (!c.addressState) return false;
-    if (!c.addressCity) return false;
-    if (!c.addressPostcode) return false;
+    if (c.addressLine1.trim().length < 5)   return "Address — Line 1 (≥5 chars), or tick 'Unknown'";
+    if (!c.addressState)                    return "Address — State, or tick 'Unknown'";
+    if (!c.addressCity)                     return "Address — City, or tick 'Unknown'";
+    if (!c.addressPostcode)                 return "Address — Postcode, or tick 'Unknown'";
   }
-  if (!c.billingSame && c.billing.trim().length < 5) return false;
-  if (!d.delivery.dateTbd && !d.delivery.date) return false;
-  if (!d.outletId) return false;
-  if (!d.salespersonId) return false;
-  return true;
+  if (!c.billingSame && c.billing.trim().length < 5) return "Billing — fill billing address, or tick 'Same as delivery'";
+  if (!d.delivery.dateTbd && !d.delivery.date)       return "Delivery — pick a date, or tick 'TBD'";
+  return null;
 }
 
 /**

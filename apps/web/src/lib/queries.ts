@@ -43,6 +43,8 @@ import {
   type RefundCreateInput,
   type RefundPayInput,
   type ReservedDrilldownResponse,
+  type SalespersonDto,
+  type SalespersonCreateInput,
   type SalespersonsListResponse,
   type SetOrderAddressInput,
   type SetOrderDateInput,
@@ -739,6 +741,46 @@ export function useSalespersons(
       ),
     staleTime: 5 * 60_000,
     ...opts,
+  });
+}
+
+/**
+ * Phase 2D — Dealer/Showroom Settings page CRUD.
+ * useCreateSalesperson posts to POST /api/salespersons. After success,
+ * invalidates the wizard's salespersons cache so the dropdown shows the
+ * new row immediately. The hook is intentionally agnostic of which dealer
+ * the new SP belongs to — server derives that from the JWT.
+ */
+export function useCreateSalesperson(
+  opts?: Partial<UseMutationOptions<SalespersonDto, ApiError, SalespersonCreateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<SalespersonDto, ApiError, SalespersonCreateInput>({
+    mutationFn: (input) =>
+      apiFetch<SalespersonDto>("/api/salespersons", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["salespersons"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useDeleteSalesperson(
+  opts?: Partial<UseMutationOptions<{ ok: true }, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ ok: true }, ApiError, string>({
+    mutationFn: (id) =>
+      apiFetch<{ ok: true }>(`/api/salespersons/${id}`, { method: "DELETE" }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["salespersons"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }
 

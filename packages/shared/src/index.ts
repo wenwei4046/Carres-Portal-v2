@@ -88,6 +88,7 @@ export {
   outletsListResponseSchema,
   salespersonSchema,
   salespersonsListResponseSchema,
+  salespersonCreateInputSchema,
   productCategorySchema,
   variantKindSchema,
   type CatalogResponse,
@@ -100,6 +101,7 @@ export {
   type OutletsListResponse,
   type SalespersonDto,
   type SalespersonsListResponse,
+  type SalespersonCreateInput,
   type ProductCategory,
   type VariantKind,
 } from "./schemas/catalog";

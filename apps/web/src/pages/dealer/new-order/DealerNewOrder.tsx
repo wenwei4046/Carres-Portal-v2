@@ -11,6 +11,7 @@ import {
   emptyDraft,
   loadDraft,
   saveDraft,
+  step1FirstIssue,
   step1Valid,
   step2Valid,
   step3Valid,
@@ -384,13 +385,20 @@ export default function DealerNewOrder({ open, onClose }: Props) {
                   </span>
                 )}
                 {step < 3 ? (
-                  <button
-                    onClick={() => canAdvance && setStep(step + 1)}
-                    disabled={!canAdvance}
-                    className="btn-primary"
-                  >
-                    Continue →
-                  </button>
+                  <div className="flex flex-col items-end gap-1">
+                    <button
+                      onClick={() => canAdvance && setStep(step + 1)}
+                      disabled={!canAdvance}
+                      className="btn-primary"
+                    >
+                      Continue →
+                    </button>
+                    {!canAdvance && step === 1 && (
+                      <span className="text-[11px] text-base-500 italic">
+                        Missing: {step1FirstIssue(draft)}
+                      </span>
+                    )}
+                  </div>
                 ) : (
                   <button
                     onClick={handleSubmit}

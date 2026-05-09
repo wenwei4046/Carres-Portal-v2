@@ -97,3 +97,16 @@ export const salespersonsListResponseSchema = z.object({
   salespersons: z.array(salespersonSchema),
 });
 export type SalespersonsListResponse = z.infer<typeof salespersonsListResponseSchema>;
+
+/**
+ * Phase 2D — Dealer/Showroom self-service salesperson CRUD.
+ * Dealer/showroom roles can create salesperson rows scoped to their own
+ * dealer (RLS `salespersons_dealer_write` enforces this). The server
+ * derives dealer_id from the JWT — caller cannot pass a different one.
+ */
+export const salespersonCreateInputSchema = z.object({
+  name:     z.string().trim().min(2).max(100),
+  phone:    z.string().trim().min(8).max(40).nullable().optional(),
+  outletId: z.string().uuid().nullable().optional(),
+}).strict();
+export type SalespersonCreateInput = z.infer<typeof salespersonCreateInputSchema>;
