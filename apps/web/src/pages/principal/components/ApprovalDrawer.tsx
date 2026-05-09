@@ -1,10 +1,17 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
-import { useDecideApproval } from "@/lib/queries";
+import { useDecideApproval, useTopupApprove } from "@/lib/queries";
 import { TOAST } from "@/lib/toast-copy";
 import ApprovalKindBadge from "./ApprovalKindBadge";
 import ApprovalStatusPill from "./ApprovalStatusPill";
+
+// Payment methods offered for top_up approval. `dealer_deposit` is excluded
+// because topping up the deposit balance with the deposit balance is circular;
+// `credit_card`/`debit_card` are excluded because Carres has no card terminal
+// for B2B top-ups (per Loo). Finance picks one of these four when approving.
+const TOPUP_METHODS = ["bank_transfer", "cash", "cheque", "duitnow_qr"] as const;
+type TopupMethod = (typeof TOPUP_METHODS)[number];
 
 /**
  * Right slide-in drawer for a single approval. Mirrors
@@ -49,12 +56,30 @@ interface Props {
 
 export default function ApprovalDrawer({ approval, onClose }: Props) {
   const [note, setNote] = useState("");
+  const [method, setMethod] = useState<TopupMethod>("bank_transfer");
+  const [reference, setReference] = useState("");
   const decide = useDecideApproval(approval.id);
+  const topup = useTopupApprove();
   const isPending = approval.status === "pending";
+  const isTopup = approval.kind === "top_up";
+  const busy = decide.isPending || topup.isPending;
 
   async function submit(status: "approved" | "rejected") {
     try {
-      await decide.mutateAsync({ status, note: note.trim() || undefined });
+      // top_up approve uses the wrap RPC (finance_topup_approve) which
+      // atomically decides the approval, inserts payments, and bumps
+      // dealers.deposit_balance. The generic approval_decide RPC doesn't
+      // handle kind='top_up' (refund/new_dealer/price_change only) — using
+      // it here would leave deposit_balance untouched.
+      if (isTopup && status === "approved") {
+        await topup.mutateAsync({
+          approvalId: approval.id,
+          method,
+          reference: reference.trim() || null,
+        });
+      } else {
+        await decide.mutateAsync({ status, note: note.trim() || undefined });
+      }
       const successMsg =
         status === "approved"
           ? approval.kind === "refund"
@@ -161,13 +186,43 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
 
         {isPending && (
           <div className="pt-[18px] border-t border-base-100">
+            {isTopup && (
+              <>
+                <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-1.5">
+                  Method (required to approve)
+                </div>
+                <select
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value as TopupMethod)}
+                  data-testid="topup-method"
+                  className="w-full px-2.5 py-2 border border-base-200 rounded text-[12px] outline-none mb-3 font-sans bg-white"
+                >
+                  {TOPUP_METHODS.map((m) => (
+                    <option key={m} value={m}>
+                      {m.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+                <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-1.5">
+                  Reference (optional)
+                </div>
+                <input
+                  type="text"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder="Bank slip / cheque no / txn ID…"
+                  data-testid="topup-reference"
+                  className="w-full px-2.5 py-2 border border-base-200 rounded text-[12px] outline-none mb-3 font-sans"
+                />
+              </>
+            )}
             <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-1.5">
-              Note (optional)
+              {isTopup ? "Reject reason (optional)" : "Note (optional)"}
             </div>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Reason or condition…"
+              placeholder={isTopup ? "Why rejecting?" : "Reason or condition…"}
               className="w-full px-2.5 py-2 border border-base-200 rounded text-[12px] resize-y outline-none mb-3 font-sans"
               style={{ minHeight: 60 }}
             />
@@ -175,7 +230,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => submit("rejected")}
-                disabled={decide.isPending}
+                disabled={busy}
                 className="btn-secondary flex-1"
               >
                 Reject
@@ -183,8 +238,9 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => submit("approved")}
-                disabled={decide.isPending}
+                disabled={busy}
                 className="btn-primary flex-1"
+                data-testid="approval-approve"
               >
                 Approve
               </button>
