@@ -152,6 +152,10 @@ export const qk = {
     refunds:          (filters?: FinanceRefundsFilters) =>
       ["finance", "refunds", filters ?? {}] as const,
   },
+  // Phase 8 — BD namespace.
+  bd: {
+    inquiries: () => ["bd", "inquiries"] as const,
+  },
   // Phase 6 — Supplier namespace. Same nested-key strategy so mutations can
   // blast `["supplier"]` (e.g. ack/start-production ripples to PO list +
   // dashboard counts) or a tighter sub-tree.
@@ -2793,6 +2797,107 @@ export function useAttachPod(
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["partner"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 8 — BD namespace.
+// ---------------------------------------------------------------------------
+export type InquiryKind = "new_dealer" | "expansion" | "product";
+export type InquiryStage = "new" | "contacted" | "qualified" | "converted" | "lost";
+
+export interface InquiryRow {
+  id:                string;
+  kind:              InquiryKind;
+  company:           string;
+  region:            string | null;
+  contact:           string | null;
+  stage:             InquiryStage;
+  owner_user_id:     string | null;
+  note:              string | null;
+  linked_dealer_id:  string | null;
+  created_at:        string;
+  updated_at:        string;
+}
+
+export interface InquiryCreateInput {
+  kind:    InquiryKind;
+  company: string;
+  region?: string | null;
+  contact?: string | null;
+  note?:   string | null;
+}
+
+export interface InquiryUpdateInput {
+  stage?:   InquiryStage;
+  contact?: string | null;
+  region?:  string | null;
+  note?:    string | null;
+}
+
+export function useBdInquiries(
+  opts?: Partial<UseQueryOptions<InquiryRow[], ApiError>>,
+) {
+  return useQuery<InquiryRow[], ApiError>({
+    queryKey: qk.bd.inquiries(),
+    queryFn: () => apiFetch<InquiryRow[]>("/api/bd/inquiries"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useCreateInquiry(
+  opts?: Partial<UseMutationOptions<InquiryRow, ApiError, InquiryCreateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<InquiryRow, ApiError, InquiryCreateInput>({
+    mutationFn: (input) =>
+      apiFetch<InquiryRow>("/api/bd/inquiries", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.bd.inquiries() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useUpdateInquiry(
+  opts?: Partial<UseMutationOptions<InquiryRow, ApiError, { id: string; patch: InquiryUpdateInput }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<InquiryRow, ApiError, { id: string; patch: InquiryUpdateInput }>({
+    mutationFn: ({ id, patch }) =>
+      apiFetch<InquiryRow>(`/api/bd/inquiries/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.bd.inquiries() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useConvertInquiry(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, string>({
+    mutationFn: (id) =>
+      apiFetch(`/api/bd/inquiries/${id}/convert`, { method: "POST" }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.bd.inquiries() });
+      // Approval row was created — also blast principal namespace if it
+      // exists in the cache so the principal approvals view picks up the
+      // new pending row when next observed.
+      await qc.invalidateQueries({ queryKey: ["principal"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
