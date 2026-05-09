@@ -274,6 +274,21 @@ VALUES (
   '[]'::jsonb
 );
 
+-- ----- Top-up approval fixture for phase-5-dealer-topup-approve E2E -----
+-- approvals row with kind='top_up' status='pending' for the finance-side
+-- approve flow. Each test run consumes this row (sets status='approved')
+-- so the DELETE + reinsert below is what makes the test re-runnable.
+DELETE FROM approvals WHERE id = '99999999-aaaa-aaaa-aaaa-000000000abb'::uuid;
+INSERT INTO approvals (id, kind, title, dealer_id, amount, status)
+VALUES (
+  '99999999-aaaa-aaaa-aaaa-000000000abb'::uuid,
+  'top_up',
+  'E2E Top Up Test',
+  '00000000-0000-0000-0000-000000000d01',
+  3000,
+  'pending'
+);
+
 -- Stockpile threshold fixture for stockpile-alert-to-po E2E spec.
 -- mattress:carres-cloud:Queen at warehouse c1 has qty=4 in seed (line 200 of
 -- seed.sql). Setting low_threshold=50 guarantees logistics_stock_alerts()
