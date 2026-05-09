@@ -7,6 +7,7 @@ import {
   type FinanceArAgingRow,
   type FinancePaymentRow,
 } from "@/lib/queries";
+import { apiFetchBlob, ApiError } from "@/lib/api";
 import { rm } from "@/lib/format-currency";
 import type { PaymentMethod } from "@carres/shared";
 
@@ -34,6 +35,11 @@ const METHODS: { value: PaymentMethod; label: string }[] = [
  *   - Payment history: useFinancePayments({ orderId }) → GET
  *     /api/finance/payments?orderId=... — list of inbound payments
  *     against this order.
+ *   - Download invoice PDF (post-issue): closes phase-5-ardrawer-download-button
+ *     carry-forward. After successful issue, captures the new invoice id from
+ *     the RPC response (returns the full `invoices` row per 0003:289) and
+ *     swaps the Issue button for a Download button that streams the
+ *     server-rendered PDF (Q7=A) via apiFetchBlob → ObjectURL → window.open.
  *
  * Closes on overlay click, X button, or Escape.
  */
@@ -48,6 +54,7 @@ export default function ARDrawer({
   const [recAmt, setRecAmt]             = useState(String(row.outstanding || ""));
   const [recRef, setRecRef]             = useState("");
   const [recMethod, setRecMethod]       = useState<PaymentMethod>("bank_transfer");
+  const [issuedInvoiceId, setIssuedInvoiceId] = useState<string | null>(null);
 
   const payments = useFinancePayments({ orderId: row.order_id });
   const recordReceipt = useRecordReceipt({
@@ -60,12 +67,32 @@ export default function ARDrawer({
     onError: (e) => toast.error(`Receipt failed: ${e.message}`),
   });
   const issueInvoice = useIssueInvoice({
-    onSuccess: () => {
-      toast.success(`Invoice issued for ${row.invoice_no}`);
-      onClose();
+    onSuccess: (data) => {
+      // invoice_issue RPC (0003:289) returns the full invoices row; capture
+      // the id so the Download button can hit /api/finance/invoices/:id/pdf
+      // without a follow-up list refetch.
+      const inv = data as { id?: string; invoice_no?: string } | null;
+      if (inv?.id) setIssuedInvoiceId(inv.id);
+      toast.success(`Invoice issued for ${inv?.invoice_no ?? row.invoice_no}`);
+      // Note: deliberately NOT onClose() — user should be able to click
+      // Download next without re-opening the drawer.
     },
     onError: (e) => toast.error(`Issue failed: ${e.message}`),
   });
+
+  async function downloadInvoicePdf() {
+    if (!issuedInvoiceId) return;
+    try {
+      const blob = await apiFetchBlob(`/api/finance/invoices/${issuedInvoiceId}/pdf`);
+      const url  = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      // Revoke after a short delay so the new tab has time to load.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : String(e);
+      toast.error(`PDF download failed: ${msg}`);
+    }
+  }
 
   function submitReceipt() {
     const amt = parseFloat(recAmt);
@@ -245,19 +272,30 @@ export default function ARDrawer({
           </div>
 
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={submitIssue}
-              disabled={!canIssue || issueInvoice.isPending}
-              title={
-                !canIssue
-                  ? "Issue available only after delivery + full payment"
-                  : "Issue tax invoice"
-              }
-              className="flex-1 py-2 rounded-md border border-border text-[12.5px] disabled:opacity-60"
-            >
-              {issueInvoice.isPending ? "Issuing…" : "Issue invoice"}
-            </button>
+            {issuedInvoiceId ? (
+              <button
+                type="button"
+                onClick={downloadInvoicePdf}
+                title="Download tax invoice PDF"
+                className="flex-1 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-[12.5px]"
+              >
+                Download invoice (PDF)
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={submitIssue}
+                disabled={!canIssue || issueInvoice.isPending}
+                title={
+                  !canIssue
+                    ? "Issue available only after delivery + full payment"
+                    : "Issue tax invoice"
+                }
+                className="flex-1 py-2 rounded-md border border-border text-[12.5px] disabled:opacity-60"
+              >
+                {issueInvoice.isPending ? "Issuing…" : "Issue invoice"}
+              </button>
+            )}
           </div>
         </div>
       </div>
