@@ -76,6 +76,7 @@ beforeEach(() => {
           variant: "Carres Cloud · King",
           variantKind: "size",
           price: 3500,
+          cost: null,
         },
       ],
       sofaFabrics: [],

@@ -43,6 +43,7 @@ export const productModelFromRow = (r: DB.ProductModelRow): D.ProductModel => ({
   colors: r.colors,
   gaps: r.gaps,
   sofaMode: r.sofa_mode,
+  discontinuedAt: r.discontinued_at,
 });
 
 export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
@@ -52,6 +53,10 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   variant: r.variant,
   variantKind: r.variant_kind,
   price: Number(r.price),
+  // 0074 — Postgres numeric arrives as string|number; coalesce to null when
+  // the column is NULL (catalog admin's "cost not yet set" state).
+  cost: r.cost == null ? null : Number(r.cost),
+  discontinuedAt: r.discontinued_at,
 });
 
 export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
@@ -59,6 +64,7 @@ export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
   modelId: r.model_id,
   fabricName: r.fabric_name,
   surcharge: Number(r.surcharge),
+  discontinuedAt: r.discontinued_at,
 });
 
 export const addonFromRow = (r: DB.AddonRow): D.Addon => ({

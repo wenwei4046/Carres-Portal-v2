@@ -68,16 +68,14 @@ export type WarehouseKind     = "own" | "logistics_partner";
 // have no historical cost recorded — CQ3: backfill NULL, do not invent). New
 // PO creates enforce non-NULL via zod (T25) + RPC validation (T26). The
 // auto-issue path predates that gate and uses 'auto_issued' instead.
-export type CostSource        = "hand_entered" | "prev_po" | "system_suggested" | "auto_issued";
+// 0074 added 'catalog' (Loo 2026-05-09): Create-PO auto-stamps every line
+// with cost_source='catalog' since cost auto-reads from product_skus.cost.
+// The other 4 values stay live for legacy + auto-issue paths.
+export type CostSource        = "hand_entered" | "prev_po" | "system_suggested" | "auto_issued" | "catalog";
 
 // T42-C1 — narrower form-state variant excluding the server-only `auto_issued`
 // label. The auto-issue path predates the Sprint E (T25) manual-create gating
-// and emits `auto_issued` to mark cost values inferred at PO-issue time. The
-// FE manual-create surface (`CreatePOModal` + `CogsLineEditor`) must NOT
-// originate `auto_issued` — `createPoInput.lines[].costSource` zod is locked
-// to the 3 manual values, so leaking `auto_issued` through the form would
-// 422 at the API edge. Use this type at the form-state layer to enforce that
-// invariant at compile time instead of runtime.
+// and emits `auto_issued` to mark cost values inferred at PO-issue time.
 export type ManualCostSource  = Exclude<CostSource, "auto_issued">;
 
 export interface DealerRow {
@@ -137,6 +135,12 @@ export interface ProductSkuRow {
   // follow-up tightening migration runs (carry-forward
   // phase-4-v3-skus-supplier-id-not-null-tighten).
   supplier_id: string | null;
+  // 0074 — fixed procurement cost per unit. NULL = "not yet set" (Create-PO
+  // refuses lines whose SKU has cost=null until logistics sets a value via
+  // the catalog admin UI).
+  cost: number | null;
+  // 0074 — soft-delete flag for the catalog admin UI.
+  discontinued_at: string | null;
 }
 
 export interface SofaFabricRow {
@@ -144,6 +148,8 @@ export interface SofaFabricRow {
   model_id: string;
   fabric_name: string;
   surcharge: number;
+  // 0074 — soft-delete flag for the catalog admin UI.
+  discontinued_at: string | null;
 }
 
 export interface AddonRow {

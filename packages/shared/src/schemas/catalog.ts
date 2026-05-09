@@ -25,6 +25,10 @@ export const productModelSchema = z.object({
   colors: z.array(z.string()).nullable(),
   gaps: z.array(z.string()).nullable(),
   sofaMode: z.enum(["preset", "custom", "both"]).nullable(),
+  // 0074 — soft-delete flag exposed for the catalog admin UI; the public
+  // GET /api/catalog filters discontinued models out, so consumer code
+  // generally treats this as always null. Catalog admin endpoints surface it.
+  discontinuedAt: z.string().nullable().optional(),
 });
 export type ProductModelDto = z.infer<typeof productModelSchema>;
 
@@ -35,6 +39,13 @@ export const productSkuSchema = z.object({
   variant: z.string(),
   variantKind: variantKindSchema,
   price: z.number(),
+  // 0074 — fixed procurement cost per unit (Loo 2026-05-09). Auto-fills onto
+  // every Create-PO line; the modal stamps cost_source='catalog' on persist.
+  // Nullable so legacy + freshly-added SKUs that haven't had a cost set yet
+  // still serialize cleanly; the Create-PO submit gate refuses lines whose
+  // SKU has cost=null.
+  cost: z.number().nullable(),
+  discontinuedAt: z.string().nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
 
@@ -43,6 +54,7 @@ export const sofaFabricSchema = z.object({
   modelId: z.string().uuid(),
   fabricName: z.string(),
   surcharge: z.number(),
+  discontinuedAt: z.string().nullable().optional(),
 });
 export type SofaFabricDto = z.infer<typeof sofaFabricSchema>;
 

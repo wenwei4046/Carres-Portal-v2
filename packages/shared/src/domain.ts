@@ -53,6 +53,8 @@ export interface ProductModel {
   colors: string[] | null;
   gaps: string[] | null;
   sofaMode: "preset" | "custom" | "both" | null;
+  // 0074 — soft-delete flag for the catalog admin UI (Loo 2026-05-09).
+  discontinuedAt?: string | null;
 }
 
 export interface ProductSku {
@@ -62,6 +64,10 @@ export interface ProductSku {
   variant: string;
   variantKind: "size" | "preset" | "part";
   price: number;
+  // 0074 — fixed procurement cost per unit; auto-fills onto every Create-PO
+  // line. Null = not yet set (Create-PO refuses lines whose SKU has null cost).
+  cost: number | null;
+  discontinuedAt?: string | null;
 }
 
 export interface SofaFabric {
@@ -69,6 +75,7 @@ export interface SofaFabric {
   modelId: string;
   fabricName: string;
   surcharge: number;
+  discontinuedAt?: string | null;
 }
 
 export interface Addon {

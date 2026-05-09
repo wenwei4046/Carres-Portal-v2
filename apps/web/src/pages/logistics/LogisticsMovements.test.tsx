@@ -89,6 +89,7 @@ function setLoaded(rows: MovementsListResponse["rows"] = []) {
           variant: "Carres Cloud · King",
           variantKind: "size",
           price: 3500,
+          cost: null,
         },
         {
           id: "11111111-1111-1111-1111-000000000aa3",
@@ -97,6 +98,7 @@ function setLoaded(rows: MovementsListResponse["rows"] = []) {
           variant: "Oslo · Queen",
           variantKind: "size",
           price: 1800,
+          cost: null,
         },
       ],
       sofaFabrics: [],

@@ -166,6 +166,7 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
           variant: "Carres Cloud · King",
           variantKind: "size",
           price: 3500,
+          cost: null,
         },
         {
           id: "11111111-1111-1111-1111-000000000aa2",
@@ -174,6 +175,7 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
           variant: "Carres Cloud · Queen",
           variantKind: "size",
           price: 3000,
+          cost: null,
         },
         {
           id: "11111111-1111-1111-1111-000000000aa3",
@@ -182,6 +184,7 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
           variant: "Oslo · Queen",
           variantKind: "size",
           price: 1800,
+          cost: null,
         },
         {
           id: "11111111-1111-1111-1111-000000000aa4",
@@ -190,6 +193,7 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
           variant: "Nordic · 3 seater",
           variantKind: "preset",
           price: 4500,
+          cost: null,
         },
       ],
       sofaFabrics: [],

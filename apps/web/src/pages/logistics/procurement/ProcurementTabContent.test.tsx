@@ -172,6 +172,7 @@ function setLoaded(pos: LogisticsPoListRow[]) {
           variant: "Carres Cloud · King",
           variantKind: "size",
           price: 3500,
+          cost: null,
         },
         {
           id: "s2",
@@ -180,6 +181,7 @@ function setLoaded(pos: LogisticsPoListRow[]) {
           variant: "Nordic Sofa · 3 seater",
           variantKind: "preset",
           price: 4500,
+          cost: null,
         },
       ],
       sofaFabrics: [],

@@ -96,6 +96,7 @@ vi.mock("@/lib/queries", async () => {
             variant: "Nordic Sofa · 3 seater",
             variantKind: "preset",
             price: 4500,
+            cost: null,
           },
         ],
         sofaFabrics: [],

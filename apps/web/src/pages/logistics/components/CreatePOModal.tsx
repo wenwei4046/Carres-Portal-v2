@@ -27,7 +27,6 @@ import {
   useStockAlerts,
   type SupplierRow,
 } from "@/lib/queries";
-import CogsLineEditor from "./CogsLineEditor";
 import { INPUT_CLS, Modal, ModalActions } from "./Modal";
 
 /**
@@ -234,6 +233,14 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     }
     return m;
   }, [catalogQ.data]);
+  // 0074 — auto-cost lookup: line.sku → ProductSkuDto. Each line's cost is
+  // pulled from product_skus.cost the moment the operator picks a variant
+  // (Loo Q5=a 2026-05-09: cost is fixed in catalog, not editable per PO).
+  const skuByCode = useMemo(() => {
+    const m = new Map<string, ProductSkuDto>();
+    for (const s of catalogQ.data?.skus ?? []) m.set(s.sku, s);
+    return m;
+  }, [catalogQ.data]);
   const partners = partnersQ.data?.partners ?? [];
 
   // ---- Lines ----
@@ -242,47 +249,63 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // valid-form gate enforces non-null per line). Auto-fill / suggest paths
   // also leave them null so the operator picks the cost source explicitly per
   // line.
-  // 0073 — prefill carries sku only. Derive modelId so the cascade renders
-  // correctly when the modal opens auto-filled from a shortage. attrs starts
-  // null on every line; bedframe/sofa lines flag red until the operator
-  // completes color/gap/fabric inline (Q2=A red-flag pattern).
+  // 0074 — auto-cost helper. When a line's sku is set, pull cost +
+  // cost_source from product_skus. Returns nulls when SKU has no cost yet
+  // (catalog admin needs to fill it in; submit gate refuses such lines).
+  const lineCostFromSku = (
+    sku: string,
+  ): { cost: number | null; costSource: ManualCostSource | null } => {
+    if (!sku) return { cost: null, costSource: null };
+    const skuObj = skuByCode.get(sku);
+    if (skuObj == null || skuObj.cost == null) {
+      return { cost: null, costSource: null };
+    }
+    return { cost: skuObj.cost, costSource: "catalog" };
+  };
+
+  // 0073/0074 — prefill carries sku only. Derive modelId for the cascade,
+  // and pull cost from product_skus.cost (fixed per Loo Q5=a). attrs starts
+  // null; bedframe/sofa lines flag red until the operator completes the
+  // cascade (Q2=A).
   const initialLines: DraftLine[] = useMemo(() => {
     if (prefill.lines && prefill.lines.length > 0) {
-      return prefill.lines.map((l) => ({
-        modelId: modelIdForSku(l.sku, models),
-        sku: l.sku,
-        qty: l.qty,
-        cost: null,
-        costSource: null,
-        attrs: null,
-      }));
+      return prefill.lines.map((l) => {
+        const cs = lineCostFromSku(l.sku);
+        return {
+          modelId: modelIdForSku(l.sku, models),
+          sku: l.sku,
+          qty: l.qty,
+          cost: cs.cost,
+          costSource: cs.costSource,
+          attrs: null,
+        };
+      });
     }
     return [];
-  }, [prefill.lines, models]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill.lines, models, skuByCode]);
   const [lines, setLines] = useState<DraftLine[]>(initialLines);
 
   // Default the first line to the first SKU once the catalog loads (only when
-  // we started with zero prefill lines). This mirrors proto's `[{ sku: stock[0],
-  // qty: 5 }]` default. 0073: derive modelId from the SKU so the cascade sub-
-  // row renders the right Variant/Color/Gap/Fabric combo. attrs starts null;
-  // bedframe/sofa default lines flag red until the operator completes the
-  // cascade (Q2=A red-flag pattern).
+  // we started with zero prefill lines). 0074: cost auto-fills from the SKU.
   useEffect(() => {
     if (lines.length === 0 && initialLines.length === 0) {
       const firstSku = catalogQ.data?.skus?.[0];
       if (firstSku) {
+        const cs = lineCostFromSku(firstSku.sku);
         setLines([
           {
             modelId: firstSku.modelId,
             sku: firstSku.sku,
             qty: 5,
-            cost: null,
-            costSource: null,
+            cost: cs.cost,
+            costSource: cs.costSource,
             attrs: null,
           },
         ]);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length, catalogQ.data, initialLines.length]);
 
   // C5.2 — per-supplier-group warehouse (Q4=A: blank required, no auto-default).
@@ -383,19 +406,23 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       }
       // Q3=A — override (replace), not append. Q2-extended — line.qty equals
       // the literal shortfall (need - available), as returned by the server.
-      // T29: cost + costSource start null — operator picks via CogsLineEditor.
       // 0073: derive modelId from sku; attrs left null so bedframe/sofa lines
       // surface as red-flagged "missing color/gap/fabric" until the operator
       // completes the cascade inline (Loo Q2=A 2026-05-09).
+      // 0074: cost auto-fills from product_skus.cost (Loo Q5=a 2026-05-09);
+      // SKUs without a configured cost flag red and block submit.
       setLines(
-        data.shortage.map((s) => ({
-          modelId: modelIdForSku(s.sku, models),
-          sku: s.sku,
-          qty: s.shortage,
-          cost: null,
-          costSource: null,
-          attrs: null,
-        })),
+        data.shortage.map((s) => {
+          const cs = lineCostFromSku(s.sku);
+          return {
+            modelId: modelIdForSku(s.sku, models),
+            sku: s.sku,
+            qty: s.shortage,
+            cost: cs.cost,
+            costSource: cs.costSource,
+            attrs: null,
+          };
+        }),
       );
       const totalUnits = data.shortage.reduce((acc, s) => acc + s.need, 0);
       toast.success(
@@ -460,14 +487,18 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       }
       // 0073: derive modelId per sku; attrs null until operator picks the
       // bedframe color/gap or sofa fabric inline (red-flagged pattern).
-      const nextLines = Array.from(gapBySku.entries()).map(([sku, qty]) => ({
-        modelId: modelIdForSku(sku, models),
-        sku,
-        qty,
-        cost: null,
-        costSource: null,
-        attrs: null,
-      }));
+      // 0074: cost auto-fills from product_skus.cost.
+      const nextLines = Array.from(gapBySku.entries()).map(([sku, qty]) => {
+        const cs = lineCostFromSku(sku);
+        return {
+          modelId: modelIdForSku(sku, models),
+          sku,
+          qty,
+          cost: cs.cost,
+          costSource: cs.costSource,
+          attrs: null,
+        };
+      });
       setLines(nextLines);
       const count = nextLines.length;
       toast.success(
@@ -497,22 +528,22 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   }
   function addLine() {
     // Seed the first unused SKU so the cascade renders with sensible
-    // defaults (operator can re-pick Model/Variant/etc. inline). Pre-0073
-    // behaviour did the same. attrs starts null — bedframe/sofa lines flag
-    // red until the operator completes the cascade.
+    // defaults (operator can re-pick Model/Variant/etc. inline). attrs
+    // starts null; cost auto-fills from product_skus.cost (0074).
     const used = new Set(lines.map((l) => l.sku));
     const next = (catalogQ.data?.skus ?? []).find((s) => !used.has(s.sku));
     const fallback = catalogQ.data?.skus?.[0];
     const seed = next ?? fallback;
     if (!seed) return;
+    const cs = lineCostFromSku(seed.sku);
     setLines((ls) => [
       ...ls,
       {
         modelId: seed.modelId,
         sku: seed.sku,
         qty: 1,
-        cost: null,
-        costSource: null,
+        cost: cs.cost,
+        costSource: cs.costSource,
         attrs: null,
       },
     ]);
@@ -932,16 +963,17 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                 >
                   <select
                     value={l.sku}
-                    onChange={(e) =>
-                      // T42-C4 invariant preserved: switching variant resets
-                      // COGS so a stale `prev_po` cost can't ride a different
-                      // SKU. attrs persist (same model = same color/gap menu).
+                    onChange={(e) => {
+                      // 0074 — switching variant pulls cost+source from
+                      // product_skus.cost (Q5=a 2026-05-09). attrs persist
+                      // (same model = same color/gap menu).
+                      const cs = lineCostFromSku(e.target.value);
                       setLine(i, {
                         sku: e.target.value,
-                        cost: null,
-                        costSource: null,
-                      })
-                    }
+                        cost: cs.cost,
+                        costSource: cs.costSource,
+                      });
+                    }}
                     aria-label={`Line ${i + 1} variant`}
                     className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] bg-white outline-none focus:border-base-500"
                   >
@@ -1044,23 +1076,39 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                     : "Pick fabric so the supplier knows which version to upholster."}
                 </div>
               )}
-              {/* T29 — per-line COGS editor (cost + cost_source). Sub-row
-                  spans the full width below the cascade; renders as a
-                  2-cell layout (cost input + dropdown). The shared zod
-                  schema `createPoInput.lines[]` requires both fields, and the
-                  modal's submit gate (`allLinesOk`) blocks submit until every
-                  line has both. */}
-              <div className="pl-0">
-                <CogsLineEditor
-                  sku={l.sku}
-                  cost={l.cost}
-                  costSource={l.costSource}
-                  onChange={(cost, costSource) =>
-                    setLine(i, { cost, costSource })
-                  }
-                  disabled={isPending}
-                />
-              </div>
+              {/* 0074 — Cost is fixed in catalog (Loo Q5=a 2026-05-09). The
+                  hand-entry CogsLineEditor is gone; we show the catalog cost
+                  read-only and flag SKUs whose cost hasn't been set yet. */}
+              {l.sku && (
+                <div
+                  className="text-[10.5px] font-body flex items-center gap-2"
+                  data-testid={`po-line-cost-${i}`}
+                >
+                  {l.cost != null ? (
+                    <>
+                      <span className="text-base-500">Cost</span>
+                      <span className="font-mono text-base-900">
+                        RM {l.cost.toLocaleString()}
+                      </span>
+                      <span
+                        className="text-base-500"
+                        style={{
+                          fontSize: "9.5px",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        · catalog
+                      </span>
+                    </>
+                  ) : (
+                    <span style={{ color: "var(--brand-signature)" }}>
+                      ⚠ No cost on this SKU yet — set it in Catalog before
+                      issuing the PO.
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

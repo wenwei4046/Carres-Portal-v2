@@ -117,11 +117,11 @@ export const createPoInput = z.object({
     // mirror that here so 422 surfaces at the API edge rather than 500ing on
     // SQLSTATE 23514 from Postgres.
     cost: z.number().nonnegative(),
-    // Migration 0055. Enum labels match `cost_source_enum` 1:1; the FE drives
-    // this via CogsLineEditor (T28) — `hand_entered` when the user types,
-    // `prev_po` when the auto-fill button populates from
-    // logistics_recent_po_cost (T27), `system_suggested` for heuristics.
-    costSource: z.enum(['hand_entered', 'prev_po', 'system_suggested']),
+    // Migration 0055 + 0074. Enum labels mirror `cost_source_enum` minus the
+    // server-only 'auto_issued'. Post-0074 (Loo 2026-05-09 Q5=a) Create-PO
+    // always emits 'catalog' since cost auto-reads from product_skus.cost;
+    // the legacy 3 values stay accepted for any backfill / migration path.
+    costSource: z.enum(['hand_entered', 'prev_po', 'system_suggested', 'catalog']),
     // Migration 0073 cascade picker (Loo 2026-05-09). Optional jsonb payload
     // per-line: bedframe={color, gap}, sofa={fabric_id, fabric_name,
     // fabric_surcharge}, mattress=null. Server is a dumb persister; client

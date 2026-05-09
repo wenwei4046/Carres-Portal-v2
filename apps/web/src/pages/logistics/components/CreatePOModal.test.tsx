@@ -208,6 +208,9 @@ function setLoaded() {
           variant: "Carres Cloud · King",
           variantKind: "size",
           price: 3500,
+          // 0074 — fixed catalog cost; CreatePOModal auto-fills line.cost
+          // from this and stamps cost_source='catalog' on submit.
+          cost: 1500,
         },
         {
           id: "s2",
@@ -216,6 +219,7 @@ function setLoaded() {
           variant: "Nordic Sofa · 3 seater",
           variantKind: "preset",
           price: 4500,
+          cost: 2200,
         },
         {
           id: "s3",
@@ -224,6 +228,7 @@ function setLoaded() {
           variant: "Carres Cloud · Queen",
           variantKind: "size",
           price: 3000,
+          cost: 1300,
         },
       ],
       sofaFabrics: [],
@@ -285,16 +290,8 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
       target: { value: WAREHOUSE_KL.id },
     });
 
-    // T29 — fill cost + costSource on the seeded line via the per-line
-    // CogsLineEditor sub-component. The valid-form gate now requires both.
-    const SKU_KING = "mattress:carres-cloud:King";
-    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
-      target: { value: "1500" },
-    });
-    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
-      target: { value: "hand_entered" },
-    });
-
+    // 0074 — cost auto-fills from product_skus.cost (King fixture = 1500).
+    // No more hand-entry; the valid-form gate just needs the seeded SKU.
     // Submit
     const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
     expect(issueBtn).not.toBeDisabled();
@@ -313,9 +310,9 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
     expect(callArg.supplierId).toBe(SUPPLIER_A.id);
     expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
     expect(callArg.lines.length).toBeGreaterThan(0);
-    // T29 — every emitted line carries cost + costSource.
+    // 0074 — every emitted line carries the catalog cost + costSource='catalog'.
     expect(callArg.lines[0].cost).toBe(1500);
-    expect(callArg.lines[0].costSource).toBe("hand_entered");
+    expect(callArg.lines[0].costSource).toBe("catalog");
     // The contract: stockpile mode forces dl/dlRefs out of the payload.
     // Either omitted or explicitly null is acceptable per the API zod
     // (dl/dlRefs are .optional()), but neither must carry a value.
@@ -373,51 +370,32 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
     fireEvent.click(screen.getByTestId("stockpile-po-toggle"));
     expect(issueBtn).toBeDisabled();
 
-    // Pick warehouse — still not enough now that T29 requires per-line
-    // cost + costSource on every line. Submit stays gated.
+    // 0074 — cost auto-fills from product_skus.cost on the seeded line
+    // (King fixture = 1500). Submit only needs warehouse picked.
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
-    });
-    expect(issueBtn).toBeDisabled();
-
-    // T29 — fill cost + costSource via CogsLineEditor.
-    const SKU_KING = "mattress:carres-cloud:King";
-    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
-      target: { value: "1500" },
-    });
-    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
-      target: { value: "hand_entered" },
     });
     expect(issueBtn).not.toBeDisabled();
   });
 
-  it("submit blocked when any line is missing cost or costSource", () => {
-    // T29 — explicit invariant test: a line without cost OR costSource
-    // disables submit, even when warehouse is picked + stockpile mode on.
+  it("submit blocked when any line points at a SKU with NULL cost", () => {
+    // 0074 — replaces the T29 "missing cost/costSource" gate. Cost is now
+    // catalog-driven; the gate refuses lines whose SKU has cost=null (i.e.
+    // catalog admin hasn't set a procurement cost yet).
+    catalogHookState = {
+      data: {
+        ...catalogHookState.data!,
+        skus: catalogHookState.data!.skus.map((s) =>
+          s.sku === "mattress:carres-cloud:King" ? { ...s, cost: null } : s,
+        ),
+      },
+    };
     render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
     fireEvent.click(screen.getByTestId("stockpile-po-toggle"));
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
     });
     const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
-    const SKU_KING = "mattress:carres-cloud:King";
-
-    // Pick costSource only — cost still null → blocked.
-    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
-      target: { value: "hand_entered" },
-    });
-    expect(issueBtn).toBeDisabled();
-
-    // Add cost — now both filled → unblocked.
-    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
-      target: { value: "1500" },
-    });
-    expect(issueBtn).not.toBeDisabled();
-
-    // Clear cost again — back to blocked.
-    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
-      target: { value: "" },
-    });
     expect(issueBtn).toBeDisabled();
   });
 });
@@ -464,6 +442,10 @@ describe("CreatePOModal — Suggest from alerts (T22)", () => {
               ...e,
               variantKind: "size" as const,
               price: 0,
+              // 0074 — extra fixture SKUs default to NULL cost; tests that
+              // exercise actual cost numbers seed a real value via the main
+              // `setLoaded()` fixture instead.
+              cost: null,
             })),
         ],
         sofaFabrics: [],
@@ -782,13 +764,7 @@ describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
     });
-    // T29 — fill cost + costSource on the seeded line via CogsLineEditor.
-    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
-      target: { value: "1500" },
-    });
-    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
-      target: { value: "hand_entered" },
-    });
+    // 0074 — cost auto-fills from product_skus.cost (King fixture = 1500).
     expect(issueBtn).not.toBeDisabled();
     fireEvent.click(issueBtn);
     await waitFor(() => {
@@ -802,61 +778,29 @@ describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement
     expect(callArg.supplierId).toBe(SUPPLIER_A.id);
     expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
     expect(callArg.lines.length).toBeGreaterThan(0);
-    // T29 — every emitted line carries cost + costSource.
+    // 0074 — every emitted line carries the catalog cost + 'catalog' source.
     expect(callArg.lines[0].cost).toBe(1500);
-    expect(callArg.lines[0].costSource).toBe("hand_entered");
+    expect(callArg.lines[0].costSource).toBe("catalog");
   });
 
-  it("changing SKU on a line clears that line's cost + costSource (T42-C4)", () => {
-    // T42-C4 — codex P2 fix. Without the reset, an operator who picks
-    // `prev_po` for SKU-A (auto-fills cost = 1500) and then switches the
-    // dropdown to SKU-B would persist SKU-A's 1500 against SKU-B (submit
-    // only checks non-null, not "matches the current SKU"). This test
-    // pins down the reset side-effect of the SKU select onChange.
+  it("changing variant on a line re-pulls cost from the new SKU (0074)", () => {
+    // 0074 — replaces T42-C4 manual-entry test. Switching variant via the
+    // cascade picker now re-reads cost from product_skus.cost (King = 1500
+    // → Queen = 1300 per fixture). costSource stays 'catalog'.
     render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
 
     const SKU_QUEEN = "mattress:carres-cloud:Queen";
 
-    // Fill cost + costSource for the seeded line (King).
-    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
-      target: { value: "1500" },
-    });
-    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
-      target: { value: "hand_entered" },
-    });
-
-    // Sanity: King editor shows the typed values BEFORE the SKU swap.
-    expect(
-      (screen.getByTestId(`cogs-cost-input-${SKU_KING}`) as HTMLInputElement)
-        .value,
-    ).toBe("1500");
-    expect(
-      (
-        screen.getByTestId(`cogs-source-select-${SKU_KING}`) as HTMLSelectElement
-      ).value,
-    ).toBe("hand_entered");
-
-    // Switch SKU on line 0 from King → Queen.
-    // 0073 cascade picker: SKU swap moved from a single dropdown to the
-    // per-line Variant select (model already chosen by the seeded default).
+    // Switch SKU on line 0 from King → Queen via the variant select.
     const skuSelects = screen.getAllByLabelText(/Line \d+ variant/);
     fireEvent.change(skuSelects[0], { target: { value: SKU_QUEEN } });
 
-    // After the switch, the new line's CogsLineEditor (keyed by Queen) should
-    // mount fresh — both cost AND costSource are cleared so SKU-A's stale
-    // values don't bleed onto SKU-B.
-    const newCostInput = screen.getByTestId(
-      `cogs-cost-input-${SKU_QUEEN}`,
-    ) as HTMLInputElement;
-    const newSourceSelect = screen.getByTestId(
-      `cogs-source-select-${SKU_QUEEN}`,
-    ) as HTMLSelectElement;
-    expect(newCostInput.value).toBe("");
-    expect(newSourceSelect.value).toBe("");
-
-    // Submit gate is back to disabled — line is incomplete again.
+    // Submit and inspect the emitted cost — should be Queen's catalog cost.
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
     const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
-    expect(issueBtn).toBeDisabled();
+    expect(issueBtn).not.toBeDisabled();
   });
 
   it("warns when 2 suppliers match → auto-split notice", () => {
@@ -1029,21 +973,8 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_B.id}`), {
       target: { value: WAREHOUSE_PG.id },
     });
-    // T29 — fill cost + costSource on each auto-filled line via the
-    // CogsLineEditor sub-component. The valid-form gate now requires both
-    // fields per line (mirrors `createPoInput.lines[]` zod refinement).
-    fireEvent.change(screen.getByTestId(`cogs-cost-input-${SKU_KING}`), {
-      target: { value: "1500" },
-    });
-    fireEvent.change(screen.getByTestId(`cogs-source-select-${SKU_KING}`), {
-      target: { value: "hand_entered" },
-    });
-    fireEvent.change(screen.getByTestId(`cogs-cost-input-sofa:nordic:3s`), {
-      target: { value: "2200" },
-    });
-    fireEvent.change(screen.getByTestId(`cogs-source-select-sofa:nordic:3s`), {
-      target: { value: "prev_po" },
-    });
+    // 0074 — cost auto-fills from product_skus.cost (King=1500, Nordic=2200);
+    // costSource = 'catalog' fixed.
     expect(issueBtn).not.toBeDisabled();
     fireEvent.click(issueBtn);
     // Batch RPC fires (NOT the single-PO RPC) — atomic 2-PO commit.
@@ -1070,12 +1001,13 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
     expect(aGroup?.warehouseId).toBe(WAREHOUSE_KL.id);
     expect(bGroup?.warehouseId).toBe(WAREHOUSE_PG.id);
     // 0073 cascade picker: mattress + sofa-without-fabric lines emit attrs=null.
+    // 0074: catalog cost auto-stamped + costSource='catalog' on every line.
     expect(aGroup?.lines).toEqual([
       {
         sku: SKU_KING,
         qty: 5,
         cost: 1500,
-        costSource: "hand_entered",
+        costSource: "catalog",
         attrs: null,
       },
     ]);
@@ -1084,7 +1016,7 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
         sku: "sofa:nordic:3s",
         qty: 3,
         cost: 2200,
-        costSource: "prev_po",
+        costSource: "catalog",
         attrs: null,
       },
     ]);
