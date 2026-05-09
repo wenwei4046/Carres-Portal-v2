@@ -113,6 +113,35 @@ partnerPickupsRouter.get("/rfd-pending", async (c) => {
  *   42P01 → 422 (thread not found)
  *   P0001 → 422 (rule violation; detail surfaces as code)
  */
+/**
+ * GET /api/partner/pickups/to-deliver — Phase 7 Sprint 1.
+ *
+ * Lists customer-leg threads where Logistics has dispatched and the partner
+ * is now in transit / awaiting delivery. Sourced from
+ * `order_supplier_threads` where:
+ *   - delivery_partner_id = auth.app_partner_id() (RLS scopes per partner)
+ *   - logistics_stage = 'dispatched'
+ *
+ * Used by PartnerPickupsPage to render the "In Transit" section + the
+ * Mark Delivered button (POD upload flow).
+ *
+ * Joins orders.customer_name + orders.dl for display. RLS on
+ * order_supplier_threads (`ost_partner_read` 0033:96) admits the partner
+ * as procurement-leg owner; for customer-leg threads (delivery_partner_id =
+ * me but procurement_partner_id may belong to a different partner), the
+ * RPC pattern from rfd-pending is reused via a SECURITY DEFINER wrapper.
+ */
+partnerPickupsRouter.get("/to-deliver", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Only partner role with partner_id" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("partner_threads_to_deliver");
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json(data ?? []);
+});
+
 partnerPickupsRouter.post("/accept-rfd", async (c) => {
   const auth = c.var.auth;
   if (auth.role !== "partner") {

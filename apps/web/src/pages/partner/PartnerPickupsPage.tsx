@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { qk } from "@/lib/queries";
+import { qk, usePartnerToDeliver, type PartnerToDeliverRow } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import PartnerRequestForDeliveryDialog from "./components/PartnerRequestForDeliveryDialog";
+import PODUploadDialog from "./components/PODUploadDialog";
 
 /**
  * PartnerPickupsPage — the LP's per-leg work queue. Two sections:
@@ -51,6 +52,8 @@ type RfdPendingRow = {
 export default function PartnerPickupsPage() {
   const qc = useQueryClient();
   const [openRfd, setOpenRfd] = useState<{ threadId: string; poLabel: string } | null>(null);
+  const [openPod, setOpenPod] = useState<PartnerToDeliverRow | null>(null);
+  const { data: toDeliverRows, isLoading: toDeliverLoading } = usePartnerToDeliver();
 
   const { data: poRows, isLoading: posLoading } = useQuery({
     queryKey: qk.partner.pickups(),
@@ -62,7 +65,7 @@ export default function PartnerPickupsPage() {
     queryFn: () => apiFetch<RfdPendingRow[]>("/api/partner/pickups/rfd-pending"),
   });
 
-  if (posLoading || rfdLoading) {
+  if (posLoading || rfdLoading || toDeliverLoading) {
     return (
       <div className="px-9 py-8 pb-14 text-[13px] text-base-600">Loading…</div>
     );
@@ -146,7 +149,63 @@ export default function PartnerPickupsPage() {
         </div>
       </section>
 
-      {/* Section 2: All Pickups (procurement-leg) */}
+      {/* Section 2: In Transit — customer-leg threads at logistics_stage='dispatched'.
+          Phase 7 Sprint 2: each row gets a "Mark Delivered" button that opens
+          PODUploadDialog. After successful POD upload, partner_attach_pod RPC
+          advances the thread to 'delivered' and the row drops off this list. */}
+      <section className="space-y-2" data-testid="partner-in-transit-section">
+        <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-base-700">
+          In Transit
+        </h2>
+        <div className="bg-white border border-base-200 rounded-md overflow-hidden">
+          {(toDeliverRows ?? []).length === 0 ? (
+            <div className="p-4 text-[12px] text-base-500">
+              Nothing in transit. Accepted RFDs will surface here once Logistics dispatches.
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-base-200 bg-base-50">
+                  <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
+                    PO
+                  </th>
+                  <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
+                    Customer
+                  </th>
+                  <th className="text-left p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
+                    Confirm delivery
+                  </th>
+                  <th className="text-right p-3 text-[11px] uppercase tracking-[0.18em] font-semibold text-base-600">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(toDeliverRows ?? []).map((r) => (
+                  <tr key={r.thread_id} className="border-b border-base-200 last:border-0">
+                    <td className="p-3 text-[13px] font-medium text-base-900">{r.po_id ?? "—"}</td>
+                    <td className="p-3 text-[13px] text-base-700">{r.customer_name}</td>
+                    <td className="p-3 text-[12px] text-base-600">
+                      {r.confirm_delivery_date ?? "—"}
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => setOpenPod(r)}
+                        className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-[12px] font-medium"
+                        data-testid={`mark-delivered-${r.thread_id}`}
+                      >
+                        Mark Delivered
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
+
+      {/* Section 3: All Pickups (procurement-leg) */}
       <section className="space-y-2">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-base-700">
           All Pickups
@@ -180,6 +239,10 @@ export default function PartnerPickupsPage() {
           </table>
         </div>
       </section>
+
+      {openPod && (
+        <PODUploadDialog row={openPod} onClose={() => setOpenPod(null)} />
+      )}
 
       {openRfd && (
         <PartnerRequestForDeliveryDialog

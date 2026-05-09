@@ -32,11 +32,10 @@ const THREAD_ID = "00000000-0000-0000-0000-0000000200a1";
 // Customer-leg state lives on `order_supplier_threads` post-0052; the
 // PO-sourced indicator that disappeared with the column drop is now restored
 // from threads via the new endpoint.
-function mockApi(rfdRows: unknown[], poRows: unknown[]) {
+function mockApi(rfdRows: unknown[], poRows: unknown[], toDeliverRows: unknown[] = []) {
   vi.mocked(apiFetch).mockImplementation(async (path) => {
-    if (typeof path === "string" && path.includes("/rfd-pending")) {
-      return rfdRows;
-    }
+    if (typeof path === "string" && path.includes("/rfd-pending")) return rfdRows;
+    if (typeof path === "string" && path.includes("/to-deliver")) return toDeliverRows;
     return poRows;
   });
 }
@@ -54,7 +53,9 @@ describe("PartnerPickupsPage", () => {
     await waitFor(() => expect(screen.getByText("PO-001")).toBeInTheDocument());
     expect(screen.getByText(/pickup_assigned/i)).toBeInTheDocument();
     expect(screen.getByText("PO-002")).toBeInTheDocument();
-    expect(screen.getByText(/delivered/i)).toBeInTheDocument();
+    // sup_status chip "delivered" is the only `delivered`-text element when
+    // the In Transit list is empty (added Phase 7 Sprint 2).
+    expect(screen.getByText("delivered")).toBeInTheDocument();
   });
 
   it("renders empty-state when no RFD-pending threads", async () => {

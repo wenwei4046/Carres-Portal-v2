@@ -80,6 +80,7 @@ export const qk = {
     dashboard:  () => ["partner", "dashboard"] as const,
     pickups:    () => ["partner", "pickups"] as const,
     rfdPending: () => ["partner", "rfd-pending"] as const,
+    toDeliver:  () => ["partner", "to-deliver"] as const,
   },
   // Phase 4 — HQ Logistics namespace. Same nested-key strategy as `principal`
   // so M5 mutation hooks can blast `["logistics"]` (or a sub-tree) on each
@@ -2749,6 +2750,52 @@ export interface SupplierDemandRow {
   sku: string;
   openQty: number;
   poCount: number;
+}
+
+/** Phase 7 Sprint 1 — partner_threads_to_deliver RPC payload. */
+export interface PartnerToDeliverRow {
+  thread_id:             string;
+  order_id:              string;
+  po_id:                 string | null;
+  customer_name:         string;
+  customer_address:      string | null;
+  customer_phone:        string | null;
+  dispatched_at:         string;
+  confirm_delivery_date: string | null;
+}
+
+export function usePartnerToDeliver(
+  opts?: Partial<UseQueryOptions<PartnerToDeliverRow[], ApiError>>,
+) {
+  return useQuery<PartnerToDeliverRow[], ApiError>({
+    queryKey: qk.partner.toDeliver(),
+    queryFn: () => apiFetch<PartnerToDeliverRow[]>("/api/partner/pickups/to-deliver"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Phase 7 — partner_attach_pod mutation. Caller passes threadId + podPath
+ *  (the path returned by the prior sign-upload call). On success, blasts
+ *  the partner namespace (toDeliver disappears, dashboard counts update). */
+export function useAttachPod(
+  opts?: Partial<
+    UseMutationOptions<unknown, ApiError, { threadId: string; podPath: string }>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { threadId: string; podPath: string }>({
+    mutationFn: ({ threadId, podPath }) =>
+      apiFetch(`/api/partner/pod/${threadId}/attach`, {
+        method: "POST",
+        body: JSON.stringify({ podPath }),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["partner"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
 }
 
 export function useSupplierMe(
