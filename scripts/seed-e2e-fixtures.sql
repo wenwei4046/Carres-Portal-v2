@@ -176,6 +176,17 @@ WHERE NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = '99999999-9104-9104
 -- collide with our explicit fixture ids. Idempotent: setval to MAX(9104, current).
 SELECT setval('orders_dl_seq', GREATEST(9104, last_value)) FROM orders_dl_seq;
 
+-- Stockpile threshold fixture for stockpile-alert-to-po E2E spec.
+-- mattress:carres-cloud:Queen at warehouse c1 has qty=4 in seed (line 200 of
+-- seed.sql). Setting low_threshold=50 guarantees logistics_stock_alerts()
+-- returns this row (effective 4 < threshold 50) so the StockAlertsTile on
+-- /logistics dashboard renders the alert.
+UPDATE stock_balances
+   SET low_threshold = 50
+ WHERE sku = 'mattress:carres-cloud:Queen'
+   AND warehouse_id = '00000000-0000-0000-0000-0000000000c1'
+   AND (low_threshold IS DISTINCT FROM 50);
+
 -- Visibility check
 SELECT dl, status, paid, placed_at::date AS placed_date
 FROM orders
