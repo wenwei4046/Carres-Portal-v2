@@ -64,6 +64,7 @@ export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
   modelId: r.model_id,
   fabricName: r.fabric_name,
   surcharge: Number(r.surcharge),
+  colors: r.colors,
   discontinuedAt: r.discontinued_at,
 });
 

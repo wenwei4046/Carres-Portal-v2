@@ -15,6 +15,7 @@ import {
   useDeleteCatalogModel,
   useDeleteCatalogSku,
   useDeleteSofaFabric,
+  usePatchCatalogModel,
   usePatchCatalogSku,
   usePatchSofaFabric,
 } from "@/lib/queries";
@@ -57,16 +58,19 @@ interface AddFabricState {
 }
 
 export default function LogisticsCatalog() {
-  const catalogQ = useCatalog();
+  // 0075 — admin mode includes discontinued items so the toggle UX has
+  // both states visible (Loo 2026-05-09).
+  const catalogQ = useCatalog({ admin: true });
   const [activeCat, setActiveCat] = useState<ProductCategory>("mattress");
   const [addModel, setAddModel] = useState<AddModelState | null>(null);
   const [addVariant, setAddVariant] = useState<AddVariantState | null>(null);
   const [addFabric, setAddFabric] = useState<AddFabricState | null>(null);
 
+  // 0075 — admin mode renders discontinued rows too so the toggle shows
+  // both states. Each consumer fades them visually + offers Restore.
   const skusByModel = useMemo(() => {
     const m = new Map<string, ProductSkuDto[]>();
     for (const s of catalogQ.data?.skus ?? []) {
-      if (s.discontinuedAt) continue;
       const arr = m.get(s.modelId) ?? [];
       arr.push(s);
       m.set(s.modelId, arr);
@@ -77,7 +81,6 @@ export default function LogisticsCatalog() {
   const fabricsByModel = useMemo(() => {
     const m = new Map<string, SofaFabricDto[]>();
     for (const f of catalogQ.data?.sofaFabrics ?? []) {
-      if (f.discontinuedAt) continue;
       const arr = m.get(f.modelId) ?? [];
       arr.push(f);
       m.set(f.modelId, arr);
@@ -86,7 +89,7 @@ export default function LogisticsCatalog() {
   }, [catalogQ.data]);
 
   const modelsInCat = (catalogQ.data?.models ?? [])
-    .filter((m) => m.category === activeCat && !m.discontinuedAt);
+    .filter((m) => m.category === activeCat);
 
   return (
     <div className="px-9 py-8 pb-14">
@@ -193,6 +196,72 @@ export default function LogisticsCatalog() {
 // Per-model card
 // -----------------------------------------------------------------------------
 
+// 0075 (Loo 2026-05-09) — Animated on/off pill replacing the plain
+// Discontinue text button. Orange (terracotta) when in the discontinued
+// state, gray when active. The thumb slides 14px between states with a
+// 160ms transition.
+function ToggleDiscontinue({
+  discontinued,
+  onChange,
+  pending,
+  ariaLabel,
+}: {
+  discontinued: boolean;
+  onChange: (next: boolean) => void;
+  pending?: boolean;
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={discontinued}
+      aria-label={ariaLabel}
+      disabled={pending}
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange(!discontinued);
+      }}
+      className="inline-flex items-center gap-2 select-none"
+      style={{ opacity: pending ? 0.55 : 1 }}
+    >
+      <span
+        className="relative rounded-full"
+        style={{
+          width: 32,
+          height: 18,
+          background: discontinued
+            ? "var(--brand-signature, #D64F20)"
+            : "rgba(34,31,32,.18)",
+          transition: "background 160ms",
+        }}
+      >
+        <span
+          className="absolute rounded-full bg-white shadow-sm"
+          style={{
+            width: 14,
+            height: 14,
+            top: 2,
+            left: discontinued ? 16 : 2,
+            transition: "left 160ms",
+          }}
+        />
+      </span>
+      <span
+        className="text-[10.5px] font-ui font-semibold uppercase"
+        style={{
+          letterSpacing: "0.08em",
+          color: discontinued
+            ? "var(--brand-signature, #D64F20)"
+            : "var(--base-600)",
+        }}
+      >
+        {discontinued ? "Discontinued" : "Active"}
+      </span>
+    </button>
+  );
+}
+
 function ModelCard({
   model,
   skus,
@@ -207,26 +276,40 @@ function ModelCard({
   onAddFabric: () => void;
 }) {
   const deleteModel = useDeleteCatalogModel();
+  const patchModel = usePatchCatalogModel();
   // Loo 2026-05-09 — collapse by default. Click header to expand variants
   // + fabrics; click again to close. Compact list when there are many
   // models in the catalog.
   const [expanded, setExpanded] = useState(false);
+  const isDiscontinued = !!model.discontinuedAt;
 
-  function discontinue(e: React.MouseEvent) {
-    // Stop the click from bubbling to the header toggle behind it.
-    e.stopPropagation();
-    if (!confirm(`Discontinue "${model.name}"? Variants will be hidden from new POs.`)) return;
-    deleteModel.mutate(model.id, {
-      onSuccess: () => toast.success(`${model.name} discontinued`),
-      onError: (err: unknown) =>
-        toast.error(err instanceof ApiError ? err.message : "Discontinue failed"),
-    });
+  function toggleDiscontinue(next: boolean) {
+    if (next) {
+      // Going discontinued: confirm + hit DELETE (stamps discontinued_at).
+      if (!confirm(`Discontinue "${model.name}"? It will be hidden from new POs but kept in records.`)) return;
+      deleteModel.mutate(model.id, {
+        onSuccess: () => toast.success(`${model.name} discontinued`),
+        onError: (err: unknown) =>
+          toast.error(err instanceof ApiError ? err.message : "Discontinue failed"),
+      });
+    } else {
+      // Restore: PATCH discontinuedAt:null.
+      patchModel.mutate(
+        { id: model.id, patch: { discontinuedAt: null } },
+        {
+          onSuccess: () => toast.success(`${model.name} re-activated`),
+          onError: (err: unknown) =>
+            toast.error(err instanceof ApiError ? err.message : "Restore failed"),
+        },
+      );
+    }
   }
 
   return (
     <div
       className="bg-white border border-base-200 rounded-[4px] p-4"
       data-testid={`catalog-model-${model.modelKey}`}
+      style={{ opacity: isDiscontinued ? 0.55 : 1 }}
     >
       {/* Clickable header — toggles expand/collapse. Discontinue button
           stops propagation so it doesn't trigger the toggle. */}
@@ -279,15 +362,14 @@ function ModelCard({
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={discontinue}
-          disabled={deleteModel.isPending}
-          data-testid={`catalog-model-discontinue-${model.modelKey}`}
-          className="btn-ghost text-[11px] text-warning"
-        >
-          Discontinue
-        </button>
+        <div data-testid={`catalog-model-discontinue-${model.modelKey}`}>
+          <ToggleDiscontinue
+            discontinued={isDiscontinued}
+            onChange={toggleDiscontinue}
+            pending={deleteModel.isPending || patchModel.isPending}
+            ariaLabel={`Toggle ${model.name} discontinued state`}
+          />
+        </div>
       </div>
 
       {expanded && (
@@ -329,6 +411,15 @@ function ModelCard({
       {model.category === "sofa" && (
         <div className="border-t border-base-100 mt-3 pt-2.5">
           <div className="label mb-1.5">Fabrics</div>
+          <div
+            className="grid items-center gap-3 px-1 py-1 bg-base-50 border-b border-base-200 rounded-[3px]"
+            style={{ gridTemplateColumns: "1fr 1fr 110px auto" }}
+          >
+            <div className="label">Fabric</div>
+            <div className="label">Colors (comma-separated)</div>
+            <div className="label text-right">Surcharge (RM)</div>
+            <div></div>
+          </div>
           {fabrics.length === 0 && (
             <div className="text-[11px] text-base-500 py-1">
               No fabrics yet.
@@ -362,6 +453,27 @@ function ModelCard({
 function SkuRow({ sku }: { sku: ProductSkuDto }) {
   const patch = usePatchCatalogSku();
   const del = useDeleteCatalogSku();
+  const isDiscontinued = !!sku.discontinuedAt;
+
+  function toggleDiscontinue(next: boolean) {
+    if (next) {
+      if (!confirm(`Discontinue ${sku.variant}? Existing POs/orders keep working; new ones won't see it.`)) return;
+      del.mutate(sku.id, {
+        onSuccess: () => toast.success(`${sku.variant} discontinued`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Discontinue failed"),
+      });
+    } else {
+      patch.mutate(
+        { id: sku.id, patch: { discontinuedAt: null } },
+        {
+          onSuccess: () => toast.success(`${sku.variant} re-activated`),
+          onError: (e: unknown) =>
+            toast.error(e instanceof ApiError ? e.message : "Restore failed"),
+        },
+      );
+    }
+  }
 
   function commitField(field: "price" | "cost", raw: string) {
     const trimmed = raw.trim();
@@ -393,19 +505,13 @@ function SkuRow({ sku }: { sku: ProductSkuDto }) {
     );
   }
 
-  function discontinue() {
-    if (!confirm(`Discontinue ${sku.variant}? Existing POs/orders keep working; new ones won't see it.`)) return;
-    del.mutate(sku.id, {
-      onSuccess: () => toast.success(`${sku.variant} discontinued`),
-      onError: (e: unknown) =>
-        toast.error(e instanceof ApiError ? e.message : "Discontinue failed"),
-    });
-  }
-
   return (
     <div
       className="grid items-center gap-3 px-1 py-2 border-b border-base-100 last:border-b-0"
-      style={{ gridTemplateColumns: "1.4fr 110px 110px auto" }}
+      style={{
+        gridTemplateColumns: "1.4fr 110px 110px auto",
+        opacity: isDiscontinued ? 0.55 : 1,
+      }}
       data-testid={`catalog-sku-${sku.sku}`}
     >
       <div className="text-[12px] font-body">
@@ -444,15 +550,12 @@ function SkuRow({ sku }: { sku: ProductSkuDto }) {
             : undefined
         }
       />
-      <button
-        type="button"
-        onClick={discontinue}
-        disabled={del.isPending}
-        aria-label={`Discontinue ${sku.variant}`}
-        className="btn-ghost text-[14px] text-warning"
-      >
-        ×
-      </button>
+      <ToggleDiscontinue
+        discontinued={isDiscontinued}
+        onChange={toggleDiscontinue}
+        pending={del.isPending || patch.isPending}
+        ariaLabel={`Toggle ${sku.variant} discontinued state`}
+      />
     </div>
   );
 }
@@ -460,6 +563,7 @@ function SkuRow({ sku }: { sku: ProductSkuDto }) {
 function FabricRow({ fabric }: { fabric: SofaFabricDto }) {
   const patch = usePatchSofaFabric();
   const del = useDeleteSofaFabric();
+  const isDiscontinued = !!fabric.discontinuedAt;
 
   function commitSurcharge(raw: string) {
     const trimmed = raw.trim();
@@ -479,21 +583,66 @@ function FabricRow({ fabric }: { fabric: SofaFabricDto }) {
     );
   }
 
-  function discontinue() {
-    if (!confirm(`Discontinue fabric "${fabric.fabricName}"?`)) return;
-    del.mutate(fabric.id, {
-      onError: (e: unknown) =>
-        toast.error(e instanceof ApiError ? e.message : "Discontinue failed"),
-    });
+  // 0075 — comma-separated colors edit. Empty input → null (no colors).
+  function commitColors(raw: string) {
+    const next = raw
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
+    const same =
+      (fabric.colors ?? []).length === next.length &&
+      (fabric.colors ?? []).every((c, i) => c === next[i]);
+    if (same) return;
+    patch.mutate(
+      { id: fabric.id, patch: { colors: next.length === 0 ? null : next } },
+      {
+        onSuccess: () => toast.success(`${fabric.fabricName} colors updated`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  function toggleDiscontinue(next: boolean) {
+    if (next) {
+      if (!confirm(`Discontinue fabric "${fabric.fabricName}"?`)) return;
+      del.mutate(fabric.id, {
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Discontinue failed"),
+      });
+    } else {
+      patch.mutate(
+        { id: fabric.id, patch: { discontinuedAt: null } },
+        {
+          onSuccess: () => toast.success(`${fabric.fabricName} re-activated`),
+          onError: (e: unknown) =>
+            toast.error(e instanceof ApiError ? e.message : "Restore failed"),
+        },
+      );
+    }
   }
 
   return (
     <div
       className="grid items-center gap-3 px-1 py-1.5"
-      style={{ gridTemplateColumns: "1.4fr 110px auto" }}
+      style={{
+        gridTemplateColumns: "1fr 1fr 110px auto",
+        opacity: isDiscontinued ? 0.55 : 1,
+      }}
       data-testid={`catalog-fabric-${fabric.id}`}
     >
       <div className="text-[12px] font-body">{fabric.fabricName}</div>
+      <input
+        type="text"
+        defaultValue={(fabric.colors ?? []).join(", ")}
+        placeholder="Slate, Cream, Navy"
+        onBlur={(e) => commitColors(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        aria-label={`${fabric.fabricName} colors`}
+        className={`${INPUT_CLS} text-[12px]`}
+      />
       <input
         type="number"
         min={0}
@@ -506,15 +655,12 @@ function FabricRow({ fabric }: { fabric: SofaFabricDto }) {
         aria-label={`${fabric.fabricName} surcharge`}
         className={`${INPUT_CLS} text-right font-mono text-[12px]`}
       />
-      <button
-        type="button"
-        onClick={discontinue}
-        disabled={del.isPending}
-        aria-label={`Discontinue ${fabric.fabricName}`}
-        className="btn-ghost text-[14px] text-warning"
-      >
-        ×
-      </button>
+      <ToggleDiscontinue
+        discontinued={isDiscontinued}
+        onChange={toggleDiscontinue}
+        pending={del.isPending || patch.isPending}
+        ariaLabel={`Toggle ${fabric.fabricName} discontinued state`}
+      />
     </div>
   );
 }
@@ -779,6 +925,7 @@ function AddFabricModal({
   const create = useCreateSofaFabric();
   const [name, setName] = useState("");
   const [surcharge, setSurcharge] = useState("0");
+  const [colors, setColors] = useState("");
 
   const surchargeNum = Number(surcharge);
   const valid =
@@ -786,11 +933,16 @@ function AddFabricModal({
 
   function submit() {
     if (!valid) return;
+    const colorsArr = colors
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
     create.mutate(
       {
         modelId: model.id,
         fabricName: name,
         surcharge: surchargeNum,
+        colors: colorsArr.length > 0 ? colorsArr : null,
       },
       {
         onSuccess: () => {
@@ -812,6 +964,15 @@ function AddFabricModal({
             onChange={(e) => setName(e.target.value)}
             placeholder="Linen Slate"
             data-testid="add-fabric-name"
+            className={INPUT_CLS}
+          />
+        </FieldRow>
+        <FieldRow label="Colors (comma-separated, optional — set later if unknown)">
+          <input
+            value={colors}
+            onChange={(e) => setColors(e.target.value)}
+            placeholder="Slate, Cream, Navy, Charcoal"
+            data-testid="add-fabric-colors"
             className={INPUT_CLS}
           />
         </FieldRow>

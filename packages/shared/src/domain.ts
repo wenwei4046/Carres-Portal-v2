@@ -75,6 +75,9 @@ export interface SofaFabric {
   modelId: string;
   fabricName: string;
   surcharge: number;
+  // 0075 — fabric color options (Loo 2026-05-09). Mirrors bedframe
+  // product_models.colors[] pattern.
+  colors: string[] | null;
   discontinuedAt?: string | null;
 }
 

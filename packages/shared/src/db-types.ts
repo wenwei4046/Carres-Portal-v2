@@ -148,6 +148,10 @@ export interface SofaFabricRow {
   model_id: string;
   fabric_name: string;
   surcharge: number;
+  // 0075 — list of available colors for this fabric (Loo 2026-05-09).
+  // NULL means "no colors configured yet"; the catalog admin fills via
+  // comma-separated input. Mirrors product_models.colors[] on bedframe.
+  colors: string[] | null;
   // 0074 — soft-delete flag for the catalog admin UI.
   discontinued_at: string | null;
 }

@@ -667,6 +667,8 @@ describe("Catalog admin — sofa fabrics CRUD", () => {
       model_id: MODEL_ID_LIVE,
       fabric_name: "Linen Slate",
       surcharge: 250,
+      // 0075 — colors defaults to null when caller omits the field.
+      colors: null,
     });
   });
 

@@ -54,6 +54,8 @@ export const sofaFabricSchema = z.object({
   modelId: z.string().uuid(),
   fabricName: z.string(),
   surcharge: z.number(),
+  // 0075 — fabric color options (Loo 2026-05-09).
+  colors: z.array(z.string()).nullable(),
   discontinuedAt: z.string().nullable().optional(),
 });
 export type SofaFabricDto = z.infer<typeof sofaFabricSchema>;
@@ -139,6 +141,11 @@ export type ProductModelCreateInput = z.infer<typeof productModelCreateInput>;
 
 export const productModelPatchInput = productModelCreateInput
   .partial()
+  .extend({
+    // 0075 (Loo 2026-05-09) — admin "restore" toggle: PATCH with
+    // discontinuedAt:null clears the soft-delete stamp set by DELETE.
+    discontinuedAt: z.string().datetime().nullable().optional(),
+  })
   // Re-strict so unknown keys 422 instead of silently dropping.
   .strict();
 export type ProductModelPatchInput = z.infer<typeof productModelPatchInput>;
@@ -162,6 +169,8 @@ export const productSkuPatchInput = z
     price: z.number().nonnegative().optional(),
     cost: z.number().nonnegative().nullable().optional(),
     supplierId: z.string().uuid().nullable().optional(),
+    // 0075 (Loo 2026-05-09) — restore toggle.
+    discontinuedAt: z.string().datetime().nullable().optional(),
   })
   .strict();
 export type ProductSkuPatchInput = z.infer<typeof productSkuPatchInput>;
@@ -171,6 +180,8 @@ export const sofaFabricCreateInput = z
     modelId: z.string().uuid(),
     fabricName: z.string().trim().min(1).max(60),
     surcharge: z.number().nonnegative(),
+    // 0075 — fabric colors (Loo 2026-05-09).
+    colors: z.array(z.string().trim().regex(colorOrGapValueRegex)).max(20).nullable().optional(),
   })
   .strict();
 export type SofaFabricCreateInput = z.infer<typeof sofaFabricCreateInput>;
@@ -179,6 +190,9 @@ export const sofaFabricPatchInput = z
   .object({
     fabricName: z.string().trim().min(1).max(60).optional(),
     surcharge: z.number().nonnegative().optional(),
+    colors: z.array(z.string().trim().regex(colorOrGapValueRegex)).max(20).nullable().optional(),
+    // 0075 (Loo 2026-05-09) — restore toggle.
+    discontinuedAt: z.string().datetime().nullable().optional(),
   })
   .strict();
 export type SofaFabricPatchInput = z.infer<typeof sofaFabricPatchInput>;

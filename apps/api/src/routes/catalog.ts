@@ -34,10 +34,16 @@ catalogRouter.get("/", async (c) => {
   const auth = c.var.auth;
   const sb = userClient(c.env, auth.jwt);
 
+  // 0075 (Loo 2026-05-09) — admin mode includes discontinued models so the
+  // catalog admin UI can render them (faded + with a Restore toggle). Public
+  // consumers (dealer wizard, Create-PO modal) get the default filtered list.
+  const adminMode = c.req.query("admin") === "true";
+
   // Run the 5 small queries in parallel — each is a simple `select *` against a
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
+  const modelsQ = sb.from("product_models").select("*");
   const [modelsR, skusR, fabricsR, addonsR, floorR] = await Promise.all([
-    sb.from("product_models").select("*").is("discontinued_at", null),
+    adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     sb.from("product_skus").select("*"),
     sb.from("sofa_fabrics").select("*"),
     sb.from("addons").select("*").eq("active", true),
@@ -132,6 +138,9 @@ catalogRouter.patch("/models/:id", async (c) => {
   if (parsed.data.colors !== undefined) patch.colors = parsed.data.colors;
   if (parsed.data.gaps !== undefined) patch.gaps = parsed.data.gaps;
   if (parsed.data.sofaMode !== undefined) patch.sofa_mode = parsed.data.sofaMode;
+  // 0075 — restore toggle (Loo 2026-05-09).
+  if (parsed.data.discontinuedAt !== undefined)
+    patch.discontinued_at = parsed.data.discontinuedAt;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
@@ -264,6 +273,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;
   if (parsed.data.cost !== undefined) patch.cost = parsed.data.cost;
   if (parsed.data.supplierId !== undefined) patch.supplier_id = parsed.data.supplierId;
+  // 0075 — restore toggle (Loo 2026-05-09).
+  if (parsed.data.discontinuedAt !== undefined)
+    patch.discontinued_at = parsed.data.discontinuedAt;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
@@ -342,6 +354,8 @@ catalogRouter.post("/sofa-fabrics", async (c) => {
       model_id: parsed.data.modelId,
       fabric_name: parsed.data.fabricName,
       surcharge: parsed.data.surcharge,
+      // 0075 — fabric colors (Loo 2026-05-09).
+      colors: parsed.data.colors ?? null,
     })
     .select("*")
     .single();
@@ -362,6 +376,10 @@ catalogRouter.patch("/sofa-fabrics/:id", async (c) => {
   const patch: Record<string, unknown> = {};
   if (parsed.data.fabricName !== undefined) patch.fabric_name = parsed.data.fabricName;
   if (parsed.data.surcharge !== undefined) patch.surcharge = parsed.data.surcharge;
+  if (parsed.data.colors !== undefined) patch.colors = parsed.data.colors;
+  // 0075 — restore toggle: PATCH discontinuedAt:null clears the soft-delete.
+  if (parsed.data.discontinuedAt !== undefined)
+    patch.discontinued_at = parsed.data.discontinuedAt;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
