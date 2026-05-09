@@ -4,6 +4,7 @@ import type { LogisticsPoListRow, SupplierRow } from "@/lib/queries";
 import type { ProcurementTabSlug } from "@carres/shared";
 import type { ProductSkuDto } from "@carres/shared";
 import AssignPickupDialog from "../components/AssignPickupDialog";
+import ReassignWarehouseDialog from "../components/ReassignWarehouseDialog";
 import LpInboundConfirmDialog from "../components/LpInboundConfirmDialog";
 import PoDetailModal from "../components/PoDetailModal";
 import ReceivePOModal from "../components/ReceivePOModal";
@@ -84,6 +85,7 @@ export default function ProcurementTabContent({
   const [filter, setFilter] = useState<FilterKey>("open");
   const [receivePoId, setReceivePoId] = useState<string | null>(null);
   const [assignPickupPoId, setAssignPickupPoId] = useState<string | null>(null);
+  const [reassignPoId, setReassignPoId] = useState<string | null>(null);
   const [lpInboundFor, setLpInboundFor] = useState<string | null>(null);
   const [detailPo, setDetailPo] = useState<LogisticsPoListRow | null>(null);
 
@@ -342,6 +344,7 @@ export default function ProcurementTabContent({
                   onReceive={() => setReceivePoId(po.id)}
                   onAssignPickup={() => setAssignPickupPoId(po.id)}
                   onLpInboundConfirm={() => setLpInboundFor(po.id)}
+                  onReassign={() => setReassignPoId(po.id)}
                 />
               </div>
             </div>
@@ -389,6 +392,23 @@ export default function ProcurementTabContent({
           onClose={() => setLpInboundFor(null)}
         />
       )}
+      {reassignPoId &&
+        (() => {
+          // Phase 7 sweep: wire ReassignWarehouseDialog (Phase 4 D3=A had
+          // deferred this — the dialog existed but no trigger was mounted).
+          // Surfaces when a PO reaches sup_status='reassign_needed' (state
+          // production deferred to whoever ships the partner customer-rejected
+          // action; the dialog is ready to receive that traffic now).
+          const po = pos.find((p) => p.id === reassignPoId);
+          if (!po) return null;
+          return (
+            <ReassignWarehouseDialog
+              po={po}
+              supplier={supplierById.get(po.supplier_id)}
+              onClose={() => setReassignPoId(null)}
+            />
+          );
+        })()}
       {detailPo && (
         <PoDetailModal
           po={detailPo}
@@ -419,6 +439,7 @@ function ActionCell({
   onReceive: () => void;
   onAssignPickup: () => void;
   onLpInboundConfirm: () => void;
+  onReassign: () => void;
 }) {
   const st = poDisplayStatus(po);
   const ss = po.sup_status;
@@ -427,6 +448,28 @@ function ActionCell({
   if (st === "cancelled") {
     return (
       <span className="font-mono text-[10px] text-base-500">cancelled</span>
+    );
+  }
+  if (ss === "reassign_needed") {
+    // Phase 7 sweep: customer rejected at original wh — needs relocation.
+    // The dialog itself was shipped in Phase 4 (F1.A) but stayed dead UI
+    // pending Phase 7. This is the trigger.
+    return (
+      <button
+        type="button"
+        className="btn-primary text-[11px] py-1 px-2.5"
+        style={{
+          background: "var(--brand-signature)",
+          borderColor: "var(--brand-signature)",
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onReassign();
+        }}
+        data-testid={`reassign-${po.id}`}
+      >
+        Reassign warehouse
+      </button>
     );
   }
   if (ss === "ready_confirm_sent") {
