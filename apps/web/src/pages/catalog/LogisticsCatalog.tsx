@@ -483,6 +483,18 @@ function FabricRow({ fabric }: { fabric: SofaFabricDto }) {
 // Modals: Add Model / Variant / Fabric
 // -----------------------------------------------------------------------------
 
+// Derive a kebab-case modelKey from a human display name. Lowercases, then
+// collapses any run of non-alphanumeric chars into a single dash, then trims
+// leading/trailing dashes. Loo 2026-05-09 — UX preference: he shouldn't have
+// to know what kebab-case is; the form derives it from the display name.
+function deriveModelKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function AddModelModal({
   category,
   onClose,
@@ -491,14 +503,14 @@ function AddModelModal({
   onClose: () => void;
 }) {
   const create = useCreateCatalogModel();
-  const [modelKey, setModelKey] = useState("");
   const [name, setName] = useState("");
   const [blurb, setBlurb] = useState("");
   const [colors, setColors] = useState("");
   const [gaps, setGaps] = useState("");
   const [sofaMode, setSofaMode] = useState<"preset" | "custom" | "both">("preset");
 
-  const valid = modelKey.length >= 2 && /^[a-z0-9-]+$/.test(modelKey) && name.length >= 2;
+  const modelKey = deriveModelKey(name);
+  const valid = name.length >= 2 && modelKey.length >= 2;
 
   function submit() {
     if (!valid) return;
@@ -532,15 +544,6 @@ function AddModelModal({
   return (
     <Modal title={`New ${category} model`} onClose={onClose}>
       <div className="flex flex-col gap-3">
-        <FieldRow label="Model key (kebab-case, e.g. carres-hybrid)">
-          <input
-            value={modelKey}
-            onChange={(e) => setModelKey(e.target.value)}
-            placeholder="carres-hybrid"
-            data-testid="add-model-key"
-            className={INPUT_CLS}
-          />
-        </FieldRow>
         <FieldRow label="Display name">
           <input
             value={name}
@@ -549,6 +552,13 @@ function AddModelModal({
             data-testid="add-model-name"
             className={INPUT_CLS}
           />
+          {/* Auto-derived internal id preview so the user sees what gets
+              stored without having to understand kebab-case. */}
+          {modelKey && (
+            <div className="text-[10.5px] text-base-500 font-mono mt-1">
+              Internal id: <span className="text-base-700">{modelKey}</span>
+            </div>
+          )}
         </FieldRow>
         <FieldRow label="Blurb (optional)">
           <input
