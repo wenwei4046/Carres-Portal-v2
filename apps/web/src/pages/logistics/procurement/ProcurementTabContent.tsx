@@ -434,6 +434,7 @@ function ActionCell({
   onReceive,
   onAssignPickup,
   onLpInboundConfirm,
+  onReassign,
 }: {
   po: LogisticsPoListRow;
   onReceive: () => void;
