@@ -433,7 +433,27 @@ Phase 9 NEXT carry-forwards (added in prep):
   • phase-9-pdf-storage-persistence (medium) — Phase 5 invoice PDF currently renders on-demand; long-term tax retention (7 yr) needs Storage bucket + signed URLs. Defer to Phase 9.5 ops sweep.
   • phase-9-secret-rotation-cadence (low) — establish quarterly rotation policy for Workers secrets post-go-live.
 
-Phase 9 status: prep COMPLETE 2026-05-09 ~16:30 GMT+8 — 3 artifacts written, 1 commit pending. Ready for Loo to (a) fill `production-master-data.sql` offline, (b) confirm `phase-9-cleanup.sql` apply, (c) execute Day 1 cutover steps from `docs/runbook.md`.
+Phase 9 status: **DB cutover EXECUTED 2026-05-09 ~17:00 GMT+8** — Loo authorized "go ahead both" in conversation, applied via Supabase MCP execute_sql on staging project `kfprgpjpaffedghytstl`. Live state:
+  • auth.users: 17 → 1 (only `principal@carres.com`)
+  • app_users: 17 → 1 (renamed "Sara · Principal" to just "principal")
+  • dealers: 7 → 2 (Mattress King + Carres KL Showroom)
+  • outlets: 5 → 2; salespersons: 3 → 1; warehouses: 2 → 1 (Carres Klang)
+  • suppliers: 2 → 2 (kept HoOKkA + Nice Future in place because `product_skus.supplier_id` FKs them; only lead_time + contact updated to Loo's spec)
+  • delivery_partners: 6 → 1 (Nets Sdn Bhd)
+  • orders / POs / payments / invoices / approvals / audit_log / etc.: all → 0
+  • Sequences `orders_dl_seq` / `invoice_no_seq` / `credit_note_no_seq` reset to 1001
+  • product_models / product_skus / sofa_fabrics / addons / floor_config: untouched
+
+3 FK-order surprises caught + recovered via auto-rollback during execution (corrected in committed scripts):
+  • purchase_orders BEFORE orders (PO.dl FK refs orders.dl)
+  • app_users BEFORE entities (app_users.partner_id/dealer_id/etc. FKs)
+  • warehouses BEFORE delivery_partners (warehouses.owning_partner_id FK)
+  • suppliers cannot be deleted while product_skus exists — kept HoOKkA + Nice Future, UPDATE'd in place. If a future cleanup wants full wipe, uncomment Layer 7 in `phase-9-cleanup.sql` (which now includes `delete from product_skus` + `delete from suppliers` together).
+
+Next steps (not yet done):
+  • Loo executes runbook Steps 4-10 — secret rotation, Wrangler prod env, CF Pages deploy, smoke test, Day 1 user creation via PrincipalAccounts UI (10 alpha users: 9 new + principal)
+  • 24h monitoring per Step 11
+  • Day 5+ retire old Carres-Portal repo / CF / Supabase
 
 
 

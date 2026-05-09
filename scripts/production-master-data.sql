@@ -38,13 +38,14 @@ insert into salespersons (dealer_id, outlet_id, name, phone) values
    null);
 
 -- -----------------------------------------------------------------------------
--- SUPPLIERS — 2 (HoOKkA + Nice Future), both with logins on Day 1
+-- SUPPLIERS — 2 (HoOKkA + Nice Future), kept in place during cleanup because
+-- product_skus.supplier_id references these rows. Names + kinds + cat_covered
+-- already match Loo's prod spec from seed.sql; only lead_time + contact need
+-- updating. Login users (hookka@gmail.com + nicefuture@carres.com) get
+-- created via PrincipalAccounts UI on Day 1 with supplier_id pointing here.
 -- -----------------------------------------------------------------------------
--- HoOKkA      — kind=own_logistics    (factory ships direct to Carres warehouse)
--- Nice Future — kind=factory_pickup   (Carres logistics picks up from factory)
-insert into suppliers (name, contact, lead_time, kind, cat_covered) values
-  ('HoOKkA',      null, '7-21 days', 'own_logistics',  array['bedframe', 'sofa']),
-  ('Nice Future', null, '7-10 days', 'factory_pickup', array['mattress']);
+update suppliers set lead_time = '7-21 days', contact = null where name = 'HoOKkA';
+update suppliers set lead_time = '7-10 days', contact = null where name = 'Nice Future';
 
 -- -----------------------------------------------------------------------------
 -- DELIVERY PARTNERS — Nets Sdn Bhd

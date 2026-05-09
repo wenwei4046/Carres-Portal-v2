@@ -26,12 +26,20 @@
 --
 -- Apply with: supabase db query --linked --file scripts/phase-9-cleanup.sql
 -- (after explicit "go ahead" from Loo in conversation)
+--
+-- Layer ordering corrected 2026-05-09 after live-staging FK errors:
+--   • purchase_orders BEFORE orders (PO.dl FK refs orders.dl)
+--   • app_users BEFORE entities (app_users.partner_id/dealer_id/etc. refs)
+--   • warehouses BEFORE delivery_partners (warehouses.owning_partner_id FK)
+--   • suppliers NOT deleted: product_skus.supplier_id refs them, AND
+--     HoOKkA + Nice Future names already match Loo's prod spec — UPDATE
+--     fields in production-master-data.sql instead of INSERT.
 -- =============================================================================
 
 begin;
 
 -- -----------------------------------------------------------------------------
--- Layer 1 — leaf tables (no incoming FKs from anything we keep)
+-- Layer 1 — leaf tables
 -- -----------------------------------------------------------------------------
 delete from audit_log;
 delete from po_history;
@@ -48,7 +56,7 @@ delete from announcements;
 delete from inquiries;
 
 -- -----------------------------------------------------------------------------
--- Layer 2 — child rows of orders / POs
+-- Layer 2 — child rows
 -- -----------------------------------------------------------------------------
 delete from order_lines;
 delete from order_addons;
@@ -63,45 +71,48 @@ delete from stock_balances;
 delete from partner_fleet;
 
 -- -----------------------------------------------------------------------------
--- Layer 4 — orders + POs
+-- Layer 4 — purchase_orders BEFORE orders (PO.dl FK refs orders.dl)
 -- -----------------------------------------------------------------------------
-delete from orders;
 delete from purchase_orders;
+delete from orders;
 
 -- -----------------------------------------------------------------------------
--- Layer 5 — entity tables (suppliers / partners / warehouses)
+-- Layer 5 — app_users (drops FK refs to entities BEFORE deleting entities)
 -- -----------------------------------------------------------------------------
-delete from delivery_partners;
-delete from suppliers;
+delete from app_users where email like '%@x.com';
+delete from app_users where email like '%@carres.com' and email <> 'principal@carres.com';
+
+-- -----------------------------------------------------------------------------
+-- Layer 6 — warehouses BEFORE delivery_partners (warehouses.owning_partner_id)
+-- -----------------------------------------------------------------------------
 delete from warehouses;
+delete from delivery_partners;
+
+-- suppliers NOT deleted — product_skus.supplier_id references them, and the
+-- HoOKkA + Nice Future names + kinds + cat_covered already match Loo's prod
+-- spec. production-master-data.sql does UPDATEs on these rows in place.
 
 -- -----------------------------------------------------------------------------
--- Layer 6 — product catalog (commented out by default; uncomment for full wipe)
+-- Layer 7 — product catalog (commented out by default; uncomment for full wipe
+-- — but note suppliers cleanup must also be enabled or FKs will block)
 -- -----------------------------------------------------------------------------
 -- delete from product_skus;
 -- delete from product_models;
 -- delete from sofa_fabrics;
 -- delete from addons;
 -- delete from floor_config;
+-- delete from suppliers;
 
 -- -----------------------------------------------------------------------------
--- Layer 7 — dealer hierarchy
+-- Layer 8 — dealer hierarchy
 -- -----------------------------------------------------------------------------
 delete from salespersons;
 delete from outlets;
 delete from dealers;
 
 -- -----------------------------------------------------------------------------
--- Layer 8 — users (app_users first — has FK to auth.users)
+-- Layer 9 — auth.users last
 -- -----------------------------------------------------------------------------
--- Drop ALL test users (*@x.com — runtime-created via pnpm seed:test-users).
-delete from app_users where email like '%@x.com';
-
--- Drop demo *@carres.com users EXCEPT principal (Loo's account).
-delete from app_users where email like '%@carres.com' and email <> 'principal@carres.com';
-
--- Drop the auth.users rows. CASCADE not enabled on app_users → must delete in
--- this order. principal@carres.com keeps both rows.
 delete from auth.users where email like '%@x.com';
 delete from auth.users where email like '%@carres.com' and email <> 'principal@carres.com';
 
