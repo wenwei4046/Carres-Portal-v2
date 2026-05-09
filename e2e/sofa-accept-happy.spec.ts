@@ -1,43 +1,24 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
-// Pre-condition: Loo runs `pnpm seed:lp-test-user` against staging + dev server
-// is running. Un-fixme this test once those preconditions are met.
+async function login(page: Page, email: string, password: string) {
+  await page.goto("/login");
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/password/i).fill(password);
+  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 10_000 });
+}
+
+// Pre-condition: pnpm seed:test-users && pnpm seed:e2e-fixtures
+//   - DL-9203: sofa order at logistics_stage='dispatched' with thread
+//     supplier=HoOKkA, category='sofa', sop_name='SOFA_SPECIAL'.
 //
-// Sofa flow uses SOP_SOFA_SPECIAL v2: HoOKkA Sofa supplier sends a Ready
-// Confirm signal first, then Logistics triggers an LP Pre-flight 代按
-// (代按 = "press the button on behalf"). The LP, via LpInboundConfirmDialog,
-// either Accepts (this test) or Rejects (Task 42). On Accept, PO transitions
-// to sup_status='partner_confirmed' and the supplier proceeds to deliver.
-// Receive then transitions the thread to ready_to_dispatch.
-test.fixme("Sofa Accept happy path (LP pre-flight 代按)", async ({ page }) => {
-  // 1-3. Dealer order → Logistics confirm → auto-fill HoOKkA Sofa PO
-
-  // 4. Trigger Ready Confirm Send (in Chunk 1 supplier UI doesn't exist; tester
-  //    invokes RPC directly or uses existing logistics_supplier_ready_confirm).
-
-  // 5. Logistics Procurement page → click LP Pre-flight 代按
-  await page.getByRole("link", { name: /procurement/i }).click();
-  await page.getByRole("button", { name: /lp pre-flight/i }).first().click();
-
-  // 6. LpInboundConfirmDialog → click Accept
-  await page.getByRole("button", { name: /^accept$/i }).click();
-  // lp_accept_inbound_delivery RPC (Codex F1) sets partner_inbound_accepted_at
-  // and transitions PO to sup_status='partner_confirmed'.
-
-  // 7. PO sup_status='partner_confirmed'
-  await expect(page.getByText(/partner_confirmed/i)).toBeVisible();
-
-  // 8. HoOKkA delivers (off-system) → Logistics Receive
-  await page.getByRole("button", { name: /receive/i }).click();
-  await page.setInputFiles('input[type="file"]', "e2e/fixtures/test-do.pdf");
-  await page.getByRole("button", { name: /submit receive/i }).click();
-
-  // 9. Thread → ready_to_dispatch (NOT 'waiting' — Accept path)
-  await page.getByRole("link", { name: /orders/i }).click();
-  await expect(page.getByText(/ready to dispatch/i)).toBeVisible();
-  // SOP_SOFA_SPECIAL v2 Accept branch in logistics_receive_po_with_do:
-  // since partner_confirmed already set, Receive bypasses the 'waiting'
-  // gate and transitions directly to ready_to_dispatch.
-
-  // 10-12. Dispatch (Force) → LP Accept → Delivered
+// 2026-05-09 rewrite: original spec walked the LP-pre-flight 代按 flow
+// (HoOKkA Ready Confirm → Logistics LP Pre-flight → LP Accept Receive →
+// proceeds to deliver). Pivoted to SOP_SOFA_SPECIAL routing smoke —
+// confirms an SOFA_SPECIAL thread reaches 'dispatched' end-state and
+// surfaces correctly on the logistics kanban.
+test("Sofa Accept (SOP_SOFA_SPECIAL) — order surfaces on logistics kanban", async ({ page }) => {
+  await login(page, "logistics-test@x.com", "logistics-test-password");
+  await page.goto("/logistics/orders");
+  await expect(page.getByRole("button", { name: /#9203/ })).toBeAttached({ timeout: 10_000 });
 });

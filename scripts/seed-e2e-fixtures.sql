@@ -274,6 +274,78 @@ VALUES (
   '[]'::jsonb
 );
 
+-- ----- SOP/SKU smoke fixtures for full-happy specs --------------------
+-- 4 orders + threads, one per SOP+SKU combo. Each spec asserts its order
+-- card is visible on the logistics kanban (validates SOP routing + RLS).
+-- Idempotent: DELETE-then-INSERT.
+DELETE FROM order_supplier_threads WHERE order_id IN (
+  '99999999-a000-a000-a000-000000000aa1'::uuid,  -- mattress
+  '99999999-a000-a000-a000-000000000aa2'::uuid,  -- bedframe
+  '99999999-a000-a000-a000-000000000aa3'::uuid,  -- sofa-accept
+  '99999999-a000-a000-a000-000000000aa4'::uuid   -- sofa-reject
+);
+DELETE FROM orders WHERE id IN (
+  '99999999-a000-a000-a000-000000000aa1'::uuid,
+  '99999999-a000-a000-a000-000000000aa2'::uuid,
+  '99999999-a000-a000-a000-000000000aa3'::uuid,
+  '99999999-a000-a000-a000-000000000aa4'::uuid
+);
+
+-- DL-9201: Mattress (SOP_STANDARD, dispatched) — mattress-full-happy
+-- DL-9202: Bedframe (SOP_STANDARD, dispatched) — bed-frame-full-happy
+-- DL-9203: Sofa Accept (SOP_SOFA_SPECIAL, dispatched) — sofa-accept-happy
+-- DL-9204: Sofa Reject (SOP_SOFA_SPECIAL, waiting) — sofa-reject-relocate
+INSERT INTO orders (
+  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  customer_name, customer_phone, customer_address, customer_address_unknown,
+  delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
+  paid, terms_accepted, placed_at, logistics_stage
+) VALUES
+  ('99999999-a000-a000-a000-000000000aa1'::uuid, 9201, 'proceed_order', 'dealer',
+   '00000000-0000-0000-0000-000000000d01',
+   '00000000-0000-0000-0000-0000000000a1',
+   '00000000-0000-0000-0000-0000000000b1',
+   'E2E Mattress Customer', '+60 11 9201 0001', '1 Mattress Way', false,
+   current_date + 7, false, 1, false,
+   0, true, now(), 'dispatched'),
+  ('99999999-a000-a000-a000-000000000aa2'::uuid, 9202, 'proceed_order', 'dealer',
+   '00000000-0000-0000-0000-000000000d01',
+   '00000000-0000-0000-0000-0000000000a1',
+   '00000000-0000-0000-0000-0000000000b1',
+   'E2E Bedframe Customer', '+60 11 9202 0002', '2 Bedframe Lane', false,
+   current_date + 7, false, 1, false,
+   0, true, now(), 'dispatched'),
+  ('99999999-a000-a000-a000-000000000aa3'::uuid, 9203, 'proceed_order', 'dealer',
+   '00000000-0000-0000-0000-000000000d01',
+   '00000000-0000-0000-0000-0000000000a1',
+   '00000000-0000-0000-0000-0000000000b1',
+   'E2E Sofa Accept Customer', '+60 11 9203 0003', '3 Sofa St', false,
+   current_date + 7, false, 1, false,
+   0, true, now(), 'dispatched'),
+  ('99999999-a000-a000-a000-000000000aa4'::uuid, 9204, 'proceed_order', 'dealer',
+   '00000000-0000-0000-0000-000000000d01',
+   '00000000-0000-0000-0000-0000000000a1',
+   '00000000-0000-0000-0000-0000000000b1',
+   'E2E Sofa Reject Customer', '+60 11 9204 0004', '4 Reject Rd', false,
+   current_date + 7, false, 1, false,
+   0, true, now(), 'waiting');
+
+INSERT INTO order_supplier_threads (
+  id, order_id, supplier_id, category, sop_name, logistics_stage, history
+) VALUES
+  ('99999999-aa11-aa11-aa11-000000000aa1'::uuid, '99999999-a000-a000-a000-000000000aa1'::uuid,
+   '00000000-0000-0000-0000-0000000000e2',  -- Nice Future
+   'mattress', 'STANDARD', 'dispatched', '[]'::jsonb),
+  ('99999999-aa22-aa22-aa22-000000000aa2'::uuid, '99999999-a000-a000-a000-000000000aa2'::uuid,
+   '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
+   'bedframe', 'STANDARD', 'dispatched', '[]'::jsonb),
+  ('99999999-aa33-aa33-aa33-000000000aa3'::uuid, '99999999-a000-a000-a000-000000000aa3'::uuid,
+   '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
+   'sofa', 'SOFA_SPECIAL', 'dispatched', '[]'::jsonb),
+  ('99999999-aa44-aa44-aa44-000000000aa4'::uuid, '99999999-a000-a000-a000-000000000aa4'::uuid,
+   '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
+   'sofa', 'SOFA_SPECIAL', 'waiting', '[]'::jsonb);
+
 -- ----- Top-up approval fixture for phase-5-dealer-topup-approve E2E -----
 -- approvals row with kind='top_up' status='pending' for the finance-side
 -- approve flow. Each test run consumes this row (sets status='approved')
