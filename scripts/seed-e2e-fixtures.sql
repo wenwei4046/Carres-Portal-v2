@@ -184,12 +184,16 @@ SELECT setval('orders_dl_seq', GREATEST(9104, last_value)) FROM orders_dl_seq;
 -- must NOT see LP-B's PO and vice versa.
 --
 -- Idempotent reset: clear any prior state on these PO ids.
-DELETE FROM purchase_orders WHERE id IN ('PO-LP-A-1', 'PO-LP-B-1');
+DELETE FROM purchase_orders WHERE id IN ('PO-LP-A-1', 'PO-LP-B-1', 'PO-FIXTURE-LP');
 
 INSERT INTO purchase_orders (id, supplier_id, warehouse_id, status, sup_status, procurement_partner_id, placed_at)
 VALUES
-  ('PO-LP-A-1', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '11111111-aaaa-aaaa-aaaa-000000000001', now() - interval '2 days'),
-  ('PO-LP-B-1', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '11111111-bbbb-bbbb-bbbb-000000000002', now() - interval '2 days')
+  ('PO-LP-A-1',      '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '11111111-aaaa-aaaa-aaaa-000000000001', now() - interval '2 days'),
+  ('PO-LP-B-1',      '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '11111111-bbbb-bbbb-bbbb-000000000002', now() - interval '2 days'),
+  -- PO-FIXTURE-LP: assigned to lp-test (JT Express partner) for the
+  -- lp-update-column-whitelist E2E spec. Trigger 0046/0067/0068 enforces
+  -- the column blocklist when partner role updates this PO.
+  ('PO-FIXTURE-LP',  '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '00000000-0000-0000-0000-0000000000f1', now() - interval '2 days')
 ON CONFLICT (id) DO NOTHING;
 
 -- Stockpile threshold fixture for stockpile-alert-to-po E2E spec.
