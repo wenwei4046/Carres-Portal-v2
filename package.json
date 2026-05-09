@@ -11,7 +11,9 @@
     "test": "pnpm -r --if-present test",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
-    "seed:lp-test-user": "tsx scripts/seed-lp-test-user.ts"
+    "seed:lp-test-user": "tsx scripts/seed-lp-test-user.ts",
+    "seed:test-users": "tsx scripts/seed-test-users.ts",
+    "reset:e2e-state": "tsx scripts/reset-e2e-state.ts"
   },
   "engines": {
     "node": ">=20",
@@ -19,9 +21,15 @@
   },
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp", "workerd"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
   },
   "devDependencies": {
-    "@playwright/test": "^1.48.2"
+    "@playwright/test": "^1.48.2",
+    "@supabase/supabase-js": "^2.105.4",
+    "tsx": "^4.21.0"
   }
 }

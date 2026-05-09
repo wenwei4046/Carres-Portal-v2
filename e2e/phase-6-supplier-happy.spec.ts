@@ -19,6 +19,13 @@ async function login(page: Page, email: string, password: string) {
 // exercises every supplier-callable RPC. factory_pickup variant for
 // Nice Future is covered by API tests; an E2E variant could be added
 // post-V1 if the path diverges materially.
+// Pre-condition update 2026-05-09 morning: spec is ready to run but blocks
+// on (a) the seed having ≥1 HoOKkA PO in pending sup_status, and (b)
+// `pnpm reset:e2e-state` working — currently blocked by the LP whitelist
+// trigger (0046) firing on service_role connections because
+// `app_role() <> 'partner'` evaluates to NULL not TRUE when auth.uid() is
+// null. Fix needs a new migration: skip trigger when app_role() IS NULL.
+// Tracked: phase-7-lp-whitelist-trigger-service-role-bypass.
 test.fixme("phase-6 happy: supplier acknowledges PO → production → ready → DO upload → delivered", async ({ page }) => {
   // ----- 1. Supplier login + sees PO list -----------------------------------
   await login(page, "supplier@carres.com", "111");
@@ -27,10 +34,15 @@ test.fixme("phase-6 happy: supplier acknowledges PO → production → ready →
   await page.goto("/supplier/pos");
   await expect(page.getByRole("heading", { name: /Purchase Orders/i })).toBeVisible();
 
-  // PO tab active by default — list shows pending POs from seed (HoOKkA's
-  // POs in pending sup_status). Pick the first pending PO row.
-  const firstPendingCard = page.locator('[data-testid^="po-card-"]').first();
-  await expect(firstPendingCard).toBeVisible({ timeout: 5_000 });
+  // PO tab active by default. Pick a card that has an "Acknowledge PO" button
+  // — that's the canonical pending-state filter, robust across re-runs that
+  // may have already advanced PO-2048 etc. (the spec mutates real Supabase
+  // staging state; idempotent re-runs need to find a fresh pending PO).
+  const firstPendingCard = page
+    .locator('[data-testid^="po-card-"]')
+    .filter({ has: page.getByRole("button", { name: /Acknowledge PO/i }) })
+    .first();
+  await expect(firstPendingCard).toBeVisible({ timeout: 10_000 });
   const poId = (await firstPendingCard.getAttribute("data-testid"))?.replace(
     "po-card-",
     "",
@@ -39,33 +51,36 @@ test.fixme("phase-6 happy: supplier acknowledges PO → production → ready →
 
   // ----- 2. Acknowledge PO --------------------------------------------------
   await firstPendingCard.getByRole("button", { name: /Acknowledge PO/i }).click();
-  await expect(page.getByText(/acknowledged/i)).toBeVisible({ timeout: 5_000 });
-
-  // Card now shows "Start production" button (acknowledged state).
+  // Wait for the card's "Start production" button to appear — that's the
+  // canonical signal the mutation completed AND cache refetched. The status
+  // pill text is ambiguous (matches both card pill + toast), so we key off
+  // the post-ack action button instead.
   await expect(
     page.locator(`[data-testid="po-card-${poId}"]`).getByRole("button", { name: /Start production/i }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 5_000 });
 
   // ----- 3. Start production ------------------------------------------------
   await page
     .locator(`[data-testid="po-card-${poId}"]`)
     .getByRole("button", { name: /Start production/i })
     .click();
-  await expect(page.getByText(/production started/i)).toBeVisible({ timeout: 5_000 });
-
-  // Card now shows "Mark Ready for Pickup" (in_production state).
+  // Same pattern: wait for the in_production action button.
   await expect(
     page.locator(`[data-testid="po-card-${poId}"]`).getByRole("button", {
       name: /Mark Ready for Pickup/i,
     }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 5_000 });
 
   // ----- 4. Mark ready for pickup -------------------------------------------
   await page
     .locator(`[data-testid="po-card-${poId}"]`)
     .getByRole("button", { name: /Mark Ready for Pickup/i })
     .click();
-  await expect(page.getByText(/marked ready/i)).toBeVisible({ timeout: 5_000 });
+  // PO disappears from PO tab on transition to ready_for_pickup; assert the
+  // card is gone from the current tab as the signal.
+  await expect(
+    page.locator(`[data-testid="po-card-${poId}"]`),
+  ).toHaveCount(0, { timeout: 5_000 });
 
   // PO disappears from PO tab (now in Ready bucket). Switch tab.
   await page.getByRole("button", { name: /^Ready to Pickup/i }).click();
