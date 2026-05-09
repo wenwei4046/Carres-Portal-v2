@@ -147,14 +147,20 @@ test.describe("Phase 2B.3.c — full wizard happy path", () => {
     // collisions otherwise.
     const dialog = page.getByRole("dialog", { name: /New order/i });
 
-    // The ThankYou screen renders a heading + the order number CO-{dl}.
-    // Submit can take a few seconds (Storage uploads + POST + RPC + nested
-    // fetch), so give it generous timeout.
+    // The ThankYou screen renders "Order placed" as a kicker <p> (not a heading)
+    // + a "Thank you" heading. Submit can take a few seconds (Storage uploads
+    // + POST + RPC + nested fetch), so give it generous timeout.
     await expect(
-      dialog.getByRole("heading", { name: /Order placed/i }),
+      dialog.getByText("Order placed"),
     ).toBeVisible({ timeout: 20_000 });
+    await expect(
+      dialog.getByRole("heading", { name: /Thank you/i }),
+    ).toBeVisible();
     await expect(dialog.getByText(/^CO-\d+$/)).toBeVisible();
-    await expect(dialog.getByText(/E2E Submit Customer/)).toBeVisible();
+    // (Customer name is no longer rendered on the ThankYou screen — the
+    // current UI shows order number + "Thank you · share with the customer
+    // when ready". Customer name verification belongs in the order detail
+    // modal, not the wizard ThankYou.)
 
     // Copy + close path is reachable
     await expect(
