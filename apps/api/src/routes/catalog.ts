@@ -71,7 +71,11 @@ catalogRouter.get("/", async (c) => {
     floorConfig: Adapters.floorConfigFromRow(floorR.data as DB.FloorConfigRow),
   });
 
-  c.header("Cache-Control", "private, max-age=300");
+  // 0074 — was `private, max-age=300` but the browser cache was beating
+  // react-query's invalidate-on-write (Loo 2026-05-09: new sofa model
+  // didn't show until hard reload). React-query's `staleTime: 5 * 60_000`
+  // already handles client-side caching; HTTP cache here was redundant.
+  c.header("Cache-Control", "no-store");
   return c.json(body);
 });
 

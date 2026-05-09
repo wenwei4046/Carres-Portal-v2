@@ -212,7 +212,11 @@ describe("GET /api/catalog", () => {
     expect(recorded.addons).toContainEqual({ method: "eq", col: "active", val: true });
 
     // Cache hint
-    expect(res.headers.get("Cache-Control")).toBe("private, max-age=300");
+    // 0074 — switched from `private, max-age=300` to `no-store` so the
+    // catalog admin invalidate-on-write flow isn't blocked by the browser's
+    // HTTP cache (Loo 2026-05-09 sofa-model bug). React-query's staleTime
+    // still handles client-side caching.
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
 
   it("requires authentication (no JWT → 401)", async () => {
