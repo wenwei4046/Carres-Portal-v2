@@ -184,17 +184,57 @@ SELECT setval('orders_dl_seq', GREATEST(9104, last_value)) FROM orders_dl_seq;
 -- must NOT see LP-B's PO and vice versa.
 --
 -- Idempotent reset: clear any prior state on these PO ids.
-DELETE FROM purchase_orders WHERE id IN ('PO-LP-A-1', 'PO-LP-B-1', 'PO-FIXTURE-LP');
+-- (Threads cascade-delete via purchase_orders.id FK on order_supplier_threads.po_id.)
+DELETE FROM order_supplier_threads WHERE po_id IN ('PO-LP-A-1', 'PO-LP-B-1', 'PO-FIXTURE-LP', 'PO-FIXTURE-LEG-X');
+DELETE FROM purchase_orders WHERE id IN ('PO-LP-A-1', 'PO-LP-B-1', 'PO-FIXTURE-LP', 'PO-FIXTURE-LEG-X');
+DELETE FROM orders WHERE id = '99999999-8000-8000-8000-000000008000'::uuid;
 
 INSERT INTO purchase_orders (id, supplier_id, warehouse_id, status, sup_status, procurement_partner_id, placed_at)
 VALUES
   ('PO-LP-A-1',      '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '11111111-aaaa-aaaa-aaaa-000000000001', now() - interval '2 days'),
   ('PO-LP-B-1',      '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '11111111-bbbb-bbbb-bbbb-000000000002', now() - interval '2 days'),
   -- PO-FIXTURE-LP: assigned to lp-test (JT Express partner) for the
-  -- lp-update-column-whitelist E2E spec. Trigger 0046/0067/0068 enforces
-  -- the column blocklist when partner role updates this PO.
-  ('PO-FIXTURE-LP',  '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '00000000-0000-0000-0000-0000000000f1', now() - interval '2 days')
+  -- lp-update-column-whitelist E2E spec.
+  ('PO-FIXTURE-LP',  '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'pickup_assigned', '00000000-0000-0000-0000-0000000000f1', now() - interval '2 days'),
+  -- PO-FIXTURE-LEG-X: per-leg LP split — procurement-leg = LP-X.
+  -- Customer-leg lives on a paired thread (delivery_partner_id = LP-Y).
+  ('PO-FIXTURE-LEG-X', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000c1', 'open', 'ready_for_pickup', '11111111-cccc-cccc-cccc-000000000003', now() - interval '1 day')
 ON CONFLICT (id) DO NOTHING;
+
+-- Companion order + thread for PO-FIXTURE-LEG-X. Thread has the customer-leg
+-- LP (LP-Y) + an RFD raised (request_for_delivery_at NOT NULL) so it surfaces
+-- on /api/partner/pickups/rfd-pending for LP-Y.
+INSERT INTO orders (
+  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  customer_name, customer_phone, customer_address, customer_address_unknown,
+  delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
+  paid, terms_accepted, placed_at
+)
+VALUES (
+  '99999999-8000-8000-8000-000000008000'::uuid,
+  9080, 'proceed_order', 'dealer',
+  '00000000-0000-0000-0000-000000000d01',
+  '00000000-0000-0000-0000-0000000000a1',
+  '00000000-0000-0000-0000-0000000000b1',
+  'E2E Per-Leg Customer', '+60 11 9080 0000', '8 Per-Leg Drive', false,
+  current_date + 7, false, 1, false,
+  0, true, now() - interval '1 day'
+);
+
+INSERT INTO order_supplier_threads (
+  id, order_id, po_id, supplier_id, category, sop_name, logistics_stage,
+  delivery_partner_id, request_for_delivery_at, history
+)
+VALUES (
+  '99999999-8888-8888-8888-000000008888'::uuid,
+  '99999999-8000-8000-8000-000000008000'::uuid,
+  'PO-FIXTURE-LEG-X',
+  '00000000-0000-0000-0000-0000000000e1',
+  'mattress', 'STANDARD', 'ready_to_dispatch',
+  '11111111-dddd-dddd-dddd-000000000004',  -- customer-leg = LP-Y
+  now() - interval '1 hour',                -- RFD raised → surfaces on rfd-pending
+  '[]'::jsonb
+);
 
 -- ----- Race-condition fixture for concurrent-rfd-race E2E spec -----
 -- A thread at logistics_stage='ready_to_dispatch'. Two concurrent calls to

@@ -80,6 +80,9 @@ const PARTNER_ID_JT_EXPRESS = "00000000-0000-0000-0000-0000000000f1";
 // ----- E2E test partner IDs (synthetic; created via SQL fallback below) -----
 const PARTNER_ID_LP_A = "11111111-aaaa-aaaa-aaaa-000000000001";
 const PARTNER_ID_LP_B = "11111111-bbbb-bbbb-bbbb-000000000002";
+// Per-leg-lp-split: LP-X is procurement-leg, LP-Y is customer-leg.
+const PARTNER_ID_LP_X = "11111111-cccc-cccc-cccc-000000000003";
+const PARTNER_ID_LP_Y = "11111111-dddd-dddd-dddd-000000000004";
 
 async function ensureDeliveryPartner(id: string, name: string): Promise<void> {
   // Idempotent: insert if missing. supabase-js doesn't have a clean UPSERT
@@ -154,6 +157,21 @@ const USERS: TestUser[] = [
     name:      "E2E Test · LP-B",
     role:      "partner",
     partnerId: PARTNER_ID_LP_B,
+  },
+  // lp-x / lp-y: per-leg LP split. Procurement-leg = LP-X; customer-leg = LP-Y.
+  {
+    email:     "lp-x@x.com",
+    password:  "lp-x-password",
+    name:      "E2E Test · LP-X (procurement)",
+    role:      "partner",
+    partnerId: PARTNER_ID_LP_X,
+  },
+  {
+    email:     "lp-y@x.com",
+    password:  "lp-y-password",
+    name:      "E2E Test · LP-Y (customer)",
+    role:      "partner",
+    partnerId: PARTNER_ID_LP_Y,
   },
 ];
 
@@ -271,10 +289,12 @@ async function patchSeedUsers(): Promise<void> {
 async function main(): Promise<void> {
   console.log(`Seeding ${USERS.length} E2E test users into ${url}`);
 
-  // Ensure E2E delivery_partners exist (lp-a + lp-b users link to these).
+  // Ensure E2E delivery_partners exist (lp-a/b/x/y users link to these).
   console.log("\nEnsuring E2E delivery_partners rows");
   await ensureDeliveryPartner(PARTNER_ID_LP_A, "E2E LP-A");
   await ensureDeliveryPartner(PARTNER_ID_LP_B, "E2E LP-B");
+  await ensureDeliveryPartner(PARTNER_ID_LP_X, "E2E LP-X");
+  await ensureDeliveryPartner(PARTNER_ID_LP_Y, "E2E LP-Y");
 
   for (const u of USERS) {
     console.log(`\n${u.role.padEnd(10)} ${u.email}`);
