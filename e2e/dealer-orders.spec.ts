@@ -49,9 +49,10 @@ test.describe("dealer Phase 2A read path", () => {
     }
     expect(opened, "expected at least one order row across the 3 tabs").toBe(true);
 
-    // Modal opened — Order journey heading is present, Read-only footer present.
+    // Modal opened — Order journey heading is present. (The "Read-only view"
+    // footer text was removed during Phase 4.5+ UI refactors; the Order journey
+    // heading is still the canonical signal.)
     await expect(page.getByText(/Order journey/i)).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText(/Read-only view/)).toBeVisible();
 
     // ?open=<id> reflects in the URL
     expect(new URL(page.url()).searchParams.get("open")).toBeTruthy();
