@@ -346,6 +346,42 @@ INSERT INTO order_supplier_threads (
    '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
    'sofa', 'SOFA_SPECIAL', 'waiting', '[]'::jsonb);
 
+-- ----- Phase 7 POD upload fixture --------------------
+-- Thread at logistics_stage='dispatched' with delivery_partner_id=JT Express
+-- (lp-test partner) for the phase-7-partner-pod-happy E2E spec. Idempotent.
+DELETE FROM order_supplier_threads WHERE id = '99999999-aabb-aabb-aabb-000000007077'::uuid;
+DELETE FROM orders WHERE id = '99999999-7077-7077-7077-000000007077'::uuid;
+
+INSERT INTO orders (
+  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  customer_name, customer_phone, customer_address, customer_address_unknown,
+  delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
+  paid, terms_accepted, placed_at, logistics_stage
+)
+VALUES (
+  '99999999-7077-7077-7077-000000007077'::uuid,
+  9077, 'proceed_order', 'dealer',
+  '00000000-0000-0000-0000-000000000d01',
+  '00000000-0000-0000-0000-0000000000a1',
+  '00000000-0000-0000-0000-0000000000b1',
+  'E2E POD Customer', '+60 11 9077 0000', '7 POD Lane', false,
+  current_date + 1, false, 1, false,
+  0, true, now(), 'dispatched'
+);
+
+INSERT INTO order_supplier_threads (
+  id, order_id, supplier_id, category, sop_name, logistics_stage,
+  delivery_partner_id, history
+)
+VALUES (
+  '99999999-aabb-aabb-aabb-000000007077'::uuid,
+  '99999999-7077-7077-7077-000000007077'::uuid,
+  '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
+  'mattress', 'STANDARD', 'dispatched',
+  '00000000-0000-0000-0000-0000000000f1',  -- JT Express (lp-test partner)
+  '[]'::jsonb
+);
+
 -- ----- Top-up approval fixture for phase-5-dealer-topup-approve E2E -----
 -- approvals row with kind='top_up' status='pending' for the finance-side
 -- approve flow. Each test run consumes this row (sets status='approved')
