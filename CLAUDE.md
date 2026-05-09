@@ -388,7 +388,54 @@ E2E NEW carry-forwards (added 2026-05-09 morning recon):
 Pre-Chunk-1 carry-forward TODOs (unchanged from Phase 4.5a): orphaned-debt-rpcs · audit-log-duplicate-index · approval-decided-by-shows-uuid · approval-row-type-missing-reason · pagination-deferred · supabase-jwt-secret-cleanup · phase-2-leftovers (mobile nav, salesperson outlet scoping) · phase-4-m2-schema-audit · phase-4-rpc-shape-audit · phase-4-or-filter-harden · phase-4-replace-any-types · phase-4-zod-strict-uniform · phase-4-logistics-test-gaps · phase-4-or-filter-harden-orders · phase-4-22p02-mapping · phase-4-uuid-path-validation · phase-4-spec-photo-upload-reconcile · phase-4-create-po-eta-partner · phase-4-cross-order-bundle-aggregation · phase-4-zod-strict-nested-lines · phase-4-po-id-race · phase-4-prefill-warehouseid-q4-drift · phase-4-orphans-warning-banner · phase-4-v3-receive-eligibility-extract · phase-4-warehouse-picker-dedupe · phase-4-warehouse-picker-kind-filter · phase-4-v3-skus-supplier-id-not-null-tighten · phase-4-v3-sop-type-dedupe · phase-4-v3-rpc-integration-tests · phase-4-v3-sop-source-of-truth-dedupe · phase-4-v3-auto-fill-thread-scan-narrow · phase-4-v3-receive-idempotent-audit · phase-4-v3-receive-cumulative-vs-delta-naming · phase-4-orders-test-logistics-stage-null-type-drift · phase-7-reassign-warehouse-wire · phase-7-pdf-do-photo-upload · phase-9-movements-cursor-pagination · phase-9-pdf-visual-snapshots · phase-9-dashboard-split-layout · phase-9-trigram-search · phase-9-pdf-cache-immutable-orders · phase-9-bundle-size-monitor · phase-9-cjk-font-extended
 ```
 
-Update this section at the start and end of every working session.
+**Phase 9 prep (in progress, started 2026-05-09 ~16:00 GMT+8):**
+
+Decisions locked with Loo this session:
+  • **Q1 Supabase**: B (promote staging) — apply `scripts/phase-9-cleanup.sql` to wipe demo + test data, keep migrations / RLS / RPCs / triggers untouched.
+  • **Q2 Domain**: Cloudflare *.pages.dev temp URL on Day 1, custom domain deferred until alpha is stable.
+  • **Q3 Secret rotation**: Day 1 cutover — new service_role + JWT secret pushed via `wrangler secret put --env production`.
+  • **Q4 Alpha users**: Day 1 全 9 角色 via PrincipalAccounts UI (NOT SQL — must seed master data first via filled-in `production-master-data.sql`).
+  • **Demo master data**: Clean slate — wipe all 6 demo dealers + 2 suppliers + 1 partner + warehouses, reseed real data via Loo-filled template.
+  • **Product catalog**: preserved (Carres-branded SKUs assumed real; uncomment Layer 6 in cleanup SQL if later proven fictional).
+
+Phase 9 artifacts shipped (commit pending — pushed in next commit after this §17 edit):
+  • `scripts/phase-9-cleanup.sql` — 1 destructive run, `BEGIN..COMMIT` wrapped, sanity-check `DO $$` block at end. Drops audit_log + history + payments + invoices + refunds + approvals + bank_statements + orders + POs + threads + master data + demo `*@carres.com` users (except principal) + all `*@x.com` test users. Sequence resets `orders_dl_seq` / `invoice_no_seq` / `credit_note_no_seq` to 1001. ⚠️ requires Loo's per-instance §14 #1 confirmation before execution.
+  • `scripts/production-master-data.sql.template` — Loo-fills-offline template for real dealers / outlets / salespersons / warehouses / suppliers / delivery_partners / partner_fleet, plus an `update app_users set name=` to rename Loo's principal row away from "Sara · Principal" demo placeholder.
+  • `docs/runbook.md` — 11-step Day 1 cutover playbook, Day 2-4 stabilization, Day 5+ retirement, rollback procedures, known-risks table.
+
+Pre-flight evidence (commit `a9beddb`):
+  • Web build green: 1006 KiB raw / 253 KiB gzipped, 0 TS errors (4 pre-existing TS6133s fixed: APDrawer unused `i`, FinanceApp unused `ChunkBCStub`, FinanceRefunds unused `rmCompact`, FinanceReports unused `useMemo`).
+  • API typecheck green (1 pre-existing TS2322 in orders.test.ts widened to `unknown` cast — test fixture had nulls for 'place'-state rows that helper signature didn't allow).
+  • Unit suite: 1052/1052 (shared 154 + api 516 + web 382 — was 1041 before Phase 9 prep, +11 from session: ApprovalDrawer top_up routing 3 + 8 from earlier carry-forward sweep).
+  • E2E: 35/0/0 verified after `pnpm reset:e2e-state && pnpm seed:e2e-fixtures` (29.2s on staging).
+
+Phase 9 known-risks (signed-off by Loo, NOT bugs to fix):
+  • **principal@carres.com password='111' kept post-go-live** — Loo signed off 2026-05-09. Mitigation: documented in `docs/runbook.md` rollback section + Post-Go-Live Cleanup Week 2 entry to rotate. If brute-force detected, run `update auth.users set encrypted_password = crypt('<new>', gen_salt('bf')) where email='principal@carres.com'`. Production cost estimate: PDPA fine up to RM 300k if customer PII exposed via principal-level breach.
+  • Demo product catalog (product_skus / product_models / sofa_fabrics / addons / floor_config) NOT wiped by cleanup — assumed Carres-branded real SKUs. If proven fictional, uncomment Layer 6 in `phase-9-cleanup.sql` and rerun.
+
+Phase 9 acceptance gates (per master plan §8.9 + §10):
+  ☐ `phase-9-cleanup.sql` applied + sanity check passes
+  ☐ Loo-filled `production-master-data.sql` applied
+  ☐ Service_role + JWT secret rotated
+  ☐ Wrangler `[env.production]` deployed → Workers URL captured
+  ☐ Cloudflare Pages deploy → *.pages.dev URL captured
+  ☐ Smoke test: principal@carres.com login → empty dashboard, no console errors
+  ☐ 9 alpha users created via PrincipalAccounts UI
+  ☐ Each role manual smoke: dashboard loads, no RLS leak, no 500
+  ☐ One real order placed → traced through full lifecycle (place → delivered → invoiced)
+  ☐ 24h monitoring quiet (Workers Analytics + Supabase Logs error rate <1%)
+  ☐ Old Carres-Portal repo + Workers + Pages archived/deleted
+  ☐ `docs/phase-9-reflection.md` written
+
+Phase 9 NEXT carry-forwards (added in prep):
+  • phase-9-custom-domain (low) — bind real domain to Pages once alpha stable. Q2 deferred to Week 2+.
+  • phase-9-rotate-principal-password (HIGH but signed-off as known-risk) — eliminate the §17 known-risk by rotating principal@carres.com to a strong password Week 2.
+  • phase-9-pdf-storage-persistence (medium) — Phase 5 invoice PDF currently renders on-demand; long-term tax retention (7 yr) needs Storage bucket + signed URLs. Defer to Phase 9.5 ops sweep.
+  • phase-9-secret-rotation-cadence (low) — establish quarterly rotation policy for Workers secrets post-go-live.
+
+Phase 9 status: prep COMPLETE 2026-05-09 ~16:30 GMT+8 — 3 artifacts written, 1 commit pending. Ready for Loo to (a) fill `production-master-data.sql` offline, (b) confirm `phase-9-cleanup.sql` apply, (c) execute Day 1 cutover steps from `docs/runbook.md`.
+
+
 
 ---
 

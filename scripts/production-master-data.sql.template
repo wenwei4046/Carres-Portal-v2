@@ -1,0 +1,148 @@
+-- =============================================================================
+-- production-master-data.sql.template — Phase 9 Go-live master data seed
+-- =============================================================================
+--
+-- Purpose: After phase-9-cleanup.sql wipes staging, this file seeds the REAL
+-- Carres master data Loo provides (real dealers, suppliers, partners,
+-- warehouses, outlets, salespersons).
+--
+-- Usage:
+--   1. Copy this file to scripts/production-master-data.sql (drop the
+--      .template suffix). Don't commit the filled-in copy.
+--   2. Replace every `[FILL_IN_*]` placeholder with real values.
+--   3. Delete any rows you don't have data for yet — Loo can add more
+--      via the PrincipalAccounts / DealerCreate / etc. UI later.
+--   4. Hand the completed file back to Claude → applied via
+--      `supabase db query --linked --file scripts/production-master-data.sql`
+--
+-- Day 1 minimum (so all 9 roles can log in and see something sensible):
+--   • 1 dealer + 1 outlet + 1 salesperson
+--   • 1 supplier
+--   • 1 delivery_partner
+--   • 1 warehouse
+--   • 1 showroom dealer (channel='showroom')
+--
+-- Anything above the minimum is bonus. Don't block go-live trying to type
+-- in your full dealer network — that's what PrincipalAccounts page is for.
+-- =============================================================================
+
+begin;
+
+-- -----------------------------------------------------------------------------
+-- DEALERS — repeat the row for each real dealer; fill all fields.
+-- -----------------------------------------------------------------------------
+-- credit_limit: how much customer-owe-HQ outstanding HQ tolerates per dealer
+--               before blocking new orders (Phase 4.5 Chunk 2 50% top-up gate)
+-- payment_terms: free-text label, e.g. 'NET 30', 'NET 14', 'COD'
+-- channel: 'dealer' for normal dealers, 'showroom' for Carres-owned showrooms
+insert into dealers (id, name, region, contact, joined_date, status, credit_limit, payment_terms, channel) values
+  -- Day 1 must-have:
+  (gen_random_uuid(), '[FILL_IN_DEALER_1_NAME]',  '[FILL_IN_REGION]',     '[FILL_IN_CONTACT_LINE]',     '[FILL_IN_JOINED_DATE]', 'active', [FILL_IN_CREDIT_LIMIT_NUMERIC], '[FILL_IN_PAYMENT_TERMS]', 'dealer'),
+  -- Add more dealers below (delete this comment + add comma above):
+  -- (gen_random_uuid(), 'Dealer 2 Name', 'Region', 'Contact · phone',     '2024-01-01', 'active', 100000, 'NET 30', 'dealer'),
+  -- Showroom (channel='showroom'):
+  (gen_random_uuid(), '[FILL_IN_SHOWROOM_NAME e.g. Carres KL Bangsar]', '[FILL_IN_REGION]', '[FILL_IN_CONTACT]', '[FILL_IN_JOINED_DATE]', 'active', 0, '—', 'showroom');
+
+-- -----------------------------------------------------------------------------
+-- OUTLETS — physical locations under a dealer. One dealer can have N outlets.
+-- -----------------------------------------------------------------------------
+-- The dealer_id MUST match a real dealers.id you just inserted. Use a CTE or
+-- look it up by name. Easiest: query `select id, name from dealers` after
+-- inserting to get the UUIDs, then paste them here.
+insert into outlets (id, dealer_id, name, address) values
+  (gen_random_uuid(),
+   (select id from dealers where name = '[FILL_IN_DEALER_1_NAME]' limit 1),
+   '[FILL_IN_OUTLET_1_NAME]',
+   '[FILL_IN_OUTLET_1_ADDRESS]');
+  -- Add more outlets below (one row per location).
+
+-- -----------------------------------------------------------------------------
+-- SALESPERSONS — sales staff under each dealer/outlet.
+-- -----------------------------------------------------------------------------
+-- These are NOT login users — they're metadata used by orders.salesperson_id.
+-- The actual login user (with role='salesperson') gets created via
+-- PrincipalAccounts UI on Day 1, with that user's app_users.salesperson_id
+-- pointing back to one of these rows.
+insert into salespersons (id, dealer_id, outlet_id, name, phone) values
+  (gen_random_uuid(),
+   (select id from dealers where name = '[FILL_IN_DEALER_1_NAME]' limit 1),
+   (select id from outlets where name = '[FILL_IN_OUTLET_1_NAME]' limit 1),
+   '[FILL_IN_SALESPERSON_1_NAME]',
+   '[FILL_IN_SALESPERSON_1_PHONE]');
+
+-- -----------------------------------------------------------------------------
+-- WAREHOUSES — physical Carres warehouses where stock sits.
+-- -----------------------------------------------------------------------------
+-- Day 1 minimum: 1 warehouse. Add more as Carres expands.
+insert into warehouses (id, name, address) values
+  (gen_random_uuid(), '[FILL_IN_WAREHOUSE_1_NAME e.g. Carres HQ Subang]', '[FILL_IN_WAREHOUSE_1_ADDRESS]');
+
+-- -----------------------------------------------------------------------------
+-- SUPPLIERS — factories Carres procures from.
+-- -----------------------------------------------------------------------------
+-- kind: 'factory_pickup'  → Carres logistics picks up from supplier factory
+--       'own_logistics'   → supplier ships directly to Carres warehouse
+-- cat_covered: array of categories this supplier handles. Valid values:
+--              'mattress', 'bedframe', 'sofa', 'pillow' (per packages/shared)
+insert into suppliers (id, name, contact, lead_time, kind, cat_covered) values
+  (gen_random_uuid(),
+   '[FILL_IN_SUPPLIER_1_NAME]',
+   '[FILL_IN_SUPPLIER_1_CONTACT_LINE]',
+   '[FILL_IN_LEAD_TIME e.g. 7-10 days]',
+   '[FILL_IN_factory_pickup_OR_own_logistics]',
+   array['[FILL_IN_CATEGORY_1]', '[FILL_IN_CATEGORY_2]']);
+  -- Add more suppliers below.
+
+-- -----------------------------------------------------------------------------
+-- DELIVERY_PARTNERS — 3PL companies for last-mile delivery.
+-- -----------------------------------------------------------------------------
+-- zones: free-text, the geographic areas this partner covers
+-- rate_card: jsonb, can be left null for V1; fill via PartnerEdit UI later.
+insert into delivery_partners (id, name, contact, zones, onboarded_date, rate_card) values
+  (gen_random_uuid(),
+   '[FILL_IN_PARTNER_1_NAME]',
+   '[FILL_IN_PARTNER_1_CONTACT_LINE]',
+   '[FILL_IN_ZONES e.g. Klang Valley, Selangor]',
+   '[FILL_IN_ONBOARDED_DATE]',
+   null);
+  -- Add more partners below.
+
+-- -----------------------------------------------------------------------------
+-- PARTNER_FLEET — vehicles + drivers under each delivery partner.
+-- -----------------------------------------------------------------------------
+-- Optional for Day 1 — partners can fill via PartnerFleet UI (Phase 7 Sprint 3).
+insert into partner_fleet (id, partner_id, plate, vehicle_type, capacity, driver_name, driver_phone) values
+  (gen_random_uuid(),
+   (select id from delivery_partners where name = '[FILL_IN_PARTNER_1_NAME]' limit 1),
+   '[FILL_IN_PLATE_NUMBER]',
+   '[FILL_IN_VEHICLE_TYPE e.g. Lorry 3 ton]',
+   '[FILL_IN_CAPACITY e.g. 6 mattresses]',
+   '[FILL_IN_DRIVER_NAME]',
+   '[FILL_IN_DRIVER_PHONE]');
+
+-- -----------------------------------------------------------------------------
+-- LOO'S OWN principal app_users row
+-- -----------------------------------------------------------------------------
+-- The cleanup SQL preserves principal@carres.com in auth.users + app_users,
+-- but the app_users row currently has actor name 'Sara · Principal' from the
+-- demo seed. Update it to Loo's actual name. Email stays as-is per Loo's
+-- decision to keep principal@carres.com (with password '111' as known-risk).
+update app_users
+   set name = '[FILL_IN_LOO_FULL_NAME e.g. Loo Wen Wei]'
+ where email = 'principal@carres.com';
+
+commit;
+
+-- =============================================================================
+-- After applying this file:
+--
+-- Day 1 user creation (do via PrincipalAccounts UI, not SQL):
+--   1. Loo logs in as principal@carres.com / 111
+--   2. PrincipalAccounts → "+ Create user"
+--   3. For each role, pick the matching dealer/supplier/partner from the
+--      dropdowns (which now show the real entities you just seeded).
+--   4. Copy the generated password back to the alpha user.
+--
+-- Don't try to seed users via SQL — the PrincipalAccounts flow handles
+-- auth.users + app_users + custom JWT claims atomically.
+-- =============================================================================
