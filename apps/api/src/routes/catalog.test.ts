@@ -384,6 +384,11 @@ function buildWriteSb(opts: {
       }
       return chain;
     };
+    // 0074 — `.contains(col, [value])` for the supplier auto-resolve path.
+    // Tests stub the row(s) directly, so we just no-op the filter — the
+    // arrange step is responsible for seeding the right row.
+    chain.contains = (_col: string, _val: unknown) => chain;
+    chain.limit = (_n: number) => chain;
     chain.maybeSingle = async () => {
       if (mode === "write") return { data: writeReturn, error: null };
       return { data: rows[0] ?? null, error: null };
@@ -546,6 +551,15 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
               model_key: "carres-classic",
             },
           ],
+          // 0074 — POST /skus auto-resolves the supplier from
+          // suppliers.cat_covered so logistics doesn't have to pick one.
+          // Stub a mattress-covering supplier here.
+          suppliers: [
+            {
+              id: "00000000-0000-0000-0000-00000000ff01",
+              cat_covered: ["mattress"],
+            },
+          ],
         },
         recorded,
         writeReturn: {
@@ -556,7 +570,7 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
           variant_kind: "size",
           price: 2400,
           cost: 1300,
-          supplier_id: null,
+          supplier_id: "00000000-0000-0000-0000-00000000ff01",
           discontinued_at: null,
         },
       }),

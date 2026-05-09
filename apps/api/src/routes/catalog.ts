@@ -201,6 +201,36 @@ catalogRouter.post("/skus", async (c) => {
   }
   const skuCode = `${modelRow.category}:${modelRow.model_key}:${parsed.data.variant}`;
 
+  // 0074 bugfix (Loo 2026-05-09): product_skus.supplier_id is NOT NULL on
+  // staging/prod. Auto-resolve from suppliers.cat_covered[] when the caller
+  // doesn't pass an explicit supplierId — same routing rule the Create-PO
+  // modal uses (`findSupplierForSku`). Falls back to 422 when no supplier
+  // covers this category yet.
+  let supplierId: string | null = parsed.data.supplierId ?? null;
+  if (!supplierId) {
+    const { data: supRow, error: supErr } = await sb
+      .from("suppliers")
+      .select("id")
+      .contains("cat_covered", [modelRow.category])
+      .limit(1)
+      .maybeSingle();
+    if (supErr) {
+      const m = mapPgError(supErr);
+      return c.json(m.body, m.status);
+    }
+    if (!supRow) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "no_supplier_for_category",
+          message: `No supplier currently covers ${modelRow.category}. Configure one before adding ${modelRow.category} variants.`,
+        },
+        422,
+      );
+    }
+    supplierId = supRow.id as string;
+  }
+
   const { data, error } = await sb
     .from("product_skus")
     .insert({
@@ -210,7 +240,7 @@ catalogRouter.post("/skus", async (c) => {
       variant_kind: parsed.data.variantKind,
       price: parsed.data.price,
       cost: parsed.data.cost ?? null,
-      supplier_id: parsed.data.supplierId ?? null,
+      supplier_id: supplierId,
     })
     .select("*")
     .single();
