@@ -38,7 +38,7 @@ vi.mock("@/lib/queries", async () => {
             eta_date: "2026-06-01",
             placed_at: "2026-05-01T00:00:00Z",
             purchase_order_lines: [
-              { sku: "mattress:carres-cloud:King", qty: 5, received_qty: 0 },
+              { id: "00000000-0000-0000-0000-aa0000000041", sku: "mattress:carres-cloud:King", qty: 5, received_qty: 0 },
             ],
           } satisfies LogisticsPoListRow,
         ],

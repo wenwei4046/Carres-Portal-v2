@@ -69,7 +69,7 @@ function makePo(overrides: Partial<LogisticsPoListRow> = {}): LogisticsPoListRow
     dl_refs: null,
     eta_date: null,
     placed_at: "2026-05-01T00:00:00Z",
-    purchase_order_lines: [{ sku: "sofa:nordic:3s", qty: 2, received_qty: 0 }],
+    purchase_order_lines: [{ id: "00000000-0000-0000-0000-aa0000000072", sku: "sofa:nordic:3s", qty: 2, received_qty: 0 }],
     ...overrides,
   };
 }

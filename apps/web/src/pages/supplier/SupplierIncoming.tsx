@@ -26,7 +26,6 @@ export default function SupplierIncoming() {
   const totalOpenUnits = rows.reduce((s, r) => s + r.openQty, 0);
   const totalPendingUnits = rows.reduce((s, r) => s + (r.pendingQty ?? 0), 0);
   const totalUnits = totalOpenUnits + totalPendingUnits;
-  const totalPos = (pendingPos.data ?? []).length;
   const pendingAck = (pendingPos.data ?? []).filter(
     (p) => p.sup_status === "pending",
   ).length;

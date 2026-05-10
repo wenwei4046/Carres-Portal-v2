@@ -37,7 +37,7 @@ vi.mock("@/lib/queries", async () => {
             eta_date: "2026-06-20",
             placed_at: "2026-05-03T00:00:00Z",
             purchase_order_lines: [
-              { sku: "bedframe:oak:queen", qty: 2, received_qty: 0 },
+              { id: "00000000-0000-0000-0000-aa0000000040", sku: "bedframe:oak:queen", qty: 2, received_qty: 0 },
             ],
           } satisfies LogisticsPoListRow,
         ],

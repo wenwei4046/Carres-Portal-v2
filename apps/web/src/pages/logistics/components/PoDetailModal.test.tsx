@@ -58,7 +58,7 @@ function makePo(overrides: Partial<LogisticsPoListRow> = {}): LogisticsPoListRow
     eta_date: "2026-05-15",
     placed_at: "2026-05-01T00:00:00Z",
     purchase_order_lines: [
-      { sku: "mattress:carres-cloud:King", qty: 5, received_qty: 0 },
+      { id: "00000000-0000-0000-0000-aa0000000061", sku: "mattress:carres-cloud:King", qty: 5, received_qty: 0 },
     ],
     ...overrides,
   };
@@ -126,7 +126,7 @@ describe("PoDetailModal — Receive entry button (v3-S2.3)", () => {
         <PoDetailModal
           po={makePo({
             purchase_order_lines: [
-              { sku: "mattress:carres-cloud:King", qty: 5, received_qty: 5 },
+              { id: "00000000-0000-0000-0000-aa0000000129", sku: "mattress:carres-cloud:King", qty: 5, received_qty: 5 },
             ],
           })}
           supplier={SUPPLIER}
