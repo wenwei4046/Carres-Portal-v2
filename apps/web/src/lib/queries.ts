@@ -2267,6 +2267,51 @@ export function useReceivePoWithDoMutation(
   });
 }
 
+/**
+ * Partner-side variant of useReceivePoWithDoMutation — Loo 2026-05-11.
+ *
+ * Posts to /api/partner/pickups/:id/receive, which calls the SAME
+ * `logistics_receive_po_with_do` RPC under the hood (the RPC's role gate
+ * already admits partners + checks procurement_partner_id matches caller).
+ * Replaces the "Arrived at WH → wait for Logistics Receive" two-step with
+ * one atomic move: partner uploads DO + ticks qty → PO flips straight to
+ * status='received'.
+ *
+ * Cache invalidation differs from the logistics version: blast the partner
+ * sub-tree (so dashboard + pickups kanban refresh) AND the logistics tree
+ * (so the procurement view sees the PO arrive in the Received tab).
+ */
+export function useReceivePoAsPartnerMutation(
+  poId: string,
+  opts?: Partial<
+    UseMutationOptions<LogisticsReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<LogisticsReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>({
+    mutationFn: (input) =>
+      apiFetch<LogisticsReceivePoWithDoResponse>(
+        `/api/partner/pickups/${poId}/receive`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      // Partner-side caches.
+      await qc.invalidateQueries({ queryKey: ["partner"] });
+      // Logistics-side caches (PO appears in Received tab; warehouse stock
+      // bumped; orders may unblock awaiting_logistics_action).
+      await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 /** Cancel an open PO. Reason required; mirrors abandon-order shape. */
 export function useCancelPoMutation(
   poId: string,

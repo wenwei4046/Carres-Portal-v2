@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ApiError, apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queries";
+import PartnerReceiveAtWhModal from "./components/PartnerReceiveAtWhModal";
 
 /**
  * Partner · Factory pickups — supplier → warehouse pipeline.
@@ -32,6 +33,10 @@ type PickupLine = {
   id: string;
   sku: string;
   qty: number;
+  // 2026-05-11 (Loo): receive-at-arrival flow needs current received_qty so
+  // PartnerReceiveAtWhModal can compute pending = qty - received_qty.
+  // Server SELECT widened in lockstep.
+  received_qty?: number | null;
   attrs: Record<string, unknown> | null;
 };
 
@@ -86,6 +91,9 @@ export default function PartnerFactoryPickupsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  // Loo 2026-05-11: "Arrived at WH" now opens a full receive modal that
+  // uploads DO + ticks per-line qty, atomically flipping the PO to received.
+  const [receivingPoId, setReceivingPoId] = useState<string | null>(null);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: qk.partner.pickups(),
@@ -108,14 +116,9 @@ export default function PartnerFactoryPickupsPage() {
       await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
     },
   });
-  const markArrived = useMutation({
-    mutationFn: (poId: string) =>
-      apiFetch(`/api/partner/pickups/${poId}/arrived`, { method: "POST" }),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: qk.partner.pickups() });
-      await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
-    },
-  });
+  // markArrived RPC kept on the API (POST /:id/arrived → partner_arrived_at_warehouse)
+  // for the rare "I'm here but don't have DO yet" case, but no UI trigger now —
+  // every code path goes through the receive modal instead.
 
   const buckets = useMemo(() => {
     const out = {
@@ -238,20 +241,11 @@ export default function PartnerFactoryPickupsPage() {
               renderAction={(po) => (
                 <button
                   type="button"
-                  disabled={markArrived.isPending}
-                  onClick={() =>
-                    markArrived.mutate(po.id, {
-                      onSuccess: () =>
-                        toast.success(`${po.id} arrived · awaiting WH receive`),
-                      onError: (err) =>
-                        toast.error(
-                          err instanceof ApiError ? err.message : "Mark failed",
-                        ),
-                    })
-                  }
-                  className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                  onClick={() => setReceivingPoId(po.id)}
+                  className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold"
+                  data-testid={`receive-at-wh-${po.id}`}
                 >
-                  🏢 Arrived at WH
+                  🏢 Arrived at WH · Receive
                 </button>
               )}
               onOpen={setOpenId}
@@ -305,21 +299,29 @@ export default function PartnerFactoryPickupsPage() {
                 toast.error(err instanceof ApiError ? err.message : "Mark failed"),
             })
           }
-          onMarkArrived={() =>
-            markArrived.mutate(openPo.id, {
-              onSuccess: () => {
-                toast.success(`${openPo.id} arrived · awaiting WH receive`);
-                setOpenId(null);
-              },
-              onError: (err) =>
-                toast.error(err instanceof ApiError ? err.message : "Mark failed"),
-            })
-          }
+          onMarkArrived={() => {
+            // Drawer's In-transit CTA now opens the receive modal too — same
+            // pivot as the kanban-card button.
+            const id = openPo.id;
+            setOpenId(null);
+            setReceivingPoId(id);
+          }}
           accepting={accept.isPending}
           markingCollected={markCollected.isPending}
-          markingArrived={markArrived.isPending}
         />
       )}
+
+      {receivingPoId &&
+        (() => {
+          const po = rows.find((p) => p.id === receivingPoId);
+          if (!po) return null;
+          return (
+            <PartnerReceiveAtWhModal
+              po={po}
+              onClose={() => setReceivingPoId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }
@@ -453,7 +455,6 @@ function PickupDrawer({
   onMarkArrived,
   accepting,
   markingCollected,
-  markingArrived,
 }: {
   po: PickupRow;
   onClose: () => void;
@@ -462,7 +463,6 @@ function PickupDrawer({
   onMarkArrived: () => void;
   accepting: boolean;
   markingCollected: boolean;
-  markingArrived: boolean;
 }) {
   const stage = stageOf(po);
   const { totalQty } = lineSummary(po.lines);
@@ -606,11 +606,10 @@ function PickupDrawer({
           {stage === "in_transit" && (
             <button
               type="button"
-              disabled={markingArrived}
               onClick={onMarkArrived}
-              className="px-5 py-2 bg-primary text-white rounded-md text-[13px] font-semibold disabled:opacity-50"
+              className="px-5 py-2 bg-primary text-white rounded-md text-[13px] font-semibold"
             >
-              {markingArrived ? "Marking…" : "🏢 Arrived at WH"}
+              🏢 Arrived at WH · Receive
             </button>
           )}
         </div>

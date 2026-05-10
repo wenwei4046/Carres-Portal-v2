@@ -388,3 +388,108 @@ describe("POST /api/partner/pickups/reject-rfd", () => {
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arrived+receive", () => {
+  const VALID_BODY = {
+    doNumber: "DO-9001",
+    doFilePath: "delivery-orders/PO-9001/2026-05-11/DO-9001.pdf",
+    lines: [
+      { id: "00000000-0000-4000-8000-0000000000a1", receivedQty: 6 },
+    ],
+  };
+
+  it("calls logistics_receive_po_with_do RPC and returns the result", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { po_id: "PO-9001", po_status: "received", sup_status: "delivered" },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/PO-9001/receive", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID_BODY),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_receive_po_with_do", {
+      p_po_id: "PO-9001",
+      p_do_file_path: VALID_BODY.doFilePath,
+      p_do_number: VALID_BODY.doNumber,
+      p_lines: [{ id: VALID_BODY.lines[0].id, received_qty: 6 }],
+    });
+  });
+
+  it("422 on invalid body shape (missing doNumber)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/PO-9001/receive", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...VALID_BODY, doNumber: undefined }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("403 for non-partner role", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/PO-9001/receive", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID_BODY),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("403 for partner without partner_id in JWT", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("partner"); // no partnerId
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/PO-9001/receive", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID_BODY),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps RPC 42501 (cross-partner) to 403", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "42501", message: "forbidden: cross-partner receive", details: "forbidden" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups/PO-9001/receive", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(VALID_BODY),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});

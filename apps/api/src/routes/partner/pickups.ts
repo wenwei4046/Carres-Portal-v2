@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { partnerAcceptRfdInput, partnerRejectRfdInput } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import {
+  partnerAcceptRfdInput,
+  partnerRejectRfdInput,
+  receivePoWithDoInput,
+} from "@carres/shared";
+import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -49,7 +53,7 @@ partnerPickupsRouter.get("/", async (c) => {
       id, dl, supplier_id, warehouse_id, sup_status, status, eta_date, placed_at,
       suppliers(name, contact),
       warehouses(name, address),
-      lines:purchase_order_lines(id, sku, qty, attrs)
+      lines:purchase_order_lines(id, sku, qty, received_qty, attrs)
     `,
     )
     .eq("procurement_partner_id", auth.partnerId)
@@ -97,6 +101,11 @@ partnerPickupsRouter.post("/:id/mark-picked-up", async (c) => {
 // 2026-05-10 (Loo) — third partner-side state transition. picked_up →
 // delivered (sup_status only; status stays 'open' so the warehouse-side
 // receive flow still has work to do). Wraps migration 0082 RPC.
+//
+// Kept around for the rare case where a partner driver wants to flag arrival
+// without simultaneously filing the DO + counts. The new POST /:id/receive
+// (Loo 2026-05-11) is the happy-path replacement that goes straight to
+// status='received'.
 partnerPickupsRouter.post("/:id/arrived", async (c) => {
   const auth = c.var.auth;
   if (auth.role !== "partner" || !auth.partnerId) {
@@ -105,6 +114,52 @@ partnerPickupsRouter.post("/:id/arrived", async (c) => {
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("partner_arrived_at_warehouse", {
     p_po_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+/**
+ * POST /api/partner/pickups/:id/receive — Loo 2026-05-11
+ *
+ * Collapses the old two-step "Arrived at WH" → "Logistics Receive" flow into
+ * one. Partner driver at the warehouse uploads the signed DO + ticks per-line
+ * received_qty; the PO flips straight to status='received' (atomic).
+ *
+ * Wraps the same `logistics_receive_po_with_do` RPC the Logistics route uses
+ * (migration 0076). The RPC's role gate already admits partners and verifies
+ * `purchase_orders.procurement_partner_id = auth.app_partner_id()` — so a
+ * cross-partner call returns 42501 → 403, matching the cross-partner guard
+ * on /accept, /mark-picked-up, /arrived.
+ *
+ * Body shape: receivePoWithDoInput (camelCase, same as the logistics route)
+ * — { doNumber, doFilePath, lines: [{ id, receivedQty }] }. Reshaped to
+ * snake_case for the RPC's `p_lines` jsonb at the boundary.
+ *
+ * Logistics still has /api/logistics/pos/:id/receive (different auth gate)
+ * for the Direct-receive escape hatch when DO arrives via supplier or
+ * warehouse-direct channels (skipping the partner entirely).
+ */
+partnerPickupsRouter.post("/:id/receive", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Only partner role with partner_id" });
+  }
+  const parsed = await parseJsonBody(c, receivePoWithDoInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("logistics_receive_po_with_do", {
+    p_po_id: c.req.param("id"),
+    p_do_file_path: parsed.data.doFilePath,
+    p_do_number: parsed.data.doNumber,
+    p_lines: parsed.data.lines.map((l) => ({
+      id: l.id,
+      received_qty: l.receivedQty,
+    })),
   });
   if (error) {
     const m = mapPgError(error);
