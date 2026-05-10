@@ -117,19 +117,25 @@ export default function ProcurementTabContent({
     return m;
   }, [catalogQ.data]);
 
+  // 2026-05-10 (Loo): "Pickup action" must exclude already-received POs.
+  // The receive RPC leaves sup_status='delivered' (semantically "goods were
+  // delivered to warehouse") even after status flips to 'received', which
+  // used to double-count POs as both Pickup-action AND Received. Gate the
+  // bucket on `p.status !== 'received'` so the chip only counts work that
+  // still needs a logistics hand-off.
+  const needsPickup = (p: { status: string; sup_status: string }) =>
+    p.status !== "received" &&
+    (p.sup_status === "ready_for_pickup" ||
+      p.sup_status === "delivered" ||
+      p.sup_status === "reassign_needed");
+
   const counts = useMemo(() => {
     const acc = { all: pos.length, open: 0, pickup: 0, received: 0 };
     for (const p of pos) {
       const st = poDisplayStatus(p);
       if (st !== "received" && st !== "cancelled") acc.open += 1;
       if (st === "received") acc.received += 1;
-      if (
-        p.sup_status === "ready_for_pickup" ||
-        p.sup_status === "delivered" ||
-        p.sup_status === "reassign_needed"
-      ) {
-        acc.pickup += 1;
-      }
+      if (needsPickup(p)) acc.pickup += 1;
     }
     return acc;
   }, [pos]);
@@ -140,13 +146,7 @@ export default function ProcurementTabContent({
       if (filter === "all") return true;
       if (filter === "open") return st !== "received" && st !== "cancelled";
       if (filter === "received") return st === "received";
-      if (filter === "pickup") {
-        return (
-          p.sup_status === "ready_for_pickup" ||
-          p.sup_status === "delivered" ||
-          p.sup_status === "reassign_needed"
-        );
-      }
+      if (filter === "pickup") return needsPickup(p);
       return true;
     });
   }, [pos, filter]);

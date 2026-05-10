@@ -216,6 +216,30 @@ describe("ProcurementTabContent — list rendering + filter chips", () => {
     expect(screen.getByTestId("po-row-PO-2032")).toBeInTheDocument();
   });
 
+  // 2026-05-10 (Loo): regression — "Pickup action" used to count POs whose
+  // status had already flipped to 'received' but kept sup_status='delivered'.
+  // Same PO surfaced in both "Pickup action" and "Received" tabs, doubling
+  // the perceived workload. needsPickup() now gates on status !== 'received'.
+  it("Pickup action chip excludes already-received POs (sup_status=delivered + status=received)", () => {
+    setLoaded([
+      // Already received via warehouse — sup_status stays 'delivered' but
+      // status flipped to 'received'. Belongs in Received only.
+      makePo({ id: "PO-2080", status: "received", sup_status: "delivered" }),
+      // Genuinely awaiting logistics action — partner just delivered to wh
+      // but logistics hasn't pressed Receive yet.
+      makePo({ id: "PO-2081", status: "open", sup_status: "delivered" }),
+    ]);
+    render(wrap(<ProcurementTabContent slug="nice-future" />));
+    // Count chip shows 1, not 2.
+    expect(
+      screen.getByRole("tab", { name: /Pickup action · 1/ }),
+    ).toBeInTheDocument();
+    // Filter rows to Pickup action — only the still-open PO surfaces.
+    fireEvent.click(screen.getByRole("tab", { name: /Pickup action · 1/ }));
+    expect(screen.queryByTestId("po-row-PO-2080")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-row-PO-2081")).toBeInTheDocument();
+  });
+
   it("status filter chips narrow visible rows", () => {
     setLoaded([
       makePo({ id: "PO-2031", status: "open" }),
