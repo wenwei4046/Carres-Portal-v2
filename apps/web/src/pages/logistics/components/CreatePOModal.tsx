@@ -302,6 +302,39 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   }, [prefill.lines, models, skuByCode]);
   const [lines, setLines] = useState<DraftLine[]>(initialLines);
 
+  // 2026-05-11 (Loo): catalog-arrives re-sync. `useState(initialLines)` captures
+  // lines on first paint, but `initialLines` is built from `models` /
+  // `skuByCode` which are derived from `catalogQ.data`. On a cold-cache
+  // open the catalog query is still in-flight at first paint → models = [] →
+  // `modelIdForSku(sku, [])` returns undefined → SKU dropdown shows
+  // "— pick model —" forever even though sku/qty/supplier autofilled
+  // correctly. Re-syncing once catalog data arrives fixes the cold-cache
+  // first-open case (warm-cache reopens were already correct, which is why
+  // closing+reopening the modal "fixed" it).
+  //
+  // Ref guard: fires exactly once per modal mount, AFTER catalog data is
+  // present + initialLines actually has rows. Functional setState protects
+  // any in-flight user edits — only re-syncs when the current state still
+  // matches the stale shape (modelId is missing on a row that has a sku).
+  const initialLinesSyncRef = useRef(false);
+  useEffect(() => {
+    if (initialLinesSyncRef.current) return;
+    if (catalogQ.data == null) return;
+    if (initialLines.length === 0) return;
+    setLines((prev) => {
+      if (prev.length !== initialLines.length) return prev; // user added/removed
+      const hasStale = prev.some(
+        (l, i) => l.sku && !l.modelId && initialLines[i]?.modelId,
+      );
+      if (!hasStale) {
+        initialLinesSyncRef.current = true;
+        return prev;
+      }
+      initialLinesSyncRef.current = true;
+      return initialLines;
+    });
+  }, [catalogQ.data, initialLines]);
+
   // Default the first line to the first SKU once the catalog loads (only when
   // we started with zero prefill lines). 0074: cost auto-fills from the SKU.
   //
