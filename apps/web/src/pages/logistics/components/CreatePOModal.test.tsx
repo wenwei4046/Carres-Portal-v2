@@ -1050,3 +1050,116 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
     expect(screen.getByDisplayValue("Carres Cloud · King")).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Bundle auto-prefill (2026-05-10) — fixes memory 1790/1793.
+//
+// CrossOrderBundleSheet → "+ Create combined PO" sets `prefill.dlRefs` on
+// CreatePOModal. Pre-fix, the modal seeded a placeholder `qty=5` line with the
+// first catalog SKU because nothing else had populated `lines`. Loo's retest
+// surfaced this as "wrong qty / wrong SKU on bundle PO". Post-fix:
+//   1. The placeholder seeding skips when prefill.dlRefs is set.
+//   2. A one-shot useEffect calls autoFillFromShortage() on mount, which
+//      (with the hook now scoped via ?dls=…) populates lines with the actual
+//      aggregated shortage for those orders.
+// ---------------------------------------------------------------------------
+describe("CreatePOModal — Bundle auto-prefill (2026-05-10)", () => {
+  it("auto-fires shortage fetch on mount and populates lines from server", async () => {
+    const refetch = vi.fn().mockResolvedValue({
+      data: {
+        shortage: [
+          { sku: "mattress:carres-cloud:Queen", need: 3, available: 0, shortage: 3 },
+          { sku: "sofa:nordic:3s", need: 2, available: 0, shortage: 2 },
+        ],
+      },
+    });
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch,
+    };
+    render(
+      wrap(
+        <CreatePOModal
+          prefill={{ dlRefs: [1003, 1002] }}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    // Auto-fire happens in a useEffect — wait for it.
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+    // Lines populated with the server result, NOT the first-SKU placeholder.
+    await waitFor(() => {
+      expect(
+        screen.getAllByDisplayValue("Carres Cloud · Queen").length,
+      ).toBeGreaterThan(0);
+    });
+    expect(
+      screen.getAllByDisplayValue("Nordic Sofa · 3 seater").length,
+    ).toBeGreaterThan(0);
+    // The placeholder line ("Carres Cloud · King" — first SKU in the catalog
+    // fixture) is NOT present. This is the regression guard for memory 1793.
+    expect(screen.queryByDisplayValue("Carres Cloud · King")).toBeNull();
+  });
+
+  it("does NOT seed the first-SKU placeholder when prefill.dlRefs is set", async () => {
+    // Server returns empty shortage — modal should still skip the placeholder
+    // line. Prior to the fix, the effect at L301-319 would re-seed
+    // "Carres Cloud · King · qty=5" once initialLines was empty.
+    const refetch = vi.fn().mockResolvedValue({ data: { shortage: [] } });
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch,
+    };
+    render(
+      wrap(
+        <CreatePOModal
+          prefill={{ dlRefs: [4001, 4002] }}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+    // No placeholder. The empty-shortage toast fires and the table stays empty
+    // — the operator either picks SKUs manually or closes.
+    expect(screen.queryByDisplayValue("Carres Cloud · King")).toBeNull();
+    expect(sonnerMocks.defaultFn).toHaveBeenCalled();
+  });
+
+  it("respects caller-supplied prefill.lines and does not auto-fire", async () => {
+    // When the parent has already aggregated lines, don't clobber them with a
+    // server round-trip. (Production currently never sends lines through this
+    // path, but the contract is documented in CreatePoPrefill and one test
+    // exercises it for the stockpile-toggle gate — we keep that behavior.)
+    const refetch = vi.fn().mockResolvedValue({ data: { shortage: [] } });
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch,
+    };
+    render(
+      wrap(
+        <CreatePOModal
+          prefill={{
+            dlRefs: [9001, 9002],
+            lines: [{ sku: "mattress:carres-cloud:King", qty: 7 }],
+          }}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    // Wait a tick so any auto-fire would have a chance to run.
+    await new Promise((r) => setTimeout(r, 10));
+    expect(refetch).not.toHaveBeenCalled();
+    // Caller-supplied line is what shows.
+    expect(screen.getByDisplayValue("Carres Cloud · King")).toBeInTheDocument();
+  });
+});

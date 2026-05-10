@@ -1068,15 +1068,38 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
           // resolves at .select() (which is the awaitable thenable).
           chain.select = vi.fn(() => promise(opts.threads ?? []));
           break;
-        case "orders":
-          // T5 (Phase 4.5a): route now calls
-          // `.eq("logistics_stage", "awaiting_logistics_action")` (the legacy
-          // IN-list aliasing was dropped). The mock resolves at .eq(); the
-          // .in() variant is kept as a safety net so an older v2 fallback
-          // path (or a future re-widening) doesn't silently break this mock.
-          chain.eq = vi.fn(() => promise(opts.awaitingOrders ?? []));
-          chain.in = vi.fn(() => promise(opts.awaitingOrders ?? []));
-          break;
+        case "orders": {
+          // The orders chain has to be both thenable (when the route awaits
+          // `.eq("logistics_stage", ...)` directly) AND chainable (when the
+          // route additionally calls `.in("dl", [...])` for a `?dls=`-scoped
+          // bundle request). Tracking `dlScope` lets the mock narrow the
+          // resolved data the same way Postgres would, so tests can supply a
+          // superset of awaitingOrders and assert dl filtering pruned the
+          // out-of-scope ones.
+          let dlScope: number[] | null = null;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const ordersChain: any = {};
+          ordersChain.select = vi.fn(() => ordersChain);
+          ordersChain.eq = vi.fn(() => ordersChain);
+          ordersChain.in = vi.fn((col: string, vals: unknown[]) => {
+            if (col === "dl") dlScope = vals as number[];
+            return ordersChain;
+          });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ordersChain.then = (onFulfilled: any, onRejected: any) => {
+            let rows = opts.awaitingOrders ?? [];
+            if (dlScope) {
+              rows = rows.filter(
+                (o) => o.dl != null && dlScope!.includes(o.dl),
+              );
+            }
+            return Promise.resolve({ data: rows, error: null }).then(
+              onFulfilled,
+              onRejected,
+            );
+          };
+          return ordersChain;
+        }
         case "order_lines":
           // Resolves at .in('order_id', [...]). Mock applies the same filter
           // so tests can provide lines for ALL orders and verify the route
@@ -1644,6 +1667,120 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     expect(body.shortage).toEqual([
       { sku: "mattress:cloud:King", attrs: null, need: 5, available: 1, shortage: 4 },
     ]);
+  });
+
+  // -------------------------------------------------------------------------
+  // ?dls= scoping — bundle PO from CrossOrderBundleSheet
+  //
+  // The CreatePOModal opens with `prefill.dlRefs` set to the operator's
+  // selected orders. The hook re-issues this request with `?dls=...`, and the
+  // route must narrow shortage to exactly those orders (otherwise the
+  // pre-fill leaks lines from unrelated awaiting orders, which is the bug
+  // memory 1790 / 1793 documented).
+  // -------------------------------------------------------------------------
+  it("scopes shortage to ?dls= when present (legacy path narrows by dl)", async () => {
+    // Three awaiting orders. dls=[4001,4002] → only A and B should contribute.
+    // C's lines must NOT surface.
+    const ID_A = "00000000-0000-0000-0000-000000000a01";
+    const ID_B = "00000000-0000-0000-0000-000000000a02";
+    const ID_C = "00000000-0000-0000-0000-000000000a03";
+    mockShortageQueries({
+      awaitingOrders: [
+        { id: ID_A, dl: 4001 },
+        { id: ID_B, dl: 4002 },
+        { id: ID_C, dl: 9999 },
+      ],
+      orderLines: [
+        { order_id: ID_A, sku: "mattress:cloud:King", qty: 3 },
+        { order_id: ID_B, sku: "mattress:cloud:King", qty: 2 },
+        { order_id: ID_C, sku: "sofa:nordic:3s", qty: 99 },
+      ],
+      stockBalances: [
+        { sku: "mattress:cloud:King", qty: 0, reserved: 0 },
+        { sku: "sofa:nordic:3s", qty: 0, reserved: 0 },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(
+        "http://t/api/logistics/pos/awaiting-stock-shortage?dls=4001,4002",
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
+    };
+    // Only A + B's mattress line surfaces — sofa:nordic:3s (qty 99 from C) is
+    // proof the dl scope held: without it the sentinel would leak through.
+    expect(body.shortage).toEqual([
+      { sku: "mattress:cloud:King", attrs: null, need: 5, available: 0, shortage: 5 },
+    ]);
+  });
+
+  it("intersects ?dls= with primary-path threads (out-of-scope thread doesn't leak)", async () => {
+    // Threads carry no dl, so when ?dls= is present the route must intersect
+    // primaryOrderIds with the dl-scoped orders set. Without that step, an
+    // awaiting + po_id-null thread for an order outside the user's selection
+    // would re-introduce its lines into the shortage feed.
+    const ID_IN = "00000000-0000-0000-0000-000000000b01"; // dl=5001 (in scope)
+    const ID_OUT = "00000000-0000-0000-0000-000000000b02"; // dl=5099 (NOT in scope)
+    mockShortageQueries({
+      threads: [
+        { order_id: ID_IN, logistics_stage: "awaiting_logistics_action", po_id: null },
+        { order_id: ID_OUT, logistics_stage: "awaiting_logistics_action", po_id: null },
+      ],
+      awaitingOrders: [
+        { id: ID_IN, dl: 5001 },
+        { id: ID_OUT, dl: 5099 },
+      ],
+      orderLines: [
+        { order_id: ID_IN, sku: "mattress:cloud:King", qty: 4 },
+        // Sentinel — must NOT surface. Different SKU so the assertion tells us
+        // exactly whether the intersection held.
+        { order_id: ID_OUT, sku: "sofa:nordic:3s", qty: 7 },
+      ],
+      stockBalances: [
+        { sku: "mattress:cloud:King", qty: 0, reserved: 0 },
+        { sku: "sofa:nordic:3s", qty: 0, reserved: 0 },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(
+        "http://t/api/logistics/pos/awaiting-stock-shortage?dls=5001",
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
+    };
+    expect(body.shortage).toEqual([
+      { sku: "mattress:cloud:King", attrs: null, need: 4, available: 0, shortage: 4 },
+    ]);
+  });
+
+  it("rejects ?dls= with non-integer values (422)", async () => {
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(
+        "http://t/api/logistics/pos/awaiting-stock-shortage?dls=4001,abc",
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("invalid_param");
+    expect(body.message).toContain("abc");
+    // Validation must short-circuit BEFORE any Supabase round-trip.
+    expect(from).not.toHaveBeenCalled();
   });
 });
 

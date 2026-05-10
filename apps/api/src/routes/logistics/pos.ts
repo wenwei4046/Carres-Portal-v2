@@ -114,21 +114,67 @@ logisticsPosRouter.get("/", requireLogistics, async (c) => {
 // RLS: the inline role guard above plus the user JWT covers this; no policy
 // changes needed.
 //
+// Optional `?dls=1003,1002` query — when present, scopes the shortage feed to
+// the orders matching those dl numbers (used by CrossOrderBundleSheet so the
+// modal pre-fills lines for the user's exact selection, not the global pool).
+// Comma-separated positive integers. The orders fetch becomes dl-scoped and
+// `primaryOrderIds` is intersected with that scope so threads-side rows can't
+// leak orders the user didn't pick. Without this param, the endpoint returns
+// global awaiting shortage as before.
+//
 // Path is registered before `/:id/print` so the static segment wins over the
 // :id pattern in Hono's matcher.
 logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
+  // Parse optional dls scope. Reject malformed input with 422 — silent
+  // ignoring would let the operator submit a bundle PO with the wrong lines.
+  const dlsParam = c.req.query("dls");
+  let dlsFilter: number[] | null = null;
+  if (dlsParam != null && dlsParam.length > 0) {
+    const parts = dlsParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    const parsed: number[] = [];
+    for (const p of parts) {
+      const n = Number(p);
+      if (!Number.isInteger(n) || n <= 0) {
+        return c.json(
+          {
+            error: "invalid_query",
+            code: "invalid_param",
+            message: `dls must be a comma-separated list of positive integers (got '${p}')`,
+          },
+          422,
+        );
+      }
+      parsed.push(n);
+    }
+    if (parsed.length === 0) {
+      const empty: AwaitingStockShortageResponse = { shortage: [] };
+      return c.json(empty);
+    }
+    dlsFilter = parsed;
+  }
+
   // Step 1 — three parallel fetches: threads (primary path source), legacy
   // candidate orders (alias-aware), and open POs (for the legacy
   // dl/dl_refs filter). All independent; Promise.all is the same pattern as
-  // the order_lines + stock_balances pair below.
+  // the order_lines + stock_balances pair below. When dlsFilter is set, the
+  // orders fetch narrows to those dls — `legacyOrderIds` then auto-scopes
+  // through `ordersRes.data`, and `primaryOrderIds` (from threads, which
+  // don't carry dl) is intersected with the same scope below.
+  const ordersBuilder = sb
+    .from("orders")
+    .select("id, dl")
+    .eq("logistics_stage", "awaiting_logistics_action");
+  const ordersQuery = dlsFilter
+    ? ordersBuilder.in("dl", dlsFilter)
+    : ordersBuilder;
   const [threadsRes, ordersRes, posRes] = await Promise.all([
     sb.from("order_supplier_threads").select("order_id, logistics_stage, po_id"),
-    sb
-      .from("orders")
-      .select("id, dl")
-      .eq("logistics_stage", "awaiting_logistics_action"),
+    ordersQuery,
     sb.from("purchase_orders").select("dl, dl_refs").eq("status", "open"),
   ]);
   if (threadsRes.error) {
@@ -189,10 +235,20 @@ logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) =
     legacyOrderIds.add(oid);
   }
 
+  // When dlsFilter is set, threads-side primaryOrderIds may include orders
+  // outside the user's selection (threads carry no dl). Intersect with the
+  // dl-scoped orders set so the union honors the bundle scope.
+  const inScopeOrderIds = dlsFilter
+    ? new Set((ordersRes.data ?? []).map((o: { id: unknown }) => String(o.id)))
+    : null;
+  const scopedPrimaryOrderIds = inScopeOrderIds
+    ? new Set([...primaryOrderIds].filter((id) => inScopeOrderIds.has(id)))
+    : primaryOrderIds;
+
   // Union — Set semantics dedupe automatically. If a future invariant
   // violation surfaces the same order in both paths, its lines still
   // aggregate to `need` exactly once.
-  const orderIdsUnion = new Set<string>([...primaryOrderIds, ...legacyOrderIds]);
+  const orderIdsUnion = new Set<string>([...scopedPrimaryOrderIds, ...legacyOrderIds]);
   const orderIds = [...orderIdsUnion];
 
   // Short-circuit when nothing needs procurement.

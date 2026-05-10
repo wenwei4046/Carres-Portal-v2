@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   ManualCostSource,
@@ -168,7 +168,13 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // hides the button entirely when the modal was opened with a specific
   // order/bundle prefill (those flows already know the lines and we don't
   // want to clobber them).
-  const shortageQ = useAwaitingStockShortage();
+  //
+  // 2026-05-10 — bundle prefill (`prefill.dlRefs`) re-uses this same hook
+  // with `?dls=...` scoping so the cross-order bundle modal pre-fills the
+  // exact lines for the operator's selection. The auto-fire effect below
+  // calls `autoFillFromShortage()` once on mount when dlRefs is set; the
+  // button itself stays hidden (showAutoFill checks dlRefs).
+  const shortageQ = useAwaitingStockShortage(prefill.dlRefs);
 
   // Phase 4.5 Chunk 2 T22 — "Suggest from alerts" button. Same lazy pattern as
   // the shortage hook above: `enabled: false` so the network call only fires
@@ -298,7 +304,19 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
 
   // Default the first line to the first SKU once the catalog loads (only when
   // we started with zero prefill lines). 0074: cost auto-fills from the SKU.
+  //
+  // 2026-05-10 — skip when the modal was opened with a specific order ref
+  // (`prefill.dl`) or a cross-order bundle (`prefill.dlRefs`). The placeholder
+  // line was misleading operators in the bundle case: a `qty=5` row with the
+  // first catalog SKU has no relationship to the orders the user selected, so
+  // it looked like the modal had auto-aggregated wrong totals (memory 1790,
+  // 1793). Bundle flow auto-prefills via the shortage fetch effect below;
+  // single-order flow expects the operator to use the auto-fill button or add
+  // SKUs manually. The placeholder is reserved for the truly empty case
+  // (stockpile / fresh PO from scratch with no caller hint).
   useEffect(() => {
+    if (prefill.dl != null) return;
+    if (prefill.dlRefs != null && prefill.dlRefs.length > 0) return;
     if (lines.length === 0 && initialLines.length === 0) {
       const firstSku = catalogQ.data?.skus?.[0];
       if (firstSku) {
@@ -317,6 +335,30 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length, catalogQ.data, initialLines.length]);
+
+  // 2026-05-10 — bundle auto-prefill on mount. When the modal opens with
+  // `prefill.dlRefs` (CrossOrderBundleSheet → "+ Create combined PO" →
+  // setBundlePrefill), kick off `autoFillFromShortage()` exactly once so the
+  // shortage fetch (now scoped to those dls via the hook) pre-fills the
+  // lines table with the actual aggregated need from the source orders.
+  // Ref guard keeps it idempotent across re-renders without coupling to the
+  // dlRefs identity (parents recreate arrays on every render of the kanban).
+  const bundleAutoFetchRan = useRef(false);
+  useEffect(() => {
+    if (bundleAutoFetchRan.current) return;
+    if (prefill.dlRefs == null || prefill.dlRefs.length === 0) return;
+    // Caller-supplied lines win — if the parent already aggregated, don't
+    // clobber its work with a server fetch.
+    if (prefill.lines && prefill.lines.length > 0) return;
+    // Wait for catalog to load — `modelIdForSku` needs `models` populated to
+    // resolve each line's modelId, which drives the cascade picker. Without
+    // this gate the auto-fill can land before catalog → modelId stays empty
+    // → operator sees "— pick model —" rows even though sku/qty are correct.
+    if (!catalogQ.data) return;
+    bundleAutoFetchRan.current = true;
+    void autoFillFromShortage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogQ.data]);
 
   // C5.2 — per-supplier-group warehouse (Q4=A: blank required, no auto-default).
   // `prefill.warehouseId` (when supplied) seeds every group on first paint, so
@@ -407,9 +449,13 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         return;
       }
       const data = res.data;
+      const isBundleScope =
+        prefill.dlRefs != null && prefill.dlRefs.length > 0;
       if (!data || data.shortage.length === 0) {
         toast(
-          "No shortages — all awaiting orders covered by stock",
+          isBundleScope
+            ? "Selected orders are covered by current stock — no PO needed"
+            : "No shortages — all awaiting orders covered by stock",
           { duration: 3000 },
         );
         return;
@@ -440,7 +486,9 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       );
       const totalUnits = data.shortage.reduce((acc, s) => acc + s.need, 0);
       toast.success(
-        `Auto-filled ${data.shortage.length} SKU${data.shortage.length === 1 ? "" : "s"} from ${totalUnits} unit${totalUnits === 1 ? "" : "s"} pending`,
+        isBundleScope
+          ? `Pre-filled ${data.shortage.length} SKU${data.shortage.length === 1 ? "" : "s"} from ${prefill.dlRefs!.length} order${prefill.dlRefs!.length === 1 ? "" : "s"} (${totalUnits} unit${totalUnits === 1 ? "" : "s"})`
+          : `Auto-filled ${data.shortage.length} SKU${data.shortage.length === 1 ? "" : "s"} from ${totalUnits} unit${totalUnits === 1 ? "" : "s"} pending`,
       );
     } catch (e: unknown) {
       if (e instanceof ApiError) toast.error(e.message || "Auto-fill failed");

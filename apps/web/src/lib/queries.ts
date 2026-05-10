@@ -125,9 +125,15 @@ export const qk = {
      *  awaiting stock" button on CreatePOModal. Lazy: fired only on click via
      *  the hook's `refetch()`. Nested under `pos` so future blunt
      *  invalidations on `["logistics","pos"]` reach this cache too (e.g. when
-     *  a PO is issued, the awaiting_logistics_action pool changes). */
-    awaitingStockShortage: () =>
-      ["logistics", "pos", "awaiting-stock-shortage"] as const,
+     *  a PO is issued, the awaiting_logistics_action pool changes).
+     *
+     *  `dls` (optional, sorted) scopes shortage to a specific dl set, used by
+     *  the cross-order bundle prefill flow. Sorting keeps the cache key stable
+     *  across permutations of the same selection. */
+    awaitingStockShortage: (dls?: number[]) =>
+      dls && dls.length > 0
+        ? (["logistics", "pos", "awaiting-stock-shortage", [...dls].sort((a, b) => a - b)] as const)
+        : (["logistics", "pos", "awaiting-stock-shortage"] as const),
     /** Phase 4.5 Chunk 2 (T18/T21) — stock alerts derived from
      *  `(qty - reserved) < low_threshold`. Read by `StockAlertsTile` on the
      *  dashboard and (later) the warehouse red-dot indicator. The
@@ -1783,16 +1789,23 @@ export function useReservedDrilldown(
  *  query only fires when the user clicks the button (via `refetch()`). The
  *  result replaces the modal's `lines` state. staleTime is 0 so a fresh
  *  refetch is always triggered — the awaiting_logistics_action pool can change between
- *  clicks (e.g. user dispatches an order, abandons one). */
+ *  clicks (e.g. user dispatches an order, abandons one).
+ *
+ *  Bundle scoping: when `dls` is non-empty the query appends `?dls=1,2,3` so
+ *  the server narrows shortage to those orders only — used by the
+ *  CrossOrderBundleSheet → CreatePOModal flow so the modal pre-fills lines
+ *  for the operator's exact selection instead of the global awaiting pool. */
 export function useAwaitingStockShortage(
+  dls?: number[],
   opts?: Partial<UseQueryOptions<LogisticsAwaitingStockShortageResponse>>,
 ) {
+  const hasDls = dls != null && dls.length > 0;
+  const url = hasDls
+    ? `/api/logistics/pos/awaiting-stock-shortage?dls=${[...dls!].sort((a, b) => a - b).join(",")}`
+    : "/api/logistics/pos/awaiting-stock-shortage";
   return useQuery({
-    queryKey: qk.logistics.awaitingStockShortage(),
-    queryFn: () =>
-      apiFetch<LogisticsAwaitingStockShortageResponse>(
-        "/api/logistics/pos/awaiting-stock-shortage",
-      ),
+    queryKey: qk.logistics.awaitingStockShortage(dls),
+    queryFn: () => apiFetch<LogisticsAwaitingStockShortageResponse>(url),
     enabled: false,
     staleTime: 0,
     ...opts,
