@@ -141,6 +141,11 @@ export const createPoInput = z.object({
   })).min(1),
   dl: z.number().int().positive().optional(),
   dlRefs: z.array(z.number().int().positive()).optional(),
+  // 0083 (Loo 2026-05-10) — required ISO date string. Pre-0083 rows had this
+  // field captured by the modal but never sent (input-shape carry-forward
+  // closed). Supplier/Finance AP-aging both read `purchase_orders.eta_date`;
+  // null was silently corrupting both surfaces.
+  etaDate: z.string().date(),
 }).strict();
 export type CreatePoInput = z.infer<typeof createPoInput>;
 

@@ -161,12 +161,15 @@ describe('createPoInput', () => {
     cost: 1500,
     costSource: 'hand_entered' as const,
   };
+  // 0083 (Loo 2026-05-10) — etaDate is now required (ISO date).
+  const ETA = '2026-06-01';
   it('accepts supplier + warehouse + at least one line with cost+costSource', () => {
     expect(
       createPoInput.safeParse({
         supplierId: UUID,
         warehouseId: UUID2,
         lines: [VALID_LINE],
+        etaDate: ETA,
       }).success,
     ).toBe(true);
   });
@@ -176,6 +179,7 @@ describe('createPoInput', () => {
         supplierId: UUID,
         warehouseId: UUID2,
         lines: [],
+        etaDate: ETA,
       }).success,
     ).toBe(false);
   });
@@ -185,6 +189,7 @@ describe('createPoInput', () => {
         supplierId: UUID,
         warehouseId: UUID2,
         lines: [VALID_LINE],
+        etaDate: ETA,
         extraField: 'x',
       }).success,
     ).toBe(false);
@@ -195,6 +200,7 @@ describe('createPoInput', () => {
         supplierId: UUID,
         warehouseId: UUID2,
         lines: [{ sku: 'SOFA-OAK-3S', qty: 1, costSource: 'hand_entered' }],
+        etaDate: ETA,
       }).success,
     ).toBe(false);
   });
@@ -204,6 +210,7 @@ describe('createPoInput', () => {
         supplierId: UUID,
         warehouseId: UUID2,
         lines: [{ sku: 'SOFA-OAK-3S', qty: 1, cost: 1500 }],
+        etaDate: ETA,
       }).success,
     ).toBe(false);
   });
@@ -213,6 +220,7 @@ describe('createPoInput', () => {
         supplierId: UUID,
         warehouseId: UUID2,
         lines: [{ ...VALID_LINE, cost: -1 }],
+        etaDate: ETA,
       }).success,
     ).toBe(false);
   });
@@ -222,6 +230,7 @@ describe('createPoInput', () => {
         supplierId: UUID,
         warehouseId: UUID2,
         lines: [{ ...VALID_LINE, cost: 0 }],
+        etaDate: ETA,
       }).success,
     ).toBe(true);
   });
@@ -231,6 +240,7 @@ describe('createPoInput', () => {
         supplierId: UUID,
         warehouseId: UUID2,
         lines: [{ ...VALID_LINE, costSource: 'made_up' }],
+        etaDate: ETA,
       }).success,
     ).toBe(false);
   });
@@ -241,9 +251,40 @@ describe('createPoInput', () => {
           supplierId: UUID,
           warehouseId: UUID2,
           lines: [{ ...VALID_LINE, costSource: cs }],
+          etaDate: ETA,
         }).success,
       ).toBe(true);
     }
+  });
+  // 0083 (Loo 2026-05-10) — etaDate required + must be ISO date.
+  it('rejects when etaDate is missing (0083)', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [VALID_LINE],
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects empty etaDate (0083)', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [VALID_LINE],
+        etaDate: '',
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects malformed etaDate (0083)', () => {
+    expect(
+      createPoInput.safeParse({
+        supplierId: UUID,
+        warehouseId: UUID2,
+        lines: [VALID_LINE],
+        etaDate: '01/06/2026',
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -259,6 +300,8 @@ describe('createPosBatchInput', () => {
         costSource: 'hand_entered' as const,
       },
     ],
+    // 0083 (Loo 2026-05-10) — etaDate now required on each PO entry.
+    etaDate: '2026-06-01',
   };
   it('accepts an array with one valid PO entry', () => {
     expect(

@@ -534,6 +534,22 @@ logisticsPosRouter.post("/", requireLogistics, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
+  // 0083 (Loo 2026-05-10) — `logistics_create_po(uuid,uuid,jsonb,int,int[])`
+  // hard-codes `p_eta_date := null` at 0055b:222 and adding a 6th param
+  // would need a DROP+CREATE migration. Cheaper: post-RPC UPDATE. Logistics
+  // role passes RLS `po_scoped_update` (0002:249); LP whitelist trigger
+  // (0068) early-returns for non-partner roles, so this is safe.
+  const poId = (data as { id?: string } | null)?.id;
+  if (poId) {
+    const { error: etaErr } = await sb
+      .from("purchase_orders")
+      .update({ eta_date: parsed.data.etaDate })
+      .eq("id", poId);
+    if (etaErr) {
+      const m = mapPgError(etaErr);
+      return c.json(m.body, m.status);
+    }
+  }
   return c.json({ po: data });
 });
 
@@ -574,7 +590,10 @@ logisticsPosRouter.post("/batch", requireLogistics, async (c) => {
       cost_source: l.costSource,
       attrs: l.attrs ?? null,
     })),
-    eta_date: null as string | null,
+    // 0083 (Loo 2026-05-10) — was hard-coded null. RPC reads `eta_date`
+    // off each JSONB entry and casts to date (0055b:300-303); empty string
+    // falls back to null but our zod (.date()) blocks empty.
+    eta_date: p.etaDate,
     dl_refs: p.dlRefs ?? null,
     note: null as string | null,
   }));

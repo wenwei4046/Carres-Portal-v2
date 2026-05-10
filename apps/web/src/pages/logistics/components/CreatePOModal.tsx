@@ -367,15 +367,9 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     Record<string, string>
   >({});
 
-  // ETA + per-supplier partner are visual elements present in proto but the
-  // current `createPoInput` zod schema (packages/shared/src/schemas/logistics.ts:84)
-  // does NOT yet accept them. Per CLAUDE.md §7 schema discipline we don't extend
-  // the schema without explicit Loo approval — instead we capture the values for
-  // UI fidelity (proto §18.4 NewPODialog) but they aren't sent on submit. The
-  // RPC defaults sup_status to 'pending' and assignment happens later via
-  // useAssignPickupPartnerMutation. Tracking this carry-forward as
-  // `phase-4-create-po-eta-partner` for follow-up if Loo wants the proto's
-  // pre-assignment behavior wired through the schema.
+  // ETA is now wired end-to-end (0083, Loo 2026-05-10). `etaDate` is a
+  // required field on `createPoInput`; submit blocks until the user picks a
+  // date. Single-PO route does post-RPC UPDATE; batch RPC accepts it inline.
   const [eta, setEta] = useState<string>("");
   const [partnerBySupplier, setPartnerBySupplier] = useState<
     Record<string, string>
@@ -661,6 +655,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     warehousesOk &&
     groups.orphans.length === 0 &&
     partnersOk &&
+    !!eta &&
     !isPending;
 
   // 0076: dup detection keys on (sku, attrs canonical) so multi-variant
@@ -742,6 +737,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
             ? { dlRefs: prefill.dlRefs }
             : {}),
+          etaDate: eta,
         });
         toast.success(
           `PO issued · ${lines.length} line${lines.length === 1 ? "" : "s"} · ${totalUnits} units`,
@@ -774,6 +770,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
               ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
                 ? { dlRefs: prefill.dlRefs }
                 : {}),
+              etaDate: eta,
             };
           }),
         });
@@ -1391,17 +1388,27 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         })}
       </div>
 
-      {/* ETA — global. Warehouse moved into each supplier group above (C5.2). */}
+      {/* ETA — global. Warehouse moved into each supplier group above (C5.2).
+          Required since 0083 (Loo 2026-05-10). */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
-          <div className="label mb-1.5">Expected delivery</div>
+          <div className="label mb-1.5">
+            Expected delivery <span className="text-primary">*</span>
+          </div>
           <input
             type="date"
             value={eta}
             onChange={(e) => setEta(e.target.value)}
             aria-label="Expected delivery date"
+            aria-required="true"
+            required
             className={INPUT_CLS}
           />
+          {!eta && (
+            <div className="text-[11px] text-base-600 mt-1 font-body">
+              Pick an ETA — supplier + Finance AP both rely on it.
+            </div>
+          )}
         </div>
       </div>
 

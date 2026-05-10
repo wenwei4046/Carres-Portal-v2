@@ -176,14 +176,28 @@ describe("POST /api/logistics/pos", () => {
     warehouseId: WAREHOUSE_ID,
     lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" as const }],
     dl: 4001,
+    // 0083 (Loo 2026-05-10) — etaDate now required (ISO date).
+    etaDate: "2026-06-01",
   };
+
+  // 0083: success-path tests need a chained `.from().update().eq()` mock
+  // for the post-RPC eta_date UPDATE. Helper builds the chain inline so we
+  // don't have to add it to every error-path test (those return before
+  // reaching the UPDATE).
+  function makeFromMock(updateError: unknown = null) {
+    const eq = vi.fn().mockResolvedValue({ error: updateError });
+    const update = vi.fn().mockReturnValue({ eq });
+    const from = vi.fn().mockReturnValue({ update });
+    return { from, update, eq };
+  }
 
   it("returns 200 on success and calls RPC with snake_case args", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: { id: "PO-2050", supplier_id: SUPPLIER_ID, warehouse_id: WAREHOUSE_ID, status: "open", sup_status: "pending", dl: 4001, dl_refs: null }, error: null,
     });
+    const fromMock = makeFromMock();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    vi.mocked(userClient).mockReturnValue({ rpc, from: fromMock.from } as any);
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
       new Request("http://t/api/logistics/pos", {
@@ -216,12 +230,18 @@ describe("POST /api/logistics/pos", () => {
       "p_dl_refs",
       "p_procurement_partner_id",
     ]);
+    // 0083 (Loo 2026-05-10) — post-RPC UPDATE persists eta_date on the
+    // returned PO id (RPC public signature doesn't accept p_eta_date).
+    expect(fromMock.from).toHaveBeenCalledWith("purchase_orders");
+    expect(fromMock.update).toHaveBeenCalledWith({ eta_date: "2026-06-01" });
+    expect(fromMock.eq).toHaveBeenCalledWith("id", "PO-2050");
   });
 
   it("supports combined PO with dlRefs[] (and no dl)", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    const rpc = vi.fn().mockResolvedValue({ data: { id: "PO-2051" }, error: null });
+    const fromMock = makeFromMock();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    vi.mocked(userClient).mockReturnValue({ rpc, from: fromMock.from } as any);
     const jwt = await makeJwt("logistics");
     await app.fetch(
       new Request("http://t/api/logistics/pos", {
@@ -232,6 +252,8 @@ describe("POST /api/logistics/pos", () => {
           warehouseId: WAREHOUSE_ID,
           lines: [{ sku: "MAT-K-001", qty: 5, cost: 1500, costSource: "hand_entered" }],
           dlRefs: [4001, 4002, 4003],
+          // 0083: required.
+          etaDate: "2026-07-15",
         }),
       }),
       env,
@@ -1802,11 +1824,14 @@ describe("POST /api/logistics/pos/batch", () => {
         supplierId: SUPPLIER_A,
         warehouseId: WH_KLANG,
         lines: [{ sku: "mattress:carres-cloud:King", qty: 2, cost: 1500, costSource: "hand_entered" as const }],
+        // 0083 (Loo 2026-05-10) — etaDate now required on each PO entry.
+        etaDate: "2026-06-01",
       },
       {
         supplierId: SUPPLIER_B,
         warehouseId: WH_PJ,
         lines: [{ sku: "sofa:oak:3-seater", qty: 1, cost: 2200, costSource: "prev_po" as const }],
+        etaDate: "2026-06-15",
       },
     ],
   };
@@ -1842,7 +1867,9 @@ describe("POST /api/logistics/pos/batch", () => {
           // T29: per-line `costSource` reshaped to snake_case `cost_source` at API edge.
           // 0073: attrs jsonb forwarded too (NULL for mattress + legacy callers).
           lines: [{ sku: "mattress:carres-cloud:King", qty: 2, cost: 1500, cost_source: "hand_entered", attrs: null }],
-          eta_date: null,
+          // 0083 (Loo 2026-05-10) — etaDate now propagated from caller into
+          // RPC's JSONB input, no longer hard-coded null.
+          eta_date: "2026-06-01",
           dl_refs: null,
           note: null,
         },
@@ -1851,7 +1878,7 @@ describe("POST /api/logistics/pos/batch", () => {
           warehouse_id: WH_PJ,
           procurement_partner_id: null,
           lines: [{ sku: "sofa:oak:3-seater", qty: 1, cost: 2200, cost_source: "prev_po", attrs: null }],
-          eta_date: null,
+          eta_date: "2026-06-15",
           dl_refs: null,
           note: null,
         },
@@ -1910,6 +1937,7 @@ describe("POST /api/logistics/pos/batch", () => {
       supplierId: SUPPLIER_A,
       warehouseId: WH_KLANG,
       lines: [{ sku: "mattress:carres-cloud:King", qty: 1, cost: 1500, costSource: "hand_entered" as const }],
+      etaDate: "2026-06-01",
     };
     const res = await app.fetch(
       new Request("http://t/api/logistics/pos/batch", {

@@ -248,6 +248,15 @@ beforeEach(() => {
   setLoaded();
 });
 
+// 0083 (Loo 2026-05-10) — etaDate is now required on createPoInput. Every
+// "Issue PO becomes enabled" assertion below needs an ETA seeded first.
+const ETA_FIXTURE = "2026-06-01";
+function fillEta(date: string = ETA_FIXTURE) {
+  fireEvent.change(screen.getByLabelText(/Expected delivery date/i), {
+    target: { value: date },
+  });
+}
+
 describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
   it("Stockpile PO toggle hides order-ref fields when checked", () => {
     // Open with bundle prefill so the bundle intro text would normally render.
@@ -292,6 +301,9 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
 
     // 0074 — cost auto-fills from product_skus.cost (King fixture = 1500).
     // No more hand-entry; the valid-form gate just needs the seeded SKU.
+    // 0083 — ETA also required.
+    fillEta();
+
     // Submit
     const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
     expect(issueBtn).not.toBeDisabled();
@@ -306,6 +318,7 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
       lines: { sku: string; qty: number; cost: number; costSource: string }[];
       dl?: number | null;
       dlRefs?: number[] | null;
+      etaDate?: string;
     };
     expect(callArg.supplierId).toBe(SUPPLIER_A.id);
     expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
@@ -318,6 +331,8 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
     // (dl/dlRefs are .optional()), but neither must carry a value.
     expect(callArg.dl ?? null).toBeNull();
     expect(callArg.dlRefs ?? null).toBeNull();
+    // 0083 — etaDate forwarded.
+    expect(callArg.etaDate).toBe(ETA_FIXTURE);
   });
 
   it("Stockpile PO toggle is disabled when modal opened with auto-fill prefill", () => {
@@ -375,6 +390,9 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
     });
+    // 0083 — ETA also required.
+    expect(issueBtn).toBeDisabled();
+    fillEta();
     expect(issueBtn).not.toBeDisabled();
   });
 
@@ -741,6 +759,22 @@ describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement
     expect(screen.getByTestId("po-lines-table")).toBeInTheDocument();
   });
 
+  // 0083 (Loo 2026-05-10) — ETA gate: button stays disabled even with valid
+  // warehouse + lines until the user picks an Expected delivery date.
+  it("disables 'Issue PO' when ETA is blank, even with valid warehouse + lines (0083)", () => {
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
+    expect(issueBtn).toBeDisabled();
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    // Warehouse picked + catalog cost auto-filled — button still disabled
+    // because ETA hasn't been set.
+    expect(issueBtn).toBeDisabled();
+    fillEta();
+    expect(issueBtn).not.toBeDisabled();
+  });
+
   it("disables 'Issue PO' when no warehouse picked", () => {
     // Empty warehouses → the supplier-group warehouse select has no valid
     // option, so submit stays gated.
@@ -763,6 +797,8 @@ describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement
       target: { value: WAREHOUSE_KL.id },
     });
     // 0074 — cost auto-fills from product_skus.cost (King fixture = 1500).
+    // 0083 — ETA also required before button enables.
+    fillEta();
     expect(issueBtn).not.toBeDisabled();
     fireEvent.click(issueBtn);
     await waitFor(() => {
@@ -772,6 +808,7 @@ describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement
       supplierId: string;
       warehouseId: string;
       lines: { sku: string; qty: number; cost: number; costSource: string }[];
+      etaDate?: string;
     };
     expect(callArg.supplierId).toBe(SUPPLIER_A.id);
     expect(callArg.warehouseId).toBe(WAREHOUSE_KL.id);
@@ -779,6 +816,8 @@ describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement
     // 0074 — every emitted line carries the catalog cost + 'catalog' source.
     expect(callArg.lines[0].cost).toBe(1500);
     expect(callArg.lines[0].costSource).toBe("catalog");
+    // 0083 — etaDate forwarded.
+    expect(callArg.etaDate).toBe(ETA_FIXTURE);
   });
 
   it("changing variant on a line re-pulls cost from the new SKU (0074)", () => {
@@ -797,6 +836,8 @@ describe("CreatePOModal — base modal flows (migrated from LogisticsProcurement
     fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
       target: { value: WAREHOUSE_KL.id },
     });
+    // 0083 — ETA also required before button enables.
+    fillEta();
     const issueBtn = screen.getByRole("button", { name: /Issue PO/ });
     expect(issueBtn).not.toBeDisabled();
   });
@@ -973,6 +1014,8 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
     });
     // 0074 — cost auto-fills from product_skus.cost (King=1500, Nordic=2200);
     // costSource = 'catalog' fixed.
+    // 0083 — ETA also required before button enables.
+    fillEta();
     expect(issueBtn).not.toBeDisabled();
     fireEvent.click(issueBtn);
     // Batch RPC fires (NOT the single-PO RPC) — atomic 2-PO commit.
@@ -991,6 +1034,7 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
           costSource: string;
           attrs: Record<string, unknown> | null;
         }[];
+        etaDate?: string;
       }[];
     };
     expect(callArg.pos).toHaveLength(2);
@@ -998,6 +1042,9 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
     const bGroup = callArg.pos.find((p) => p.supplierId === SUPPLIER_B.id);
     expect(aGroup?.warehouseId).toBe(WAREHOUSE_KL.id);
     expect(bGroup?.warehouseId).toBe(WAREHOUSE_PG.id);
+    // 0083 — etaDate forwarded onto each PO entry in the batch.
+    expect(aGroup?.etaDate).toBe(ETA_FIXTURE);
+    expect(bGroup?.etaDate).toBe(ETA_FIXTURE);
     // 0073 cascade picker: mattress + sofa-without-fabric lines emit attrs=null.
     // 0074: catalog cost auto-stamped + costSource='catalog' on every line.
     expect(aGroup?.lines).toEqual([
