@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { qk } from "@/lib/queries";
+import { qk, usePartnerToDeliver, type PartnerToDeliverRow } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 
 /**
@@ -40,6 +40,23 @@ type DashboardPickupRow = {
   warehouses: { name: string; address: string | null } | null;
   lines: DashboardPickupLine[];
 };
+
+// 2026-05-11 (Loo): Deliveries pipeline preview on Today — same RFD-pending +
+// to-deliver feeds as the dedicated Deliveries page, just summarized inline.
+type RfdPendingRow = {
+  thread_id: string;
+  order_id: string;
+  po_id: string;
+  customer_name: string;
+  request_for_delivery_at: string;
+  confirm_delivery_date: string | null;
+};
+
+function todayISO(): string {
+  const d = new Date();
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 type FleetRow = {
   id: string;
@@ -105,6 +122,14 @@ export default function PartnerDashboard() {
     queryKey: qk.partner.fleet(),
     queryFn: () => apiFetch<FleetRow[]>("/api/partner/fleet"),
   });
+  // 2026-05-11 (Loo): Today now also surfaces customer-leg deliveries —
+  // partner sees both legs at a glance instead of having to flip between
+  // Today and Deliveries tabs.
+  const rfdPending = useQuery({
+    queryKey: qk.partner.rfdPending(),
+    queryFn: () => apiFetch<RfdPendingRow[]>("/api/partner/pickups/rfd-pending"),
+  });
+  const toDeliver = usePartnerToDeliver();
 
   const buckets = useMemo(() => {
     const out = {
@@ -120,6 +145,27 @@ export default function PartnerDashboard() {
     }
     return out;
   }, [pickups.data]);
+
+  const today = useMemo(() => todayISO(), []);
+  const deliveryBuckets = useMemo(() => {
+    const out = {
+      awaiting: rfdPending.data ?? [],
+      scheduled: [] as PartnerToDeliverRow[],
+      out_for_delivery: [] as PartnerToDeliverRow[],
+    };
+    for (const r of toDeliver.data ?? []) {
+      if (!r.confirm_delivery_date || r.confirm_delivery_date <= today) {
+        out.out_for_delivery.push(r);
+      } else {
+        out.scheduled.push(r);
+      }
+    }
+    return out;
+  }, [rfdPending.data, toDeliver.data, today]);
+  const deliveryTotal =
+    deliveryBuckets.awaiting.length +
+    deliveryBuckets.scheduled.length +
+    deliveryBuckets.out_for_delivery.length;
 
   if (counts.isLoading || !counts.data) {
     return <div className="px-9 py-8 pb-14 text-[13px] text-base-600">Loading…</div>;
@@ -188,6 +234,62 @@ export default function PartnerDashboard() {
           hint="Goods loaded · en route to warehouse"
           accent="info"
           items={buckets.in_transit}
+        />
+      </div>
+
+      {/* 2026-05-11 (Loo): Deliveries pipeline — customer-leg work view.
+          Same columns + rules as the dedicated Deliveries page; click "See
+          all deliveries" for the full kanban + action buttons. */}
+      <div className="flex justify-between items-end gap-4">
+        <div className="kicker text-base-500">
+          Deliveries pipeline · {deliveryTotal} active
+        </div>
+        <Link
+          to="/delivery-partner/deliveries"
+          className="text-[12px] text-primary hover:underline font-semibold"
+        >
+          See all deliveries →
+        </Link>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <DeliveryPreviewColumn
+          label="Awaiting accept"
+          hint="RFD raised · accept to schedule"
+          accent="warning"
+          count={deliveryBuckets.awaiting.length}
+          rows={deliveryBuckets.awaiting.map((r) => ({
+            poId: r.po_id,
+            customer: r.customer_name,
+            dateLine: r.confirm_delivery_date
+              ? `Customer wants ${r.confirm_delivery_date}`
+              : "Date TBD",
+          }))}
+        />
+        <DeliveryPreviewColumn
+          label="Scheduled"
+          hint="Accepted · waiting for delivery day"
+          accent="info"
+          count={deliveryBuckets.scheduled.length}
+          rows={deliveryBuckets.scheduled.map((r) => ({
+            poId: r.po_id ?? "—",
+            customer: r.customer_name,
+            dateLine: r.confirm_delivery_date
+              ? `Delivery on ${r.confirm_delivery_date}`
+              : "—",
+          }))}
+        />
+        <DeliveryPreviewColumn
+          label="Out for delivery"
+          hint="Delivery day · drop off + POD"
+          accent="info"
+          count={deliveryBuckets.out_for_delivery.length}
+          rows={deliveryBuckets.out_for_delivery.map((r) => ({
+            poId: r.po_id ?? "—",
+            customer: r.customer_name,
+            dateLine: r.confirm_delivery_date
+              ? `Today · ${r.confirm_delivery_date}`
+              : "Ready to deliver",
+          }))}
         />
       </div>
 
@@ -355,6 +457,61 @@ function PreviewColumn({
               </Link>
             );
           })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 2026-05-11 (Loo): Deliveries pipeline preview column. Read-only summary —
+// each card links to the dedicated Deliveries page (no inline action buttons
+// to keep Today scannable).
+function DeliveryPreviewColumn({
+  label,
+  hint,
+  accent,
+  count,
+  rows,
+}: {
+  label: string;
+  hint: string;
+  accent: "warning" | "info";
+  count: number;
+  rows: { poId: string; customer: string; dateLine: string }[];
+}) {
+  const accentCls = accent === "warning" ? "text-warning" : "text-info";
+  return (
+    <div className="bg-white border border-base-200 rounded-md overflow-hidden">
+      <div className="px-4 py-3.5 border-b border-base-100">
+        <div className="flex justify-between items-baseline">
+          <div className={`text-[11px] font-bold uppercase tracking-[0.14em] ${accentCls}`}>
+            {label}
+          </div>
+          <span className="font-mono text-[13px] font-semibold">{count}</span>
+        </div>
+        <div className="font-body text-[11px] text-base-500 mt-0.5">{hint}</div>
+      </div>
+      <div className="p-2 min-h-[140px]">
+        {rows.length === 0 ? (
+          <div className="text-center text-base-400 text-[11px] py-6">—</div>
+        ) : (
+          rows.slice(0, 4).map((r, i) => (
+            <Link
+              key={`${r.poId}-${i}`}
+              to="/delivery-partner/deliveries"
+              className="block w-full bg-white border border-base-100 rounded-[4px] px-3 py-2.5 mb-1.5 hover:border-primary transition-colors"
+            >
+              <div className="flex justify-between items-baseline">
+                <span className="font-mono text-[11px] font-semibold">{r.poId}</span>
+              </div>
+              <div className="font-body text-[12px] font-medium mt-0.5 truncate">
+                {r.customer}
+              </div>
+              <div className="font-body text-[10px] text-base-500 mt-1">
+                {r.dateLine}
+              </div>
+            </Link>
+          ))
         )}
       </div>
     </div>
