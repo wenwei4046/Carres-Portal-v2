@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import CarresLockup from "@/components/CarresLockup";
 import NavBadge from "@/components/NavBadge";
-import { useLogisticsBadges } from "@/lib/queries";
+import { useLogisticsBadges, useMarkLogisticsBadgeSeen } from "@/lib/queries";
 
 /**
  * Logistics sidebar — 5 nav items per spec §18.7, all enabled in Phase 4 MVP
@@ -64,6 +64,12 @@ export default function LogisticsSidebar({ active, onChange }: Props) {
     orders: badgesQ.data?.orders ?? 0,
     procurement: badgesQ.data?.procurement ?? 0,
   };
+  // Mark-seen mutation (Loo 2026-05-11). Fires on click for keys that have
+  // a badge counter — optimistically zeros the count so the orange dot
+  // disappears instantly. Server reconciles on the next 30s poll if any
+  // items advanced between click and ack.
+  const markSeen = useMarkLogisticsBadgeSeen();
+  const BADGE_KEYS = new Set(["orders", "procurement"]);
 
   return (
     <aside
@@ -98,7 +104,12 @@ export default function LogisticsSidebar({ active, onChange }: Props) {
                   <button
                     key={n.k}
                     type="button"
-                    onClick={() => onChange(n.k)}
+                    onClick={() => {
+                      onChange(n.k);
+                      if (BADGE_KEYS.has(n.k) && (badgeCount[n.k] ?? 0) > 0) {
+                        markSeen.mutate(n.k as "orders" | "procurement");
+                      }
+                    }}
                     className={cls}
                   >
                     {isActive && (
@@ -115,12 +126,11 @@ export default function LogisticsSidebar({ active, onChange }: Props) {
                       {n.icon}
                     </span>
                     <span className="flex-1">{n.t}</span>
-                    {/* Hide badge on the active tab — Loo 2026-05-11: badge
-                        means "work pending", but seeing it on the tab you're
-                        already looking at feels like a stale unread dot.
-                        Badge re-appears when you navigate away and there's
-                        still open work. */}
-                    {!isActive && <NavBadge count={badgeCount[n.k] ?? 0} label={n.t} />}
+                    {/* Loo 2026-05-11: badge now uses "unread since last view"
+                        semantics — count = items where updated_at >
+                        user_nav_seen.last_seen_at. Click fires mark-seen +
+                        optimistic zero, so the dot clears immediately. */}
+                    <NavBadge count={badgeCount[n.k] ?? 0} label={n.t} />
                   </button>
                 );
               })}

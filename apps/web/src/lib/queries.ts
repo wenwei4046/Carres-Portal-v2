@@ -1620,6 +1620,56 @@ export function useLogisticsBadges(
   });
 }
 
+/**
+ * Mark a logistics nav badge as seen — Loo 2026-05-11 unread semantics.
+ *
+ * Optimistically zeros the count for the given key in the badges cache so
+ * the UI reacts instantly (~16 ms instead of waiting for the next 30s
+ * poll). On settle, invalidates the badges query so the actual server
+ * count (could be >0 if new items advanced between click and ack)
+ * reconciles.
+ *
+ * Pairs with POST /api/logistics/badges/seen which calls the
+ * mark_badge_seen RPC (migration 0083).
+ */
+type LogisticsBadgeKey = "logistics:orders" | "logistics:procurement";
+type LogisticsBadgeKeyShort = "orders" | "procurement";
+
+export function useMarkLogisticsBadgeSeen() {
+  const qc = useQueryClient();
+  return useMutation<
+    { badgeKey: LogisticsBadgeKey; lastSeenAt: string },
+    ApiError,
+    LogisticsBadgeKeyShort,
+    { prev: import("@carres/shared").LogisticsBadgesResponse | undefined }
+  >({
+    mutationFn: (short) =>
+      apiFetch("/api/logistics/badges/seen", {
+        method: "POST",
+        body: JSON.stringify({ badgeKey: `logistics:${short}` }),
+      }),
+    onMutate: async (short) => {
+      await qc.cancelQueries({ queryKey: qk.logistics.badges() });
+      const prev = qc.getQueryData<import("@carres/shared").LogisticsBadgesResponse>(
+        qk.logistics.badges(),
+      );
+      if (prev) {
+        qc.setQueryData<import("@carres/shared").LogisticsBadgesResponse>(
+          qk.logistics.badges(),
+          { ...prev, [short]: 0 },
+        );
+      }
+      return { prev };
+    },
+    onError: (_err, _short, ctx) => {
+      if (ctx?.prev) qc.setQueryData(qk.logistics.badges(), ctx.prev);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.logistics.badges() });
+    },
+  });
+}
+
 /** Delivery partners — populates the DispatchModal dropdown (M5 task 2 §18.3).
  *  Stable list, rarely changes; cache for 5 minutes. */
 export function useDeliveryPartners(

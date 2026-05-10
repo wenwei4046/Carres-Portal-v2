@@ -51,19 +51,37 @@ beforeEach(() => {
 afterAll(() => _setJwksForTesting(null));
 
 /**
- * Mock orders + purchase_orders count chains. The route does:
- *   1. orders.select("id", count, head).eq("logistics_stage", "awaiting_logistics_action")
- *   2. purchase_orders.select("id", count, head).neq("status", "received")
- *      .in("sup_status", [...])
+ * Mock the badges chain (Loo 2026-05-11 unread-rewrite):
+ *   1. user_nav_seen.select("badge_key, last_seen_at").in("badge_key", [...])
+ *      → returns the per-key last_seen_at rows
+ *   2. orders.select("id", count, head).eq(logistics_stage, ...).gt(updated_at, since)
+ *   3. purchase_orders.select("id", count, head).neq(status, "received")
+ *      .in(sup_status, [...]).gt(updated_at, since)
  */
-function mockBadges(opts: { ordersCount: number; procurementCount: number }) {
+function mockBadges(opts: {
+  ordersCount: number;
+  procurementCount: number;
+  seen?: { badge_key: string; last_seen_at: string }[];
+}) {
+  const seenRows = opts.seen ?? [];
   const from = vi.fn((table: string) => {
+    if (table === "user_nav_seen") {
+      return {
+        select: vi.fn(() => ({
+          in: vi.fn(() =>
+            Promise.resolve({ data: seenRows, error: null }),
+          ),
+        })),
+      };
+    }
     if (table === "orders") {
       return {
         select: vi.fn(() => ({
-          eq: vi.fn(() =>
-            Promise.resolve({ data: null, error: null, count: opts.ordersCount }),
-          ),
+          eq: vi.fn(() => ({
+            gt: vi.fn(() =>
+              Promise.resolve({ data: null, error: null, count: opts.ordersCount }),
+            ),
+          })),
         })),
       };
     }
@@ -71,13 +89,15 @@ function mockBadges(opts: { ordersCount: number; procurementCount: number }) {
       return {
         select: vi.fn(() => ({
           neq: vi.fn(() => ({
-            in: vi.fn(() =>
-              Promise.resolve({
-                data: null,
-                error: null,
-                count: opts.procurementCount,
-              }),
-            ),
+            in: vi.fn(() => ({
+              gt: vi.fn(() =>
+                Promise.resolve({
+                  data: null,
+                  error: null,
+                  count: opts.procurementCount,
+                }),
+              ),
+            })),
           })),
         })),
       };
@@ -92,7 +112,7 @@ function mockBadges(opts: { ordersCount: number; procurementCount: number }) {
 }
 
 describe("GET /api/logistics/badges", () => {
-  it("returns 200 + count JSON for logistics", async () => {
+  it("returns 200 + count JSON for logistics (no prior seen rows)", async () => {
     mockBadges({ ordersCount: 3, procurementCount: 2 });
 
     const jwt = await makeJwt("logistics");
@@ -107,24 +127,100 @@ describe("GET /api/logistics/badges", () => {
     expect(body).toEqual({ orders: 3, procurement: 2 });
   });
 
-  it("zeroes default when supabase returns null counts", async () => {
-    // null from PostgREST is a valid edge — coerce to 0 instead of NaN/null.
+  it("threads each key's last_seen_at into the .gt(updated_at, …) filter", async () => {
+    // Capture the .gt() calls per table so we can assert the threshold
+    // matches the seeded last_seen_at for that key.
+    const ordersGt = vi.fn(() =>
+      Promise.resolve({ data: null, error: null, count: 0 }),
+    );
+    const procGt = vi.fn(() =>
+      Promise.resolve({ data: null, error: null, count: 0 }),
+    );
+    const seenRows = [
+      { badge_key: "logistics:orders", last_seen_at: "2026-05-11T10:00:00Z" },
+      { badge_key: "logistics:procurement", last_seen_at: "2026-05-11T11:00:00Z" },
+    ];
     const from = vi.fn((table: string) => {
-      const result = Promise.resolve({ data: null, error: null, count: null });
+      if (table === "user_nav_seen") {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() =>
+              Promise.resolve({ data: seenRows, error: null }),
+            ),
+          })),
+        };
+      }
       if (table === "orders") {
-        return { select: vi.fn(() => ({ eq: vi.fn(() => result) })) };
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({ gt: ordersGt })),
+          })),
+        };
       }
       return {
         select: vi.fn(() => ({
-          neq: vi.fn(() => ({ in: vi.fn(() => result) })),
+          neq: vi.fn(() => ({ in: vi.fn(() => ({ gt: procGt })) })),
         })),
       };
     });
-    vi.mocked(userClient).mockReturnValue({
-      from,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
 
+    const jwt = await makeJwt("logistics");
+    await app.fetch(
+      new Request("http://t/api/logistics/badges", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+
+    expect(ordersGt).toHaveBeenCalledWith("updated_at", "2026-05-11T10:00:00Z");
+    expect(procGt).toHaveBeenCalledWith("updated_at", "2026-05-11T11:00:00Z");
+  });
+
+  it("falls back to epoch when no user_nav_seen row exists for a key", async () => {
+    const ordersGt = vi.fn(() =>
+      Promise.resolve({ data: null, error: null, count: 5 }),
+    );
+    const procGt = vi.fn(() =>
+      Promise.resolve({ data: null, error: null, count: 7 }),
+    );
+    const from = vi.fn((table: string) => {
+      if (table === "user_nav_seen") {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+        };
+      }
+      if (table === "orders") {
+        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ gt: ordersGt })) })) };
+      }
+      return {
+        select: vi.fn(() => ({
+          neq: vi.fn(() => ({ in: vi.fn(() => ({ gt: procGt })) })),
+        })),
+      };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/badges", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(ordersGt).toHaveBeenCalledWith("updated_at", "1970-01-01T00:00:00Z");
+    expect(procGt).toHaveBeenCalledWith("updated_at", "1970-01-01T00:00:00Z");
+    const body = (await res.json()) as { orders: number; procurement: number };
+    expect(body).toEqual({ orders: 5, procurement: 7 });
+  });
+
+  it("zeroes default when supabase returns null counts", async () => {
+    mockBadges({ ordersCount: 0, procurementCount: 0 });
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
       new Request("http://t/api/logistics/badges", {
@@ -156,5 +252,90 @@ describe("GET /api/logistics/badges", () => {
       env,
     );
     expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /api/logistics/badges/seen", () => {
+  function mockMarkSeen() {
+    const rpc = vi.fn(() =>
+      Promise.resolve({ data: "2026-05-11T12:00:00Z", error: null }),
+    );
+    vi.mocked(userClient).mockReturnValue({
+      rpc,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return { rpc };
+  }
+
+  it("calls mark_badge_seen RPC with the supplied badgeKey", async () => {
+    const { rpc } = mockMarkSeen();
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/badges/seen", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ badgeKey: "logistics:orders" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("mark_badge_seen", {
+      p_badge_key: "logistics:orders",
+    });
+    const body = (await res.json()) as { badgeKey: string; lastSeenAt: string };
+    expect(body).toEqual({
+      badgeKey: "logistics:orders",
+      lastSeenAt: "2026-05-11T12:00:00Z",
+    });
+  });
+
+  it("422 on unknown badgeKey (zod literal-union guard)", async () => {
+    mockMarkSeen();
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/badges/seen", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ badgeKey: "logistics:bogus" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("422 on missing body", async () => {
+    mockMarkSeen();
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/badges/seen", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("403 for non-logistics", async () => {
+    mockMarkSeen();
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/badges/seen", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ badgeKey: "logistics:orders" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
   });
 });
