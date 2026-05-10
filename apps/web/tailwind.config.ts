@@ -110,6 +110,11 @@ export default {
         // render cleanly. Noto Sans SC also covers Latin so ASCII stays sharp.
         cjk: ['"Noto Sans SC"', "DM Sans", "system-ui", "sans-serif"],
         stencil: ["Big Shoulders Stencil Display", "DM Sans", "sans-serif"],
+        // Editorial display family for the proto Login page only. Mulish is the
+        // Google Fonts substitute for proto's paid "Cera Pro" — same warm-humanist
+        // proportions, free license. Keep scoped to Login.tsx; other pages use
+        // `font-display` (DM Sans) per CLAUDE.md §10.
+        editorial: ['"Cera Pro"', "Mulish", "DM Sans", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       borderRadius: {
