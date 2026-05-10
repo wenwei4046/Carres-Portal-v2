@@ -1,6 +1,6 @@
 # Wrangler config for the Hono API on Cloudflare Workers.
 # Local dev: pnpm dev (runs `wrangler dev`)
-# Deploy: deferred until end of project (per Loo's directive — localhost-first).
+# Production: `wrangler deploy --env production` (Phase 9 cutover 2026-05-10)
 
 name = "carres-portal-v2-api"
 main = "src/index.ts"
@@ -15,4 +15,13 @@ compatibility_flags = ["nodejs_compat"]
 # cron = "0 1 * * *"  # 09:00 MYT daily
 
 [observability]
+enabled = true
+
+# Production environment — deployed via `wrangler deploy --env production`.
+# Secrets are set per-env via `wrangler secret put <KEY> --env production`.
+# Custom routes (api.your-domain.com) deferred — using *.workers.dev for now.
+[env.production]
+name = "carres-portal-v2-api"
+
+[env.production.observability]
 enabled = true

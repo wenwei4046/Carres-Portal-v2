@@ -414,18 +414,18 @@ Phase 9 known-risks (signed-off by Loo, NOT bugs to fix):
   • Demo product catalog (product_skus / product_models / sofa_fabrics / addons / floor_config) NOT wiped by cleanup — assumed Carres-branded real SKUs. If proven fictional, uncomment Layer 6 in `phase-9-cleanup.sql` and rerun.
 
 Phase 9 acceptance gates (per master plan §8.9 + §10):
-  ☐ `phase-9-cleanup.sql` applied + sanity check passes
-  ☐ Loo-filled `production-master-data.sql` applied
-  ☐ Service_role + JWT secret rotated
-  ☐ Wrangler `[env.production]` deployed → Workers URL captured
-  ☐ Cloudflare Pages deploy → *.pages.dev URL captured
-  ☐ Smoke test: principal@carres.com login → empty dashboard, no console errors
-  ☐ 9 alpha users created via PrincipalAccounts UI
-  ☐ Each role manual smoke: dashboard loads, no RLS leak, no 500
-  ☐ One real order placed → traced through full lifecycle (place → delivered → invoiced)
+  ✅ `phase-9-cleanup.sql` applied + sanity check passes (executed 2026-05-09 via MCP)
+  ✅ Loo-filled `production-master-data.sql` applied (executed 2026-05-09 via MCP)
+  ☐ Service_role + JWT secret rotated (SKIPPED per Loo 2026-05-10 — using staging keys as prod)
+  ✅ Wrangler `[env.production]` deployed → `https://carres-portal-v2-api.wwch.workers.dev` (2026-05-10)
+  ✅ Cloudflare Pages deploy → `https://carres-portal.pages.dev` (2026-05-10)
+  ✅ Smoke test: principal@carres.com login → empty dashboard, no console errors (Loo confirmed 2026-05-10)
+  ☐ 9 alpha users created via PrincipalAccounts UI (Day 2+)
+  ☐ Each role manual smoke: dashboard loads, no RLS leak, no 500 (Day 2+)
+  ☐ One real order placed → traced through full lifecycle (place → delivered → invoiced) (Day 2+)
   ☐ 24h monitoring quiet (Workers Analytics + Supabase Logs error rate <1%)
-  ☐ Old Carres-Portal repo + Workers + Pages archived/deleted
-  ☐ `docs/phase-9-reflection.md` written
+  ☐ Old Carres-Portal repo + Workers + Pages archived/deleted (Day 5+)
+  ☐ `docs/phase-9-reflection.md` written (post-stabilization)
 
 Phase 9 NEXT carry-forwards (added in prep):
   • phase-9-custom-domain (low) — bind real domain to Pages once alpha stable. Q2 deferred to Week 2+.
@@ -454,6 +454,23 @@ Next steps (not yet done):
   • Loo executes runbook Steps 4-10 — secret rotation, Wrangler prod env, CF Pages deploy, smoke test, Day 1 user creation via PrincipalAccounts UI (10 alpha users: 9 new + principal)
   • 24h monitoring per Step 11
   • Day 5+ retire old Carres-Portal repo / CF / Supabase
+
+**Phase 9 Cloudflare deploy EXECUTED 2026-05-10 ~23:25 GMT+8** — Loo abbreviated the runbook ("skip the phase 9 process, make as complete, now we do deploy on cloudflare") and authorized deploy with current staging Supabase keys (no rotation Q3=DEFERRED). Live URLs:
+  • **Web (Pages)**: https://carres-portal.pages.dev (project `carres-portal`, production branch `main`, deployment `6dcb423f`)
+  • **API (Workers)**: https://carres-portal-v2-api.wwch.workers.dev (Worker `carres-portal-v2-api`, version `dcf328b2-669c-489f-a566-bfa31b209c05`, account `wenwei4046@gmail.com`)
+  • API health 200 in 614ms cold / Pages 200 in 316ms — both green
+  • Bundle size: API 4744 KiB raw / 993 KiB gzipped (⚠️ 1 KB under Workers Free 1MB limit — will need paid plan if grows)
+  • Web bundle: 1064 KiB raw / 266 KiB gzipped (single chunk — phase-9-bundle-size-monitor CF tracks)
+  • CORS: `origin: "*"` in apps/api/src/index.ts:48 — wide open, OK for V1 since auth uses Bearer header not cookies
+  • SERVICE_ROLE leak audit: 0 hits in `apps/web/dist` ✅ §4.4 RED LINE held
+Deploy commits: `apps/api/wrangler.toml` `[env.production]` block + this §17 update (next commit). Tag `phase-9-complete` annotated.
+
+What was SKIPPED per Loo's "skip the phase 9 process" directive:
+  • Secret rotation (Step 4 of runbook) — staging service_role + JWT secret reused as prod
+  • Day 1 alpha user creation (Step 8) — Loo will do via PrincipalAccounts UI when ready
+  • Manual per-role smoke (Step 9) — only principal smoke tested, others Day 2+
+  • 24h monitoring (Step 10) — open
+  • Old system retirement (Day 5+) — open
 
 
 
