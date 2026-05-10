@@ -115,7 +115,12 @@ export default function LogisticsSidebar({ active, onChange }: Props) {
                       {n.icon}
                     </span>
                     <span className="flex-1">{n.t}</span>
-                    <NavBadge count={badgeCount[n.k] ?? 0} label={n.t} />
+                    {/* Hide badge on the active tab — Loo 2026-05-11: badge
+                        means "work pending", but seeing it on the tab you're
+                        already looking at feels like a stale unread dot.
+                        Badge re-appears when you navigate away and there's
+                        still open work. */}
+                    {!isActive && <NavBadge count={badgeCount[n.k] ?? 0} label={n.t} />}
                   </button>
                 );
               })}
