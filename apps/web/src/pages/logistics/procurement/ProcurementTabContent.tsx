@@ -432,9 +432,24 @@ export default function ProcurementTabContent({
   );
 }
 
-// Per-row action cell — same logic as LogisticsProcurement.tsx (mirrors v3
-// spec §7.3 "Receive default" + factory_pickup carve-outs). Kept inline here
-// so each tab stays self-contained without a deep import chain.
+// Per-row action cell — mirrors v3 spec §7.3 "Receive default" + factory_pickup
+// carve-outs.
+//
+// 2026-05-11 (Loo): Direct-Receive escape hatch.
+// The receive RPC `logistics_receive_po_with_do` (0076) only requires
+// status='open' — sup_status is unconstrained, and on full receive it
+// atomically flips status='received' + sup_status='delivered' (or
+// 'at_warehouse_waiting' for relocated). So Logistics CAN legitimately
+// receive at any pickup-pipeline stage when DO comes in via supplier or
+// warehouse-direct channels (skipping the partner-side "Mark Arrived"
+// button). The partner kanban filters by status='open', so once the PO
+// flips to received it disappears from their view — no stale UI.
+//
+// UI rules:
+//   - terminal states (received / cancelled): no actions
+//   - reassign_needed: Reassign warehouse (the only way out of that hole)
+//   - other states: surface the stage-specific primary action AS WELL AS
+//     a small "Direct receive" link as the always-available escape hatch
 function ActionCell({
   po,
   onReceive,
@@ -459,8 +474,6 @@ function ActionCell({
   }
   if (ss === "reassign_needed") {
     // Phase 7 sweep: customer rejected at original wh — needs relocation.
-    // The dialog itself was shipped in Phase 4 (F1.A) but stayed dead UI
-    // pending Phase 7. This is the trigger.
     return (
       <button
         type="button"
@@ -479,48 +492,73 @@ function ActionCell({
       </button>
     );
   }
+
+  const directReceive = (
+    <button
+      type="button"
+      className="text-[10px] text-base-500 underline hover:text-base-800 transition-colors"
+      onClick={(e) => {
+        e.stopPropagation();
+        onReceive();
+      }}
+      data-testid={`receive-po-${po.id}`}
+    >
+      Direct receive →
+    </button>
+  );
+
   if (ss === "ready_confirm_sent") {
     return (
-      <button
-        type="button"
-        className="btn-primary text-[11px] py-1 px-2.5"
-        onClick={(e) => {
-          e.stopPropagation();
-          onLpInboundConfirm();
-        }}
-        data-testid={`lp-inbound-confirm-${po.id}`}
-      >
-        LP Pre-flight 代按
-      </button>
+      <div className="flex flex-col items-end gap-1">
+        <button
+          type="button"
+          className="btn-primary text-[11px] py-1 px-2.5"
+          onClick={(e) => {
+            e.stopPropagation();
+            onLpInboundConfirm();
+          }}
+          data-testid={`lp-inbound-confirm-${po.id}`}
+        >
+          LP Pre-flight 代按
+        </button>
+        {directReceive}
+      </div>
     );
   }
   if (ss === "ready_for_pickup") {
     return (
-      <button
-        type="button"
-        className="btn-primary text-[11px] py-1 px-2.5"
-        onClick={(e) => {
-          e.stopPropagation();
-          onAssignPickup();
-        }}
-        data-testid={`assign-pickup-${po.id}`}
-      >
-        Assign partner
-      </button>
+      <div className="flex flex-col items-end gap-1">
+        <button
+          type="button"
+          className="btn-primary text-[11px] py-1 px-2.5"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAssignPickup();
+          }}
+          data-testid={`assign-pickup-${po.id}`}
+        >
+          Assign partner
+        </button>
+        {directReceive}
+      </div>
     );
   }
-  if (ss === "pickup_assigned" || ss === "pickup_accepted") {
+  if (ss === "pickup_assigned" || ss === "pickup_accepted" || ss === "picked_up") {
     return (
-      <span className="font-mono text-[10px] text-base-500">
-        {ss === "pickup_assigned" ? "awaiting accept" : "pickup scheduled"}
-      </span>
+      <div className="flex flex-col items-end gap-1">
+        <span className="font-mono text-[10px] text-base-500">
+          {ss === "pickup_assigned"
+            ? "awaiting accept"
+            : ss === "pickup_accepted"
+              ? "pickup scheduled"
+              : "in transit"}
+        </span>
+        {directReceive}
+      </div>
     );
   }
-  if (ss === "picked_up") {
-    return (
-      <span className="font-mono text-[10px] text-base-500">in transit</span>
-    );
-  }
+  // Default (sup_status='delivered' = partner already pressed Arrived at WH,
+  // OR any other unhandled state): full primary Receive button.
   return (
     <button
       type="button"

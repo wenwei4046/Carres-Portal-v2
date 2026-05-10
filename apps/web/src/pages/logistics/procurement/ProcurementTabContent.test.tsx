@@ -447,6 +447,51 @@ describe("ProcurementTabContent — Receive button + ReceivePOModal", () => {
       expect(screen.getByTestId(`receive-po-${poId}`)).toBeInTheDocument();
     },
   );
+
+  // 2026-05-11 (Loo): Direct-Receive escape hatch. The receive RPC is
+  // status='open'-gated, NOT sup_status-gated, so DO-from-supplier or
+  // DO-from-warehouse-direct flows shouldn't have to wait for the partner
+  // pickup state machine. Every non-terminal stage now exposes
+  // `receive-po-{id}` as either the primary button or a "Direct receive"
+  // text-link.
+  it.each([
+    ["ready_confirm_sent", "PO-4001"],
+    ["ready_for_pickup", "PO-4002"],
+    ["pickup_assigned", "PO-4003"],
+    ["pickup_accepted", "PO-4004"],
+    ["picked_up", "PO-4005"],
+  ])(
+    "Direct-receive link present at sup_status=%s (non-terminal stages)",
+    (supStatus, poId) => {
+      setLoaded([
+        makePo({
+          id: poId,
+          sup_status: supStatus as LogisticsPoListRow["sup_status"],
+        }),
+      ]);
+      render(wrap(<ProcurementTabContent slug="nice-future" />));
+      expect(screen.getByTestId(`receive-po-${poId}`)).toBeInTheDocument();
+    },
+  );
+
+  // Sanity: terminal states still don't expose Receive at all.
+  it.each([
+    ["received-status", "PO-4010", "open" /* sup_status */, "received" /* status */],
+    ["cancelled-status", "PO-4011", "ready_for_pickup", "cancelled"],
+  ])(
+    "no Receive button when %s",
+    (_label, poId, supStatus, status) => {
+      setLoaded([
+        makePo({
+          id: poId,
+          sup_status: supStatus as LogisticsPoListRow["sup_status"],
+          status: status as LogisticsPoListRow["status"],
+        }),
+      ]);
+      render(wrap(<ProcurementTabContent slug="nice-future" />));
+      expect(screen.queryByTestId(`receive-po-${poId}`)).not.toBeInTheDocument();
+    },
+  );
 });
 
 describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => {
