@@ -120,6 +120,15 @@ const styles = StyleSheet.create({
   colUnit: { width: "8%", textAlign: "left" },
   colUnitPrice: { width: "14%", textAlign: "right" },
   colTotal: { width: "14%", textAlign: "right" },
+  // 0076 / 0077 — variant suffix line (color + gap or fabric) shown under
+  // the description in slightly muted weight so the supplier knows which
+  // version to make. Empty for mattress lines (no extras).
+  variant: {
+    fontSize: 8,
+    color: ACCENT,
+    marginTop: 2,
+    fontWeight: 700,
+  },
   totalsRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -157,6 +166,34 @@ const styles = StyleSheet.create({
 
 function formatMoney(value: number, currency: string): string {
   return `${currency} ${value.toFixed(2)}`;
+}
+
+/**
+ * 0076 / 0077 — flatten attrs into a one-line variant suffix the supplier
+ * can read at a glance. Bedframe shows "{color} · gap {gap}", sofa shows
+ * "{fabric_name}" with optional "+RM {surcharge}" suffix, mattress returns
+ * empty (template hides the row when label is empty). Mirrors the
+ * PoDetailModal display logic so the on-screen + PDF descriptions match.
+ */
+function variantLabel(attrs: Record<string, unknown> | null | undefined): string {
+  if (!attrs) return "";
+  const parts: string[] = [];
+  const a = attrs as {
+    color?: string;
+    gap?: string;
+    fabric_name?: string;
+    fabric_surcharge?: number;
+  };
+  if (a.color) parts.push(a.color);
+  if (a.gap) parts.push(`gap ${a.gap}`);
+  if (a.fabric_name) {
+    parts.push(
+      a.fabric_surcharge && a.fabric_surcharge > 0
+        ? `${a.fabric_name} (+RM ${a.fabric_surcharge})`
+        : a.fabric_name,
+    );
+  }
+  return parts.join(" · ");
 }
 
 export function PoTemplate(data: PoTemplateData) {
@@ -201,10 +238,14 @@ export function PoTemplate(data: PoTemplateData) {
           </View>
           {lines.map((line, idx) => {
             const isLast = idx === lines.length - 1;
+            const variant = variantLabel(line.attrs);
             return (
               <View key={`${line.sku}-${idx}`} style={isLast ? styles.tableRowLast : styles.tableRow}>
                 <Text style={[styles.td, styles.colSku]}>{line.sku}</Text>
-                <Text style={[styles.td, styles.colDesc]}>{line.description}</Text>
+                <View style={[styles.td, styles.colDesc]}>
+                  <Text>{line.description}</Text>
+                  {variant ? <Text style={styles.variant}>{variant}</Text> : null}
+                </View>
                 <Text style={[styles.td, styles.colQty]}>{line.qty}</Text>
                 <Text style={[styles.td, styles.colUnit]}>{line.unit}</Text>
                 <Text style={[styles.td, styles.colUnitPrice]}>{formatMoney(line.unit_price, currency)}</Text>

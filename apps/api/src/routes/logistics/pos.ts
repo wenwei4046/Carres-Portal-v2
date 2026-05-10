@@ -203,8 +203,11 @@ logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) =
 
   // Step 2 — fetch order_lines (for those order IDs) AND stock_balances (all
   // rows) in parallel. Same Promise.all pattern as orders.ts:164/212.
+  // 0076 (Loo 2026-05-10): also pull `attrs` so the per-(sku, attrs)
+  // aggregation below can preserve color/gap/fabric for CreatePOModal's
+  // cascade pre-fill. attrs is jsonb; NULL stays NULL for mattress lines.
   const [linesRes, stockRes] = await Promise.all([
-    sb.from("order_lines").select("sku, qty").in("order_id", orderIds),
+    sb.from("order_lines").select("sku, qty, attrs").in("order_id", orderIds),
     sb.from("stock_balances").select("sku, qty, reserved"),
   ]);
   if (linesRes.error) {
@@ -216,13 +219,38 @@ logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) =
     return c.json(m.body, m.status);
   }
 
-  // Step 3 — TS aggregation. need = Σ qty per SKU; available = Σ (qty -
-  // reserved) per SKU across every warehouse. Filter to shortage > 0.
-  const needBySku = new Map<string, number>();
+  // Step 3 — TS aggregation. Key is now (sku, attrs-canonical) so the same
+  // SKU with different bedframe colors / sofa fabrics surfaces as separate
+  // shortage rows. JSON.stringify with sorted keys keeps two semantically
+  // identical attrs objects on the same bucket regardless of source key
+  // order. `available` is still per-SKU (stock isn't variant-tracked) and
+  // gets divided across variants in declaration order — first variant takes
+  // available stock, later variants see 0. This is conservative (over-orders
+  // stock if the operator didn't explicitly want it on the same variant)
+  // but never under-orders. Matches the existing logistics_calc_shortages
+  // semantics for single-variant orders byte-for-byte.
+  type ShortageRow = AwaitingStockShortageResponse["shortage"][number];
+  type Attrs = ShortageRow["attrs"];
+
+  const canonAttrs = (a: unknown): string => {
+    if (a == null) return "";
+    if (typeof a !== "object") return JSON.stringify(a);
+    const obj = a as Record<string, unknown>;
+    const keys = Object.keys(obj).sort();
+    const ordered: Record<string, unknown> = {};
+    for (const k of keys) ordered[k] = obj[k];
+    return JSON.stringify(ordered);
+  };
+
+  const needByKey = new Map<string, { sku: string; attrs: Attrs; need: number }>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const l of (linesRes.data ?? []) as any[]) {
     const sku = String(l.sku);
-    needBySku.set(sku, (needBySku.get(sku) ?? 0) + Number(l.qty));
+    const attrs = (l.attrs ?? null) as Attrs;
+    const key = `${sku} ${canonAttrs(attrs)}`;
+    const cur = needByKey.get(key);
+    if (cur) cur.need += Number(l.qty);
+    else needByKey.set(key, { sku, attrs, need: Number(l.qty) });
   }
 
   const availBySku = new Map<string, number>();
@@ -233,14 +261,29 @@ logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) =
     availBySku.set(sku, (availBySku.get(sku) ?? 0) + avail);
   }
 
-  const shortage: AwaitingStockShortageResponse["shortage"] = [];
-  for (const [sku, need] of needBySku.entries()) {
-    const available = availBySku.get(sku) ?? 0;
-    if (available < need) {
-      shortage.push({ sku, need, available, shortage: need - available });
+  // Distribute SKU-level availability across variants in deterministic
+  // (sku, attrs canonical) order. First variant absorbs available stock;
+  // later variants see whatever's left.
+  const shortage: ShortageRow[] = [];
+  const remainingBySku = new Map(availBySku);
+  const ordered = [...needByKey.values()].sort((a, b) => {
+    const c = a.sku.localeCompare(b.sku);
+    return c !== 0 ? c : canonAttrs(a.attrs).localeCompare(canonAttrs(b.attrs));
+  });
+  for (const row of ordered) {
+    const remaining = remainingBySku.get(row.sku) ?? 0;
+    const consumed = Math.min(remaining, row.need);
+    remainingBySku.set(row.sku, remaining - consumed);
+    if (consumed < row.need) {
+      shortage.push({
+        sku: row.sku,
+        attrs: row.attrs,
+        need: row.need,
+        available: consumed,
+        shortage: row.need - consumed,
+      });
     }
   }
-  shortage.sort((a, b) => a.sku.localeCompare(b.sku));
 
   const response: AwaitingStockShortageResponse = { shortage };
   return c.json(response);
@@ -295,7 +338,7 @@ logisticsPosRouter.get("/:id/print", requireLogistics, async (c) => {
   // Lines.
   const { data: lines, error: e2 } = await sb
     .from("purchase_order_lines")
-    .select("sku, qty, received_qty")
+    .select("sku, qty, received_qty, attrs")
     .eq("po_id", poId);
   if (e2) {
     const m = mapPgError(e2);
@@ -335,19 +378,25 @@ logisticsPosRouter.get("/:id/print", requireLogistics, async (c) => {
   const supplierRow = poRow.suppliers ?? null;
   const warehouseRow = poRow.warehouses ?? null;
 
-  const pdfLines = lineRows.map((l: { sku: string; qty: number; received_qty: number }) => {
-    const meta = skuMetaBySku[l.sku];
-    const qty = Number(l.qty);
-    const unitPrice = meta?.price ?? 0;
-    return {
-      sku: String(l.sku),
-      description: meta?.variant ?? String(l.sku),
-      qty,
-      unit: "pc",
-      unit_price: unitPrice,
-      line_total: qty * unitPrice,
-    };
-  });
+  const pdfLines = lineRows.map(
+    (l: { sku: string; qty: number; received_qty: number; attrs?: Record<string, unknown> | null }) => {
+      const meta = skuMetaBySku[l.sku];
+      const qty = Number(l.qty);
+      const unitPrice = meta?.price ?? 0;
+      return {
+        sku: String(l.sku),
+        description: meta?.variant ?? String(l.sku),
+        qty,
+        unit: "pc",
+        unit_price: unitPrice,
+        line_total: qty * unitPrice,
+        // 0076 / 0077: thread the cascade picker payload into the PDF so the
+        // supplier sees "Walnut · gap 14"" right under the description and
+        // doesn't have to guess which variant.
+        attrs: l.attrs ?? null,
+      };
+    },
+  );
   const grandTotal = pdfLines.reduce((s, ln) => s + ln.line_total, 0);
 
   const templateData: PoTemplateData = {
@@ -540,7 +589,11 @@ logisticsPosRouter.post("/:id/receive", requireLogistics, async (c) => {
     p_do_file_path: parsed.data.doFilePath,
     p_do_number: parsed.data.doNumber,
     p_lines: parsed.data.lines.map((l) => ({
-      sku: l.sku,
+      // 0076 (2026-05-10): RPC v3 keys WHERE/UPDATE on the line UUID `id`,
+      // not (po_id, sku), so multi-variant lines with the same SKU are
+      // disambiguated. Snake-case key matches the v_line->>'id' read in the
+      // RPC body.
+      id: l.id,
       received_qty: l.receivedQty,
     })),
   });

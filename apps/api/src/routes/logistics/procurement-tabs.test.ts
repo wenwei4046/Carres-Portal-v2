@@ -160,7 +160,7 @@ describe("GET /api/logistics/procurement/:slug", () => {
     // T42-pass3-C4 — the embed must NOT use !inner so POs with zero lines
     // still surface.
     expect(select.mock.calls[0]?.[0]).toContain(
-      "purchase_order_lines(sku, qty, received_qty)",
+      "purchase_order_lines(id, sku, qty, received_qty, attrs)",
     );
     expect(select.mock.calls[0]?.[0]).not.toContain(
       "purchase_order_lines!inner",
@@ -208,7 +208,7 @@ describe("GET /api/logistics/procurement/:slug", () => {
     expect(from).toHaveBeenCalledWith("purchase_orders");
     expect(passBSelect).toHaveBeenCalledTimes(1);
     expect(passBSelect.mock.calls[0]?.[0]).toContain(
-      "purchase_order_lines(sku, qty, received_qty)",
+      "purchase_order_lines(id, sku, qty, received_qty, attrs)",
     );
     expect(passBSelect.mock.calls[0]?.[0]).not.toContain(
       "purchase_order_lines!inner",

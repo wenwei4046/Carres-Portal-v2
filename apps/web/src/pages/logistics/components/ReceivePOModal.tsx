@@ -59,11 +59,14 @@ export default function ReceivePOModal({
 }: Props) {
   const lines = useMemo(() => po.purchase_order_lines ?? [], [po]);
 
-  // Per-sku desired qty to receive on this DO. Default = pending qty.
+  // 0076 (Loo 2026-05-10): per-LINE desired qty (keyed by line UUID, not
+  // sku). Multi-variant POs may carry the same SKU twice with different
+  // attrs — the sku-based key would collide. line.id is the post-migration
+  // UUID PK and is unique per row.
   const [recv, setRecv] = useState<Record<string, number>>(() => {
     const o: Record<string, number> = {};
     for (const l of lines) {
-      o[l.sku] = Math.max(0, Number(l.qty || 0) - Number(l.received_qty || 0));
+      o[l.id] = Math.max(0, Number(l.qty || 0) - Number(l.received_qty || 0));
     }
     return o;
   });
@@ -90,37 +93,40 @@ export default function ReceivePOModal({
     !!doFilePath &&
     !receive.isPending;
 
-  function setLine(sku: string, val: number, max: number) {
-    setRecv((prev) => ({ ...prev, [sku]: Math.max(0, Math.min(max, val)) }));
+  function setLine(id: string, val: number, max: number) {
+    setRecv((prev) => ({ ...prev, [id]: Math.max(0, Math.min(max, val)) }));
   }
   function receiveAllPending() {
     const o: Record<string, number> = {};
     for (const l of lines) {
-      o[l.sku] = Math.max(0, Number(l.qty || 0) - Number(l.received_qty || 0));
+      o[l.id] = Math.max(0, Number(l.qty || 0) - Number(l.received_qty || 0));
     }
     setRecv(o);
   }
   function clearAll() {
-    setRecv(Object.fromEntries(lines.map((l) => [l.sku, 0])));
+    setRecv(Object.fromEntries(lines.map((l) => [l.id, 0])));
   }
 
   async function submit() {
     if (!valid || !doFilePath) return;
     try {
-      // v3 batched call: build lines as { sku, receivedQty: NEW TOTAL }. The
-      // recv[sku] state holds "qty to add on this DO" (a delta from existing
+      // v3 batched call: build lines as { id, receivedQty: NEW TOTAL }. The
+      // recv[id] state holds "qty to add on this DO" (a delta from existing
       // received_qty); the v3 RPC expects the new total after this DO and
       // computes delta internally. Submit only ticked lines (qty > 0); the
       // RPC rejects empty arrays with detail='lines_empty', which we already
       // guard via `totalReceiving > 0` in `valid`.
+      // 0076 (Loo 2026-05-10): payload now keys by line UUID `id` instead of
+      // sku — multi-variant POs can carry the same SKU twice with different
+      // attrs and the RPC needs the unambiguous lookup key.
       const tickedLines = lines
         .map((l) => ({
-          sku: l.sku,
-          receivedQty: Number(l.received_qty || 0) + (recv[l.sku] || 0),
-          delta: recv[l.sku] || 0,
+          id: l.id,
+          receivedQty: Number(l.received_qty || 0) + (recv[l.id] || 0),
+          delta: recv[l.id] || 0,
         }))
         .filter((x) => x.delta > 0)
-        .map(({ sku, receivedQty }) => ({ sku, receivedQty }));
+        .map(({ id, receivedQty }) => ({ id, receivedQty }));
       await receive.mutateAsync({
         doNumber: doNumber.trim(),
         doFilePath,
@@ -168,11 +174,21 @@ export default function ReceivePOModal({
             0,
             Number(l.qty || 0) - Number(l.received_qty || 0),
           );
-          const checked = (recv[l.sku] || 0) > 0;
+          const checked = (recv[l.id] || 0) > 0;
           const disabled = pending === 0;
+          // 0076 (2026-05-10): variant suffix (e.g. "Natural Oak · 12\"")
+          // distinguishes multi-variant lines that share the same SKU.
+          const attrs = l.attrs as Record<string, unknown> | null | undefined;
+          const variantBits: string[] = [];
+          if (attrs) {
+            if (typeof attrs.color === "string") variantBits.push(attrs.color);
+            if (typeof attrs.gap === "string") variantBits.push(attrs.gap);
+            if (typeof attrs.fabric_name === "string") variantBits.push(attrs.fabric_name);
+          }
+          const variantLabel = variantBits.length > 0 ? variantBits.join(" · ") : null;
           return (
             <label
-              key={l.sku}
+              key={l.id}
               className={`grid items-center gap-2 px-3.5 py-2.5 border-t border-base-100 ${disabled ? "opacity-50" : "cursor-pointer"}`}
               style={{ gridTemplateColumns: "32px 1fr 80px 90px" }}
             >
@@ -181,13 +197,18 @@ export default function ReceivePOModal({
                 checked={checked}
                 disabled={disabled}
                 onChange={(e) =>
-                  setLine(l.sku, e.target.checked ? pending : 0, pending)
+                  setLine(l.id, e.target.checked ? pending : 0, pending)
                 }
                 className="accent-primary"
                 aria-label={`Tick ${l.sku} to receive`}
               />
               <div>
                 <div className="text-[12px] font-body">{l.sku}</div>
+                {variantLabel && (
+                  <div className="text-[10.5px] text-base-700 font-body">
+                    {variantLabel}
+                  </div>
+                )}
                 <div className="font-mono text-[10px] text-base-500 mt-0.5">
                   Ordered {l.qty} · already received {l.received_qty}
                 </div>
@@ -199,10 +220,10 @@ export default function ReceivePOModal({
                 type="number"
                 min={0}
                 max={pending}
-                value={recv[l.sku] || 0}
+                value={recv[l.id] || 0}
                 disabled={disabled}
                 onChange={(e) =>
-                  setLine(l.sku, parseInt(e.target.value, 10) || 0, pending)
+                  setLine(l.id, parseInt(e.target.value, 10) || 0, pending)
                 }
                 aria-label={`Receive qty for ${l.sku}`}
                 className="px-2 py-1.5 border border-base-300 rounded-[4px] text-[12px] text-right bg-white outline-none focus:border-base-500"

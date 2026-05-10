@@ -136,7 +136,13 @@ function makePo(overrides: Partial<LogisticsPoListRow> = {}): LogisticsPoListRow
     eta_date: "2026-05-15",
     placed_at: "2026-05-01T00:00:00Z",
     purchase_order_lines: [
-      { sku: "mattress:carres-cloud:King", qty: 5, received_qty: 0 },
+      {
+        // 0076: line UUID — required by ReceivePOModal recv-state keying.
+        id: "11111111-1111-4111-8111-111111111111",
+        sku: "mattress:carres-cloud:King",
+        qty: 5,
+        received_qty: 0,
+      },
     ],
     ...overrides,
   };
@@ -297,7 +303,12 @@ describe("ProcurementTabContent — Receive button + ReceivePOModal", () => {
         id: "PO-2050",
         sup_status: "delivered",
         purchase_order_lines: [
-          { sku: "sofa:nordic:3s", qty: 3, received_qty: 0 },
+          {
+            id: "44444444-4444-4444-8444-444444444444",
+            sku: "sofa:nordic:3s",
+            qty: 3,
+            received_qty: 0,
+          },
         ],
       }),
     ]);
@@ -313,7 +324,12 @@ describe("ProcurementTabContent — Receive button + ReceivePOModal", () => {
         id: "PO-2050",
         sup_status: "delivered",
         purchase_order_lines: [
-          { sku: "sofa:nordic:3s", qty: 3, received_qty: 1 },
+          {
+            id: "55555555-5555-4555-8555-555555555555",
+            sku: "sofa:nordic:3s",
+            qty: 3,
+            received_qty: 1,
+          },
         ],
       }),
     ]);
@@ -332,8 +348,18 @@ describe("ProcurementTabContent — Receive button + ReceivePOModal", () => {
         id: "PO-2051",
         sup_status: "delivered",
         purchase_order_lines: [
-          { sku: "sofa:nordic:3s", qty: 2, received_qty: 0 },
-          { sku: "mattress:carres-cloud:King", qty: 1, received_qty: 0 },
+          {
+            id: "66666666-6666-4666-8666-666666666666",
+            sku: "sofa:nordic:3s",
+            qty: 2,
+            received_qty: 0,
+          },
+          {
+            id: "77777777-7777-4777-8777-777777777777",
+            sku: "mattress:carres-cloud:King",
+            qty: 1,
+            received_qty: 0,
+          },
         ],
       }),
     ]);
@@ -366,9 +392,11 @@ describe("ProcurementTabContent — Receive button + ReceivePOModal", () => {
     const payload = receiveMutateAsync.mock.calls[0]?.[0];
     expect(payload).toMatchObject({
       doFilePath: "PO-2051/abc-DO-1.pdf",
+      // 0076: payload keys by line UUID `id` (not sku) — see ReceivePOModal
+      // submit() comments and packages/shared receivePoWithDoInput schema.
       lines: expect.arrayContaining([
-        { sku: "sofa:nordic:3s", receivedQty: 2 },
-        { sku: "mattress:carres-cloud:King", receivedQty: 1 },
+        { id: "66666666-6666-4666-8666-666666666666", receivedQty: 2 },
+        { id: "77777777-7777-4777-8777-777777777777", receivedQty: 1 },
       ]),
     });
     expect(payload.doNumber).toMatch(/^DO-\d+/);
@@ -406,7 +434,12 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
         warehouse_id: WAREHOUSE_KL.id,
         eta_date: "2026-06-01",
         purchase_order_lines: [
-          { sku: "mattress:carres-cloud:King", qty: 5, received_qty: 2 },
+          {
+            id: "88888888-8888-4888-8888-888888888888",
+            sku: "mattress:carres-cloud:King",
+            qty: 5,
+            received_qty: 2,
+          },
         ],
       }),
     ]);
@@ -452,7 +485,12 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
         id: "PO-2072",
         sup_status: "delivered",
         purchase_order_lines: [
-          { sku: "sofa:nordic:3s", qty: 3, received_qty: 0 },
+          {
+            id: "99999999-9999-4999-8999-999999999999",
+            sku: "sofa:nordic:3s",
+            qty: 3,
+            received_qty: 0,
+          },
         ],
       }),
     ]);
@@ -558,7 +596,12 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
         id: "PO-4001",
         sup_status: "in_production",
         purchase_order_lines: [
-          { sku: "mattress:carres-cloud:King", qty: 5, received_qty: 0 },
+          {
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            sku: "mattress:carres-cloud:King",
+            qty: 5,
+            received_qty: 0,
+          },
         ],
       }),
     ]);

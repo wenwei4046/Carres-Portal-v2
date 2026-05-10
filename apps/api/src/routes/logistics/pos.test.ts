@@ -351,10 +351,13 @@ describe("POST /api/logistics/pos", () => {
 
 describe("POST /api/logistics/pos/:id/receive", () => {
   const PO_ID = "PO-2030";
+  const LINE_ID = "11111111-1111-4111-8111-111111111111";
   const VALID_BODY = {
     doNumber: "DO-5210",
     doFilePath: `${PO_ID}/abc-DO-5210.pdf`,
-    lines: [{ sku: "MAT-K-001", receivedQty: 2 }],
+    // 0076 (Loo 2026-05-10): payload keys by line UUID `id` so multi-variant
+    // POs (same SKU, different attrs) can be addressed unambiguously.
+    lines: [{ id: LINE_ID, receivedQty: 2 }],
   };
 
   it("returns 200 on success and calls v3 RPC with snake_case-reshaped lines", async () => {
@@ -389,8 +392,9 @@ describe("POST /api/logistics/pos/:id/receive", () => {
       p_do_number: VALID_BODY.doNumber,
       // jsonb payload uses snake_case received_qty (RPC reads
       // v_line->>'received_qty' at 0045:688). camelCase → snake_case
-      // reshape happens at the route boundary.
-      p_lines: [{ sku: "MAT-K-001", received_qty: 2 }],
+      // reshape happens at the route boundary. 0076 (2026-05-10): `id` is
+      // already snake-case (single token), no reshape needed.
+      p_lines: [{ id: LINE_ID, received_qty: 2 }],
     });
     assertRpcCallShape(rpc, "logistics_receive_po_with_do", [
       "p_po_id",
@@ -410,7 +414,7 @@ describe("POST /api/logistics/pos/:id/receive", () => {
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           ...VALID_BODY,
-          lines: [{ sku: "MAT-K-001", receivedQty: -1 }],
+          lines: [{ id: LINE_ID, receivedQty: -1 }],
         }),
       }),
       env,
@@ -418,7 +422,7 @@ describe("POST /api/logistics/pos/:id/receive", () => {
     expect(res.status).toBe(422);
   });
 
-  it("returns 422 when sku is empty", async () => {
+  it("returns 422 when line id is not a valid UUID", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
     const jwt = await makeJwt("logistics");
@@ -428,7 +432,7 @@ describe("POST /api/logistics/pos/:id/receive", () => {
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           ...VALID_BODY,
-          lines: [{ sku: "", receivedQty: 2 }],
+          lines: [{ id: "not-a-uuid", receivedQty: 2 }],
         }),
       }),
       env,
@@ -480,7 +484,7 @@ describe("POST /api/logistics/pos/:id/receive", () => {
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           ...VALID_BODY,
-          lines: [{ sku: "MAT-K-001", receivedQty: 99 }],
+          lines: [{ id: LINE_ID, receivedQty: 99 }],
         }),
       }),
       env,
@@ -1165,11 +1169,12 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      shortage: { sku: string; need: number; available: number; shortage: number }[];
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     expect(body.shortage).toHaveLength(1);
     expect(body.shortage[0]).toEqual({
       sku: "mattress:cloud:King",
+      attrs: null,
       need: 5,
       available: 3,
       shortage: 2,
@@ -1220,11 +1225,12 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      shortage: { sku: string; need: number; available: number; shortage: number }[];
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     expect(body.shortage).toHaveLength(1);
     expect(body.shortage[0]).toEqual({
       sku: "mattress:cloud:King",
+      attrs: null,
       need: 8,
       available: 6,
       shortage: 2,
@@ -1271,11 +1277,11 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      shortage: { sku: string; need: number; available: number; shortage: number }[];
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     // Only order B's SKU surfaces — order A is covered by an open PO.
     expect(body.shortage).toEqual([
-      { sku: "sofa:nordic:3s", need: 2, available: 0, shortage: 2 },
+      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2 },
     ]);
   });
 
@@ -1313,11 +1319,11 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      shortage: { sku: string; need: number; available: number; shortage: number }[];
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     // Only order C's SKU surfaces — A and B are covered by the batch PO.
     expect(body.shortage).toEqual([
-      { sku: "mattress:cloud:King", need: 3, available: 1, shortage: 2 },
+      { sku: "mattress:cloud:King", attrs: null, need: 3, available: 1, shortage: 2 },
     ]);
   });
 
@@ -1354,11 +1360,11 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      shortage: { sku: string; need: number; available: number; shortage: number }[];
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     // Order A's SKU IS in shortage — received PO does not gate it.
     expect(body.shortage).toEqual([
-      { sku: "sofa:nordic:3s", need: 2, available: 0, shortage: 2 },
+      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2 },
     ]);
   });
 
@@ -1389,10 +1395,10 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      shortage: { sku: string; need: number; available: number; shortage: number }[];
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     expect(body.shortage).toEqual([
-      { sku: "sofa:nordic:3s", need: 2, available: 0, shortage: 2 },
+      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2 },
     ]);
   });
 
@@ -1435,10 +1441,10 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      shortage: { sku: string; need: number; available: number; shortage: number }[];
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     expect(body.shortage).toEqual([
-      { sku: "mattress:cloud:King", need: 4, available: 1, shortage: 3 },
+      { sku: "mattress:cloud:King", attrs: null, need: 4, available: 1, shortage: 3 },
     ]);
   });
 
@@ -1524,10 +1530,10 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      shortage: { sku: string; need: number; available: number; shortage: number }[];
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     expect(body.shortage).toEqual([
-      { sku: "sofa:nordic:3s", need: 2, available: 0, shortage: 2 },
+      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2 },
     ]);
   });
 
@@ -1589,11 +1595,11 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      shortage: { sku: string; need: number; available: number; shortage: number }[];
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     // need = 3 (NOT 6 — no double count from the two paths).
     expect(body.shortage).toEqual([
-      { sku: "mattress:cloud:King", need: 3, available: 0, shortage: 3 },
+      { sku: "mattress:cloud:King", attrs: null, need: 3, available: 0, shortage: 3 },
     ]);
   });
 
@@ -1625,11 +1631,11 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      shortage: { sku: string; need: number; available: number; shortage: number }[];
+      shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     // need = 5 (2 from A primary + 3 from B legacy), available = 1, shortage = 4.
     expect(body.shortage).toEqual([
-      { sku: "mattress:cloud:King", need: 5, available: 1, shortage: 4 },
+      { sku: "mattress:cloud:King", attrs: null, need: 5, available: 1, shortage: 4 },
     ]);
   });
 });

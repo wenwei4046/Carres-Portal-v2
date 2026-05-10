@@ -255,7 +255,9 @@ export default function PoDetailModal({
             const st = lineStatus(line);
             return (
               <div
-                key={`${line.sku}-${i}`}
+                // 0076: line.id is the post-migration UUID PK and unique per
+                // row even when multi-variant lines share the same sku.
+                key={line.id ?? `${line.sku}-${i}`}
                 data-testid={`po-detail-line-${i}`}
                 className="grid items-center gap-3 px-3.5 py-2.5 border-t border-base-100"
                 style={{ gridTemplateColumns: "2.4fr 80px 80px 90px" }}

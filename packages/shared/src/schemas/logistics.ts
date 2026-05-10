@@ -57,7 +57,12 @@ export const receivePoWithDoInput = z.object({
   doNumber: z.string().min(3),
   doFilePath: z.string().min(1),
   lines: z.array(z.object({
-    sku: z.string().min(1),
+    // 0076 (Loo 2026-05-10): line lookup is now by UUID `id` because
+    // (po_id, sku) is no longer unique once same-sku-different-attrs lines
+    // coexist (multi-variant bedframe POs). The RPC keys WHERE/UPDATE on
+    // this id; the frontend reads the line UUID from the existing
+    // purchase_order_lines select. sku is kept for display/audit only.
+    id: z.string().uuid(),
     receivedQty: z.number().int().nonnegative(),
   })).min(1),
 }).strict();
@@ -478,6 +483,12 @@ export type ReservedDrilldownResponse = z.infer<typeof reservedDrilldownResponse
 export const awaitingStockShortageResponse = z.object({
   shortage: z.array(z.object({
     sku: z.string().min(1),
+    // 0076 (Loo 2026-05-10): per-(sku, attrs) granularity. When dealer orders
+    // capture color/gap (order_lines.attrs), aggregation now keys by
+    // (sku, attrs) so CreatePOModal can pre-fill the cascade picker instead
+    // of forcing manual re-selection. NULL maps to mattress lines (no extras)
+    // and any pre-cascade legacy rows.
+    attrs: z.record(z.unknown()).nullable(),
     need: z.number().int().nonnegative(),
     available: z.number().int(),
     shortage: z.number().int().positive(),

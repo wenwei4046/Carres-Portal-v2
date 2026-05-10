@@ -130,6 +130,16 @@ export type PoTemplateData = {
     unit_price: number;
     /** Line subtotal in MYR major units (qty * unit_price). */
     line_total: number;
+    /**
+     * 0076 / 0077 (Loo 2026-05-10): cascade picker payload mirrored from
+     * `purchase_order_lines.attrs`. Bedframe = `{color, gap}`, sofa =
+     * `{fabric_id, fabric_name, fabric_surcharge}`, mattress = NULL.
+     * Template renders this under the description so the supplier knows
+     * exactly which version to make — without it a "BF-001 King ×2" PO
+     * could be Walnut, Natural Oak, or Black and the supplier would have
+     * to guess.
+     */
+    attrs?: Record<string, unknown> | null;
   }>;
 
   /** Order grand total in MYR major units (sum of line_total). */

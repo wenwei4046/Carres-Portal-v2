@@ -86,7 +86,14 @@ function makePo(overrides: Partial<LogisticsPoListRow> = {}): LogisticsPoListRow
     eta_date: "2026-05-15",
     placed_at: "2026-05-01T00:00:00Z",
     purchase_order_lines: [
-      { sku: "mattress:carres-cloud:King", qty: 2, received_qty: 0 },
+      {
+        // 0076: line UUID — modal keys recv state by id and sends it as the
+        // RPC lookup key (replaces sku-based scoping).
+        id: "11111111-1111-4111-8111-111111111111",
+        sku: "mattress:carres-cloud:King",
+        qty: 2,
+        received_qty: 0,
+      },
     ],
     ...overrides,
   };
@@ -196,8 +203,18 @@ describe("ReceivePOModal — Task 38 DO file upload", () => {
         <ReceivePOModal
           po={makePo({
             purchase_order_lines: [
-              { sku: "mattress:carres-cloud:King", qty: 2, received_qty: 0 },
-              { sku: "sofa:nordic:3s", qty: 1, received_qty: 0 },
+              {
+                id: "22222222-2222-4222-8222-222222222222",
+                sku: "mattress:carres-cloud:King",
+                qty: 2,
+                received_qty: 0,
+              },
+              {
+                id: "33333333-3333-4333-8333-333333333333",
+                sku: "sofa:nordic:3s",
+                qty: 1,
+                received_qty: 0,
+              },
             ],
           })}
           supplier={SUPPLIER}
@@ -232,9 +249,12 @@ describe("ReceivePOModal — Task 38 DO file upload", () => {
     const payload = receiveMutateAsync.mock.calls[0]?.[0];
     expect(payload).toMatchObject({
       doFilePath: "PO-2050/abc-DO-1.pdf",
+      // 0076: payload now keys by line UUID `id` (not sku) — the RPC scopes
+      // WHERE/UPDATE on id so multi-variant lines (same sku, different
+      // attrs) don't collide.
       lines: expect.arrayContaining([
-        { sku: "mattress:carres-cloud:King", receivedQty: 2 },
-        { sku: "sofa:nordic:3s", receivedQty: 1 },
+        { id: "22222222-2222-4222-8222-222222222222", receivedQty: 2 },
+        { id: "33333333-3333-4333-8333-333333333333", receivedQty: 1 },
       ]),
     });
     expect(payload.doNumber).toMatch(/^DO-\d+/);

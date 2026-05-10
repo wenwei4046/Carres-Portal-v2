@@ -61,7 +61,7 @@ describe('receivePoWithDoInput', () => {
   const VALID = {
     doNumber: 'DO-5210',
     doFilePath: 'PO-2050/abc-DO-5210.pdf',
-    lines: [{ sku: 'SOFA-OAK-3S', receivedQty: 2 }],
+    lines: [{ id: '11111111-1111-4111-8111-111111111111', receivedQty: 2 }],
   };
   it('accepts doNumber + doFilePath + non-empty lines', () => {
     expect(receivePoWithDoInput.safeParse(VALID).success).toBe(true);
@@ -70,7 +70,7 @@ describe('receivePoWithDoInput', () => {
     expect(
       receivePoWithDoInput.safeParse({
         ...VALID,
-        lines: [{ sku: 'SOFA-OAK-3S', receivedQty: 0 }],
+        lines: [{ id: '11111111-1111-4111-8111-111111111111', receivedQty: 0 }],
       }).success,
     ).toBe(true);
   });
@@ -78,7 +78,7 @@ describe('receivePoWithDoInput', () => {
     expect(
       receivePoWithDoInput.safeParse({
         ...VALID,
-        lines: [{ sku: 'SOFA-OAK-3S', receivedQty: -1 }],
+        lines: [{ id: '11111111-1111-4111-8111-111111111111', receivedQty: -1 }],
       }).success,
     ).toBe(false);
   });

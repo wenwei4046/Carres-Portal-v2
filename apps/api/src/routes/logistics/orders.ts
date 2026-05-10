@@ -230,7 +230,7 @@ logisticsOrdersRouter.get("/:id", requireLogistics, async (c) => {
     const poIds = pos.map((p: any) => p.id);
     const { data: poLines, error: e_polines } = await sb
       .from("purchase_order_lines")
-      .select("po_id, sku, qty, received_qty")
+      .select("id, po_id, sku, qty, received_qty, attrs")
       .in("po_id", poIds);
     if (e_polines) { const m = mapPgError(e_polines); return c.json(m.body, m.status); }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -70,8 +70,11 @@ export interface CreatePoPrefill {
   dl?: number;
   /** Cross-order bundle PO — sets `dl_refs` (array of order DLs). */
   dlRefs?: number[];
-  /** Pre-filled line items (sku + qty); comes from order shortage aggregation. */
-  lines?: { sku: string; qty: number }[];
+  /** Pre-filled line items (sku + qty + optional attrs); comes from order
+   * shortage aggregation. 0076: attrs is now carried through so bedframe
+   * color/gap and sofa fabric pre-fill the cascade picker. NULL/undefined
+   * means mattress (no extras) or pre-cascade legacy data. */
+  lines?: { sku: string; qty: number; attrs?: Record<string, unknown> | null }[];
   /** Optional preselect (used when proto auto-issued for a known supplier). */
   supplierId?: string;
   /** Pre-selected destination warehouse. */
@@ -199,6 +202,11 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     prefill.dl != null ||
     (prefill.dlRefs != null && prefill.dlRefs.length > 0);
   const [stockpile, setStockpile] = useState<boolean>(false);
+  // 0076 (Loo 2026-05-10): per-variant split. OFF (default) = one combined PO
+  // per supplier (bedframe workflow — multi-color in same PO). ON = one PO
+  // per (supplier, sku, attrs) tuple (sofa workflow — HoOKkA needs separate
+  // POs per fabric for production). Operator picks per situation.
+  const [splitPerVariant, setSplitPerVariant] = useState<boolean>(false);
 
   const suppliers = suppliersQ.data?.suppliers ?? [];
   const warehouses = warehousesQ.data?.warehouses ?? [];
@@ -263,10 +271,12 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     return { cost: skuObj.cost, costSource: "catalog" };
   };
 
-  // 0073/0074 — prefill carries sku only. Derive modelId for the cascade,
-  // and pull cost from product_skus.cost (fixed per Loo Q5=a). attrs starts
-  // null; bedframe/sofa lines flag red until the operator completes the
-  // cascade (Q2=A).
+  // 0073/0074 — prefill carries sku + qty + optional attrs. Derive modelId
+  // for the cascade and pull cost from product_skus.cost (fixed per Loo
+  // Q5=a). 0076 (Loo 2026-05-10): when prefill.lines includes attrs (auto-
+  // fill from shortage now does), carry it through so bedframe/sofa cascade
+  // pre-fills and the operator doesn't have to re-pick. Mattress lines pass
+  // attrs undefined → null, which is correct.
   const initialLines: DraftLine[] = useMemo(() => {
     if (prefill.lines && prefill.lines.length > 0) {
       return prefill.lines.map((l) => {
@@ -277,7 +287,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           qty: l.qty,
           cost: cs.cost,
           costSource: cs.costSource,
-          attrs: null,
+          attrs: l.attrs ?? null,
         };
       });
     }
@@ -406,11 +416,15 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       }
       // Q3=A — override (replace), not append. Q2-extended — line.qty equals
       // the literal shortfall (need - available), as returned by the server.
-      // 0073: derive modelId from sku; attrs left null so bedframe/sofa lines
-      // surface as red-flagged "missing color/gap/fabric" until the operator
-      // completes the cascade inline (Loo Q2=A 2026-05-09).
+      // 0073: derive modelId from sku.
       // 0074: cost auto-fills from product_skus.cost (Loo Q5=a 2026-05-09);
-      // SKUs without a configured cost flag red and block submit.
+      //       SKUs without a configured cost flag red and block submit.
+      // 0076 (Loo 2026-05-10): attrs now comes from the server response (the
+      //       per-(sku, attrs) aggregation), so bedframe color/gap and sofa
+      //       fabric pre-fill from the source order_lines.attrs instead of
+      //       forcing the operator to re-pick. attrs is `Record<string,
+      //       unknown> | null`; we cast through unknown because DraftLine's
+      //       attrs is the same nullable record shape.
       setLines(
         data.shortage.map((s) => {
           const cs = lineCostFromSku(s.sku);
@@ -420,7 +434,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             qty: s.shortage,
             cost: cs.cost,
             costSource: cs.costSource,
-            attrs: null,
+            attrs: s.attrs,
           };
         }),
       );
@@ -601,28 +615,62 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     partnersOk &&
     !isPending;
 
-  const skuSet = new Set(lines.map((l) => l.sku));
-  const dup = skuSet.size !== lines.length;
+  // 0076: dup detection keys on (sku, attrs canonical) so multi-variant
+  // bedframe lines (same SKU, different colors) aren't falsely flagged.
+  // True duplicates (same SKU + same attrs) still warn — those would crash
+  // on the new (po_id, sku, coalesce(attrs::text,'')) unique index.
+  const canonAttrs = (a: Record<string, unknown> | null | undefined): string => {
+    if (a == null) return "";
+    const keys = Object.keys(a).sort();
+    const ordered: Record<string, unknown> = {};
+    for (const k of keys) ordered[k] = a[k];
+    return JSON.stringify(ordered);
+  };
+  const variantSet = new Set(lines.map((l) => `${l.sku} ${canonAttrs(l.attrs)}`));
+  const dup = variantSet.size !== lines.length;
   const totalUnits = lines.reduce((s, l) => s + (l.qty || 0), 0);
-  const willSplit = groups.groups.length > 1;
+
+  // 0076 (Loo 2026-05-10) — `issuanceGroups` is the post-split normalized list
+  // of POs to be created. OFF (default): one entry per supplier (existing
+  // bedframe behavior). ON: one entry per (supplier, sku, attrs) tuple — the
+  // sofa workflow where HoOKkA needs separate POs per fabric.
+  const issuanceGroups = useMemo(() => {
+    if (!splitPerVariant) return groups.groups;
+    const out: typeof groups.groups = [];
+    for (const g of groups.groups) {
+      const byVariant = new Map<string, typeof g.lines>();
+      for (const l of g.lines) {
+        const key = `${l.sku}${canonAttrs(l.attrs)}`;
+        if (!byVariant.has(key)) byVariant.set(key, []);
+        byVariant.get(key)!.push(l);
+      }
+      for (const lines of byVariant.values()) {
+        out.push({ supplier: g.supplier, lines });
+      }
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups.groups, splitPerVariant]);
+
+  const willSplit = issuanceGroups.length > 1;
 
   async function submit() {
     if (!valid) return;
     try {
-      const n = groups.groups.length;
+      const n = issuanceGroups.length;
       // T29: emit cost + costSource per line. valid-form gate ensures both
       // are non-null at this point — `!` non-null assertion mirrors the
       // submit-time invariant (validation guard above blocks submit otherwise).
       // The API edge reshapes camelCase `costSource` → snake_case `cost_source`
       // before the RPC call.
       if (n === 1) {
-        // Single supplier group → keep using the existing single-PO RPC.
+        // Single PO → keep using the existing single-PO RPC.
         // This preserves the legacy contract (logistics_create_po) for the
         // common case and avoids touching tests that assert this path.
         // v3-S4.5: stockpile mode forces dl/dlRefs out of the payload —
         // backend RPC accepts NULL for both (= "this PO covers no specific
         // customer order"). Spread guards apply only when NOT stockpile.
-        const g = groups.groups[0];
+        const g = issuanceGroups[0];
         await create.mutateAsync({
           supplierId: g.supplier.id,
           warehouseId: warehouseFor(g.supplier),
@@ -642,13 +690,13 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           `PO issued · ${lines.length} line${lines.length === 1 ? "" : "s"} · ${totalUnits} units`,
         );
       } else {
-        // 2+ supplier groups → atomic batch RPC. Each entry carries its own
-        // warehouse pick. dl_refs (if present) propagates onto every PO since
-        // a bundle PO is always cross-order. dl (single) doesn't apply when
-        // splitting — the batch RPC's helper is bundle-shaped only.
-        // v3-S4.5: same stockpile carve-out as the single-supplier branch.
+        // 2+ POs → atomic batch RPC. Each entry carries its own warehouse
+        // pick. dl_refs (if present) propagates onto every PO since a bundle
+        // PO is always cross-order. dl (single) doesn't apply when splitting
+        // — the batch RPC's helper is bundle-shaped only.
+        // v3-S4.5: same stockpile carve-out as the single-PO branch.
         await createBatch.mutateAsync({
-          pos: groups.groups.map((g) => ({
+          pos: issuanceGroups.map((g) => ({
             supplierId: g.supplier.id,
             warehouseId: warehouseFor(g.supplier),
             lines: g.lines.map((l) => ({
@@ -732,6 +780,26 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             Stockpile
           </span>
         )}
+      </div>
+
+      {/* 0076 (Loo 2026-05-10) — Split per variant. Sofa workflow needs one PO
+          per fabric (HoOKkA's production constraint); bedframe stays combined.
+          Operator chooses at submit time — no auto-detection. */}
+      <div className="mb-3 flex items-center gap-2 text-[12px] font-body">
+        <input
+          id="split-per-variant-toggle"
+          data-testid="split-per-variant-toggle"
+          type="checkbox"
+          checked={splitPerVariant}
+          onChange={(e) => setSplitPerVariant(e.target.checked)}
+          className="h-3.5 w-3.5"
+        />
+        <label htmlFor="split-per-variant-toggle" className="select-none">
+          <strong>Split per variant</strong>
+          <span className="text-base-600">
+            {" "}(one PO per (sku + color/gap/fabric) — use for sofa)
+          </span>
+        </label>
       </div>
 
       <div className="text-[12px] text-base-600 mb-3 font-body">
@@ -1142,15 +1210,17 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             border: "1px solid rgba(58,89,131,.25)",
           }}
         >
-          <strong>Auto-split:</strong> this PO will be issued as{" "}
-          <strong>{groups.groups.length} separate POs</strong> — one per
-          supplier.{" "}
-          {groups.groups
-            .map(
-              (g) =>
-                `${g.supplier.name} (${g.lines.length} line${g.lines.length === 1 ? "" : "s"})`,
-            )
-            .join(" · ")}
+          <strong>{splitPerVariant ? "Per-variant split:" : "Auto-split:"}</strong>{" "}
+          this will be issued as{" "}
+          <strong>{issuanceGroups.length} separate POs</strong> —{" "}
+          {splitPerVariant ? "one per (sku + attrs)" : "one per supplier"}.{" "}
+          {!splitPerVariant &&
+            groups.groups
+              .map(
+                (g) =>
+                  `${g.supplier.name} (${g.lines.length} line${g.lines.length === 1 ? "" : "s"})`,
+              )
+              .join(" · ")}
         </div>
       )}
 

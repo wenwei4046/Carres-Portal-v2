@@ -1418,6 +1418,11 @@ export interface LogisticsPoListRow {
   eta_date: string | null;
   placed_at: string;
   purchase_order_lines: {
+    // 0076 (Loo 2026-05-10): line UUID — primary key after migration. Used
+    // by ReceivePOModal as the recv-state key (replacing sku) so multi-
+    // variant lines (same SKU different colors/fabrics) don't collide. Also
+    // the lookup key for logistics_receive_po_with_do.
+    id: string;
     sku: string;
     qty: number;
     received_qty: number;
