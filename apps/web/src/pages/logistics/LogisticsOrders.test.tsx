@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import LogisticsOrders from "./LogisticsOrders";
 import type {
   LogisticsOrdersListResponse,
@@ -83,13 +83,21 @@ vi.mock("@/lib/queries", async () => {
   };
 });
 
-function wrap(node: React.ReactNode) {
+function wrap(node: React.ReactNode, initialPath = "/logistics/orders") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  // 2026-05-10: OrderDetailDrawer uses useNavigate (jump to procurement on
-  // "+ Issue POs"). Tests need a Router context for that hook to mount.
+  // 2026-05-10 redesign: LogisticsOrders is now URL-driven (Overall vs
+  // per-stage). Mount under a Routes table so `useParams<{ stage }>()` reads
+  // the slug from the URL the same way LogisticsApp wires it in production.
+  // Tests start at the Overall path by default; pass `initialPath` to land
+  // on a specific stage page.
   return (
     <QueryClientProvider client={qc}>
-      <MemoryRouter>{node}</MemoryRouter>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <Routes>
+          <Route path="/logistics/orders" element={node} />
+          <Route path="/logistics/orders/:stage" element={node} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>
   );
 }
@@ -220,42 +228,85 @@ describe("LogisticsOrders — kanban", () => {
     expect(screen.getByTestId("stage-column-delivered")).toBeInTheDocument();
   });
 
-  it("2. stage filter chip narrows visible orders to that stage", () => {
+  it("2. clicking a pipeline chip navigates to the per-stage page (URL + view both update)", () => {
     setLoaded([
       makeOrder({ id: "a", dl: 1, logistics_stage: "awaiting_logistics_action", customer_name: "Awaiting" }),
       makeOrder({ id: "b", dl: 2, logistics_stage: "ready_to_dispatch", customer_name: "Ready" }),
     ]);
     render(wrap(<LogisticsOrders />));
+    // Overall view shows BOTH orders (kanban with all 6 columns).
     expect(screen.getByText("Awaiting")).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
 
-    // Click the "Ready to Dispatch · 1" chip
-    fireEvent.click(screen.getByRole("tab", { name: /Ready to Dispatch · 1/ }));
+    // Click chip → Link nav to /logistics/orders/ready_to_dispatch.
+    fireEvent.click(screen.getByTestId("pipeline-chip-ready_to_dispatch"));
+
+    // Stage page now shows only the ready order; the awaiting one is hidden.
+    expect(screen.getByTestId("stage-page-ready_to_dispatch")).toBeInTheDocument();
     expect(screen.queryByText("Awaiting")).not.toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
+    // Banner reflects the count for that stage.
+    expect(screen.getByTestId("stage-banner-count-ready_to_dispatch").textContent).toBe("1");
   });
 
-  it("3. channel filter dropdown has dealers + showrooms options", () => {
-    setLoaded([makeOrder({ id: "a" })]);
+  it("3. pipeline header renders all 7 chips (Overall + 6 stages) with correct counts", () => {
+    setLoaded([
+      makeOrder({ id: "a", logistics_stage: "awaiting_logistics_action" }),
+      makeOrder({ id: "b", logistics_stage: "awaiting_logistics_action" }),
+      makeOrder({ id: "c", logistics_stage: "delivered" }),
+    ]);
     render(wrap(<LogisticsOrders />));
-    const select = screen.getByLabelText(/Sales channel filter/);
-    expect(select).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /All sales channels/ })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /^Dealers$/ })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /^Showrooms$/ })).toBeInTheDocument();
+    // All 7 chips present.
+    expect(screen.getByTestId("pipeline-chip-overall")).toBeInTheDocument();
+    expect(screen.getByTestId("pipeline-chip-placed")).toBeInTheDocument();
+    expect(screen.getByTestId("pipeline-chip-proceed_request")).toBeInTheDocument();
+    expect(screen.getByTestId("pipeline-chip-awaiting_logistics_action")).toBeInTheDocument();
+    expect(screen.getByTestId("pipeline-chip-ready_to_dispatch")).toBeInTheDocument();
+    expect(screen.getByTestId("pipeline-chip-dispatched")).toBeInTheDocument();
+    expect(screen.getByTestId("pipeline-chip-delivered")).toBeInTheDocument();
+    // Counts reflect the loaded orders.
+    expect(
+      screen.getByTestId("pipeline-chip-awaiting_logistics_action").textContent,
+    ).toMatch(/2/);
+    expect(screen.getByTestId("pipeline-chip-delivered").textContent).toMatch(/1/);
+    // Overall sums to 3.
+    expect(screen.getByTestId("pipeline-chip-overall").textContent).toMatch(/3/);
   });
 
-  it("4. search input updates and the filter chip count reflects the full list", () => {
+  it("4. search input updates state (header search box, new aria label)", () => {
     setLoaded([
       makeOrder({ id: "a", dl: 9001, customer_name: "Alice" }),
       makeOrder({ id: "b", dl: 9002, customer_name: "Bob" }),
     ]);
     render(wrap(<LogisticsOrders />));
-    const search = screen.getByLabelText(/Search orders/);
+    const search = screen.getByLabelText(/Search by order ID/);
     fireEvent.change(search, { target: { value: "9001" } });
-    // We do client-side stage filtering only — the server-side search is
-    // exercised via the URL query param. Confirm the input took the value.
     expect((search as HTMLInputElement).value).toBe("9001");
+  });
+
+  it("4b. landing on /logistics/orders/:stage directly renders the stage page (deep-link)", () => {
+    setLoaded([
+      makeOrder({ id: "a", logistics_stage: "delivered", customer_name: "DeepLink" }),
+      makeOrder({ id: "b", logistics_stage: "awaiting_logistics_action", customer_name: "OtherStage" }),
+    ]);
+    render(wrap(<LogisticsOrders />, "/logistics/orders/delivered"));
+    expect(screen.getByTestId("stage-page-delivered")).toBeInTheDocument();
+    // Banner copy reflects the stage description.
+    expect(screen.getByTestId("stage-banner-delivered").textContent).toMatch(
+      /DO on file/i,
+    );
+    // Other stage's order is filtered out.
+    expect(screen.queryByText("OtherStage")).not.toBeInTheDocument();
+    expect(screen.getByText("DeepLink")).toBeInTheDocument();
+  });
+
+  it("4c. stage page with no matching orders shows the empty state", () => {
+    setLoaded([
+      makeOrder({ id: "a", logistics_stage: "awaiting_logistics_action" }),
+    ]);
+    render(wrap(<LogisticsOrders />, "/logistics/orders/dispatched"));
+    expect(screen.getByTestId("stage-empty-state")).toBeInTheDocument();
+    expect(screen.getByText(/No orders in this stage/i)).toBeInTheDocument();
   });
 
   it("5. clicking an order card opens the detail drawer", () => {

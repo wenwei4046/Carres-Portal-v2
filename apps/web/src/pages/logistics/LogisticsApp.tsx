@@ -32,35 +32,44 @@ export default function LogisticsApp() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Detect URL-driven procurement section. Anything under `/logistics/procurement`
-  // (with or without slug) flips the sidebar highlight to "procurement" without
-  // mutating the tab state for the other slots. The URL is the source of truth
-  // for procurement; the tab state is the source of truth for everything else.
+  // Detect URL-driven sections. Anything under `/logistics/procurement` or
+  // `/logistics/orders` flips the sidebar highlight to that tab without
+  // mutating the tab state for the other slots. The URL is the source of
+  // truth for procurement + orders; the tab state owns everything else.
+  //
+  // 2026-05-10 — orders joined the URL-driven set as part of the pipeline
+  // redesign so per-stage chip nav can route to `/logistics/orders/:stage`
+  // (refresh / share / back+forward all preserve the stage selection).
   const isProcurementUrl = location.pathname.startsWith(
     "/logistics/procurement",
   );
+  const isOrdersUrl = location.pathname.startsWith("/logistics/orders");
+  const isUrlDriven = isProcurementUrl || isOrdersUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   const [movementsPrefill, setMovementsPrefill] = useState<
     Partial<MovementsFilters> | undefined
   >(undefined);
 
-  // When the URL leaves the procurement section (e.g. user navigated via Back
+  // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/logistics`), make sure the local tab state has a sensible value so
   // the conditional render below picks SOMETHING. Default back to dashboard
-  // unless tab state already points at a non-procurement slot.
+  // unless tab state already points at a non-URL-driven slot.
   useEffect(() => {
     if (!isProcurementUrl && tab === "procurement") {
       setTab("dashboard");
     }
-  }, [isProcurementUrl, tab]);
+    if (!isOrdersUrl && tab === "orders") {
+      setTab("dashboard");
+    }
+  }, [isProcurementUrl, isOrdersUrl, tab]);
 
   function goMovements(prefill?: Partial<MovementsFilters>) {
     setMovementsPrefill(prefill);
     setTab("movements");
-    // Leave the procurement URL if we were inside it — otherwise the nested
-    // <Routes> below would keep showing TabbedProcurementShell.
-    if (isProcurementUrl) {
+    // Leave any URL-driven section if we were inside one — otherwise the
+    // nested <Routes> below would keep showing that page.
+    if (isUrlDriven) {
       navigate("/logistics");
     }
   }
@@ -68,18 +77,21 @@ export default function LogisticsApp() {
   /**
    * Single tab-change entry point used by both the sidebar and child pages
    * (LogisticsDashboard's KPI tiles + side cards still call
-   * `setTab("procurement")` per the established prop contract). Procurement
-   * is URL-driven now, so any "procurement" target gets translated into a
-   * `navigate('/logistics/procurement')` call instead of mutating local state
-   * — the missing-slug redirect inside `TabbedProcurementShell` then carries
-   * the user to the default channel (`nice-future`). Every other tab keeps
-   * the original useState pattern so the rest of the shell is unchanged.
+   * `setTab("procurement")` per the established prop contract). URL-driven
+   * tabs (procurement, orders) get translated into a `navigate(...)` call so
+   * the nested Routes below render the right shell — the missing-slug
+   * redirect inside `TabbedProcurementShell` carries procurement to the
+   * default channel; LogisticsOrders interprets a missing `:stage` as
+   * the Overall layout. Every other tab keeps the original useState pattern.
    */
   function changeTab(next: string) {
     if (next === "procurement") {
       navigate("/logistics/procurement");
-      // Switching to procurement also discards any pending movements prefill,
-      // matching the original sidebar behaviour.
+      setMovementsPrefill(undefined);
+      return;
+    }
+    if (next === "orders") {
+      navigate("/logistics/orders");
       setMovementsPrefill(undefined);
       return;
     }
@@ -88,15 +100,20 @@ export default function LogisticsApp() {
     // pending prefill so re-entering the tab starts fresh.
     if (next !== "movements") setMovementsPrefill(undefined);
     setTab(next);
-    // Leave any procurement URL behind so the nested <Routes> stops matching.
-    if (isProcurementUrl) {
+    // Leave any URL-driven section behind so the nested <Routes> stops
+    // matching.
+    if (isUrlDriven) {
       navigate("/logistics");
     }
   }
 
-  // The sidebar highlight follows the URL when we're in procurement; for every
-  // other slot it follows the local tab state.
-  const activeTab = isProcurementUrl ? "procurement" : tab;
+  // The sidebar highlight follows the URL when we're in a URL-driven section;
+  // for every other slot it follows the local tab state.
+  const activeTab = isProcurementUrl
+    ? "procurement"
+    : isOrdersUrl
+      ? "orders"
+      : tab;
 
   return (
     <div
@@ -108,16 +125,24 @@ export default function LogisticsApp() {
     >
       <LogisticsSidebar active={activeTab} onChange={changeTab} />
       <main className="min-w-0 overflow-auto bg-base-50">
-        {isProcurementUrl ? (
-          // Nested route table for `/logistics/procurement[/:slug]`. Both the
-          // bare and slugged paths mount the same shell — the shell internally
-          // dispatches on `useParams<{ slug? }>()` and `<Navigate replace>`
+        {isUrlDriven ? (
+          // Nested route table for the URL-driven sections.
+          //
+          // Procurement (`/logistics/procurement[/:slug]`) — both the bare and
+          // slugged paths mount `TabbedProcurementShell`; the shell dispatches
+          // internally on `useParams<{ slug? }>()` and `<Navigate replace>`
           // sends invalid/missing slugs to the default tab (`nice-future`).
           //
-          // Paths are RELATIVE because this is a descendant `<Routes>` mounted
-          // inside App.tsx's `<Route path="/logistics/*">`. React Router 7
-          // matches descendant route paths relative to the parent route's
-          // matched portion. Absolute paths (`/logistics/procurement`) silently
+          // Orders (`/logistics/orders[/:stage]`) — the redesign mounts the
+          // same `LogisticsOrders` shell for both. With `:stage` missing it
+          // renders the Overall (6-col) kanban; with `:stage` set it renders
+          // the per-stage banner + card list. Invalid stage slugs fall back
+          // to Overall (parseStageParam guard inside LogisticsOrders).
+          //
+          // Paths are RELATIVE because this is a descendant `<Routes>`
+          // mounted inside App.tsx's `<Route path="/logistics/*">`. React
+          // Router 7 matches descendant route paths relative to the parent's
+          // matched portion. Absolute paths (`/logistics/orders`) silently
           // fail to match here even though the URL string is identical — the
           // result is the main area renders nothing while the URL stays put.
           <Routes>
@@ -126,11 +151,12 @@ export default function LogisticsApp() {
               path="procurement/:slug"
               element={<TabbedProcurementShell />}
             />
+            <Route path="orders" element={<LogisticsOrders />} />
+            <Route path="orders/:stage" element={<LogisticsOrders />} />
           </Routes>
         ) : (
           <>
             {tab === "dashboard" && <LogisticsDashboard setTab={changeTab} />}
-            {tab === "orders" && <LogisticsOrders />}
             {tab === "warehouse" && (
               <LogisticsWarehouse setTab={changeTab} goMovements={goMovements} />
             )}

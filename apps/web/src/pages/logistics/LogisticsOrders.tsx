@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import {
   useLogisticsOrders,
   type LogisticsOrderListRow,
@@ -7,23 +8,31 @@ import CreatePOModal, {
   type CreatePoPrefill,
 } from "./components/CreatePOModal";
 import OrderColumn from "./components/OrderColumn";
+import OrderCard from "./components/OrderCard";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import CrossOrderBundleSheet from "./components/CrossOrderBundleSheet";
 import ResumeFromWaitingDialog from "./components/ResumeFromWaitingDialog";
+import PipelineHeader, {
+  PIPELINE_STAGE_LABELS,
+  type PipelineSubFilter,
+} from "./components/PipelineHeader";
+import StageBanner, { STAGE_DESCRIPTIONS } from "./components/StageBanner";
 import type { LogisticsStage } from "./components/StageChip";
 
 /**
- * LogisticsOrders — full kanban view for the HQ logistics role.
+ * LogisticsOrders — pipeline shell for `/logistics/orders[/:stage]`.
  *
- * Mirrors `reference/proto/logistics-orders.jsx` `LogisticsOrders`
- * (lines 1-138) with Pipeline v2 (Phase 4 C3) extensions:
- *   - Header (Pipeline kicker + count strap + search + dealer/showroom select)
- *   - Stage filter chips (All + 6 stage chips with counts)
- *   - Bulk action bar when ≥1 awaiting_logistics_action orders selected
- *   - 6-column kanban (placed / proceed_request / awaiting_logistics_action /
- *     ready_to_dispatch / dispatched / delivered) with click-to-expand
- *     (the active column gets `flex: 4`, others compress to `flex: 0.4`)
- *   - OrderDetailDrawer overlay when an order is opened
+ * Two layouts share this component, picked from the URL via `useParams`:
+ *
+ *  - **Overall** (URL `/logistics/orders`, no `:stage` param) — 6-column
+ *    Pipeline v2 kanban. Click-to-expand columns are preserved (Phase 4
+ *    C3.2: focused column gets `flex:4`, siblings shrink to `flex:0.4`).
+ *    Cross-order bundle bar surfaces when ≥1 awaiting_logistics_action
+ *    order is selected.
+ *
+ *  - **Single-stage** (URL `/logistics/orders/:stage`) — banner + full-width
+ *    `OrderCard` list for the picked stage. Empty-state when count is zero.
+ *    Stage-specific bundle bar still surfaces on the awaiting page.
  *
  * Pipeline v2 LOGISTICS_FLOW (mirrors proto + C1 enum extension):
  *   placed                       → "Awaiting request"        · action null
@@ -33,9 +42,17 @@ import type { LogisticsStage } from "./components/StageChip";
  *   dispatched                   → "With delivery partner"   · action "Attach DO"
  *   delivered                    → "DO on file"              · action null
  *
- * Filtering: stage + channel both go to the server (cache key respects them);
- * `search` also goes to the server (the route's regex-whitelisted search field
- * matches customer_name ILIKE + dl numeric exact).
+ * 2026-05-10 redesign carry-forwards (Loo's call to ship V1 thin):
+ *   - phase-pipeline-running-late-filter — sub-filter chip is visible but
+ *     inert; needs `eta_date < now() AND stage != 'delivered'` filter.
+ *   - phase-pipeline-last-24h-filter — same; needs `updated_at` window.
+ *   - phase-pipeline-quick-action / -alerts / -help — header buttons inert.
+ *   - phase-pipeline-multi-criteria-filter / -export — buttons inert.
+ *   - phase-pipeline-resume-mode-restore — the prior "At Warehouse Waiting"
+ *     filter chip + ResumeFromWaitingDialog routing was dropped from the
+ *     header for layout simplicity. The dialog still mounts when something
+ *     calls `setResumeFor(dl)`, but no UI surfaces it today. Re-add as a
+ *     ready_to_dispatch detail-drawer action when Loo needs it back.
  */
 const LOGISTICS_FLOW: ReadonlyArray<{
   key: LogisticsStage;
@@ -51,42 +68,41 @@ const LOGISTICS_FLOW: ReadonlyArray<{
   { key: "delivered",         label: "Delivered",         hint: "DO on file",              action: null },
 ];
 
-type StageFilter = "all" | LogisticsStage;
-type ChannelFilter = "all" | "dealers" | "showrooms";
+const ALL_STAGE_KEYS = new Set<LogisticsStage>(LOGISTICS_FLOW.map((s) => s.key));
+
+function parseStageParam(raw: string | undefined): LogisticsStage | null {
+  if (!raw) return null;
+  return ALL_STAGE_KEYS.has(raw as LogisticsStage)
+    ? (raw as LogisticsStage)
+    : null;
+}
 
 export default function LogisticsOrders() {
-  const [stage, setStage] = useState<StageFilter>("all");
-  const [channel, setChannel] = useState<ChannelFilter>("all");
+  // The route is mounted at both `/logistics/orders` and
+  // `/logistics/orders/:stage` — undefined `stage` means the Overall layout.
+  // Invalid `:stage` values fall back to Overall too (parseStageParam guard);
+  // a noisier 404 isn't worth it because the chip nav above never produces
+  // an invalid slug — the only way to land here is a hand-edited URL.
+  const params = useParams<{ stage?: string }>();
+  const activeStage = parseStageParam(params.stage);
+
   const [search, setSearch] = useState("");
+  const [subFilter, setSubFilter] = useState<PipelineSubFilter>("all");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [selectedDls, setSelectedDls] = useState<Set<number>>(() => new Set());
   const [bundlePrefill, setBundlePrefill] = useState<CreatePoPrefill | null>(
     null,
   );
-  // Pipeline v2 (C3) expand-to-zoom: clicking a column header focuses it (flex:4)
-  // while the others compress (flex:0.4). Click again to collapse. Clicking a
-  // different column flips focus instantly (no need to collapse first).
+  // Pipeline v2 (C3) expand-to-zoom — Overall view only.
   const [expandedStage, setExpandedStage] = useState<LogisticsStage | null>(null);
-  // Phase 4.5 Chunk 1 (Task 36): "At Warehouse Waiting" filter mode. When on,
-  // narrows the kanban to orders whose threads are parked at
-  // `at_warehouse_waiting` (post partner-rejection ⇢ relocate). The list-row
-  // payload doesn't carry per-PO `sup_status`, so we approximate by using the
-  // order-level rollup `logistics_stage='ready_to_dispatch'` (per migration
-  // 0047 amend, 'waiting' threads roll up to that stage). Clicking a card in
-  // this mode opens ResumeFromWaitingDialog instead of the detail drawer.
-  // Deviation noted: this is a superset filter — orders that legitimately sit
-  // at `ready_to_dispatch` (no waiting threads) will also surface here. The RPC
-  // itself is a no-op when no threads are in 'waiting', so the worst-case is a
-  // harmless click (no audit-log entry, no state change).
-  const [resumeMode, setResumeMode] = useState(false);
+  // Resume from waiting (Phase 4.5a Task 36) — dialog only; no header chip in
+  // V1 of the redesign. See top docstring carry-forward note.
   const [resumeFor, setResumeFor] = useState<number | null>(null);
 
-  // The server applies stage + channel + search; we still fetch the full list
-  // for the per-column filter chips (which need ALL stage counts even when a
-  // stage filter is active). To get "All · N" + each stage's count, the
-  // simplest fix is to ALWAYS fetch with stage='all' and filter client-side.
+  // Server applies search; we always fetch the full list and bucket
+  // client-side so chip badges show every stage's count even when the active
+  // page narrows the visible orders.
   const { data, isLoading, isError, error, refetch } = useLogisticsOrders({
-    channel: channel === "all" ? undefined : channel,
     search: search.trim() || undefined,
   });
 
@@ -121,17 +137,6 @@ export default function LogisticsOrders() {
     return counts;
   }, [allOrders]);
 
-  const visibleOrders = useMemo(() => {
-    // Resume mode (Task 36) takes precedence over stage chips: narrow to the
-    // ready_to_dispatch rollup, where orders with `waiting` threads surface
-    // (per migration 0047 rollup amend). See `resumeMode` comment above.
-    if (resumeMode) {
-      return allOrders.filter((o) => stageOf(o) === "ready_to_dispatch");
-    }
-    if (stage === "all") return allOrders;
-    return allOrders.filter((o) => stageOf(o) === stage);
-  }, [allOrders, stage, resumeMode]);
-
   const ordersByStage = useMemo(() => {
     const buckets: Record<LogisticsStage, LogisticsOrderListRow[]> = {
       placed: [],
@@ -141,9 +146,9 @@ export default function LogisticsOrders() {
       dispatched: [],
       delivered: [],
     };
-    for (const o of visibleOrders) buckets[stageOf(o)].push(o);
+    for (const o of allOrders) buckets[stageOf(o)].push(o);
     return buckets;
-  }, [visibleOrders]);
+  }, [allOrders]);
 
   const toggleSelect = (dl: number) => {
     setSelectedDls((prev) => {
@@ -155,9 +160,15 @@ export default function LogisticsOrders() {
   };
   const clearSelected = () => setSelectedDls(new Set());
 
+  // Bundle eligibility — only awaiting_logistics_action orders can be bundled
+  // into a single PO. We restrict the selectable IDs server-side via the
+  // bundle CTA, so a stale selection from another stage never reaches the
+  // server (defence-in-depth on top of the OrderCard's `selectable` gate).
   const selectedOrderIds = useMemo(() => {
     return allOrders
-      .filter((o) => selectedDls.has(o.dl) && stageOf(o) === "awaiting_logistics_action")
+      .filter(
+        (o) => selectedDls.has(o.dl) && stageOf(o) === "awaiting_logistics_action",
+      )
       .map((o) => o.id);
   }, [allOrders, selectedDls]);
 
@@ -179,7 +190,7 @@ export default function LogisticsOrders() {
 
   if (isLoading) {
     return (
-      <div className="px-9 py-8 pb-14">
+      <div className="px-9 py-7 pb-14">
         <KanbanSkeleton />
       </div>
     );
@@ -187,7 +198,7 @@ export default function LogisticsOrders() {
 
   if (isError) {
     return (
-      <div className="px-9 py-8 pb-14">
+      <div className="px-9 py-7 pb-14">
         <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm">
           <div className="text-destructive font-semibold mb-2">
             Couldn&rsquo;t load orders
@@ -207,89 +218,33 @@ export default function LogisticsOrders() {
     );
   }
 
-  const totalIncoming = allOrders.length;
+  // Per-stage labels needed by StageBanner (numeric prefix + short label).
+  const stageMeta = activeStage
+    ? PIPELINE_STAGE_LABELS.find((s) => s.slug === activeStage) ?? null
+    : null;
+
+  // Bundle bar visible on Overall (any selected) + Awaiting stage page.
+  const bundleBarApplies =
+    activeStage === null || activeStage === "awaiting_logistics_action";
 
   return (
-    <div className="px-9 py-7">
-      {/* Header */}
-      <div className="flex justify-between items-start mb-[22px] gap-4 flex-wrap">
-        <div>
-          <div className="kicker">Orders</div>
-          <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
-            Pipeline
-          </h1>
-          <div className="font-body text-[13px] text-base-600 mt-1">
-            {visibleOrders.length} of {totalIncoming} orders shown
-          </div>
-        </div>
-        <div className="flex gap-2.5 items-center flex-wrap">
-          <input
-            type="search"
-            placeholder="Search #DL or customer…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search orders by DL number or customer name"
-            className="px-3.5 py-2 border border-base-300 rounded-[4px] text-[13px] min-w-[220px] outline-none focus:border-base-500"
-          />
-          <select
-            value={channel}
-            onChange={(e) => setChannel(e.target.value as ChannelFilter)}
-            aria-label="Sales channel filter"
-            className="px-3 py-2 border border-base-300 rounded-[4px] text-[13px] bg-white outline-none focus:border-base-500"
-          >
-            <option value="all">All sales channels</option>
-            <option value="dealers">Dealers</option>
-            <option value="showrooms">Showrooms</option>
-          </select>
-        </div>
-      </div>
+    <div className="px-9 py-7" data-testid="logistics-orders">
+      <PipelineHeader
+        stageCounts={stageCounts}
+        activeStage={activeStage}
+        subFilter={subFilter}
+        onSubFilterChange={setSubFilter}
+        search={search}
+        onSearchChange={setSearch}
+      />
 
-      {/* Stage filter chips */}
-      <div
-        className="flex gap-1.5 mb-[18px] flex-wrap"
-        role="tablist"
-        aria-label="Stage filter"
-      >
-        <FilterChip
-          active={!resumeMode && stage === "all"}
-          label={`All · ${totalIncoming}`}
-          onClick={() => {
-            setResumeMode(false);
-            setStage("all");
-          }}
-        />
-        {LOGISTICS_FLOW.map((s) => (
-          <FilterChip
-            key={s.key}
-            active={!resumeMode && stage === s.key}
-            label={`${s.label} · ${stageCounts[s.key]}`}
-            onClick={() => {
-              setResumeMode(false);
-              setStage(s.key);
-            }}
-          />
-        ))}
-        {/* Phase 4.5 Chunk 1 (Task 36) — At Warehouse Waiting resume chip.
-            See `resumeMode` state comment above for filter rationale. When
-            active, kanban rows route clicks to ResumeFromWaitingDialog. */}
-        <FilterChip
-          active={resumeMode}
-          label="At Warehouse Waiting"
-          onClick={() => setResumeMode((prev) => !prev)}
-        />
-      </div>
-
-      {/* Bulk-select action bar */}
-      {selectedOrderIds.length > 0 && (
+      {/* Bulk-select action bar — same wiring as before, just rendered
+          conditionally on stage so non-awaiting pages don't surface a stale
+          bundle CTA when a selection from another tab persists. */}
+      {bundleBarApplies && selectedOrderIds.length > 0 && (
         <CrossOrderBundleSheet
           selectedOrderIds={selectedOrderIds}
           onClear={clearSelected}
-          // M5.3 wires the bundle CTA to CreatePOModal. We pass the selected
-          // orders' DL numbers as `dlRefs` so the create-PO RPC ties the new
-          // PO back to all source orders. Line aggregation is left to the
-          // user — the proto NewPODialog accepts manual SKU picking; the
-          // client-side N-detail-fetch shortage rollup was deferred so the
-          // modal feels fast.
           onBundleClick={(orderIds) => {
             const dls = allOrders
               .filter((o) => orderIds.includes(o.id))
@@ -302,38 +257,81 @@ export default function LogisticsOrders() {
         />
       )}
 
-      {/* Kanban — flex row so each column can animate flex-basis on expand. */}
-      <div className="flex gap-3 items-stretch">
-        {LOGISTICS_FLOW.map((s) => (
-          <OrderColumn
-            key={s.key}
-            stage={s.key}
-            label={s.label}
-            hint={s.hint}
-            bucketAction={s.action}
-            orders={ordersByStage[s.key]}
-            selectedDls={selectedDls}
-            onToggleSelect={toggleSelect}
-            onOpenOrder={(id) => {
-              // Task 36: in resume mode, clicking a card opens the resume
-              // dialog (keyed by `dl`) instead of the detail drawer (keyed by
-              // `id`). Look up the dl from the loaded list.
-              if (resumeMode) {
-                const o = allOrders.find((x) => x.id === id);
-                if (o) setResumeFor(o.dl);
-                return;
+      {activeStage === null ? (
+        /* Overall — 6-col kanban (preserved from C3.2). */
+        <div
+          className="flex gap-3 items-stretch"
+          data-testid="overall-kanban"
+        >
+          {LOGISTICS_FLOW.map((s) => (
+            <OrderColumn
+              key={s.key}
+              stage={s.key}
+              label={s.label}
+              hint={s.hint}
+              bucketAction={s.action}
+              orders={ordersByStage[s.key]}
+              selectedDls={selectedDls}
+              onToggleSelect={toggleSelect}
+              onOpenOrder={(id) => setOpenOrderId(id)}
+              onSelectAll={() => selectAllInColumn(s.key)}
+              expanded={expandedStage === s.key}
+              anyExpanded={expandedStage !== null}
+              onToggleExpand={() =>
+                setExpandedStage((prev) => (prev === s.key ? null : s.key))
               }
-              setOpenOrderId(id);
-            }}
-            onSelectAll={() => selectAllInColumn(s.key)}
-            expanded={expandedStage === s.key}
-            anyExpanded={expandedStage !== null}
-            onToggleExpand={() =>
-              setExpandedStage((prev) => (prev === s.key ? null : s.key))
-            }
-          />
-        ))}
-      </div>
+            />
+          ))}
+        </div>
+      ) : (
+        /* Single-stage page — banner + full-width card list. */
+        <div data-testid={`stage-page-${activeStage}`}>
+          {stageMeta && (
+            <StageBanner
+              stage={activeStage}
+              num={stageMeta.num}
+              label={stageMeta.label}
+              description={STAGE_DESCRIPTIONS[activeStage]}
+              count={ordersByStage[activeStage].length}
+            />
+          )}
+          {ordersByStage[activeStage].length === 0 ? (
+            <div
+              data-testid="stage-empty-state"
+              className="rounded-[6px] border border-dashed border-base-200 bg-card py-16 text-center"
+            >
+              <div className="text-[12px] text-base-500 font-body uppercase tracking-[0.14em] mb-2">
+                Empty stage
+              </div>
+              <div className="text-[14px] text-base-700 font-body">
+                No orders in this stage
+              </div>
+            </div>
+          ) : (
+            <div
+              className="flex flex-col gap-2"
+              data-testid={`stage-list-${activeStage}`}
+            >
+              {ordersByStage[activeStage].map((o) => {
+                const action = LOGISTICS_FLOW.find(
+                  (s) => s.key === activeStage,
+                )?.action;
+                return (
+                  <OrderCard
+                    key={o.id}
+                    order={o}
+                    selectable={activeStage === "awaiting_logistics_action"}
+                    selected={selectedDls.has(o.dl)}
+                    onToggleSelect={() => toggleSelect(o.dl)}
+                    onOpen={() => setOpenOrderId(o.id)}
+                    actionHint={action ? `${action} →` : undefined}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {openOrderId && (
         <OrderDetailDrawer
@@ -357,33 +355,6 @@ export default function LogisticsOrders() {
         />
       )}
     </div>
-  );
-}
-
-function FilterChip({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={[
-        "px-3 py-1.5 rounded-[4px] text-[12px] transition-colors border",
-        active
-          ? "bg-base-900 text-white border-base-900 font-semibold"
-          : "bg-white text-base-700 border-base-200 font-medium hover:border-base-400",
-      ].join(" ")}
-    >
-      {label}
-    </button>
   );
 }
 
