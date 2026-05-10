@@ -81,6 +81,9 @@ function step3FilledDraft(): WizardDraft {
     mime: "image/png",
     dataUrl: TINY_PNG_DATAURL,
   };
+  // 2026-05-10 (Loo) — approval / reference code now required for every
+  // payment method (including online). Mirrors the new step3Valid gate.
+  d.payment.approvalCode = "FT2026050012345";
   d.wizardSessionId = "ddddddd1-dddd-dddd-dddd-dddddddddddd";
   d.paid = 1250;
   return d;
@@ -338,6 +341,20 @@ describe("step3Valid — Submit gate", () => {
     const d = step3FilledDraft();
     d.payment.slip = null;
     expect(step3Valid(d)).toBe(false);
+  });
+
+  // 2026-05-10 (Loo) — approval/reference code is now required for every
+  // payment method, including online. Pins the gate so a future "online
+  // doesn't need approval" regression doesn't slip through.
+  it("rejects online method when approval / reference code is blank", () => {
+    const d = step3FilledDraft();
+    d.payment.method = "online";
+    d.payment.approvalCode = "";
+    expect(step3Valid(d)).toBe(false);
+    d.payment.approvalCode = "AB";
+    expect(step3Valid(d)).toBe(false);
+    d.payment.approvalCode = "FT2026050012345";
+    expect(step3Valid(d)).toBe(true);
   });
 
   it("rejects credit method when approval code < 3 chars", () => {

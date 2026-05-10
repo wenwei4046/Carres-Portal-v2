@@ -66,9 +66,11 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
   // ---------- Submit-eligibility helpers (proto parity) ----------
   const hasSlip = !!draft.payment.slip;
   const hasApproval = draft.payment.approvalCode.trim().length >= 3;
+  // 2026-05-10 (Loo) — approval / reference code now required for every
+  // payment method (online used to skip this; finance couldn't reconcile).
   const paymentMethodOk =
     draft.payment.method === "online"
-      ? hasSlip
+      ? hasApproval && hasSlip
       : draft.payment.method === "credit"
         ? hasApproval && hasSlip
         : draft.payment.method === "installment"
@@ -82,9 +84,11 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
 
   function paymentBlockerLabel(): string | null {
     if (paymentMethodOk) return null;
-    if (draft.payment.method === "online") return "bank slip is attached";
-    if (!hasApproval && !hasSlip) return "approval code & slip are added";
-    if (!hasApproval) return "approval code is entered";
+    // 2026-05-10 (Loo) — online now also requires the bank reference code
+    // for finance reconciliation; same blocker hierarchy as the other
+    // methods (both → both, missing one → name it).
+    if (!hasApproval && !hasSlip) return "approval / reference code & slip are added";
+    if (!hasApproval) return "approval / reference code is entered";
     return "payment slip is attached";
   }
 
@@ -296,12 +300,29 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
         </div>
 
         {draft.payment.method === "online" && (
-          <PaymentSlipPicker
-            label="Bank slip / receipt photo *"
-            hint="Bank transfer slip, e-receipt screenshot, or DuitNow confirmation"
-            slip={draft.payment.slip}
-            onChange={(slip) => setPay({ slip })}
-          />
+          <div className="flex flex-col gap-3.5">
+            {/* 2026-05-10 (Loo) — bank reference / FT number is required so
+                finance can match the deposit on the bank statement. Was
+                previously hidden for online and the slip alone wasn't
+                enough — orders sat unprocessed until someone manually
+                chased the dealer for the reference. */}
+            <ApprovalCodeField
+              label="Bank reference number *"
+              value={draft.payment.approvalCode}
+              onChange={(v) =>
+                setPay({ approvalCode: v.replace(/[^0-9A-Za-z-]/g, "").toUpperCase() })
+              }
+              maxLength={32}
+              hint="Transaction reference from the bank slip / DuitNow confirmation (e.g. FT2026... / DN-...). Finance uses this to reconcile against the bank statement."
+              placeholder="e.g. FT2026050012345"
+            />
+            <PaymentSlipPicker
+              label="Bank slip / receipt photo *"
+              hint="Bank transfer slip, e-receipt screenshot, or DuitNow confirmation"
+              slip={draft.payment.slip}
+              onChange={(slip) => setPay({ slip })}
+            />
+          </div>
         )}
 
         {draft.payment.method === "credit" && (

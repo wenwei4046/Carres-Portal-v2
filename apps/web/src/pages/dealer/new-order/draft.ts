@@ -90,6 +90,13 @@ export interface WizardDraft {
     dateTbd: boolean;
     floor: number;
     hasLift: boolean;
+    // 2026-05-10 (Loo) — "As Fast As Possible" pill on Step1. When clicked,
+    // sets date = today + 20 days and flips this flag. After successful
+    // order create, the wizard auto-fires the Proceed mutation so the order
+    // skips the manual Place→Proceed click. If Proceed conditions aren't
+    // met (e.g. insufficient deposit), we surface the error and the order
+    // stays in 'place' for the dealer to top up + manually proceed.
+    asap?: boolean;
   };
   /** Step 2: products picked + addons toggled. Empty array = no products yet. */
   lines: DraftLine[];
@@ -130,7 +137,7 @@ export function emptyDraft(): WizardDraft {
       emergencyRelationship: "",
       emergencyRelationshipOther: "",
     },
-    delivery: { date: "", dateTbd: false, floor: 1, hasLift: false },
+    delivery: { date: "", dateTbd: false, floor: 1, hasLift: false, asap: false },
     lines: [],
     addons: [],
     paid: 0,
@@ -282,9 +289,12 @@ export function step3Valid(d: WizardDraft): boolean {
   if (!d.signature || !d.signature.startsWith("data:image/")) return false;
   if (!d.termsAccepted) return false;
   if (!d.payment.slip) return false;
-  if (d.payment.method !== "online") {
-    if (d.payment.approvalCode.trim().length < 3) return false;
-  }
+  // 2026-05-10 (Loo) — approval code / reference number is REQUIRED for
+  // every payment method, including online bank transfer. Without it the
+  // accountant can't reconcile the deposit against the bank statement and
+  // the order sits unprocessed. Was previously gated only on
+  // method !== 'online' and online was let through with just a slip.
+  if (d.payment.approvalCode.trim().length < 3) return false;
   if (d.payment.method === "installment") {
     if (d.payment.installmentMonths !== 6 && d.payment.installmentMonths !== 12) return false;
   }

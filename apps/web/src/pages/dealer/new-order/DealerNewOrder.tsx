@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CreateOrderInput, Order } from "@carres/shared";
 import { composeAddress } from "@/data/malaysia-postcodes";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { useCatalog, useCreateOrder, useOutlets, useSalespersons } from "@/lib/queries";
+import {
+  useCatalog,
+  useCreateOrder,
+  useOutlets,
+  useProceedOrder,
+  useSalespersons,
+} from "@/lib/queries";
 import { extensionForMime, uploadDataUrl } from "@/lib/storage";
 import {
   type WizardDraft,
@@ -53,6 +60,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
   const [uploading, setUploading] = useState(false);
   const dealerId = useAuth((s) => s.dealerId);
   const createOrder = useCreateOrder();
+  const proceedOrder = useProceedOrder();
 
   const outletsQ = useOutlets({ enabled: open });
   const salespersonsQ = useSalespersons(undefined, { enabled: open });
@@ -109,7 +117,24 @@ export default function DealerNewOrder({ open, onClose }: Props) {
 
   const canStep1 = useMemo(() => step1Valid(draft), [draft]);
   const canStep2 = useMemo(() => step2Valid(draft), [draft]);
-  const canStep3 = useMemo(() => step3Valid(draft), [draft]);
+  // 2026-05-10 (Loo) — when ASAP is on, the 50% deposit threshold is a HARD
+  // submit gate (the wizard auto-fires Proceed after create — Proceed
+  // requires ≥50% so we reject the order at submit time rather than create
+  // it then have auto-proceed bounce). For non-ASAP orders the threshold
+  // stays advisory (per Phase 2C: 50% is a Place→Proceed gate, not a
+  // create gate — dealer can still create + collect later).
+  const asapDepositOk = useMemo(() => {
+    if (!draft.delivery.asap) return true;
+    const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+    const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
+    const totalForPct = lineSub + addonSub;
+    if (totalForPct <= 0) return false;
+    return (draft.paid / totalForPct) * 100 >= 50;
+  }, [draft]);
+  const canStep3 = useMemo(
+    () => step3Valid(draft) && asapDepositOk,
+    [draft, asapDepositOk],
+  );
   const canAdvance = step === 1 ? canStep1 : step === 2 ? canStep2 : canStep3;
   const submitDisabled =
     !canStep3 || uploading || createOrder.isPending || !dealerId;
@@ -220,6 +245,22 @@ export default function DealerNewOrder({ open, onClose }: Props) {
       const created = await createOrder.mutateAsync(input);
       clearDraft();
       setSubmitted(created);
+
+      // 2026-05-10 (Loo) — "As Fast As Possible" auto-proceed. After
+      // create succeeds, if the dealer ticked ASAP on Step 1 (delivery
+      // date pill), fire the Proceed mutation so the order skips the
+      // manual Place→Proceed click. Failures (e.g. insufficient deposit
+      // / blocked rule) surface as a toast — order stays in 'place' for
+      // the dealer to top up + manually proceed later.
+      if (draft.delivery.asap) {
+        try {
+          await proceedOrder.mutateAsync(created.id);
+          toast.success(`Order DL-${created.dl} auto-proceeded · ASAP`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Auto-proceed failed";
+          toast.warning(`Order created, but auto-proceed failed: ${msg}`);
+        }
+      }
     } catch (err) {
       setUploading(false);
       const msg = err instanceof Error ? err.message : "Submit failed";
