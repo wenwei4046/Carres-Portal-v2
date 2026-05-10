@@ -671,9 +671,18 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         // backend RPC accepts NULL for both (= "this PO covers no specific
         // customer order"). Spread guards apply only when NOT stockpile.
         const g = issuanceGroups[0];
+        // 0079 (Loo 2026-05-10) — pre-assign procurement-leg LP at creation.
+        // Only factory_pickup suppliers need it; partnersOk gate ensures
+        // the value is present when required, and own_logistics suppliers
+        // pass undefined (RPC accepts null).
+        const partnerId =
+          g.supplier.kind === "factory_pickup"
+            ? partnerFor(g.supplier) || undefined
+            : undefined;
         await create.mutateAsync({
           supplierId: g.supplier.id,
           warehouseId: warehouseFor(g.supplier),
+          ...(partnerId ? { procurementPartnerId: partnerId } : {}),
           lines: g.lines.map((l) => ({
             sku: l.sku,
             qty: l.qty,
@@ -696,20 +705,29 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         // — the batch RPC's helper is bundle-shaped only.
         // v3-S4.5: same stockpile carve-out as the single-PO branch.
         await createBatch.mutateAsync({
-          pos: issuanceGroups.map((g) => ({
-            supplierId: g.supplier.id,
-            warehouseId: warehouseFor(g.supplier),
-            lines: g.lines.map((l) => ({
-              sku: l.sku,
-              qty: l.qty,
-              cost: l.cost!,
-              costSource: l.costSource!,
-              attrs: l.attrs ?? null,
-            })),
-            ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
-              ? { dlRefs: prefill.dlRefs }
-              : {}),
-          })),
+          pos: issuanceGroups.map((g) => {
+            const partnerId =
+              g.supplier.kind === "factory_pickup"
+                ? partnerFor(g.supplier) || undefined
+                : undefined;
+            return {
+              supplierId: g.supplier.id,
+              warehouseId: warehouseFor(g.supplier),
+              // 0079 (Loo 2026-05-10) — same per-group LP pre-assignment as
+              // the single-PO branch above.
+              ...(partnerId ? { procurementPartnerId: partnerId } : {}),
+              lines: g.lines.map((l) => ({
+                sku: l.sku,
+                qty: l.qty,
+                cost: l.cost!,
+                costSource: l.costSource!,
+                attrs: l.attrs ?? null,
+              })),
+              ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
+                ? { dlRefs: prefill.dlRefs }
+                : {}),
+            };
+          }),
         });
         toast.success(`Issued ${n} POs`);
       }

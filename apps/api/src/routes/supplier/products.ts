@@ -51,26 +51,71 @@ supplierProductsRouter.get("/demand", requireSupplier, async (c) => {
   const auth = c.var.auth;
   const sb = userClient(c.env, auth.jwt);
 
-  // Pull open POs + aggregate to lines. Two-step is cheaper than a CTE here
-  // because RLS already filters purchase_orders by supplier_id at the row
-  // level; we just need the line-level rollup.
-  const { data: pos, error: posErr } = await sb
-    .from("purchase_orders")
-    .select("id, sku, qty, sup_status")
-    .in("sup_status", OPEN_SUP_STATUSES);
-  if (posErr) throw new HTTPException(500, { message: posErr.message });
-
-  // Sum by sku across the supplier's open POs.
-  const map = new Map<string, { sku: string; openQty: number; poCount: number }>();
-  for (const row of pos ?? []) {
-    const r = row as { sku: string; qty: number; sup_status: string };
-    if (!r.sku) continue;
-    const cur = map.get(r.sku) ?? { sku: r.sku, openQty: 0, poCount: 0 };
-    cur.openQty += r.qty;
-    cur.poCount += 1;
-    map.set(r.sku, cur);
+  // 2026-05-10 (Loo) — TWO buckets in the response:
+  //   openQty   = formal commitment (already-issued PO lines)
+  //   pendingQty = pre-commit demand (sales orders with matching cat_covered
+  //                that no PO has covered yet)
+  //
+  // Open bucket: query purchase_order_lines via embedded purchase_orders
+  // (RLS-scoped to caller's supplier_id). Replaces the broken legacy query
+  // that read dropped scalar `purchase_orders.sku/qty` columns.
+  //
+  // Pending bucket: orders + order_lines aren't readable by the supplier
+  // role under RLS, so we go through `supplier_pending_demand()` SECURITY
+  // DEFINER RPC (migration 0078) which does the join + aggregation
+  // server-side and returns only (sku, pending_qty, order_count).
+  const [linesRes, pendingRes] = await Promise.all([
+    sb
+      .from("purchase_order_lines")
+      .select(
+        "sku, qty, purchase_orders!inner(id, sup_status)",
+      )
+      .in(
+        "purchase_orders.sup_status",
+        OPEN_SUP_STATUSES as unknown as string[],
+      ),
+    sb.rpc("supplier_pending_demand"),
+  ]);
+  if (linesRes.error) {
+    throw new HTTPException(500, { message: linesRes.error.message });
   }
-  return c.json([...map.values()].sort((a, b) => b.openQty - a.openQty));
+  if (pendingRes.error) {
+    throw new HTTPException(500, { message: pendingRes.error.message });
+  }
+
+  const map = new Map<
+    string,
+    { sku: string; openQty: number; poCount: number; pendingQty: number; pendingOrderCount: number }
+  >();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const row of (linesRes.data ?? []) as any[]) {
+    const sku = String(row.sku);
+    const qty = Number(row.qty ?? 0);
+    if (!sku || qty <= 0) continue;
+    const cur =
+      map.get(sku) ??
+      { sku, openQty: 0, poCount: 0, pendingQty: 0, pendingOrderCount: 0 };
+    cur.openQty += qty;
+    cur.poCount += 1;
+    map.set(sku, cur);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const row of (pendingRes.data ?? []) as any[]) {
+    const sku = String(row.sku);
+    if (!sku) continue;
+    const cur =
+      map.get(sku) ??
+      { sku, openQty: 0, poCount: 0, pendingQty: 0, pendingOrderCount: 0 };
+    cur.pendingQty += Number(row.pending_qty ?? 0);
+    cur.pendingOrderCount += Number(row.order_count ?? 0);
+    map.set(sku, cur);
+  }
+  return c.json(
+    [...map.values()].sort(
+      (a, b) =>
+        b.openQty + b.pendingQty - (a.openQty + a.pendingQty),
+    ),
+  );
 });
 
 export default supplierProductsRouter;

@@ -45,7 +45,24 @@ partnerDashboardRouter.get("/", async (c) => {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rows = (data ?? []) as Array<{ id: string; sup_status: string | null }>;
+  // 0079 (Loo 2026-05-10) — partner now sees POs from pre-pickup states
+  // because procurement_partner_id is set at PO creation. Two new buckets:
+  //   upcoming  : supplier hasn't pressed Mark Ready yet — partner just
+  //               monitors capacity (pending / acknowledged / in_production).
+  //   ready     : supplier marked ready — partner needs to schedule pickup
+  //               (ready_confirm_sent / ready_for_pickup).
   const counts = {
+    upcoming: rows.filter(
+      (r) =>
+        r.sup_status === "pending" ||
+        r.sup_status === "acknowledged" ||
+        r.sup_status === "in_production",
+    ).length,
+    ready: rows.filter(
+      (r) =>
+        r.sup_status === "ready_confirm_sent" ||
+        r.sup_status === "ready_for_pickup",
+    ).length,
     assigned: rows.filter((r) => r.sup_status === "pickup_assigned").length,
     accepted: rows.filter((r) => r.sup_status === "pickup_accepted").length,
     in_transit: rows.filter((r) => r.sup_status === "picked_up").length,

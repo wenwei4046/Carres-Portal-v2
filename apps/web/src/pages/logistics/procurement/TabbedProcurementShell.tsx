@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Navigate, NavLink, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
 import CreatePOModal, {
   type CreatePoPrefill,
@@ -58,6 +58,8 @@ function isValidSlug(slug: string | undefined): slug is ProcurementTabSlug {
 export default function TabbedProcurementShell() {
   const params = useParams<{ slug?: string }>();
   const rawSlug = params.slug;
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // T42-C2 — restore the "+ New PO" entry point that lived on the deleted
   // LogisticsProcurement.tsx (T36). The shell is now the only mount point for
@@ -68,6 +70,20 @@ export default function TabbedProcurementShell() {
   const [createPrefill, setCreatePrefill] = useState<CreatePoPrefill | null>(
     null,
   );
+
+  // 2026-05-10 (Loo) — accept a CreatePOModal prefill via React Router
+  // location.state. Used by OrderDetailDrawer's "+ Issue POs" navigate-to-
+  // procurement flow so the order's shortages (sku + qty + attrs) feed
+  // straight into the modal. Once consumed we replace the history entry to
+  // strip the state — back/forward navigation must NOT reopen the modal.
+  useEffect(() => {
+    const state = location.state as { prefill?: CreatePoPrefill } | null;
+    if (state?.prefill) {
+      setCreatePrefill(state.prefill);
+      navigate(location.pathname, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   // Invalid or missing slug → redirect to the default tab. `replace` keeps
   // history clean (a typo doesn't pollute the back stack).

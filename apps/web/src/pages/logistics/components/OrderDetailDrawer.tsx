@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import {
@@ -14,7 +15,6 @@ import StageChip, { type LogisticsStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
 import AbandonOrderModal from "./AbandonOrderModal";
-import IssuePOsModal from "./IssuePOsModal";
 import ConfirmProceedDialog from "./ConfirmProceedDialog";
 import TransferReadyDialog from "./TransferReadyDialog";
 import { SectionHead } from "./Modal";
@@ -69,10 +69,10 @@ function calcShortages(
 
 export default function OrderDetailDrawer({ orderId, onClose }: Props) {
   const { data, isLoading, isError, error, refetch } = useLogisticsOrder(orderId);
+  const navigate = useNavigate();
 
   const [showDispatch, setShowDispatch] = useState(false);
   const [showDO, setShowDO] = useState(false);
-  const [showIssuePOs, setShowIssuePOs] = useState(false);
   const [showAbandon, setShowAbandon] = useState(false);
   const [showConfirmProceed, setShowConfirmProceed] = useState(false);
   const [showTransferReady, setShowTransferReady] = useState(false);
@@ -84,7 +84,6 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
     const anyModalOpen =
       showDispatch ||
       showDO ||
-      showIssuePOs ||
       showAbandon ||
       showConfirmProceed ||
       showTransferReady;
@@ -101,11 +100,70 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
     onClose,
     showDispatch,
     showDO,
-    showIssuePOs,
     showAbandon,
     showConfirmProceed,
     showTransferReady,
   ]);
+
+  // 2026-05-10 (Loo) — "+ Issue POs" jumps to /logistics/procurement with a
+  // CreatePOModal prefill instead of calling the auto-issue RPC. The auto-
+  // issue path crashed when orders.warehouse_id was NULL (auto-skip leaves it
+  // empty when buffer stock is insufficient), and Loo's instinct is right:
+  // the procurement modal already has a per-supplier warehouse picker + COGS
+  // editor + cascade picker, so reusing it is cleaner than building a parallel
+  // dialog.
+  //
+  // Per-(sku, attrs) shortage walk mirrors the server-side
+  // /awaiting-stock-shortage aggregation: take order_lines as-is (preserves
+  // attrs), subtract available stock pool by sku in declaration order, only
+  // include lines where shortage > 0.
+  function gotoProcurementWithPrefill() {
+    if (!data) return;
+    const totalsBySku: Record<string, number> = {};
+    for (const b of data.stockBalances) {
+      totalsBySku[b.sku] =
+        (totalsBySku[b.sku] ?? 0) +
+        Math.max(0, Number(b.qty) - Number(b.reserved));
+    }
+    const remainingBySku = { ...totalsBySku };
+    const prefillLines: { sku: string; qty: number; attrs?: Record<string, unknown> | null }[] = [];
+    for (const ol of data.lines) {
+      const remaining = remainingBySku[ol.sku] ?? 0;
+      const consumed = Math.min(remaining, ol.qty);
+      remainingBySku[ol.sku] = remaining - consumed;
+      if (consumed < ol.qty) {
+        prefillLines.push({
+          sku: ol.sku,
+          qty: ol.qty - consumed,
+          attrs: ol.attrs ?? null,
+        });
+      }
+    }
+    if (prefillLines.length === 0) {
+      toast.info("No shortages — every line is covered by current stock");
+      return;
+    }
+    // Land on the tab matching the first shortage line's category so the
+    // modal opens in a context that feels right. The modal itself groups by
+    // supplier so multi-category orders still split correctly on submit.
+    const firstCat = prefillLines[0]?.sku.split(":")[0] ?? "";
+    const slug =
+      firstCat === "sofa"
+        ? "hookka-sofa"
+        : firstCat === "bedframe"
+          ? "hookka-bedframe"
+          : "nice-future";
+    navigate(`/logistics/procurement/${slug}`, {
+      state: {
+        prefill: {
+          dl: data.order.dl,
+          lines: prefillLines,
+          note: `From order #${data.order.dl} · ${prefillLines.length} short line${prefillLines.length === 1 ? "" : "s"}`,
+        },
+      },
+    });
+    onClose();
+  }
 
   return (
     <div
@@ -138,7 +196,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
               onClose={onClose}
               onDispatchClick={() => setShowDispatch(true)}
               onDOClick={() => setShowDO(true)}
-              onIssuePOsClick={() => setShowIssuePOs(true)}
+              onIssuePOsClick={gotoProcurementWithPrefill}
               onAbandonClick={() => setShowAbandon(true)}
               onConfirmProceedClick={() => setShowConfirmProceed(true)}
               onTransferReadyClick={() => setShowTransferReady(true)}
@@ -156,15 +214,6 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
                 warehouse={data.warehouse}
                 lines={data.lines}
                 onClose={() => setShowDO(false)}
-              />
-            )}
-            {showIssuePOs && (
-              <IssuePOsModal
-                order={data.order}
-                shortages={calcShortages(data.lines, data.stockBalances).map(
-                  ({ sku, short }) => ({ sku, short }),
-                )}
-                onClose={() => setShowIssuePOs(false)}
               />
             )}
             {showAbandon && (

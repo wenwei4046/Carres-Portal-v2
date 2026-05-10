@@ -92,6 +92,7 @@ export const qk = {
     pickups:    () => ["partner", "pickups"] as const,
     rfdPending: () => ["partner", "rfd-pending"] as const,
     toDeliver:  () => ["partner", "to-deliver"] as const,
+    fleet:      () => ["partner", "fleet"] as const,
   },
   // Phase 4 — HQ Logistics namespace. Same nested-key strategy as `principal`
   // so M5 mutation hooks can blast `["logistics"]` (or a sub-tree) on each
@@ -101,6 +102,10 @@ export const qk = {
   // typecheck at the call site rather than silently breaking cache reads.
   logistics: {
     dashboard: () => ["logistics", "dashboard"] as const,
+    /** Loo 2026-05-10 — sidebar badge counts (orders awaiting + pickup-action
+     *  POs). 30s refetch, kept under `logistics` so a future blunt invalidate
+     *  on `["logistics"]` after a relevant mutation fans out here too. */
+    badges:    () => ["logistics", "badges"] as const,
     orders:    (filters?: LogisticsOrderFilters) =>
       ["logistics", "orders", filters ?? {}] as const,
     order:     (id: string) => ["logistics", "orders", id] as const,
@@ -1350,6 +1355,11 @@ export interface LogisticsOrderDetailLine {
   sku: string;
   qty: number;
   unit_price: number;
+  // 2026-05-10 (Loo) — cascade picker payload threaded into the "+ Issue POs"
+  // → CreatePOModal navigation so bedframe color/gap and sofa fabric stay
+  // attached to the new PO line. Null for mattress lines (no extras) and
+  // pre-cascade legacy data.
+  attrs?: Record<string, unknown> | null;
 }
 export interface LogisticsOrderDetailAddon {
   addon_key: string;
@@ -1581,6 +1591,25 @@ export function useLogisticsDashboard(
     queryFn: () =>
       apiFetch<LogisticsDashboardResponse>("/api/logistics/dashboard"),
     staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Loo 2026-05-10 — sidebar badge counts. Polled every 30s so the operator
+ *  sees the chip update without leaving the page. Mounted from
+ *  LogisticsSidebar; staleTime matches refetchInterval so the cache stays
+ *  warm across nav transitions. */
+export function useLogisticsBadges(
+  opts?: Partial<UseQueryOptions<import("@carres/shared").LogisticsBadgesResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.logistics.badges(),
+    queryFn: () =>
+      apiFetch<import("@carres/shared").LogisticsBadgesResponse>(
+        "/api/logistics/badges",
+      ),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
     ...opts,
   });
 }
@@ -2766,13 +2795,26 @@ export type SupplierSupStatus =
 /** Mirror of `purchase_orders` row visible to a supplier (RLS-scoped to
  *  own supplier_id). Keep fields aligned with API response from
  *  GET /api/supplier/pos. */
+export interface SupplierPoLine {
+  id: string;
+  sku: string;
+  qty: number;
+  received_qty: number;
+  // 0073 cascade picker payload — bedframe={color,gap}, sofa={fabric_id,
+  // fabric_name, fabric_surcharge}, mattress=null. Supplier sees this on
+  // the PO card so they make the right version.
+  attrs?: Record<string, unknown> | null;
+}
+
 export interface SupplierPoRow {
   id: string;
   dl: number | null;
   supplier_id: string;
   warehouse_id: string;
-  sku: string;
-  qty: number;
+  // 2026-05-10 (Loo) — was scalar `sku`/`qty` (read from dropped columns
+  // post-0017) which always rendered blank. Now embeds the full line array
+  // so the supplier card sums qty + lists every variant.
+  lines: SupplierPoLine[];
   status: "open" | "received" | "cancelled";
   sup_status: SupplierSupStatus;
   delivery_partner_id: string | null;
@@ -2824,8 +2866,14 @@ export interface SupplierMe {
 
 export interface SupplierDemandRow {
   sku: string;
+  /** Formal commitment (already-issued PO lines). */
   openQty: number;
   poCount: number;
+  // 2026-05-10 (Loo) — pre-commit demand from sales orders matching the
+  // supplier's cat_covered. Fed by `supplier_pending_demand()` RPC; null/0
+  // means "nothing in the pipeline beyond what's already POed".
+  pendingQty: number;
+  pendingOrderCount: number;
 }
 
 /** Phase 7 Sprint 1 — partner_threads_to_deliver RPC payload. */

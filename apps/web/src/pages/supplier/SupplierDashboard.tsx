@@ -27,7 +27,13 @@ export default function SupplierDashboard() {
 
   const rows: SupplierPoRow[] = pos.data ?? [];
 
-  const totalUnits = rows.reduce((s, p) => s + (p.qty ?? 0), 0);
+  // 2026-05-10 (Loo) — was reading dropped column `purchase_orders.qty`
+  // (post-0017 it lives on the embedded lines). Sum across the new lines[].
+  const totalUnits = rows.reduce(
+    (s, p) =>
+      s + (p.lines ?? []).reduce((ss, l) => ss + (l.qty ?? 0), 0),
+    0,
+  );
   const pendingAck = rows.filter((p) => p.sup_status === "pending").length;
   const inProd = rows.filter(
     (p) => p.sup_status === "acknowledged" || p.sup_status === "in_production",

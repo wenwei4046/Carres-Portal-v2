@@ -44,10 +44,14 @@ describe("SupplierIncoming", () => {
     render(wrap(<SupplierIncoming />));
 
     await waitFor(() => {
-      expect(screen.getByText("Total open units")).toBeInTheDocument();
+      // 2026-05-10 (Loo) — KPI labels changed when the "pending demand"
+      // bucket landed: "Total open units" → "Total demand", "Open POs" →
+      // "Committed (POs)" + new "Pending (orders)" tile.
+      expect(screen.getByText("Total demand")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Open POs")).toBeInTheDocument();
+    expect(screen.getByText("Committed (POs)")).toBeInTheDocument();
+    expect(screen.getByText("Pending (orders)")).toBeInTheDocument();
     expect(screen.getByText("Pending ack")).toBeInTheDocument();
   });
 

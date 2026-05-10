@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import LogisticsOrders from "./LogisticsOrders";
 import type {
   LogisticsOrdersListResponse,
@@ -84,7 +85,13 @@ vi.mock("@/lib/queries", async () => {
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={qc}>{node}</QueryClientProvider>;
+  // 2026-05-10: OrderDetailDrawer uses useNavigate (jump to procurement on
+  // "+ Issue POs"). Tests need a Router context for that hook to mount.
+  return (
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>{node}</MemoryRouter>
+    </QueryClientProvider>
+  );
 }
 
 function makeOrder(overrides: Partial<LogisticsOrderListRow> = {}): LogisticsOrderListRow {

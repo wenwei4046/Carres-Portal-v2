@@ -9,11 +9,17 @@ import CarresLockup from "@/components/CarresLockup";
  * (`/delivery-partner/pickups`) round-trips cleanly. Tabs live as URL paths so
  * a partner can paste a link to "today's pickups" into WhatsApp.
  */
+// 2026-05-10 (Loo) — split single "Pickups" tab into two clean legs:
+//   Factory pickups = supplier → warehouse (the partner's pickup work)
+//   Deliveries      = warehouse → customer (the partner's POD work)
+// Different state machines, different RPCs, different mental models — no
+// reason to entangle them on one page.
 const NAV_ITEMS = [
-  { to: "/delivery-partner/dashboard", label: "Today", icon: "◆", end: false },
-  { to: "/delivery-partner/pickups", label: "Pickups", icon: "▣", end: false },
-  { to: "/delivery-partner/fleet",   label: "Fleet",   icon: "▥", end: false },
-  { to: "/delivery-partner/profile", label: "Profile", icon: "◐", end: false },
+  { to: "/delivery-partner/dashboard",       label: "Today",           icon: "◆", end: false },
+  { to: "/delivery-partner/factory-pickups", label: "Factory pickups", icon: "▦", end: false },
+  { to: "/delivery-partner/deliveries",      label: "Deliveries",      icon: "▣", end: false },
+  { to: "/delivery-partner/fleet",           label: "Fleet",           icon: "▥", end: false },
+  { to: "/delivery-partner/profile",         label: "Profile",         icon: "◐", end: false },
 ] as const;
 
 export default function PartnerSidebar() {

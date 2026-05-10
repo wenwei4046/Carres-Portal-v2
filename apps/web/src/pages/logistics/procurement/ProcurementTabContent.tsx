@@ -125,7 +125,13 @@ export default function ProcurementTabContent({
   // still needs a logistics hand-off.
   const needsPickup = (p: { status: string; sup_status: string }) =>
     p.status !== "received" &&
-    (p.sup_status === "ready_for_pickup" ||
+    // 2026-05-10 (Loo) — ready_confirm_sent is the actual state factory-pickup
+    // suppliers land in after Mark Ready (logistics_supplier_ready_confirm
+    // RPC sets it). It was missing here so the Pickup action chip + sidebar
+    // badge silently sat at 0 even though the PO was waiting for partner
+    // assignment. Surfaced 2026-05-10 by Loo testing the Nice Future flow.
+    (p.sup_status === "ready_confirm_sent" ||
+      p.sup_status === "ready_for_pickup" ||
       p.sup_status === "delivered" ||
       p.sup_status === "reassign_needed");
 

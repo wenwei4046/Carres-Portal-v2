@@ -172,7 +172,10 @@ logisticsOrdersRouter.get("/:id", requireLogistics, async (c) => {
   // `partner_rejected_at`) that previously lived on the PO. Drawer reads
   // `threads[].delivery_partner_id` for the partner-assignment hint.
   const [linesRes, addonsRes, historyRes, threadsRes] = await Promise.all([
-    sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", id),
+    // 2026-05-10 (Loo) — also pull `attrs` so the OrderDetailDrawer's
+    // "+ Issue POs" navigate-to-procurement flow can carry color/gap/fabric
+    // into CreatePOModal's cascade picker without a second round-trip.
+    sb.from("order_lines").select("sku, qty, unit_price, attrs").eq("order_id", id),
     sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
     sb.from("order_history").select("text, by_role, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
     sb

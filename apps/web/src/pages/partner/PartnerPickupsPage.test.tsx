@@ -41,23 +41,9 @@ function mockApi(rfdRows: unknown[], poRows: unknown[], toDeliverRows: unknown[]
 }
 
 describe("PartnerPickupsPage", () => {
-  it("renders procurement-leg PO rows with sup_status chips", async () => {
-    mockApi(
-      [],
-      [
-        { id: "PO-001", sup_status: "pickup_assigned" },
-        { id: "PO-002", sup_status: "delivered" },
-      ],
-    );
-    render(wrap(<PartnerPickupsPage />));
-    await waitFor(() => expect(screen.getByText("PO-001")).toBeInTheDocument());
-    expect(screen.getByText(/pickup_assigned/i)).toBeInTheDocument();
-    expect(screen.getByText("PO-002")).toBeInTheDocument();
-    // sup_status chip "delivered" is the only `delivered`-text element when
-    // the In Transit list is empty (added Phase 7 Sprint 2).
-    expect(screen.getByText("delivered")).toBeInTheDocument();
-  });
-
+  // 2026-05-10 (Loo) — page split into two: procurement-leg "All Pickups"
+  // section moved to PartnerFactoryPickupsPage (its own test file). What
+  // remains here is strictly customer-leg (RFD pending + In Transit).
   it("renders empty-state when no RFD-pending threads", async () => {
     mockApi([], [{ id: "PO-001", sup_status: "delivered" }]);
     render(wrap(<PartnerPickupsPage />));

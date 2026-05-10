@@ -468,6 +468,11 @@ logisticsPosRouter.post("/", requireLogistics, async (c) => {
     p_lines: linesForRpc,
     p_dl: parsed.data.dl ?? null,
     p_dl_refs: parsed.data.dlRefs ?? null,
+    // 0079 (Loo 2026-05-10) — pre-assign the procurement-leg LP at PO
+    // creation. Modal already validates that factory_pickup suppliers have
+    // a partner picked; own_logistics suppliers omit the field and the RPC
+    // accepts null.
+    p_procurement_partner_id: parsed.data.procurementPartnerId ?? null,
   });
   if (error) {
     const m = mapPgError(error);
@@ -503,6 +508,9 @@ logisticsPosRouter.post("/batch", requireLogistics, async (c) => {
   const payload = parsed.data.pos.map((p) => ({
     supplier_id: p.supplierId,
     warehouse_id: p.warehouseId,
+    // 0079 (Loo 2026-05-10) — per-PO procurement-leg LP. RPC reads
+    // `procurement_partner_id` off each jsonb entry and forwards to inner.
+    procurement_partner_id: p.procurementPartnerId ?? null,
     lines: p.lines.map((l) => ({
       sku: l.sku,
       qty: l.qty,

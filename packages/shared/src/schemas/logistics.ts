@@ -115,6 +115,11 @@ export type AbandonOrderInput = z.infer<typeof abandonOrderInput>;
 export const createPoInput = z.object({
   supplierId: z.string().uuid(),
   warehouseId: z.string().uuid(),
+  // 0079 (Loo 2026-05-10) — procurement-leg LP assigned at PO creation so
+  // the partner sees the upcoming pickup the moment Logistics issues the
+  // PO (instead of after Mark Ready). Optional: own_logistics suppliers
+  // omit it; factory_pickup suppliers must include it (modal enforces).
+  procurementPartnerId: z.string().uuid().optional(),
   lines: z.array(z.object({
     sku: z.string().min(1),
     qty: z.number().int().positive(),
@@ -558,3 +563,21 @@ export const listMovementsQuery = z.object({
   to: z.string().datetime().optional(),
 }).strict();
 export type ListMovementsQuery = z.infer<typeof listMovementsQuery>;
+
+/**
+ * `logisticsBadgesResponse` — GET /api/logistics/badges (Loo 2026-05-10).
+ *
+ * Sidebar action-count feed. Each numeric field maps 1:1 to a nav item that
+ * carries a red-dot badge in `LogisticsSidebar`:
+ *   - orders       → Pipeline → Orders         (awaiting_logistics_action)
+ *   - procurement  → Pipeline → Procurement    (Pickup-action POs)
+ *
+ * Other roles use the same `{ key: count }` shape under their own routes
+ * (e.g. /api/supplier/badges, /api/partner/badges) so the sidebar wrapper
+ * can be generic.
+ */
+export const logisticsBadgesResponse = z.object({
+  orders: z.number().int().nonnegative(),
+  procurement: z.number().int().nonnegative(),
+});
+export type LogisticsBadgesResponse = z.infer<typeof logisticsBadgesResponse>;

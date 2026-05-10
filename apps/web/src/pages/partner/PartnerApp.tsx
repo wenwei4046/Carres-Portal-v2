@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import PartnerSidebar from "./PartnerSidebar";
 import PartnerDashboard from "./PartnerDashboard";
+import PartnerFactoryPickupsPage from "./PartnerFactoryPickupsPage";
 import PartnerPickupsPage from "./PartnerPickupsPage";
 import PartnerFleet from "./PartnerFleet";
 import PartnerProfile from "./PartnerProfile";
@@ -24,7 +25,16 @@ export default function PartnerApp() {
         <Routes>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<PartnerDashboard />} />
-          <Route path="pickups" element={<PartnerPickupsPage />} />
+          {/* 2026-05-10 (Loo) — split into two pages by leg:
+              factory-pickups = supplier → warehouse (procurement leg)
+              deliveries      = warehouse → customer (customer leg)
+              Old `/pickups` redirects to factory-pickups for shared links. */}
+          <Route path="factory-pickups" element={<PartnerFactoryPickupsPage />} />
+          <Route path="deliveries" element={<PartnerPickupsPage />} />
+          <Route
+            path="pickups"
+            element={<Navigate to="../factory-pickups" replace />}
+          />
           <Route path="fleet" element={<PartnerFleet />} />
           <Route path="profile" element={<PartnerProfile />} />
           <Route path="*" element={<Navigate to="dashboard" replace />} />

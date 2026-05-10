@@ -67,9 +67,14 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
   const f = parsed.data;
 
   const sb = userClient(c.env, auth.jwt);
+  // 2026-05-10 (Loo) — embed purchase_order_lines so the supplier card can
+  // render real SKU + qty + cascade attrs. Pre-fix this select was just `*`
+  // and the legacy `purchase_orders.sku/.qty` columns it was reading were
+  // dropped in migration 0017 when multi-line PO landed — every supplier
+  // card showed blank UNITS and no SKU name.
   let q = sb
     .from("purchase_orders")
-    .select("*")
+    .select("*, lines:purchase_order_lines(id, sku, qty, received_qty, attrs)")
     .order("placed_at", { ascending: false });
   if (f.bucket) {
     q = q.in("sup_status", PIPELINE_BUCKETS[f.bucket] as unknown as string[]);
@@ -86,7 +91,7 @@ supplierPosRouter.get("/:id", requireSupplier, async (c) => {
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb
     .from("purchase_orders")
-    .select("*")
+    .select("*, lines:purchase_order_lines(id, sku, qty, received_qty, attrs)")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new HTTPException(500, { message: error.message });

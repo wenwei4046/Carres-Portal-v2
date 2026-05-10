@@ -100,21 +100,38 @@ describe("GET /api/supplier/products", () => {
 });
 
 describe("GET /api/supplier/products/demand", () => {
-  it("aggregates open-PO demand by SKU and sorts desc", async () => {
-    const sb = {
+  // 2026-05-10 (Loo) — route now reads purchase_order_lines (post-0017 the
+  // qty/sku columns moved off purchase_orders) AND merges pending demand
+  // from the supplier_pending_demand RPC. Mocks reflect both sources.
+  function mockDemandSb(opts: {
+    lines: Array<{
+      sku: string;
+      qty: number;
+      purchase_orders: { id: string; sup_status: string };
+    }>;
+    pending: Array<{ sku: string; pending_qty: number; order_count: number }>;
+    linesInFn?: ReturnType<typeof vi.fn>;
+  }) {
+    const inFn =
+      opts.linesInFn ??
+      vi.fn().mockResolvedValue({ data: opts.lines, error: null });
+    return {
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockResolvedValue({
-            data: [
-              { id: "PO-1", sku: "mattress:cloud:Queen", qty: 10, sup_status: "pending" },
-              { id: "PO-2", sku: "mattress:cloud:Queen", qty: 5, sup_status: "in_production" },
-              { id: "PO-3", sku: "mattress:cloud:King", qty: 3, sup_status: "ready_for_pickup" },
-            ],
-            error: null,
-          }),
-        }),
+        select: vi.fn().mockReturnValue({ in: inFn }),
       }),
+      rpc: vi.fn().mockResolvedValue({ data: opts.pending, error: null }),
     };
+  }
+
+  it("aggregates open-PO demand by SKU and sorts desc", async () => {
+    const sb = mockDemandSb({
+      lines: [
+        { sku: "mattress:cloud:Queen", qty: 10, purchase_orders: { id: "PO-1", sup_status: "pending" } },
+        { sku: "mattress:cloud:Queen", qty: 5, purchase_orders: { id: "PO-2", sup_status: "in_production" } },
+        { sku: "mattress:cloud:King", qty: 3, purchase_orders: { id: "PO-3", sup_status: "ready_for_pickup" } },
+      ],
+      pending: [],
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
@@ -139,13 +156,9 @@ describe("GET /api/supplier/products/demand", () => {
     });
   });
 
-  it("only includes open sup_status (not delivered/picked_up)", async () => {
+  it("only includes open sup_status on the embedded purchase_orders filter", async () => {
     const inFn = vi.fn().mockResolvedValue({ data: [], error: null });
-    const sb = {
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({ in: inFn }),
-      }),
-    };
+    const sb = mockDemandSb({ lines: [], pending: [], linesInFn: inFn });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
@@ -156,7 +169,7 @@ describe("GET /api/supplier/products/demand", () => {
       }),
       env,
     );
-    expect(inFn).toHaveBeenCalledWith("sup_status", [
+    expect(inFn).toHaveBeenCalledWith("purchase_orders.sup_status", [
       "pending",
       "acknowledged",
       "in_production",
@@ -168,14 +181,8 @@ describe("GET /api/supplier/products/demand", () => {
     ]);
   });
 
-  it("returns empty array when no open POs", async () => {
-    const sb = {
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      }),
-    };
+  it("returns empty array when no open POs and no pending orders", async () => {
+    const sb = mockDemandSb({ lines: [], pending: [] });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
@@ -188,6 +195,52 @@ describe("GET /api/supplier/products/demand", () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
+  });
+
+  it("merges pending demand from supplier_pending_demand RPC alongside open POs", async () => {
+    const sb = mockDemandSb({
+      lines: [
+        { sku: "mattress:cloud:Queen", qty: 5, purchase_orders: { id: "PO-1", sup_status: "pending" } },
+      ],
+      pending: [
+        { sku: "mattress:cloud:Queen", pending_qty: 3, order_count: 2 },
+        { sku: "mattress:cloud:King", pending_qty: 7, order_count: 4 },
+      ],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("supplier");
+    const res = await app.fetch(
+      new Request("http://t/api/supplier/products/demand", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<{
+      sku: string;
+      openQty: number;
+      poCount: number;
+      pendingQty: number;
+      pendingOrderCount: number;
+    }>;
+    // Queen: openQty 5 + pending 3 = 8 (highest, sorted first).
+    expect(rows[0]).toMatchObject({
+      sku: "mattress:cloud:Queen",
+      openQty: 5,
+      poCount: 1,
+      pendingQty: 3,
+      pendingOrderCount: 2,
+    });
+    // King: openQty 0 + pending 7 = 7.
+    expect(rows[1]).toMatchObject({
+      sku: "mattress:cloud:King",
+      openQty: 0,
+      poCount: 0,
+      pendingQty: 7,
+      pendingOrderCount: 4,
+    });
   });
 
   it("rejects partner role with 403", async () => {

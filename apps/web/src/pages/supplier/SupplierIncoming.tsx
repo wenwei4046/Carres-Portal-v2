@@ -19,7 +19,13 @@ export default function SupplierIncoming() {
   const pendingPos = useSupplierPos("po");
 
   const rows = demand.data ?? [];
-  const totalUnits = rows.reduce((s, r) => s + r.openQty, 0);
+  // 2026-05-10 (Loo) — `openQty` is committed via PO; `pendingQty` is
+  // pre-commit demand from sales orders with matching cat_covered. Surface
+  // both so the supplier can plan production capacity without waiting for
+  // logistics to formalise every order into a PO.
+  const totalOpenUnits = rows.reduce((s, r) => s + r.openQty, 0);
+  const totalPendingUnits = rows.reduce((s, r) => s + (r.pendingQty ?? 0), 0);
+  const totalUnits = totalOpenUnits + totalPendingUnits;
   const totalPos = (pendingPos.data ?? []).length;
   const pendingAck = (pendingPos.data ?? []).filter(
     (p) => p.sup_status === "pending",
@@ -43,18 +49,30 @@ export default function SupplierIncoming() {
           Incoming Demand
         </h1>
         <div className="text-[13px] text-muted-foreground">
-          Aggregated SKU demand from open POs. No customer-level detail.
+          Two demand buckets: <strong>committed</strong> (issued POs) and{" "}
+          <strong>pending</strong> (sales orders not yet POed). Aggregated only —
+          no customer-level detail.
         </div>
       </header>
 
-      <div className="grid grid-cols-3 gap-3.5 mb-5">
+      <div className="grid grid-cols-4 gap-3.5 mb-5">
         <Kpi
-          label="Total open units"
+          label="Total demand"
           value={totalUnits}
           accent={totalUnits > 0}
           hint={`Across ${rows.length} SKU${rows.length === 1 ? "" : "s"}`}
         />
-        <Kpi label="Open POs" value={totalPos} hint="Active across pipeline" />
+        <Kpi
+          label="Committed (POs)"
+          value={totalOpenUnits}
+          hint="Already-issued PO lines"
+        />
+        <Kpi
+          label="Pending (orders)"
+          value={totalPendingUnits}
+          hint="Sales orders not yet POed"
+          accent={totalPendingUnits > 0}
+        />
         <Kpi
           label="Pending ack"
           value={pendingAck}
@@ -69,7 +87,7 @@ export default function SupplierIncoming() {
             No incoming demand right now.
           </div>
           <div className="text-[12px] text-muted-foreground mt-1.5">
-            New POs from Carres will appear here as they're issued.
+            New sales orders + POs from Carres will appear here as they land.
           </div>
         </div>
       ) : (
@@ -92,7 +110,7 @@ export default function SupplierIncoming() {
               {items.map((it, i) => (
                 <div
                   key={it.sku}
-                  className={`grid grid-cols-[1fr_120px] items-center gap-4 px-5 py-3.5 ${
+                  className={`grid grid-cols-[1fr_140px_140px] items-center gap-4 px-5 py-3.5 ${
                     i === items.length - 1 ? "" : "border-b border-border"
                   }`}
                 >
@@ -102,14 +120,33 @@ export default function SupplierIncoming() {
                     </div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">
                       {it.poCount} PO{it.poCount === 1 ? "" : "s"}
+                      {it.pendingOrderCount > 0 && (
+                        <>
+                          {" · "}
+                          {it.pendingOrderCount} pending order
+                          {it.pendingOrderCount === 1 ? "" : "s"}
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="font-mono text-[20px] font-bold">
+                    <span className="font-mono text-[18px] font-bold">
                       {it.openQty}
                     </span>
-                    <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground ml-1.5">
-                      units
+                    <span className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground ml-1.5">
+                      committed
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span
+                      className={`font-mono text-[18px] font-bold ${
+                        it.pendingQty > 0 ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    >
+                      {it.pendingQty ?? 0}
+                    </span>
+                    <span className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground ml-1.5">
+                      pending
                     </span>
                   </div>
                 </div>

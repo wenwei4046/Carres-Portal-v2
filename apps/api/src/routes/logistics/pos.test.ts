@@ -204,6 +204,9 @@ describe("POST /api/logistics/pos", () => {
       p_lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, cost_source: "hand_entered", attrs: null }],
       p_dl: 4001,
       p_dl_refs: null,
+      // 0079 (Loo 2026-05-10) — procurement-leg LP pre-assigned at PO
+      // creation. Null when caller omits (own_logistics suppliers).
+      p_procurement_partner_id: null,
     });
     assertRpcCallShape(rpc, "logistics_create_po", [
       "p_supplier_id",
@@ -211,6 +214,7 @@ describe("POST /api/logistics/pos", () => {
       "p_lines",
       "p_dl",
       "p_dl_refs",
+      "p_procurement_partner_id",
     ]);
   });
 
@@ -240,6 +244,8 @@ describe("POST /api/logistics/pos", () => {
       p_lines: [{ sku: "MAT-K-001", qty: 5, cost: 1500, cost_source: "hand_entered", attrs: null }],
       p_dl: null,
       p_dl_refs: [4001, 4002, 4003],
+      // 0079 (Loo 2026-05-10) — see prior test for rationale.
+      p_procurement_partner_id: null,
     });
     assertRpcCallShape(rpc, "logistics_create_po", [
       "p_supplier_id",
@@ -247,6 +253,7 @@ describe("POST /api/logistics/pos", () => {
       "p_lines",
       "p_dl",
       "p_dl_refs",
+      "p_procurement_partner_id",
     ]);
   });
 
@@ -1692,6 +1699,9 @@ describe("POST /api/logistics/pos/batch", () => {
         {
           supplier_id: SUPPLIER_A,
           warehouse_id: WH_KLANG,
+          // 0079 (Loo 2026-05-10) — procurement-leg LP per PO. null for
+          // own_logistics suppliers or when caller omits.
+          procurement_partner_id: null,
           // T29: per-line `costSource` reshaped to snake_case `cost_source` at API edge.
           // 0073: attrs jsonb forwarded too (NULL for mattress + legacy callers).
           lines: [{ sku: "mattress:carres-cloud:King", qty: 2, cost: 1500, cost_source: "hand_entered", attrs: null }],
@@ -1702,6 +1712,7 @@ describe("POST /api/logistics/pos/batch", () => {
         {
           supplier_id: SUPPLIER_B,
           warehouse_id: WH_PJ,
+          procurement_partner_id: null,
           lines: [{ sku: "sofa:oak:3-seater", qty: 1, cost: 2200, cost_source: "prev_po", attrs: null }],
           eta_date: null,
           dl_refs: null,

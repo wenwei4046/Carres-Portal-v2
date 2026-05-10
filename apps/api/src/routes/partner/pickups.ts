@@ -38,12 +38,18 @@ partnerPickupsRouter.get("/", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
+  // 2026-05-10 (Loo) — embed lines + supplier + warehouse so the partner
+  // detail drawer can render the full pickup brief without a second
+  // round-trip. delivery_partners join was the legacy customer-leg join;
+  // suppliers + warehouses are the actual procurement-leg context.
   const { data, error } = await sb
     .from("purchase_orders")
     .select(
       `
-      id, dl, supplier_id, warehouse_id, sup_status,
-      delivery_partners(name)
+      id, dl, supplier_id, warehouse_id, sup_status, eta_date, placed_at,
+      suppliers(name, contact),
+      warehouses(name, address),
+      lines:purchase_order_lines(id, sku, qty, attrs)
     `,
     )
     .eq("procurement_partner_id", auth.partnerId)
@@ -51,6 +57,60 @@ partnerPickupsRouter.get("/", async (c) => {
 
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json(data ?? []);
+});
+
+// 2026-05-10 (Loo) — partner state-progression endpoints. Both wrap RPCs
+// from migration 0080. ready_confirm_sent → pickup_accepted → picked_up,
+// then the warehouse-side receive flow takes over.
+partnerPickupsRouter.post("/:id/accept", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Only partner role with partner_id" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("partner_accept_pickup", {
+    p_po_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+partnerPickupsRouter.post("/:id/mark-picked-up", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Only partner role with partner_id" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("partner_mark_picked_up", {
+    p_po_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+// 2026-05-10 (Loo) — third partner-side state transition. picked_up →
+// delivered (sup_status only; status stays 'open' so the warehouse-side
+// receive flow still has work to do). Wraps migration 0082 RPC.
+partnerPickupsRouter.post("/:id/arrived", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Only partner role with partner_id" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("partner_arrived_at_warehouse", {
+    p_po_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
 });
 
 /**

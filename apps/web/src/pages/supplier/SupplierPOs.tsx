@@ -220,7 +220,7 @@ function POCard({
 
         <div className="flex items-baseline gap-2 pr-3 border-r border-border pl-1">
           <span className="font-display text-[24px] font-semibold leading-none">
-            {po.qty}
+            {(po.lines ?? []).reduce((s, l) => s + (l.qty ?? 0), 0)}
           </span>
           <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
             units
@@ -317,7 +317,46 @@ function POCard({
       </div>
 
       <div className="pt-3 mt-3 border-t border-dashed border-border text-[13px]">
-        <div className="font-semibold text-foreground">{po.sku}</div>
+        {/* 2026-05-10 (Loo) — render every line with qty + cascade variant
+            (color/gap/fabric) so the supplier knows exactly what to make.
+            Multi-variant POs (post-migration 0076) can carry the same SKU
+            twice with different attrs; render them as separate rows. */}
+        {(po.lines ?? []).map((l) => {
+          const a = (l.attrs ?? {}) as {
+            color?: string;
+            gap?: string;
+            fabric_name?: string;
+            fabric_surcharge?: number;
+          };
+          const variantBits: string[] = [];
+          if (a.color) variantBits.push(a.color);
+          if (a.gap) variantBits.push(`gap ${a.gap}`);
+          if (a.fabric_name) {
+            variantBits.push(
+              a.fabric_surcharge && a.fabric_surcharge > 0
+                ? `${a.fabric_name} (+RM ${a.fabric_surcharge})`
+                : a.fabric_name,
+            );
+          }
+          return (
+            <div
+              key={l.id}
+              className="flex items-baseline justify-between gap-3 mb-1 last:mb-0"
+            >
+              <div className="min-w-0">
+                <div className="font-semibold text-foreground truncate">{l.sku}</div>
+                {variantBits.length > 0 && (
+                  <div className="text-[11px] text-primary font-semibold mt-0.5">
+                    {variantBits.join(" · ")}
+                  </div>
+                )}
+              </div>
+              <div className="font-mono text-[12px] text-muted-foreground whitespace-nowrap">
+                ×{l.qty}
+              </div>
+            </div>
+          );
+        })}
         <div className="font-mono text-[10.5px] text-muted-foreground mt-1.5 tracking-wide">
           ETA {po.eta_date ?? "—"}
           {po.do_number && ` · DO ${po.do_number}`}
@@ -377,7 +416,15 @@ function PODrawer({
             </div>
             <div className="font-mono font-display text-[22px] mt-1">{po.id}</div>
             <div className="text-[12px] text-muted-foreground mt-1">
-              {po.sku} · <strong>{po.qty}</strong> unit{po.qty === 1 ? "" : "s"}
+              {(po.lines ?? []).length} line
+              {(po.lines ?? []).length === 1 ? "" : "s"} ·{" "}
+              <strong>
+                {(po.lines ?? []).reduce((s, l) => s + (l.qty ?? 0), 0)}
+              </strong>{" "}
+              unit
+              {(po.lines ?? []).reduce((s, l) => s + (l.qty ?? 0), 0) === 1
+                ? ""
+                : "s"}
             </div>
           </div>
           <button
@@ -399,14 +446,66 @@ function PODrawer({
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-5">
-            <Field label="SKU" value={po.sku} />
-            <Field label="Quantity" value={String(po.qty)} />
             <Field label="Placed" value={new Date(po.placed_at).toLocaleDateString()} />
             <Field label="ETA" value={po.eta_date ?? "—"} />
             {po.do_number && <Field label="DO Number" value={po.do_number} />}
             {po.expected_ready_date && (
               <Field label="Expected ready" value={po.expected_ready_date} />
             )}
+          </div>
+
+          {/* 2026-05-10 (Loo) — full line table. Variant suffix per row so
+              the supplier can build the right version even when the same
+              SKU appears multiple times (multi-variant bedframe POs). */}
+          <div className="mb-5">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
+              Line items
+            </div>
+            <div className="border border-border rounded-md divide-y divide-border">
+              {(po.lines ?? []).map((l) => {
+                const a = (l.attrs ?? {}) as {
+                  color?: string;
+                  gap?: string;
+                  fabric_name?: string;
+                  fabric_surcharge?: number;
+                };
+                const variantBits: string[] = [];
+                if (a.color) variantBits.push(a.color);
+                if (a.gap) variantBits.push(`gap ${a.gap}`);
+                if (a.fabric_name) {
+                  variantBits.push(
+                    a.fabric_surcharge && a.fabric_surcharge > 0
+                      ? `${a.fabric_name} (+RM ${a.fabric_surcharge})`
+                      : a.fabric_name,
+                  );
+                }
+                return (
+                  <div
+                    key={l.id}
+                    className="flex items-baseline justify-between gap-3 px-3 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-semibold truncate">
+                        {l.sku}
+                      </div>
+                      {variantBits.length > 0 && (
+                        <div className="text-[11px] text-primary mt-0.5">
+                          {variantBits.join(" · ")}
+                        </div>
+                      )}
+                    </div>
+                    <div className="font-mono text-[13px] text-foreground whitespace-nowrap">
+                      ×{l.qty}
+                      {l.received_qty > 0 && (
+                        <span className="text-muted-foreground text-[11px] ml-2">
+                          ({l.received_qty} rcv)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {showDOForm && (

@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import CarresLockup from "@/components/CarresLockup";
+import NavBadge from "@/components/NavBadge";
+import { useLogisticsBadges } from "@/lib/queries";
 
 /**
  * Logistics sidebar — 5 nav items per spec §18.7, all enabled in Phase 4 MVP
@@ -54,6 +56,14 @@ export default function LogisticsSidebar({ active, onChange }: Props) {
   const session = useAuth((s) => s.session);
   const email = session?.user?.email ?? "";
   const initials = email.slice(0, 2).toUpperCase();
+  // Loo 2026-05-10 — sidebar action-count badges. Failures/loading degrade
+  // silently to 0 (no badge render) so a transient API hiccup doesn't break
+  // the nav.
+  const badgesQ = useLogisticsBadges();
+  const badgeCount: Record<string, number> = {
+    orders: badgesQ.data?.orders ?? 0,
+    procurement: badgesQ.data?.procurement ?? 0,
+  };
 
   return (
     <aside
@@ -105,6 +115,7 @@ export default function LogisticsSidebar({ active, onChange }: Props) {
                       {n.icon}
                     </span>
                     <span className="flex-1">{n.t}</span>
+                    <NavBadge count={badgeCount[n.k] ?? 0} label={n.t} />
                   </button>
                 );
               })}

@@ -105,6 +105,17 @@ export default function OrderCard({
   // Phase 4.5 Chunk 2 (T9) — LP pill driven by thread.delivery_partner_id.
   const lpSummary = summariseThreadLps(order.order_supplier_threads);
 
+  // 2026-05-10 (Loo) — PO-issued chip. Each `order_supplier_threads` row
+  // represents one (supplier, category) leg of the order; `po_id` becomes
+  // non-null once logistics issues a PO for that thread. Showing the count
+  // on the kanban card stops Loo from accidentally clicking "+ Issue POs"
+  // twice on the same order.
+  const threads = order.order_supplier_threads ?? [];
+  const posTotal = threads.length;
+  const posIssued = threads.filter((t) => t.po_id !== null).length;
+  const poChipState: "none" | "partial" | "all" =
+    posIssued === 0 ? "none" : posIssued < posTotal ? "partial" : "all";
+
   const containerCls = [
     "flex w-full box-border cursor-pointer rounded-[4px] mb-1.5 last:mb-0 transition-colors",
     selected
@@ -225,7 +236,39 @@ export default function OrderCard({
                 )}
               </div>
             )}
-            <div className="flex items-baseline justify-end mt-1.5">
+            <div className="flex items-baseline justify-between mt-1.5 gap-2">
+              {poChipState !== "none" ? (
+                <span
+                  data-testid={`order-card-po-chip-${order.dl}`}
+                  className="inline-flex items-center font-semibold"
+                  style={{
+                    fontSize: "9.5px",
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    background:
+                      poChipState === "all"
+                        ? "rgba(50,120,80,.12)"
+                        : "rgba(214,79,32,.12)",
+                    color:
+                      poChipState === "all"
+                        ? "rgb(50,120,80)"
+                        : "var(--brand-signature, #D64F20)",
+                  }}
+                  title={
+                    poChipState === "all"
+                      ? `${posIssued} PO${posIssued === 1 ? "" : "s"} already issued — don't double-issue`
+                      : `${posIssued} of ${posTotal} threads have a PO — ${posTotal - posIssued} still need one`
+                  }
+                >
+                  {poChipState === "all"
+                    ? `PO issued · ${posIssued}`
+                    : `PO ${posIssued}/${posTotal}`}
+                </span>
+              ) : (
+                <span />
+              )}
               {actionHint && (
                 <span className="text-[10px] text-primary font-semibold">
                   {actionHint} &rarr;
