@@ -79,6 +79,32 @@ describe("GET /api/partner/pickups", () => {
     );
     expect(res.status).toBe(403);
   });
+
+  // Regression 2026-05-11 (Loo a-to-z run): SELECT was missing the bare `status`
+  // column (only `sup_status` was selected). PartnerFactoryPickupsPage.stageOf()
+  // returns null when status !== 'open', so all rows fell out of the kanban
+  // even though they sat in `rows` — header showed "1 job · 0 awaiting accept".
+  it("SELECT includes both status and sup_status (regression for empty kanban)", async () => {
+    const selectFn = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        order: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }),
+    });
+    const sb = { from: vi.fn(() => ({ select: selectFn })) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    await app.fetch(
+      new Request("http://t/api/partner/pickups", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+
+    const sql = (selectFn.mock.calls[0]?.[0] ?? "") as string;
+    // bare `status` (preceded by comma+space or whitespace, NOT `_`)
+    expect(sql).toMatch(/(?<!_)status\s*,/);
+    expect(sql).toMatch(/sup_status\s*,/);
+  });
 });
 
 describe("GET /api/partner/pickups/rfd-pending", () => {

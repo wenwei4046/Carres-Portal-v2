@@ -46,7 +46,7 @@ partnerPickupsRouter.get("/", async (c) => {
     .from("purchase_orders")
     .select(
       `
-      id, dl, supplier_id, warehouse_id, sup_status, eta_date, placed_at,
+      id, dl, supplier_id, warehouse_id, sup_status, status, eta_date, placed_at,
       suppliers(name, contact),
       warehouses(name, address),
       lines:purchase_order_lines(id, sku, qty, attrs)
