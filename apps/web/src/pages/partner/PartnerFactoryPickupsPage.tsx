@@ -54,10 +54,18 @@ type PickupRow = {
   lines: PickupLine[];
 };
 
-type Stage = "awaiting" | "scheduled" | "in_transit" | "delivered";
+type Stage = "upcoming" | "awaiting" | "scheduled" | "in_transit" | "delivered";
 
 function stageOf(p: PickupRow): Stage | null {
   if (p.status !== "open") return null;
+  // 2026-05-11 (Loo): "Upcoming" — supplier still producing. Partner sees the
+  // PO + ETA early so they can plan capacity before it lands in Awaiting.
+  if (
+    p.sup_status === "pending" ||
+    p.sup_status === "acknowledged" ||
+    p.sup_status === "in_production"
+  )
+    return "upcoming";
   if (
     p.sup_status === "ready_confirm_sent" ||
     p.sup_status === "ready_for_pickup" ||
@@ -122,6 +130,7 @@ export default function PartnerFactoryPickupsPage() {
 
   const buckets = useMemo(() => {
     const out = {
+      upcoming: [] as PickupRow[],
       awaiting: [] as PickupRow[],
       scheduled: [] as PickupRow[],
       in_transit: [] as PickupRow[],
@@ -180,7 +189,22 @@ export default function PartnerFactoryPickupsPage() {
       ) : (
         <>
           <div className="kicker text-base-500">Active pipeline</div>
-          <div className="grid grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {/* 2026-05-11 (Loo): Upcoming column = supplier still producing.
+                Read-only — no action button (partner just monitors ETA to plan
+                capacity until the PO drops into Awaiting accept). */}
+            <PipelineColumn
+              label="Upcoming"
+              hint="Supplier still producing · plan ahead"
+              accent="muted"
+              items={buckets.upcoming}
+              renderAction={(po) => (
+                <span className="block w-full text-center font-mono text-[10px] text-base-500 py-1.5">
+                  {po.eta_date ? `ETA ${po.eta_date}` : "ETA tbd"}
+                </span>
+              )}
+              onOpen={setOpenId}
+            />
             <PipelineColumn
               label="Awaiting accept"
               hint="Dispatched to you · accept to schedule"
@@ -336,12 +360,17 @@ function PipelineColumn({
 }: {
   label: string;
   hint: string;
-  accent: "warning" | "info";
+  accent: "warning" | "info" | "muted";
   items: PickupRow[];
   renderAction: (p: PickupRow) => React.ReactNode;
   onOpen: (id: string) => void;
 }) {
-  const accentCls = accent === "warning" ? "text-warning" : "text-info";
+  const accentCls =
+    accent === "warning"
+      ? "text-warning"
+      : accent === "info"
+        ? "text-info"
+        : "text-base-500";
   return (
     <div className="bg-white border border-base-200 rounded-md overflow-hidden flex flex-col">
       <div className="px-4 py-3.5 border-b border-base-100">

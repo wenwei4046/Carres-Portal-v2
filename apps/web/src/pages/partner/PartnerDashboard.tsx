@@ -50,8 +50,19 @@ type FleetRow = {
   driver_phone: string | null;
 };
 
-function bucketOf(p: DashboardPickupRow): "awaiting" | "scheduled" | "in_transit" | "delivered" | null {
+type Bucket = "upcoming" | "awaiting" | "scheduled" | "in_transit" | "delivered";
+
+function bucketOf(p: DashboardPickupRow): Bucket | null {
   if (p.status !== "open" && p.sup_status !== "delivered") return null;
+  // 2026-05-11 (Loo): "Upcoming" preview — partner sees POs the supplier is
+  // still producing so they can plan capacity by ETA before the row jumps
+  // into Awaiting Accept. Source bucket = pre-LP-confirm sup_status values.
+  if (
+    p.sup_status === "pending" ||
+    p.sup_status === "acknowledged" ||
+    p.sup_status === "in_production"
+  )
+    return "upcoming";
   if (
     p.sup_status === "ready_confirm_sent" ||
     p.sup_status === "ready_for_pickup" ||
@@ -97,6 +108,7 @@ export default function PartnerDashboard() {
 
   const buckets = useMemo(() => {
     const out = {
+      upcoming: [] as DashboardPickupRow[],
       awaiting: [] as DashboardPickupRow[],
       scheduled: [] as DashboardPickupRow[],
       in_transit: [] as DashboardPickupRow[],
@@ -152,7 +164,13 @@ export default function PartnerDashboard() {
           See all pickups →
         </Link>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <PreviewColumn
+          label="Upcoming"
+          hint="Supplier still producing · plan ahead"
+          accent="muted"
+          items={buckets.upcoming}
+        />
         <PreviewColumn
           label="Awaiting accept"
           hint="Dispatched to you · accept to schedule"
@@ -290,10 +308,15 @@ function PreviewColumn({
 }: {
   label: string;
   hint: string;
-  accent: "warning" | "info";
+  accent: "warning" | "info" | "muted";
   items: DashboardPickupRow[];
 }) {
-  const accentCls = accent === "warning" ? "text-warning" : "text-info";
+  const accentCls =
+    accent === "warning"
+      ? "text-warning"
+      : accent === "info"
+        ? "text-info"
+        : "text-base-500";
   return (
     <div className="bg-white border border-base-200 rounded-md overflow-hidden">
       <div className="px-4 py-3.5 border-b border-base-100">
