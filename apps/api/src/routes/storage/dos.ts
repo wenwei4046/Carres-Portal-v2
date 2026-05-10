@@ -50,8 +50,21 @@ function extForMime(mime: (typeof ALLOWED_MIMES)[number]): string {
 
 dosRouter.post("/sign-upload", async (c) => {
   const auth = c.var.auth;
-  if (!["logistics", "principal"].includes(auth.role)) {
-    throw new HTTPException(403, { message: "Logistics or principal role required" });
+  // 2026-05-11 (Loo): partner role added — the new partner-side receive flow
+  // collapses "Arrived at WH" + "Logistics Receive" into one step, so the
+  // partner driver uploads the DO directly. Storage RLS (migration 0084)
+  // scopes partner writes to POs where procurement_partner_id matches their
+  // JWT app_partner_id, so cross-partner uploads still 403 at the RLS layer
+  // even though the API gate admits them.
+  if (!["logistics", "principal", "partner"].includes(auth.role)) {
+    throw new HTTPException(403, {
+      message: "Logistics, principal, or partner role required",
+    });
+  }
+  if (auth.role === "partner" && !auth.partnerId) {
+    throw new HTTPException(403, {
+      message: "Partner role requires partner_id in JWT",
+    });
   }
 
   const raw = await c.req.json().catch(() => ({}));
