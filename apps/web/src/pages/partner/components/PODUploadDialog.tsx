@@ -3,30 +3,32 @@ import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useAttachPod, type PartnerToDeliverRow } from "@/lib/queries";
+import { Modal, ModalActions } from "../../logistics/components/Modal";
 
 /**
  * PODUploadDialog — Phase 7 Sprint 2, redesigned 2026-05-11 (Loo).
  *
- * Two-stage flow:
+ * Two-stage flow + shared Carres Modal chrome (matches DOAttachModal /
+ * ReceivePOModal / PartnerReceiveAtWhModal):
+ *
  *   1. Pick photo → upload to `proof-of-delivery` Storage bucket. State holds
  *      the resulting path + an in-browser preview URL. NOTHING transitions yet.
  *   2. User reviews preview → clicks "Mark delivered" → calls
  *      partner_attach_pod RPC which sets pod_url + advances
  *      thread.logistics_stage='delivered'.
  *
- * Previous version (pre-2026-05-11) auto-committed the moment the file picker
- * resolved — Loo couldn't verify what was uploaded before it flipped the row
- * to delivered. New flow makes the upload visible + reviewable + reversible
- * (re-pick) up until Submit is pressed.
+ * Pre-Loo-2026-05-11 the dialog used raw Tailwind chrome (its own backdrop,
+ * its own header) AND auto-committed the moment a file was picked. Loo asked
+ * partner POD to share visual language with the logistics DOAttachModal so an
+ * operator switching roles doesn't re-learn the action surface.
  *
- * Bytes are uploaded immediately so the user sees a thumbnail/filename
- * confirmation. If the user cancels after upload, the blob is orphaned in
- * Storage — acceptable cost, mirrors DOFileUploadField behavior; Phase 9
- * storage TTL sweep will reap.
+ * Bytes are uploaded immediately so the preview renders; if the user cancels
+ * after upload, the blob is orphaned in Storage — acceptable cost, mirrors
+ * DOFileUploadField behavior; Phase 9 storage TTL sweep will reap.
  *
  * Storage RLS (migration 0069) gates writes to threads where
  * delivery_partner_id = my partner_id, so the API endpoint signs with the
- * USER JWT (not service_role) — same Codex F11 pattern as DO upload.
+ * USER JWT (not service_role) — same Codex F11 pattern as the order-DO path.
  *
  * On Submit success, useAttachPod invalidates ["partner"] which removes the
  * row from the In Transit list (toDeliver) and bumps dashboard counts.
@@ -107,7 +109,6 @@ export default function PODUploadDialog({
         .uploadToSignedUrl(sign.path, sign.token, file);
       if (uploadErr) throw uploadErr;
 
-      // Path stored — user can now review and Submit.
       setUploadedPath(sign.path);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upload failed";
@@ -130,38 +131,33 @@ export default function PODUploadDialog({
   const canSubmit = !!uploadedPath && !uploading && !attach.isPending;
   const isImage = pickedType === "image/jpeg" || pickedType === "image/png";
   const sizeMb = pickedSize ? (pickedSize / 1024 / 1024).toFixed(2) : null;
+  const titleRef = row.po_id ?? `Order ${row.order_id.slice(0, 8)}`;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-      onClick={attach.isPending || uploading ? undefined : onClose}
-    >
+    <Modal title={`Proof of Delivery · ${titleRef}`} onClose={onClose}>
       <div
-        className="w-[520px] max-w-full bg-card rounded-md shadow-xl p-6"
-        onClick={(e) => e.stopPropagation()}
+        className="text-[12px] text-base-600 mb-3.5 font-body"
         data-testid="pod-upload-dialog"
       >
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
-          Proof of Delivery
-        </div>
-        <h2 className="font-display text-[20px] mb-4">
-          {row.po_id ?? `Order ${row.order_id.slice(0, 8)}`}
-        </h2>
-        <div className="text-[12.5px] text-muted-foreground mb-4">
-          Customer: <span className="text-foreground">{row.customer_name}</span>
-          {row.customer_address && (
-            <>
-              <br />
-              Address: <span className="text-foreground">{row.customer_address}</span>
-            </>
-          )}
-        </div>
+        Drop off at <strong>{row.customer_name}</strong>
+        {row.customer_address && (
+          <>
+            {" · "}
+            <span>{row.customer_address}</span>
+          </>
+        )}
+        . Upload the signed POD photo — the thread flips straight to{" "}
+        <strong>delivered</strong> when you submit.
+      </div>
 
-        {!previewUrl ? (
-          <label className="block mb-3">
-            <span className="text-[12px] font-medium text-foreground block mb-1.5">
-              Upload POD photo (JPG / PNG / PDF, ≤ 10 MB)
-            </span>
+      <div className="grid gap-3 mb-4">
+        <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
+          <div className="text-[11px] text-base-600 mb-2 font-body">
+            Attach signed POD *{" "}
+            <span className="text-base-400">(JPG/PNG/PDF · ≤10 MB)</span>
+          </div>
+
+          {!previewUrl ? (
             <input
               ref={fileInputRef}
               type="file"
@@ -169,29 +165,24 @@ export default function PODUploadDialog({
               onChange={handleChange}
               disabled={uploading || attach.isPending}
               aria-label="POD file"
-              className="block w-full text-sm"
+              className="block w-full text-[12px]"
               data-testid="pod-file-input"
             />
-          </label>
-        ) : (
-          <div className="mb-3">
-            <span className="text-[12px] font-medium text-foreground block mb-1.5">
-              Review before submitting
-            </span>
-            <div className="border border-dashed border-base-300 rounded-md p-3 bg-white">
+          ) : (
+            <div>
               {isImage ? (
                 <img
                   src={previewUrl}
                   alt={pickedName ?? "POD preview"}
-                  className="max-h-64 mx-auto rounded-sm object-contain"
+                  className="max-h-56 mx-auto rounded-sm object-contain"
                   data-testid="pod-preview-image"
                 />
               ) : (
-                <div className="flex items-center gap-3 py-4 px-2">
+                <div className="flex items-center gap-3 py-3 px-1">
                   <div className="w-10 h-12 bg-base-100 border border-base-200 rounded-sm flex items-center justify-center font-mono text-[10px] text-base-700">
                     PDF
                   </div>
-                  <div className="font-body text-[12.5px] text-base-800">
+                  <div className="font-body text-[12.5px] text-base-800 truncate">
                     {pickedName}
                   </div>
                 </div>
@@ -213,7 +204,7 @@ export default function PODUploadDialog({
                 type="button"
                 onClick={handleRepick}
                 disabled={uploading || attach.isPending}
-                className="mt-2.5 text-[11px] underline text-base-600 disabled:opacity-50"
+                className="mt-2 text-[11px] underline text-base-600 disabled:opacity-50"
                 data-testid="pod-repick"
               >
                 Choose a different file
@@ -229,36 +220,26 @@ export default function PODUploadDialog({
                 data-testid="pod-file-input"
               />
             </div>
-          </div>
-        )}
+          )}
 
-        {error && (
-          <p className="text-[12px] text-destructive mt-2" data-testid="pod-error">
-            {error}
-          </p>
-        )}
-
-        <div className="flex justify-end gap-2 mt-5">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={uploading || attach.isPending}
-            className="px-3 py-2 text-[12px] border border-border rounded-md disabled:opacity-50"
-            data-testid="pod-cancel"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="px-3 py-2 text-[12px] bg-primary text-primary-foreground rounded-md font-semibold disabled:opacity-50"
-            data-testid="pod-submit"
-          >
-            {attach.isPending ? "Marking…" : "Mark delivered"}
-          </button>
+          {error && (
+            <p
+              className="text-[11px] text-destructive mt-1.5"
+              data-testid="pod-error"
+            >
+              {error}
+            </p>
+          )}
         </div>
       </div>
-    </div>
+
+      <ModalActions
+        onCancel={onClose}
+        onPrimary={handleSubmit}
+        primary="Mark delivered"
+        primaryDisabled={!canSubmit}
+        primaryPending={attach.isPending}
+      />
+    </Modal>
   );
 }
