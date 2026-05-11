@@ -472,6 +472,44 @@ What was SKIPPED per Loo's "skip the phase 9 process" directive:
   • 24h monitoring (Step 10) — open
   • Old system retirement (Day 5+) — open
 
+**Phase 9 Day 1 a-to-z bug sweep EXECUTED 2026-05-11 ~02:30 GMT+8** — Loo ran end-to-end smoke (new order → procurement → delivery) immediately post-deploy and surfaced UX gaps + cross-role sync bugs. Over ~3 hours: 13 commits + 4 migrations (0083-0086) shipping root-layer fixes, plus 3 feature additions Loo asked for during the test (Direct-receive escape hatch, partner-side collapsed Arrived+Receive, Upcoming column + Today Deliveries pipeline preview). Tree clean at `55ad1c1`, origin/main in sync.
+
+Commits (oldest → newest):
+- `b3beb88` Login page rewritten 1:1 from `reference/Carres Portal · Login.html` per Loo's "make sure all same even the motion need same as well" (editorial split-screen + film grain + ✸ star spin + panel rise + CTA hover + modal flow; proto's paid Cera Pro → Mulish via Google Fonts with same humanist proportions; `font-editorial` family added to Tailwind scoped to Login only)
+- `6c8f1a1` partner pickups SELECT now includes `status` column — kanban was always empty even when rows existed; one-word fix
+- `eb76eb9` (later superseded by `8ef5f7e`) hide sidebar badge on active tab — first attempt was visual hack; Loo wanted true unread semantics
+- `8ef5f7e` migration 0083 user_nav_seen + mark_badge_seen RPC; click tab → POST /api/logistics/badges/seen upserts last_seen_at=now(); badge query filters `updated_at > last_seen_at`. Both `orders` + `purchase_orders` already had updated_at triggers so any state transition re-lights the badge. Optimistic mutation zeros count instantly, 30s poll reconciles
+- `dab4439` Logistics Procurement "Direct receive" escape hatch surfaces on every non-terminal sup_status (DO direct from supplier/warehouse case)
+- `b3f15c9` Partner side "Arrived at WH" button now opens full receive modal (DO upload + per-line qty + signed checkbox) → atomically flips PO to `status='received'`; partner kanban filters `status='open'` so PO drops off cleanly. Underlying RPC `logistics_receive_po_with_do` (0076) already admitted partner role — plumbing was there, just missing partner-side route + UI mount
+- `c7dd23b` CreatePOModal SKU dropdown stale on cold-cache first open — root: useState(initialLines) captured before catalog loaded; ref-guarded useEffect re-syncs when catalog arrives
+- `9801b3c` Upcoming column added at front of partner Active Pipeline (sup_status pending/acknowledged/in_production, muted gray, read-only, ETA inline) — capacity-planning preview
+- `878a289` Storage `delivery-orders` bucket partner write policy (scoped EXISTS check on procurement_partner_id) + bonus discovery: existing READ policy still referenced pre-0052 `delivery_partner_id` column (silently broken since logistics/principal short-circuited the OR) — fixed in same migration
+- `b9395cc` LP whitelist relax for status + do_file_path + do_uploaded_at + do_uploaded_by — mirrors 0081's pattern (SECURITY DEFINER RPC's UPDATE still fires triggers under caller session role). Risk acceptance: partner can raw-UPDATE `status='received'` but stock_balances + threads stay untouched so drift surfaces as missing stock_movements audit row
+- `481cf3b` migration 0086 — `logistics_assign_partner` RPC recreated: now sets `orders.warehouse_id` from first ready_to_dispatch thread, force-dispatches every ready_to_dispatch thread on the order with delivery_partner_id + confirm_delivery_date (from orders.delivery_date) + partner_accepted_at. Backfill DO block patches #1004 + any other order stuck in same broken state. Root: legacy 0019 RPC predates threads — only mutated orders row, never propagated to order_supplier_threads
+- `3d2d7f2` Deliveries page rebuilt as 3-column kanban (Awaiting accept / Scheduled / Out for delivery) mirroring Factory pickups visual; cards split PO# / customer / date into separate spans (so `test getByText("2026-05-15")` still passes)
+- `55ad1c1` Today's Active Pipeline now shows second "Deliveries pipeline · N active" section alongside Factory pickups; cards link to full Deliveries page (no inline actions, keep Today scannable)
+
+Migrations applied this session (staging Supabase `kfprgpjpaffedghytstl` via Supabase MCP `apply_migration`):
+- `0083_user_nav_seen` — per-user badge seen-state table + `mark_badge_seen` RPC
+- `0084_storage_dos_partner_write` — delivery-orders bucket partner write + read RLS column rename fix
+- `0085_lp_whitelist_allow_receive_columns` — status + do_* columns for partner receive
+- `0086_assign_partner_propagate_to_threads` — RPC recreate + #1004 backfill
+
+**Recurring confusion point identified — customer-leg vs procurement-leg separation is THE bug source**. Today's #1004 + "source warehouse blank" + "partner sees no delivery" all rooted there. Future partner-debug heuristic: ASK WHICH LEG. procurement leg (factory → WH) = `purchase_orders.procurement_partner_id`; customer leg (WH → customer home) = `order_supplier_threads.delivery_partner_id`.
+
+**Bug-fix discipline that worked**: every Loo screenshot got drilled 2-3 layers (DB query → trigger → RPC → UI) before any code change. Avoided 表面 fix temptation; the fix usually lived 2-3 layers down.
+
+Migration count: 86 files (was 82 post-Phase-9-deploy).
+Test count deltas this session: badges 4→10, partner pickups 18→23, ProcurementTabContent 18→25, dos.ts 4→6, PartnerPickupsPage 4→4 (kept passing through redesign by splitting date into separate span). All green at save time.
+Worker version IDs deployed today (most recent first): 91476b0f → 8e63d3e4 → 6c36197c → 404171a1 → dcf328b2.
+
+Phase 9 Day 2+ tasks still open:
+  • 8 alpha users (finance / logistics / bd / dealer / salesperson / supplier / partner / showroom) via PrincipalAccounts UI
+  • per-role manual smoke (only principal verified Day 1)
+  • 24h Cloudflare + Supabase log monitoring
+  • principal@carres.com password rotation Week 2 (signed-off known-risk per earlier §17 entry)
+  • API bundle 993 KiB gzipped — 31 KiB under Workers Free 1024 KiB limit; next major API addition probably pushes over (upgrade $5/mo paid plan, or code-split)
+
 
 
 ---
