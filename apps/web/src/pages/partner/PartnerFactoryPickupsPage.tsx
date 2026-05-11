@@ -49,8 +49,13 @@ type PickupRow = {
   status: string;
   eta_date: string | null;
   placed_at: string;
-  suppliers: { name: string; contact: string | null } | null;
-  warehouses: { name: string; address: string | null } | null;
+  procurement_partner_id: string | null;
+  // 2026-05-11 (Loo migration 0090): supplier.kind drives Accept-Pickup vs
+  // Accept-Receive button branching at sup_status='ready_confirm_sent'.
+  // warehouse.kind + owning_partner_id surface so the UI can label
+  // partner-WH-owned PO rows distinctly from procurement-assignment ones.
+  suppliers: { name: string; contact: string | null; kind: "own_logistics" | "factory_pickup" | null } | null;
+  warehouses: { name: string; address: string | null; kind: "own" | "logistics_partner" | null; owning_partner_id: string | null } | null;
   lines: PickupLine[];
 };
 
@@ -114,6 +119,38 @@ export default function PartnerFactoryPickupsPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: qk.partner.pickups() });
       await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
+    },
+  });
+  // 2026-05-11 (Loo migration 0090) — own_logistics + ready_confirm_sent
+  // branch. The supplier dispatches the goods themselves; partner only
+  // confirms receipt at the partner-WH OR rejects so logistics relocates.
+  const confirmReceive = useMutation({
+    mutationFn: (poId: string) =>
+      apiFetch(`/api/partner/pickups/${poId}/confirm-receive`, { method: "POST" }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: qk.partner.pickups() });
+      await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
+      toast.success("Receive confirmed · supplier may dispatch");
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof ApiError ? err.message : "Confirm failed";
+      toast.error(msg);
+    },
+  });
+  const rejectReceive = useMutation({
+    mutationFn: ({ poId, reason }: { poId: string; reason: string }) =>
+      apiFetch(`/api/partner/pickups/${poId}/reject-receive`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: qk.partner.pickups() });
+      await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
+      toast.success("Rejected · Logistics will relocate the warehouse");
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof ApiError ? err.message : "Reject failed";
+      toast.error(msg);
     },
   });
   const markCollected = useMutation({
@@ -210,25 +247,67 @@ export default function PartnerFactoryPickupsPage() {
               hint="Dispatched to you · accept to schedule"
               accent="warning"
               items={buckets.awaiting}
-              renderAction={(po) => (
-                <button
-                  type="button"
-                  disabled={accept.isPending}
-                  onClick={() =>
-                    accept.mutate(po.id, {
-                      onSuccess: () =>
-                        toast.success(`${po.id} accepted · scheduled for pickup`),
-                      onError: (err) =>
-                        toast.error(
-                          err instanceof ApiError ? err.message : "Accept failed",
-                        ),
-                    })
-                  }
-                  className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
-                >
-                  ✓ Accept pickup
-                </button>
-              )}
+              renderAction={(po) => {
+                // 2026-05-11 (Loo migration 0090) — branch on supplier kind:
+                //   own_logistics + ready_confirm_sent → Accept Receive +
+                //     Reject (sofa flow, supplier dispatches themselves to
+                //     partner-owned WH, partner only confirms or relocates)
+                //   anything else → Accept Pickup (the partner picks up at
+                //     the factory in the standard factory_pickup flow)
+                const isReceiveFlow =
+                  po.suppliers?.kind === "own_logistics" &&
+                  po.sup_status === "ready_confirm_sent";
+                if (isReceiveFlow) {
+                  return (
+                    <div className="flex flex-col gap-1.5">
+                      <button
+                        type="button"
+                        disabled={confirmReceive.isPending || rejectReceive.isPending}
+                        onClick={() => confirmReceive.mutate(po.id)}
+                        className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                        data-testid={`confirm-receive-${po.id}`}
+                      >
+                        ✓ Accept · Confirm receive
+                      </button>
+                      <button
+                        type="button"
+                        disabled={confirmReceive.isPending || rejectReceive.isPending}
+                        onClick={() => {
+                          const reason = window.prompt(
+                            "Why are you rejecting this incoming delivery? (≥4 chars, optional but recommended)",
+                            "",
+                          );
+                          if (reason === null) return;
+                          rejectReceive.mutate({ poId: po.id, reason });
+                        }}
+                        className="w-full px-3 py-1.5 bg-white border border-warning text-warning rounded text-[12px] font-semibold disabled:opacity-50"
+                        data-testid={`reject-receive-${po.id}`}
+                      >
+                        ✗ Reject · Relocate
+                      </button>
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    type="button"
+                    disabled={accept.isPending}
+                    onClick={() =>
+                      accept.mutate(po.id, {
+                        onSuccess: () =>
+                          toast.success(`${po.id} accepted · scheduled for pickup`),
+                        onError: (err) =>
+                          toast.error(
+                            err instanceof ApiError ? err.message : "Accept failed",
+                          ),
+                      })
+                    }
+                    className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                  >
+                    ✓ Accept pickup
+                  </button>
+                );
+              }}
               onOpen={setOpenId}
             />
             <PipelineColumn

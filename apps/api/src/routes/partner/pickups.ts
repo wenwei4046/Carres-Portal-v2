@@ -44,19 +44,24 @@ partnerPickupsRouter.get("/", async (c) => {
   const sb = userClient(c.env, auth.jwt);
   // 2026-05-10 (Loo) — embed lines + supplier + warehouse so the partner
   // detail drawer can render the full pickup brief without a second
-  // round-trip. delivery_partners join was the legacy customer-leg join;
-  // suppliers + warehouses are the actual procurement-leg context.
+  // round-trip. 2026-05-11 (Loo migration 0090) — partner can now own a PO
+  // via either procurement_partner_id (factory-pickup assignment) OR
+  // warehouse.owning_partner_id (own_logistics + partner-owned WH sofa
+  // flow). RLS partner_sees_own_po already permits both paths; remove the
+  // narrow `.eq("procurement_partner_id", ...)` so the kanban surfaces both.
+  // supplier.kind is now in the SELECT so the UI can branch button labels
+  // (Accept Pickup vs Accept Receive) per Loo's sofa-acceptance flow.
   const { data, error } = await sb
     .from("purchase_orders")
     .select(
       `
       id, dl, supplier_id, warehouse_id, sup_status, status, eta_date, placed_at,
-      suppliers(name, contact),
-      warehouses(name, address),
+      procurement_partner_id,
+      suppliers(name, contact, kind),
+      warehouses(name, address, kind, owning_partner_id),
       lines:purchase_order_lines(id, sku, qty, received_qty, attrs)
     `,
     )
-    .eq("procurement_partner_id", auth.partnerId)
     .order("placed_at", { ascending: false });
 
   if (error) throw new HTTPException(500, { message: error.message });
@@ -90,6 +95,49 @@ partnerPickupsRouter.post("/:id/mark-picked-up", async (c) => {
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("partner_mark_picked_up", {
     p_po_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+// 2026-05-11 (Loo) — Sofa-acceptance flow (own_logistics suppliers shipping
+// straight to a partner-owned warehouse). Migration 0090 reactivates
+// partner_confirm_receive (was dropped by 0060) + extends ownership to
+// include warehouse.owning_partner_id so partner WH owners get accept/reject
+// rights at sup_status='ready_confirm_sent'.
+//
+//   accept → partner_confirmed → supplier dispatches
+//   reject → customer_rejected → Logistics relocates warehouse
+partnerPickupsRouter.post("/:id/confirm-receive", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Only partner role with partner_id" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("partner_confirm_receive", {
+    p_po_id: c.req.param("id"),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+partnerPickupsRouter.post("/:id/reject-receive", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Only partner role with partner_id" });
+  }
+  const raw = await c.req.json().catch(() => ({}));
+  const reason = typeof raw?.reason === "string" ? raw.reason : "";
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("partner_reject_customer", {
+    p_po_id: c.req.param("id"),
+    p_reason: reason,
   });
   if (error) {
     const m = mapPgError(error);
