@@ -89,25 +89,37 @@ test("phase-6 happy: supplier acknowledges PO → production → ready → DO up
   // E2E happy paths to walk the chain. For this V1 happy spec we assume
   // the seed has at least one pickup_accepted PO ready for DO upload.
 
-  // ----- 6. DO upload on a pickup_accepted PO -------------------------------
-  // Find a card showing "Upload Delivery Order" capability (open drawer).
+  // ----- 6. DO upload UI surface on a pickup_accepted PO --------------------
+  // Migration 0094 (Loo 2026-05-11) now REQUIRES the signed DO file path on
+  // supplier_mark_delivered. Mirroring the Phase 7 POD spec convention, we
+  // don't drive a real Supabase Storage upload from Playwright — signed-URL
+  // expiry + network timing make `setInputFiles` brittle on staging. UI
+  // wiring is validated here; the underlying RPC + zod + storage RLS are
+  // covered by apps/api/src/routes/supplier/pos.test.ts +
+  // apps/api/src/routes/storage/dos.test.ts.
   const acceptedCard = page
     .locator('[data-testid^="po-card-"]')
-    .filter({ hasText: /Pickup scheduled|Shipped/i })
+    .filter({ hasText: /Pickup scheduled|Shipped|Partner accepted/i })
     .first();
   if (await acceptedCard.isVisible()) {
     await acceptedCard.click();
     await expect(page.getByTestId("po-drawer")).toBeVisible();
     await page.getByRole("button", { name: /Upload Delivery Order/i }).click();
-    await page.getByLabel(/DO number/i).fill("DO-E2E-9999");
-    await page.getByLabel(/I confirm/i).check();
-    await page
-      .getByRole("button", { name: /Submit DO.*Mark Delivered/i })
-      .click();
-    await expect(page.getByText(/DO.*uploaded.*closed/i)).toBeVisible({ timeout: 5_000 });
 
-    // Switch to Delivered tab — the PO is there.
-    await page.getByRole("button", { name: /^Delivered$/i }).click();
-    await expect(page.getByText(/DO-E2E-9999|delivered/i).first()).toBeVisible();
+    // Pre-DO# state: file-upload widget is gated, hint visible.
+    await expect(
+      page.getByText(/Enter the DO number above first/i),
+    ).toBeVisible();
+
+    // Typing a 3+ char DO# mounts the DOFileUploadField.
+    await page.getByTestId("do-number-input").fill("DO-E2E-9999");
+    await expect(page.getByLabel(/DO file/i)).toBeVisible();
+    await page.getByLabel(/I confirm/i).check();
+
+    // Submit stays disabled — doFilePath is still null because no file was
+    // uploaded. This is the assertion: the new required-file gate works.
+    await expect(
+      page.getByRole("button", { name: /Submit DO.*Mark Delivered/i }),
+    ).toBeDisabled();
   }
 });

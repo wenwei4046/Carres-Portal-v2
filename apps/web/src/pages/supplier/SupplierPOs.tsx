@@ -12,6 +12,7 @@ import {
   type SupplierSupStatus,
   type SupplierMe,
 } from "@/lib/queries";
+import DOFileUploadField from "@/components/DOFileUploadField";
 
 /**
  * Supplier · Purchase Orders page — Phase 6 spec §6.
@@ -437,15 +438,30 @@ function PODrawer({
   const [doNumber, setDoNumber] = useState("");
   const [doNote, setDoNote] = useState("");
   const [doConfirm, setDoConfirm] = useState(false);
+  // DO file path captured from DOFileUploadField. Uploads stream to the
+  // `delivery-orders` Storage bucket via /api/storage/dos/sign-upload first
+  // (server route widened to admit supplier role per migration 0094); the
+  // canonical path rides the mark-delivered mutation. Photo upload is
+  // REQUIRED — supplier_mark_delivered RPC 0094 422s without it.
+  const [doFilePath, setDoFilePath] = useState<string | null>(null);
   const markDelivered = useMarkDelivered();
 
-  const canSubmit = doNumber.trim().length > 0 && doConfirm;
+  // doNumber ≥ 3 mirrors the storage sign-upload server check
+  // (`do_number: z.string().min(3)`); enforce client-side so the file upload
+  // doesn't 422 with a confusing message.
+  const canSubmit =
+    doNumber.trim().length >= 3 && !!doFilePath && doConfirm;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit || !doFilePath) return;
     markDelivered.mutate(
-      { poId: po.id, doNumber: doNumber.trim(), doNote: doNote.trim() || undefined },
+      {
+        poId: po.id,
+        doNumber: doNumber.trim(),
+        doFilePath,
+        doNote: doNote.trim() || undefined,
+      },
       {
         onSuccess: () => {
           toast.success(`DO ${doNumber.trim()} uploaded · ${po.id} closed`);
@@ -626,6 +642,7 @@ function PODrawer({
                     onChange={(e) => setDoNumber(e.target.value)}
                     placeholder="e.g. DO-CMS-9023"
                     className="block w-full mt-1 px-3 py-2 border border-border rounded font-mono text-[13px] bg-background"
+                    data-testid="do-number-input"
                   />
                 </label>
                 <label className="text-[12px] text-foreground">
@@ -638,6 +655,26 @@ function PODrawer({
                     className="block w-full mt-1 px-3 py-2 border border-border rounded text-[13px] resize-y bg-background"
                   />
                 </label>
+                <div
+                  className="px-3 py-2.5 border border-dashed border-border rounded bg-background"
+                  data-testid="do-file-upload"
+                >
+                  <div className="text-[12px] text-foreground mb-2">
+                    Attach signed DO file{" "}
+                    <span className="text-muted-foreground">(PDF/JPG/PNG · ≤10 MB · required)</span>
+                  </div>
+                  {doNumber.trim().length < 3 ? (
+                    <div className="text-[11px] text-muted-foreground italic">
+                      Enter the DO number above first (min 3 characters).
+                    </div>
+                  ) : (
+                    <DOFileUploadField
+                      poId={po.id}
+                      doNumber={doNumber.trim()}
+                      onUploaded={(path) => setDoFilePath(path)}
+                    />
+                  )}
+                </div>
                 <label className="flex items-start gap-2 text-[12px] text-foreground leading-snug">
                   <input
                     type="checkbox"

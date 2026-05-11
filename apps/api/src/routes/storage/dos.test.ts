@@ -16,9 +16,14 @@ const KID = "k1";
 let signKey: KeyLike;
 let publicJwk: JWK;
 
-async function makeJwt(role: string, partnerId?: string) {
+async function makeJwt(
+  role: string,
+  partnerId?: string,
+  supplierId?: string,
+) {
   const app_metadata: Record<string, unknown> = { role };
   if (partnerId) app_metadata.partner_id = partnerId;
+  if (supplierId) app_metadata.supplier_id = supplierId;
   return new SignJWT({ email: `${role}@x`, app_metadata })
     .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
     .setSubject("11111111-1111-1111-1111-000000000001")
@@ -116,7 +121,7 @@ describe("POST /api/storage/dos/sign-upload", () => {
     expect(res.status).toBe(422);
   });
 
-  it("rejects non-logistics/principal/partner callers with 403", async () => {
+  it("rejects dealer caller with 403 (only logistics/principal/partner/supplier admitted)", async () => {
     const jwt = await makeJwt("dealer");
     const res = await app.fetch(
       new Request("http://t/api/storage/dos/sign-upload", {
@@ -177,6 +182,64 @@ describe("POST /api/storage/dos/sign-upload", () => {
         body: JSON.stringify({
           po_id: "PO-200",
           do_number: "DO-9",
+          mime_type: "application/pdf",
+          size_bytes: 2048,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  // Loo 2026-05-11 (phase-6-storage-do-upload close): supplier DO upload —
+  // supplier_mark_delivered (migration 0094) now requires the signed file path,
+  // so the supplier role gets admit + supplierId guard mirroring partner.
+  it("returns signed upload URL for supplier caller (with supplier_id)", async () => {
+    const sb = {
+      storage: {
+        from: vi.fn(() => ({
+          createSignedUploadUrl: vi.fn().mockResolvedValue({
+            data: { token: "stok", path: "PO-300/uuid-DO-7.pdf" },
+            error: null,
+          }),
+        })),
+      },
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt(
+      "supplier",
+      undefined,
+      "11111111-1111-1111-1111-bbbbbbbbbbbb",
+    );
+    const res = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          po_id: "PO-300",
+          do_number: "DO-7",
+          mime_type: "application/pdf",
+          size_bytes: 2048,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { token: string; path: string };
+    expect(body.token).toBe("stok");
+  });
+
+  it("rejects supplier without supplier_id in JWT with 403", async () => {
+    const jwt = await makeJwt("supplier"); // no supplierId
+    const res = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          po_id: "PO-300",
+          do_number: "DO-7",
           mime_type: "application/pdf",
           size_bytes: 2048,
         }),

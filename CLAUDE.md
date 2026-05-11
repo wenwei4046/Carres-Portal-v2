@@ -367,7 +367,7 @@ Phase 5 NEW carry-forwards (added 2026-05-09 Chunk B):
 Phase 6 NEW carry-forwards (added 2026-05-09 supplier autonomous run):
   • phase-6-supplier-me-endpoint ✅ closed 2026-05-09 commit `d49d3a3` — new GET `/api/supplier/me` RLS-scoped via suppliers_read (0002:152), 422 on missing JWT supplier_id, 404 on RLS-hidden row. SupplierPOs button gating: factory_pickup pending|acknowledged → Mark-in-production only; own_logistics pending → Acknowledge only, acknowledged → Start production. SupplierDashboard Coverage callout (proto:184-195) renders cat_covered + lead_time + contact_email + workflow badge. Loading-fallback keeps V1 dual-button behavior. +4 api tests + 4 web tests.
   • phase-6-incoming-server-side (medium) — SupplierIncoming V1 uses open-PO demand (useSupplierDemand) as forecast signal. Proto's true semantics: pending sales orders (orders.status='place') filtered by supplier.cat_covered. Add dedicated `/api/supplier/incoming` RPC + hook when forecast precision matters.
-  • phase-6-storage-do-upload (low) — supplier_mark_delivered V1 stores text-only do_number per Q2=A. Proto has DO PDF drop-zone. Add real Storage upload via Phase 7's signed-URL infrastructure when that lands.
+  • phase-6-storage-do-upload ✅ closed 2026-05-11 — migration 0094 widens `supplier_mark_delivered` to require `p_do_file_path`; modal mounts `DOFileUploadField` gated on doNumber ≥ 3 chars; Storage `delivery-orders` bucket RLS adds supplier branch scoped on `po.supplier_id = app_supplier_id()`. See §17 entry.
   • phase-6-supplier-mobile (low) — supplier-mobile.jsx (566 LOC) not built per Q4=A defer. Phase 8 mobile sweep candidate.
   • phase-6-pdf-do-print (low) — proto PODrawer has Print PO + Print DO buttons. Defer to Phase 9 PDF batch work.
   • phase-6-supplier-sku-code-mapping (low) — proto SupplierSKU shows synthesized "Supplier SKU" code column from a fake mapping. Real systems would map this in a `supplier_sku_codes(supplier_id, carres_sku, supplier_code)` table. Add only if a supplier asks for it.
@@ -509,6 +509,25 @@ Phase 9 Day 2+ tasks still open:
   • 24h Cloudflare + Supabase log monitoring
   • principal@carres.com password rotation Week 2 (signed-off known-risk per earlier §17 entry)
   • API bundle 993 KiB gzipped — 31 KiB under Workers Free 1024 KiB limit; next major API addition probably pushes over (upgrade $5/mo paid plan, or code-split)
+
+
+**Phase 6 supplier required DO photo (Loo 2026-05-11 ~23:00 GMT+8)** — single-screenshot bug fix closing the `phase-6-storage-do-upload` carry-forward. The supplier "Submit DO · Mark Delivered" modal accepted a DO# + note + signed checkbox only; no actual file. Migration 0094 widens `supplier_mark_delivered` to require `p_do_file_path` (3rd arg, written to `purchase_orders.do_file_path` + `do_uploaded_at` + `do_uploaded_by` — columns already on the table from the 0034 logistics receive flow). Same migration extends `delivery-orders` Storage bucket read+write RLS with a supplier branch scoped on `po.supplier_id = app_supplier_id()` (mirrors the partner branch added in 0084).
+
+API changes:
+- `apps/api/src/routes/storage/dos.ts` — `sign-upload` admits `supplier` role + requires `app_supplier_id()` on JWT. Storage RLS does the cross-supplier scoping; the API just gates entry.
+- `apps/api/src/routes/supplier/pos.ts` — `mark-delivered` passes `body.data.doFilePath` as `p_do_file_path` to RPC.
+- `packages/shared/src/schemas/supplier.ts` — `supplierMarkDeliveredInput` adds required `doFilePath: z.string().trim().min(1).max(500)`.
+
+Web changes:
+- `apps/web/src/lib/queries.ts` — `useMarkDelivered` mutation input adds `doFilePath`; body JSON forwards it.
+- `apps/web/src/pages/supplier/SupplierPOs.tsx` — modal mounts the existing `DOFileUploadField` (reuse from logistics/ReceivePOModal). Gated UX: DOFileUploadField only mounts after `doNumber` ≥ 3 chars (mirroring the storage sign-upload server check); a hint "Enter the DO number above first (min 3 characters)" surfaces before that. `canSubmit` adds `!!doFilePath` so the Submit button stays disabled until upload completes.
+
+E2E:
+- `e2e/phase-6-supplier-happy.spec.ts` — DO-upload section truncated to UI-surface checks (open form → see gating hint → type DO# → see upload field → assert Submit disabled). Mirrors Phase 7 POD spec convention: don't drive real Supabase Storage uploads from Playwright (signed-URL brittleness on staging). API tests + zod cover the contract.
+
+Tests added: +2 api/pos (5 → 7 mark-delivered cases), +2 api/dos (supplier admit + supplier-without-supplier_id reject), +2 web/SupplierPOs (DO# gating + submit disabled). Pre-existing failures (`partner/pickups.test.ts` 1 fail + `HoOKkASofaTab.test.tsx` 4 fails — `dab4439` Direct-receive escape hatch didn't update them) verified to exist on clean main via `git stash`; out of this PR's scope.
+
+Migration count: 94 files (was 86 in last §17 sync, includes 0087-0093 from intermediate sessions plus this 0094).
 
 
 

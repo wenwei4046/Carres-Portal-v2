@@ -3278,17 +3278,21 @@ export function useReadyForPickup(
   });
 }
 
+type MarkDeliveredInput = {
+  poId: string;
+  doNumber: string;
+  doFilePath: string;
+  doNote?: string;
+};
 export function useMarkDelivered(
-  opts?: Partial<
-    UseMutationOptions<unknown, ApiError, { poId: string; doNumber: string; doNote?: string }>
-  >,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, MarkDeliveredInput>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<unknown, ApiError, { poId: string; doNumber: string; doNote?: string }>({
-    mutationFn: ({ poId, doNumber, doNote }) =>
+  return useMutation<unknown, ApiError, MarkDeliveredInput>({
+    mutationFn: ({ poId, doNumber, doFilePath, doNote }) =>
       apiFetch(`/api/supplier/pos/${poId}/mark-delivered`, {
         method: "POST",
-        body: JSON.stringify({ doNumber, doNote }),
+        body: JSON.stringify({ doNumber, doFilePath, doNote }),
       }),
     ...opts,
     onSuccess: async (...args) => {

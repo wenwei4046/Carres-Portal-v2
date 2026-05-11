@@ -167,6 +167,7 @@ supplierPosRouter.post("/:id/mark-delivered", requireSupplier, async (c) => {
   const { data, error } = await sb.rpc("supplier_mark_delivered", {
     p_po_id: id,
     p_do_number: body.data.doNumber,
+    p_do_file_path: body.data.doFilePath,
     p_do_note: body.data.doNote ?? null,
   });
   if (error) {

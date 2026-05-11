@@ -198,4 +198,78 @@ describe("SupplierPOs", () => {
       screen.getByRole("button", { name: /Mark Ready for Pickup/i }),
     ).toBeInTheDocument();
   });
+
+  // Loo 2026-05-11 (phase-6-storage-do-upload close): supplier_mark_delivered
+  // (migration 0094) now requires the signed DO file path. The modal gates the
+  // upload widget on doNumber ≥ 3 (matching the storage sign-upload server
+  // check) and disables Submit until the upload completes.
+  it("DO upload field is gated behind a 3-char DO number", async () => {
+    mockAll({ me: ME_OWN, pos: [ACCEPTED_PO] });
+
+    render(wrap(<SupplierPOs />));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("po-card-PO-2048")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("po-card-PO-2048"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("po-drawer")).toBeInTheDocument();
+    });
+
+    // Open the DO form
+    fireEvent.click(
+      screen.getByRole("button", { name: /Upload Delivery Order/i }),
+    );
+
+    // doNumber is empty → upload field hidden, hint visible
+    expect(
+      screen.getByText(/Enter the DO number above first/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/DO file/i),
+    ).not.toBeInTheDocument();
+
+    // Typing a ≥ 3-char DO# mounts the DOFileUploadField
+    fireEvent.change(screen.getByTestId("do-number-input"), {
+      target: { value: "DO-7" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/DO file/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/Enter the DO number above first/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Submit button disabled until DO file is uploaded", async () => {
+    mockAll({ me: ME_OWN, pos: [ACCEPTED_PO] });
+
+    render(wrap(<SupplierPOs />));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("po-card-PO-2048")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("po-card-PO-2048"));
+
+    await waitFor(() => expect(screen.getByTestId("po-drawer")).toBeInTheDocument());
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Upload Delivery Order/i }),
+    );
+
+    // Fill DO# + tick signed — but skip file upload. Submit must stay
+    // disabled because doFilePath is null.
+    fireEvent.change(screen.getByTestId("do-number-input"), {
+      target: { value: "DO-7" },
+    });
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /confirm goods have been handed over/i }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: /Submit DO · Mark Delivered/i }),
+    ).toBeDisabled();
+  });
 });

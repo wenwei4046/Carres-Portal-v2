@@ -327,10 +327,21 @@ describe("POST /api/supplier/pos/:id/ready-for-pickup", () => {
 });
 
 describe("POST /api/supplier/pos/:id/mark-delivered", () => {
-  it("calls supplier_mark_delivered with do_number + do_note", async () => {
+  // Migration 0094 widens the RPC signature to require p_do_file_path; the
+  // frontend captures the path from /api/storage/dos/sign-upload before
+  // submitting. Every passing case below sends doFilePath, and the rejection
+  // case asserts the schema 422s when it's missing.
+  const SAMPLE_PATH = `${PO_ID}/abc-DO-9999.pdf`;
+
+  it("calls supplier_mark_delivered with all 4 args (number + file_path + note)", async () => {
     const sb = {
       rpc: vi.fn().mockResolvedValue({
-        data: { po_id: PO_ID, sup_status: "delivered", do_number: "DO-9999" },
+        data: {
+          po_id: PO_ID,
+          sup_status: "delivered",
+          do_number: "DO-9999",
+          do_file_path: SAMPLE_PATH,
+        },
         error: null,
       }),
     };
@@ -345,7 +356,11 @@ describe("POST /api/supplier/pos/:id/mark-delivered", () => {
           Authorization: `Bearer ${jwt}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ doNumber: "DO-9999", doNote: "partial" }),
+        body: JSON.stringify({
+          doNumber: "DO-9999",
+          doFilePath: SAMPLE_PATH,
+          doNote: "partial",
+        }),
       }),
       env,
     );
@@ -353,6 +368,7 @@ describe("POST /api/supplier/pos/:id/mark-delivered", () => {
     expect(sb.rpc).toHaveBeenCalledWith("supplier_mark_delivered", {
       p_po_id: PO_ID,
       p_do_number: "DO-9999",
+      p_do_file_path: SAMPLE_PATH,
       p_do_note: "partial",
     });
   });
@@ -372,7 +388,7 @@ describe("POST /api/supplier/pos/:id/mark-delivered", () => {
           Authorization: `Bearer ${jwt}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ doNumber: "DO-9999" }),
+        body: JSON.stringify({ doNumber: "DO-9999", doFilePath: SAMPLE_PATH }),
       }),
       env,
     );
@@ -380,6 +396,7 @@ describe("POST /api/supplier/pos/:id/mark-delivered", () => {
     expect(sb.rpc).toHaveBeenCalledWith("supplier_mark_delivered", {
       p_po_id: PO_ID,
       p_do_number: "DO-9999",
+      p_do_file_path: SAMPLE_PATH,
       p_do_note: null,
     });
   });
@@ -393,7 +410,39 @@ describe("POST /api/supplier/pos/:id/mark-delivered", () => {
           Authorization: `Bearer ${jwt}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ doNumber: "  " }),
+        body: JSON.stringify({ doNumber: "  ", doFilePath: SAMPLE_PATH }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects missing doFilePath with 422 (migration 0094 closes phase-6-storage-do-upload)", async () => {
+    const jwt = await makeJwt("supplier");
+    const res = await app.fetch(
+      new Request(`http://t/api/supplier/pos/${PO_ID}/mark-delivered`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ doNumber: "DO-9999" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects empty doFilePath with 422", async () => {
+    const jwt = await makeJwt("supplier");
+    const res = await app.fetch(
+      new Request(`http://t/api/supplier/pos/${PO_ID}/mark-delivered`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ doNumber: "DO-9999", doFilePath: "   " }),
       }),
       env,
     );

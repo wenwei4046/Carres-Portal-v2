@@ -12,14 +12,17 @@ import { z } from 'zod';
 /**
  * `supplierMarkDeliveredInput` — POST /api/supplier/pos/:id/mark-delivered.
  *
- * Maps to RPC `supplier_mark_delivered(p_po_id, p_do_number, p_do_note)`
- * (migration 0066). DO is text-only for V1 (Q2=A locked 2026-05-09);
- * real Storage upload deferred to Phase 7 partner POD work.
+ * Maps to RPC `supplier_mark_delivered(p_po_id, p_do_number, p_do_file_path,
+ * p_do_note)` (migration 0094 widened the 0066 V1 signature to require the
+ * signed DO file path). The frontend uploads to the `delivery-orders` Storage
+ * bucket via `/api/storage/dos/sign-upload` first, captures the canonical
+ * path, then sends it here. `doNote` stays optional.
  *
- * `doNote` is optional — supplier may add condition / partial-delivery notes.
+ * phase-6-storage-do-upload carry-forward closes here.
  */
 export const supplierMarkDeliveredInput = z.object({
   doNumber: z.string().trim().min(1, 'DO number is required').max(64),
+  doFilePath: z.string().trim().min(1, 'DO file is required').max(500),
   doNote: z.string().trim().max(500).optional(),
 });
 export type SupplierMarkDeliveredInput = z.infer<

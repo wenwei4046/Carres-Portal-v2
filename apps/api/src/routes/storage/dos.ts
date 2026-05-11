@@ -69,14 +69,23 @@ dosRouter.post("/sign-upload", async (c) => {
   // scopes partner writes to POs where procurement_partner_id matches their
   // JWT app_partner_id, so cross-partner uploads still 403 at the RLS layer
   // even though the API gate admits them.
-  if (!["logistics", "principal", "partner"].includes(auth.role)) {
+  // 2026-05-11 later (Loo, phase-6-storage-do-upload close): supplier role
+  // added — supplier_mark_delivered now requires the signed DO file (migration
+  // 0094). Storage RLS scopes supplier writes to POs whose supplier_id matches
+  // app_supplier_id(); cross-supplier uploads 403 at the RLS layer.
+  if (!["logistics", "principal", "partner", "supplier"].includes(auth.role)) {
     throw new HTTPException(403, {
-      message: "Logistics, principal, or partner role required",
+      message: "Logistics, principal, partner, or supplier role required",
     });
   }
   if (auth.role === "partner" && !auth.partnerId) {
     throw new HTTPException(403, {
       message: "Partner role requires partner_id in JWT",
+    });
+  }
+  if (auth.role === "supplier" && !auth.supplierId) {
+    throw new HTTPException(403, {
+      message: "Supplier role requires supplier_id in JWT",
     });
   }
 
