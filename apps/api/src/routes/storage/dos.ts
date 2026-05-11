@@ -42,6 +42,19 @@ const signUploadSchema = z.object({
   size_bytes: z.number().int().positive().max(MAX_SIZE),
 });
 
+// Order-level DO uploads (logistics → customer final delivery). Path prefix
+// `order-<order_uuid>/...` keeps these distinct from PO-level files at
+// `<po_id>/...`. Bucket + RLS unchanged from PO uploads — logistics +
+// principal short-circuit both read and write; the partner branch's
+// purchase_orders lookup fails for the `order-*` prefix so partner reads are
+// correctly denied for order DOs. Migration 0087 (Loo 2026-05-11).
+const signOrderUploadSchema = z.object({
+  order_id:   z.string().uuid(),
+  do_number:  z.string().min(3).max(50),
+  mime_type:  z.enum(ALLOWED_MIMES),
+  size_bytes: z.number().int().positive().max(MAX_SIZE),
+});
+
 function extForMime(mime: (typeof ALLOWED_MIMES)[number]): string {
   if (mime === "application/pdf") return "pdf";
   if (mime === "image/jpeg") return "jpg";
@@ -87,6 +100,52 @@ dosRouter.post("/sign-upload", async (c) => {
 
   // F11 — USER JWT, never service_role. Storage RLS (migration 0042) gates
   // writes; we just defer to it.
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.storage
+    .from("delivery-orders")
+    .createSignedUploadUrl(path);
+  if (error) throw new HTTPException(500, { message: error.message });
+
+  return c.json({ token: data.token, path: data.path });
+});
+
+// ----------------------------------------------------------------------------
+// POST /api/storage/dos/sign-order-upload — order-level DO upload (logistics
+// final-delivery flow, migration 0087 Loo 2026-05-11).
+//
+// Same bucket (`delivery-orders`), different path prefix: `order-<order_id>`
+// instead of `<po_id>`. Partner role is intentionally excluded — the partner
+// uploads POD via `/api/partner/pod/sign-upload` to a different bucket
+// (`proof-of-delivery`); the final order-level DO is logistics' artefact.
+// ----------------------------------------------------------------------------
+dosRouter.post("/sign-order-upload", async (c) => {
+  const auth = c.var.auth;
+  if (!["logistics", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, {
+      message: "Logistics or principal role required",
+    });
+  }
+
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = signOrderUploadSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: parsed.error.issues[0]?.message ?? "invalid input",
+      },
+      422,
+    );
+  }
+
+  const { order_id, do_number, mime_type } = parsed.data;
+  const safeDo = do_number.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const ext = extForMime(mime_type);
+  const path = `order-${order_id}/${crypto.randomUUID()}-${safeDo}.${ext}`;
+
+  // USER JWT — Storage RLS (0042 + 0084 logistics/principal short-circuit)
+  // gates writes; this endpoint only enforces caller role + path shape.
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.storage
     .from("delivery-orders")

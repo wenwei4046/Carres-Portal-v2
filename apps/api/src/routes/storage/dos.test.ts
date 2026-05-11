@@ -186,3 +186,113 @@ describe("POST /api/storage/dos/sign-upload", () => {
     expect(res.status).toBe(403);
   });
 });
+
+// Loo 2026-05-11 — order-level DO upload (migration 0087 added file storage
+// to logistics "Mark delivered" flow).
+describe("POST /api/storage/dos/sign-order-upload", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+
+  it("returns signed upload URL for logistics caller with order- prefix", async () => {
+    const createSignedUploadUrl = vi.fn().mockResolvedValue({
+      data: { token: "otok", path: `order-${ORDER_ID}/uuid-DO-1.pdf` },
+      error: null,
+    });
+    const sb = { storage: { from: vi.fn(() => ({ createSignedUploadUrl })) } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-order-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: ORDER_ID,
+          do_number: "DO-1",
+          mime_type: "application/pdf",
+          size_bytes: 1024,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { token: string; path: string };
+    expect(body.token).toBe("otok");
+    expect(body.path).toMatch(new RegExp(`^order-${ORDER_ID}/`));
+    expect(createSignedUploadUrl).toHaveBeenCalledTimes(1);
+    const callArg = createSignedUploadUrl.mock.calls[0]?.[0];
+    expect(callArg).toMatch(new RegExp(`^order-${ORDER_ID}/.+\\.pdf$`));
+  });
+
+  it("rejects non-UUID order_id", async () => {
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-order-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: "not-a-uuid",
+          do_number: "DO-1",
+          mime_type: "application/pdf",
+          size_bytes: 1024,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects mime not in allowlist", async () => {
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-order-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: ORDER_ID,
+          do_number: "DO-1",
+          mime_type: "application/zip",
+          size_bytes: 1024,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects partner caller (order DO is logistics-only)", async () => {
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-order-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: ORDER_ID,
+          do_number: "DO-1",
+          mime_type: "application/pdf",
+          size_bytes: 1024,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects dealer caller with 403", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-order-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: ORDER_ID,
+          do_number: "DO-1",
+          mime_type: "application/pdf",
+          size_bytes: 1024,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});

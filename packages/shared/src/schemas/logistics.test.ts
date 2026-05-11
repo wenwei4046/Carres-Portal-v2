@@ -40,19 +40,32 @@ describe('assignPartnerInput', () => {
 });
 
 describe('attachDoInput', () => {
-  it('accepts DO# + signed=true (note optional)', () => {
-    expect(
-      attachDoInput.safeParse({ doNumber: 'DO-9801', signed: true }).success,
-    ).toBe(true);
+  const VALID = {
+    doNumber: 'DO-9801',
+    signed: true as const,
+    doFilePath: 'order-00000000-0000-0000-0000-000000000a01/abc-DO-9801.pdf',
+  };
+  it('accepts DO# + signed=true + doFilePath (note optional)', () => {
+    expect(attachDoInput.safeParse(VALID).success).toBe(true);
   });
   it('rejects when signed is false (customer-signed checkbox required)', () => {
     expect(
-      attachDoInput.safeParse({ doNumber: 'DO-9801', signed: false }).success,
+      attachDoInput.safeParse({ ...VALID, signed: false }).success,
+    ).toBe(false);
+  });
+  it('rejects when doFilePath is missing (file required post-0087)', () => {
+    expect(
+      attachDoInput.safeParse({ doNumber: 'DO-9801', signed: true }).success,
+    ).toBe(false);
+  });
+  it('rejects when doFilePath is too short', () => {
+    expect(
+      attachDoInput.safeParse({ ...VALID, doFilePath: 'ab' }).success,
     ).toBe(false);
   });
   it('rejects extra keys (strict mode)', () => {
     expect(
-      attachDoInput.safeParse({ doNumber: 'DO-9801', signed: true, extraField: 'x' }).success,
+      attachDoInput.safeParse({ ...VALID, extraField: 'x' }).success,
     ).toBe(false);
   });
 });

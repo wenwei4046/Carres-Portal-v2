@@ -22,16 +22,25 @@ export type AssignPartnerInput = z.infer<typeof assignPartnerInput>;
 
 /**
  * `attachDoInput` — POST /api/logistics/orders/:id/attach-do.
- * Maps to `logistics_attach_do_and_deliver(order_id, do_number, do_note)` RPC
- * (D1.dispatch step 2). Records the Delivery Order number, deducts stock, and
- * flips order status to `delivered`. `signed` must be literal `true` — the
- * "Customer signed the DO on receipt" checkbox is required by proto §18.3
- * DOAttachModal.
+ * Maps to `logistics_attach_do_and_deliver(order_id, do_number, do_note,
+ * signed, do_file_path)` RPC (D1.dispatch step 2 + Phase 9 Day 1 file-upload
+ * extension, migration 0087). Records the Delivery Order number + signed
+ * file path, deducts stock, and flips order status to `delivered`.
+ *
+ * `signed` must be literal `true` — the "Customer signed the DO on receipt"
+ * checkbox is required by proto §18.3 DOAttachModal.
+ *
+ * `doFilePath` is the canonical Storage path returned by
+ * `/api/storage/dos/sign-order-upload` after the browser streams the signed
+ * DO file to the `delivery-orders` bucket under `order-<order_id>/...`.
+ * Required by migration 0087 (Loo 2026-05-11) — Finance audit + customer
+ * dispute resolution need the actual artefact, not just a typed-in number.
  */
 export const attachDoInput = z.object({
   doNumber: z.string().min(3),
   doNote: z.string().optional(),
   signed: z.literal(true),
+  doFilePath: z.string().min(3).max(300),
 }).strict();
 export type AttachDoInput = z.infer<typeof attachDoInput>;
 

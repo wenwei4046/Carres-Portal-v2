@@ -480,7 +480,13 @@ describe("POST /api/logistics/orders/:id/assign-partner", () => {
 
 describe("POST /api/logistics/orders/:id/attach-do", () => {
   const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
-  const VALID = { doNumber: "DO-9801", doNote: "Delivered to lobby", signed: true };
+  const DO_PATH = `order-${ORDER_ID}/abc-DO-9801.pdf`;
+  const VALID = {
+    doNumber: "DO-9801",
+    doNote: "Delivered to lobby",
+    signed: true,
+    doFilePath: DO_PATH,
+  };
 
   it("returns 200 on success and calls RPC with snake_case args", async () => {
     const rpc = vi.fn().mockResolvedValue({
@@ -503,12 +509,14 @@ describe("POST /api/logistics/orders/:id/attach-do", () => {
       p_do_number: "DO-9801",
       p_do_note: "Delivered to lobby",
       p_signed: true,
+      p_do_file_path: DO_PATH,
     });
     assertRpcCallShape(rpc, "logistics_attach_do_and_deliver", [
       "p_order_id",
       "p_do_number",
       "p_do_note",
       "p_signed",
+      "p_do_file_path",
     ]);
   });
 
@@ -520,7 +528,7 @@ describe("POST /api/logistics/orders/:id/attach-do", () => {
       new Request(`http://t/api/logistics/orders/${ORDER_ID}/attach-do`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ doNumber: "DO-9801", signed: false }),
+        body: JSON.stringify({ ...VALID, signed: false }),
       }),
       env,
     );
@@ -535,11 +543,28 @@ describe("POST /api/logistics/orders/:id/attach-do", () => {
       new Request(`http://t/api/logistics/orders/${ORDER_ID}/attach-do`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ doNumber: "DO", signed: true }),
+        body: JSON.stringify({ ...VALID, doNumber: "DO" }),
       }),
       env,
     );
     expect(res.status).toBe(422);
+  });
+
+  it("rejects when doFilePath is missing (file required post-0087)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/attach-do`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ doNumber: "DO-9801", signed: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("passes p_do_note as null when omitted", async () => {
@@ -551,7 +576,7 @@ describe("POST /api/logistics/orders/:id/attach-do", () => {
       new Request(`http://t/api/logistics/orders/${ORDER_ID}/attach-do`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ doNumber: "DO-9802", signed: true }),
+        body: JSON.stringify({ doNumber: "DO-9802", signed: true, doFilePath: DO_PATH }),
       }),
       env,
     );
@@ -560,12 +585,14 @@ describe("POST /api/logistics/orders/:id/attach-do", () => {
       p_do_number: "DO-9802",
       p_do_note: null,
       p_signed: true,
+      p_do_file_path: DO_PATH,
     });
     assertRpcCallShape(rpc, "logistics_attach_do_and_deliver", [
       "p_order_id",
       "p_do_number",
       "p_do_note",
       "p_signed",
+      "p_do_file_path",
     ]);
   });
 

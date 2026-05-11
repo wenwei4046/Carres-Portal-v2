@@ -430,6 +430,7 @@ logisticsOrdersRouter.post("/:id/attach-do", requireLogistics, async (c) => {
     p_do_number: parsed.data.doNumber,
     p_do_note: parsed.data.doNote ?? null,
     p_signed: parsed.data.signed,
+    p_do_file_path: parsed.data.doFilePath,
   });
   if (error) {
     const m = mapPgError(error);
