@@ -78,6 +78,12 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
       setUploadError(`Unsupported file type: ${file.type || "unknown"}. Use PDF, JPG, or PNG.`);
       return;
     }
+    if (file.size === 0) {
+      setUploadError(
+        `File appears to be empty (0 bytes). If it's a OneDrive cloud-only file, open it once locally first then try again.`,
+      );
+      return;
+    }
     if (file.size > MAX_SIZE) {
       setUploadError(`File too large (${Math.round(file.size / 1024 / 1024)} MB). Max 10 MB.`);
       return;
@@ -107,8 +113,14 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
 
       setDoFilePath(sign.path);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Upload failed";
-      setUploadError(msg);
+      const baseMsg = err instanceof Error ? err.message : "Upload failed";
+      const body =
+        err && typeof err === "object" && "body" in err
+          ? (err as { body?: { field?: string } }).body
+          : null;
+      const field = body?.field;
+      const diag = `(received ${file.size} bytes · ${file.type || "no mime"})`;
+      setUploadError(field ? `${baseMsg} · field=${field} ${diag}` : `${baseMsg} ${diag}`);
     } finally {
       setUploading(false);
     }

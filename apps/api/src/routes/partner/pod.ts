@@ -61,11 +61,13 @@ partnerPodRouter.post("/sign-upload", async (c) => {
   const raw = await c.req.json().catch(() => ({}));
   const parsed = signUploadSchema.safeParse(raw);
   if (!parsed.success) {
+    const issue = parsed.error.issues[0];
     return c.json(
       {
         error: "invalid_input",
         code: "invalid_param",
-        message: parsed.error.issues[0]?.message ?? "invalid input",
+        message: issue?.message ?? "invalid input",
+        field: issue?.path.join(".") ?? "unknown",
       },
       422,
     );
@@ -99,11 +101,13 @@ partnerPodRouter.post("/:threadId/attach", async (c) => {
   const raw = await c.req.json().catch(() => ({}));
   const parsed = attachSchema.safeParse(raw);
   if (!parsed.success) {
+    const issue = parsed.error.issues[0];
     return c.json(
       {
         error: "invalid_input",
         code: "invalid_param",
-        message: parsed.error.issues[0]?.message ?? "invalid input",
+        message: issue?.message ?? "invalid input",
+        field: issue?.path.join(".") ?? "unknown",
       },
       422,
     );
