@@ -2893,6 +2893,9 @@ export type SupplierSupStatus =
   | "in_production"
   | "ready_for_pickup"
   | "ready_confirm_sent"
+  // 0090 sofa flow (Loo 2026-05-11): partner WH owner confirmed receive;
+  // supplier now self-dispatches.
+  | "partner_confirmed"
   | "pickup_assigned"
   | "pickup_accepted"
   | "shipped"

@@ -46,6 +46,8 @@ function labelFor(ss: SupplierSupStatus, kind: "own_logistics" | "factory_pickup
     case "pending":            return "Pending";
     case "acknowledged":       return "Acknowledged";
     case "in_production":      return "In production";
+    // 0090 sofa flow: partner WH owner accepted; supplier now self-dispatches.
+    case "partner_confirmed":  return "Partner accepted · ready to dispatch";
     case "pickup_assigned":    return "Partner assigned";
     case "pickup_accepted":    return "Pickup scheduled";
     case "shipped":            return "Shipped";
@@ -454,8 +456,14 @@ function PODrawer({
     );
   }
 
+  // 0090 sofa flow (Loo 2026-05-11): partner_confirmed is the post-accept
+  // state for own_logistics PO shipped to a partner-owned WH. Supplier now
+  // self-dispatches + uploads DO to close. Migration 0093 already widened
+  // supplier_mark_delivered to admit this source state.
   const canUploadDo =
-    po.sup_status === "pickup_accepted" || po.sup_status === "shipped";
+    po.sup_status === "pickup_accepted"
+    || po.sup_status === "shipped"
+    || po.sup_status === "partner_confirmed";
 
   return (
     <div

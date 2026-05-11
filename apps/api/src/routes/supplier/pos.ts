@@ -41,6 +41,12 @@ const PIPELINE_BUCKETS = {
     // pressing "Mark Ready for Pickup". Surfaced 2026-05-09 by phase-6
     // E2E spec.
     "ready_confirm_sent",
+    // partner_confirmed (0090 sofa flow) — partner WH owner accepted the
+    // supplier-delivered goods; supplier now self-dispatches + marks
+    // delivered. Without this entry the PO falls out of the supplier's
+    // Ready-to-Pickup tab after partner accept, leaving HoOKkA with no
+    // way to track it (Loo 2026-05-11 screenshot bug).
+    "partner_confirmed",
     "pickup_assigned",
     "pickup_accepted",
     "shipped",
