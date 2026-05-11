@@ -2923,6 +2923,17 @@ export interface SupplierPoRow {
   // post-0017) which always rendered blank. Now embeds the full line array
   // so the supplier card sums qty + lists every variant.
   lines: SupplierPoLine[];
+  // 2026-05-11 (Loo migration 0091) — embed destination warehouse + owning
+  // partner so the supplier card can render "send to X (owned by partner Y)"
+  // — supplier self-delivers and needs to know where the goods go.
+  warehouses: {
+    id: string;
+    name: string;
+    address: string | null;
+    kind: "own" | "logistics_partner" | null;
+    owning_partner_id: string | null;
+    owner: { id: string; name: string; contact: string | null } | null;
+  } | null;
   status: "open" | "received" | "cancelled";
   sup_status: SupplierSupStatus;
   delivery_partner_id: string | null;

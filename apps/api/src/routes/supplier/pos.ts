@@ -72,9 +72,19 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
   // and the legacy `purchase_orders.sku/.qty` columns it was reading were
   // dropped in migration 0017 when multi-line PO landed — every supplier
   // card showed blank UNITS and no SKU name.
+  // 2026-05-11 (Loo) — embed destination warehouse + owning partner so the
+  // supplier card can render "send to X (owned by partner Y)" — supplier
+  // self-delivers and needs to know where the goods go. Two-level nested
+  // select: warehouses.owning_partner_id → delivery_partners aliased
+  // as `owner`. RLS via warehouses + delivery_partners read policies; both
+  // already grant supplier-role read on rows referenced from PO they own.
   let q = sb
     .from("purchase_orders")
-    .select("*, lines:purchase_order_lines(id, sku, qty, received_qty, attrs)")
+    .select(
+      "*, " +
+        "lines:purchase_order_lines(id, sku, qty, received_qty, attrs), " +
+        "warehouses(id, name, address, kind, owning_partner_id, owner:delivery_partners(id, name, contact))",
+    )
     .order("placed_at", { ascending: false });
   if (f.bucket) {
     q = q.in("sup_status", PIPELINE_BUCKETS[f.bucket] as unknown as string[]);

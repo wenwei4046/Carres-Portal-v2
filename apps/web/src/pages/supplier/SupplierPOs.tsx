@@ -269,6 +269,30 @@ function POCard({
               </span>
             </div>
           )}
+          {po.warehouses && (
+            <div
+              className="text-[11px] text-muted-foreground flex flex-col"
+              data-testid={`po-destination-${po.id}`}
+            >
+              <span className="text-[9px] uppercase tracking-[0.12em]">Send to</span>
+              <span className="font-semibold text-foreground">
+                {po.warehouses.name}
+                {po.warehouses.owner && (
+                  <span className="text-muted-foreground font-normal">
+                    {" · "}LP: {po.warehouses.owner.name}
+                  </span>
+                )}
+              </span>
+              {po.warehouses.address && (
+                <span className="text-[10.5px] text-muted-foreground mt-0.5 max-w-[280px] truncate">
+                  {po.warehouses.address}
+                  {po.warehouses.owner?.contact && (
+                    <span> · {po.warehouses.owner.contact}</span>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -478,6 +502,40 @@ function PODrawer({
             </div>
             <StatusPill ss={po.sup_status} kind={supplierKind} />
           </div>
+
+          {po.warehouses && (
+            <div className="mb-5">
+              <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
+                Send to
+              </div>
+              <div className="border border-border rounded-md p-3 bg-card">
+                <div className="font-display text-[15px] font-semibold text-foreground">
+                  {po.warehouses.name}
+                  {po.warehouses.kind === "logistics_partner" && (
+                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-warning/15 text-warning">
+                      LP-OWNED
+                    </span>
+                  )}
+                </div>
+                {po.warehouses.address && (
+                  <div className="text-[12px] text-muted-foreground mt-1">
+                    {po.warehouses.address}
+                  </div>
+                )}
+                {po.warehouses.owner && (
+                  <div className="text-[11.5px] mt-2 pt-2 border-t border-border">
+                    <span className="text-muted-foreground">Logistics Partner: </span>
+                    <span className="font-semibold text-foreground">
+                      {po.warehouses.owner.name}
+                    </span>
+                    {po.warehouses.owner.contact && (
+                      <span className="text-muted-foreground"> · {po.warehouses.owner.contact}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4 mb-5">
             <Field label="Placed" value={new Date(po.placed_at).toLocaleDateString()} />
