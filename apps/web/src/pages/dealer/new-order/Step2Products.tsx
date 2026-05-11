@@ -73,7 +73,11 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
     <div className="flex flex-col gap-7">
       {/* ---------- Add products ---------- */}
       <Section title="Add products" hint="Pick category, model, then configure">
-        <ProductPicker catalog={catalog} onAddLine={addLine} />
+        <ProductPicker
+          catalog={catalog}
+          onAddLine={addLine}
+          draftLines={draft.lines}
+        />
       </Section>
 
       {/* ---------- Add-ons (3-col cards) ---------- */}

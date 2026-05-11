@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   CatalogResponse,
   ProductCategory,
@@ -14,9 +14,41 @@ const CATEGORIES: { key: ProductCategory; label: string; icon: string }[] = [
   { key: "sofa", label: "Sofa", icon: "▦" },
 ];
 
+/**
+ * Compute the set of categories that are locked out for "Add line" given the
+ * lines already on the draft. Business rule (Loo 2026-05-11, migration 0089):
+ * sofa is mutually exclusive with mattress + bedframe at the order level.
+ * Mattress + bedframe can co-exist with each other.
+ *
+ * Exported for unit tests; the server-side mutex lives in migration 0089's
+ * create_order RPC so direct API hits can't bypass this UI gate.
+ */
+export function lockedCategoriesFor(
+  draftLines: DraftLine[],
+  skuToCategory: Map<string, ProductCategory>,
+): Set<ProductCategory> {
+  const present = new Set<ProductCategory>();
+  for (const l of draftLines) {
+    const cat = skuToCategory.get(l.sku);
+    if (cat) present.add(cat);
+  }
+  const locked = new Set<ProductCategory>();
+  if (present.has("sofa")) {
+    locked.add("mattress");
+    locked.add("bedframe");
+  }
+  if (present.has("mattress") || present.has("bedframe")) {
+    locked.add("sofa");
+  }
+  return locked;
+}
+
 interface Props {
   catalog: CatalogResponse;
   onAddLine: (line: DraftLine) => void;
+  /** Lines already on the draft — used to lock conflicting category tabs
+   *  per the sofa-vs-(mattress|bedframe) mutex rule (migration 0089). */
+  draftLines: DraftLine[];
 }
 
 /**
@@ -32,7 +64,7 @@ interface Props {
  * Each configurator owns its own transient state and only mutates parent state
  * via `onAddLine` when the user explicitly clicks Add. Resets on add.
  */
-export default function ProductPicker({ catalog, onAddLine }: Props) {
+export default function ProductPicker({ catalog, onAddLine, draftLines }: Props) {
   const [activeCat, setActiveCat] = useState<ProductCategory>("mattress");
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
 
@@ -57,6 +89,39 @@ export default function ProductPicker({ catalog, onAddLine }: Props) {
     return m;
   }, [catalog.sofaFabrics]);
 
+  // sku → category, derived from catalog. Used by lockedCategoriesFor to
+  // classify the lines already on the draft.
+  const skuToCategory = useMemo(() => {
+    const modelById = new Map(catalog.models.map((m) => [m.id, m]));
+    const m = new Map<string, ProductCategory>();
+    for (const s of catalog.skus) {
+      const model = modelById.get(s.modelId);
+      if (model) m.set(s.sku, model.category);
+    }
+    return m;
+  }, [catalog.models, catalog.skus]);
+
+  const lockedCats = useMemo(
+    () => lockedCategoriesFor(draftLines, skuToCategory),
+    [draftLines, skuToCategory],
+  );
+
+  // If the user was on a category that just became locked (e.g. they added
+  // a sofa line while sitting on the sofa tab — that doesn't lock sofa
+  // itself, but adding a mattress line WOULD lock sofa if the user later
+  // switched), bounce to the first unlocked one. Defensive — normal flow
+  // can't reach this since the user can't pick a locked tab in the first
+  // place, but covers prop-change races.
+  useEffect(() => {
+    if (lockedCats.has(activeCat)) {
+      const next = CATEGORIES.find((c) => !lockedCats.has(c.key));
+      if (next) {
+        setActiveCat(next.key);
+        setSelectedModelId(null);
+      }
+    }
+  }, [lockedCats, activeCat]);
+
   const inCat = catalog.models.filter((m) => m.category === activeCat);
   const selected = selectedModelId ? catalog.models.find((m) => m.id === selectedModelId) : null;
   const selectedSkus = selected ? skusByModel.get(selected.id) ?? [] : [];
@@ -67,31 +132,61 @@ export default function ProductPicker({ catalog, onAddLine }: Props) {
     setSelectedModelId(null);
   }
 
+  const lockHint =
+    lockedCats.has("sofa")
+      ? "Sofa is locked because this order already has mattress or bed frame."
+      : lockedCats.size > 0
+        ? "Mattress + bed frame are locked because this order already has a sofa."
+        : null;
+
   return (
     <div className="rounded border border-base-200 bg-white overflow-hidden">
       {/* Category tabs */}
       <div className="flex border-b border-base-100">
         {CATEGORIES.map((c) => {
           const active = activeCat === c.key;
+          const locked = lockedCats.has(c.key);
           return (
             <button
               key={c.key}
               onClick={() => {
+                if (locked) return;
                 setActiveCat(c.key);
                 setSelectedModelId(null);
               }}
+              disabled={locked}
+              aria-disabled={locked}
+              title={
+                locked
+                  ? c.key === "sofa"
+                    ? "Sofa cannot mix with mattress / bed frame in the same order."
+                    : "Mattress / bed frame cannot mix with sofa in the same order."
+                  : undefined
+              }
+              data-testid={`category-tab-${c.key}`}
               className={`flex-1 px-4 py-3 text-center border-b-2 transition-colors ${
-                active
-                  ? "bg-white border-primary text-base-900"
-                  : "bg-base-50 border-transparent text-base-600 hover:text-base-900"
+                locked
+                  ? "bg-base-50 border-transparent text-base-400 cursor-not-allowed"
+                  : active
+                    ? "bg-white border-primary text-base-900"
+                    : "bg-base-50 border-transparent text-base-600 hover:text-base-900"
               }`}
             >
-              <span className="text-base mr-1.5">{c.icon}</span>
+              <span className="text-base mr-1.5">{locked ? "🔒" : c.icon}</span>
               <span className="text-[13px] font-semibold">{c.label}</span>
             </button>
           );
         })}
       </div>
+
+      {lockHint && (
+        <div
+          className="px-4 py-2 bg-warning/10 border-b border-warning/20 text-[11px] text-base-700"
+          data-testid="category-lock-hint"
+        >
+          {lockHint}
+        </div>
+      )}
 
       {/* Model grid (2-col) */}
       {inCat.length === 0 && (

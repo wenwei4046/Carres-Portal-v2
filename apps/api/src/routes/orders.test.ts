@@ -142,7 +142,7 @@ function buildSb(
  */
 function buildSbForCreate(opts: {
   rpcResult?: { id: string; dl: number; placed_at: string };
-  rpcError?: { code?: string; message?: string };
+  rpcError?: { code?: string; message?: string; details?: string };
   fetchedRow?: unknown;
 }) {
   const rpcCalls: Array<{ name: string; payload: unknown }> = [];
@@ -570,6 +570,33 @@ describe("POST /api/orders", () => {
       env,
     );
     expect(res.status).toBe(400);
+  });
+
+  // Migration 0089 (Loo 2026-05-11) — sofa cannot mix with mattress / bedframe.
+  // The RPC raises 22023 with DETAIL='mixed_category_lines'; the route maps
+  // this specific detail to 422 + code so the UI can surface a friendly toast.
+  it("maps RPC 22023 mixed_category_lines → 422 with typed code", async () => {
+    const sb = buildSbForCreate({
+      rpcError: {
+        code: "22023",
+        message: "sofa cannot mix with mattress or bedframe in the same order",
+        details: "mixed_category_lines",
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validCreateBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; message?: string };
+    expect(body.code).toBe("mixed_category_lines");
+    expect(body.message).toMatch(/sofa/i);
   });
 
   it("returns 403 when dealer role JWT has no dealerId", async () => {

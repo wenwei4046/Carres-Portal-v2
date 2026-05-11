@@ -164,6 +164,21 @@ ordersRouter.post("/", async (c) => {
       throw new HTTPException(403, { message: "Forbidden" });
     }
     if (error.code === "22023") {
+      // Loo 2026-05-11 (migration 0089) — surface the new category mutex
+      // detail to the client as a typed code so the UI can toast a friendly
+      // message instead of the raw RPC error string. Other 22023s stay on
+      // the generic 400 path (pre-existing contract).
+      const detail = (error as { details?: string }).details;
+      if (detail === "mixed_category_lines") {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "mixed_category_lines",
+            message: "Sofa cannot mix with mattress or bed frame in the same order. Please place them as separate Sales Orders.",
+          },
+          422,
+        );
+      }
       throw new HTTPException(400, { message: error.message });
     }
     throw new HTTPException(500, { message: error.message });
