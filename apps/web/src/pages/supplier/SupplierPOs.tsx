@@ -29,25 +29,50 @@ import {
  * pending) — non-regressive. Closes phase-6-supplier-me-endpoint.
  */
 
-const SUP_STATUS_LABEL: Record<SupplierSupStatus, string> = {
-  pending: "Pending",
-  acknowledged: "Acknowledged",
-  in_production: "In production",
-  ready_for_pickup: "Ready · awaiting partner",
-  ready_confirm_sent: "Ready · awaiting partner",
-  pickup_assigned: "Partner assigned",
-  pickup_accepted: "Pickup scheduled",
-  shipped: "Shipped",
-  picked_up: "Picked up",
-  delivered: "Delivered",
-  reassign_needed: "Customer rejected · awaiting reassignment",
-};
+/**
+ * Status label is kind-aware: own_logistics suppliers run goods to the WH
+ * themselves so "awaiting partner" is nonsensical for them — they're
+ * waiting for Logistics to receive at the warehouse. factory_pickup
+ * suppliers stage at the factory waiting for a partner pickup, which is
+ * where the "awaiting partner" wording applies (Loo 2026-05-11).
+ */
+function labelFor(ss: SupplierSupStatus, kind: "own_logistics" | "factory_pickup" | null): string {
+  if (ss === "ready_for_pickup" || ss === "ready_confirm_sent") {
+    return kind === "own_logistics"
+      ? "Ready · awaiting logistics receive"
+      : "Ready · awaiting partner";
+  }
+  switch (ss) {
+    case "pending":            return "Pending";
+    case "acknowledged":       return "Acknowledged";
+    case "in_production":      return "In production";
+    case "pickup_assigned":    return "Partner assigned";
+    case "pickup_accepted":    return "Pickup scheduled";
+    case "shipped":            return "Shipped";
+    case "picked_up":          return "Picked up";
+    case "delivered":          return "Delivered";
+    case "reassign_needed":    return "Customer rejected · awaiting reassignment";
+    default:                   return ss;
+  }
+}
 
-const TABS: { key: SupplierBucket; label: string; hint: string }[] = [
-  { key: "po", label: "PO", hint: "Awaiting ack / in production" },
-  { key: "ready", label: "Ready to Pickup", hint: "Staged · awaiting partner" },
-  { key: "delivered", label: "Delivered", hint: "DO uploaded · closed" },
+function readyTabHint(kind: "own_logistics" | "factory_pickup" | null): string {
+  return kind === "own_logistics"
+    ? "Staged · awaiting logistics receive"
+    : "Staged · awaiting partner";
+}
+
+const TABS: { key: SupplierBucket; label: string }[] = [
+  { key: "po", label: "PO" },
+  { key: "ready", label: "Ready to Pickup" },
+  { key: "delivered", label: "Delivered" },
 ];
+
+const TAB_HINTS: Record<SupplierBucket, (kind: "own_logistics" | "factory_pickup" | null) => string> = {
+  po:        () => "Awaiting ack / in production",
+  ready:     readyTabHint,
+  delivered: () => "DO uploaded · closed",
+};
 
 export default function SupplierPOs() {
   const [active, setActive] = useState<SupplierBucket>("po");
@@ -98,7 +123,7 @@ export default function SupplierPOs() {
               </span>
             </div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
-              {t.hint}
+              {TAB_HINTS[t.key](supplierKind)}
             </div>
           </button>
         ))}
@@ -126,6 +151,7 @@ export default function SupplierPOs() {
       {openPo && (
         <PODrawer
           po={rows.find((r) => r.id === openPo.id) ?? openPo}
+          supplierKind={supplierKind}
           onClose={() => setOpenPo(null)}
         />
       )}
@@ -141,8 +167,14 @@ function emptyHintFor(stage: SupplierBucket) {
   return "No completed POs yet.";
 }
 
-function StatusPill({ ss }: { ss: SupplierSupStatus }) {
-  const label = SUP_STATUS_LABEL[ss] ?? ss;
+function StatusPill({
+  ss,
+  kind,
+}: {
+  ss: SupplierSupStatus;
+  kind: "own_logistics" | "factory_pickup" | null;
+}) {
+  const label = labelFor(ss, kind);
   const tone =
     ss === "delivered" || ss === "picked_up"
       ? "ok"
@@ -228,7 +260,7 @@ function POCard({
         </div>
 
         <div className="flex items-center gap-5 flex-1 flex-wrap">
-          <StatusPill ss={ss} />
+          <StatusPill ss={ss} kind={supplierKind} />
           {po.expected_ready_date && (
             <div className="text-[11px] text-muted-foreground flex flex-col">
               <span className="text-[9px] uppercase tracking-[0.12em]">Ready by</span>
@@ -369,9 +401,11 @@ function POCard({
 function PODrawer({
   po,
   onClose,
+  supplierKind,
 }: {
   po: SupplierPoRow;
   onClose: () => void;
+  supplierKind: "own_logistics" | "factory_pickup" | null;
 }) {
   const [showDOForm, setShowDOForm] = useState(false);
   const [doNumber, setDoNumber] = useState("");
@@ -442,7 +476,7 @@ function PODrawer({
             <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
               Status
             </div>
-            <StatusPill ss={po.sup_status} />
+            <StatusPill ss={po.sup_status} kind={supplierKind} />
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-5">
