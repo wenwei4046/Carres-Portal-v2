@@ -40,8 +40,11 @@ const signUploadSchema = z.object({
 });
 
 const attachSchema = z.object({
-  podPath: z.string().min(1).max(500),
-});
+  podPath:  z.string().min(1).max(500),
+  doNumber: z.string().min(3).max(50),
+  doNote:   z.string().max(500).optional(),
+  signed:   z.literal(true),
+}).strict();
 
 function extForMime(mime: (typeof ALLOWED_MIMES)[number]): string {
   if (mime === "application/pdf") return "pdf";
@@ -110,6 +113,9 @@ partnerPodRouter.post("/:threadId/attach", async (c) => {
   const { data, error } = await sb.rpc("partner_attach_pod", {
     p_thread_id: threadId,
     p_pod_path:  parsed.data.podPath,
+    p_do_number: parsed.data.doNumber,
+    p_do_note:   parsed.data.doNote ?? null,
+    p_signed:    parsed.data.signed,
   });
   if (error) {
     const m = mapPgError(error);

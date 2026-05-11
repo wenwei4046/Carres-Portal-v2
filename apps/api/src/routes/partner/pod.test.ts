@@ -140,10 +140,18 @@ describe("POST /api/partner/pod/sign-upload", () => {
 });
 
 describe("POST /api/partner/pod/:threadId/attach", () => {
-  it("calls partner_attach_pod RPC and returns 200", async () => {
+  const POD_PATH = `${THREAD_ID}/abc-pod.jpg`;
+  const VALID = {
+    podPath:  POD_PATH,
+    doNumber: "DO-5301",
+    doNote:   "Delivered at lobby",
+    signed:   true,
+  };
+
+  it("calls partner_attach_pod RPC with 5 args and returns 200", async () => {
     const sb = {
       rpc: vi.fn().mockResolvedValue({
-        data: { thread_id: THREAD_ID, logistics_stage: "delivered", pod_url: "path/to/pod.jpg" },
+        data: { thread_id: THREAD_ID, logistics_stage: "delivered", pod_url: POD_PATH },
         error: null,
       }),
     };
@@ -155,15 +163,74 @@ describe("POST /api/partner/pod/:threadId/attach", () => {
       new Request(`http://t/api/partner/pod/${THREAD_ID}/attach`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ podPath: `${THREAD_ID}/abc-pod.jpg` }),
+        body: JSON.stringify(VALID),
       }),
       env,
     );
     expect(res.status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith("partner_attach_pod", {
       p_thread_id: THREAD_ID,
-      p_pod_path:  `${THREAD_ID}/abc-pod.jpg`,
+      p_pod_path:  POD_PATH,
+      p_do_number: "DO-5301",
+      p_do_note:   "Delivered at lobby",
+      p_signed:    true,
     });
+  });
+
+  it("passes p_do_note as null when omitted", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: {}, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("partner", { partnerId: PARTNER_ID });
+    await app.fetch(
+      new Request(`http://t/api/partner/pod/${THREAD_ID}/attach`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ podPath: POD_PATH, doNumber: "DO-5302", signed: true }),
+      }),
+      env,
+    );
+    expect(sb.rpc).toHaveBeenCalledWith("partner_attach_pod", {
+      p_thread_id: THREAD_ID,
+      p_pod_path:  POD_PATH,
+      p_do_number: "DO-5302",
+      p_do_note:   null,
+      p_signed:    true,
+    });
+  });
+
+  it("rejects when signed is false", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("partner", { partnerId: PARTNER_ID });
+    const res = await app.fetch(
+      new Request(`http://t/api/partner/pod/${THREAD_ID}/attach`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...VALID, signed: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects when doNumber is < 3 chars", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("partner", { partnerId: PARTNER_ID });
+    const res = await app.fetch(
+      new Request(`http://t/api/partner/pod/${THREAD_ID}/attach`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...VALID, doNumber: "DO" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("rejects non-uuid threadId with 422", async () => {
@@ -172,7 +239,7 @@ describe("POST /api/partner/pod/:threadId/attach", () => {
       new Request(`http://t/api/partner/pod/not-a-uuid/attach`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ podPath: "x/abc.jpg" }),
+        body: JSON.stringify(VALID),
       }),
       env,
     );
@@ -194,7 +261,7 @@ describe("POST /api/partner/pod/:threadId/attach", () => {
       new Request(`http://t/api/partner/pod/${THREAD_ID}/attach`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ podPath: `${THREAD_ID}/abc-pod.jpg` }),
+        body: JSON.stringify(VALID),
       }),
       env,
     );
@@ -207,7 +274,7 @@ describe("POST /api/partner/pod/:threadId/attach", () => {
       new Request(`http://t/api/partner/pod/${THREAD_ID}/attach`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ podPath: "x/abc.jpg" }),
+        body: JSON.stringify(VALID),
       }),
       env,
     );

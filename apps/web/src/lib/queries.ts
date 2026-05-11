@@ -3008,19 +3008,30 @@ export function usePartnerToDeliver(
 }
 
 /** Phase 7 — partner_attach_pod mutation. Caller passes threadId + podPath
- *  (the path returned by the prior sign-upload call). On success, blasts
- *  the partner namespace (toDeliver disappears, dashboard counts update). */
+ *  (the path returned by the prior sign-upload call) + DO number + optional
+ *  note + signed bool. On success, blasts the partner namespace (toDeliver
+ *  disappears, dashboard counts update).
+ *
+ *  Migration 0088 (Loo 2026-05-11): partner POD upload now matches the
+ *  logistics DOAttachModal field set so role-switching operators don't
+ *  re-learn anything. RPC validates signed=true + doNumber ≥3 chars +
+ *  podPath non-empty. */
+export type AttachPodInput = {
+  threadId:  string;
+  podPath:   string;
+  doNumber:  string;
+  doNote?:   string;
+  signed:    true;
+};
 export function useAttachPod(
-  opts?: Partial<
-    UseMutationOptions<unknown, ApiError, { threadId: string; podPath: string }>
-  >,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, AttachPodInput>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<unknown, ApiError, { threadId: string; podPath: string }>({
-    mutationFn: ({ threadId, podPath }) =>
+  return useMutation<unknown, ApiError, AttachPodInput>({
+    mutationFn: ({ threadId, podPath, doNumber, doNote, signed }) =>
       apiFetch(`/api/partner/pod/${threadId}/attach`, {
         method: "POST",
-        body: JSON.stringify({ podPath }),
+        body: JSON.stringify({ podPath, doNumber, doNote, signed }),
       }),
     ...opts,
     onSuccess: async (...args) => {

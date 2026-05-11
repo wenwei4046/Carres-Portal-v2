@@ -3,38 +3,37 @@ import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useAttachPod, type PartnerToDeliverRow } from "@/lib/queries";
-import { Modal, ModalActions } from "../../logistics/components/Modal";
+import { INPUT_CLS, Modal, ModalActions } from "../../logistics/components/Modal";
 
 /**
  * PODUploadDialog — Phase 7 Sprint 2, redesigned 2026-05-11 (Loo).
  *
- * Two-stage flow + shared Carres Modal chrome (matches DOAttachModal /
- * ReceivePOModal / PartnerReceiveAtWhModal):
+ * Two-stage flow + shared Carres Modal chrome + same 3-field set as the
+ * logistics DOAttachModal so an operator switching roles doesn't re-learn
+ * the action surface:
  *
- *   1. Pick photo → upload to `proof-of-delivery` Storage bucket. State holds
- *      the resulting path + an in-browser preview URL. NOTHING transitions yet.
- *   2. User reviews preview → clicks "Mark delivered" → calls
- *      partner_attach_pod RPC which sets pod_url + advances
- *      thread.logistics_stage='delivered'.
+ *   1. Pick photo → upload to `proof-of-delivery` Storage bucket. NOTHING
+ *      transitions yet — bytes land in Storage, path stored in state.
+ *   2. User fills DO# + (optional) note + ticks "customer signed" → clicks
+ *      "Mark delivered" → calls partner_attach_pod RPC (migration 0088
+ *      5-arg signature) which sets pod_url + pod_do_number + pod_note +
+ *      advances thread.logistics_stage='delivered'.
  *
- * Pre-Loo-2026-05-11 the dialog used raw Tailwind chrome (its own backdrop,
- * its own header) AND auto-committed the moment a file was picked. Loo asked
- * partner POD to share visual language with the logistics DOAttachModal so an
- * operator switching roles doesn't re-learn the action surface.
+ * Field order matches DOAttachModal: DO# → Note → File → Signed checkbox.
  *
- * Bytes are uploaded immediately so the preview renders; if the user cancels
- * after upload, the blob is orphaned in Storage — acceptable cost, mirrors
- * DOFileUploadField behavior; Phase 9 storage TTL sweep will reap.
+ * Cancel-after-upload orphans the blob in Storage — acceptable cost,
+ * mirrors DOFileUploadField behavior; Phase 9 storage TTL sweep reaps.
  *
- * Storage RLS (migration 0069) gates writes to threads where
- * delivery_partner_id = my partner_id, so the API endpoint signs with the
- * USER JWT (not service_role) — same Codex F11 pattern as the order-DO path.
- *
- * On Submit success, useAttachPod invalidates ["partner"] which removes the
- * row from the In Transit list (toDeliver) and bumps dashboard counts.
+ * Storage RLS (0069) gates writes to threads where delivery_partner_id =
+ * my partner_id, so the API endpoint signs with the USER JWT — same
+ * Codex F11 pattern as the order-DO path.
  */
 const ALLOWED_MIMES = ["image/jpeg", "image/png", "application/pdf"];
 const MAX_SIZE = 10 * 1024 * 1024;
+
+function suggestDoNumber(): string {
+  return "DO-" + (5200 + Math.floor(Math.random() * 800));
+}
 
 export default function PODUploadDialog({
   row,
@@ -43,6 +42,9 @@ export default function PODUploadDialog({
   row: PartnerToDeliverRow;
   onClose: () => void;
 }) {
+  const [doNumber, setDoNumber] = useState(suggestDoNumber);
+  const [doNote, setDoNote] = useState("");
+  const [signed, setSigned] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [pickedName, setPickedName] = useState<string | null>(null);
@@ -82,7 +84,6 @@ export default function PODUploadDialog({
       return;
     }
 
-    // Reset prior state if user is re-picking.
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setUploadedPath(null);
     setPickedName(file.name);
@@ -119,8 +120,15 @@ export default function PODUploadDialog({
   }
 
   function handleSubmit() {
-    if (!uploadedPath || attach.isPending) return;
-    attach.mutate({ threadId: row.thread_id, podPath: uploadedPath });
+    if (attach.isPending) return;
+    if (!uploadedPath || !signed || doNumber.trim().length < 3) return;
+    attach.mutate({
+      threadId: row.thread_id,
+      podPath:  uploadedPath,
+      doNumber: doNumber.trim(),
+      doNote:   doNote.trim() || undefined,
+      signed:   true,
+    });
   }
 
   function handleRepick() {
@@ -128,7 +136,12 @@ export default function PODUploadDialog({
     fileInputRef.current?.click();
   }
 
-  const canSubmit = !!uploadedPath && !uploading && !attach.isPending;
+  const canSubmit =
+    !!uploadedPath &&
+    !uploading &&
+    !attach.isPending &&
+    signed &&
+    doNumber.trim().length >= 3;
   const isImage = pickedType === "image/jpeg" || pickedType === "image/png";
   const sizeMb = pickedSize ? (pickedSize / 1024 / 1024).toFixed(2) : null;
   const titleRef = row.po_id ?? `Order ${row.order_id.slice(0, 8)}`;
@@ -146,11 +159,39 @@ export default function PODUploadDialog({
             <span>{row.customer_address}</span>
           </>
         )}
-        . Upload the signed POD photo — the thread flips straight to{" "}
+        . Record the DO + tick the signed box — the thread flips straight to{" "}
         <strong>delivered</strong> when you submit.
       </div>
 
       <div className="grid gap-3 mb-4">
+        <div>
+          <label className="label mb-1.5 block" htmlFor="pod-do-number">
+            DO number *
+          </label>
+          <input
+            id="pod-do-number"
+            value={doNumber}
+            onChange={(e) => setDoNumber(e.target.value)}
+            className={INPUT_CLS}
+            data-testid="pod-do-number"
+          />
+        </div>
+
+        <div>
+          <label className="label mb-1.5 block" htmlFor="pod-do-note">
+            Note (optional)
+          </label>
+          <textarea
+            id="pod-do-note"
+            rows={2}
+            value={doNote}
+            onChange={(e) => setDoNote(e.target.value)}
+            placeholder="e.g. Delivered at lobby · customer signed"
+            className={`${INPUT_CLS} resize-y`}
+            data-testid="pod-do-note"
+          />
+        </div>
+
         <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
           <div className="text-[11px] text-base-600 mb-2 font-body">
             Attach signed POD *{" "}
@@ -231,6 +272,19 @@ export default function PODUploadDialog({
             </p>
           )}
         </div>
+
+        <label className="flex gap-2 items-center px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={signed}
+            onChange={(e) => setSigned(e.target.checked)}
+            className="accent-primary"
+            data-testid="pod-signed"
+          />
+          <span className="text-[12px] font-body">
+            Customer signed the DO on receipt
+          </span>
+        </label>
       </div>
 
       <ModalActions
