@@ -60,6 +60,9 @@ interface Props {
   expanded: boolean;
   anyExpanded: boolean;
   onToggleExpand: () => void;
+  /** 2026-05-12 (Loo) — fires when a card's `↶ Revert` link is clicked.
+   *  Parent owns the confirm dialog + mutation. */
+  onRevert?: (orderId: string, dl: number, kind: "proceed" | "dispatch") => void;
 }
 
 export default function OrderColumn({
@@ -75,6 +78,7 @@ export default function OrderColumn({
   expanded,
   anyExpanded,
   onToggleExpand,
+  onRevert,
 }: Props) {
   const accentText = STAGE_ACCENT_TEXT[stage];
   const accentBorder = STAGE_ACCENT_BORDER[stage];
@@ -159,6 +163,12 @@ export default function OrderColumn({
               onOpen={() => onOpenOrder(o.id)}
               actionHint={bucketAction ?? undefined}
               compact={compact}
+              stage={stage}
+              onRevert={
+                onRevert
+                  ? (kind) => onRevert(o.id, o.dl, kind)
+                  : undefined
+              }
             />
           ))
         )}

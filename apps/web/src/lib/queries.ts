@@ -1993,6 +1993,59 @@ export function useAbandonOrderMutation(
   });
 }
 
+/** 2026-05-12 (Loo) — back-arrow from Proceed Request column → Placed.
+ *  No body. Server enforces logistics or principal role + RPC 0095 enforces
+ *  current stage. */
+export function useRevertOrderProceedMutation(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ order_id: string; dl: number }, ApiError, void>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ order_id: string; dl: number }, ApiError, void>({
+    mutationFn: () =>
+      apiFetch<{ order_id: string; dl: number }>(
+        `/api/logistics/orders/${orderId}/revert-proceed`,
+        { method: "POST" },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** 2026-05-12 (Loo) — back-arrow from Dispatched column → Ready to Dispatch.
+ *  Reverts every dispatched thread on the order; clears partner assignment. */
+export function useRevertOrderDispatchMutation(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<{ order_id: string; dl: number; threads_reverted: number }, ApiError, void>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { order_id: string; dl: number; threads_reverted: number },
+    ApiError,
+    void
+  >({
+    mutationFn: () =>
+      apiFetch<{ order_id: string; dl: number; threads_reverted: number }>(
+        `/api/logistics/orders/${orderId}/revert-dispatch`,
+        { method: "POST" },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 /** Manual override of the auto-picked source warehouse (E1 awaiting_logistics_action). */
 export function useWarehousePickMutation(
   orderId: string,

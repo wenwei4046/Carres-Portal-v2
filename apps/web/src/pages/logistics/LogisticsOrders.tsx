@@ -12,6 +12,7 @@ import OrderCard from "./components/OrderCard";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import CrossOrderBundleSheet from "./components/CrossOrderBundleSheet";
 import ResumeFromWaitingDialog from "./components/ResumeFromWaitingDialog";
+import RevertConfirmDialog from "./components/RevertConfirmDialog";
 import PipelineHeader, {
   PIPELINE_STAGE_LABELS,
   type PipelineSubFilter,
@@ -98,6 +99,10 @@ export default function LogisticsOrders() {
   // Resume from waiting (Phase 4.5a Task 36) — dialog only; no header chip in
   // V1 of the redesign. See top docstring carry-forward note.
   const [resumeFor, setResumeFor] = useState<number | null>(null);
+  // 2026-05-12 (Loo) — back-arrow on Proceed Request + Dispatched cards.
+  const [revertFor, setRevertFor] = useState<
+    { orderId: string; dl: number; kind: "proceed" | "dispatch" } | null
+  >(null);
 
   // Server applies search; we always fetch the full list and bucket
   // client-side so chip badges show every stage's count even when the active
@@ -280,6 +285,9 @@ export default function LogisticsOrders() {
               onToggleExpand={() =>
                 setExpandedStage((prev) => (prev === s.key ? null : s.key))
               }
+              onRevert={(orderId, dl, kind) =>
+                setRevertFor({ orderId, dl, kind })
+              }
             />
           ))}
         </div>
@@ -325,6 +333,10 @@ export default function LogisticsOrders() {
                     onToggleSelect={() => toggleSelect(o.dl)}
                     onOpen={() => setOpenOrderId(o.id)}
                     actionHint={action ? `${action} →` : undefined}
+                    stage={activeStage}
+                    onRevert={(kind) =>
+                      setRevertFor({ orderId: o.id, dl: o.dl, kind })
+                    }
                   />
                 );
               })}
@@ -352,6 +364,14 @@ export default function LogisticsOrders() {
         <ResumeFromWaitingDialog
           dl={resumeFor}
           onClose={() => setResumeFor(null)}
+        />
+      )}
+      {revertFor && (
+        <RevertConfirmDialog
+          orderId={revertFor.orderId}
+          dl={revertFor.dl}
+          kind={revertFor.kind}
+          onClose={() => setRevertFor(null)}
         />
       )}
     </div>

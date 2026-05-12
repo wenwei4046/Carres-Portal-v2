@@ -3,6 +3,7 @@ import type {
   LogisticsOrderThreadRow,
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
+import type { LogisticsStage } from "./StageChip";
 
 /**
  * OrderCard — kanban tile for the LogisticsOrders pipeline view.
@@ -78,6 +79,11 @@ interface Props {
    *  shrinks to ~10% width, so we strip the card down to just `#DL` + customer
    *  name to stay scannable. */
   compact?: boolean;
+  /** 2026-05-12 (Loo) — current kanban stage. When set to a revertible stage
+   *  (`proceed_request` or `dispatched`) the card surfaces a small `↶ Revert`
+   *  link that fires `onRevert(kind)` instead of opening the drawer. */
+  stage?: LogisticsStage;
+  onRevert?: (kind: "proceed" | "dispatch") => void;
 }
 
 export default function OrderCard({
@@ -88,7 +94,16 @@ export default function OrderCard({
   onOpen,
   actionHint,
   compact = false,
+  stage,
+  onRevert,
 }: Props) {
+  const revertKind: "proceed" | "dispatch" | null =
+    stage === "proceed_request"
+      ? "proceed"
+      : stage === "dispatched"
+        ? "dispatch"
+        : null;
+  const canRevert = !!onRevert && revertKind !== null;
   const customer = order.customer_name;
   const dealerName = order.dealers?.name ?? "—";
   const isShowroom = order.outlet_id !== null;
@@ -275,6 +290,21 @@ export default function OrderCard({
                 </span>
               )}
             </div>
+            {canRevert && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (revertKind) onRevert?.(revertKind);
+                }}
+                onKeyDown={(e) => e.stopPropagation()}
+                className="mt-1.5 text-[10px] text-base-500 hover:text-primary underline-offset-2 hover:underline transition-colors"
+                data-testid={`order-card-revert-${order.dl}`}
+                aria-label={`Revert order ${order.dl} to previous stage`}
+              >
+                &#x21B6; Revert
+              </button>
+            )}
           </>
         )}
       </div>

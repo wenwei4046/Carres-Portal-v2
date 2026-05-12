@@ -12,7 +12,7 @@ import {
 } from "@carres/shared";
 import { renderDoPdf } from "../../lib/pdf/render";
 import type { DoTemplateData } from "../../lib/pdf/types";
-import { requireLogistics } from "../../lib/auth-guards";
+import { requireLogistics, requireLogisticsOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -571,5 +571,47 @@ logisticsOrdersRouter.post("/:id/issue-pos", requireLogistics, async (c) => {
   }
   return c.json(data);
 });
+
+// ----- POST /:id/revert-proceed -----
+// 2026-05-12 (Loo) — back-arrow from Proceed Request column → Placed column.
+// No body; just the order id in the path. Both logistics and principal can
+// trigger. Maps RPC's 22023 wrong_stage into a 422 invalid_param.
+logisticsOrdersRouter.post(
+  "/:id/revert-proceed",
+  requireLogisticsOrPrincipal,
+  async (c) => {
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { data, error } = await sb.rpc(
+      "logistics_revert_order_proceed_to_placed",
+      { p_order_id: c.req.param("id") },
+    );
+    if (error) {
+      const m = mapPipelineV2Error(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(data);
+  },
+);
+
+// ----- POST /:id/revert-dispatch -----
+// 2026-05-12 (Loo) — back-arrow from Dispatched column → Ready to Dispatch.
+// Clears every thread's partner assignment on this order. logistics or
+// principal.
+logisticsOrdersRouter.post(
+  "/:id/revert-dispatch",
+  requireLogisticsOrPrincipal,
+  async (c) => {
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { data, error } = await sb.rpc(
+      "logistics_revert_order_dispatched_to_ready",
+      { p_order_id: c.req.param("id") },
+    );
+    if (error) {
+      const m = mapPipelineV2Error(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(data);
+  },
+);
 
 export default logisticsOrdersRouter;

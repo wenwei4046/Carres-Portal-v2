@@ -32,6 +32,19 @@ export const requireLogistics: MiddlewareHandler<AppEnv> = async (c, next) => {
 };
 
 /**
+ * 2026-05-12 (Loo) — admits `logistics` OR `principal`. Used by the revert
+ * RPCs (`logistics_revert_order_*`) so the principal can rewind orders even
+ * when no logistics staff are around. Mirrors the role gate inside the RPCs.
+ */
+export const requireLogisticsOrPrincipal: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const role = c.var.auth?.role;
+  if (role !== "logistics" && role !== "principal") {
+    throw new HTTPException(403, { message: "Logistics or Principal only" });
+  }
+  await next();
+};
+
+/**
  * Phase 5 — admits `finance` OR `principal` roles. Mirrors the role gate
  * inside every Phase 5 RPC (`if app_role() not in ('finance','principal')
  * then raise '42501'`). The principal role is admitted because the

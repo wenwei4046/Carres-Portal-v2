@@ -1456,3 +1456,158 @@ describe("POST /api/logistics/orders/:id/issue-pos", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+// 2026-05-12 (Loo) — revert RPCs added by migration 0095.
+describe("POST /api/logistics/orders/:id/revert-proceed", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+
+  it("returns 200 on success and calls the right RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { order_id: ORDER_ID, dl: 1001, status: "place", logistics_stage: "placed" },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/revert-proceed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_revert_order_proceed_to_placed", {
+      p_order_id: ORDER_ID,
+    });
+  });
+
+  it("admits principal role too (Loo's de-facto admin)", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { order_id: ORDER_ID, dl: 1001, status: "place", logistics_stage: "placed" },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/revert-proceed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalled();
+  });
+
+  it("returns 403 for dealer (not logistics or principal)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/revert-proceed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps RPC 22023 wrong_stage → 422 invalid_param", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "22023",
+        message: "Order is not in proceed_request stage",
+        details: "wrong_stage",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/revert-proceed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("wrong_stage");
+  });
+});
+
+describe("POST /api/logistics/orders/:id/revert-dispatch", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+
+  it("returns 200 + threads_reverted on success", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { order_id: ORDER_ID, dl: 1002, threads_reverted: 2 },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/revert-dispatch`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("logistics_revert_order_dispatched_to_ready", {
+      p_order_id: ORDER_ID,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.threads_reverted).toBe(2);
+  });
+
+  it("returns 403 for partner role", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("partner");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/revert-dispatch`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps RPC 22023 no_dispatched_threads → 422", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "22023",
+        message: "No dispatched threads on this order",
+        details: "no_dispatched_threads",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/orders/${ORDER_ID}/revert-dispatch`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("no_dispatched_threads");
+  });
+});
