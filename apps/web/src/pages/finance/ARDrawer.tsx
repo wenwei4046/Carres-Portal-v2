@@ -8,6 +8,8 @@ import {
   type FinancePaymentRow,
 } from "@/lib/queries";
 import { apiFetchBlob, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import { rm } from "@/lib/format-currency";
 import type { PaymentMethod } from "@carres/shared";
 
@@ -55,6 +57,7 @@ export default function ARDrawer({
   const [recRef, setRecRef]             = useState("");
   const [recMethod, setRecMethod]       = useState<PaymentMethod>("bank_transfer");
   const [issuedInvoiceId, setIssuedInvoiceId] = useState<string | null>(null);
+  const role = useAuth((s) => s.role);
 
   const payments = useFinancePayments({ orderId: row.order_id });
   const recordReceipt = useRecordReceipt({
@@ -174,6 +177,18 @@ export default function ARDrawer({
               <span>DL-{row.dl} · {row.status}</span>
               <span className="font-mono">{rm(row.total)}</span>
             </div>
+            {/* 2026-05-12 (Loo) — reprint the customer Sales Order from AR. */}
+            {role && (
+              <div className="mt-2">
+                <DownloadSalesOrderButton
+                  orderId={row.order_id}
+                  dl={row.dl}
+                  role={role}
+                  variant="secondary"
+                  className="w-full"
+                />
+              </div>
+            )}
           </div>
 
           {row.outstanding > 0 && (

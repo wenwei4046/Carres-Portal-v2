@@ -24,14 +24,21 @@ import { pdf } from "@react-pdf/renderer";
 import { DoTemplate } from "./do-template";
 import { PoTemplate } from "./po-template";
 import { InvoiceTemplate } from "./invoice-template";
+import { SalesOrderTemplate } from "./sales-order-template";
 import { registerNotoSansSC } from "./fonts/noto";
-import type { DoTemplateData, InvoiceTemplateData, PoTemplateData } from "./types";
+import type {
+  DoTemplateData,
+  InvoiceTemplateData,
+  PoTemplateData,
+  SalesOrderTemplateData,
+} from "./types";
 
 async function renderElementToBytes(
   element:
     | ReturnType<typeof DoTemplate>
     | ReturnType<typeof PoTemplate>
-    | ReturnType<typeof InvoiceTemplate>,
+    | ReturnType<typeof InvoiceTemplate>
+    | ReturnType<typeof SalesOrderTemplate>,
 ): Promise<Uint8Array> {
   registerNotoSansSC();
   const blob = await pdf(element).toBlob();
@@ -64,4 +71,15 @@ export async function renderPoPdf(data: PoTemplateData): Promise<Uint8Array> {
  */
 export async function renderInvoicePdf(data: InvoiceTemplateData): Promise<Uint8Array> {
   return renderElementToBytes(InvoiceTemplate(data));
+}
+
+/**
+ * Render a Sales Order to a PDF byte array. Loo 2026-05-12 —
+ * customer-facing doc handed out at point of sale. See `renderDoPdf` for
+ * the Workers vs Node implementation note.
+ */
+export async function renderSalesOrderPdf(
+  data: SalesOrderTemplateData,
+): Promise<Uint8Array> {
+  return renderElementToBytes(SalesOrderTemplate(data));
 }

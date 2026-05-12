@@ -99,6 +99,95 @@ export type InvoiceTemplateData = {
   currency: string;
 };
 
+/**
+ * Sales Order PDF — customer-facing document handed to the buyer at point of
+ * sale. Mirrors proto `pdf-render.jsx` `printSalesOrder` (line 504).
+ *
+ * Loo 2026-05-12: dealer / showroom / salesperson / finance / principal / bd
+ * can pull this; logistics / partner / supplier cannot — they have their
+ * own internal docs (DO, POD, PO) so a customer-facing SO would be off-script.
+ */
+export type SalesOrderTemplateData = {
+  /** Sales Order number, e.g. "SO-001001" (6-digit zero-padded `orders.dl`). */
+  so_number: string;
+  /** Issue date (orders.placed_at as ISO yyyy-mm-dd). */
+  issue_date: string;
+  /** Underlying order PK for cross-reference. */
+  order_id: string;
+  /** Dealer-facing reference ("DL-{dl}"). Printed alongside SO# for ops. */
+  order_code: string;
+  /** orders.status display label, e.g. "Awaiting fulfilment". */
+  status_label: string;
+  /** Channel — "dealer" or "showroom" (drives the salesperson row). */
+  channel: "dealer" | "showroom";
+
+  /** Customer block. */
+  customer: {
+    name: string;
+    address: string;
+    phone: string | null;
+  };
+
+  /** Seller block — Carres KL + dealer + outlet/salesperson if showroom. */
+  dealer: {
+    name: string;
+    contact: string | null;
+    /** Outlet name if `channel = "showroom"`, else null. */
+    outlet_name: string | null;
+    outlet_address: string | null;
+    /** Salesperson assigned for showroom orders. */
+    salesperson_name: string | null;
+    salesperson_phone: string | null;
+  };
+
+  /** Delivery block. */
+  delivery: {
+    /** ISO yyyy-mm-dd OR "TBD" when `delivery_date_tbd` is true. */
+    date: string;
+    /** Floor number (default 1). */
+    floor: number;
+    /** Whether the customer's unit has lift access. */
+    has_lift: boolean;
+  };
+
+  /**
+   * Line items rendered in the body table. `description` includes the SKU's
+   * model + variant; `attrs` summarises bedframe `{color, gap}` / sofa
+   * `{fabric_name, fabric_surcharge}` / mattress `{preset}` so the customer
+   * sees what they actually bought.
+   */
+  lines: Array<{
+    sku: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    line_total: number;
+    attrs: Record<string, unknown> | null;
+  }>;
+
+  /** Add-ons (e.g. dismantling, stair-carry quoted upfront, accessory pack). */
+  addons: Array<{
+    label: string;
+    qty: number;
+    unit_price: number;
+    line_total: number;
+  }>;
+
+  /** Subtotal lines + addons (before deposit). */
+  subtotal: number;
+  /** Grand total = subtotal (no separate tax in proto SO; SST is inclusive). */
+  total: number;
+  /** Amount paid so far (orders.paid). */
+  paid: number;
+  /** Balance due (total - paid). May be negative if over-paid. */
+  balance_due: number;
+  /** Currency display code, default "MYR". */
+  currency: string;
+
+  /** Whether the order has a customer signature on file (orders.signature_url). */
+  signed: boolean;
+};
+
 export type PoTemplateData = {
   /** Purchase Order document number, e.g. "PO-2026-00007". */
   po_number: string;

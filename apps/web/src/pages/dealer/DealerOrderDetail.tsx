@@ -7,9 +7,11 @@ import {
   type Order,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { proceedBlockers } from "@/lib/order-blockers";
 import { useCatalog, useOrder, useProceedOrder } from "@/lib/queries";
 import { orderTotal, lineSubtotal, addonSubtotal, floorSurcharge } from "@/lib/order-totals";
+import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import AddAddressModal from "./order-actions/AddAddressModal";
 import CancelOrderDialog from "./order-actions/CancelOrderDialog";
 import ConfirmDateModal from "./order-actions/ConfirmDateModal";
@@ -19,6 +21,7 @@ import TopUpDepositModal from "./order-actions/TopUpDepositModal";
 export default function DealerOrderDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: order, isPending, error } = useOrder(id);
   const { data: catalog } = useCatalog();
+  const role = useAuth((s) => s.role);
   const [editing, setEditing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -53,6 +56,17 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
             {/* Edit + Cancel only on Place orders — once proceeded, changes
              *  and cancellation go through logistics. Mirrors proto's
              *  customer editor button + the implicit cancel intent. */}
+            {/* 2026-05-12 (Loo) — customer-facing Sales Order PDF.
+             *  Always available on the detail drawer regardless of order
+             *  status; the button itself hides for denied roles. */}
+            {order && role && (
+              <DownloadSalesOrderButton
+                orderId={order.id}
+                dl={order.dl}
+                role={role}
+                variant="secondary"
+              />
+            )}
             {order?.status === "place" && (
               <>
                 <button

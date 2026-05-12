@@ -16,6 +16,8 @@ import {
   updateOrderInputSchema,
 } from "@carres/shared";
 import { userClient } from "../lib/supabase";
+import { renderSalesOrderPdf } from "../lib/pdf/render";
+import type { SalesOrderTemplateData } from "../lib/pdf/types";
 import type { AppEnv } from "../types";
 
 const ordersRouter = new Hono<AppEnv>();
@@ -664,6 +666,149 @@ ordersRouter.get("/:id", async (c) => {
   const signed = { ...order, signatureUrl, paymentSlipUrl, totalAmount };
 
   return c.json(orderSchema.parse(signed));
+});
+
+// 2026-05-12 (Loo) — Sales Order PDF.
+// Customer-facing doc. Dealer / Showroom / Salesperson / Finance / Principal
+// / BD can pull; Logistics / Partner / Supplier are denied at the route gate
+// (they have their own internal docs — DO, POD, PO). RLS on `orders` still
+// gates which rows each role can read, so the deny list here is UI-aligned
+// (not the security boundary).
+ordersRouter.get("/:id/sales-order-pdf", async (c) => {
+  const auth = c.var.auth;
+  const role = auth.role;
+  if (role === "logistics" || role === "partner" || role === "supplier") {
+    throw new HTTPException(403, {
+      message: "Sales Order PDF not available for this role",
+    });
+  }
+  const id = c.req.param("id");
+  const idCheck = z.string().uuid().safeParse(id);
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const sb = userClient(c.env, auth.jwt);
+
+  // Join order + lines + addons + dealer + outlet + salesperson in one
+  // PostgREST round-trip. Each child table inherits its RLS from `orders`,
+  // so a row visible to the caller carries all its children through.
+  const { data, error } = await sb
+    .from("orders")
+    .select(
+      "id, dl, status, channel, customer_name, customer_phone, customer_address, " +
+        "delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift, " +
+        "paid, signature_url, placed_at, " +
+        "order_lines(sku, qty, unit_price, attrs), " +
+        "order_addons(addon_key, qty, unit_price), " +
+        "dealers(name, contact), " +
+        "outlets(name, address), " +
+        "salespersons(name, phone)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new HTTPException(500, { message: error.message });
+  if (!data) throw new HTTPException(404, { message: "Order not found" });
+
+  // PostgREST nested select shape; cast in-place since this is the only
+  // consumer of this exact join.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const o = data as any;
+  const lines: Array<{
+    sku: string;
+    qty: number;
+    unit_price: number | string;
+    attrs: Record<string, unknown> | null;
+  }> = o.order_lines ?? [];
+  const addons: Array<{ addon_key: string; qty: number; unit_price: number | string }> =
+    o.order_addons ?? [];
+
+  const lineRows = lines.map((l) => {
+    const qty = Number(l.qty);
+    const unitPrice = Number(l.unit_price);
+    return {
+      sku: String(l.sku),
+      description: String(l.sku),
+      qty,
+      unit_price: unitPrice,
+      line_total: qty * unitPrice,
+      attrs: l.attrs ?? null,
+    };
+  });
+  const addonRows = addons.map((a) => {
+    const qty = Number(a.qty);
+    const unitPrice = Number(a.unit_price);
+    return {
+      label: String(a.addon_key),
+      qty,
+      unit_price: unitPrice,
+      line_total: qty * unitPrice,
+    };
+  });
+
+  const subtotal =
+    lineRows.reduce((s, r) => s + r.line_total, 0) +
+    addonRows.reduce((s, r) => s + r.line_total, 0);
+  const total = subtotal;
+  const paid = Number(o.paid ?? 0);
+  const balance_due = total - paid;
+
+  // proto `soNumber` → "SO-001001" (6-digit zero-padded dl).
+  const so_number = `SO-${String(o.dl).padStart(6, "0")}`;
+  const issue_date = (o.placed_at as string | null)?.slice(0, 10) ?? "—";
+  const statusLabel =
+    o.status === "place"
+      ? "Awaiting fulfilment"
+      : o.status === "proceed_order"
+        ? "Proceed requested"
+        : o.status === "delivered"
+          ? "Delivered"
+          : o.status === "cancelled"
+            ? "Cancelled"
+            : String(o.status);
+
+  const channel: "dealer" | "showroom" =
+    o.channel === "showroom" || o.outlets ? "showroom" : "dealer";
+
+  const data_: SalesOrderTemplateData = {
+    so_number,
+    issue_date,
+    order_id: id,
+    order_code: `DL-${o.dl}`,
+    status_label: statusLabel,
+    channel,
+    customer: {
+      name: String(o.customer_name ?? "—"),
+      address: String(o.customer_address ?? "—"),
+      phone: o.customer_phone ?? null,
+    },
+    dealer: {
+      name: String(o.dealers?.name ?? "Carres"),
+      contact: o.dealers?.contact ?? null,
+      outlet_name: o.outlets?.name ?? null,
+      outlet_address: o.outlets?.address ?? null,
+      salesperson_name: o.salespersons?.name ?? null,
+      salesperson_phone: o.salespersons?.phone ?? null,
+    },
+    delivery: {
+      date: o.delivery_date_tbd ? "To be confirmed" : String(o.delivery_date ?? "—"),
+      floor: Number(o.delivery_floor ?? 1),
+      has_lift: Boolean(o.delivery_has_lift),
+    },
+    lines: lineRows,
+    addons: addonRows,
+    subtotal,
+    total,
+    paid,
+    balance_due,
+    currency: "MYR",
+    signed: !!o.signature_url,
+  };
+
+  const pdfBytes = await renderSalesOrderPdf(data_);
+  return c.body(pdfBytes.buffer as ArrayBuffer, 200, {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `inline; filename="${so_number}.pdf"`,
+    "Cache-Control": "no-store",
+  });
 });
 
 export default ordersRouter;

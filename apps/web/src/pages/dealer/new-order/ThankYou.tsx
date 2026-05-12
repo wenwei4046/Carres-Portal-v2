@@ -1,4 +1,6 @@
 import type { Order } from "@carres/shared";
+import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
+import { useAuth } from "@/lib/auth";
 
 interface Props {
   order: Order;
@@ -17,6 +19,7 @@ interface Props {
  * sees on the kanban card.
  */
 export default function ThankYou({ order, onNewOrder, onClose }: Props) {
+  const role = useAuth((s) => s.role);
   return (
     <div className="text-center overflow-hidden">
       <div className="px-9 pt-11 pb-7 bg-base-50">
@@ -43,6 +46,18 @@ export default function ThankYou({ order, onNewOrder, onClose }: Props) {
             Once the DO is submitted, the order moves to <strong>Delivered</strong>.
           </li>
         </ol>
+        {role && (
+          <div className="mt-[22px]">
+            <div className="label mb-1.5">Print for customer</div>
+            <DownloadSalesOrderButton
+              orderId={order.id}
+              dl={order.dl}
+              role={role}
+              variant="secondary"
+              className="w-full"
+            />
+          </div>
+        )}
         <div className="flex gap-2.5 mt-[22px]">
           <button type="button" onClick={onNewOrder} className="btn-secondary flex-1">
             + New order
