@@ -5,7 +5,9 @@ import {
   useFinanceInvoices,
   type FinanceArAgingRow,
 } from "@/lib/queries";
-import { apiFetchBlob, ApiError } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
+import { renderInvoicePdf } from "@/lib/pdf/render";
+import type { InvoiceTemplateData } from "@/lib/pdf/types";
 import { rm, rmCompact } from "@/lib/format-currency";
 
 type InvoiceStatus = "unpaid" | "partial" | "paid";
@@ -103,10 +105,12 @@ export default function FinanceInvoices() {
       return;
     }
     try {
-      const blob = await apiFetchBlob(`/api/finance/invoices/${invId}/pdf`);
+      const data = await apiFetch<InvoiceTemplateData>(
+        `/api/finance/invoices/${invId}/pdf-data`,
+      );
+      const blob = await renderInvoicePdf(data);
       const url  = URL.createObjectURL(blob);
       window.open(url, "_blank");
-      // Revoke after a short delay so the new tab has time to load.
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : String(e);

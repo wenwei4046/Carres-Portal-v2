@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
+import { renderPoPdf } from "@/lib/pdf/render";
+import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useCatalog,
   type LogisticsPoListRow,
@@ -91,7 +93,6 @@ export default function PoDetailModal({
 }: Props) {
   const catalogQ = useCatalog();
   const [printing, setPrinting] = useState(false);
-  const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   // Mirror the friendly-name pattern from LogisticsWarehouse.tsx:138 — model
   // name + variant joined as "Carres Cloud · King" instead of bare SKU code.
@@ -137,20 +138,11 @@ export default function PoDetailModal({
     if (printing) return;
     setPrinting(true);
     try {
-      const session = useAuth.getState().session;
-      const headers = new Headers();
-      if (session?.access_token) {
-        headers.set("Authorization", `Bearer ${session.access_token}`);
-      }
-      const res = await fetch(
-        `${baseUrl}/api/logistics/pos/${po.id}/print`,
-        { headers },
+      // 2026-05-12 (Loo): server returns JSON; @react-pdf renders client-side.
+      const data = await apiFetch<PoTemplateData>(
+        `/api/logistics/pos/${po.id}/print-data`,
       );
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Print failed (${res.status})`);
-      }
-      const blob = await res.blob();
+      const blob = await renderPoPdf(data);
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank", "noopener,noreferrer");
       if (!win) {

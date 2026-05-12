@@ -9,7 +9,7 @@ import {
   receivePoWithDoInput,
   type AwaitingStockShortageResponse,
 } from "@carres/shared";
-import { renderPoPdf } from "../../lib/pdf/render";
+// renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { PoTemplateData } from "../../lib/pdf/types";
 import { requireLogistics } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
@@ -356,7 +356,10 @@ logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) =
 // also supplies the SKU description (variant text). When a line's SKU isn't
 // found in product_skus (legacy PO), unit_price falls back to 0 and the SKU
 // itself is used as the description — the PDF still renders.
-logisticsPosRouter.get("/:id/print", requireLogistics, async (c) => {
+// 2026-05-12 (Loo): renamed `/print` → `/print-data`. Returns JSON;
+// browser renders @react-pdf locally (Workers WASM ban — see render.ts
+// note in apps/web/src/lib/pdf/).
+logisticsPosRouter.get("/:id/print-data", requireLogistics, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
 
@@ -483,19 +486,7 @@ logisticsPosRouter.get("/:id/print", requireLogistics, async (c) => {
     terms: null,
   };
 
-  const pdfBytes = await renderPoPdf(templateData);
-  // De-dupe filename prefix the same way /print-do does. po.id should
-  // always start with 'PO-' (auto-generated as 'PO-' || sequence in
-  // logistics_create_po / logistics_issue_pos_for_order), but tolerate
-  // edge values without the prefix.
-  const filenameBase = templateData.po_number.startsWith("PO-")
-    ? templateData.po_number
-    : `PO-${templateData.po_number}`;
-  return c.body(pdfBytes.buffer as ArrayBuffer, 200, {
-    "Content-Type": "application/pdf",
-    "Content-Disposition": `attachment; filename="${filenameBase}.pdf"`,
-    "Cache-Control": "no-store",
-  });
+  return c.json(templateData);
 });
 
 // ----- POST / create -----

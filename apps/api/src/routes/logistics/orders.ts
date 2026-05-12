@@ -10,7 +10,7 @@ import {
   transferReadyInputSchema,
   warehousePickInput,
 } from "@carres/shared";
-import { renderDoPdf } from "../../lib/pdf/render";
+// renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
 import { requireLogistics, requireLogisticsOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
@@ -262,7 +262,9 @@ logisticsOrdersRouter.get("/:id", requireLogistics, async (c) => {
 // Server-side DO PDF (E2 / spec §17.3). Only callable on delivered orders
 // (those have a signed DO attached via logistics_attach_do_and_deliver).
 // Returns application/pdf with attachment Content-Disposition.
-logisticsOrdersRouter.get("/:id/print-do", requireLogistics, async (c) => {
+// 2026-05-12 (Loo): renamed `/print-do` → `/print-do-data`. Returns JSON;
+// browser renders @react-pdf locally (Workers WASM ban).
+logisticsOrdersRouter.get("/:id/print-do-data", requireLogistics, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
 
@@ -386,22 +388,7 @@ logisticsOrdersRouter.get("/:id/print-do", requireLogistics, async (c) => {
     currency: "MYR",
   };
 
-  const pdfBytes = await renderDoPdf(templateData);
-  // Filename uses do_number directly. Spec §17.3 / E2 wrote `filename="DO-{do_number}.pdf"`,
-  // but the actual `do_number` text already carries its own `DO-` prefix
-  // (auto-suggest format `DO-{9800-9999}` per spec §18.3 DOAttachModal), so
-  // doubling the prefix would yield "DO-DO-9801.pdf". Use do_number raw and
-  // also tolerate edge values without the prefix by ensuring one is present.
-  const filenameBase = templateData.do_number.startsWith("DO-")
-    ? templateData.do_number
-    : `DO-${templateData.do_number}`;
-  // Hono c.body accepts ArrayBuffer | Uint8Array<ArrayBuffer>; renderDoPdf returns
-  // Uint8Array<ArrayBufferLike> (TS general), so pass the underlying ArrayBuffer.
-  return c.body(pdfBytes.buffer as ArrayBuffer, 200, {
-    "Content-Type": "application/pdf",
-    "Content-Disposition": `attachment; filename="${filenameBase}.pdf"`,
-    "Cache-Control": "no-store",
-  });
+  return c.json(templateData);
 });
 
 // ----- POST /:id/assign-partner -----

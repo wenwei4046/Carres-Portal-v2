@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
-import { http, passthrough } from "msw";
-import { PDFParse } from "pdf-parse";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
-import { server } from "../../test/server";
+
+// 2026-05-12 (Loo): route renamed `/print` → `/print-data` and returns JSON
+// instead of application/pdf — render moved to apps/web/src/lib/pdf/.
 
 // Mirror orders-print-do.test.ts: route reads po/lines/skus via the
 // user-scoped supabase client, so we mock userClient and feed the same
@@ -53,12 +53,6 @@ beforeAll(async () => {
 beforeEach(() => {
   _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
   vi.mocked(userClient).mockReset();
-  // @react-pdf/renderer fetches Noto Sans SC TTFs from jsdelivr at first
-  // render. setup.ts uses onUnhandledRequest:"error", so passthrough is
-  // required — same as render.test.ts and orders-print-do.test.ts.
-  server.use(
-    http.get("https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-sc@latest/*", () => passthrough()),
-  );
 });
 
 afterAll(() => _setJwksForTesting(null));
@@ -123,91 +117,59 @@ function mockPrintPoQueries(opts: {
   return fromImpl;
 }
 
-async function pdfText(bytes: Uint8Array): Promise<string> {
-  const parser = new PDFParse({ data: bytes });
-  const result = await parser.getText();
-  await parser.destroy();
-  return result.text;
-}
+describe("GET /api/logistics/pos/:id/print-data", () => {
+  it("200 — returns JSON template data with PO#, supplier, buyer, lines, total", async () => {
+    mockPrintPoQueries({
+      lines: [
+        { sku: "MAT-K-001", qty: 5, received_qty: 0 },
+        { sku: "BED-K-002", qty: 3, received_qty: 0 },
+        { sku: "SOFA-3S-001", qty: 1, received_qty: 0 },
+      ],
+      skus: [
+        { sku: "MAT-K-001", variant: "King Mattress 200x200", price: 1500 },
+        { sku: "BED-K-002", variant: "Oak Bedframe King", price: 800 },
+        { sku: "SOFA-3S-001", variant: "Linen Sofa Warm Beige", price: 4500 },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/print-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toMatch(/application\/json/);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.po_number).toBe("PO-9801");
+    expect(body.supplier.name).toBe("Acme Furniture Sdn Bhd");
+    expect(body.buyer.name).toBe("KL HQ");
+    expect(body.lines).toHaveLength(3);
+    // grand_total = 5*1500 + 3*800 + 1*4500 = 14400.
+    expect(body.grand_total).toBe(14400);
+  });
 
-describe("GET /api/logistics/pos/:id/print", () => {
-  it(
-    "200 — returns application/pdf with attachment filename and pdf-parse extracts PO# / supplier / lines / total",
-    async () => {
-      mockPrintPoQueries({
-        lines: [
-          { sku: "MAT-K-001", qty: 5, received_qty: 0 },
-          { sku: "BED-K-002", qty: 3, received_qty: 0 },
-          { sku: "SOFA-3S-001", qty: 1, received_qty: 0 },
-        ],
-        skus: [
-          { sku: "MAT-K-001", variant: "King Mattress 200x200", price: 1500 },
-          { sku: "BED-K-002", variant: "Oak Bedframe King", price: 800 },
-          { sku: "SOFA-3S-001", variant: "Linen Sofa Warm Beige", price: 4500 },
-        ],
-      });
-      const jwt = await makeJwt("logistics");
-      const res = await app.fetch(
-        new Request(`http://t/api/logistics/pos/${PO_ID}/print`, {
-          headers: { Authorization: `Bearer ${jwt}` },
-        }),
-        env,
-      );
-      expect(res.status).toBe(200);
-      expect(res.headers.get("Content-Type")).toBe("application/pdf");
-      // Filename de-dupes the PO- prefix when po.id already starts with "PO-"
-      // (which it always should — auto-generated 'PO-NNNN' format).
-      expect(res.headers.get("Content-Disposition")).toBe('attachment; filename="PO-9801.pdf"');
-      const buf = new Uint8Array(await res.arrayBuffer());
-      expect(buf.byteLength).toBeGreaterThan(1024);
-      // Magic header check.
-      expect(buf[0]).toBe(0x25); // %
-      expect(buf[1]).toBe(0x50); // P
-      expect(buf[2]).toBe(0x44); // D
-      expect(buf[3]).toBe(0x46); // F
-
-      const text = await pdfText(buf);
-      // PO #, supplier, buyer (warehouse), and SKU descriptions all rendered.
-      expect(text).toContain("PO-9801");
-      expect(text).toContain("Acme Furniture Sdn Bhd");
-      expect(text).toContain("KL HQ");
-      expect(text).toContain("MAT-K-001");
-      expect(text).toContain("King Mattress 200x200");
-      expect(text).toContain("Oak Bedframe King");
-      expect(text).toContain("Linen Sofa Warm Beige");
-      // grand_total = 5*1500 + 3*800 + 1*4500 = 7500 + 2400 + 4500 = 14400.
-      expect(text).toContain("14400.00");
-    },
-    60_000,
-  );
-
-  it(
-    "200 — CJK supplier name renders correctly (Noto Sans SC, not tofu)",
-    async () => {
-      mockPrintPoQueries({
-        po: makePoRow({
-          suppliers: { name: "海尔集团", contact: "+86 10 8888 8888" },
-        }),
-        lines: [{ sku: "MAT-K-001", qty: 1, received_qty: 0 }],
-        skus: [{ sku: "MAT-K-001", variant: "King Mattress 200x200", price: 1500 }],
-      });
-      const jwt = await makeJwt("logistics");
-      const res = await app.fetch(
-        new Request(`http://t/api/logistics/pos/${PO_ID}/print`, {
-          headers: { Authorization: `Bearer ${jwt}` },
-        }),
-        env,
-      );
-      expect(res.status).toBe(200);
-      const buf = new Uint8Array(await res.arrayBuffer());
-      const text = await pdfText(buf);
-      // CRITICAL: pdf-parse must extract the actual CJK characters, not "□□□"
-      // tofu. This proves runtime jsdelivr font fetch + Noto Sans SC subset is
-      // wired correctly for the PO route too (regression guard for M4.4/M4.5).
-      expect(text).toContain("海尔集团");
-    },
-    60_000,
-  );
+  it("200 — CJK supplier name passes through unchanged in JSON", async () => {
+    mockPrintPoQueries({
+      po: makePoRow({
+        suppliers: { name: "海尔集团", contact: "+86 10 8888 8888" },
+      }),
+      lines: [{ sku: "MAT-K-001", qty: 1, received_qty: 0 }],
+      skus: [{ sku: "MAT-K-001", variant: "King Mattress 200x200", price: 1500 }],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/print-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.supplier.name).toBe("海尔集团");
+  });
 
   it("422 — cancelled PO is not printable", async () => {
     mockPrintPoQueries({
@@ -215,7 +177,7 @@ describe("GET /api/logistics/pos/:id/print", () => {
     });
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
-      new Request(`http://t/api/logistics/pos/${PO_ID}/print`, {
+      new Request(`http://t/api/logistics/pos/${PO_ID}/print-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -226,32 +188,28 @@ describe("GET /api/logistics/pos/:id/print", () => {
     expect(body.error).toBe("rule_violation");
   });
 
-  it(
-    "200 — received PO is still printable (procurement record)",
-    async () => {
-      mockPrintPoQueries({
-        po: makePoRow({ status: "received", sup_status: "delivered" }),
-        lines: [{ sku: "MAT-K-001", qty: 2, received_qty: 2 }],
-        skus: [{ sku: "MAT-K-001", variant: "King Mattress 200x200", price: 1500 }],
-      });
-      const jwt = await makeJwt("logistics");
-      const res = await app.fetch(
-        new Request(`http://t/api/logistics/pos/${PO_ID}/print`, {
-          headers: { Authorization: `Bearer ${jwt}` },
-        }),
-        env,
-      );
-      expect(res.status).toBe(200);
-      expect(res.headers.get("Content-Type")).toBe("application/pdf");
-    },
-    60_000,
-  );
+  it("200 — received PO is still readable (procurement record)", async () => {
+    mockPrintPoQueries({
+      po: makePoRow({ status: "received", sup_status: "delivered" }),
+      lines: [{ sku: "MAT-K-001", qty: 2, received_qty: 2 }],
+      skus: [{ sku: "MAT-K-001", variant: "King Mattress 200x200", price: 1500 }],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/logistics/pos/${PO_ID}/print-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toMatch(/application\/json/);
+  });
 
   it("404 — PO does not exist", async () => {
     mockPrintPoQueries({ po: null });
     const jwt = await makeJwt("logistics");
     const res = await app.fetch(
-      new Request(`http://t/api/logistics/pos/${PO_ID}/print`, {
+      new Request(`http://t/api/logistics/pos/${PO_ID}/print-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -267,7 +225,7 @@ describe("GET /api/logistics/pos/:id/print", () => {
     vi.mocked(userClient).mockReturnValue({ from } as any);
     const jwt = await makeJwt("dealer");
     const res = await app.fetch(
-      new Request(`http://t/api/logistics/pos/${PO_ID}/print`, {
+      new Request(`http://t/api/logistics/pos/${PO_ID}/print-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -277,7 +235,7 @@ describe("GET /api/logistics/pos/:id/print", () => {
   });
 
   it("401 — missing Authorization header", async () => {
-    const res = await app.fetch(new Request(`http://t/api/logistics/pos/${PO_ID}/print`), env);
+    const res = await app.fetch(new Request(`http://t/api/logistics/pos/${PO_ID}/print-data`), env);
     expect(res.status).toBe(401);
   });
 });

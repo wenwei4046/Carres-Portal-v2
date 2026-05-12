@@ -7,7 +7,6 @@ import type { FinanceArAgingRow } from "@/lib/queries";
 
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(),
-  apiFetchBlob: vi.fn(),
   ApiError: class ApiError extends Error {
     status: number;
     body: unknown;
@@ -19,7 +18,11 @@ vi.mock("@/lib/api", () => ({
     }
   },
 }));
-import { apiFetch, apiFetchBlob } from "@/lib/api";
+vi.mock("@/lib/pdf/render", () => ({
+  renderInvoicePdf: vi.fn(),
+}));
+import { apiFetch } from "@/lib/api";
+import { renderInvoicePdf } from "@/lib/pdf/render";
 
 function wrap(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -94,18 +97,21 @@ describe("ARDrawer", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("Download click hits apiFetchBlob with the new invoice id", async () => {
+  it("Download click hits the JSON data route + renders client-side", async () => {
     const NEW_INVOICE_ID = "33333333-3333-3333-3333-000000000100";
     vi.mocked(apiFetch).mockImplementation(async (url, init) => {
       if (init?.method === "POST" && url.includes("/api/finance/invoices/issue")) {
         return { id: NEW_INVOICE_ID, invoice_no: "INV-2026-0001" };
       }
+      if (url.includes("/pdf-data")) {
+        // Browser-side render gets the template data, not a PDF blob.
+        return { invoice_no: "INV-2026-0001" };
+      }
       return [];
     });
-    vi.mocked(apiFetchBlob).mockResolvedValue(
+    vi.mocked(renderInvoicePdf).mockResolvedValue(
       new Blob(["%PDF-1.4 fake"], { type: "application/pdf" }),
     );
-    // Stub URL.createObjectURL + window.open so jsdom doesn't choke.
     Object.assign(window.URL, {
       createObjectURL: vi.fn(() => "blob:mock"),
       revokeObjectURL: vi.fn(),
@@ -120,9 +126,12 @@ describe("ARDrawer", () => {
     fireEvent.click(download);
 
     await waitFor(() => {
-      expect(apiFetchBlob).toHaveBeenCalledWith(
-        `/api/finance/invoices/${NEW_INVOICE_ID}/pdf`,
+      expect(apiFetch).toHaveBeenCalledWith(
+        `/api/finance/invoices/${NEW_INVOICE_ID}/pdf-data`,
       );
+    });
+    await waitFor(() => {
+      expect(renderInvoicePdf).toHaveBeenCalled();
     });
     expect(openSpy).toHaveBeenCalledWith("blob:mock", "_blank");
 

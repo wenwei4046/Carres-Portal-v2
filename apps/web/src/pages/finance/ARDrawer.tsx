@@ -7,8 +7,10 @@ import {
   type FinanceArAgingRow,
   type FinancePaymentRow,
 } from "@/lib/queries";
-import { apiFetchBlob, ApiError } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { renderInvoicePdf } from "@/lib/pdf/render";
+import type { InvoiceTemplateData } from "@/lib/pdf/types";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import { rm } from "@/lib/format-currency";
 import type { PaymentMethod } from "@carres/shared";
@@ -86,10 +88,13 @@ export default function ARDrawer({
   async function downloadInvoicePdf() {
     if (!issuedInvoiceId) return;
     try {
-      const blob = await apiFetchBlob(`/api/finance/invoices/${issuedInvoiceId}/pdf`);
+      // Server returns JSON; @react-pdf renders client-side (Workers WASM ban).
+      const data = await apiFetch<InvoiceTemplateData>(
+        `/api/finance/invoices/${issuedInvoiceId}/pdf-data`,
+      );
+      const blob = await renderInvoicePdf(data);
       const url  = URL.createObjectURL(blob);
       window.open(url, "_blank");
-      // Revoke after a short delay so the new tab has time to load.
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : String(e);

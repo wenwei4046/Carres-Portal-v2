@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ApiError } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
+import { renderDoPdf } from "@/lib/pdf/render";
+import type { DoTemplateData } from "@/lib/pdf/types";
 import {
   useLogisticsOrder,
   useRecheckStockMutation,
@@ -776,26 +778,16 @@ function PrintDoButton({
   doNumber: string | null;
 }) {
   const [pending, setPending] = useState(false);
-  const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   async function open() {
     if (pending) return;
     setPending(true);
     try {
-      const session = useAuth.getState().session;
-      const headers = new Headers();
-      if (session?.access_token) {
-        headers.set("Authorization", `Bearer ${session.access_token}`);
-      }
-      const res = await fetch(
-        `${baseUrl}/api/logistics/orders/${orderId}/print-do`,
-        { headers },
+      // 2026-05-12 (Loo): server returns JSON; @react-pdf renders client-side.
+      const data = await apiFetch<DoTemplateData>(
+        `/api/logistics/orders/${orderId}/print-do-data`,
       );
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Print failed (${res.status})`);
-      }
-      const blob = await res.blob();
+      const blob = await renderDoPdf(data);
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank", "noopener,noreferrer");
       if (!win) {

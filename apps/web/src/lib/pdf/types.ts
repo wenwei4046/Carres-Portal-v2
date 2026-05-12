@@ -12,6 +12,65 @@
  * declared here.
  */
 
+export type DoTemplateData = {
+  do_number: string;
+  issue_date: string;
+  order_id: string;
+  order_code: string;
+  customer: { name: string; address: string; phone: string | null };
+  dealer: { name: string; contact: string | null };
+  partner: { name: string } | null;
+  lines: Array<{
+    sku: string;
+    description: string;
+    qty: number;
+    unit: string;
+    line_total: number;
+  }>;
+  currency: string;
+};
+
+export type InvoiceTemplateData = {
+  invoice_no: string;
+  issue_date: string;
+  order_id: string;
+  order_code: string;
+  customer: { name: string; address: string; phone: string | null };
+  dealer: { name: string; contact: string | null };
+  lines: Array<{
+    sku: string;
+    description: string;
+    qty: number;
+    unit: string;
+    unit_price: number;
+    line_total: number;
+  }>;
+  subtotal: number;
+  tax_amount: number;
+  total: number;
+  currency: string;
+};
+
+export type PoTemplateData = {
+  po_number: string;
+  issue_date: string;
+  po_id: string;
+  supplier: { name: string; address: string | null; contact: string | null };
+  buyer: { name: string; contact: string | null };
+  lines: Array<{
+    sku: string;
+    description: string;
+    qty: number;
+    unit: string;
+    unit_price: number;
+    line_total: number;
+    attrs?: Record<string, unknown> | null;
+  }>;
+  grand_total: number;
+  currency: string;
+  terms: string | null;
+};
+
 export type SalesOrderTemplateData = {
   so_number: string;
   issue_date: string;

@@ -11,19 +11,38 @@
  * additional `renderXxxPdf` exports.
  */
 
+import type { ReactElement } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { SalesOrderTemplate } from "./sales-order-template";
+import { InvoiceTemplate } from "./invoice-template";
+import { DoTemplate } from "./do-template";
+import { PoTemplate } from "./po-template";
 import { registerNotoSansSC } from "./fonts/noto";
-import type { SalesOrderTemplateData } from "./types";
+import type {
+  DoTemplateData,
+  InvoiceTemplateData,
+  PoTemplateData,
+  SalesOrderTemplateData,
+} from "./types";
 
-/**
- * Render a Sales Order to a Blob suitable for `URL.createObjectURL` +
- * `window.open` to display in a new tab. Throws on render failure; callers
- * should toast the error message.
- */
-export async function renderSalesOrderPdf(
-  data: SalesOrderTemplateData,
-): Promise<Blob> {
+/** All four PDFs share the render pipeline; only the template differs. */
+async function toBlob(element: ReactElement): Promise<Blob> {
   registerNotoSansSC();
-  return pdf(SalesOrderTemplate(data)).toBlob();
+  return pdf(element).toBlob();
+}
+
+export function renderSalesOrderPdf(data: SalesOrderTemplateData): Promise<Blob> {
+  return toBlob(SalesOrderTemplate(data));
+}
+
+export function renderInvoicePdf(data: InvoiceTemplateData): Promise<Blob> {
+  return toBlob(InvoiceTemplate(data));
+}
+
+export function renderDoPdf(data: DoTemplateData): Promise<Blob> {
+  return toBlob(DoTemplate(data));
+}
+
+export function renderPoPdf(data: PoTemplateData): Promise<Blob> {
+  return toBlob(PoTemplate(data));
 }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ApiError } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { apiFetch, ApiError } from "@/lib/api";
+import { renderPoPdf } from "@/lib/pdf/render";
+import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useAssignPickupPartnerMutation,
   useDeliveryPartners,
@@ -67,7 +68,6 @@ export default function AssignPickupDialog({
   const partners = partnersQ.data?.partners ?? [];
   const [partnerId, setPartnerId] = useState<string>("");
   const assign = useAssignPickupPartnerMutation(po.id);
-  const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   // v3-S3.4 — outsource form state. Lives alongside partnerId; the partner
   // <select>'s synthetic '__OUTSOURCE__' option flips between paths.
@@ -111,24 +111,14 @@ export default function AssignPickupDialog({
     !!warehouseId;
   const valid = (validPartnerPath || validOutsourcePath) && !assign.isPending;
 
-  // v3-S3.4 spec §8.3 — Print DO for outsource. Mirrors PoDetailModal.handlePrint
-  // (auth header → blob → window.open with popup-blocked download fallback).
+  // v3-S3.4 spec §8.3 — Print DO for outsource.
+  // 2026-05-12 (Loo): server returns JSON; @react-pdf renders client-side.
   async function printDoForOutsource(name: string) {
     try {
-      const session = useAuth.getState().session;
-      const headers = new Headers();
-      if (session?.access_token) {
-        headers.set("Authorization", `Bearer ${session.access_token}`);
-      }
-      const res = await fetch(
-        `${baseUrl}/api/logistics/pos/${po.id}/print`,
-        { headers },
+      const data = await apiFetch<PoTemplateData>(
+        `/api/logistics/pos/${po.id}/print-data`,
       );
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Print failed (${res.status})`);
-      }
-      const blob = await res.blob();
+      const blob = await renderPoPdf(data);
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank", "noopener,noreferrer");
       if (!win) {

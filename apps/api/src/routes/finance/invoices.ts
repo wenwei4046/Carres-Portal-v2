@@ -6,7 +6,7 @@ import {
   invoicesListQuery,
 } from "@carres/shared";
 import { requireFinance } from "../../lib/auth-guards";
-import { renderInvoicePdf } from "../../lib/pdf/render";
+// renderInvoicePdf removed — see file header note re: Workers WASM limit.
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { InvoiceTemplateData } from "../../lib/pdf/types";
@@ -157,16 +157,16 @@ financeInvoicesRouter.post("/:id/void", requireFinance, async (c) => {
 });
 
 // ----- GET /:id/pdf -----
-// Server-side tax-invoice PDF (Q7=A locked Phase 5 Chunk C).
-// Returns application/pdf inline. Gated on:
+// 2026-05-12 (Loo): renamed `/pdf` → `/pdf-data`. Now returns JSON shaped
+// for the client-side @react-pdf render. Cloudflare Workers blocks the
+// yoga-layout WASM compile so the server-side render couldn't actually
+// run — see apps/web/src/lib/pdf/render.ts for the browser-side counterpart.
+//
+// Same gates as before:
 //   - invoice not voided
 //   - order.status='delivered'
 //   - order.paid >= invoice.amount  (full payment received before tax doc)
-//
-// The "paid >= total" gate is the same one the AR drawer's PDF button
-// pre-checks; mirroring it server-side keeps the rule single-sourced and
-// rejects any client that tries to bypass.
-financeInvoicesRouter.get("/:id/pdf", requireFinance, async (c) => {
+financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
   const id = c.req.param("id");
   if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
     return c.json(
@@ -307,13 +307,7 @@ financeInvoicesRouter.get("/:id/pdf", requireFinance, async (c) => {
     currency: "MYR",
   };
 
-  const pdfBytes = await renderInvoicePdf(templateData);
-
-  return c.body(pdfBytes.buffer as ArrayBuffer, 200, {
-    "Content-Type": "application/pdf",
-    "Content-Disposition": `inline; filename="${templateData.invoice_no}.pdf"`,
-    "Cache-Control": "no-store",
-  });
+  return c.json(templateData);
 });
 
 export default financeInvoicesRouter;

@@ -578,39 +578,19 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
     expect(screen.queryByTestId("po-detail-modal")).not.toBeInTheDocument();
   });
 
-  it("PoDetailModal Print button calls fetch with /print URL + Bearer JWT", async () => {
+  it("PoDetailModal Print button fetches JSON + renders @react-pdf client-side", async () => {
     setLoaded([makePo({ id: "PO-2074" })]);
-    // Stub fetch to return a tiny PDF blob.
-    const blob = new Blob(["%PDF-1.4 fake"], { type: "application/pdf" });
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(blob, {
-        status: 200,
-        headers: { "content-type": "application/pdf" },
-      }),
-    );
-    // Stub the auth store so we get a known token in the Authorization header.
-    const authMod = await import("@/lib/auth");
-    const getStateSpy = vi
-      .spyOn(authMod.useAuth, "getState")
-      .mockReturnValue({
-        session: {
-          access_token: "fake-jwt",
-          refresh_token: "r",
-          expires_at: 0,
-          user: null,
-        },
-        user: null,
-        role: null,
-        bootstrap: vi.fn(),
-        signIn: vi.fn(),
-        signOut: vi.fn(),
-        signUp: vi.fn(),
-        resetPassword: vi.fn(),
-      } as unknown as ReturnType<typeof authMod.useAuth.getState>);
+    // Mock the API JSON fetch + the client-side render.
+    const apiMod = await import("@/lib/api");
+    const apiFetchSpy = vi
+      .spyOn(apiMod, "apiFetch")
+      .mockResolvedValue({ po_number: "PO-2074" } as unknown as never);
+    const renderMod = await import("@/lib/pdf/render");
+    const renderSpy = vi
+      .spyOn(renderMod, "renderPoPdf")
+      .mockResolvedValue(new Blob(["%PDF-1.4 fake"], { type: "application/pdf" }));
     // Stub window.open + URL.createObjectURL/revokeObjectURL so the test
-    // doesn't try to actually navigate. JSDOM doesn't ship these, so we
-    // assign them directly instead of using vi.spyOn (which fails on missing
-    // properties).
+    // doesn't try to actually navigate.
     const openSpy = vi.spyOn(window, "open").mockReturnValue({} as Window);
     const originalCreate = (URL as unknown as { createObjectURL?: unknown })
       .createObjectURL;
@@ -627,13 +607,13 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
     fireEvent.click(screen.getByTestId("po-detail-print-button"));
 
     await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(apiFetchSpy).toHaveBeenCalledWith(
+        "/api/logistics/pos/PO-2074/print-data",
+      );
     });
-    const [url, init] = fetchSpy.mock.calls[0];
-    expect(String(url)).toMatch(/\/api\/logistics\/pos\/PO-2074\/print$/);
-    const headers = (init?.headers as Headers) ?? new Headers();
-    expect(headers.get("Authorization")).toBe("Bearer fake-jwt");
-    // Modal opened the blob in a new tab (popup not blocked in test env).
+    await waitFor(() => {
+      expect(renderSpy).toHaveBeenCalled();
+    });
     await waitFor(() => {
       expect(openSpy).toHaveBeenCalledWith(
         "blob:fake",
@@ -642,8 +622,8 @@ describe("ProcurementTabContent — PoDetailModal (read-only PO detail)", () => 
       );
     });
 
-    fetchSpy.mockRestore();
-    getStateSpy.mockRestore();
+    apiFetchSpy.mockRestore();
+    renderSpy.mockRestore();
     openSpy.mockRestore();
     if (originalCreate === undefined) {
       delete (URL as unknown as { createObjectURL?: unknown }).createObjectURL;

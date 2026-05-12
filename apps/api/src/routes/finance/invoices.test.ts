@@ -367,7 +367,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
     };
   }
 
-  it("renders application/pdf when invoice + order + lines all valid", async () => {
+  it("returns JSON template data when invoice + order + lines all valid", async () => {
     const sb = mockChain(
       { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
       { id: ORDER_ID, dl: 1240, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "10 Lorong KL", dealer_id: "d1", paid: 5970, dealers: { name: "KL Showroom", contact: "Aisha" } },
@@ -379,17 +379,20 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
 
     const jwt = await makeJwt("finance");
     const res = await app.fetch(
-      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
     );
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("application/pdf");
-    const body = await res.arrayBuffer();
-    // %PDF- magic header
-    expect(new Uint8Array(body).slice(0, 5)).toEqual(new Uint8Array([37, 80, 68, 70, 45]));
-  }, 15000);
+    expect(res.headers.get("content-type")).toMatch(/application\/json/);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.invoice_no).toBe("INV-2026-1240");
+    expect(body.order_code).toBe("DL-1240");
+    expect(body.total).toBe(5970);
+    expect(body.lines).toHaveLength(1);
+  });
 
   it("returns 404 when invoice not found", async () => {
     const sb = mockChain(null, null);
@@ -398,7 +401,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
 
     const jwt = await makeJwt("finance");
     const res = await app.fetch(
-      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -416,7 +419,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
 
     const jwt = await makeJwt("finance");
     const res = await app.fetch(
-      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -436,7 +439,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
 
     const jwt = await makeJwt("finance");
     const res = await app.fetch(
-      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -456,7 +459,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
 
     const jwt = await makeJwt("finance");
     const res = await app.fetch(
-      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -469,7 +472,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
   it("rejects invalid uuid with 422", async () => {
     const jwt = await makeJwt("finance");
     const res = await app.fetch(
-      new Request("http://t/api/finance/invoices/not-a-uuid/pdf", {
+      new Request("http://t/api/finance/invoices/not-a-uuid/pdf-data", {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -480,7 +483,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
   it("rejects dealer with 403", async () => {
     const jwt = await makeJwt("dealer");
     const res = await app.fetch(
-      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf`, {
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
