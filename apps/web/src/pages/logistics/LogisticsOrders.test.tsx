@@ -148,6 +148,8 @@ function makeDetail(): LogisticsOrderDetailResponse {
       delivery_partner_id: null,
       dealer_id: "d-1",
       outlet_id: null,
+      invoice_no: null,
+      invoiced_at: null,
       dealers: { name: "ComfortBeds" },
       outlets: null,
     },
