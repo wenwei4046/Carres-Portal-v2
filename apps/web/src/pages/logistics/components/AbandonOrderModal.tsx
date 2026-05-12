@@ -27,11 +27,23 @@ export default function AbandonOrderModal({ order, onClose }: Props) {
   const abandon = useAbandonOrderMutation(order.id);
   const valid = reason.trim().length >= 3 && !abandon.isPending;
 
+  // Mirror logistics_abandon_order RPC: stock reserve only exists at
+  // ready_to_dispatch + dispatched, so a release only happens there.
+  // Earlier copy claimed "stock released" unconditionally, which lied for
+  // proceed_request + awaiting_logistics_action abandons (Loo 2026-05-12).
+  const hadReserve =
+    order.logistics_stage === "ready_to_dispatch" ||
+    order.logistics_stage === "dispatched";
+
   async function submit() {
     if (!valid) return;
     try {
       await abandon.mutateAsync({ reason: reason.trim() });
-      toast.success(`#${order.dl} abandoned · stock released`);
+      toast.success(
+        hadReserve
+          ? `#${order.dl} abandoned · stock released`
+          : `#${order.dl} abandoned`,
+      );
       onClose();
     } catch (e: unknown) {
       if (e instanceof ApiError) toast.error(e.message || "Abandon failed");
@@ -42,9 +54,13 @@ export default function AbandonOrderModal({ order, onClose }: Props) {
   return (
     <Modal title={`Abandon order · #${order.dl}`} onClose={onClose}>
       <div className="text-[12px] text-base-600 mb-3.5 font-body">
-        This will set the order to <strong>cancelled</strong> and release any
-        reserved stock back to the warehouse. Refund handling, if any, is a
-        Finance concern (Phase 5).
+        This will set the order to <strong>cancelled</strong>.
+        {hadReserve ? (
+          <> Reserved stock will be released back to the warehouse.</>
+        ) : (
+          <> No stock has been reserved yet, so nothing to release.</>
+        )}{" "}
+        Refund handling, if any, is a Finance concern (Phase 5).
       </div>
       <div className="mb-4">
         <label className="label mb-1.5 block" htmlFor="abandon-reason-input">
