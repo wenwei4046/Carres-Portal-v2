@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SupplierDashboard from "./SupplierDashboard";
 
@@ -166,6 +166,46 @@ describe("SupplierDashboard", () => {
     // PO ids surface as anchors in the feed.
     expect(screen.getByText("PO-2050")).toBeInTheDocument();
     expect(screen.getByText("PO-2049")).toBeInTheDocument();
+  });
+
+  it("counts partner_confirmed POs in Ready pipeline cell + KPI", async () => {
+    // 0090 sofa flow regression: partner WH accepted the goods, supplier
+    // (own_logistics) is now self-dispatching. The PO must appear in the
+    // Ready bucket on the Dashboard, not vanish from the pipeline view.
+    // See apps/api/src/routes/supplier/pos.ts:49 — API ready bucket already
+    // includes partner_confirmed; this asserts Dashboard mirrors that.
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/api/supplier/me")) return ME_OWN;
+      if (url.includes("/api/supplier/activity")) return [];
+      if (url.includes("/products/demand")) return DEMAND;
+      if (url.includes("/api/supplier/pos"))
+        return [
+          {
+            id: "PO-2032",
+            sup_status: "partner_confirmed",
+            supplier_id: "e1",
+            lines: [{ id: "L1", sku: "sofa:malibu", qty: 5, attrs: {} }],
+          },
+        ];
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<SupplierDashboard />));
+
+    // Wait until the PO query settles — Pipeline overview renders before async
+    // data arrives, so check the Ready KPI flips from 0 to 1 as the signal.
+    const readyKpi = await waitFor(() => {
+      const kpi = screen.getByText("Ready · awaiting pickup").parentElement!;
+      expect(within(kpi).getByText("1")).toBeInTheDocument();
+      return kpi;
+    });
+
+    // Ready pipeline cell also shows count of 1, not 0.
+    const readyCell = screen.getByText("Ready to Pickup").parentElement!;
+    expect(within(readyCell).getByText("1")).toBeInTheDocument();
+
+    // Sanity: the KPI we waited on is the same one we asserted against.
+    expect(readyKpi).toBeInTheDocument();
   });
 
   it("Recent activity shows empty hint when feed is empty", async () => {

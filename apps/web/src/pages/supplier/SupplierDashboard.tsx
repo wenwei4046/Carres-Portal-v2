@@ -41,7 +41,12 @@ export default function SupplierDashboard() {
   const readyAwaiting = rows.filter(
     (p) =>
       p.sup_status === "ready_for_pickup" ||
-      p.sup_status === "ready_confirm_sent",
+      p.sup_status === "ready_confirm_sent" ||
+      // 0090 sofa flow (Loo 2026-05-12): partner WH owner accepted the
+      // goods; supplier (own_logistics) now self-dispatches. Mirrors the
+      // API ready bucket in apps/api/src/routes/supplier/pos.ts:49 so the
+      // Dashboard pipeline counter matches the Ready-to-Pickup tab.
+      p.sup_status === "partner_confirmed",
   ).length;
 
   const stagePo = rows.filter((p) =>
@@ -51,6 +56,7 @@ export default function SupplierDashboard() {
     [
       "ready_for_pickup",
       "ready_confirm_sent",
+      "partner_confirmed",
       "pickup_assigned",
       "pickup_accepted",
       "shipped",
