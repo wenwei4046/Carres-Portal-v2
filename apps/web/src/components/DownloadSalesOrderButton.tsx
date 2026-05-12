@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { apiFetchBlob, ApiError } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
+import { renderSalesOrderPdf } from "@/lib/pdf/render";
+import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 
 /**
  * 2026-05-12 (Loo) — Customer-facing Sales Order PDF download button.
@@ -64,7 +66,12 @@ export default function DownloadSalesOrderButton({
   async function onClick() {
     setBusy(true);
     try {
-      const blob = await apiFetchBlob(`/api/orders/${orderId}/sales-order-pdf`);
+      // Fetch JSON payload (server-side joins) then render @react-pdf
+      // locally — Workers' WASM ban prevents server-side render.
+      const data = await apiFetch<SalesOrderTemplateData>(
+        `/api/orders/${orderId}/sales-order-data`,
+      );
+      const blob = await renderSalesOrderPdf(data);
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);

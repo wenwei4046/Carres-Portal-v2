@@ -4,7 +4,7 @@ import { Toaster } from "sonner";
 import DownloadSalesOrderButton from "./DownloadSalesOrderButton";
 
 vi.mock("@/lib/api", () => ({
-  apiFetchBlob: vi.fn(),
+  apiFetch: vi.fn(),
   ApiError: class ApiError extends Error {
     status: number;
     body: unknown;
@@ -16,7 +16,11 @@ vi.mock("@/lib/api", () => ({
     }
   },
 }));
-import { apiFetchBlob } from "@/lib/api";
+vi.mock("@/lib/pdf/render", () => ({
+  renderSalesOrderPdf: vi.fn(),
+}));
+import { apiFetch } from "@/lib/api";
+import { renderSalesOrderPdf } from "@/lib/pdf/render";
 
 describe("DownloadSalesOrderButton", () => {
   beforeEach(() => {
@@ -55,9 +59,11 @@ describe("DownloadSalesOrderButton", () => {
     expect(supplier.container.firstChild).toBeNull();
   });
 
-  it("fetches PDF + opens new tab on click", async () => {
+  it("fetches JSON, renders client-side, opens new tab on click", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(apiFetch).mockResolvedValueOnce({ so_number: "SO-001001" } as any);
     const fakeBlob = new Blob(["%PDF-1.4 …"], { type: "application/pdf" });
-    vi.mocked(apiFetchBlob).mockResolvedValueOnce(fakeBlob);
+    vi.mocked(renderSalesOrderPdf).mockResolvedValueOnce(fakeBlob);
 
     render(
       <>
@@ -69,9 +75,12 @@ describe("DownloadSalesOrderButton", () => {
     fireEvent.click(screen.getByTestId("download-sales-order-1001"));
 
     await waitFor(() => {
-      expect(apiFetchBlob).toHaveBeenCalledWith(
-        "/api/orders/ord-1/sales-order-pdf",
+      expect(apiFetch).toHaveBeenCalledWith(
+        "/api/orders/ord-1/sales-order-data",
       );
+    });
+    await waitFor(() => {
+      expect(renderSalesOrderPdf).toHaveBeenCalled();
     });
     expect(window.open).toHaveBeenCalledWith("blob:fake", "_blank");
   });

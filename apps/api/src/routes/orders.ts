@@ -16,9 +16,47 @@ import {
   updateOrderInputSchema,
 } from "@carres/shared";
 import { userClient } from "../lib/supabase";
-import { renderSalesOrderPdf } from "../lib/pdf/render";
-import type { SalesOrderTemplateData } from "../lib/pdf/types";
 import type { AppEnv } from "../types";
+
+/**
+ * 2026-05-12 (Loo) — `SalesOrderData` is the JSON shape the
+ * `/sales-order-data` route returns. Rendering happens client-side per
+ * apps/web/src/lib/pdf/render.ts; this type stays here as the route's
+ * response contract and lives alongside the route handler that fills it.
+ */
+type SalesOrderData = {
+  so_number: string;
+  issue_date: string;
+  order_id: string;
+  order_code: string;
+  status_label: string;
+  channel: "dealer" | "showroom";
+  customer: { name: string; address: string; phone: string | null };
+  dealer: {
+    name: string;
+    contact: string | null;
+    outlet_name: string | null;
+    outlet_address: string | null;
+    salesperson_name: string | null;
+    salesperson_phone: string | null;
+  };
+  delivery: { date: string; floor: number; has_lift: boolean };
+  lines: Array<{
+    sku: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    line_total: number;
+    attrs: Record<string, unknown> | null;
+  }>;
+  addons: Array<{ label: string; qty: number; unit_price: number; line_total: number }>;
+  subtotal: number;
+  total: number;
+  paid: number;
+  balance_due: number;
+  currency: string;
+  signed: boolean;
+};
 
 const ordersRouter = new Hono<AppEnv>();
 
@@ -668,14 +706,16 @@ ordersRouter.get("/:id", async (c) => {
   return c.json(orderSchema.parse(signed));
 });
 
-// 2026-05-12 (Loo) — Sales Order PDF.
+// 2026-05-12 (Loo) — Sales Order data for client-side PDF render.
+// Returns JSON (NOT PDF bytes) — the browser does the @react-pdf render
+// because Workers blocks the yoga-layout WASM compile. The route stays
+// here for the SQL joins + role gate + RLS scoping.
+//
 // Customer-facing doc. Dealer / Showroom / Salesperson / Logistics / Finance
 // / Principal / BD can pull; Partner / Supplier are denied at the route gate
 // (Partner has POD, Supplier has PO — they shouldn't be handing out the
-// customer SO). Loo 2026-05-12 ~20:00 revised the policy to admit Logistics
-// after seeing the empty drawer and expecting the button there. RLS on
-// `orders` still narrows to rows each role can read.
-ordersRouter.get("/:id/sales-order-pdf", async (c) => {
+// customer SO). RLS on `orders` narrows further to rows each role can read.
+ordersRouter.get("/:id/sales-order-data", async (c) => {
   const auth = c.var.auth;
   const role = auth.role;
   if (role === "partner" || role === "supplier") {
@@ -769,7 +809,7 @@ ordersRouter.get("/:id/sales-order-pdf", async (c) => {
   const channel: "dealer" | "showroom" =
     o.channel === "showroom" || o.outlets ? "showroom" : "dealer";
 
-  const data_: SalesOrderTemplateData = {
+  const payload: SalesOrderData = {
     so_number,
     issue_date,
     order_id: id,
@@ -804,12 +844,7 @@ ordersRouter.get("/:id/sales-order-pdf", async (c) => {
     signed: !!o.signature_url,
   };
 
-  const pdfBytes = await renderSalesOrderPdf(data_);
-  return c.body(pdfBytes.buffer as ArrayBuffer, 200, {
-    "Content-Type": "application/pdf",
-    "Content-Disposition": `inline; filename="${so_number}.pdf"`,
-    "Cache-Control": "no-store",
-  });
+  return c.json(payload);
 });
 
 export default ordersRouter;

@@ -425,8 +425,8 @@ describe("GET /api/orders/:id", () => {
   });
 });
 
-// 2026-05-12 (Loo) — Sales Order PDF.
-describe("GET /api/orders/:id/sales-order-pdf", () => {
+// 2026-05-12 (Loo) — Sales Order data for client-side render.
+describe("GET /api/orders/:id/sales-order-data", () => {
   const ORDER_ID = "11111111-1111-1111-1111-111111111111";
 
   function makeJoinedRow(over: Partial<Record<string, unknown>> = {}) {
@@ -457,40 +457,45 @@ describe("GET /api/orders/:id/sales-order-pdf", () => {
     };
   }
 
-  it("renders application/pdf for dealer role", async () => {
+  it("returns JSON payload for dealer role (browser does the render)", async () => {
     const sb = buildSb({ one: makeJoinedRow() });
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("dealer", DEALER_A);
     const res = await app.fetch(
-      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-pdf`, {
+      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
     );
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("application/pdf");
-    const body = await res.arrayBuffer();
-    expect(new Uint8Array(body).slice(0, 5)).toEqual(new Uint8Array([37, 80, 68, 70, 45]));
-  }, 15000);
+    expect(res.headers.get("content-type")).toMatch(/application\/json/);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.so_number).toBe("SO-001001");
+    expect(body.order_code).toBe("DL-1001");
+    expect(body.customer.name).toBe("Tan Mei Ling");
+    expect(body.lines).toHaveLength(1);
+    expect(body.addons).toHaveLength(1);
+  });
 
   it("admits logistics (revised 2026-05-12 — they need it on handover)", async () => {
     vi.mocked(userClient).mockReturnValue(buildSb({ one: makeJoinedRow() }));
     const jwt = await makeJwt("logistics", null);
     const res = await app.fetch(
-      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-pdf`, {
+      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
     );
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("application/pdf");
-  }, 15000);
+    expect(res.headers.get("content-type")).toMatch(/application\/json/);
+  });
 
   it("returns 403 for partner role", async () => {
     vi.mocked(userClient).mockReturnValue(buildSb({ one: makeJoinedRow() }));
     const jwt = await makeJwt("partner", null);
     const res = await app.fetch(
-      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-pdf`, {
+      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -502,7 +507,7 @@ describe("GET /api/orders/:id/sales-order-pdf", () => {
     vi.mocked(userClient).mockReturnValue(buildSb({ one: makeJoinedRow() }));
     const jwt = await makeJwt("supplier", null);
     const res = await app.fetch(
-      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-pdf`, {
+      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -515,20 +520,20 @@ describe("GET /api/orders/:id/sales-order-pdf", () => {
       vi.mocked(userClient).mockReturnValue(buildSb({ one: makeJoinedRow() }));
       const jwt = await makeJwt(role, null);
       const res = await app.fetch(
-        new Request(`http://t/api/orders/${ORDER_ID}/sales-order-pdf`, {
+        new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
           headers: { Authorization: `Bearer ${jwt}` },
         }),
         env,
       );
       expect(res.status).toBe(200);
     }
-  }, 30000);
+  });
 
   it("returns 404 for missing order (RLS-hidden or genuinely absent)", async () => {
     vi.mocked(userClient).mockReturnValue(buildSb({ one: null }));
     const jwt = await makeJwt("dealer", DEALER_A);
     const res = await app.fetch(
-      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-pdf`, {
+      new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -540,7 +545,7 @@ describe("GET /api/orders/:id/sales-order-pdf", () => {
     vi.mocked(userClient).mockReturnValue(buildSb({ one: null }));
     const jwt = await makeJwt("dealer", DEALER_A);
     const res = await app.fetch(
-      new Request(`http://t/api/orders/not-a-uuid/sales-order-pdf`, {
+      new Request(`http://t/api/orders/not-a-uuid/sales-order-data`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,

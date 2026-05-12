@@ -100,12 +100,13 @@ export type InvoiceTemplateData = {
 };
 
 /**
- * Sales Order PDF — customer-facing document handed to the buyer at point of
- * sale. Mirrors proto `pdf-render.jsx` `printSalesOrder` (line 504).
+ * Sales Order data — kept here for historical reference. As of 2026-05-12
+ * the SO PDF renders client-side (apps/web/src/lib/pdf/), so the API route
+ * `/api/orders/:id/sales-order-data` declares an inline copy of this shape
+ * and returns JSON. Delete this once no consumer references the type.
  *
- * Loo 2026-05-12: dealer / showroom / salesperson / finance / principal / bd
- * can pull this; logistics / partner / supplier cannot — they have their
- * own internal docs (DO, POD, PO) so a customer-facing SO would be off-script.
+ * @deprecated server-side SO render is gone; type lives in
+ * apps/web/src/lib/pdf/types.ts now.
  */
 export type SalesOrderTemplateData = {
   /** Sales Order number, e.g. "SO-001001" (6-digit zero-padded `orders.dl`). */
