@@ -71,7 +71,6 @@ function calcShortages(
 export default function OrderDetailDrawer({ orderId, onClose }: Props) {
   const { data, isLoading, isError, error, refetch } = useLogisticsOrder(orderId);
   const navigate = useNavigate();
-  const role = useAuth((s) => s.role);
 
   const [showDispatch, setShowDispatch] = useState(false);
   const [showDO, setShowDO] = useState(false);
@@ -331,6 +330,11 @@ function DrawerBody({
   onTransferReadyClick,
 }: DrawerBodyProps) {
   const { order, lines, addons, total, warehouse, stockBalances, pos, history, threads } = data;
+  // Loo 2026-05-12 — surface the SO PDF reprint button in the header. Hook
+  // lives in DrawerBody (not the parent OrderDetailDrawer) because the
+  // button JSX renders here; pulling `role` from the parent scope would
+  // ReferenceError at runtime.
+  const role = useAuth((s) => s.role);
   // Phase 4.5 Chunk 2 (T9) — partner-assignment hint sourced from threads
   // (`order_supplier_threads.delivery_partner_id`) rather than the order-level
   // column, per design spec §CQ1 option (b). True when ANY thread has a
