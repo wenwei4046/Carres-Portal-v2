@@ -448,6 +448,12 @@ function SofaConfigurator({
     if (!sku) return;
     const attrs: Record<string, unknown> = { mode };
     if (fabric) {
+      // 2026-05-12 (Loo): persist fabric_id (FK) alongside fabric_name
+      // (display) + fabric_surcharge (price). Without fabric_id, the
+      // Logistics CreatePOModal autofill cascade can't pre-select the
+      // fabric chip even when the dealer DID pick one — the cascade keys
+      // off id, not display name. See CreatePOModal.tsx:144.
+      attrs.fabric_id = fabric.id;
       attrs.fabric_name = fabric.fabricName;
       attrs.fabric_surcharge = surcharge;
     }
