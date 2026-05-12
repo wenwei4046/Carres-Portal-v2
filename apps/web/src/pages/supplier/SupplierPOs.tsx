@@ -664,9 +664,22 @@ function PODrawer({
                     <span className="text-muted-foreground">(PDF/JPG/PNG · ≤10 MB · required)</span>
                   </div>
                   {doNumber.trim().length < 3 ? (
-                    <div className="text-[11px] text-muted-foreground italic">
-                      Enter the DO number above first (min 3 characters).
-                    </div>
+                    // Render a real disabled file picker (not just italic
+                    // text) so the supplier sees the upload widget exists
+                    // and is locked, not missing — italic hint alone was
+                    // too easy to miss (Loo 2026-05-12).
+                    <>
+                      <input
+                        type="file"
+                        disabled
+                        aria-label="DO file (locked)"
+                        className="text-[12px] text-muted-foreground cursor-not-allowed"
+                        data-testid="do-file-locked"
+                      />
+                      <div className="text-[11px] text-primary mt-1.5 font-semibold">
+                        ↑ Locked. Enter the DO number above first (min 3 characters).
+                      </div>
+                    </>
                   ) : (
                     <DOFileUploadField
                       poId={po.id}

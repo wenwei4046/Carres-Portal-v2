@@ -222,22 +222,26 @@ describe("SupplierPOs", () => {
       screen.getByRole("button", { name: /Upload Delivery Order/i }),
     );
 
-    // doNumber is empty → upload field hidden, hint visible
+    // doNumber is empty → file picker rendered but disabled (so the
+    // supplier sees the widget exists and is locked, not missing).
     expect(
       screen.getByText(/Enter the DO number above first/i),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByLabelText(/DO file/i),
-    ).not.toBeInTheDocument();
+    const lockedInput = screen.getByTestId("do-file-locked") as HTMLInputElement;
+    expect(lockedInput).toBeInTheDocument();
+    expect(lockedInput.disabled).toBe(true);
 
-    // Typing a ≥ 3-char DO# mounts the DOFileUploadField
+    // Typing a ≥ 3-char DO# swaps the locked stub for the real
+    // DOFileUploadField (which renders an enabled <input type="file">).
     fireEvent.change(screen.getByTestId("do-number-input"), {
       target: { value: "DO-7" },
     });
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/DO file/i)).toBeInTheDocument();
+      expect(screen.queryByTestId("do-file-locked")).not.toBeInTheDocument();
     });
+    const liveInput = screen.getByLabelText(/DO file/i) as HTMLInputElement;
+    expect(liveInput.disabled).toBe(false);
     expect(
       screen.queryByText(/Enter the DO number above first/i),
     ).not.toBeInTheDocument();
