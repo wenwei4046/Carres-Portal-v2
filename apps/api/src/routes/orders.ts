@@ -669,15 +669,16 @@ ordersRouter.get("/:id", async (c) => {
 });
 
 // 2026-05-12 (Loo) — Sales Order PDF.
-// Customer-facing doc. Dealer / Showroom / Salesperson / Finance / Principal
-// / BD can pull; Logistics / Partner / Supplier are denied at the route gate
-// (they have their own internal docs — DO, POD, PO). RLS on `orders` still
-// gates which rows each role can read, so the deny list here is UI-aligned
-// (not the security boundary).
+// Customer-facing doc. Dealer / Showroom / Salesperson / Logistics / Finance
+// / Principal / BD can pull; Partner / Supplier are denied at the route gate
+// (Partner has POD, Supplier has PO — they shouldn't be handing out the
+// customer SO). Loo 2026-05-12 ~20:00 revised the policy to admit Logistics
+// after seeing the empty drawer and expecting the button there. RLS on
+// `orders` still narrows to rows each role can read.
 ordersRouter.get("/:id/sales-order-pdf", async (c) => {
   const auth = c.var.auth;
   const role = auth.role;
-  if (role === "logistics" || role === "partner" || role === "supplier") {
+  if (role === "partner" || role === "supplier") {
     throw new HTTPException(403, {
       message: "Sales Order PDF not available for this role",
     });

@@ -37,7 +37,10 @@ type Role =
   | "principal"
   | "bd";
 
-const DENIED: ReadonlySet<Role> = new Set(["logistics", "partner", "supplier"]);
+// Loo 2026-05-12 ~20:00 — logistics dropped from the deny list (they
+// surface this on their own drawer when handing over a delivery). Partner
+// has POD and Supplier has PO, so the SO doc stays off their UIs.
+const DENIED: ReadonlySet<Role> = new Set(["partner", "supplier"]);
 
 interface Props {
   orderId: string;

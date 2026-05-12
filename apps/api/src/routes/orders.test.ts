@@ -473,7 +473,7 @@ describe("GET /api/orders/:id/sales-order-pdf", () => {
     expect(new Uint8Array(body).slice(0, 5)).toEqual(new Uint8Array([37, 80, 68, 70, 45]));
   }, 15000);
 
-  it("returns 403 for logistics role (denied at route gate)", async () => {
+  it("admits logistics (revised 2026-05-12 — they need it on handover)", async () => {
     vi.mocked(userClient).mockReturnValue(buildSb({ one: makeJoinedRow() }));
     const jwt = await makeJwt("logistics", null);
     const res = await app.fetch(
@@ -482,8 +482,9 @@ describe("GET /api/orders/:id/sales-order-pdf", () => {
       }),
       env,
     );
-    expect(res.status).toBe(403);
-  });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
+  }, 15000);
 
   it("returns 403 for partner role", async () => {
     vi.mocked(userClient).mockReturnValue(buildSb({ one: makeJoinedRow() }));

@@ -36,11 +36,11 @@ describe("DownloadSalesOrderButton", () => {
     expect(screen.getByTestId("download-sales-order-1001")).toBeInTheDocument();
   });
 
-  it("renders nothing for logistics (denied)", () => {
-    const { container } = render(
+  it("renders for logistics (allowed after Loo's 2026-05-12 revision)", () => {
+    render(
       <DownloadSalesOrderButton orderId="ord-1" dl={1001} role="logistics" />,
     );
-    expect(container.firstChild).toBeNull();
+    expect(screen.getByTestId("download-sales-order-1001")).toBeInTheDocument();
   });
 
   it("renders nothing for partner + supplier (denied)", () => {

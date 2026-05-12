@@ -11,6 +11,7 @@ import {
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 import { useAuth } from "@/lib/auth";
+import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import StageChip, { type LogisticsStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
@@ -70,6 +71,7 @@ function calcShortages(
 export default function OrderDetailDrawer({ orderId, onClose }: Props) {
   const { data, isLoading, isError, error, refetch } = useLogisticsOrder(orderId);
   const navigate = useNavigate();
+  const role = useAuth((s) => s.role);
 
   const [showDispatch, setShowDispatch] = useState(false);
   const [showDO, setShowDO] = useState(false);
@@ -369,6 +371,17 @@ function DrawerBody({
           <div className="text-[12px] text-base-600 mt-0.5">{dealerName}</div>
         </div>
         <div className="flex items-center gap-2">
+          {/* 2026-05-12 (Loo) — customer-facing Sales Order PDF reprint.
+           *  Always available regardless of stage; the button itself hides
+           *  for partner / supplier roles. */}
+          {role && (
+            <DownloadSalesOrderButton
+              orderId={order.id}
+              dl={order.dl}
+              role={role}
+              variant="secondary"
+            />
+          )}
           {(order.do_number || order.status === "delivered") && (
             <PrintDoButton orderId={order.id} doNumber={order.do_number} />
           )}
