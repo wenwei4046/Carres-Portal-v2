@@ -1354,6 +1354,11 @@ export interface LogisticsOrderDetailOrder {
   delivery_partner_id: string | null;
   dealer_id: string;
   outlet_id: string | null;
+  /** 0098: auto-set by orders_auto_issue_on_dispatched_trg when
+   *  logistics_stage transitions to 'dispatched'. Surfaces in the drawer
+   *  as the Print Invoice button gate. */
+  invoice_no: string | null;
+  invoiced_at: string | null;
   dealers: { name: string } | null;
   outlets: { name: string } | null;
 }
@@ -3051,7 +3056,12 @@ export interface SupplierDemandRow {
   pendingOrderCount: number;
 }
 
-/** Phase 7 Sprint 1 — partner_threads_to_deliver RPC payload. */
+/** Phase 7 Sprint 1 — partner_threads_to_deliver RPC payload.
+ *  2026-05-13 (Loo): added `do_number` (migration 0099) so the POD upload
+ *  dialog can auto-fill. 2026-05-13 (Loo, later): migration 0101 widens
+ *  the RPC to also return delivered threads (last 30 days) + exposes
+ *  `logistics_stage` + `delivered_at` so the Deliveries kanban can show
+ *  a Delivered column without a second query. */
 export interface PartnerToDeliverRow {
   thread_id:             string;
   order_id:              string;
@@ -3061,6 +3071,11 @@ export interface PartnerToDeliverRow {
   customer_phone:        string | null;
   dispatched_at:         string;
   confirm_delivery_date: string | null;
+  do_number:             string | null;
+  /** 'dispatched' or 'delivered' — caller uses this to bucket into kanban columns */
+  logistics_stage:       "dispatched" | "delivered";
+  /** populated for delivered rows only */
+  delivered_at:          string | null;
 }
 
 export function usePartnerToDeliver(

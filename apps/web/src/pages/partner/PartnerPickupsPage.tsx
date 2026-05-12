@@ -1,34 +1,36 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { qk, usePartnerToDeliver, type PartnerToDeliverRow } from "@/lib/queries";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
+import { renderDoPdf } from "@/lib/pdf/render";
+import type { DoTemplateData } from "@/lib/pdf/types";
 import PartnerRequestForDeliveryDialog from "./components/PartnerRequestForDeliveryDialog";
 import PODUploadDialog from "./components/PODUploadDialog";
 
 /**
  * Partner · Deliveries — customer-leg work queue.
  *
- * 2026-05-11 (Loo): redesigned as a 3-column kanban mirroring the Factory
- * pickups Active Pipeline so partner sees their delivery work as a planning
- * board, not two ad-hoc tables. Columns split by partner-side state:
+ * 2026-05-13 (Loo): re-bucketed to a 3-column lifecycle kanban:
  *
  *   1. **Awaiting accept** — Logistics raised an RFD, partner needs to
  *      accept or reject. Source: GET /api/partner/pickups/rfd-pending
  *      (wraps `logistics_partner_rfd_pending` SECURITY DEFINER RPC, 0059).
  *
- *   2. **Scheduled** — accepted, confirm_delivery_date is in the future.
- *      Partner has time before the run; useful for capacity planning.
+ *   2. **Scheduled** — accepted + dispatched. LP prints DO + delivers +
+ *      uploads signed POD here. Print DO + Mark Delivered both surface.
  *
- *   3. **Out for delivery** — accepted + delivery_date is today/past, OR
- *      no date set (loose contract). This is the action lane: drop off
- *      the goods + upload POD + Mark delivered.
+ *   3. **Delivered** — POD captured, thread.logistics_stage='delivered'.
+ *      Last 30 days only (RPC 0101 clamps the window). Print DO stays
+ *      for re-print, Mark Delivered drops.
  *
- * Mark Delivered (POD upload) action available on both Scheduled and
- * Out-for-delivery cards — partner might deliver early.
- *
- * The old two-section table layout (RFD Pending + In Transit) was
- * functional but didn't match the visual richness of the Factory pickups
- * counterpart. Same data feeds, kanban presentation.
+ * Pre-0101 the third column was "Out for delivery" — a date-based
+ * sub-bucket of dispatched (today/past delivery_date). Loo's feedback
+ * 2026-05-13: that bucket doesn't match the mental model — drivers want
+ * to see "what's done" not "what's actively in transit." Migration 0101
+ * widens partner_threads_to_deliver to include delivered threads + adds
+ * `logistics_stage` + `delivered_at` so the UI buckets by stage instead
+ * of by date.
  */
 type RfdPendingRow = {
   thread_id: string;
@@ -38,12 +40,6 @@ type RfdPendingRow = {
   request_for_delivery_at: string;
   confirm_delivery_date: string | null;
 };
-
-function todayISO(): string {
-  const d = new Date();
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
 
 export default function PartnerPickupsPage() {
   const qc = useQueryClient();
@@ -56,24 +52,27 @@ export default function PartnerPickupsPage() {
     queryFn: () => apiFetch<RfdPendingRow[]>("/api/partner/pickups/rfd-pending"),
   });
 
-  const today = useMemo(() => todayISO(), []);
-
   const buckets = useMemo(() => {
+    // 2026-05-13 (Loo) — 3-column model: Awaiting / Scheduled / Delivered.
+    // Drop the date-based today/past split (the old "Out for delivery"
+    // bucket). Dispatched threads always sit in Scheduled until LP presses
+    // Mark Delivered; delivered ones move to the Delivered column.
+    // Migration 0101 widens the RPC to also return delivered (last 30d)
+    // so the Delivered column has data to show.
     const out = {
-      awaiting: rfdRows,
+      awaiting:  rfdRows,
       scheduled: [] as PartnerToDeliverRow[],
-      out_for_delivery: [] as PartnerToDeliverRow[],
+      delivered: [] as PartnerToDeliverRow[],
     };
     for (const r of toDeliverRows) {
-      // No date OR today/past → action lane. Future date → planning lane.
-      if (!r.confirm_delivery_date || r.confirm_delivery_date <= today) {
-        out.out_for_delivery.push(r);
+      if (r.logistics_stage === "delivered") {
+        out.delivered.push(r);
       } else {
         out.scheduled.push(r);
       }
     }
     return out;
-  }, [rfdRows, toDeliverRows, today]);
+  }, [rfdRows, toDeliverRows]);
 
   const totalAll = rfdRows.length + toDeliverRows.length;
 
@@ -160,18 +159,22 @@ export default function PartnerPickupsPage() {
                   <Card
                     key={r.thread_id}
                     primary={r.po_id ?? "—"}
+                    doNumber={r.do_number}
                     secondary={r.customer_name}
                     dateLabel="Delivery on"
                     dateValue={r.confirm_delivery_date ?? "—"}
                     action={
-                      <button
-                        type="button"
-                        onClick={() => setOpenPod(r)}
-                        className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded text-[12px] font-semibold"
-                        data-testid={`mark-delivered-${r.thread_id}`}
-                      >
-                        🚚 Mark Delivered
-                      </button>
+                      <div className="flex flex-col gap-1.5">
+                        <PrintDoButton orderId={r.order_id} threadId={r.thread_id} />
+                        <button
+                          type="button"
+                          onClick={() => setOpenPod(r)}
+                          className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded text-[12px] font-semibold"
+                          data-testid={`mark-delivered-${r.thread_id}`}
+                        >
+                          🚚 Mark Delivered
+                        </button>
+                      </div>
                     }
                   />
                 ))
@@ -179,30 +182,28 @@ export default function PartnerPickupsPage() {
             </PipelineColumn>
 
             <PipelineColumn
-              label="Out for delivery"
-              hint="Delivery day · drop off + POD"
-              accent="info"
-              count={buckets.out_for_delivery.length}
+              label="Delivered"
+              hint="POD captured · customer signed (last 30 days)"
+              accent="success"
+              count={buckets.delivered.length}
             >
-              {buckets.out_for_delivery.length === 0 ? (
+              {buckets.delivered.length === 0 ? (
                 <EmptyDash />
               ) : (
-                buckets.out_for_delivery.map((r) => (
+                buckets.delivered.map((r) => (
                   <Card
                     key={r.thread_id}
                     primary={r.po_id ?? "—"}
+                    doNumber={r.do_number}
                     secondary={r.customer_name}
-                    dateLabel={r.confirm_delivery_date ? "Today · " : null}
-                    dateValue={r.confirm_delivery_date ?? "Ready to deliver"}
+                    dateLabel="Delivered on"
+                    dateValue={
+                      r.delivered_at
+                        ? r.delivered_at.slice(0, 10)
+                        : (r.confirm_delivery_date ?? "—")
+                    }
                     action={
-                      <button
-                        type="button"
-                        onClick={() => setOpenPod(r)}
-                        className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded text-[12px] font-semibold"
-                        data-testid={`mark-delivered-${r.thread_id}`}
-                      >
-                        🚚 Mark Delivered
-                      </button>
+                      <PrintDoButton orderId={r.order_id} threadId={r.thread_id} />
                     }
                   />
                 ))
@@ -236,11 +237,16 @@ function PipelineColumn({
 }: {
   label: string;
   hint: string;
-  accent: "warning" | "info";
+  accent: "warning" | "info" | "success";
   count: number;
   children: React.ReactNode;
 }) {
-  const accentCls = accent === "warning" ? "text-warning" : "text-info";
+  const accentCls =
+    accent === "warning"
+      ? "text-warning"
+      : accent === "success"
+      ? "text-success"
+      : "text-info";
   return (
     <div className="bg-white border border-base-200 rounded-md overflow-hidden flex flex-col">
       <div className="px-4 py-3.5 border-b border-base-100">
@@ -265,12 +271,19 @@ function EmptyDash() {
 
 function Card({
   primary,
+  doNumber,
   secondary,
   dateLabel,
   dateValue,
   action,
 }: {
   primary: string;
+  /** 2026-05-13 (Loo) — optional Carres DO# shown next to the PO# in the
+   *  card header so the LP driver can match the doc they're about to print
+   *  / hand to the customer against the same code on the order detail. Set
+   *  on Scheduled + Out-for-delivery cards (where 0098 has issued it);
+   *  omitted on Awaiting-accept cards (pre-dispatch, no DO# yet). */
+  doNumber?: string | null;
   secondary: string;
   dateLabel: string | null;
   dateValue: string;
@@ -279,8 +292,11 @@ function Card({
   return (
     <div className="bg-white border border-base-100 rounded-md p-3 flex flex-col gap-2.5">
       <div className="space-y-0.5">
-        <div className="font-mono text-[11px] font-semibold text-base-900">
-          {primary}
+        <div className="font-mono text-[11px] font-semibold text-base-900 flex items-center gap-2 flex-wrap">
+          <span>{primary}</span>
+          {doNumber && (
+            <span className="text-base-500 font-medium">· {doNumber}</span>
+          )}
         </div>
         <div className="font-body text-[13px] font-medium text-base-800 truncate">
           {secondary}
@@ -292,5 +308,56 @@ function Card({
       </div>
       <div>{action}</div>
     </div>
+  );
+}
+
+/**
+ * 2026-05-13 (Loo) — Carres customer-facing DO printable from the LP's
+ * Delivery tab. Driver prints the blank-but-numbered DO at handover time,
+ * customer signs it on arrival, then driver uploads the signed copy via
+ * "Mark Delivered" → PODUploadDialog (a separate, existing flow).
+ *
+ * Calls GET /api/partner/pickups/deliveries/:orderId/print-do-data (added
+ * alongside this UI), which returns JSON; @react-pdf renders client-side
+ * because Cloudflare Workers blocks the yoga-layout WASM.
+ */
+function PrintDoButton({ orderId, threadId }: { orderId: string; threadId: string }) {
+  const [pending, setPending] = useState(false);
+  async function open() {
+    if (pending) return;
+    setPending(true);
+    try {
+      const data = await apiFetch<DoTemplateData>(
+        `/api/partner/pickups/deliveries/${orderId}/print-do-data`,
+      );
+      const blob = await renderDoPdf(data);
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (!win) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${data.do_number}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : String(e);
+      toast.error(`Print DO failed: ${msg}`);
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={open}
+      disabled={pending}
+      className="w-full px-3 py-1.5 border border-base-200 bg-white text-base-900 rounded text-[12px] font-semibold disabled:opacity-50 hover:border-primary transition-colors"
+      data-testid={`print-do-${threadId}`}
+    >
+      {pending ? "Opening…" : "🖨 Print DO"}
+    </button>
   );
 }

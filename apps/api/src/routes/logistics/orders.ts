@@ -154,7 +154,7 @@ logisticsOrdersRouter.get("/:id", requireLogistics, async (c) => {
   const { data: order, error: e1 } = await sb
     .from("orders")
     .select(
-      "id, dl, status, logistics_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, dealer_id, outlet_id, dealers(name), outlets(name)",
+      "id, dl, status, logistics_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, dealer_id, outlet_id, invoice_no, invoiced_at, dealers(name), outlets(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -287,17 +287,17 @@ logisticsOrdersRouter.get("/:id/print-do-data", requireLogistics, async (c) => {
     return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
   }
 
-  // Only delivered orders have a signed DO worth printing.
-  if (order.status !== "delivered") {
-    return c.json(
-      { error: "rule_violation", code: "order_not_delivered", message: "Only delivered orders have signed DO" },
-      422,
-    );
-  }
+  // 2026-05-13 (Loo) — DO printable from dispatched onward.
+  // Pre-0098 the rule required status='delivered' (the legacy
+  // logistics_attach_do_and_deliver flow set do_number only at delivery).
+  // 0098's BEFORE-UPDATE trigger now auto-assigns do_number when an order
+  // transitions to logistics_stage='dispatched' so LP drivers can print
+  // the blank customer-DO at dispatch time and the customer signs it on
+  // arrival. Only do_number is required; status may be 'place'/'proceed_order'/'received'
+  // depending on which lifecycle column the kanban reads (logistics_stage is the truth).
   if (!order.do_number) {
-    // Defensive: status='delivered' should always pair with do_number set by logistics_attach_do_and_deliver.
     return c.json(
-      { error: "rule_violation", code: "do_missing", message: "Order is delivered but DO number is missing" },
+      { error: "rule_violation", code: "do_missing", message: "DO is only printable after dispatch (no DO number assigned yet)" },
       422,
     );
   }

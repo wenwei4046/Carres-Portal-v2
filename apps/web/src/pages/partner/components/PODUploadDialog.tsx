@@ -31,10 +31,6 @@ import { INPUT_CLS, Modal, ModalActions } from "../../logistics/components/Modal
 const ALLOWED_MIMES = ["image/jpeg", "image/png", "application/pdf"];
 const MAX_SIZE = 10 * 1024 * 1024;
 
-function suggestDoNumber(): string {
-  return "DO-" + (5200 + Math.floor(Math.random() * 800));
-}
-
 export default function PODUploadDialog({
   row,
   onClose,
@@ -42,7 +38,12 @@ export default function PODUploadDialog({
   row: PartnerToDeliverRow;
   onClose: () => void;
 }) {
-  const [doNumber, setDoNumber] = useState(suggestDoNumber);
+  // 2026-05-13 (Loo) — pre-fill from row.do_number (migration 0099 added it
+  // to the partner_threads_to_deliver RPC). 0098's trigger guarantees it's
+  // set the moment the order enters dispatched (= when the row becomes
+  // visible to this dialog). Field stays editable for the rare manual
+  // override case.
+  const [doNumber, setDoNumber] = useState(row.do_number ?? "");
   const [doNote, setDoNote] = useState("");
   const [signed, setSigned] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +157,11 @@ export default function PODUploadDialog({
     doNumber.trim().length >= 3;
   const isImage = pickedType === "image/jpeg" || pickedType === "image/png";
   const sizeMb = pickedSize ? (pickedSize / 1024 / 1024).toFixed(2) : null;
-  const titleRef = row.po_id ?? `Order ${row.order_id.slice(0, 8)}`;
+  // 2026-05-13 (Loo) — title surfaces the customer-facing DO# (the doc the
+  // customer actually signs). Falls back to PO# / order id slice for rows
+  // where do_number hasn't been issued yet (shouldn't happen post-0098 but
+  // kept as a safety net).
+  const titleRef = row.do_number ?? row.po_id ?? `Order ${row.order_id.slice(0, 8)}`;
 
   return (
     <Modal title={`Proof of Delivery · ${titleRef}`} onClose={onClose}>

@@ -200,7 +200,11 @@ describe("GET /api/logistics/orders/:id/print-do-data", () => {
     expect(body.partner).toBeNull();
   });
 
-  it("422 — order is not delivered yet (status='proceed_order')", async () => {
+  it("422 — DO is not yet assigned (pre-dispatch, do_number=null)", async () => {
+    // 2026-05-13 (Loo): gate changed from `status !== 'delivered'` to
+    // `!do_number`. After 0098 the trigger auto-assigns do_number on
+    // logistics_stage→'dispatched', so DO is printable at dispatched +
+    // delivered. Pre-dispatch the field is null → 422 do_missing.
     mockPrintDoQueries({
       order: makeOrderRow({ status: "proceed_order", do_number: null, delivered_at: null }),
     });
@@ -213,7 +217,7 @@ describe("GET /api/logistics/orders/:id/print-do-data", () => {
     );
     expect(res.status).toBe(422);
     const body = (await res.json()) as { error: string; code: string; message: string };
-    expect(body.code).toBe("order_not_delivered");
+    expect(body.code).toBe("do_missing");
     expect(body.error).toBe("rule_violation");
   });
 

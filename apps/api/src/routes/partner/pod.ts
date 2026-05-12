@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { mapPgError } from "../../lib/route-helpers";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
@@ -77,11 +77,43 @@ partnerPodRouter.post("/sign-upload", async (c) => {
   const ext = extForMime(mimeType);
   const path = `${threadId}/${crypto.randomUUID()}-pod.${ext}`;
 
-  const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.storage
+  // 2026-05-13 (Loo) — Storage backend's RLS path 503s with "schema invalid
+  // or incompatible" for the sofa direct-ship customer-leg flow even after
+  // 0100 RLS extension (suspected nested-EXISTS plan cache issue inside
+  // Storage's internal queries). Switch to admin client + explicit
+  // ownership check — same pattern as partner-side print-do-data. The
+  // WHERE delivery_partner_id = auth.partnerId is the explicit gate; admin
+  // bypasses Storage RLS but the SQL filter still scopes per partner.
+  const ownerSb = adminClient(c.env);
+  const { data: ownThread, error: tErr } = await ownerSb
+    .from("order_supplier_threads")
+    .select("id")
+    .eq("id", threadId)
+    .eq("delivery_partner_id", auth.partnerId)
+    .maybeSingle();
+  if (tErr) throw new HTTPException(500, { message: tErr.message });
+  if (!ownThread) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "Thread not found or not assigned to you" },
+      404,
+    );
+  }
+
+  const { data, error } = await ownerSb.storage
     .from("proof-of-delivery")
     .createSignedUploadUrl(path);
-  if (error) throw new HTTPException(500, { message: error.message });
+  if (error) {
+    console.error("createSignedUploadUrl failed (admin path)", {
+      path,
+      partnerId: auth.partnerId,
+      err: {
+        message: (error as { message?: string }).message,
+        name: (error as { name?: string }).name,
+        statusCode: (error as { statusCode?: string }).statusCode,
+      },
+    });
+    throw new HTTPException(500, { message: error.message });
+  }
 
   return c.json({ token: data.token, path: data.path });
 });

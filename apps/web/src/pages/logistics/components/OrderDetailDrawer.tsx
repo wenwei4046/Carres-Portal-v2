@@ -14,6 +14,7 @@ import {
 import { cjkClassName } from "@/lib/cjk";
 import { useAuth } from "@/lib/auth";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
+import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
 import StageChip, { type LogisticsStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
@@ -377,10 +378,15 @@ function DrawerBody({
           <div className="text-[12px] text-base-600 mt-0.5">{dealerName}</div>
         </div>
         <div className="flex items-center gap-2">
-          {/* 2026-05-12 (Loo) — customer-facing Sales Order PDF reprint.
-           *  Always available regardless of stage; the button itself hides
-           *  for partner / supplier roles. */}
-          {role && (
+          {/* 2026-05-13 (Loo) — stage gates the customer-doc affordances:
+           *    pre-dispatch  → Sales Order (the original quote/contract)
+           *    dispatched+   → Sales Invoice + Carres DO (the order has
+           *                    "become" the invoice; SO is no longer the
+           *                    live doc the customer is handed). 0098's
+           *                    BEFORE-UPDATE trigger seeds order.invoice_no
+           *                    and order.do_number at the same moment so
+           *                    both buttons surface together. */}
+          {role && stage !== "dispatched" && stage !== "delivered" && (
             <DownloadSalesOrderButton
               orderId={order.id}
               dl={order.dl}
@@ -388,7 +394,15 @@ function DrawerBody({
               variant="secondary"
             />
           )}
-          {(order.do_number || order.status === "delivered") && (
+          {role && (stage === "dispatched" || stage === "delivered") && order.invoice_no && (
+            <DownloadInvoiceButton
+              orderId={order.id}
+              dl={order.dl}
+              role={role}
+              variant="secondary"
+            />
+          )}
+          {order.do_number && (
             <PrintDoButton orderId={order.id} doNumber={order.do_number} />
           )}
           <button

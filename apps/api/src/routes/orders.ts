@@ -847,4 +847,128 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   return c.json(payload);
 });
 
+/**
+ * GET /api/orders/:id/invoice-pdf-data — Loo 2026-05-13.
+ *
+ * Sales Invoice PDF data for the Logistics drawer "Print Invoice" button.
+ * Mirrors the Finance route at /api/finance/invoices/:id/pdf-data shape
+ * but keyed by order_id (not invoice_id) and gated permissively so the
+ * Logistics user can re-print at dispatch handover without bouncing
+ * through Finance.
+ *
+ * Available to logistics, finance, principal, bd. Partner / supplier /
+ * dealer / showroom / salesperson denied (invoice is an internal/tax
+ * doc; the customer-facing SO PDF is already wired elsewhere).
+ *
+ * Required state: order.invoice_no is set (0098's BEFORE-UPDATE trigger
+ * auto-issues at dispatch). Returns 422 if not yet issued — caller should
+ * surface as "invoice not yet generated".
+ */
+ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
+  const auth = c.var.auth;
+  const role = auth.role;
+  if (!["logistics", "finance", "principal", "bd"].includes(String(role))) {
+    throw new HTTPException(403, { message: "Invoice PDF not available for this role" });
+  }
+  const id = c.req.param("id");
+  const idCheck = z.string().uuid().safeParse(id);
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const sb = userClient(c.env, auth.jwt);
+
+  const { data: order, error: ordErr } = await sb
+    .from("orders")
+    .select(
+      "id, dl, status, invoice_no, invoiced_at, customer_name, customer_phone, customer_address, dealer_id, dealers(name, contact)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (ordErr) throw new HTTPException(500, { message: ordErr.message });
+  if (!order) throw new HTTPException(404, { message: "Order not found" });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ord: any = order;
+  if (!ord.invoice_no) {
+    throw new HTTPException(422, {
+      message: "Invoice not yet issued (auto-issued at dispatch — wait until logistics_stage='dispatched')",
+    });
+  }
+
+  const { data: inv, error: invErr } = await sb
+    .from("invoices")
+    .select("id, invoice_no, amount, tax_amount, issued_at, voided_at")
+    .eq("invoice_no", ord.invoice_no)
+    .maybeSingle();
+  if (invErr) throw new HTTPException(500, { message: invErr.message });
+  if (!inv) throw new HTTPException(404, { message: "Invoice row missing for order" });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const i: any = inv;
+  if (i.voided_at) {
+    throw new HTTPException(422, { message: "Invoice has been voided — re-issue first" });
+  }
+
+  const { data: lines, error: linErr } = await sb
+    .from("order_lines")
+    .select("sku, qty, unit_price")
+    .eq("order_id", id);
+  if (linErr) throw new HTTPException(500, { message: linErr.message });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lineRows = (lines ?? []) as any[];
+
+  const skus: string[] = lineRows.map((l) => String(l.sku));
+  const skuVariantBySku: Record<string, string> = {};
+  if (skus.length > 0) {
+    const { data: skuRows, error: skuErr } = await sb
+      .from("product_skus")
+      .select("sku, variant")
+      .in("sku", skus);
+    if (skuErr) throw new HTTPException(500, { message: skuErr.message });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of (skuRows ?? []) as any[]) {
+      skuVariantBySku[String(r.sku)] = String(r.variant);
+    }
+  }
+
+  const taxAmount = Number(i.tax_amount ?? 0);
+  const total = Number(i.amount ?? 0);
+  const subtotal = +(total - taxAmount).toFixed(2);
+
+  const dealerRow = ord.dealers ?? null;
+  const dealerName = dealerRow?.name ?? "Carres";
+  const dealerContact = dealerRow?.contact ?? null;
+
+  return c.json({
+    invoice_no: String(i.invoice_no),
+    issue_date: String(i.issued_at).slice(0, 10),
+    order_id: String(ord.id),
+    order_code: `DL-${ord.dl}`,
+    customer: {
+      name: String(ord.customer_name ?? ""),
+      address: String(ord.customer_address ?? "—"),
+      phone: ord.customer_phone ?? null,
+    },
+    dealer: {
+      name: dealerName,
+      contact: dealerContact,
+    },
+    lines: lineRows.map((l) => {
+      const qty = Number(l.qty);
+      const unitPrice = Number(l.unit_price);
+      return {
+        sku: String(l.sku),
+        description: skuVariantBySku[l.sku] ?? String(l.sku),
+        qty,
+        unit: "pc",
+        unit_price: unitPrice,
+        line_total: +(qty * unitPrice).toFixed(2),
+      };
+    }),
+    subtotal,
+    tax_amount: taxAmount,
+    total,
+    currency: "MYR",
+  });
+});
+
 export default ordersRouter;

@@ -6,8 +6,9 @@ import {
   receivePoWithDoInput,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import type { DoTemplateData } from "../../lib/pdf/types";
 
 /**
  * GET /api/partner/pickups — Phase 4.5 Chunk 1 (Task 24).
@@ -366,6 +367,153 @@ partnerPickupsRouter.post("/reject-rfd", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json(data);
+});
+
+/**
+ * GET /api/partner/deliveries/:id/print-do-data — Loo 2026-05-13.
+ *
+ * Customer-facing DO data for the LP to print + take on the delivery run.
+ * Mirrors GET /api/logistics/orders/:id/print-do-data shape but admits the
+ * partner role and lets RLS narrow.
+ *
+ * Required state: order has do_number (set by 0098 trigger when status
+ * transitions to dispatched). The driver prints the blank-but-numbered DO,
+ * has the customer sign, then uploads the signed copy via the existing
+ * POD attach flow.
+ *
+ * RLS check: the partner can read this order if they own the destination
+ * warehouse OR they're the customer-leg delivery_partner_id on the
+ * corresponding thread. The orders SELECT below uses userClient — RLS
+ * narrows; if zero rows returned, return 404 instead of 403 to avoid
+ * leaking enumeration.
+ */
+partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Partner role only" });
+  }
+  const id = c.req.param("id");
+  // 2026-05-13 (Loo) — orders_scoped_read RLS (0002:185) only admits a
+  // partner via orders.delivery_partner_id, AND ost_partner_read (0033)
+  // only admits via purchase_orders.procurement_partner_id. For sofa
+  // direct-ship the customer-leg LP lives on order_supplier_threads.
+  // delivery_partner_id (set by partner_confirm_receive/0096) — neither
+  // policy admits this case. Same gap that 0071's SECURITY DEFINER RPC
+  // works around. Use adminClient for the ownership check too; the
+  // intrinsic WHERE delivery_partner_id = auth.partnerId is the gate.
+  const sb = adminClient(c.env);
+  const { data: ownThread, error: tErr } = await sb
+    .from("order_supplier_threads")
+    .select("id")
+    .eq("order_id", id)
+    .eq("delivery_partner_id", auth.partnerId)
+    .maybeSingle();
+  if (tErr) {
+    const m = mapPgError(tErr);
+    return c.json(m.body, m.status);
+  }
+  if (!ownThread) {
+    // Either order doesn't exist, doesn't have a thread, or thread isn't
+    // assigned to this partner. Same 404 either way — don't leak which.
+    return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
+  }
+
+  const { data: order, error: e1 } = await sb
+    .from("orders")
+    .select(
+      "id, dl, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners(name)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (e1) {
+    const m = mapPgError(e1);
+    return c.json(m.body, m.status);
+  }
+  if (!order) {
+    return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
+  }
+  if (!order.do_number) {
+    return c.json(
+      { error: "rule_violation", code: "do_missing", message: "DO is only printable after dispatch (no DO number assigned yet)" },
+      422,
+    );
+  }
+
+  const { data: lines, error: e2 } = await sb
+    .from("order_lines")
+    .select("sku, qty, unit_price")
+    .eq("order_id", id);
+  if (e2) {
+    const m = mapPgError(e2);
+    return c.json(m.body, m.status);
+  }
+  const lineRows = lines ?? [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const skus: string[] = lineRows.map((l: any) => l.sku);
+  const skuVariantBySku: Record<string, string> = {};
+  if (skus.length > 0) {
+    const { data: skuRows, error: e3 } = await sb
+      .from("product_skus")
+      .select("sku, variant")
+      .in("sku", skus);
+    if (e3) {
+      const m = mapPgError(e3);
+      return c.json(m.body, m.status);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of (skuRows ?? []) as any[]) {
+      skuVariantBySku[String(r.sku)] = String(r.variant);
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ord: any = order;
+  const issueIso = ord.delivered_at ?? ord.placed_at ?? new Date().toISOString();
+  const issueDate = String(issueIso).slice(0, 10);
+
+  const dealerRow = ord.dealers ?? null;
+  const warehouseRow = ord.warehouses ?? null;
+  const partnerRow = ord.delivery_partners ?? null;
+  const customerAddress: string = ord.customer_address ?? "—";
+
+  const dealerName: string = dealerRow?.name ?? "Carres";
+  const dealerContactParts: string[] = [];
+  if (dealerRow?.contact) dealerContactParts.push(String(dealerRow.contact));
+  if (warehouseRow?.name) dealerContactParts.push(`Ship from: ${warehouseRow.name}`);
+  const dealerContact: string | null = dealerContactParts.length > 0 ? dealerContactParts.join(" · ") : null;
+
+  const templateData: DoTemplateData = {
+    do_number: String(ord.do_number),
+    issue_date: issueDate,
+    order_id: String(ord.id),
+    order_code: `DL-${ord.dl}`,
+    customer: {
+      name: String(ord.customer_name ?? ""),
+      address: customerAddress,
+      phone: ord.customer_phone ?? null,
+    },
+    dealer: {
+      name: dealerName,
+      contact: dealerContact,
+    },
+    partner: partnerRow?.name ? { name: String(partnerRow.name) } : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    lines: lineRows.map((l: any) => {
+      const qty = Number(l.qty);
+      const unitPrice = Number(l.unit_price);
+      return {
+        sku: String(l.sku),
+        description: skuVariantBySku[l.sku] ?? String(l.sku),
+        qty,
+        unit: "pc",
+        line_total: qty * unitPrice,
+      };
+    }),
+    currency: "MYR",
+  };
+
+  return c.json(templateData);
 });
 
 export default partnerPickupsRouter;

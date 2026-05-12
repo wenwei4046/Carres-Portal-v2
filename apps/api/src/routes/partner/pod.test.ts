@@ -10,8 +10,11 @@ import {
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
-vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
-import { userClient } from "../../lib/supabase";
+vi.mock("../../lib/supabase", () => ({
+  userClient: vi.fn(),
+  adminClient: vi.fn(),
+}));
+import { adminClient, userClient } from "../../lib/supabase";
 
 const env = {
   SUPABASE_URL: "https://t.x",
@@ -49,13 +52,29 @@ beforeAll(async () => {
 beforeEach(() => {
   _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
   vi.mocked(userClient).mockReset();
+  vi.mocked(adminClient).mockReset();
 });
 
 afterAll(() => _setJwksForTesting(null));
 
 describe("POST /api/partner/pod/sign-upload", () => {
   it("returns signed upload URL for valid request", async () => {
+    // 2026-05-13 (Loo): route switched to adminClient + explicit thread
+    // ownership check (was userClient with RLS-gated storage). Mock both
+    // the ownership lookup and the storage chain.
     const sb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { id: THREAD_ID },
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      }),
       storage: {
         from: vi.fn().mockReturnValue({
           createSignedUploadUrl: vi.fn().mockResolvedValue({
@@ -66,7 +85,7 @@ describe("POST /api/partner/pod/sign-upload", () => {
       },
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
+    vi.mocked(adminClient).mockReturnValue(sb as any);
 
     const jwt = await makeJwt("partner", { partnerId: PARTNER_ID });
     const res = await app.fetch(
@@ -82,6 +101,7 @@ describe("POST /api/partner/pod/sign-upload", () => {
       env,
     );
     expect(res.status).toBe(200);
+    expect(sb.from).toHaveBeenCalledWith("order_supplier_threads");
     expect(sb.storage.from).toHaveBeenCalledWith("proof-of-delivery");
     const body = (await res.json()) as { token: string; path: string };
     expect(body.token).toBe("fake-token");
