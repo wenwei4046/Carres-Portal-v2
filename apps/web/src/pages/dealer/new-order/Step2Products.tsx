@@ -57,6 +57,15 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
     onChange({ ...draft, addons: [...draft.addons, next] });
   }
 
+  function bumpAddonQty(addonKey: string, delta: number) {
+    onChange({
+      ...draft,
+      addons: draft.addons.map((a) =>
+        a.key === addonKey ? { ...a, qty: Math.max(1, a.qty + delta) } : a,
+      ),
+    });
+  }
+
   function setFloor(next: number) {
     setDelivery({ floor: Math.max(1, next) });
   }
@@ -87,23 +96,70 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {catalog.addons.map((a) => {
-              const on = draft.addons.some((d) => d.key === a.key);
+              const selected = draft.addons.find((d) => d.key === a.key);
+              if (!selected) {
+                return (
+                  <button
+                    key={a.key}
+                    type="button"
+                    onClick={() => toggleAddon(a.key)}
+                    className="text-left rounded px-3.5 py-3 transition-colors border-[1.5px] border-base-200 bg-white hover:border-primary/40"
+                  >
+                    <div className="text-sm font-medium">+ {a.name}</div>
+                    <div className="font-mono text-[11px] text-base-500 mt-1">
+                      {RM(a.price)}
+                    </div>
+                  </button>
+                );
+              }
               return (
-                <button
+                <div
                   key={a.key}
-                  type="button"
-                  onClick={() => toggleAddon(a.key)}
-                  className={`text-left rounded px-3.5 py-3 transition-colors border-[1.5px] ${
-                    on
-                      ? "border-primary bg-signature-50"
-                      : "border-base-200 bg-white hover:border-primary/40"
-                  }`}
+                  className="rounded px-3.5 py-3 border-[1.5px] border-primary bg-signature-50"
                 >
-                  <div className="text-sm font-medium">+ {a.name}</div>
-                  <div className="font-mono text-[11px] text-base-500 mt-1">
-                    {RM(a.price)}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">+ {a.name}</div>
+                      <div className="font-mono text-[11px] text-base-500 mt-1">
+                        {RM(selected.unitPrice)} ea
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleAddon(a.key)}
+                      className="text-base-500 hover:text-destructive text-sm leading-none px-1 -mt-0.5"
+                      aria-label={`Remove ${a.name}`}
+                    >
+                      ×
+                    </button>
                   </div>
-                </button>
+                  <div className="flex items-center justify-between gap-2 mt-2">
+                    <div className="flex items-center gap-1.5 bg-white border border-base-300 rounded px-1.5 py-0.5">
+                      <button
+                        type="button"
+                        onClick={() => bumpAddonQty(a.key, -1)}
+                        className="px-2 py-0.5 text-sm rounded hover:bg-base-100"
+                        aria-label={`Decrease ${a.name} quantity`}
+                      >
+                        −
+                      </button>
+                      <span className="font-mono text-[12px] w-5 text-center tabular-nums">
+                        {selected.qty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => bumpAddonQty(a.key, 1)}
+                        className="px-2 py-0.5 text-sm rounded hover:bg-base-100"
+                        aria-label={`Increase ${a.name} quantity`}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="font-mono text-[12px] font-semibold text-primary">
+                      {RM(selected.unitPrice * selected.qty)}
+                    </span>
+                  </div>
+                </div>
               );
             })}
           </div>
