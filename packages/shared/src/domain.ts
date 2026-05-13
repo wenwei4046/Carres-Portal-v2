@@ -201,6 +201,9 @@ export interface Order {
     dateTbd: boolean;
     floor: number;
     hasLift: boolean;
+    /** Count of items the dealer marked as needing stair-carry. NULL = dealer
+     *  left it auto, callers fall back to sum(line.qty) for backward compat. */
+    stairItems: number | null;
   };
 
   paid: number;

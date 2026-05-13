@@ -22,7 +22,7 @@ function readyOrder(over: Partial<Order> = {}): Order {
       billingSame: true,
       emergency: "Bob · 012-9988776 · Spouse",
     },
-    delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false },
+    delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false, stairItems: null },
     paid: 1000,
     totalAmount: 2000,
     signatureUrl: "orders-attachments/d01/sess/signature.png",

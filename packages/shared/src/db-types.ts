@@ -265,6 +265,7 @@ export interface OrderRow {
   delivery_date_tbd: boolean;
   delivery_floor: number;
   delivery_has_lift: boolean;
+  delivery_stair_items: number | null;
   paid: number;
   signature_url: string | null;
   payment_slip_url: string | null;

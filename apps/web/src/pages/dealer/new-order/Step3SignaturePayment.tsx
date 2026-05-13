@@ -54,7 +54,18 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
   const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
   const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
   const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
-  const stair = floorSurchargeRaw(draft.delivery.floor, draft.delivery.hasLift, itemsTotal, cfg);
+  // Dealer-picked stair-carry count, falling back to all items when null.
+  // Mirrors Step 2 + order-totals.floorSurcharge semantics.
+  const stairItemsEffective =
+    draft.delivery.stairItems == null
+      ? itemsTotal
+      : Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems));
+  const stair = floorSurchargeRaw(
+    draft.delivery.floor,
+    draft.delivery.hasLift,
+    stairItemsEffective,
+    cfg,
+  );
   const total = lineSub + addonSub + stair;
   const minDeposit = useMemo(() => Math.round(total * 0.5), [total]);
   const paidPct = total > 0 ? Math.round((draft.paid / total) * 100) : 0;

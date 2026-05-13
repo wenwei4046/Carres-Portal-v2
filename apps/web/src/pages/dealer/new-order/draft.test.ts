@@ -40,7 +40,7 @@ function validDraft(): WizardDraft {
       emergencyRelationship: "Spouse",
       emergencyRelationshipOther: "",
     },
-    delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false },
+    delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false, stairItems: null },
     lines: [],
     addons: [],
     paid: 0,

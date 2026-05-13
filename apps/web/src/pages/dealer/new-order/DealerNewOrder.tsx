@@ -216,6 +216,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
           dateTbd: draft.delivery.dateTbd,
           floor: draft.delivery.floor,
           hasLift: draft.delivery.hasLift,
+          stairItems: draft.delivery.stairItems,
         },
         lines: draft.lines.map((l) => ({
           sku: l.sku,

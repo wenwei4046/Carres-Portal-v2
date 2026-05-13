@@ -45,7 +45,14 @@ export function floorSurchargeRaw(
 }
 
 export function floorSurcharge(order: Order, cfg: FloorConfigDto): number {
-  return floorSurchargeRaw(order.delivery.floor, order.delivery.hasLift, totalItems(order), cfg);
+  // delivery.stairItems is the dealer-picked count of items that need stair
+  // carry. Null = legacy / dealer didn't override → fall back to all items
+  // (current behavior pre-0104). Clamped ≥ 0 for safety.
+  const count =
+    order.delivery.stairItems == null
+      ? totalItems(order)
+      : Math.max(0, order.delivery.stairItems);
+  return floorSurchargeRaw(order.delivery.floor, order.delivery.hasLift, count, cfg);
 }
 
 export function orderTotal(order: Order, cfg: FloorConfigDto): number {

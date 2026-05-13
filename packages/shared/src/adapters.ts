@@ -192,6 +192,7 @@ export const orderFromRow = (
     dateTbd: r.delivery_date_tbd,
     floor: r.delivery_floor,
     hasLift: r.delivery_has_lift,
+    stairItems: r.delivery_stair_items ?? null,
   },
   paid: Number(r.paid),
   // `?? null` so an old DB row missing this column reads as null rather than
@@ -380,6 +381,7 @@ export const orderInputToRpcPayload = (
   delivery_date_tbd: input.delivery.dateTbd,
   delivery_floor: input.delivery.floor,
   delivery_has_lift: input.delivery.hasLift,
+  delivery_stair_items: input.delivery.stairItems ?? null,
   paid: input.paid,
   signature_url: input.signaturePath,
   payment_slip_url: input.paymentSlipPath,

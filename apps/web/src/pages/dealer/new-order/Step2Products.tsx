@@ -70,11 +70,31 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
     setDelivery({ floor: Math.max(1, next) });
   }
 
+  function bumpStairItems(delta: number, maxItems: number) {
+    // null means "auto = totalItems". First touch from + decrements from
+    // totalItems, from − goes one below totalItems. Clamped [0, totalItems].
+    const current = draft.delivery.stairItems ?? maxItems;
+    const next = Math.max(0, Math.min(maxItems, current + delta));
+    setDelivery({ stairItems: next });
+  }
+
   // Live totals — same formula as Step 3 + order detail.
   const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
   const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
   const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
-  const stair = floorSurchargeRaw(draft.delivery.floor, draft.delivery.hasLift, itemsTotal, cfg);
+  // stairItems = null sentinel → "auto = all items". Effective count is
+  // clamped to itemsTotal so removing lines after lowering stairItems can't
+  // produce stairItems > itemsTotal.
+  const stairItemsEffective =
+    draft.delivery.stairItems == null
+      ? itemsTotal
+      : Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems));
+  const stair = floorSurchargeRaw(
+    draft.delivery.floor,
+    draft.delivery.hasLift,
+    stairItemsEffective,
+    cfg,
+  );
   const total = lineSub + addonSub + stair;
   const empty = draft.lines.length === 0 && draft.addons.length === 0 && stair === 0;
 
@@ -171,7 +191,7 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
         title="Stair carry"
         hint={`1F–${cfg.freeUpToFloor}F free · ${RM(cfg.perFloorPerItem)} per floor per item from ${cfg.freeUpToFloor + 1}F`}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 items-end">
           <FieldLabel label="Floor">
             <div className="flex items-center gap-1.5 border border-base-300 bg-white rounded px-1.5 py-1">
               <button
@@ -183,8 +203,8 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
                 −
               </button>
               <input
-                type="number"
-                min={1}
+                type="text"
+                inputMode="numeric"
                 value={draft.delivery.floor}
                 onChange={(e) => setFloor(parseInt(e.target.value, 10) || 1)}
                 className="flex-1 text-center text-sm font-mono bg-transparent outline-none border-none py-1"
@@ -194,6 +214,45 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
                 onClick={() => setFloor(draft.delivery.floor + 1)}
                 className="px-2.5 py-1.5 rounded text-sm hover:bg-base-100"
                 aria-label="Increase floor"
+              >
+                +
+              </button>
+            </div>
+          </FieldLabel>
+
+          <FieldLabel
+            label={`Items needing stair carry (max ${itemsTotal})`}
+          >
+            <div className="flex items-center gap-1.5 border border-base-300 bg-white rounded px-1.5 py-1">
+              <button
+                type="button"
+                onClick={() => bumpStairItems(-1, itemsTotal)}
+                disabled={itemsTotal === 0 || stairItemsEffective === 0}
+                className="px-2.5 py-1.5 rounded text-sm hover:bg-base-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Decrease stair-carry item count"
+              >
+                −
+              </button>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={stairItemsEffective}
+                onChange={(e) => {
+                  const parsed = parseInt(e.target.value, 10);
+                  const safe = Number.isFinite(parsed)
+                    ? Math.max(0, Math.min(itemsTotal, parsed))
+                    : 0;
+                  setDelivery({ stairItems: safe });
+                }}
+                disabled={itemsTotal === 0}
+                className="flex-1 text-center text-sm font-mono bg-transparent outline-none border-none py-1 disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={() => bumpStairItems(1, itemsTotal)}
+                disabled={itemsTotal === 0 || stairItemsEffective >= itemsTotal}
+                className="px-2.5 py-1.5 rounded text-sm hover:bg-base-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Increase stair-carry item count"
               >
                 +
               </button>
@@ -244,7 +303,7 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
         </div>
         {stair > 0 && (
           <p className="text-[11px] text-base-500 mt-2.5">
-            {itemsTotal} item{itemsTotal === 1 ? "" : "s"} ×{" "}
+            {stairItemsEffective} of {itemsTotal} item{itemsTotal === 1 ? "" : "s"} ×{" "}
             {draft.delivery.floor - cfg.freeUpToFloor} floor
             {draft.delivery.floor - cfg.freeUpToFloor === 1 ? "" : "s"} above {cfg.freeUpToFloor}F
             × {RM(cfg.perFloorPerItem)} ={" "}

@@ -625,6 +625,7 @@ ordersRouter.patch("/:id", async (c) => {
     if ("dateTbd" in del) flat.delivery_date_tbd = del.dateTbd;
     if ("floor" in del) flat.delivery_floor = del.floor;
     if ("hasLift" in del) flat.delivery_has_lift = del.hasLift;
+    if ("stairItems" in del) flat.delivery_stair_items = del.stairItems;
   }
 
   if (Object.keys(flat).length === 0) {

@@ -90,6 +90,10 @@ export interface WizardDraft {
     dateTbd: boolean;
     floor: number;
     hasLift: boolean;
+    // 2026-05-13 (Loo) — Dealer-picked count of items needing stair carry.
+    // null = "auto = all items" (legacy behavior). Lets dealer charge for
+    // partial coverage when only some of the lines go above the free floor.
+    stairItems: number | null;
     // 2026-05-10 (Loo) — "As Fast As Possible" pill on Step1. When clicked,
     // sets date = today + 20 days and flips this flag. After successful
     // order create, the wizard auto-fires the Proceed mutation so the order
@@ -137,7 +141,7 @@ export function emptyDraft(): WizardDraft {
       emergencyRelationship: "",
       emergencyRelationshipOther: "",
     },
-    delivery: { date: "", dateTbd: false, floor: 1, hasLift: false, asap: false },
+    delivery: { date: "", dateTbd: false, floor: 1, hasLift: false, stairItems: null, asap: false },
     lines: [],
     addons: [],
     paid: 0,
@@ -183,9 +187,20 @@ export function loadDraft(): WizardDraft | null {
       addressCity: parsed.customer.addressCity ?? empty.customer.addressCity,
       addressPostcode: parsed.customer.addressPostcode ?? empty.customer.addressPostcode,
     };
+    // Only backfill the new stairItems field for old drafts; don't merge in
+    // empty.delivery (that would inject defaults like asap=false the original
+    // draft never had, breaking save/load round-trip equality).
+    const delivery = {
+      ...parsed.delivery,
+      stairItems:
+        typeof parsed.delivery.stairItems === "number"
+          ? parsed.delivery.stairItems
+          : null,
+    };
     return {
       ...(parsed as WizardDraft),
       customer,
+      delivery,
       lines: parsed.lines ?? [],
       addons: parsed.addons ?? [],
       paid: typeof parsed.paid === "number" ? parsed.paid : empty.paid,

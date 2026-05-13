@@ -21,7 +21,7 @@ function baseOrder(over: Partial<Order> = {}): Order {
     outletId: null,
     salespersonId: null,
     customer: { name: "X", phone: null, address: null, addressUnknown: false, billing: null, billingSame: true, emergency: null },
-    delivery: { date: null, dateTbd: false, floor: 1, hasLift: false },
+    delivery: { date: null, dateTbd: false, floor: 1, hasLift: false, stairItems: null },
     paid: 0,
     signatureUrl: null,
     paymentSlipUrl: null,
@@ -79,7 +79,7 @@ describe("floorSurcharge — un-stubbed in 2B.1", () => {
 
   it("returns 0 when delivery has a lift (floor irrelevant)", () => {
     const o = baseOrder({
-      delivery: { date: null, dateTbd: false, floor: 12, hasLift: true },
+      delivery: { date: null, dateTbd: false, floor: 12, hasLift: true, stairItems: null },
       lines: lineQty2,
     });
     expect(floorSurcharge(o, CFG)).toBe(0);
@@ -88,13 +88,13 @@ describe("floorSurcharge — un-stubbed in 2B.1", () => {
   it("returns 0 when floor is at or below freeUpToFloor", () => {
     expect(
       floorSurcharge(
-        baseOrder({ delivery: { date: null, dateTbd: false, floor: 1, hasLift: false }, lines: lineQty2 }),
+        baseOrder({ delivery: { date: null, dateTbd: false, floor: 1, hasLift: false, stairItems: null }, lines: lineQty2 }),
         CFG,
       ),
     ).toBe(0);
     expect(
       floorSurcharge(
-        baseOrder({ delivery: { date: null, dateTbd: false, floor: 2, hasLift: false }, lines: lineQty2 }),
+        baseOrder({ delivery: { date: null, dateTbd: false, floor: 2, hasLift: false, stairItems: null }, lines: lineQty2 }),
         CFG,
       ),
     ).toBe(0);
@@ -103,7 +103,7 @@ describe("floorSurcharge — un-stubbed in 2B.1", () => {
   it("charges (floor − freeUpToFloor) × perFloorPerItem × total_qty when no lift", () => {
     // 2 items, floor 5, free up to 2 → flights=3, 3 × 50 × 2 = 300
     const o = baseOrder({
-      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false },
+      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false, stairItems: null },
       lines: lineQty2,
     });
     expect(floorSurcharge(o, CFG)).toBe(300);
@@ -112,7 +112,7 @@ describe("floorSurcharge — un-stubbed in 2B.1", () => {
   it("multi-line items sum into qty correctly for surcharge", () => {
     // 3 items total (qty 2 + qty 1), floor 4, free up to 2 → flights=2, 2 × 50 × 3 = 300
     const o = baseOrder({
-      delivery: { date: null, dateTbd: false, floor: 4, hasLift: false },
+      delivery: { date: null, dateTbd: false, floor: 4, hasLift: false, stairItems: null },
       lines: [
         { id: "a", orderId: "x", sku: "s1", qty: 2, attrs: null, unitPrice: 100 },
         { id: "b", orderId: "x", sku: "s2", qty: 1, attrs: null, unitPrice: 50 },
@@ -137,7 +137,7 @@ describe("floorSurchargeRaw — single source of truth shared with wizard", () =
 
   it("matches floorSurcharge(order, cfg) for the same inputs", () => {
     const o = {
-      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false },
+      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false, stairItems: null },
       lines: [{ id: "x", orderId: "y", sku: "s", qty: 2, attrs: null, unitPrice: 100 }],
     } as unknown as Parameters<typeof floorSurcharge>[0];
     expect(floorSurcharge(o, CFG)).toBe(floorSurchargeRaw(5, false, 2, CFG));
@@ -149,7 +149,7 @@ describe("orderTotal", () => {
     const o = baseOrder({
       lines: [{ id: "a", orderId: "x", sku: "s1", qty: 1, attrs: null, unitPrice: 100 }],
       addons: [{ id: "b", orderId: "x", addonKey: "p", qty: 2, unitPrice: 25 }],
-      delivery: { date: null, dateTbd: false, floor: 1, hasLift: false },
+      delivery: { date: null, dateTbd: false, floor: 1, hasLift: false, stairItems: null },
     });
     expect(orderTotal(o, CFG)).toBe(150);
   });
@@ -157,7 +157,7 @@ describe("orderTotal", () => {
   it("includes stair-carry charge when applicable", () => {
     const o = baseOrder({
       lines: [{ id: "a", orderId: "x", sku: "s1", qty: 1, attrs: null, unitPrice: 1000 }],
-      delivery: { date: null, dateTbd: false, floor: 4, hasLift: false },
+      delivery: { date: null, dateTbd: false, floor: 4, hasLift: false, stairItems: null },
     });
     // 1000 + 0 + (4−2) × 50 × 1 = 1100
     expect(orderTotal(o, CFG)).toBe(1100);
