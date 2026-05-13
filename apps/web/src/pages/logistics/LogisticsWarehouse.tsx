@@ -471,7 +471,7 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
           <div
             className="grid items-center gap-4 px-[18px] py-3 bg-base-50 border-b border-base-200"
             style={{
-              gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 168px",
+              gridTemplateColumns: "minmax(0,2.6fr) 120px 120px 96px 200px",
             }}
           >
             <div className="label">Product</div>
@@ -513,14 +513,14 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
                   data-testid={`warehouse-row-${row.sku}`}
                   className="grid items-center gap-4 px-[18px] py-3 border-t border-base-100"
                   style={{
-                    gridTemplateColumns: "minmax(0,2.4fr) 130px 130px 110px 168px",
+                    gridTemplateColumns: "minmax(0,2.6fr) 120px 120px 96px 200px",
                   }}
                 >
                   <div className="min-w-0">
                     {goMovements ? (
                       <button
                         type="button"
-                        className="text-left w-full font-body text-[13px] truncate hover:text-primary transition-colors"
+                        className="group text-left w-full hover:text-primary transition-colors"
                         style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }}
                         onClick={() =>
                           goMovements({ sku: row.sku, warehouseId: activeWarehouse.id })
@@ -528,11 +528,11 @@ export default function LogisticsWarehouse({ setTab, goMovements }: Props) {
                         data-testid={`warehouse-row-link-${row.sku}`}
                         title="View movement log for this SKU"
                       >
-                        <span className="font-body text-[13px] truncate inline-block max-w-full">
+                        <span className="block font-body text-[13px] truncate">
                           {friendly}
                         </span>
                         <span
-                          className="text-[10px] text-base-400 ml-1.5"
+                          className="block text-[10px] text-base-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           aria-hidden="true"
                         >
                           view log →
