@@ -15,14 +15,12 @@ import type { LogisticsStage } from "./StageChip";
  * path is exactly `/logistics/orders`). Each chip is a `<Link>` so right-click
  * → "Open in new tab" Just Works and the URL is shareable.
  *
- * Sub-filter row: `All / Running late / Last 24h` chips + search input.
- * Today only `All` and search are wired (V1 of the redesign per Loo's call):
- *   - `Running late` is purely visual — wiring needs `eta_date < now() AND
- *     logistics_stage NOT IN ('delivered')` filter on the loaded orders, plus
- *     a count-aware label. Tracked as `phase-pipeline-running-late-filter`.
- *   - `Last 24h` would use `updated_at > now() - interval '24h'`. Tracked as
- *     `phase-pipeline-last-24h-filter`.
- * Filter / Export buttons are placeholders for the same V2 sweep.
+ * Sub-filter row: `All / Running late / Last 24h` chips + search input. All
+ * three chips + search are wired client-side in `LogisticsOrders.tsx`:
+ *   - `Running late`: delivery_date < today AND stage !== 'delivered'.
+ *   - `Last 24h`: placed_at within last 24h (server doesn't expose updated_at;
+ *     placed_at is the proxy and the ops-friendlier reading).
+ * Filter / Export buttons remain placeholders for the V2 sweep.
  */
 
 export type PipelineSubFilter = "all" | "running_late" | "last_24h";

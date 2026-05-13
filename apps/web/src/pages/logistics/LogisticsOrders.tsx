@@ -142,6 +142,31 @@ export default function LogisticsOrders() {
     return counts;
   }, [allOrders]);
 
+  // Sub-filter applied client-side on the full list before bucketing into stage
+  // columns. Counts (stageCounts above) intentionally ignore subFilter so chip
+  // badges stay anchored to the underlying pipeline; the visible cards in each
+  // column narrow as you click Running late / Last 24h.
+  //   - running_late: delivery_date strictly before today AND not yet delivered.
+  //     `delivery_date` is an ISO `YYYY-MM-DD` string so lex compare == time
+  //     compare. Orders with null delivery_date (date_tbd) are excluded.
+  //   - last_24h: placed_at within the last 24h. Server doesn't expose
+  //     updated_at, so placed_at is the proxy — "new orders today" is also a
+  //     more intuitive label for ops than "rows touched today".
+  const filteredOrders = useMemo(() => {
+    if (subFilter === "all") return allOrders;
+    if (subFilter === "running_late") {
+      const today = new Date().toISOString().slice(0, 10);
+      return allOrders.filter(
+        (o) =>
+          o.delivery_date !== null &&
+          o.delivery_date < today &&
+          stageOf(o) !== "delivered",
+      );
+    }
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    return allOrders.filter((o) => new Date(o.placed_at).getTime() >= cutoff);
+  }, [allOrders, subFilter]);
+
   const ordersByStage = useMemo(() => {
     const buckets: Record<LogisticsStage, LogisticsOrderListRow[]> = {
       placed: [],
@@ -151,9 +176,9 @@ export default function LogisticsOrders() {
       dispatched: [],
       delivered: [],
     };
-    for (const o of allOrders) buckets[stageOf(o)].push(o);
+    for (const o of filteredOrders) buckets[stageOf(o)].push(o);
     return buckets;
-  }, [allOrders]);
+  }, [filteredOrders]);
 
   const toggleSelect = (dl: number) => {
     setSelectedDls((prev) => {
