@@ -2,6 +2,7 @@ import { MY_STATES, getCities, getPostcodes } from "@/data/malaysia-postcodes";
 
 interface AddressData {
   addressLine1: string;
+  addressLine2: string;
   addressState: string;
   addressCity: string;
   addressPostcode: string;
@@ -45,6 +46,16 @@ export default function MYAddressFields({ data, onChange }: Props) {
           value={data.addressLine1}
           placeholder="Building, unit, street (e.g. 12-3, Jalan Telawi 5, Bangsar Baru)"
           onChange={(e) => onChange({ addressLine1: e.target.value })}
+          className={ACTIVE_CLASS}
+        />
+      </FieldLabel>
+
+      <FieldLabel label="Address Line 2 (optional)">
+        <input
+          type="text"
+          value={data.addressLine2}
+          placeholder="Unit / floor / block (e.g. Unit 12-A, Block B)"
+          onChange={(e) => onChange({ addressLine2: e.target.value })}
           className={ACTIVE_CLASS}
         />
       </FieldLabel>

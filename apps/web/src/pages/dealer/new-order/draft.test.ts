@@ -29,6 +29,7 @@ function validDraft(): WizardDraft {
       phone: "012-3456789",
       address: "",
       addressLine1: "123 Jalan Sample",
+      addressLine2: "",
       addressState: "Kuala Lumpur",
       addressCity: "Bangsar",
       addressPostcode: "59000",

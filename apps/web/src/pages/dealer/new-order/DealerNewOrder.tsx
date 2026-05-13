@@ -195,6 +195,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
 
       const composedAddress = composeAddress({
         line1: draft.customer.addressLine1,
+        line2: draft.customer.addressLine2,
         state: draft.customer.addressState,
         city: draft.customer.addressCity,
         postcode: draft.customer.addressPostcode,

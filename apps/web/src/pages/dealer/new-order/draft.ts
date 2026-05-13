@@ -72,8 +72,10 @@ export interface WizardDraft {
      *  the wire. */
     address: string;
     /** Cascading Malaysia address fields. State picks city dropdown, city
-     *  picks postcode dropdown. Required when `addressUnknown` is false. */
+     *  picks postcode dropdown. Required when `addressUnknown` is false.
+     *  addressLine2 is optional (unit / block / floor). */
     addressLine1: string;
+    addressLine2: string;
     addressState: string;
     addressCity: string;
     addressPostcode: string;
@@ -130,6 +132,7 @@ export function emptyDraft(): WizardDraft {
       phone: "",
       address: "",
       addressLine1: "",
+      addressLine2: "",
       addressState: "",
       addressCity: "",
       addressPostcode: "",
@@ -183,6 +186,7 @@ export function loadDraft(): WizardDraft | null {
       ...empty.customer,
       ...parsed.customer,
       addressLine1: parsed.customer.addressLine1 ?? empty.customer.addressLine1,
+      addressLine2: parsed.customer.addressLine2 ?? empty.customer.addressLine2,
       addressState: parsed.customer.addressState ?? empty.customer.addressState,
       addressCity: parsed.customer.addressCity ?? empty.customer.addressCity,
       addressPostcode: parsed.customer.addressPostcode ?? empty.customer.addressPostcode,

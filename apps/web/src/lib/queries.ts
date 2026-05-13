@@ -1359,6 +1359,10 @@ export interface LogisticsOrderDetailOrder {
    *  as the Print Invoice button gate. */
   invoice_no: string | null;
   invoiced_at: string | null;
+  /** 0105 — surfaced so the drawer can render the Record-top-up modal at
+   *  ready_to_dispatch / dispatched stages (logistics records the customer's
+   *  final balance payment at delivery). */
+  paid: number;
   dealers: { name: string } | null;
   outlets: { name: string } | null;
 }

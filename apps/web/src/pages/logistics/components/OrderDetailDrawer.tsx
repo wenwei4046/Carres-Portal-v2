@@ -21,6 +21,7 @@ import DOAttachModal from "./DOAttachModal";
 import AbandonOrderModal from "./AbandonOrderModal";
 import ConfirmProceedDialog from "./ConfirmProceedDialog";
 import TransferReadyDialog from "./TransferReadyDialog";
+import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 import { SectionHead } from "./Modal";
 
 /**
@@ -80,6 +81,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
   const [showAbandon, setShowAbandon] = useState(false);
   const [showConfirmProceed, setShowConfirmProceed] = useState(false);
   const [showTransferReady, setShowTransferReady] = useState(false);
+  const [showTopUp, setShowTopUp] = useState(false);
 
   // Esc-to-close listener at the drawer level. Modals install their own Esc
   // handlers; while a modal is open we let it consume the key first by gating
@@ -90,7 +92,8 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
       showDO ||
       showAbandon ||
       showConfirmProceed ||
-      showTransferReady;
+      showTransferReady ||
+      showTopUp;
     if (anyModalOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -107,6 +110,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
     showAbandon,
     showConfirmProceed,
     showTransferReady,
+    showTopUp,
   ]);
 
   // 2026-05-10 (Loo) — "+ Issue POs" jumps to /logistics/procurement with a
@@ -204,6 +208,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
               onAbandonClick={() => setShowAbandon(true)}
               onConfirmProceedClick={() => setShowConfirmProceed(true)}
               onTransferReadyClick={() => setShowTransferReady(true)}
+              onTopUpClick={() => setShowTopUp(true)}
             />
             {showDispatch && (
               <DispatchModal
@@ -238,6 +243,18 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
                 order={data.order}
                 lines={data.lines}
                 onClose={() => setShowTransferReady(false)}
+              />
+            )}
+            {showTopUp && (
+              <TopUpDepositModal
+                order={{
+                  id: data.order.id,
+                  dl: data.order.dl,
+                  dealerId: data.order.dealer_id,
+                  paid: data.order.paid,
+                }}
+                total={data.total}
+                onClose={() => setShowTopUp(false)}
               />
             )}
           </>
@@ -320,6 +337,7 @@ interface DrawerBodyProps {
   onAbandonClick: () => void;
   onConfirmProceedClick: () => void;
   onTransferReadyClick: () => void;
+  onTopUpClick: () => void;
 }
 
 function DrawerBody({
@@ -331,6 +349,7 @@ function DrawerBody({
   onAbandonClick,
   onConfirmProceedClick,
   onTransferReadyClick,
+  onTopUpClick,
 }: DrawerBodyProps) {
   const { order, lines, addons, total, warehouse, stockBalances, pos, history, threads } = data;
   // Loo 2026-05-12 — surface the SO PDF reprint button in the header. Hook
@@ -432,6 +451,7 @@ function DrawerBody({
           onAbandonClick={onAbandonClick}
           onConfirmProceedClick={onConfirmProceedClick}
           onTransferReadyClick={onTransferReadyClick}
+          onTopUpClick={onTopUpClick}
         />
       </div>
 
@@ -588,6 +608,7 @@ interface ActionBarProps {
   onAbandonClick: () => void;
   onConfirmProceedClick: () => void;
   onTransferReadyClick: () => void;
+  onTopUpClick: () => void;
 }
 
 function ActionBar({
@@ -602,6 +623,7 @@ function ActionBar({
   onAbandonClick,
   onConfirmProceedClick,
   onTransferReadyClick,
+  onTopUpClick,
 }: ActionBarProps) {
   const recheck = useRecheckStockMutation(orderId);
 
@@ -708,6 +730,13 @@ function ActionBar({
           </button>
           <button
             type="button"
+            className="btn-secondary text-[12px]"
+            onClick={onTopUpClick}
+          >
+            Record top-up
+          </button>
+          <button
+            type="button"
             className="btn-ghost text-[12px] text-destructive"
             onClick={onAbandonClick}
           >
@@ -730,6 +759,13 @@ function ActionBar({
             onClick={onDOClick}
           >
             Attach DO &amp; mark delivered
+          </button>
+          <button
+            type="button"
+            className="btn-secondary text-[12px]"
+            onClick={onTopUpClick}
+          >
+            Record top-up
           </button>
         </div>
       </div>

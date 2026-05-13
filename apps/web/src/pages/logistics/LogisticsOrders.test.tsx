@@ -150,6 +150,7 @@ function makeDetail(): LogisticsOrderDetailResponse {
       outlet_id: null,
       invoice_no: null,
       invoiced_at: null,
+      paid: 2250,
       dealers: { name: "ComfortBeds" },
       outlets: null,
     },

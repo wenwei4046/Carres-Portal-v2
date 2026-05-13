@@ -132,7 +132,7 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
                   // Wipe structured fields when toggled on so a later un-toggle
                   // doesn't surface stale data.
                   ...(v
-                    ? { addressLine1: "", addressState: "", addressCity: "", addressPostcode: "" }
+                    ? { addressLine1: "", addressLine2: "", addressState: "", addressCity: "", addressPostcode: "" }
                     : {}),
                 })
               }
@@ -146,6 +146,7 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
             <MYAddressFields
               data={{
                 addressLine1: c.addressLine1,
+                addressLine2: c.addressLine2,
                 addressState: c.addressState,
                 addressCity: c.addressCity,
                 addressPostcode: c.addressPostcode,
@@ -215,7 +216,7 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
           onChange={(v) =>
             setC({
               billingSame: v,
-              billing: v ? composeAddress({ line1: c.addressLine1, state: c.addressState, city: c.addressCity, postcode: c.addressPostcode }) : c.billing,
+              billing: v ? composeAddress({ line1: c.addressLine1, line2: c.addressLine2, state: c.addressState, city: c.addressCity, postcode: c.addressPostcode }) : c.billing,
             })
           }
         />
@@ -234,6 +235,7 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
             <strong className="text-base-900">
               {composeAddress({
                 line1: c.addressLine1,
+                line2: c.addressLine2,
                 state: c.addressState,
                 city: c.addressCity,
                 postcode: c.addressPostcode,

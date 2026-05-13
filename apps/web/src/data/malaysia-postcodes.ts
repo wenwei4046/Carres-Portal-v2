@@ -230,14 +230,19 @@ export function getPostcodes(state: string | null, city: string | null): string[
 
 /** Compose the structured address fields into the single `customer_address`
  *  string the DB stores. Empty parts are dropped so the result is always tidy.
- *  Ordering: `{line1}, {city} {postcode}, {state}`. */
+ *  Ordering: `{line1}, {line2?}, {city} {postcode}, {state}`. line2 is
+ *  optional (e.g. "Unit 12-A, Block B") — added 2026-05-13 for residential
+ *  addresses where Line 1 alone can't carry the full street + unit. */
 export function composeAddress(parts: {
   line1: string;
+  line2?: string;
   state: string;
   city: string;
   postcode: string;
 }): string {
-  const { line1, state, city, postcode } = parts;
+  const { line1, line2, state, city, postcode } = parts;
   const tail = [city, postcode].filter(Boolean).join(" ");
-  return [line1.trim(), tail, state].filter(Boolean).join(", ");
+  return [line1.trim(), (line2 ?? "").trim(), tail, state]
+    .filter(Boolean)
+    .join(", ");
 }

@@ -23,6 +23,7 @@ interface Props {
  */
 export default function AddAddressModal({ order, onClose }: Props) {
   const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
   const [addressState, setAddressState] = useState("");
   const [addressCity, setAddressCity] = useState("");
   const [addressPostcode, setAddressPostcode] = useState("");
@@ -48,6 +49,7 @@ export default function AddAddressModal({ order, onClose }: Props) {
 
   const composed = composeAddress({
     line1: addressLine1,
+    line2: addressLine2,
     state: addressState,
     city: addressCity,
     postcode: addressPostcode,
@@ -85,9 +87,10 @@ export default function AddAddressModal({ order, onClose }: Props) {
       {/* Body */}
       <div className="px-7 py-6 overflow-auto flex-1 flex flex-col gap-4">
         <MYAddressFields
-          data={{ addressLine1, addressState, addressCity, addressPostcode }}
+          data={{ addressLine1, addressLine2, addressState, addressCity, addressPostcode }}
           onChange={(patch) => {
             if (patch.addressLine1 !== undefined) setAddressLine1(patch.addressLine1);
+            if (patch.addressLine2 !== undefined) setAddressLine2(patch.addressLine2);
             if (patch.addressState !== undefined) setAddressState(patch.addressState);
             if (patch.addressCity !== undefined) setAddressCity(patch.addressCity);
             if (patch.addressPostcode !== undefined) setAddressPostcode(patch.addressPostcode);

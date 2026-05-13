@@ -1,13 +1,23 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { Order } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
 import { useTopUpOrder } from "@/lib/queries";
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 
+/**
+ * Minimal shape the modal needs. Dealer side passes a full `Order`; logistics
+ * side passes a slim adapter from `LogisticsOrderDetailOrder`. Structural
+ * typing — Order already satisfies these fields, no change needed dealer-side.
+ */
+export interface TopUpTarget {
+  id: string;
+  dl: number;
+  dealerId: string;
+  paid: number;
+}
+
 interface Props {
-  order: Order;
+  order: TopUpTarget;
   /** Server-computed total (line + addon, no stair) — same as proceed gating. */
   total: number;
   onClose: () => void;
@@ -38,7 +48,11 @@ interface PhotoSlot {
  * `order_history.metadata.photo_paths`.
  */
 export default function TopUpDepositModal({ order, total, onClose }: Props) {
-  const dealerId = useAuth((s) => s.dealerId);
+  // 2026-05-13 (Loo) — derive dealer scope from the order, not the caller's
+  // JWT. Lets logistics / finance / principal record top-ups on dealer-owned
+  // orders without needing a dealer JWT claim. Storage paths still nest under
+  // the order's dealer folder so RLS on orders-attachments stays scoped.
+  const dealerId = order.dealerId;
   const paid = order.paid;
   const balanceTo50 = Math.max(0, Math.ceil(total * 0.5) - paid);
   const balanceToFull = Math.max(0, total - paid);
