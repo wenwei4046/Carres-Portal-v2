@@ -547,6 +547,40 @@ Migration count: 106 files (was 94 in last §17 sync, includes 0095-0105 from in
 
 
 
+**Supplier per-thread readiness + multi-DO partial pickup (Loo 2026-05-15 ~AM, autonomous overnight execution)** — Largest feature ship since Phase 9 deploy. 15-task plan (`docs/superpowers/plans/2026-05-15-supplier-thread-pickup-plan.md`) executed via subagent-driven-development per Loo's go-ahead "execute the plan autonomously, I'll check in the morning".
+
+Schema: migrations 0107 + 0108 (0107 = new `po_pickup_events` table + 3 columns on `order_supplier_threads` + `partially_shipped` enum value + 5 SECURITY DEFINER RPCs + RLS policies + backfill PO-2032; 0108 = SOP-aware thread.logistics_stage + terminal sup_status convergence on `delivered`).
+
+RPCs: `supplier_mark_thread_ready` / `supplier_unmark_thread_ready` (idempotent), `partner_pickup_threads` (procurement-leg, scoped via `procurement_partner_id` — original spec said `delivery_partner_id` which was wrong; code reviewer caught it), `logistics_receive_threads` (own_logistics path, threads → 'ready_to_dispatch' at WH), `pickup_event_render_payload` (STABLE, role-gated, returns full payload for browser-side PDF render).
+
+API: 6 new endpoints (`POST/DELETE /api/supplier/threads/:id/ready`, `POST /api/partner/pickups/batch`, `POST /api/logistics/pos/:poId/receive-threads`, `GET /api/pickup-events/:id/print`, `GET /api/supplier/pos/:poId/threads`, `GET /api/supplier/pos/:poId/pickup-events`, `GET /api/logistics/pos/:poId/threads`). Enrichment on `GET /api/supplier/pos` + `GET /api/partner/pickups` adding `urgency / customer_eta_min / behind_schedule / sku_summary` per PO row.
+
+UI: SupplierPOs list gets urgency badge + customer ETA + behind-schedule warning + sku summary line + 4-option sort dropdown; PODrawer gets `PODrawerThreadList` (per-thread checkbox + state pill) + `PickupHistoryList` (past pickup events with reprint button); PartnerFactoryPickupsPage gets multi-select checkboxes per ready thread + `PickupBatchDialog` (DO# + DOFileUploadField + signed + submit); ReceivePOModal gets per-thread receive section for own_logistics suppliers; new `/print/pickup-event/:eventId` browser route renders DO PDF via new `pickup-event-template.tsx` (mirrors `do-template.tsx` pattern, A4 + terracotta accent + Noto Sans SC).
+
+OPEN_SUP_STATUSES audit: `partially_shipped` added to 7 filter sites (Forecast / supplier dashboard pipeline buckets / partner dashboard buckets / logistics badges / PoDetailModal action gate / ProcurementTabContent needsPickup / SupplierPOs labelFor) so partial PO state stays visible in "open" UI surfaces.
+
+Commits (in order): `8520528` migration 0107, `0c2eef4` migration 0108 (SOP-aware fixes), `9585d23` shared types + zod, `e3ae3de` supplier threads endpoints, `2967a0e` partner batch pickup, `75216ad` logistics receive threads, `9d5e1b9` PO list enrichment, `70b6893` pickup event print endpoint, `61fe102` web query hooks, `9a4a8cf` SupplierPOs list urgency UI, `a7ddb5a` PODrawerThreadList component, `4f30a10` PickupBatchDialog + PartnerFactoryPickupsPage multi-select, `d5cfdd0` ReceivePOModal per-thread section, `494c679` pickup history + DO reprint, `9ef9a7f` OPEN_SUP_STATUSES audit + E2E spec, plus this §17 sync.
+
+Test count delta: api +75 (1 file 8 tests pickup-events/print, partial fills across pos/threads/pickups-batch/receive-threads/pos.test.ts), web +24 (PODrawerThreadList 5, PickupBatchDialog 6, PartnerFactoryPickupsPage 3, PickupHistoryList 3, ReceivePOModal 7).
+
+E2E: new spec `e2e/phase-10-partial-pickup-happy.spec.ts` (test.fixme, 209 lines, covers 3+4+3 partial pickup chain). Awaits seed-test-users + seed-e2e-fixtures additions before un-fixme.
+
+Pre-existing failures (NOT from this PR, documented in earlier §17 entries):
+- api: `partner/pickups.test.ts > returns LP's POs` — mock chain stale post-0090
+- web: `HoOKkASofaTab.test.tsx` 4 fails — `dab4439` Direct-receive escape hatch regression
+
+Deploy: Cloudflare Pages `carres-portal` + Workers `carres-portal-v2-api` (env production). Migration 0107+0108 already on staging Supabase (= prod per Phase 9). Worker version + Pages deployment IDs below.
+
+Migration count: 108 files (was 106 in last §17 sync; this entry adds 0107 + 0108).
+
+Phase 10 carry-forwards (added 2026-05-15):
+- phase-10-partner-side-reprint — partner role can already hit `/print/pickup-event/:id` via the role-agnostic endpoint but `PartnerFactoryPickupsPage` doesn't surface a "Pickup history" mount yet. Add `GET /api/partner/pos/:poId/pickup-events` + mount `PickupHistoryList` for parity.
+- phase-10-e2e-fixtures-partial-pickup — seed-test-users.ts needs `supplier-nicefuture@x.com` + `partner-nets@x.com`; seed-e2e-fixtures.sql needs PO-FIX-NF-PARTIAL with 10 threads in `in_production`. Then un-fixme `e2e/phase-10-partial-pickup-happy.spec.ts`.
+- phase-10-purchase-orders-do-number-fallback — `purchase_orders.do_number` not auto-updated by new RPCs; legacy reads will see NULL on partial-pickup POs. Either backfill from first pickup_event or add a fallback view. Low priority — most reads check `?? null` already.
+- phase-10-stockpile-po-readiness — for stockpile POs (no thread links), supplier still uses the existing PO-level "Mark Ready" button. New thread checklist appropriately hides for stockpile.
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)
