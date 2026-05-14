@@ -247,6 +247,131 @@ describe("SupplierPOs", () => {
     ).not.toBeInTheDocument();
   });
 
+  // Task 9 — server enrichment fields (apps/api/src/routes/supplier/pos.ts:120).
+  // The list page surfaces urgency / customer ETA / behind-schedule warning /
+  // dedupe sku summary on each card + offers a sort dropdown to reorder.
+  it("renders urgency badge + customer ETA + sku summary on each PO card", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/api/supplier/pos")) {
+        return [
+          {
+            id: "PO-9999",
+            sup_status: "in_production",
+            eta_date: "2026-05-22",
+            placed_at: "2026-05-08T00:00:00Z",
+            expected_ready_date: null,
+            do_number: null,
+            supplier_id: "e1",
+            sku_summary: [{ sku: "mattress:carres-original:King", qty: 5 }],
+            customer_eta_min: "2026-05-20",
+            urgency: "critical",
+            behind_schedule: true,
+            lines: [
+              {
+                id: "l1",
+                sku: "mattress:carres-original:King",
+                qty: 5,
+                received_qty: 0,
+              },
+            ],
+          },
+        ];
+      }
+      if (url.includes("/api/supplier/me")) return ME_OWN;
+      if (url.includes("/api/supplier/activity")) return [];
+      if (url.includes("/api/supplier/products/demand")) return [];
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    render(wrap(<SupplierPOs />));
+    await waitFor(() => {
+      expect(screen.getByText(/Customer ETA/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText("2026-05-20")).toBeInTheDocument();
+    expect(screen.getByText(/Behind schedule/i)).toBeInTheDocument();
+    expect(screen.getByText(/Critical/)).toBeInTheDocument();
+    // sku_summary line rolls up [{sku, qty}] into "<sku> × <qty>" joined by " · ".
+    expect(
+      screen.getByTestId("sku-summary-PO-9999"),
+    ).toHaveTextContent("mattress:carres-original:King × 5");
+  });
+
+  it("sort dropdown reorders POs by urgency vs PO ID", async () => {
+    // Three POs with mixed urgency. API order is intentionally NOT
+    // urgency-sorted so we can assert the client re-sorts.
+    const POS = [
+      {
+        id: "PO-A",
+        sup_status: "in_production",
+        eta_date: "2026-06-01",
+        placed_at: "2026-05-08T00:00:00Z",
+        expected_ready_date: null,
+        do_number: null,
+        supplier_id: "e1",
+        urgency: "normal",
+        customer_eta_min: "2026-06-10",
+        behind_schedule: false,
+        sku_summary: [{ sku: "sofa:halo:3-seat", qty: 1 }],
+        lines: [{ id: "la", sku: "sofa:halo:3-seat", qty: 1, received_qty: 0 }],
+      },
+      {
+        id: "PO-B",
+        sup_status: "in_production",
+        eta_date: "2026-05-22",
+        placed_at: "2026-05-08T00:00:00Z",
+        expected_ready_date: null,
+        do_number: null,
+        supplier_id: "e1",
+        urgency: "critical",
+        customer_eta_min: "2026-05-20",
+        behind_schedule: true,
+        sku_summary: [{ sku: "mattress:carres-original:King", qty: 5 }],
+        lines: [{ id: "lb", sku: "mattress:carres-original:King", qty: 5, received_qty: 0 }],
+      },
+      {
+        id: "PO-C",
+        sup_status: "in_production",
+        eta_date: "2026-05-28",
+        placed_at: "2026-05-08T00:00:00Z",
+        expected_ready_date: null,
+        do_number: null,
+        supplier_id: "e1",
+        urgency: "urgent",
+        customer_eta_min: "2026-05-25",
+        behind_schedule: false,
+        sku_summary: [{ sku: "bedframe:oak:Queen", qty: 2 }],
+        lines: [{ id: "lc", sku: "bedframe:oak:Queen", qty: 2, received_qty: 0 }],
+      },
+    ];
+    mockAll({ me: ME_OWN, pos: POS });
+
+    render(wrap(<SupplierPOs />));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("po-card-PO-A")).toBeInTheDocument();
+    });
+
+    // Default sort = urgency → critical first (PO-B), then urgent (PO-C),
+    // then normal (PO-A).
+    let cards = screen.getAllByTestId(/^po-card-/);
+    expect(cards.map((c) => c.getAttribute("data-testid"))).toEqual([
+      "po-card-PO-B",
+      "po-card-PO-C",
+      "po-card-PO-A",
+    ]);
+
+    // Switch to PO ID sort → alphabetical (PO-A, PO-B, PO-C).
+    fireEvent.change(screen.getByTestId("supplier-pos-sort"), {
+      target: { value: "po_id" },
+    });
+    cards = screen.getAllByTestId(/^po-card-/);
+    expect(cards.map((c) => c.getAttribute("data-testid"))).toEqual([
+      "po-card-PO-A",
+      "po-card-PO-B",
+      "po-card-PO-C",
+    ]);
+  });
+
   it("Submit button disabled until DO file is uploaded", async () => {
     mockAll({ me: ME_OWN, pos: [ACCEPTED_PO] });
 

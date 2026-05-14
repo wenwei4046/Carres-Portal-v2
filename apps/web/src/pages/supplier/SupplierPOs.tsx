@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   useSupplierPos,
@@ -77,8 +77,16 @@ const TAB_HINTS: Record<SupplierBucket, (kind: "own_logistics" | "factory_pickup
   delivered: () => "DO uploaded · closed",
 };
 
+/** Sort modes for the PO list. `urgency` is the default — surfaces
+ *  closest customer ETA at top so the supplier sees what to build first.
+ *  `created` keeps the API order (server returns newest-first). */
+type SortKey = "urgency" | "po_id" | "po_eta" | "created";
+
+const URGENCY_RANK: Record<string, number> = { critical: 0, urgent: 1, normal: 2 };
+
 export default function SupplierPOs() {
   const [active, setActive] = useState<SupplierBucket>("po");
+  const [sortBy, setSortBy] = useState<SortKey>("urgency");
   const [openPo, setOpenPo] = useState<SupplierPoRow | null>(null);
 
   const pos = useSupplierPos(active);
@@ -86,18 +94,53 @@ export default function SupplierPOs() {
   const rows = pos.data ?? [];
   const supplierKind = me.data?.kind ?? null;
 
+  const sortedRows = useMemo(() => {
+    const arr = [...rows];
+    if (sortBy === "urgency") {
+      arr.sort((a, b) => {
+        const ra = URGENCY_RANK[a.urgency ?? "normal"] ?? 99;
+        const rb = URGENCY_RANK[b.urgency ?? "normal"] ?? 99;
+        if (ra !== rb) return ra - rb;
+        // tiebreak by customer_eta_min (earlier delivery first).
+        return (a.customer_eta_min ?? "9999").localeCompare(b.customer_eta_min ?? "9999");
+      });
+    } else if (sortBy === "po_eta") {
+      arr.sort((a, b) => (a.eta_date ?? "9999").localeCompare(b.eta_date ?? "9999"));
+    } else if (sortBy === "po_id") {
+      arr.sort((a, b) => a.id.localeCompare(b.id));
+    }
+    // "created" → leave server order (placed_at desc).
+    return arr;
+  }, [rows, sortBy]);
+
   return (
     <div className="p-9 max-w-[1400px] mx-auto">
-      <header className="mb-7">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-          Operations
+      <header className="mb-7 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            Operations
+          </div>
+          <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+            Purchase Orders
+          </h1>
+          <div className="text-[13px] text-muted-foreground">
+            Three-stage pipeline · PO → Ready to Pickup → Delivered
+          </div>
         </div>
-        <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
-          Purchase Orders
-        </h1>
-        <div className="text-[13px] text-muted-foreground">
-          Three-stage pipeline · PO → Ready to Pickup → Delivered
-        </div>
+        <label className="flex items-center gap-2 text-[11px] text-muted-foreground self-end">
+          <span className="uppercase tracking-[0.08em]">Sort</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortKey)}
+            data-testid="supplier-pos-sort"
+            className="border border-border bg-card rounded px-2.5 py-1 text-[12px] text-foreground"
+          >
+            <option value="urgency">Urgency</option>
+            <option value="po_eta">PO ETA</option>
+            <option value="po_id">PO ID</option>
+            <option value="created">Created</option>
+          </select>
+        </label>
       </header>
 
       {/* Stage tabs */}
@@ -135,11 +178,11 @@ export default function SupplierPOs() {
       {/* Stage body */}
       {pos.isLoading ? (
         <Empty hint="Loading…" />
-      ) : rows.length === 0 ? (
+      ) : sortedRows.length === 0 ? (
         <Empty hint={emptyHintFor(active)} />
       ) : (
         <div className="flex flex-col gap-2.5">
-          {rows.map((p) => (
+          {sortedRows.map((p) => (
             <POCard
               key={p.id}
               po={p}
@@ -245,8 +288,31 @@ function POCard({
     >
       <div className="flex items-center gap-7 flex-wrap">
         <div className="min-w-[120px]">
-          <div className="font-mono text-[14px] font-bold tracking-wide">
-            {po.id}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="font-mono text-[14px] font-bold tracking-wide">
+              {po.id}
+            </div>
+            {/* Task 9 — urgency badge derived from min(customer ETA) across
+                linked threads. critical <7d · urgent 7-13d · normal >=14d.
+                Null when no threads (forecast/stockpile PO) → hidden. */}
+            {po.urgency && (
+              <span
+                className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.06em] ${
+                  po.urgency === "critical"
+                    ? "bg-destructive/10 text-destructive"
+                    : po.urgency === "urgent"
+                      ? "bg-warning/15 text-warning"
+                      : "bg-success/10 text-success"
+                }`}
+                data-testid={`urgency-${po.id}`}
+              >
+                {po.urgency === "critical"
+                  ? "🔴 Critical"
+                  : po.urgency === "urgent"
+                    ? "🟠 Urgent"
+                    : "🟢 Normal"}
+              </span>
+            )}
           </div>
           <div className="text-[11px] text-muted-foreground mt-0.5">
             Placed {new Date(po.placed_at).toLocaleDateString()}
@@ -270,6 +336,24 @@ function POCard({
               <span className="font-semibold text-primary">
                 {po.expected_ready_date}
               </span>
+            </div>
+          )}
+          {/* Task 9 — customer's promised delivery date (min across threads).
+              Sits next to "Ready by" so supplier sees their PO ETA vs the
+              customer's required date side-by-side. */}
+          {po.customer_eta_min && (
+            <div className="text-[11px] text-muted-foreground flex flex-col">
+              <span className="text-[9px] uppercase tracking-[0.12em]">
+                Customer ETA
+              </span>
+              <span className="font-mono font-semibold text-foreground">
+                {po.customer_eta_min}
+              </span>
+              {po.behind_schedule && (
+                <span className="text-[10px] text-destructive font-semibold mt-0.5">
+                  ⚠ Behind schedule
+                </span>
+              )}
             </div>
           )}
           {po.warehouses && (
@@ -420,6 +504,17 @@ function POCard({
           ETA {po.eta_date ?? "—"}
           {po.do_number && ` · DO ${po.do_number}`}
         </div>
+        {/* Task 9 — deduped sku × qty roll-up from the server (sku_summary).
+            Acts as a tooltip-style one-liner summary for at-a-glance scanning
+            even when the multi-line block above is collapsed. */}
+        {po.sku_summary && po.sku_summary.length > 0 && (
+          <div
+            className="text-[11px] text-muted-foreground mt-1.5"
+            data-testid={`sku-summary-${po.id}`}
+          >
+            {po.sku_summary.map((l) => `${l.sku} × ${l.qty}`).join(" · ")}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -3024,6 +3024,16 @@ export interface SupplierPoRow {
   placed_at: string;
   created_at: string;
   updated_at: string;
+  // Task 6 server enrichment (apps/api/src/routes/supplier/pos.ts:120-150).
+  // All optional so older callers / tests that mock without these still typecheck.
+  //   customer_eta_min — min(orders.delivery_date) across linked threads
+  //   urgency          — <7d critical · 7-13d urgent · >=14d normal · null if no threads
+  //   behind_schedule  — true when PO.eta_date is at/after customer_eta_min
+  //   sku_summary      — deduped [{sku, qty}] from lines for compact card render
+  customer_eta_min?: string | null;
+  urgency?: "critical" | "urgent" | "normal" | null;
+  behind_schedule?: boolean;
+  sku_summary?: Array<{ sku: string; qty: number }>;
 }
 
 export interface SupplierProductRow {
