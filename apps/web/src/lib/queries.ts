@@ -189,6 +189,19 @@ export const qk = {
     products: () => ["supplier", "products"] as const,
     demand:   () => ["supplier", "products", "demand"] as const,
   },
+  // 2026-05-15 (Loo) — Supplier per-thread readiness + pickup event keys.
+  // Top-level (not nested under `supplier`) because thread + pickup-event
+  // reads are role-agnostic (supplier reads threads; partner+logistics +
+  // anyone with link reads pickup-event print payload). Mutations invalidate
+  // these by their top-level prefix (`["supplierThreads"]` /
+  // `["pickupEvents"]`) so the namespacing matches the invalidate calls.
+  supplierThreads: {
+    byPo: (poId: string) => ["supplierThreads", poId] as const,
+  },
+  pickupEvent: {
+    print: (eventId: string) => ["pickupEvent", eventId] as const,
+    byPo:  (poId: string)  => ["pickupEvents", poId] as const,
+  },
 };
 
 export interface OrderFilters {
@@ -3371,6 +3384,207 @@ export function useMarkDelivered(
       await qc.invalidateQueries({ queryKey: ["supplier"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 2026-05-15 (Loo) — Supplier per-thread readiness + pickup batch hooks
+// (Task 8 of supplier-thread-pickup-plan). The supplier marks individual
+// threads ready (POST/DELETE /api/supplier/threads/:id/ready); partners or
+// logistics batch-pickup a set of ready threads on a PO (POST
+// /api/partner/pickups/batch or POST /api/logistics/pos/:poId/receive-threads).
+// The reprint queries hit /api/pickup-events/:id/print for the bundled DO
+// payload.
+//
+// NOTE: `/api/supplier/pos/:poId/threads` and
+// `/api/supplier/pos/:poId/pickup-events` endpoints DO NOT EXIST yet — Task 10
+// (per-thread checklist) adds `/threads`; Task 13 (DO reprint history) adds
+// `/pickup-events`. The hooks below type-check now but will 404 at runtime
+// until those tasks land. This is intentional scaffolding so feature work in
+// Tasks 9/11/12 can call them.
+// ---------------------------------------------------------------------------
+
+/** Supplier marks a single thread ready for pickup. RPC returns the updated
+ *  thread row + new `po_sup_status` so callers can show optimistic UI; the
+ *  `noop` flag fires when the thread was already marked ready (idempotent). */
+export function useMarkThreadReady() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (threadId: string) => {
+      return apiFetch<{
+        thread_id: string;
+        supplier_ready_at: string | null;
+        po_sup_status: string;
+        noop?: boolean;
+      }>(`/api/supplier/threads/${threadId}/ready`, { method: "POST" });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["supplier", "pos"] });
+      qc.invalidateQueries({ queryKey: ["supplierThreads"] });
+    },
+  });
+}
+
+/** Supplier un-marks a thread ready (only allowed pre-pickup). RPC nulls
+ *  `supplier_ready_at` and recomputes PO sup_status downward (last ready
+ *  removed → drops back to `ready_for_pickup`/`in_production`). `noop` fires
+ *  when the thread was already not-ready. */
+export function useUnmarkThreadReady() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (threadId: string) => {
+      return apiFetch<{
+        thread_id: string;
+        po_sup_status?: string;
+        noop?: boolean;
+      }>(`/api/supplier/threads/${threadId}/ready`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["supplier", "pos"] });
+      qc.invalidateQueries({ queryKey: ["supplierThreads"] });
+    },
+  });
+}
+
+/** Partner batch pickup — picks N ready threads on a PO in one DO. Server
+ *  creates one `pickup_events` row + stamps every selected thread's
+ *  `pickup_event_id`. `signed: true` is hard-coded (matches the
+ *  partner_attach_pod pattern — gating is server-side). */
+export function usePartnerPickupBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      poId: string;
+      threadIds: string[];
+      doNumber: string;
+      doFilePath: string;
+      doNote?: string;
+    }) => {
+      return apiFetch<{
+        pickup_event_id: string;
+        thread_count: number;
+        po_sup_status: string;
+      }>("/api/partner/pickups/batch", {
+        method: "POST",
+        body: JSON.stringify({ ...input, signed: true }),
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["partner"] });
+      qc.invalidateQueries({ queryKey: ["pickupEvents"] });
+      qc.invalidateQueries({ queryKey: ["supplierThreads"] });
+    },
+  });
+}
+
+/** Logistics counterpart — same shape, different role-gated route.
+ *  `poId` lives in the URL (matches the existing
+ *  `/api/logistics/pos/:poId/...` family); body carries the rest. */
+export function useLogisticsReceiveThreads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      poId: string;
+      threadIds: string[];
+      doNumber: string;
+      doFilePath: string;
+      doNote?: string;
+    }) => {
+      const { poId, ...body } = input;
+      return apiFetch<{
+        pickup_event_id: string;
+        thread_count: number;
+        po_sup_status: string;
+      }>(`/api/logistics/pos/${poId}/receive-threads`, {
+        method: "POST",
+        body: JSON.stringify({ ...body, signed: true }),
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
+      qc.invalidateQueries({ queryKey: ["pickupEvents"] });
+      qc.invalidateQueries({ queryKey: ["supplierThreads"] });
+    },
+  });
+}
+
+/** Thread list for a single PO. Used by the supplier PODrawer's per-thread
+ *  checklist (Task 10). Each row is one `order_supplier_threads` row scoped
+ *  to that PO, plus the SKU lines this thread is responsible for (derived
+ *  from the `order_supplier_thread_lines` join). `pickup_event_id` is
+ *  non-null when the thread has already been picked up.
+ *
+ *  Endpoint added by Task 10; this hook currently 404s until then. */
+export type ThreadRow = {
+  id: string;
+  order_id: string;
+  order_dl: number;
+  customer_name: string;
+  customer_delivery_date: string | null;
+  supplier_ready_at: string | null;
+  pickup_event_id: string | null;
+  sku_lines: Array<{ sku: string; qty: number }>;
+};
+
+export function useSupplierThreadsForPo(poId: string | null) {
+  return useQuery({
+    queryKey: poId ? qk.supplierThreads.byPo(poId) : ["supplierThreads", "none"],
+    queryFn: () => apiFetch<ThreadRow[]>(`/api/supplier/pos/${poId}/threads`),
+    enabled: !!poId,
+  });
+}
+
+/** Pickup events list for a single PO (history view). Used by the supplier
+ *  PODrawer's "Past pickups" section + the reprint button.
+ *  `ack_role` lets the UI label "Picked by partner" vs "Received by HQ".
+ *
+ *  Endpoint added by Task 13; this hook currently 404s until then. */
+export type PickupEventRow = {
+  id: string;
+  do_number: string;
+  picked_up_at: string;
+  ack_role: "partner" | "logistics";
+  thread_count: number;
+};
+
+export function usePickupEventsForPo(poId: string | null) {
+  return useQuery({
+    queryKey: poId ? qk.pickupEvent.byPo(poId) : ["pickupEvents", "none"],
+    queryFn: () => apiFetch<PickupEventRow[]>(`/api/supplier/pos/${poId}/pickup-events`),
+    enabled: !!poId,
+  });
+}
+
+/** Full pickup event payload for the print/reprint flow. Returns enough
+ *  context to render the DO without a second round-trip: PO ID + ETA,
+ *  supplier name, every thread in the event with customer + SKU lines.
+ *
+ *  Endpoint added by Task 13 (`/api/pickup-events/:id/print`). */
+export type PickupEventPrintPayload = {
+  event_id: string;
+  do_number: string;
+  do_file_path: string | null;
+  do_note: string | null;
+  picked_up_at: string;
+  ack_role: "partner" | "logistics";
+  po_id: string;
+  po_eta_date: string | null;
+  supplier_name: string;
+  threads: Array<{
+    thread_id: string;
+    order_id: string;
+    order_dl: number;
+    customer_name: string;
+    customer_delivery_date: string | null;
+    sku_lines: Array<{ sku: string; qty: number }>;
+  }>;
+};
+
+export function usePickupEventPrint(eventId: string | null) {
+  return useQuery({
+    queryKey: eventId ? qk.pickupEvent.print(eventId) : ["pickupEvent", "none"],
+    queryFn: () => apiFetch<PickupEventPrintPayload>(`/api/pickup-events/${eventId}/print`),
+    enabled: !!eventId,
   });
 }
 
