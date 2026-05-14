@@ -536,3 +536,128 @@ describe("POST /api/supplier/pos/:id/mark-delivered", () => {
     expect(res.status).toBe(422);
   });
 });
+
+// Task 10 (2026-05-15) — per-thread checklist source for the supplier
+// PODrawer. Returns one row per `order_supplier_threads` linked to this PO,
+// each row carrying its parent order's customer + delivery date + SKU lines.
+describe("GET /api/supplier/pos/:poId/threads", () => {
+  it("rejects logistics with 403 (supplier-only guard)", async () => {
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/supplier/pos/${PO_ID}/threads`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("returns threads with per-order sku_lines flattened", async () => {
+    // Two threads on this PO — one with pending readiness, one already
+    // marked ready. Each thread's parent order has its own line items
+    // pulled in a separate query and re-joined by order_id.
+    const eqFn = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "t1",
+          order_id: "o1",
+          supplier_ready_at: null,
+          pickup_event_id: null,
+          orders: { dl: 1001, customer_name: "Tan", delivery_date: "2026-05-20" },
+        },
+        {
+          id: "t2",
+          order_id: "o2",
+          supplier_ready_at: "2026-05-15T10:00:00Z",
+          pickup_event_id: null,
+          orders: { dl: 1002, customer_name: "Lim", delivery_date: "2026-05-28" },
+        },
+      ],
+      error: null,
+    });
+    const inFn = vi.fn().mockResolvedValue({
+      data: [
+        { order_id: "o1", sku: "mattress:King", qty: 2 },
+        { order_id: "o2", sku: "mattress:Queen", qty: 1 },
+      ],
+      error: null,
+    });
+    const sb = {
+      from: vi.fn((table: string) => {
+        if (table === "order_supplier_threads") {
+          return { select: vi.fn().mockReturnValue({ eq: eqFn }) };
+        }
+        if (table === "order_lines") {
+          return { select: vi.fn().mockReturnValue({ in: inFn }) };
+        }
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("supplier");
+    const res = await app.fetch(
+      new Request(`http://t/api/supplier/pos/${PO_ID}/threads`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(eqFn).toHaveBeenCalledWith("po_id", PO_ID);
+    expect(inFn).toHaveBeenCalledWith("order_id", ["o1", "o2"]);
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    expect(rows).toEqual([
+      {
+        id: "t1",
+        order_id: "o1",
+        order_dl: 1001,
+        customer_name: "Tan",
+        customer_delivery_date: "2026-05-20",
+        supplier_ready_at: null,
+        pickup_event_id: null,
+        sku_lines: [{ sku: "mattress:King", qty: 2 }],
+      },
+      {
+        id: "t2",
+        order_id: "o2",
+        order_dl: 1002,
+        customer_name: "Lim",
+        customer_delivery_date: "2026-05-28",
+        supplier_ready_at: "2026-05-15T10:00:00Z",
+        pickup_event_id: null,
+        sku_lines: [{ sku: "mattress:Queen", qty: 1 }],
+      },
+    ]);
+  });
+
+  it("returns empty array (no second query) when PO has no threads", async () => {
+    const eqFn = vi.fn().mockResolvedValue({ data: [], error: null });
+    const inFn = vi.fn();
+    const sb = {
+      from: vi.fn((table: string) => {
+        if (table === "order_supplier_threads") {
+          return { select: vi.fn().mockReturnValue({ eq: eqFn }) };
+        }
+        if (table === "order_lines") {
+          return { select: vi.fn().mockReturnValue({ in: inFn }) };
+        }
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("supplier");
+    const res = await app.fetch(
+      new Request(`http://t/api/supplier/pos/${PO_ID}/threads`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as unknown[]).length).toBe(0);
+    // No order_ids → skip the second query entirely.
+    expect(inFn).not.toHaveBeenCalled();
+  });
+});

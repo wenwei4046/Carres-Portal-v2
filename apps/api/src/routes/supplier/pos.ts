@@ -185,6 +185,72 @@ supplierPosRouter.get("/:id", requireSupplier, async (c) => {
   return c.json(data);
 });
 
+/**
+ * Task 10 (2026-05-15) — per-thread checklist source for the supplier
+ * PODrawer. Returns one row per `order_supplier_threads` linked to this PO,
+ * each row carrying its parent order's `dl` + customer + delivery date +
+ * the per-order SKU lines (so the supplier sees what to build for each
+ * customer). RLS via `ost_supplier_read` (0033) — supplier sees only
+ * threads on POs they own.
+ *
+ * `supplier_ready_at` (0107) — non-null once supplier has marked thread
+ * ready for pickup. `pickup_event_id` (0107) — non-null once the thread
+ * has been picked up; thread becomes immutable from supplier's side at
+ * that point (UI disables the checkbox).
+ *
+ * Two queries (threads + lines) instead of a single deep nested select
+ * because order_lines is on `orders`, not `order_supplier_threads`; the
+ * join would be 3 levels deep and Postgrest's nesting performance drops
+ * sharply past 2 levels.
+ */
+supplierPosRouter.get("/:poId/threads", requireSupplier, async (c) => {
+  const auth = c.var.auth;
+  const poId = c.req.param("poId");
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("order_supplier_threads")
+    .select(
+      "id, order_id, supplier_ready_at, pickup_event_id, orders(dl, customer_name, delivery_date)",
+    )
+    .eq("po_id", poId);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = (data ?? []) as any[];
+  const orderIds = rows.map((r) => r.order_id).filter((id: unknown): id is string => typeof id === "string");
+  const linesByOrder = new Map<string, Array<{ sku: string; qty: number }>>();
+  if (orderIds.length > 0) {
+    const { data: lines, error: e2 } = await sb
+      .from("order_lines")
+      .select("order_id, sku, qty")
+      .in("order_id", orderIds);
+    if (e2) {
+      const m = mapPgError(e2);
+      return c.json(m.body, m.status);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const l of ((lines ?? []) as any[])) {
+      const list = linesByOrder.get(l.order_id) ?? [];
+      list.push({ sku: l.sku, qty: l.qty });
+      linesByOrder.set(l.order_id, list);
+    }
+  }
+  return c.json(
+    rows.map((r) => ({
+      id: r.id,
+      order_id: r.order_id,
+      order_dl: r.orders?.dl ?? null,
+      customer_name: r.orders?.customer_name ?? null,
+      customer_delivery_date: r.orders?.delivery_date ?? null,
+      supplier_ready_at: r.supplier_ready_at,
+      pickup_event_id: r.pickup_event_id,
+      sku_lines: linesByOrder.get(r.order_id) ?? [],
+    })),
+  );
+});
+
 supplierPosRouter.post("/:id/acknowledge", requireSupplier, async (c) => {
   const auth = c.var.auth;
   const id = c.req.param("id");

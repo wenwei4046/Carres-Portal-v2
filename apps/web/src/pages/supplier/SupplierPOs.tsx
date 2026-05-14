@@ -13,6 +13,7 @@ import {
   type SupplierMe,
 } from "@/lib/queries";
 import DOFileUploadField from "@/components/DOFileUploadField";
+import PODrawerThreadList from "./PODrawerThreadList";
 
 /**
  * Supplier · Purchase Orders page — Phase 6 spec §6.
@@ -718,6 +719,18 @@ function PODrawer({
               })}
             </div>
           </div>
+
+          {/* Task 10 (2026-05-15) — per-thread production checklist. One row
+              per linked customer-leg thread; supplier toggles each thread's
+              "ready for pickup" state independently via mark-ready /
+              unmark-ready RPCs (migrations 0107/0108). Forecast / stockpile
+              POs (no threads) render an empty-state hint. */}
+          <section className="mb-5">
+            <h3 className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-3">
+              Production checklist
+            </h3>
+            <PODrawerThreadList poId={po.id} />
+          </section>
 
           {showDOForm && (
             <form

@@ -89,6 +89,13 @@ function mockAll(opts: {
       }
       return opts.me;
     }
+    // Task 10 (2026-05-15) — PODrawerThreadList fires GET
+    // /api/supplier/pos/:poId/threads when the drawer opens. Tests that open
+    // the drawer (DO upload field, Submit button gating) need an empty
+    // thread list so the checklist renders the "no linked sales orders"
+    // hint instead of crashing on missing thread fields. Sub-URL match
+    // must come BEFORE the broader `/api/supplier/pos` branch.
+    if (url.includes("/threads")) return [];
     if (url.includes("/api/supplier/pos")) return opts.pos;
     throw new Error(`unexpected fetch ${url}`);
   });
