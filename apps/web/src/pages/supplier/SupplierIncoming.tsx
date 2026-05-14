@@ -1,4 +1,4 @@
-import { useSupplierDemand, useSupplierPos } from "@/lib/queries";
+import { useSupplierDemand } from "@/lib/queries";
 
 /**
  * Supplier · Incoming — Phase 6 V1.
@@ -16,19 +16,18 @@ import { useSupplierDemand, useSupplierPos } from "@/lib/queries";
  */
 export default function SupplierIncoming() {
   const demand = useSupplierDemand();
-  const pendingPos = useSupplierPos("po");
 
   const rows = demand.data ?? [];
   // 2026-05-10 (Loo) — `openQty` is committed via PO; `pendingQty` is
   // pre-commit demand from sales orders with matching cat_covered. Surface
   // both so the supplier can plan production capacity without waiting for
   // logistics to formalise every order into a PO.
+  // 2026-05-15 (Loo) — "Pending ack" KPI removed. It was a sub-status of
+  // committed POs (sup_status='pending') and didn't belong in a demand
+  // forecast view; supplier reads PO ack state on the POs page anyway.
   const totalOpenUnits = rows.reduce((s, r) => s + r.openQty, 0);
   const totalPendingUnits = rows.reduce((s, r) => s + (r.pendingQty ?? 0), 0);
   const totalUnits = totalOpenUnits + totalPendingUnits;
-  const pendingAck = (pendingPos.data ?? []).filter(
-    (p) => p.sup_status === "pending",
-  ).length;
 
   // Group by category prefix (proto:715-720). SKU format: cat:model:variant.
   const byCat: Record<string, typeof rows> = {};
@@ -54,7 +53,7 @@ export default function SupplierIncoming() {
         </div>
       </header>
 
-      <div className="grid grid-cols-4 gap-3.5 mb-5">
+      <div className="grid grid-cols-3 gap-3.5 mb-5">
         <Kpi
           label="Total demand"
           value={totalUnits}
@@ -71,12 +70,6 @@ export default function SupplierIncoming() {
           value={totalPendingUnits}
           hint="Sales orders not yet POed"
           accent={totalPendingUnits > 0}
-        />
-        <Kpi
-          label="Pending ack"
-          value={pendingAck}
-          hint="Awaiting supplier acknowledgement"
-          accent={pendingAck > 0}
         />
       </div>
 
