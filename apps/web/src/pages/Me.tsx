@@ -1,13 +1,30 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { type MeResponse } from "@carres/shared";
+import type { Role } from "@carres/shared/domain";
 import CarresLockup from "@/components/CarresLockup";
 import { useAuth } from "@/lib/auth";
 import { apiFetch, ApiError } from "@/lib/api";
 
+function homeForRole(role: Role | null): string {
+  switch (role) {
+    case "principal":   return "/principal";
+    case "logistics":   return "/logistics";
+    case "partner":     return "/delivery-partner";
+    case "finance":     return "/finance";
+    case "supplier":    return "/supplier";
+    case "bd":          return "/bd";
+    case "dealer":
+    case "salesperson":
+    case "showroom":    return "/dealer";
+    default:            return "/";
+  }
+}
+
 export default function Me() {
   const navigate = useNavigate();
   const user = useAuth((s) => s.user);
+  const role = useAuth((s) => s.role);
   const signOut = useAuth((s) => s.signOut);
 
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -37,12 +54,20 @@ export default function Me() {
       <div className="mx-auto max-w-2xl space-y-6">
         <header className="flex items-center justify-between">
           <CarresLockup showPortal size={28} />
-          <button
-            onClick={handleSignOut}
-            className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              to={homeForRole(role)}
+              className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            >
+              ← Back to dashboard
+            </Link>
+            <button
+              onClick={handleSignOut}
+              className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            >
+              Sign out
+            </button>
+          </div>
         </header>
 
         <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
