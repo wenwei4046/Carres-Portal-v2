@@ -49,6 +49,12 @@ const PIPELINE_BUCKETS = {
     "partner_confirmed",
     "pickup_assigned",
     "pickup_accepted",
+    // 2026-05-15 (Task 14) — `partially_shipped` (migration 0107) is the
+    // mid-pickup state where at least one but not all linked threads have a
+    // pickup_event_id. The PO still has ready threads waiting; supplier needs
+    // to keep seeing it in the Ready-to-Pickup tab until every thread is
+    // picked (state then converges to `delivered` per 0108 F3 fix).
+    "partially_shipped",
     "shipped",
     "reassign_needed",
   ] as const,

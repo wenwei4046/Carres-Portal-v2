@@ -77,6 +77,10 @@ logisticsBadgesRouter.get("/", async (c) => {
       .in("sup_status", [
         "ready_confirm_sent",
         "ready_for_pickup",
+        // 2026-05-15 (Task 14) — `partially_shipped` (migration 0107) keeps
+        // the procurement badge re-lit when a partial pickup happens, so
+        // Logistics sees there's still mid-flight work on the PO.
+        "partially_shipped",
         "delivered",
         "reassign_needed",
       ])

@@ -53,6 +53,10 @@ function labelFor(ss: SupplierSupStatus, kind: "own_logistics" | "factory_pickup
     case "partner_confirmed":  return "Partner accepted · ready to dispatch";
     case "pickup_assigned":    return "Partner assigned";
     case "pickup_accepted":    return "Pickup scheduled";
+    // 2026-05-15 (Task 14): per-thread pickup mid-state (migration 0107). At
+    // least one thread is picked but not all — partner can still come back
+    // for the remainder.
+    case "partially_shipped":  return "Partially picked · partner returning";
     case "shipped":            return "Shipped";
     case "picked_up":          return "Picked up";
     case "delivered":          return "Delivered";

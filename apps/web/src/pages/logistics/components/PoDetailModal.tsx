@@ -77,11 +77,20 @@ function poDisplay(po: LogisticsPoListRow): {
 // v3-S2.3 — sup_status values that gate out the Receive button. Mid-pickup
 // flight states where Receive doesn't apply; mirrors the ActionCell carve-out
 // in LogisticsProcurement.tsx (lines 463-489).
+// Task 14 (2026-05-15) — `partially_shipped` (migration 0107) added: at least
+// one thread is picked but not all, so the supplier+partner are still
+// transacting on this PO. Logistics shouldn't be offered a generic Receive
+// at this state (the right flow is `partner_pickup_threads` for remaining
+// threads, then a single `logistics_receive_po_with_do` once the partner
+// arrives at the WH). `shipped` is the post-all-threads-picked terminal
+// state — same gate-out logic applies.
 const PICKUP_FLIGHT_SUP_STATUSES = new Set([
   "ready_for_pickup",
   "pickup_assigned",
   "pickup_accepted",
   "picked_up",
+  "partially_shipped",
+  "shipped",
 ]);
 
 export default function PoDetailModal({

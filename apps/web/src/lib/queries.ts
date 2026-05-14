@@ -2973,6 +2973,12 @@ export type SupplierSupStatus =
   | "partner_confirmed"
   | "pickup_assigned"
   | "pickup_accepted"
+  // 2026-05-15 (Task 14): migration 0107 per-thread pickup introduces this
+  // intermediate state — some but not all linked threads picked up. PO
+  // remains "open" from forecast / pipeline / badge perspectives. Filter
+  // audit landed `partially_shipped` in the `ready` bucket of
+  // PIPELINE_BUCKETS (apps/api/src/routes/supplier/pos.ts).
+  | "partially_shipped"
   | "shipped"
   | "picked_up"
   | "delivered"

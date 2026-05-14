@@ -176,6 +176,10 @@ describe("GET /api/supplier/products/demand", () => {
       "ready_for_pickup",
       "pickup_assigned",
       "pickup_accepted",
+      // 2026-05-15 (Task 14) — partially_shipped from migration 0107 is now
+      // considered "open" for forecast aggregation (PO still has un-picked
+      // threads with open demand).
+      "partially_shipped",
       "shipped",
       "reassign_needed",
     ]);

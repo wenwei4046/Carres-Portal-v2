@@ -130,8 +130,13 @@ export default function ProcurementTabContent({
     // RPC sets it). It was missing here so the Pickup action chip + sidebar
     // badge silently sat at 0 even though the PO was waiting for partner
     // assignment. Surfaced 2026-05-10 by Loo testing the Nice Future flow.
+    // 2026-05-15 (Task 14) — `partially_shipped` (migration 0107): at least
+    // one thread is still ready and not picked, so the PO STILL needs more
+    // pickup work. Without this entry the chip silently drops the partial PO
+    // from the Pickup-action count even though there's outstanding work.
     (p.sup_status === "ready_confirm_sent" ||
       p.sup_status === "ready_for_pickup" ||
+      p.sup_status === "partially_shipped" ||
       p.sup_status === "delivered" ||
       p.sup_status === "reassign_needed");
 
@@ -543,7 +548,19 @@ function ActionCell({
       </div>
     );
   }
-  if (ss === "pickup_assigned" || ss === "pickup_accepted" || ss === "picked_up") {
+  if (
+    ss === "pickup_assigned" ||
+    ss === "pickup_accepted" ||
+    ss === "picked_up" ||
+    // 2026-05-15 (Task 14) — `partially_shipped` (migration 0107): partner
+    // picked some threads, others still ready at factory. Show as in-flight
+    // (no primary Receive); direct-receive link stays available for the
+    // DO-arrives-via-supplier escape hatch.
+    ss === "partially_shipped" ||
+    // 2026-05-15 (Task 14) — `shipped` is the post-all-threads-picked terminal
+    // (per migration 0108 F3, supplier branch); partner is en route to WH.
+    ss === "shipped"
+  ) {
     return (
       <div className="flex flex-col items-end gap-1">
         <span className="font-mono text-[10px] text-base-500">
@@ -551,7 +568,9 @@ function ActionCell({
             ? "awaiting accept"
             : ss === "pickup_accepted"
               ? "pickup scheduled"
-              : "in transit"}
+              : ss === "partially_shipped"
+                ? "partially picked"
+                : "in transit"}
         </span>
         {directReceive}
       </div>

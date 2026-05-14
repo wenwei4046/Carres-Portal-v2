@@ -42,7 +42,10 @@ export default function SupplierDashboard() {
       // goods; supplier (own_logistics) now self-dispatches. Mirrors the
       // API ready bucket in apps/api/src/routes/supplier/pos.ts:49 so the
       // Dashboard pipeline counter matches the Ready-to-Pickup tab.
-      p.sup_status === "partner_confirmed",
+      p.sup_status === "partner_confirmed" ||
+      // Task 14 (2026-05-15) — `partially_shipped` (migration 0107) keeps
+      // un-picked threads visible; supplier still owes those threads.
+      p.sup_status === "partially_shipped",
   ).length;
 
   const stagePo = rows.filter((p) =>
@@ -55,6 +58,9 @@ export default function SupplierDashboard() {
       "partner_confirmed",
       "pickup_assigned",
       "pickup_accepted",
+      // Task 14 (2026-05-15) — partial PO still in ready stage until every
+      // thread is picked (mirrors `readyAwaiting` above + API bucket).
+      "partially_shipped",
       "shipped",
       "reassign_needed",
     ].includes(p.sup_status),

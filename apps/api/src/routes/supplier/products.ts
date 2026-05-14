@@ -28,6 +28,14 @@ const OPEN_SUP_STATUSES = [
   "ready_for_pickup",
   "pickup_assigned",
   "pickup_accepted",
+  // 2026-05-15 (Task 14) — `partially_shipped` (migration 0107) is the new
+  // intermediate state where at least one but not all linked threads have
+  // been picked. The PO still has remaining open demand on the
+  // not-yet-picked threads, so it MUST count as "open" for the Forecast
+  // committed-PO aggregation. Without this entry the Forecast page would
+  // silently undercount committed units the moment the first partial
+  // pickup happens.
+  "partially_shipped",
   "shipped",
   "reassign_needed",
 ];
