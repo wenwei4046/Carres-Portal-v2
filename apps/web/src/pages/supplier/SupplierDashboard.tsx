@@ -27,13 +27,9 @@ export default function SupplierDashboard() {
 
   const rows: SupplierPoRow[] = pos.data ?? [];
 
-  // 2026-05-10 (Loo) — was reading dropped column `purchase_orders.qty`
-  // (post-0017 it lives on the embedded lines). Sum across the new lines[].
-  const totalUnits = rows.reduce(
-    (s, p) =>
-      s + (p.lines ?? []).reduce((ss, l) => ss + (l.qty ?? 0), 0),
-    0,
-  );
+  // 2026-05-15 (Loo) — "Total open units" KPI dropped in favour of the new
+  // demand-side hero card (Committed (POs) reads the same units via
+  // `useSupplierDemand`). totalUnits computation also dropped.
   const pendingAck = rows.filter((p) => p.sup_status === "pending").length;
   const inProd = rows.filter(
     (p) => p.sup_status === "acknowledged" || p.sup_status === "in_production",
@@ -73,7 +69,8 @@ export default function SupplierDashboard() {
   // hadn't been formalised into POs yet, producing the confusing UX where a
   // SKU surfaced in the list but showed a big 0. Now mirrors the Forecast
   // page's "Total demand" semantic — sort + display use the combined number.
-  const demandWithTotal = (demand.data ?? []).map((d) => ({
+  const demandRows = demand.data ?? [];
+  const demandWithTotal = demandRows.map((d) => ({
     ...d,
     total: d.openQty + (d.pendingQty ?? 0),
   }));
@@ -81,6 +78,13 @@ export default function SupplierDashboard() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 4);
   const maxDemand = topDemand[0]?.total ?? 0;
+
+  // 2026-05-15 (Loo) — Mirror Forecast hero KPI row on Dashboard so the
+  // supplier sees Total Demand = Committed + Pending front-and-center,
+  // not just inside the Forecast sub-page.
+  const totalCommitted = demandRows.reduce((s, r) => s + r.openQty, 0);
+  const totalPending = demandRows.reduce((s, r) => s + (r.pendingQty ?? 0), 0);
+  const totalDemand = totalCommitted + totalPending;
 
   const isLoading = pos.isLoading || demand.isLoading;
 
@@ -98,10 +102,59 @@ export default function SupplierDashboard() {
         </div>
       </header>
 
-      {/* KPI row — 4 cards (proto's 5 cards minus Incoming, deferred to
-          SupplierIncoming page where the data fetch lives) */}
+      {/* Demand KPI row — Total demand hero + Committed + Pending. Mirrors
+          the Forecast page's KPI layout (1.5fr/1fr/1fr) so the math is
+          visible at a glance. Total = Committed + Pending. */}
       <div
-        className="grid grid-cols-4 gap-3.5 mb-5"
+        className="grid grid-cols-[1.5fr_1fr_1fr] gap-3.5 mb-5"
+        data-testid="supplier-dashboard-demand-kpis"
+      >
+        <div
+          className={`border-2 rounded-md p-5 bg-primary/[0.04] ${
+            totalDemand > 0 ? "border-primary/40" : "border-border"
+          }`}
+        >
+          <div
+            className={`text-[10px] uppercase tracking-[0.06em] ${
+              totalDemand > 0 ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            Total demand
+          </div>
+          <div className="flex items-baseline gap-3 mt-2">
+            <div className="font-display text-[44px] leading-none">
+              {totalDemand}
+            </div>
+            {totalDemand > 0 && (
+              <div className="text-[12px] text-muted-foreground leading-snug">
+                = <span className="font-mono">{totalCommitted}</span> committed
+                {" + "}
+                <span className="font-mono">{totalPending}</span> pending
+              </div>
+            )}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-2">
+            Across {demandRows.length} SKU{demandRows.length === 1 ? "" : "s"}
+          </div>
+        </div>
+        <Kpi
+          label="Committed (POs)"
+          value={totalCommitted}
+          hint="Already-issued PO lines"
+        />
+        <Kpi
+          label="Pending (orders)"
+          value={totalPending}
+          hint="Sales orders not yet POed"
+          accent={totalPending > 0}
+        />
+      </div>
+
+      {/* Pipeline KPI row — what's mid-flight on this supplier's POs right
+          now. "Total open units" KPI dropped 2026-05-15 (Loo) since it
+          duplicates the new Committed (POs) card above. */}
+      <div
+        className="grid grid-cols-3 gap-3.5 mb-5"
         data-testid="supplier-dashboard-kpis"
       >
         <Kpi
@@ -120,11 +173,6 @@ export default function SupplierDashboard() {
           value={readyAwaiting}
           hint="Goods staged at factory"
           accent={readyAwaiting > 0}
-        />
-        <Kpi
-          label="Total open units"
-          value={totalUnits}
-          hint={`${rows.length} POs across pipeline`}
         />
       </div>
 
