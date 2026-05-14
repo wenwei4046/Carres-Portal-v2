@@ -531,6 +531,22 @@ Migration count: 94 files (was 86 in last §17 sync, includes 0087-0093 from int
 
 
 
+**Dealer/sales/showroom delivered-tab bug fix (Loo 2026-05-15 ~01:00 GMT+8)** — single-screenshot bug: dealer + salesperson + showroom "Delivered" tab was always empty even after partner uploaded POD and the order was fully delivered. Root cause: `orders.status` (dealer lifecycle place/proceed_order/delivered/cancelled) and `orders.logistics_stage` (HQ kanban ready_to_dispatch/dispatched/delivered) are two separate axes. The rollup trigger `orders_rollup_stage_after_thread_change` (0036/0040/0047) correctly propagates `thread.logistics_stage='delivered'` up to `orders.logistics_stage='delivered'` but nothing was flipping the dealer-facing `orders.status` to 'delivered'. Result: stuck at `status='proceed_order'` forever, never surface in the dealer's "Delivered" tab. Verified on staging: DL-1003 + DL-1004 both had POD uploaded, `thread.logistics_stage='delivered'`, `orders.logistics_stage='delivered'`, but `orders.status='proceed_order'`.
+
+Migration 0106 fixes the schema layer: BEFORE UPDATE trigger on orders mirroring the 0098 pattern (auto-issue on dispatched). Fires only on `logistics_stage` transition INTO 'delivered'. Only flips status if currently 'proceed_order' (preserves 'cancelled' as terminal). Backfill in same migration catches existing stuck rows. Applied to staging Supabase via MCP per CLAUDE.md §7 explicit in-conversation approval.
+
+Cross-check: `dealer + salesperson + showroom` share `<DealerApp />` via `App.tsx:71` `<RequireRole roles={["dealer", "salesperson", "showroom"]}>`. RLS `orders_scoped_read` (0002:185) filters by `dealer_id = app_dealer_id()` regardless of role, so all three roles see the fix automatically — schema-level fix is correct.
+
+Bonus: `apps/web/src/pages/Me.tsx` had no escape route — only Sign out button at top right. Added `← Back to dashboard` Link that routes based on `useAuth((s) => s.role)` using same logic as `App.tsx:HomeRedirect`.
+
+Commits: `829ab93` fix(orders): auto-flip status to delivered when logistics_stage transitions (migration 0106 + backfill); `bfe124d` fix(web): add Back to dashboard button on /me debug page. Rebased on top of `656057e` (remote chore commit from another workspace: rebalance warehouse stock table columns). Pushed to `origin/main`.
+
+Deploy: web → Cloudflare Pages production (`carres-portal` project, deployment `11eae602`, https://carres-portal.pages.dev). API not redeployed (no changes).
+
+Migration count: 106 files (was 94 in last §17 sync, includes 0095-0105 from intermediate sessions plus this 0106).
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)
