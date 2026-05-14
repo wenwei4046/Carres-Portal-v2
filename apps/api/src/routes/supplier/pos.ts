@@ -251,6 +251,64 @@ supplierPosRouter.get("/:poId/threads", requireSupplier, async (c) => {
   );
 });
 
+/**
+ * Task 13 (2026-05-15) — pickup history for a single PO. Returns every
+ * `po_pickup_events` row tied to this PO, newest first, with a derived
+ * `thread_count` counting the per-thread rows assigned to that event
+ * (from `order_supplier_threads.pickup_event_id`).
+ *
+ * Powers the Pickup history section in the supplier PODrawer + the
+ * Reprint DO button per row (the print payload itself is served from
+ * `/api/pickup-events/:id/print`, browser-rendered). RLS via
+ * `po_pickup_events_supplier_read` / `ost_supplier_read` (0107) — supplier
+ * sees only events on POs they own.
+ *
+ * Two queries (events + linked threads) instead of a single nested select
+ * because event rows have no native count column; pulling threads and
+ * bucketing client-side keeps the response stable when a thread is later
+ * re-pointed to a different event (Task 14 edge case).
+ */
+supplierPosRouter.get("/:poId/pickup-events", requireSupplier, async (c) => {
+  const auth = c.var.auth;
+  const poId = c.req.param("poId");
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("po_pickup_events")
+    .select("id, do_number, picked_up_at, ack_role")
+    .eq("po_id", poId)
+    .order("picked_up_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const eventIds = ((data ?? []) as any[]).map((r) => r.id as string);
+  const counts = new Map<string, number>();
+  if (eventIds.length > 0) {
+    const { data: tcRows, error: e2 } = await sb
+      .from("order_supplier_threads")
+      .select("pickup_event_id")
+      .in("pickup_event_id", eventIds);
+    if (e2) {
+      const m = mapPgError(e2);
+      return c.json(m.body, m.status);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const t of ((tcRows ?? []) as any[])) {
+      const eid = t.pickup_event_id as string | null;
+      if (!eid) continue;
+      counts.set(eid, (counts.get(eid) ?? 0) + 1);
+    }
+  }
+  return c.json(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((data ?? []) as any[]).map((e) => ({
+      ...e,
+      thread_count: counts.get(e.id as string) ?? 0,
+    })),
+  );
+});
+
 supplierPosRouter.post("/:id/acknowledge", requireSupplier, async (c) => {
   const auth = c.var.auth;
   const id = c.req.param("id");

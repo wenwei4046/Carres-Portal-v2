@@ -12,6 +12,7 @@ import PartnerApp from "@/pages/partner/PartnerApp";
 import FinanceApp from "@/pages/finance/FinanceApp";
 import SupplierApp from "@/pages/supplier/SupplierApp";
 import BDApp from "@/pages/bd/BDApp";
+import PickupEventPrintPage from "@/pages/print/PickupEventPrintPage";
 
 function HomeRedirect() {
   const session = useAuth((s) => s.session);
@@ -131,6 +132,17 @@ export default function App() {
               <RequireRole roles={["bd"]}>
                 <BDApp />
               </RequireRole>
+            </RequireAuth>
+          }
+        />
+        {/* Task 13 (2026-05-15) — pickup-event DO reprint landing.
+         *  Role-agnostic URL pattern; the server endpoint
+         *  (`/api/pickup-events/:id/print`) gates per-role via RLS. */}
+        <Route
+          path="/print/pickup-event/:eventId"
+          element={
+            <RequireAuth>
+              <PickupEventPrintPage />
             </RequireAuth>
           }
         />

@@ -14,6 +14,7 @@ import {
 } from "@/lib/queries";
 import DOFileUploadField from "@/components/DOFileUploadField";
 import PODrawerThreadList from "./PODrawerThreadList";
+import PickupHistoryList from "./PickupHistoryList";
 
 /**
  * Supplier · Purchase Orders page — Phase 6 spec §6.
@@ -730,6 +731,18 @@ function PODrawer({
               Production checklist
             </h3>
             <PODrawerThreadList poId={po.id} />
+          </section>
+
+          {/* Task 13 (2026-05-15) — pickup history. Lists every
+              po_pickup_events row for this PO with a "Reprint DO" button
+              per row that opens `/print/pickup-event/:eventId` in a new
+              tab. PDF rendered browser-side per Workers WASM constraint
+              (commit `fa47433`). */}
+          <section className="mb-5">
+            <h3 className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-3">
+              Pickup history
+            </h3>
+            <PickupHistoryList poId={po.id} />
           </section>
 
           {showDOForm && (

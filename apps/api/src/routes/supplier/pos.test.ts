@@ -537,6 +537,129 @@ describe("POST /api/supplier/pos/:id/mark-delivered", () => {
   });
 });
 
+// Task 13 (2026-05-15) — pickup history for a single PO. Powers the Pickup
+// history section in the supplier PODrawer + the Reprint DO button per row.
+describe("GET /api/supplier/pos/:poId/pickup-events", () => {
+  it("rejects logistics with 403 (supplier-only guard)", async () => {
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(`http://t/api/supplier/pos/${PO_ID}/pickup-events`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("returns events newest-first with thread_count per row", async () => {
+    // Two events on this PO. The first has 2 threads, the second has 1.
+    const orderFn = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "evt-1",
+          do_number: "DO-9001",
+          picked_up_at: "2026-05-15T11:00:00Z",
+          ack_role: "partner",
+        },
+        {
+          id: "evt-2",
+          do_number: "DO-9000",
+          picked_up_at: "2026-05-14T10:00:00Z",
+          ack_role: "logistics",
+        },
+      ],
+      error: null,
+    });
+    const inFn = vi.fn().mockResolvedValue({
+      data: [
+        { pickup_event_id: "evt-1" },
+        { pickup_event_id: "evt-1" },
+        { pickup_event_id: "evt-2" },
+      ],
+      error: null,
+    });
+    const sb = {
+      from: vi.fn((table: string) => {
+        if (table === "po_pickup_events") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({ order: orderFn }),
+            }),
+          };
+        }
+        if (table === "order_supplier_threads") {
+          return { select: vi.fn().mockReturnValue({ in: inFn }) };
+        }
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("supplier");
+    const res = await app.fetch(
+      new Request(`http://t/api/supplier/pos/${PO_ID}/pickup-events`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(orderFn).toHaveBeenCalledWith("picked_up_at", { ascending: false });
+    expect(inFn).toHaveBeenCalledWith("pickup_event_id", ["evt-1", "evt-2"]);
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    expect(rows).toEqual([
+      {
+        id: "evt-1",
+        do_number: "DO-9001",
+        picked_up_at: "2026-05-15T11:00:00Z",
+        ack_role: "partner",
+        thread_count: 2,
+      },
+      {
+        id: "evt-2",
+        do_number: "DO-9000",
+        picked_up_at: "2026-05-14T10:00:00Z",
+        ack_role: "logistics",
+        thread_count: 1,
+      },
+    ]);
+  });
+
+  it("returns empty array (no second query) when PO has no events", async () => {
+    const orderFn = vi.fn().mockResolvedValue({ data: [], error: null });
+    const inFn = vi.fn();
+    const sb = {
+      from: vi.fn((table: string) => {
+        if (table === "po_pickup_events") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({ order: orderFn }),
+            }),
+          };
+        }
+        if (table === "order_supplier_threads") {
+          return { select: vi.fn().mockReturnValue({ in: inFn }) };
+        }
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("supplier");
+    const res = await app.fetch(
+      new Request(`http://t/api/supplier/pos/${PO_ID}/pickup-events`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as unknown[]).length).toBe(0);
+    // No event_ids → skip the second query entirely.
+    expect(inFn).not.toHaveBeenCalled();
+  });
+});
+
 // Task 10 (2026-05-15) — per-thread checklist source for the supplier
 // PODrawer. Returns one row per `order_supplier_threads` linked to this PO,
 // each row carrying its parent order's customer + delivery date + SKU lines.
