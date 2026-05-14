@@ -67,8 +67,20 @@ export default function SupplierDashboard() {
     ["picked_up", "delivered"].includes(p.sup_status),
   ).length;
 
-  const topDemand = (demand.data ?? []).slice(0, 4);
-  const maxDemand = topDemand[0]?.openQty ?? 0;
+  // 2026-05-15 (Loo) — Top demand displays Total = committed (openQty from
+  // issued POs) + pending (pendingQty from sales orders not yet POed). The
+  // prior "open POs only" view hid the existence of inbound sales orders that
+  // hadn't been formalised into POs yet, producing the confusing UX where a
+  // SKU surfaced in the list but showed a big 0. Now mirrors the Forecast
+  // page's "Total demand" semantic — sort + display use the combined number.
+  const demandWithTotal = (demand.data ?? []).map((d) => ({
+    ...d,
+    total: d.openQty + (d.pendingQty ?? 0),
+  }));
+  const topDemand = demandWithTotal
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 4);
+  const maxDemand = topDemand[0]?.total ?? 0;
 
   const isLoading = pos.isLoading || demand.isLoading;
 
@@ -245,42 +257,52 @@ export default function SupplierDashboard() {
       {/* Top SKUs */}
       <div className="border border-border rounded-md p-5 bg-card">
         <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-4">
-          Top demand · open POs
+          Top demand · committed + pending
         </div>
         {isLoading ? (
           <div className="text-[13px] text-muted-foreground py-6">Loading…</div>
         ) : topDemand.length === 0 ? (
           <div className="text-[13px] text-muted-foreground py-6">
-            No open demand right now.
+            No demand right now.
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {topDemand.map((d) => (
-              <div
-                key={d.sku}
-                className="grid grid-cols-[1fr_auto] gap-3 items-center"
-              >
-                <div className="min-w-0">
-                  <div className="text-[13px] font-semibold truncate">
-                    {d.sku}
+            {topDemand.map((d) => {
+              const pendingCount = d.pendingOrderCount ?? 0;
+              return (
+                <div
+                  key={d.sku}
+                  className="grid grid-cols-[1fr_auto] gap-3 items-center"
+                >
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold truncate">
+                      {d.sku}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      Across {d.poCount} PO{d.poCount === 1 ? "" : "s"}
+                      {pendingCount > 0 && (
+                        <>
+                          {" · "}
+                          {pendingCount} pending order
+                          {pendingCount === 1 ? "" : "s"}
+                        </>
+                      )}
+                    </div>
+                    <div className="h-1.5 bg-secondary rounded mt-1.5 overflow-hidden">
+                      <div
+                        className="h-full bg-primary"
+                        style={{
+                          width: `${maxDemand ? (d.total / maxDemand) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    Across {d.poCount} PO{d.poCount === 1 ? "" : "s"}
-                  </div>
-                  <div className="h-1.5 bg-secondary rounded mt-1.5 overflow-hidden">
-                    <div
-                      className="h-full bg-primary"
-                      style={{
-                        width: `${maxDemand ? (d.openQty / maxDemand) * 100 : 0}%`,
-                      }}
-                    />
+                  <div className="font-mono text-[18px] font-bold min-w-[42px] text-right">
+                    {d.total}
                   </div>
                 </div>
-                <div className="font-mono text-[18px] font-bold min-w-[42px] text-right">
-                  {d.openQty}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
