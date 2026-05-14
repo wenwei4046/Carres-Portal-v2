@@ -166,6 +166,8 @@ export {
   dispatchCustomerLegInput,
   resumeDispatchInput,
   setThresholdInput,
+  // Migration 0107 — supplier per-thread pickup feature.
+  logisticsReceiveThreadsInput,
   type AssignPartnerInput,
   type AttachDoInput,
   type ReceivePoWithDoInput,
@@ -194,6 +196,7 @@ export {
   type DispatchCustomerLegInput,
   type ResumeDispatchInput,
   type SetThresholdInput,
+  type LogisticsReceiveThreadsInput,
 } from "./schemas/logistics";
 
 export {
@@ -243,3 +246,17 @@ export {
   type SupplierMarkDeliveredInput,
   type SupplierPosListQuery,
 } from "./schemas/supplier";
+
+// Migration 0107 — supplier per-thread pickup feature. Path-only POST that
+// flips `order_supplier_threads.supplier_ready_at` for a single thread.
+export {
+  markThreadReadyInput,
+  type MarkThreadReadyInput,
+} from "./schemas/supplier-threads";
+
+// Migration 0107 — partner-side batch pickup of ready threads (factory_pickup
+// flow). One DO covers N threads on a single PO.
+export {
+  partnerPickupBatchInput,
+  type PartnerPickupBatchInput,
+} from "./schemas/partner";

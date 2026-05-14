@@ -280,6 +280,11 @@ export interface OrderSupplierThread {
   requestForDeliveryAt: string | null;
   partnerAcceptedAt: string | null;
   partnerRejectedAt: string | null;
+  // Supplier per-thread pickup feature (migration 0107). Mirrors snake_case
+  // `OrderSupplierThreadRow.supplier_ready_at` / `_by` / `pickup_event_id` 1:1.
+  supplierReadyAt: string | null;
+  supplierReadyBy: string | null;
+  pickupEventId: string | null;
   history: unknown[];
   createdAt: string;
   updatedAt: string;
@@ -412,3 +417,55 @@ export interface Inquiry {
   linkedDealerId: string | null;
   createdAt: string;
 }
+
+/**
+ * Supplier per-thread pickup feature (migration 0107). Urgency is a derived
+ * UI badge for `ThreadReadinessRow`, ranked by customer delivery date proximity:
+ *   - critical  → delivery date is past or within 3 days
+ *   - urgent    → 4-7 days out
+ *   - normal    → 8+ days, null, or unset
+ */
+export type Urgency = "critical" | "urgent" | "normal";
+
+/**
+ * camelCase mirror of `PoPickupEventsRow` (migration 0107). One row per
+ * physical DO paper / one trip. Created when a partner or logistics user
+ * batch-picks one or more ready threads off a PO; the new event id is then
+ * stamped onto every collected thread (`OrderSupplierThread.pickupEventId`).
+ *
+ * `ackRole` records which side recorded the pickup — partner (factory_pickup
+ * supplier) or logistics (own_logistics supplier delivers to HQ warehouse).
+ */
+export type PickupEvent = {
+  id: string;
+  poId: string;
+  doNumber: string;
+  doFilePath: string | null;
+  doNote: string | null;
+  pickedUpAt: string;
+  pickedUpBy: string | null;
+  ackRole: "partner" | "logistics";
+  createdAt: string;
+};
+
+/**
+ * Hydrated row shape for the per-thread readiness UI (supplier "Ready" tab +
+ * partner pickup batch screen + logistics receive-threads screen). Joins
+ * `order_supplier_threads` with parent order customer fields + the optional
+ * pickup event DO number.
+ *
+ * `skuLines` lists the per-thread SKU breakdown so users can verify the
+ * physical goods match what they're acknowledging. Sourced from the threaded
+ * subset of `order_lines` filtered by `(order_id, category)`.
+ */
+export type ThreadReadinessRow = {
+  threadId: string;
+  orderId: string;
+  orderDl: number;
+  customerName: string;
+  customerDeliveryDate: string | null;
+  supplierReadyAt: string | null;
+  pickupEventId: string | null;
+  pickupDoNumber: string | null;
+  skuLines: Array<{ sku: string; qty: number }>;
+};

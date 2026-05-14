@@ -354,6 +354,14 @@ export interface OrderSupplierThreadRow {
   request_for_delivery_at: string | null;
   partner_accepted_at: string | null;
   partner_rejected_at: string | null;
+  // Supplier per-thread pickup feature (migration 0107). All nullable — legacy
+  // threads pre-0107 have no per-thread readiness signal (the supplier marked
+  // the whole PO ready instead). `supplier_ready_at` flips when a supplier
+  // calls supplier_mark_thread_ready; `pickup_event_id` is stamped when a
+  // partner / logistics batch-picks the thread off its PO.
+  supplier_ready_at: string | null;
+  supplier_ready_by: string | null;
+  pickup_event_id: string | null;
   history: unknown[];
   created_at: string;
   updated_at: string;
@@ -517,4 +525,27 @@ export interface InquiryRow {
   linked_dealer_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * `po_pickup_events` (migration 0107). One row = one physical DO paper = one
+ * trip. Created when a partner (factory_pickup flow) or logistics (own_logistics
+ * delivers to HQ warehouse) batch-acks 1+ ready threads off a PO. Threads
+ * involved in the same trip share the same `pickup_event_id`, which is the
+ * grouping key for "1 DO covers N threads".
+ *
+ * `ack_role` records which side captured the pickup — 'partner' or 'logistics'.
+ * `do_file_path` is the canonical Storage path in the `delivery-orders` bucket;
+ * `do_note` is an optional free-text field for the picker.
+ */
+export interface PoPickupEventsRow {
+  id: string;
+  po_id: string;
+  do_number: string;
+  do_file_path: string | null;
+  do_note: string | null;
+  picked_up_at: string;
+  picked_up_by: string | null;
+  ack_role: "partner" | "logistics";
+  created_at: string;
 }

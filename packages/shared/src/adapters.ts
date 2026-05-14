@@ -246,6 +246,11 @@ export const orderSupplierThreadFromRow = (
   requestForDeliveryAt: r.request_for_delivery_at,
   partnerAcceptedAt: r.partner_accepted_at,
   partnerRejectedAt: r.partner_rejected_at,
+  // Supplier per-thread pickup feature (migration 0107). `?? null` keeps the
+  // adapter safe against rows fetched before the migration shipped.
+  supplierReadyAt: r.supplier_ready_at ?? null,
+  supplierReadyBy: r.supplier_ready_by ?? null,
+  pickupEventId: r.pickup_event_id ?? null,
   history: r.history,
   createdAt: r.created_at,
   updatedAt: r.updated_at,

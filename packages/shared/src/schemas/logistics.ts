@@ -595,3 +595,33 @@ export const logisticsBadgesResponse = z.object({
   procurement: z.number().int().nonnegative(),
 });
 export type LogisticsBadgesResponse = z.infer<typeof logisticsBadgesResponse>;
+
+/**
+ * `logisticsReceiveThreadsInput` — POST /api/logistics/threads/receive-batch
+ * (migration 0107, supplier per-thread pickup feature).
+ *
+ * Maps to RPC `logistics_receive_threads(p_thread_ids, p_do_number,
+ * p_do_file_path, p_do_note)`. The own_logistics counterpart to
+ * `partnerPickupBatchInput`: when an own_logistics supplier delivers ready
+ * threads to an HQ warehouse, logistics batch-acks them via this route. Server
+ * creates a `po_pickup_events` row with `ack_role='logistics'`, stamps
+ * `pickup_event_id` onto every thread, advances `logistics_stage` to
+ * `ready_to_dispatch` (or the appropriate next stage per SOP), and flips PO
+ * `sup_status` to `delivered` once every thread is received.
+ *
+ * Unlike `partnerPickupBatchInput`, there is no `poId` here — threads can span
+ * a single PO (typical) but the RPC infers the parent PO from the thread set
+ * and rejects mixed-PO arrays.
+ *
+ * `signed` must be literal `true` — same "I have signed the DO on receipt"
+ * gate as partner-side. `doFilePath` is the canonical Storage path from the
+ * `/api/storage/dos/sign-upload` flow.
+ */
+export const logisticsReceiveThreadsInput = z.object({
+  threadIds: z.array(z.string().uuid()).min(1),
+  doNumber: z.string().trim().min(3).max(50),
+  doFilePath: z.string().trim().min(1).max(500),
+  doNote: z.string().max(500).optional(),
+  signed: z.literal(true),
+}).strict();
+export type LogisticsReceiveThreadsInput = z.infer<typeof logisticsReceiveThreadsInput>;

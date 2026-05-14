@@ -206,6 +206,10 @@ describe("orderSupplierThreadFromRow", () => {
       request_for_delivery_at: null,
       partner_accepted_at: null,
       partner_rejected_at: null,
+      // Migration 0107 — supplier per-thread pickup feature.
+      supplier_ready_at: null,
+      supplier_ready_by: null,
+      pickup_event_id: null,
       history: [],
       created_at: "2026-05-06T08:00:00.000Z",
       updated_at: "2026-05-06T10:00:00.000Z",
