@@ -52,6 +52,9 @@ partnerPickupsRouter.get("/", async (c) => {
   // narrow `.eq("procurement_partner_id", ...)` so the kanban surfaces both.
   // supplier.kind is now in the SELECT so the UI can branch button labels
   // (Accept Pickup vs Accept Receive) per Loo's sofa-acceptance flow.
+  // 2026-05-15 (Task 6) — embed linked customer-leg threads + their orders'
+  // delivery_date so the response can be enriched with customer_eta_min /
+  // urgency / behind_schedule. Mirrors the supplier/pos enrichment.
   const { data, error } = await sb
     .from("purchase_orders")
     .select(
@@ -60,14 +63,63 @@ partnerPickupsRouter.get("/", async (c) => {
       procurement_partner_id,
       suppliers(name, contact, kind),
       warehouses(name, address, kind, owning_partner_id),
-      lines:purchase_order_lines(id, sku, qty, received_qty, attrs)
+      lines:purchase_order_lines(id, sku, qty, received_qty, attrs),
+      threads:order_supplier_threads(id, order_id, orders(dl, delivery_date, customer_name))
     `,
     )
     .order("placed_at", { ascending: false });
 
   if (error) throw new HTTPException(500, { message: error.message });
-  return c.json(data ?? []);
+
+  // 2026-05-15 (Task 6) — enrich each PO row with 4 computed fields. Same
+  // block as in apps/api/src/routes/supplier/pos.ts (2 callsites; inlined
+  // per spec rather than extracted to a helper).
+  const now = new Date();
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const enriched = rows.map((po) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const threadEtas: string[] = (((po as any).threads ?? []) as any[])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((t: any) => t?.orders?.delivery_date)
+      .filter((d: unknown): d is string => typeof d === "string" && d.length > 0);
+    const customerEtaMin = threadEtas.length > 0 ? [...threadEtas].sort()[0] : null;
+    const daysUntilCustomer = customerEtaMin
+      ? Math.floor((new Date(customerEtaMin).getTime() - now.getTime()) / 86_400_000)
+      : null;
+    const urgency = computePartnerUrgency(daysUntilCustomer);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const etaDate = (po as any).eta_date as string | null | undefined;
+    const behindSchedule = !!(customerEtaMin && etaDate && etaDate >= customerEtaMin);
+    const skuMap = new Map<string, number>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const l of (((po as any).lines ?? []) as any[])) {
+      const sku = String(l?.sku ?? "");
+      if (!sku) continue;
+      skuMap.set(sku, (skuMap.get(sku) ?? 0) + Number(l?.qty ?? 0));
+    }
+    const skuSummary = [...skuMap.entries()].map(([sku, qty]) => ({ sku, qty }));
+    return {
+      ...po,
+      customer_eta_min: customerEtaMin,
+      urgency,
+      behind_schedule: behindSchedule,
+      sku_summary: skuSummary,
+    };
+  });
+  return c.json(enriched);
 });
+
+/**
+ * Urgency bucket from days-until-customer-promise (Task 6, mirrors supplier).
+ */
+function computePartnerUrgency(
+  daysUntil: number | null,
+): "critical" | "urgent" | "normal" | null {
+  if (daysUntil == null) return null;
+  if (daysUntil < 7) return "critical";
+  if (daysUntil < 14) return "urgent";
+  return "normal";
+}
 
 // 2026-05-10 (Loo) — partner state-progression endpoints. Both wrap RPCs
 // from migration 0080. ready_confirm_sent → pickup_accepted → picked_up,

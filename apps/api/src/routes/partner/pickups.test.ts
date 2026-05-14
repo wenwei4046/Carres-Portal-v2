@@ -105,6 +105,89 @@ describe("GET /api/partner/pickups", () => {
     expect(sql).toMatch(/(?<!_)status\s*,/);
     expect(sql).toMatch(/sup_status\s*,/);
   });
+
+  // Task 6 (2026-05-15) — mirror supplier/pos enrichment on partner pickups.
+  // Same 4 computed fields per PO row.
+  it("returns urgency + sku_summary + customer_eta_min + behind_schedule per PO row", async () => {
+    const orderFn = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "PO-9999",
+          dl: 1001,
+          sup_status: "pickup_assigned",
+          status: "open",
+          eta_date: "2026-05-22",
+          lines: [{ sku: "mattress:carres-original:King", qty: 5 }],
+          threads: [
+            {
+              id: "t1",
+              order_id: "o1",
+              orders: { dl: 1001, delivery_date: "2026-05-20", customer_name: "A" },
+            },
+            {
+              id: "t2",
+              order_id: "o2",
+              orders: { dl: 1002, delivery_date: "2026-05-28", customer_name: "B" },
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+    const sb = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnValue({ order: orderFn }),
+      })),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].customer_eta_min).toBe("2026-05-20");
+    expect(rows[0].urgency).toMatch(/critical|urgent|normal/);
+    // eta_date 2026-05-22 >= customer_eta_min 2026-05-20 → supplier won't make it.
+    expect(rows[0].behind_schedule).toBe(true);
+    expect(rows[0].sku_summary).toEqual([
+      { sku: "mattress:carres-original:King", qty: 5 },
+    ]);
+  });
+
+  it("defaults enrichment fields safely when threads + lines absent", async () => {
+    const orderFn = vi.fn().mockResolvedValue({
+      data: [{ id: "PO-9000", dl: 1, sup_status: "pickup_assigned", status: "open" }],
+      error: null,
+    });
+    const sb = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnValue({ order: orderFn }),
+      })),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    expect(rows[0].customer_eta_min).toBeNull();
+    expect(rows[0].urgency).toBeNull();
+    expect(rows[0].behind_schedule).toBe(false);
+    expect(rows[0].sku_summary).toEqual([]);
+  });
 });
 
 describe("GET /api/partner/pickups/rfd-pending", () => {

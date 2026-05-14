@@ -84,12 +84,17 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
   // select: warehouses.owning_partner_id → delivery_partners aliased
   // as `owner`. RLS via warehouses + delivery_partners read policies; both
   // already grant supplier-role read on rows referenced from PO they own.
+  // 2026-05-15 (Task 6) — embed linked customer-leg threads + their orders'
+  // delivery_date so the response can be enriched with customer_eta_min /
+  // urgency / behind_schedule below. ost_supplier_read RLS (0033) admits
+  // threads on POs the supplier owns.
   let q = sb
     .from("purchase_orders")
     .select(
       "*, " +
         "lines:purchase_order_lines(id, sku, qty, received_qty, attrs), " +
-        "warehouses(id, name, address, kind, owning_partner_id, owner:delivery_partners(id, name, contact))",
+        "warehouses(id, name, address, kind, owning_partner_id, owner:delivery_partners(id, name, contact)), " +
+        "threads:order_supplier_threads(id, order_id, orders(dl, delivery_date, customer_name))",
     )
     .order("placed_at", { ascending: false });
   if (f.bucket) {
@@ -98,8 +103,71 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
 
   const { data, error } = await q;
   if (error) throw new HTTPException(500, { message: error.message });
-  return c.json(data ?? []);
+
+  // 2026-05-15 (Task 6) — enrich each PO row with 4 computed fields:
+  //   customer_eta_min — min(orders.delivery_date) across linked threads
+  //   urgency          — bucket of days-until-customer-eta (<7 critical,
+  //                      7-13 urgent, >=14 normal, null if no customer ETA)
+  //   behind_schedule  — true when PO.eta_date is at/after the customer
+  //                      promise (supplier won't make it in time)
+  //   sku_summary      — deduped [{sku, qty}] from PO lines for tooltip /
+  //                      mobile card display.
+  // Inline (not extracted to helper) — same block lives in
+  // apps/api/src/routes/partner/pickups.ts; abstracting at 2 callsites
+  // would just shuffle complexity. Per Task 6 spec.
+  const now = new Date();
+  const rows = ((data ?? []) as unknown) as Array<Record<string, unknown>>;
+  const enriched = rows.map((po) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const threadEtas: string[] = (((po as any).threads ?? []) as any[])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((t: any) => t?.orders?.delivery_date)
+      .filter((d: unknown): d is string => typeof d === "string" && d.length > 0);
+    // ISO YYYY-MM-DD sorts lexicographically === chronologically.
+    const customerEtaMin = threadEtas.length > 0 ? [...threadEtas].sort()[0] : null;
+    const daysUntilCustomer = customerEtaMin
+      ? Math.floor((new Date(customerEtaMin).getTime() - now.getTime()) / 86_400_000)
+      : null;
+    const urgency = computeUrgency(daysUntilCustomer);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const etaDate = (po as any).eta_date as string | null | undefined;
+    const behindSchedule = !!(customerEtaMin && etaDate && etaDate >= customerEtaMin);
+    const skuMap = new Map<string, number>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const l of (((po as any).lines ?? []) as any[])) {
+      const sku = String(l?.sku ?? "");
+      if (!sku) continue;
+      skuMap.set(sku, (skuMap.get(sku) ?? 0) + Number(l?.qty ?? 0));
+    }
+    const skuSummary = [...skuMap.entries()].map(([sku, qty]) => ({ sku, qty }));
+    return {
+      ...po,
+      customer_eta_min: customerEtaMin,
+      urgency,
+      behind_schedule: behindSchedule,
+      sku_summary: skuSummary,
+    };
+  });
+  return c.json(enriched);
 });
+
+/**
+ * Urgency bucket from days-until-customer-promise:
+ *   null     → no customer ETA (stockpile / forecast PO)
+ *   critical → < 7 days (red)
+ *   urgent   → 7-13 days (amber)
+ *   normal   → >= 14 days (green)
+ *
+ * Per Task 6 spec (docs/superpowers/plans/2026-05-15-supplier-thread-pickup-plan.md).
+ */
+function computeUrgency(
+  daysUntil: number | null,
+): "critical" | "urgent" | "normal" | null {
+  if (daysUntil == null) return null;
+  if (daysUntil < 7) return "critical";
+  if (daysUntil < 14) return "urgent";
+  return "normal";
+}
 
 supplierPosRouter.get("/:id", requireSupplier, async (c) => {
   const auth = c.var.auth;

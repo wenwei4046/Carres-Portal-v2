@@ -152,6 +152,93 @@ describe("GET /api/supplier/pos", () => {
     );
     expect(res.status).toBe(403);
   });
+
+  // Task 6 (2026-05-15) — every PO row enriched with computed fields:
+  //   customer_eta_min, urgency, behind_schedule, sku_summary.
+  // Urgency value depends on today's date relative to customer ETA, so we
+  // assert it's one of the valid enum values rather than a specific bucket.
+  it("returns urgency + sku_summary + customer_eta_min + behind_schedule per PO row", async () => {
+    const orderFn = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "PO-9999",
+          sup_status: "in_production",
+          eta_date: "2026-05-22",
+          lines: [{ sku: "mattress:carres-original:King", qty: 5 }],
+          threads: [
+            {
+              id: "t1",
+              order_id: "o1",
+              orders: { dl: 1001, delivery_date: "2026-05-20", customer_name: "A" },
+            },
+            {
+              id: "t2",
+              order_id: "o2",
+              orders: { dl: 1002, delivery_date: "2026-05-28", customer_name: "B" },
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+    const sb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ order: orderFn }),
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("supplier");
+    const res = await app.fetch(
+      new Request("http://t/api/supplier/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].customer_eta_min).toBe("2026-05-20");
+    expect(rows[0].urgency).toMatch(/critical|urgent|normal/);
+    // eta_date 2026-05-22 >= customer_eta_min 2026-05-20 → supplier won't make it.
+    expect(rows[0].behind_schedule).toBe(true);
+    expect(rows[0].sku_summary).toEqual([
+      { sku: "mattress:carres-original:King", qty: 5 },
+    ]);
+  });
+
+  it("defaults enrichment fields safely when threads + lines absent", async () => {
+    // Existing list-test mock returns rows with no threads/lines/eta_date —
+    // the additive fields must default to safe values so prior assertions
+    // continue to pass (sku_summary=[], customer_eta_min=null, urgency=null,
+    // behind_schedule=false).
+    const orderFn = vi.fn().mockResolvedValue({
+      data: [{ id: "PO-9000", sup_status: "pending", supplier_id: "e1" }],
+      error: null,
+    });
+    const sb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ order: orderFn }),
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("supplier");
+    const res = await app.fetch(
+      new Request("http://t/api/supplier/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    expect(rows[0].customer_eta_min).toBeNull();
+    expect(rows[0].urgency).toBeNull();
+    expect(rows[0].behind_schedule).toBe(false);
+    expect(rows[0].sku_summary).toEqual([]);
+  });
 });
 
 describe("GET /api/supplier/pos/:id", () => {
