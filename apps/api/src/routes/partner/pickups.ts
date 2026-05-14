@@ -64,7 +64,7 @@ partnerPickupsRouter.get("/", async (c) => {
       suppliers(name, contact, kind),
       warehouses(name, address, kind, owning_partner_id),
       lines:purchase_order_lines(id, sku, qty, received_qty, attrs),
-      threads:order_supplier_threads(id, order_id, orders(dl, delivery_date, customer_name))
+      threads:order_supplier_threads(id, order_id, supplier_ready_at, pickup_event_id, orders(dl, delivery_date, customer_name))
     `,
     )
     .order("placed_at", { ascending: false });

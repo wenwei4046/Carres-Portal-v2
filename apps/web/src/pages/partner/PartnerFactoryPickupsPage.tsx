@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { ApiError, apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queries";
 import PartnerReceiveAtWhModal from "./components/PartnerReceiveAtWhModal";
+import PickupBatchDialog from "./components/PickupBatchDialog";
 
 /**
  * Partner · Factory pickups — supplier → warehouse pipeline.
@@ -40,6 +41,20 @@ type PickupLine = {
   attrs: Record<string, unknown> | null;
 };
 
+/**
+ * 2026-05-15 (Task 11) — per-thread readiness embedded on the partner pickups
+ * SELECT. Each thread is one linked sales order; supplier_ready_at + pickup
+ * _event_id together drive the multi-select pickup UI (factory_pickup POs).
+ * Ready & unpicked threads are picked-eligible.
+ */
+type PickupThread = {
+  id: string;
+  order_id: string;
+  supplier_ready_at: string | null;
+  pickup_event_id: string | null;
+  orders: { dl: number; delivery_date: string | null; customer_name: string } | null;
+};
+
 type PickupRow = {
   id: string;
   dl: number | null;
@@ -57,7 +72,19 @@ type PickupRow = {
   suppliers: { name: string; contact: string | null; kind: "own_logistics" | "factory_pickup" | null } | null;
   warehouses: { name: string; address: string | null; kind: "own" | "logistics_partner" | null; owning_partner_id: string | null } | null;
   lines: PickupLine[];
+  threads?: PickupThread[];
 };
+
+/**
+ * 2026-05-15 (Task 11) — predicate: thread is supplier-ready and not yet
+ * picked. Used to derive the multi-select list per PO + gate "Pickup selected"
+ * button.
+ */
+function readyThreadsOf(p: PickupRow): PickupThread[] {
+  return (p.threads ?? []).filter(
+    (t) => t.supplier_ready_at !== null && t.pickup_event_id === null,
+  );
+}
 
 type Stage = "upcoming" | "awaiting" | "scheduled" | "in_transit" | "delivered";
 
@@ -74,11 +101,19 @@ function stageOf(p: PickupRow): Stage | null {
   if (
     p.sup_status === "ready_confirm_sent" ||
     p.sup_status === "ready_for_pickup" ||
-    p.sup_status === "pickup_assigned"
+    p.sup_status === "pickup_assigned" ||
+    // 2026-05-15 (Task 11) — per-thread partial pickup keeps PO in
+    // "still has ready threads waiting for partner" bucket until all
+    // threads are picked. Stays surfaced on the Awaiting column so the
+    // partner can keep batching the remaining ones.
+    p.sup_status === "partially_shipped"
   )
     return "awaiting";
   if (p.sup_status === "pickup_accepted") return "scheduled";
-  if (p.sup_status === "picked_up") return "in_transit";
+  // 2026-05-15 (Task 11) — `shipped` is the post-thread-pickup terminal state
+  // (all linked threads have a pickup_event_id). Mirrors `picked_up` from the
+  // pre-0107 PO-level flow — partner is en route to the warehouse.
+  if (p.sup_status === "picked_up" || p.sup_status === "shipped") return "in_transit";
   if (p.sup_status === "delivered") return "delivered";
   return null;
 }
@@ -107,6 +142,26 @@ export default function PartnerFactoryPickupsPage() {
   // Loo 2026-05-11: "Arrived at WH" now opens a full receive modal that
   // uploads DO + ticks per-line qty, atomically flipping the PO to received.
   const [receivingPoId, setReceivingPoId] = useState<string | null>(null);
+  // 2026-05-15 (Task 11) — per-thread multi-select pickup state. Keyed by
+  // poId because each PO has its own thread checklist; clearing on dialog
+  // close resets the entire pickup queue so the next batch starts clean.
+  const [selectedByPo, setSelectedByPo] = useState<Map<string, Set<string>>>(
+    () => new Map(),
+  );
+  const [openDialog, setOpenDialog] = useState<{
+    poId: string;
+    threadIds: string[];
+  } | null>(null);
+  function toggleThread(poId: string, threadId: string) {
+    setSelectedByPo((prev) => {
+      const next = new Map(prev);
+      const set = new Set(next.get(poId) ?? []);
+      if (set.has(threadId)) set.delete(threadId);
+      else set.add(threadId);
+      next.set(poId, set);
+      return next;
+    });
+  }
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: qk.partner.pickups(),
@@ -288,6 +343,66 @@ export default function PartnerFactoryPickupsPage() {
                     </div>
                   );
                 }
+                // 2026-05-15 (Task 11) — per-thread pickup branch. When a
+                // factory_pickup PO has 1+ supplier-ready threads (set by
+                // supplier_mark_thread_ready RPC, migration 0107), the
+                // partner picks them in batches: one DO paper = one trip =
+                // one po_pickup_events row covering N threads. PO transitions
+                // to partially_shipped (more to pick) or shipped (none left).
+                // Falls back to the legacy PO-level Accept Pickup button
+                // when no threads are ready (e.g. stockpile / forecast POs).
+                const ready = readyThreadsOf(po);
+                if (ready.length > 0) {
+                  const selSet = selectedByPo.get(po.id) ?? new Set<string>();
+                  const selectedCount = selSet.size;
+                  return (
+                    <div className="flex flex-col gap-1.5">
+                      <div
+                        className="border border-base-200 rounded-[4px] bg-base-50 p-2 space-y-1"
+                        data-testid={`ready-threads-${po.id}`}
+                      >
+                        <div className="text-[10px] uppercase tracking-[0.06em] text-base-600 font-semibold">
+                          Ready threads ({ready.length})
+                        </div>
+                        {ready.map((t) => (
+                          <label
+                            key={t.id}
+                            className="flex items-center gap-2 cursor-pointer text-[11px] font-body"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selSet.has(t.id)}
+                              onChange={() => toggleThread(po.id, t.id)}
+                              className="accent-primary"
+                              aria-label={`Select thread for DL-${t.orders?.dl ?? "?"}`}
+                              data-testid={`thread-checkbox-${t.id}`}
+                            />
+                            <span className="truncate">
+                              <span className="font-mono font-semibold">
+                                DL-{t.orders?.dl ?? "?"}
+                              </span>{" "}
+                              · {t.orders?.customer_name ?? "—"}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={selectedCount === 0}
+                        onClick={() =>
+                          setOpenDialog({
+                            poId: po.id,
+                            threadIds: Array.from(selSet),
+                          })
+                        }
+                        className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                        data-testid={`pickup-selected-${po.id}`}
+                      >
+                        🚚 Pickup selected ({selectedCount})
+                      </button>
+                    </div>
+                  );
+                }
                 return (
                   <button
                     type="button"
@@ -425,6 +540,21 @@ export default function PartnerFactoryPickupsPage() {
             />
           );
         })()}
+
+      {openDialog && (
+        <PickupBatchDialog
+          poId={openDialog.poId}
+          selectedThreadIds={openDialog.threadIds}
+          onClose={() => {
+            setOpenDialog(null);
+            // 2026-05-15 (Task 11) — reset every PO's selection so the
+            // next visit to the page starts clean. The success path
+            // invalidates qk.partner.pickups() via the mutation hook so
+            // ready-thread visibility refreshes automatically.
+            setSelectedByPo(new Map());
+          }}
+        />
+      )}
     </div>
   );
 }
