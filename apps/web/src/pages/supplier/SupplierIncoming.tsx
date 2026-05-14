@@ -53,13 +53,39 @@ export default function SupplierIncoming() {
         </div>
       </header>
 
-      <div className="grid grid-cols-3 gap-3.5 mb-5">
-        <Kpi
-          label="Total demand"
-          value={totalUnits}
-          accent={totalUnits > 0}
-          hint={`Across ${rows.length} SKU${rows.length === 1 ? "" : "s"}`}
-        />
+      {/* KPI row — Total demand is the hero (wider + tinted + bigger number
+          + inline breakdown), Committed and Pending are smaller peer cards
+          showing the two components that sum to Total. Visual hierarchy
+          mirrors the math: Total = Committed + Pending. */}
+      <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-3.5 mb-5">
+        <div
+          className={`border-2 rounded-md p-5 bg-primary/[0.04] ${
+            totalUnits > 0 ? "border-primary/40" : "border-border"
+          }`}
+        >
+          <div
+            className={`text-[10px] uppercase tracking-[0.06em] ${
+              totalUnits > 0 ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            Total demand
+          </div>
+          <div className="flex items-baseline gap-3 mt-2">
+            <div className="font-display text-[44px] leading-none">
+              {totalUnits}
+            </div>
+            {totalUnits > 0 && (
+              <div className="text-[12px] text-muted-foreground leading-snug">
+                = <span className="font-mono">{totalOpenUnits}</span> committed
+                {" + "}
+                <span className="font-mono">{totalPendingUnits}</span> pending
+              </div>
+            )}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-2">
+            Across {rows.length} SKU{rows.length === 1 ? "" : "s"}
+          </div>
+        </div>
         <Kpi
           label="Committed (POs)"
           value={totalOpenUnits}
