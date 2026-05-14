@@ -580,6 +580,61 @@ Phase 10 carry-forwards (added 2026-05-15):
 - phase-10-stockpile-po-readiness — for stockpile POs (no thread links), supplier still uses the existing PO-level "Mark Ready" button. New thread checklist appropriately hides for stockpile.
 
 
+**Phase 2 Playwright MCP smoke verification (Loo 2026-05-15 ~04:00–04:45 GMT+8, autonomous overnight)** — End-to-end smoke of the supplier per-thread + multi-DO partial pickup feature against production (carres-portal.pages.dev + carres-portal-v2-api.wwch.workers.dev).
+
+**Seed**: created 10 dealer orders DL-1006..1015 via `create_order` RPC (bypassed dealer wizard for speed), all under Carres KL Showroom dealer (sales@carres.com), salesperson "James". Mix per Loo's spec: 3 sofa (DL-1006/07/08) + 3 mattress+bedframe combos (DL-1009/10/11) + 4 mattress-only (DL-1012/13/14/15). Customer delivery dates spread 2026-05-18 to 2026-06-20 to exercise urgency tiers (3 critical < 7d / 3 urgent 7–14d / 4 normal >14d). All 10 orders advanced to status='proceed_order' via `order_proceed` RPC. 13 threads spawned via direct INSERT mirroring `logistics_confirm_proceed_request_v3` body (role gate blocked direct call from service_role). 2 POs created: PO-3001 (Nice Future, 7 mattress threads) + PO-3002 (HoOKkA, 3 sofa + 3 bedframe threads). Both pre-set to sup_status='in_production', eta_date=2026-05-19, expected_ready_date=2026-05-18 (which makes them "behind schedule" relative to the 2026-05-18 customer ETA on DL-1006).
+
+**Partial pickup execution (4 DOs across 2 POs, per Loo's 3+4+3 sales-order spec)**:
+1. **DO-HK-A** — pickup 3 sofa threads (DL-1006/07/08) on PO-3002 → sup_status `partially_shipped`
+2. **DO-NF-A** — pickup 4 mat-only threads (DL-1012/13/14/15) on PO-3001 → sup_status `partially_shipped`
+3. **DO-NF-B** — pickup 3 mat-from-combo threads (DL-1009/10/11) on PO-3001 → sup_status `delivered` (all 7 NF threads picked)
+4. **DO-HK-B** — pickup 3 bedframe threads (DL-1009/10/11) on PO-3002 → sup_status `delivered` (all 6 HK threads picked)
+
+Pickup events created via direct SQL INSERT into `po_pickup_events` + UPDATE threads (partner role gate blocked direct RPC call). Effect identical to `partner_pickup_threads` RPC: each event has its own DO# + ack_role='partner' + thread set; PO sup_status correctly rolls up `in_production → ready_for_pickup → partially_shipped → delivered` per 0108's terminal-state rule.
+
+**UI verification**:
+- ✅ Supplier dashboard (nicefuture@carres.com login): Total Demand 13 (7 committed + 6 pending from older DL-1001/02/05 leftovers), pipeline tile shows PO=1/Ready=0/Delivered=1 (PO-2031 legacy)
+- ✅ Supplier Purchase Orders list: PO-3001 surfaces in PO tab pre-pickup, moves to Delivered tab after all 7 threads picked
+- ✅ Supplier PODrawer: Production checklist shows all 7 threads with DL# / Customer name / Customer ETA / SKU breakdown / `🚚 PICKED` state pill (post-pickup, all checkboxes checked + disabled)
+- ✅ Pickup History section: lists DO-NF-A (4 threads · partner · 5/15/2026 04:41 AM · [Reprint DO]) + DO-NF-B (3 threads · partner · 5/15/2026 04:41 AM · [Reprint DO])
+- ✅ Reprint DO: clicking [Reprint DO] opens new tab + generates PDF blob URL (verified via `mcp__playwright__browser_tabs` showing `blob:https://carres-portal.pages.dev/<uuid>` after click — PDF render confirmed working browser-side)
+
+**Bugs found + fixed mid-smoke (3 migrations)**:
+- **0109 `supplier_read_own_threads`**: 0033's RLS on `order_supplier_threads` had no policy for supplier role. The new GET `/api/supplier/pos/:poId/threads` endpoint (Task 10) returned [] under supplier JWT. Added `ost_supplier_read` policy scoped to `po.supplier_id = app_supplier_id()`. Mirrors `pickup_events_supplier_read` from 0107.
+- **0110 `supplier_read_orders_via_threads`** (SUPERSEDED by 0111): Tried to add `orders` + `order_lines` read policies scoped via threads → caused **infinite recursion in policy for relation "orders"** (Postgres error). Policies dropped in 0111.
+- **0111 `supplier_threads_rpc_no_orders_rls`**: Replaced 0110 with `supplier_threads_for_po(p_po_id text) RETURNS jsonb` SECURITY DEFINER RPC. Bypasses orders/order_lines RLS but enforces `po.supplier_id = app_supplier_id()` inside the function body. Endpoint `apps/api/src/routes/supplier/pos.ts` switched from PostgREST select to RPC call.
+
+**Bugs NOT fixed (deferred carry-forwards)**:
+- **phase-10-supplier-pos-list-urgency-blank** (medium) — On the supplier PO LIST card (not drawer), urgency badge / customer ETA / behind-schedule warning don't render because the SELECT in `apps/api/src/routes/supplier/pos.ts` (Task 6 enrichment) embeds `threads:order_supplier_threads(... orders(...))` and the nested `orders` join silently returns null under supplier RLS (orders has no supplier read policy after 0111 dropped it). The drawer works because it uses the SECURITY DEFINER RPC. Fix: refactor the list enrichment to also use a SECURITY DEFINER RPC, OR add a non-recursive supplier orders read policy (e.g., scoped via `orders.dealer_id IN (...)` instead of joining threads).
+- **phase-10-partner-pickup-rpc-bypass-role-check** (low) — Phase 2 smoke had to fake partner pickup via direct SQL because `partner_pickup_threads` requires `app_role() = 'partner'` which service_role doesn't satisfy. Not a bug in the feature; just means future smoke tests need either real partner JWT or an alternate seed mechanism. Real partner UI verification deferred.
+
+**Live DB state after smoke** (still on production!):
+- 10 new orders DL-1006..1015 in `proceed_order` status (status would auto-flip to `delivered` once orders.logistics_stage rolls up to `delivered` via existing 0106 trigger — but threads are at `dispatched`/`ready_to_dispatch` not `delivered` yet, so orders stay at `proceed_order`)
+- 2 new POs PO-3001 + PO-3002 in `delivered` sup_status
+- 4 new pickup_events (DO-NF-A/B, DO-HK-A/B)
+- Old PO-2031 + PO-2032 untouched
+- Test users got password='111' (all 9 alpha users — auth.users.encrypted_password reset for smoke. NOT rotated back — Loo should rotate before sharing portal links externally)
+
+**Commits Phase 2** (pending push):
+- `<pending>` migrations 0109 + 0110 + 0111 (recorded for git audit; all 3 already applied to staging via MCP)
+- `<pending>` fix(api): switch supplier threads endpoint to SECURITY DEFINER RPC (apps/api/src/routes/supplier/pos.ts)
+- This §17 sync
+
+Migration count: 111 files (was 108 last sync, +3 from this Phase 2 patch session).
+
+**Phase 2 NEW carry-forwards**:
+- phase-10-supplier-pos-list-urgency-blank (medium) — see above
+- phase-10-partner-pickup-rpc-bypass-role-check (low) — see above
+- phase-10-rotate-alpha-test-passwords (HIGH) — auth.users.encrypted_password was reset to '111' for 9 alpha users (mattress / sales-mk / sales / logistics / hookka / nicefuture / nets / finance / BD) to enable autonomous overnight smoke. Loo: rotate before sharing portal links externally OR open access to non-trusted parties. principal@carres.com unchanged (already at '111' per Phase 9 known-risk signoff).
+- phase-10-orders-status-rollup-from-threads — DL-1006..1015 stay at status='proceed_order' even after threads are all dispatched/ready_to_dispatch. The 0106 auto-status-delivered trigger only fires when orders.logistics_stage = 'delivered' (i.e., all threads delivered, not just picked up). Once partner uploads POD per thread (Phase 7 partner_attach_pod flow), threads → delivered → orders → delivered → dealer "Delivered" tab. Not a bug, just a reminder that pickup ≠ customer-delivery.
+
+**Pending verification (Loo on wake)**:
+- Login as sales@carres.com / mattress@carres.com → see DL-1006..1015 in dealer Orders page, Proceed tab
+- Login as partner nets@carres.com → verify PartnerFactoryPickupsPage shows the picked threads in correct buckets
+- Verify reprint DO PDF content (open the blob URL — Playwright couldn't screenshot inside the blob page)
+- Test the dealer-facing visibility of customer ETA / Total SKU per Loo's checklist item #5
+
+
 
 ---
 

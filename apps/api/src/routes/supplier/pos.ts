@@ -213,48 +213,16 @@ supplierPosRouter.get("/:poId/threads", requireSupplier, async (c) => {
   const auth = c.var.auth;
   const poId = c.req.param("poId");
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb
-    .from("order_supplier_threads")
-    .select(
-      "id, order_id, supplier_ready_at, pickup_event_id, orders(dl, customer_name, delivery_date)",
-    )
-    .eq("po_id", poId);
+  // 2026-05-15 (Loo Phase 2 smoke) — switched to SECURITY DEFINER RPC because
+  // the nested orders+order_lines join under supplier RLS triggered infinite
+  // recursion (orders policy → threads → POs cycle). The RPC bypasses RLS,
+  // gates internally on supplier_id = app_supplier_id().
+  const { data, error } = await sb.rpc("supplier_threads_for_po", { p_po_id: poId });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows = (data ?? []) as any[];
-  const orderIds = rows.map((r) => r.order_id).filter((id: unknown): id is string => typeof id === "string");
-  const linesByOrder = new Map<string, Array<{ sku: string; qty: number }>>();
-  if (orderIds.length > 0) {
-    const { data: lines, error: e2 } = await sb
-      .from("order_lines")
-      .select("order_id, sku, qty")
-      .in("order_id", orderIds);
-    if (e2) {
-      const m = mapPgError(e2);
-      return c.json(m.body, m.status);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const l of ((lines ?? []) as any[])) {
-      const list = linesByOrder.get(l.order_id) ?? [];
-      list.push({ sku: l.sku, qty: l.qty });
-      linesByOrder.set(l.order_id, list);
-    }
-  }
-  return c.json(
-    rows.map((r) => ({
-      id: r.id,
-      order_id: r.order_id,
-      order_dl: r.orders?.dl ?? null,
-      customer_name: r.orders?.customer_name ?? null,
-      customer_delivery_date: r.orders?.delivery_date ?? null,
-      supplier_ready_at: r.supplier_ready_at,
-      pickup_event_id: r.pickup_event_id,
-      sku_lines: linesByOrder.get(r.order_id) ?? [],
-    })),
-  );
+  return c.json(data ?? []);
 });
 
 /**
