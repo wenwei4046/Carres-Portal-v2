@@ -281,3 +281,111 @@ describe("POST /api/logistics/pos/:poId/receive-threads", () => {
     expect(res.status).toBe(422);
   });
 });
+
+// Task 12 — Logistics threads-for-PO read endpoint backing the per-thread
+// receive section in ReceivePOModal. Mirrors the supplier-side
+// /api/supplier/pos/:poId/threads route shape. RLS on
+// order_supplier_threads (`ost_logistics_read`) is the security boundary;
+// the inline role check is just an early-out friendly error.
+const THREADS_URL = `http://t/api/logistics/pos/${PO_ID}/threads`;
+
+describe("GET /api/logistics/pos/:poId/threads", () => {
+  function makeSb(rows: unknown[], lines: unknown[] = []) {
+    // Builder mock — chain `from().select().eq()` resolves to data; second
+    // call `from("order_lines").select(...).in("order_id", [...])` resolves
+    // separately. Mirrors the supplier endpoint pattern.
+    return {
+      from: vi.fn((table: string) => {
+        if (table === "order_supplier_threads") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockResolvedValue({ data: rows, error: null }),
+          };
+        }
+        if (table === "order_lines") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            in: vi.fn().mockResolvedValue({ data: lines, error: null }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockResolvedValue({ data: [], error: null }),
+        };
+      }),
+    };
+  }
+
+  it("rejects non-logistics roles with 403", async () => {
+    const jwt = await makeJwt("partner");
+    const res = await app.fetch(
+      new Request(THREADS_URL, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("returns mapped thread rows with order joins + sku_lines for logistics", async () => {
+    const rows = [
+      {
+        id: THREAD_A,
+        order_id: "ord-a",
+        supplier_ready_at: "2026-05-15T10:00:00Z",
+        pickup_event_id: null,
+        orders: { dl: 1001, customer_name: "Aiman", delivery_date: "2026-05-20" },
+      },
+      {
+        id: THREAD_B,
+        order_id: "ord-b",
+        supplier_ready_at: null,
+        pickup_event_id: null,
+        orders: { dl: 1002, customer_name: "Lim", delivery_date: "2026-05-22" },
+      },
+    ];
+    const lines = [
+      { order_id: "ord-a", sku: "mattress:carres-cloud:King", qty: 2 },
+      { order_id: "ord-b", sku: "mattress:carres-cloud:Queen", qty: 1 },
+    ];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(rows, lines) as any);
+
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(THREADS_URL, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<Record<string, unknown>>;
+    expect(body).toHaveLength(2);
+    expect(body[0]).toMatchObject({
+      id: THREAD_A,
+      order_id: "ord-a",
+      order_dl: 1001,
+      customer_name: "Aiman",
+      customer_delivery_date: "2026-05-20",
+      supplier_ready_at: "2026-05-15T10:00:00Z",
+      pickup_event_id: null,
+      sku_lines: [{ sku: "mattress:carres-cloud:King", qty: 2 }],
+    });
+    expect(body[1]).toMatchObject({
+      id: THREAD_B,
+      supplier_ready_at: null,
+      sku_lines: [{ sku: "mattress:carres-cloud:Queen", qty: 1 }],
+    });
+  });
+
+  it("returns [] when the PO has no threads (no order_lines lookup performed)", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb([]) as any);
+
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(THREADS_URL, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual([]);
+  });
+});

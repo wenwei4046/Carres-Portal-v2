@@ -38,6 +38,75 @@ import type { AppEnv } from "../../types";
  */
 const logisticsReceiveThreadsRouter = new Hono<AppEnv>();
 
+/**
+ * GET /:poId/threads — logistics-side counterpart to the supplier-side
+ * `/api/supplier/pos/:poId/threads` endpoint (apps/api/src/routes/supplier/pos.ts).
+ *
+ * Returns the per-thread breakdown for one PO so the Logistics ReceivePOModal
+ * (own_logistics flow) can render a multi-select list of ready-but-not-yet-
+ * picked-up threads. Logistics-role guard is inline (mirrors POST below) — RLS
+ * on `order_supplier_threads` (`ost_logistics_read`, migration 0033:88) is the
+ * true security boundary; the role check is just early-out friendliness.
+ *
+ * Response shape matches the supplier endpoint byte-for-byte (same client-side
+ * `ThreadRow` type) — the modal can swap consumers later if we ever fold the
+ * two endpoints into one. Two queries (threads + order_lines lookup) for the
+ * same reason as the supplier endpoint: order_lines hangs off `orders`, not
+ * `order_supplier_threads`, so a single nested select is 3 levels deep.
+ */
+logisticsReceiveThreadsRouter.get("/:poId/threads", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "logistics") {
+    throw new HTTPException(403, { message: "Logistics role required" });
+  }
+  const poId = c.req.param("poId");
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("order_supplier_threads")
+    .select(
+      "id, order_id, supplier_ready_at, pickup_event_id, orders(dl, customer_name, delivery_date)",
+    )
+    .eq("po_id", poId);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = (data ?? []) as any[];
+  const orderIds = rows
+    .map((r) => r.order_id)
+    .filter((id: unknown): id is string => typeof id === "string");
+  const linesByOrder = new Map<string, Array<{ sku: string; qty: number }>>();
+  if (orderIds.length > 0) {
+    const { data: lines, error: e2 } = await sb
+      .from("order_lines")
+      .select("order_id, sku, qty")
+      .in("order_id", orderIds);
+    if (e2) {
+      const m = mapPgError(e2);
+      return c.json(m.body, m.status);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const l of ((lines ?? []) as any[])) {
+      const list = linesByOrder.get(l.order_id) ?? [];
+      list.push({ sku: l.sku, qty: l.qty });
+      linesByOrder.set(l.order_id, list);
+    }
+  }
+  return c.json(
+    rows.map((r) => ({
+      id: r.id,
+      order_id: r.order_id,
+      order_dl: r.orders?.dl ?? null,
+      customer_name: r.orders?.customer_name ?? null,
+      customer_delivery_date: r.orders?.delivery_date ?? null,
+      supplier_ready_at: r.supplier_ready_at,
+      pickup_event_id: r.pickup_event_id,
+      sku_lines: linesByOrder.get(r.order_id) ?? [],
+    })),
+  );
+});
+
 logisticsReceiveThreadsRouter.post("/:poId/receive-threads", async (c) => {
   const auth = c.var.auth;
   if (auth.role !== "logistics") {

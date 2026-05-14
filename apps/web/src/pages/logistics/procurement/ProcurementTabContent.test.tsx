@@ -202,6 +202,19 @@ beforeEach(() => {
   receiveMutateAsync.mockClear();
   assignPickupMutateAsync.mockClear();
   vi.mocked(apiFetch).mockReset();
+  // 2026-05-15 (Task 12): ReceivePOModal fires
+  // GET /api/logistics/pos/:poId/threads for own_logistics suppliers. Any
+  // test that opens the modal would trigger an `undefined` query result
+  // (the default vi.fn()) and React Query complains about undefined data.
+  // Install a quiet default that returns `[]` for threads calls so the
+  // per-thread section auto-hides; tests that drive the real receive flow
+  // override this with their own mockImplementation.
+  vi.mocked(apiFetch).mockImplementation((url: string) => {
+    if (typeof url === "string" && url.includes("/threads")) {
+      return Promise.resolve([]) as ReturnType<typeof apiFetch>;
+    }
+    return Promise.resolve(undefined) as ReturnType<typeof apiFetch>;
+  });
 });
 
 describe("ProcurementTabContent — list rendering + filter chips", () => {
@@ -388,9 +401,19 @@ describe("ProcurementTabContent — Receive button + ReceivePOModal", () => {
       }),
     ]);
     // Drive the DO upload deterministically by mocking sign-upload.
-    vi.mocked(apiFetch).mockResolvedValue({
-      token: "sign-tok",
-      path: "PO-2051/abc-DO-1.pdf",
+    // 2026-05-15 (Task 12): ReceivePOModal also fetches per-thread state for
+    // own_logistics suppliers via GET /api/logistics/pos/:poId/threads — that
+    // hook hits the same apiFetch mock. Route by URL so the threads call gets
+    // an empty array (the per-thread section then auto-hides on length === 0)
+    // and the upload call gets the { token, path } pair it needs.
+    vi.mocked(apiFetch).mockImplementation((url: string) => {
+      if (typeof url === "string" && url.includes("/threads")) {
+        return Promise.resolve([]) as ReturnType<typeof apiFetch>;
+      }
+      return Promise.resolve({
+        token: "sign-tok",
+        path: "PO-2051/abc-DO-1.pdf",
+      }) as ReturnType<typeof apiFetch>;
     });
     render(wrap(<ProcurementTabContent slug="nice-future" />));
     fireEvent.click(screen.getByTestId("receive-po-PO-2051"));

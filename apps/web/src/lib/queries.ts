@@ -3544,6 +3544,23 @@ export function useSupplierThreadsForPo(poId: string | null) {
   });
 }
 
+/** Logistics counterpart to {@link useSupplierThreadsForPo} — same payload
+ *  shape, different role-gated endpoint (logistics-only). Used by the
+ *  Logistics ReceivePOModal (Task 12) to render the per-thread receive list
+ *  for own_logistics suppliers (where logistics receives goods directly at
+ *  the HQ warehouse with no LP involved). Share the `supplierThreads` cache
+ *  key family with the supplier endpoint — both refer to the same DB rows. */
+export function useLogisticsThreadsForPo(
+  poId: string | null,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: poId ? qk.supplierThreads.byPo(poId) : ["supplierThreads", "none"],
+    queryFn: () => apiFetch<ThreadRow[]>(`/api/logistics/pos/${poId}/threads`),
+    enabled: !!poId && (options?.enabled ?? true),
+  });
+}
+
 /** Pickup events list for a single PO (history view). Used by the supplier
  *  PODrawer's "Past pickups" section + the reprint button.
  *  `ack_role` lets the UI label "Picked by partner" vs "Received by HQ".

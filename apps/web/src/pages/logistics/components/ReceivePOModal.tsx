@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import {
+  useLogisticsReceiveThreads,
+  useLogisticsThreadsForPo,
   useReceivePoWithDoMutation,
   type LogisticsPoListRow,
   type SupplierRow,
@@ -39,6 +41,22 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  * `phase-4.5-chunk-1-receive-rpc-v3-swap`). The `receivedQty` per line is the
  * NEW TOTAL after this DO (existing.received_qty + recv[sku]); the RPC
  * computes delta internally and rejects decreases.
+ *
+ * 2026-05-15 (Task 12 of supplier-thread-pickup-plan): for own_logistics
+ * suppliers (supplier.kind === "own_logistics"), the modal grows a second
+ * section at the bottom that lists per-thread ready-for-pickup rows. The
+ * operator multi-selects threads, captures one shared DO# + uploaded file +
+ * optional note + signed checkbox, and POSTs them in a single batch to
+ * `/api/logistics/pos/:poId/receive-threads` (Task 5 endpoint, wraps RPC
+ * `logistics_receive_threads` from migration 0107). Each ticked thread gets
+ * its `pickup_event_id` stamped, and the PO sup_status advances to
+ * `delivered` (all threads received) or `partially_shipped` (some still
+ * pending). This replaces the legacy whole-PO receive flow for own_logistics
+ * suppliers — factory_pickup suppliers continue to use the per-line table
+ * above. Both sections render in the same modal so the operator can pick the
+ * flow that matches the actual DO they're holding. The new section is hidden
+ * for factory_pickup suppliers AND for own_logistics POs with zero ready
+ * threads (supplier hasn't marked any thread ready yet).
  */
 interface Props {
   po: LogisticsPoListRow;
@@ -80,6 +98,63 @@ export default function ReceivePOModal({
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
 
   const receive = useReceivePoWithDoMutation(po.id);
+
+  // Task 12 — own_logistics per-thread flow. Fetch threads only when the
+  // supplier is own_logistics; factory_pickup POs skip the round-trip
+  // entirely. The query keys off the PO id and shares the supplierThreads
+  // cache family with the supplier-side endpoint (same rows, just a different
+  // role-gated reader).
+  const isOwnLogistics = supplier?.kind === "own_logistics";
+  const threadsQuery = useLogisticsThreadsForPo(po.id, { enabled: isOwnLogistics });
+  const readyThreads = useMemo(
+    () =>
+      (threadsQuery.data ?? []).filter(
+        (t) => t.supplier_ready_at !== null && t.pickup_event_id === null,
+      ),
+    [threadsQuery.data],
+  );
+  const [selectedThreadIds, setSelectedThreadIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const receiveThreads = useLogisticsReceiveThreads();
+
+  const canReceiveThreads =
+    doNumber.trim().length >= 3 &&
+    signed &&
+    !!doFilePath &&
+    selectedThreadIds.size > 0 &&
+    !receiveThreads.isPending;
+
+  function toggleThread(id: string) {
+    setSelectedThreadIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function submitThreads() {
+    if (!canReceiveThreads || !doFilePath) return;
+    try {
+      const res = await receiveThreads.mutateAsync({
+        poId: po.id,
+        threadIds: Array.from(selectedThreadIds),
+        doNumber: doNumber.trim(),
+        doFilePath,
+        doNote: doNote.trim() || undefined,
+      });
+      toast.success(
+        `${po.id} received · DO ${doNumber.trim()} · ${res.thread_count} thread${res.thread_count === 1 ? "" : "s"}`,
+      );
+      onClose();
+    } catch (e: unknown) {
+      if (e instanceof ApiError)
+        toast.error(e.message || "Receive threads failed");
+      else
+        toast.error(e instanceof Error ? e.message : "Receive threads failed");
+    }
+  }
 
   const totalReceiving = Object.values(recv).reduce((s, n) => s + (n || 0), 0);
   const totalPending = lines.reduce(
@@ -305,6 +380,57 @@ export default function ReceivePOModal({
           </span>
         </label>
       </div>
+
+      {/* Task 12 (2026-05-15) — own_logistics per-thread receive section.
+          Visible only for own_logistics suppliers WITH 1+ ready-but-not-
+          yet-picked-up threads. Re-uses the DO# / note / file / signed
+          fields above (own_logistics receive batches all selected threads
+          under one DO). factory_pickup POs skip this section entirely; the
+          per-line table + ModalActions footer button remain the only path. */}
+      {isOwnLogistics && readyThreads.length > 0 && (
+        <section
+          className="card p-3.5 mb-3.5 border-base-200"
+          data-testid="receive-po-ready-threads-section"
+        >
+          <h3 className="text-[10px] uppercase tracking-[0.12em] text-base-500 mb-2 font-body">
+            Ready threads ({readyThreads.length})
+          </h3>
+          <div className="grid gap-1">
+            {readyThreads.map((t) => (
+              <label
+                key={t.id}
+                className="flex items-center gap-2 py-1 cursor-pointer"
+                data-testid={`receive-po-ready-thread-${t.id}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedThreadIds.has(t.id)}
+                  onChange={() => toggleThread(t.id)}
+                  className="accent-primary"
+                  aria-label={`Tick thread for DL-${t.order_dl}`}
+                />
+                <span className="text-[12px] font-body">
+                  DL-{t.order_dl}
+                  {t.customer_name ? ` · ${t.customer_name}` : ""}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-end mt-3">
+            <button
+              type="button"
+              onClick={submitThreads}
+              disabled={!canReceiveThreads}
+              className="btn-primary text-[12px] disabled:opacity-40"
+              data-testid="receive-po-receive-threads-btn"
+            >
+              {receiveThreads.isPending
+                ? "Receiving…"
+                : `Receive ${selectedThreadIds.size} thread${selectedThreadIds.size === 1 ? "" : "s"}`}
+            </button>
+          </div>
+        </section>
+      )}
 
       <ModalActions
         onCancel={onClose}
