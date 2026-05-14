@@ -39,6 +39,7 @@ import supplierActivityRouter from "./routes/supplier/activity";
 import supplierMeRouter from "./routes/supplier/me";
 import supplierPosRouter from "./routes/supplier/pos";
 import supplierProductsRouter from "./routes/supplier/products";
+import supplierThreadsRouter from "./routes/supplier/threads";
 import salespersonsRouter from "./routes/salespersons";
 import dosRouter from "./routes/storage/dos";
 import type { AppEnv } from "./types";
@@ -95,6 +96,7 @@ api.route("/supplier/activity", supplierActivityRouter);
 api.route("/supplier/me", supplierMeRouter);
 api.route("/supplier/pos", supplierPosRouter);
 api.route("/supplier/products", supplierProductsRouter);
+api.route("/supplier/threads", supplierThreadsRouter);
 api.route("/storage/dos", dosRouter);
 
 app.route("/api", api);
