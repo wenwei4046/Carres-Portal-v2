@@ -43,6 +43,7 @@ import salespersonsRouter from "./routes/salespersons";
 import dosRouter from "./routes/storage/dos";
 import opsOrdersRouter from "./routes/ops/orders";
 import opsActivityRouter from "./routes/ops/activity";
+import opsInventoryRouter from "./routes/ops/inventory";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -101,6 +102,7 @@ api.route("/storage/dos", dosRouter);
 // Ops Panel (Jess COO 2026-05-14) — Phase 1: orders import/inbox + activity feed.
 api.route("/ops/orders", opsOrdersRouter);
 api.route("/ops/activity", opsActivityRouter);
+api.route("/ops/inventory", opsInventoryRouter);
 
 app.route("/api", api);
 

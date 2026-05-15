@@ -4,6 +4,7 @@ import OpsDashboard from "./OpsDashboard";
 import OrderImport from "./OrderImport";
 import OrderInbox from "./OrderInbox";
 import ActivityLog from "./ActivityLog";
+import StockInventory from "./StockInventory";
 
 /**
  * Ops Panel root — sidebar + content shell mirroring LogisticsApp pattern.
@@ -25,7 +26,7 @@ export default function OpsApp() {
         {tab === "order-import" && <OrderImport />}
         {tab === "order-inbox" && <OrderInbox />}
         {tab === "order-pipeline" && <ComingSoon name="Order Pipeline" />}
-        {tab === "stock-inventory" && <ComingSoon name="Stock Inventory" />}
+        {tab === "stock-inventory" && <StockInventory />}
         {tab === "stock-transfer" && <ComingSoon name="Stock Transfer" />}
         {tab === "activity" && <ActivityLog />}
       </main>
