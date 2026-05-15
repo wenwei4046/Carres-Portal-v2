@@ -628,13 +628,34 @@ Migration count: 111 files (was 108 last sync, +3 from this Phase 2 patch sessio
 - phase-10-rotate-alpha-test-passwords (HIGH) — auth.users.encrypted_password was reset to '111' for 9 alpha users (mattress / sales-mk / sales / logistics / hookka / nicefuture / nets / finance / BD) to enable autonomous overnight smoke. Loo: rotate before sharing portal links externally OR open access to non-trusted parties. principal@carres.com unchanged (already at '111' per Phase 9 known-risk signoff).
 - phase-10-orders-status-rollup-from-threads — DL-1006..1015 stay at status='proceed_order' even after threads are all dispatched/ready_to_dispatch. The 0106 auto-status-delivered trigger only fires when orders.logistics_stage = 'delivered' (i.e., all threads delivered, not just picked up). Once partner uploads POD per thread (Phase 7 partner_attach_pod flow), threads → delivered → orders → delivered → dealer "Delivered" tab. Not a bug, just a reminder that pickup ≠ customer-delivery.
 
-**Pending verification (Loo on wake)**:
+**Pending verification (Loo on wake)** [DEPRECATED — see Pre-alpha cleanup below]:
 - Login as sales@carres.com / mattress@carres.com → see DL-1006..1015 in dealer Orders page, Proceed tab
 - Login as partner nets@carres.com → verify PartnerFactoryPickupsPage shows the picked threads in correct buckets
 - Verify reprint DO PDF content (open the blob URL — Playwright couldn't screenshot inside the blob page)
 - Test the dealer-facing visibility of customer ETA / Total SKU per Loo's checklist item #5
 
 
+
+**Pre-alpha DB cleanup (Loo 2026-05-15 ~17:00 GMT+8, manual)** — Loo manually wiped all transactional data from prod Supabase. orders / order_lines / order_supplier_threads / purchase_orders / po_pickup_events / invoices / payments / approvals / bank_statements all → 0. Master data UNTOUCHED (2 dealers / 4 salespersons / 10 suppliers / 1 partner / 1 warehouse / 2 outlets / 1130 SKUs / 123 models). auth + app_users UNTOUCHED (1 principal + 9 `xxx@carres.com` test users; passwords still `'111'` per `phase-10-rotate-alpha-test-passwords` HIGH carry-forward).
+
+Evidence (verified 2026-05-15 ~17:30 GMT+8 via Supabase MCP):
+- audit_log last entry 2026-05-14 20:41 UTC (DL-1008 auto-issue invoice); no business events since.
+- pg_stat_user_tables.orders: live=0, dead=0, deletes_total=242, last_autovacuum=2026-05-15 09:23:31 UTC → cleanup window 2026-05-14 20:41 ~ 2026-05-15 09:23 UTC.
+- orders_dl_seq still at 1015 (NOT reset to 1001). So this was NOT `scripts/phase-9-cleanup.sql` (which resets the sequence). Direct SQL DELETE bypassing business RPCs (no audit trail).
+
+**All Phase 2 smoke data above is now historical reference only.** DL-1006..1015 + PO-3001/3002 + 4 pickup events no longer exist. "Pending verification (Loo on wake)" checklist is DEPRECATED — cannot execute against empty db.
+
+Phase 9 alpha-readiness checklist (post-cleanup, 2026-05-15):
+- ✅ Master data + migrations 0001-0111 + Web (`carres-portal.pages.dev`) + API (`carres-portal-v2-api.wwch.workers.dev`) all ready.
+- ✅ `orders_dl_seq` reset to 1001 (2026-05-15 ~17:35 GMT+8 via Supabase MCP per §14 #1 single-instance approval — `setval('orders_dl_seq', 1000, true)`). Alpha first order = DL-1001.
+- ✅ `audit_log` cleared 2026-05-15 ~17:35 GMT+8 via Supabase MCP per §14 #1 single-instance approval — `delete from audit_log` (42 rows → 0). Clean trail for alpha.
+- ❓ 9 test users decision pending: **A)** keep `xxx@carres.com` as alpha users + rotate passwords, OR **B)** wipe + use PrincipalAccounts UI for real-email alpha onboarding.
+- ❓ `phase-10-rotate-alpha-test-passwords` still HIGH and open.
+
+Phase 2 smoke takeaways that survive cleanup (data-independent):
+- Migrations 0107-0111 deployed + validated mid-smoke.
+- Real bugs caught + fixed: 0109 supplier RLS on threads, 0111 SECURITY DEFINER RPC pattern (replaced infinite-recursion 0110).
+- Carry-forwards `phase-10-supplier-pos-list-urgency-blank` (medium) + `phase-10-partner-pickup-rpc-bypass-role-check` (low) still open.
 
 ---
 
