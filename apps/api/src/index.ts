@@ -41,6 +41,8 @@ import supplierPosRouter from "./routes/supplier/pos";
 import supplierProductsRouter from "./routes/supplier/products";
 import salespersonsRouter from "./routes/salespersons";
 import dosRouter from "./routes/storage/dos";
+import opsOrdersRouter from "./routes/ops/orders";
+import opsActivityRouter from "./routes/ops/activity";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -96,6 +98,9 @@ api.route("/supplier/me", supplierMeRouter);
 api.route("/supplier/pos", supplierPosRouter);
 api.route("/supplier/products", supplierProductsRouter);
 api.route("/storage/dos", dosRouter);
+// Ops Panel (Jess COO 2026-05-14) — Phase 1: orders import/inbox + activity feed.
+api.route("/ops/orders", opsOrdersRouter);
+api.route("/ops/activity", opsActivityRouter);
 
 app.route("/api", api);
 

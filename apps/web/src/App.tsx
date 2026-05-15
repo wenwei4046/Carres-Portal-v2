@@ -12,6 +12,7 @@ import PartnerApp from "@/pages/partner/PartnerApp";
 import FinanceApp from "@/pages/finance/FinanceApp";
 import SupplierApp from "@/pages/supplier/SupplierApp";
 import BDApp from "@/pages/bd/BDApp";
+import OpsApp from "@/pages/ops/OpsApp";
 
 function HomeRedirect() {
   const session = useAuth((s) => s.session);
@@ -130,6 +131,18 @@ export default function App() {
             <RequireAuth>
               <RequireRole roles={["bd"]}>
                 <BDApp />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        {/* Ops Panel (Jess COO 2026-05-14). Phase 1 gates by principal+logistics
+            until 'ops' role is added in Phase 2 when ops staff onboard. */}
+        <Route
+          path="/ops/*"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["principal", "logistics"]}>
+                <OpsApp />
               </RequireRole>
             </RequireAuth>
           }
