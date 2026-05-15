@@ -913,14 +913,47 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         ) : prefill.dlRefs && prefill.dlRefs.length > 0 ? (
           <>
             Bundling shortages from{" "}
-            <strong>{prefill.dlRefs.length} orders</strong> (
-            {prefill.dlRefs.map((d) => `#${d}`).join(", ")}). SKUs matched to
+            <strong>{prefill.dlRefs.length} orders</strong>. SKUs matched to
             suppliers automatically.
           </>
         ) : (
           "Pick the SKUs you need — supplier is auto-detected per item. If multiple suppliers are involved, the PO will split automatically."
         )}
       </div>
+
+      {/* 2026-05-16 (Loo) — per-order detail card for bundle prefill. Shows each
+          selected SO with its customer delivery date so the operator can see
+          WHY this bundle exists. Data lands from `shortageQ.data.orders` after
+          the auto-fill fetch resolves; falls back to the flat dl list when the
+          fetch is still pending. */}
+      {prefill.dlRefs && prefill.dlRefs.length > 0 && (
+        <div className="mb-3 px-3 py-2 rounded-[4px] border border-base-200 bg-base-50 font-body">
+          <div className="text-[11px] uppercase tracking-wide text-base-500 mb-1.5">
+            Source orders ({prefill.dlRefs.length})
+          </div>
+          {shortageQ.data?.orders && shortageQ.data.orders.length > 0 ? (
+            <ul className="space-y-0.5 text-[12px] text-base-700">
+              {shortageQ.data.orders.map((o) => (
+                <li key={o.dl} className="flex items-center gap-2">
+                  <span className="font-mono font-semibold">#{o.dl}</span>
+                  <span className="text-base-400">·</span>
+                  <span>
+                    {o.deliveryDate ? (
+                      <>Deliver <span className="font-mono">{o.deliveryDate}</span></>
+                    ) : (
+                      <span className="text-base-400 italic">Delivery date TBD</span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-[12px] text-base-500 font-mono">
+              {prefill.dlRefs.map((d) => `#${d}`).join(", ")}
+            </div>
+          )}
+        </div>
+      )}
 
       {prefill.note && (
         <div

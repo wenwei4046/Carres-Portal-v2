@@ -1063,7 +1063,7 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
       logistics_stage: string;
       po_id: string | null;
     }[];
-    awaitingOrders?: { id: string; dl?: number | null }[];
+    awaitingOrders?: { id: string; dl?: number | null; delivery_date?: string | null }[];
     // v3-S2.1: lines may optionally carry `order_id` so the mock can mirror
     // `.in("order_id", [...])` filtering — tests supply lines for ALL orders
     // and assert the route narrows the input set BEFORE this fetch. Lines
@@ -1783,6 +1783,69 @@ describe("GET /api/logistics/pos/awaiting-stock-shortage", () => {
     expect(body.shortage).toEqual([
       { sku: "mattress:cloud:King", attrs: null, need: 4, available: 0, shortage: 4 },
     ]);
+  });
+
+  it("returns per-order delivery dates when ?dls= is set (bundle scope)", async () => {
+    // 2026-05-16 (Loo) — CreatePOModal bundle prefill needs each selected
+    // order's delivery_date so logistics can see WHY this bundle exists.
+    // Global (no-dls) calls must still return orders: [] to avoid shipping
+    // the full awaiting cohort over the wire.
+    const ID_A = "00000000-0000-0000-0000-000000000c01"; // dl=6001
+    const ID_B = "00000000-0000-0000-0000-000000000c02"; // dl=6002 (TBD)
+    mockShortageQueries({
+      awaitingOrders: [
+        { id: ID_A, dl: 6001, delivery_date: "2026-06-15" },
+        { id: ID_B, dl: 6002, delivery_date: null },
+      ],
+      orderLines: [
+        { order_id: ID_A, sku: "mattress:cloud:King", qty: 1 },
+        { order_id: ID_B, sku: "mattress:cloud:King", qty: 1 },
+      ],
+      stockBalances: [
+        { sku: "mattress:cloud:King", qty: 0, reserved: 0 },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request(
+        "http://t/api/logistics/pos/awaiting-stock-shortage?dls=6001,6002",
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: unknown[];
+      orders: { dl: number; deliveryDate: string | null }[];
+    };
+    expect(body.orders).toEqual([
+      { dl: 6001, deliveryDate: "2026-06-15" },
+      { dl: 6002, deliveryDate: null },
+    ]);
+  });
+
+  it("returns orders: [] for global (no-dls) shortage calls", async () => {
+    mockShortageQueries({
+      awaitingOrders: [
+        { id: "00000000-0000-0000-0000-000000000d01", dl: 7001, delivery_date: "2026-07-01" },
+      ],
+      orderLines: [
+        { order_id: "00000000-0000-0000-0000-000000000d01", sku: "mattress:cloud:King", qty: 1 },
+      ],
+      stockBalances: [
+        { sku: "mattress:cloud:King", qty: 0, reserved: 0 },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/awaiting-stock-shortage", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { orders: unknown[] };
+    expect(body.orders).toEqual([]);
   });
 
   it("rejects ?dls= with non-integer values (422)", async () => {

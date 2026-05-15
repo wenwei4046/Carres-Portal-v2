@@ -512,6 +512,15 @@ export const awaitingStockShortageResponse = z.object({
     available: z.number().int(),
     shortage: z.number().int().positive(),
   })),
+  // 2026-05-16 (Loo) — bundle-scope companion: when the request carries
+  // `?dls=...`, the route returns one row per selected dl with its delivery
+  // date so CreatePOModal can show `#1004 · 2026-06-15` per order instead of
+  // a flat number list. Always [] in the global (no-dls) call to avoid
+  // shipping the entire awaiting cohort.
+  orders: z.array(z.object({
+    dl: z.number().int(),
+    deliveryDate: z.string().nullable(),
+  })).default([]),
 });
 export type AwaitingStockShortageResponse = z.infer<typeof awaitingStockShortageResponse>;
 

@@ -152,7 +152,7 @@ logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) =
       parsed.push(n);
     }
     if (parsed.length === 0) {
-      const empty: AwaitingStockShortageResponse = { shortage: [] };
+      const empty: AwaitingStockShortageResponse = { shortage: [], orders: [] };
       return c.json(empty);
     }
     dlsFilter = parsed;
@@ -167,7 +167,7 @@ logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) =
   // don't carry dl) is intersected with the same scope below.
   const ordersBuilder = sb
     .from("orders")
-    .select("id, dl")
+    .select("id, dl, delivery_date")
     .eq("logistics_stage", "awaiting_logistics_action");
   const ordersQuery = dlsFilter
     ? ordersBuilder.in("dl", dlsFilter)
@@ -253,7 +253,7 @@ logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) =
 
   // Short-circuit when nothing needs procurement.
   if (orderIds.length === 0) {
-    const empty: AwaitingStockShortageResponse = { shortage: [] };
+    const empty: AwaitingStockShortageResponse = { shortage: [], orders: [] };
     return c.json(empty);
   }
 
@@ -341,7 +341,24 @@ logisticsPosRouter.get("/awaiting-stock-shortage", requireLogistics, async (c) =
     }
   }
 
-  const response: AwaitingStockShortageResponse = { shortage };
+  // 2026-05-16 (Loo) — bundle-scope per-order list. Only populated when the
+  // caller passed `?dls=...` (CreatePOModal bundle prefill). Global awaiting
+  // calls return [] to avoid shipping the entire cohort.
+  type OrderRow = AwaitingStockShortageResponse["orders"][number];
+  const orders: OrderRow[] = [];
+  if (dlsFilter) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const o of (ordersRes.data ?? []) as any[]) {
+      if (o.dl == null) continue;
+      orders.push({
+        dl: Number(o.dl),
+        deliveryDate: o.delivery_date ?? null,
+      });
+    }
+    orders.sort((a, b) => a.dl - b.dl);
+  }
+
+  const response: AwaitingStockShortageResponse = { shortage, orders };
   return c.json(response);
 });
 
