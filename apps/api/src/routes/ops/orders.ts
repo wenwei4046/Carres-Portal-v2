@@ -407,4 +407,78 @@ opsOrdersRouter.post("/:ref/status", async (c) => {
   return c.json({ order: data });
 });
 
+// -----------------------------------------------------------------------------
+// PATCH /:ref/annotation — partial update of the Excel-style annotation fields
+// (customer_request, carres_remark, action_for_logistic, logistic_remark,
+// logistic_eta, delivery_time_slot). Each field is independently optional —
+// passing `null` clears it, omitting it leaves it unchanged.
+// -----------------------------------------------------------------------------
+const annotationInput = z.object({
+  customerRequest: z.string().nullable().optional(),
+  carresRemark: z.string().nullable().optional(),
+  actionForLogistic: z.string().nullable().optional(),
+  logisticRemark: z.string().nullable().optional(),
+  logisticEta: z.string().nullable().optional(), // ISO date string or null
+  deliveryTimeSlot: z.string().nullable().optional(),
+});
+
+opsOrdersRouter.patch("/:ref/annotation", async (c) => {
+  const auth = c.var.auth;
+  const ref = c.req.param("ref");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = annotationInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: parsed.error.issues[0]?.message ?? "invalid input",
+      },
+      422,
+    );
+  }
+
+  const updateFields: Record<string, unknown> = {};
+  if (parsed.data.customerRequest !== undefined)
+    updateFields.ops_customer_request = parsed.data.customerRequest;
+  if (parsed.data.carresRemark !== undefined)
+    updateFields.ops_carres_remark = parsed.data.carresRemark;
+  if (parsed.data.actionForLogistic !== undefined)
+    updateFields.ops_action_for_logistic = parsed.data.actionForLogistic;
+  if (parsed.data.logisticRemark !== undefined)
+    updateFields.ops_logistic_remark = parsed.data.logisticRemark;
+  if (parsed.data.logisticEta !== undefined) updateFields.ops_logistic_eta = parsed.data.logisticEta;
+  if (parsed.data.deliveryTimeSlot !== undefined)
+    updateFields.ops_delivery_time_slot = parsed.data.deliveryTimeSlot;
+
+  if (Object.keys(updateFields).length === 0) {
+    return c.json({ error: "no_fields_to_update" }, 422);
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("ops_imported_orders")
+    .update(updateFields)
+    .eq("ref", ref)
+    .select()
+    .single();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  await sb.from("ops_activity_log").insert({
+    actor_id: auth.id,
+    actor_name: auth.email,
+    module: "orders",
+    action: "annotation_update",
+    entity_type: "order",
+    entity_ref: ref,
+    summary: `Updated annotations on ${ref}`,
+    details: { fields: Object.keys(updateFields) },
+  });
+
+  return c.json({ order: data });
+});
+
 export default opsOrdersRouter;

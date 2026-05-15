@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
+import OrderDetailDrawer, { type ImportedOrder as DrawerOrder } from "./OrderDetailDrawer";
 
 /**
  * Ops · Order Inbox — Jess 2026-05-14.
@@ -11,28 +12,7 @@ import { toast } from "sonner";
  * "Assign" to pick the final logistic partner.
  */
 
-type ImportedOrder = {
-  ref: string;
-  customer_name: string;
-  customer_phone: string | null;
-  delivery_address_1: string | null;
-  delivery_address_2: string | null;
-  delivery_address_3: string | null;
-  delivery_address_4: string | null;
-  delivery_location: string | null;
-  delivery_date_requested: string | null;
-  balance_raw: string | null;
-  balance_amount: number | null;
-  balance_status: string | null;
-  items: { itemGroup: string | null; qty: number; description: string | null; poDocNo: string | null }[];
-  total_qty: number;
-  order_date: string | null;
-  import_source_logistic: string | null;
-  ops_assigned_logistic: string | null;
-  ops_status: string;
-  ops_remark: string | null;
-  last_imported_at: string;
-};
+type ImportedOrder = DrawerOrder;
 
 const LOGISTIC_OPTIONS = ["NETS", "TSDD", "AL", "HOUZS", "GAI", "HOOKKA", "Self-pickup", "Other"];
 
@@ -40,9 +20,11 @@ export default function OrderInbox() {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("inbox,assigned");
   const [search, setSearch] = useState("");
-  const [assigning, setAssigning] = useState<string | null>(null); // ref of order being assigned
+  const [assigning, setAssigning] = useState<string | null>(null); // ref of order being assigned (inline pill mode)
   const [assignLogistic, setAssignLogistic] = useState<string>("");
   const [assignRemark, setAssignRemark] = useState<string>("");
+  // Drawer-open ref. Click anywhere on row (except the Assign button) to open.
+  const [openRef, setOpenRef] = useState<string | null>(null);
 
   const inboxQ = useQuery({
     queryKey: ["ops", "inbox", { status: statusFilter, search }],
@@ -127,6 +109,11 @@ export default function OrderInbox() {
         </div>
       )}
 
+      <OrderDetailDrawer
+        order={openRef ? inboxQ.data?.find((o) => o.ref === openRef) ?? null : null}
+        onClose={() => setOpenRef(null)}
+      />
+
       {inboxQ.data && inboxQ.data.length > 0 && (
         <div className="card p-0 overflow-hidden">
           <div
@@ -148,7 +135,13 @@ export default function OrderInbox() {
               return (
                 <div key={o.ref} className="border-t border-base-100">
                   <div
-                    className="grid gap-3 px-4 py-2 text-[12.5px] items-center"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setOpenRef(o.ref)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") setOpenRef(o.ref);
+                    }}
+                    className="grid gap-3 px-4 py-2 text-[12.5px] items-center hover:bg-base-50 cursor-pointer"
                     style={{ gridTemplateColumns: "110px 1.4fr 70px 70px 130px 130px 1fr 160px" }}
                   >
                     <div className="font-mono font-semibold text-base-900">{o.ref}</div>
@@ -190,7 +183,8 @@ export default function OrderInbox() {
                       <button
                         type="button"
                         className="btn-secondary text-[11px] py-1 px-2.5"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setAssigning(isAssigning ? null : o.ref);
                           setAssignLogistic(o.ops_assigned_logistic ?? "");
                           setAssignRemark(o.ops_remark ?? "");
@@ -201,7 +195,10 @@ export default function OrderInbox() {
                     </div>
                   </div>
                   {isAssigning && (
-                    <div className="px-4 py-3 bg-base-50 border-t border-base-100 flex gap-3 items-center">
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-4 py-3 bg-base-50 border-t border-base-100 flex gap-3 items-center"
+                    >
                       <select
                         className="input text-[12.5px] px-3 py-1.5"
                         value={assignLogistic}

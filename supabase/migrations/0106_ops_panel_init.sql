@@ -24,32 +24,17 @@
 -- -----------------------------------------------------------------------------
 -- 1. Carres Klang warehouse — destination for GAI/HOUZS stock consolidation.
 -- -----------------------------------------------------------------------------
--- Uses upsert-style insert so re-running is safe. Owning partner = NETS
--- (delivery_partners table) since NETS physically manages the facility and
--- handles pickup/dispatch operations from here.
-insert into warehouses (id, name, code, owning_partner_id)
-select
+-- kind='own' because Carres pays the rent (NETS manages operations but the
+-- facility/stock are Carres's). The 0027 constraint requires owning_partner_id
+-- IS NULL when kind='own', so we leave it null. ON CONFLICT makes re-run safe.
+insert into warehouses (id, name, address, kind)
+values (
   '00000000-0000-0000-0000-000000000c03'::uuid,
   'Carres Klang',
-  'CKLG',
-  dp.id
-from delivery_partners dp
-where dp.name ilike '%nets%'
-  and not exists (
-    select 1 from warehouses where id = '00000000-0000-0000-0000-000000000c03'::uuid
-  )
-limit 1;
-
--- Fallback if NETS partner row not yet seeded — create warehouse without owner.
--- Production already has NETS so this branch is defensive only.
-insert into warehouses (id, name, code)
-select
-  '00000000-0000-0000-0000-000000000c03'::uuid,
-  'Carres Klang',
-  'CKLG'
-where not exists (
-  select 1 from warehouses where id = '00000000-0000-0000-0000-000000000c03'::uuid
-);
+  'NETS-managed facility (Klang)',
+  'own'
+)
+on conflict (id) do nothing;
 
 -- -----------------------------------------------------------------------------
 -- 2. ops_activity_log — team-wide audit feed.
