@@ -13,7 +13,7 @@
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
-import { LetterheadHeader } from "./letterhead";
+import { DocHeader } from "./letterhead";
 import type { InvoiceTemplateData } from "./types";
 
 const ACCENT = "#D64F20";
@@ -29,14 +29,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     color: "#1A1714",
   },
-  // 2026-05-16 — letterhead handles brand + accent rule now; docMeta sits
-  // standalone below it, right-aligned via alignItems flex-end.
-  docMeta: {
-    alignItems: "flex-end",
-    marginBottom: 16,
-  },
-  docTitle: { fontSize: 14, fontWeight: 700, marginBottom: 4 },
-  docMetaRow: { fontSize: 9, color: MUTED },
+  // 2026-05-16 — header rendering moved to shared DocHeader.
   partyRow: { flexDirection: "row", marginBottom: 16, gap: 16 },
   party: {
     flex: 1,
@@ -129,13 +122,10 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <LetterheadHeader />
-        <View style={styles.docMeta}>
-          <Text style={styles.docTitle}>TAX INVOICE</Text>
-          <Text style={styles.docMetaRow}>{invoice_no}</Text>
-          <Text style={styles.docMetaRow}>Date: {issue_date}</Text>
-          <Text style={styles.docMetaRow}>Order: {order_code}</Text>
-        </View>
+        <DocHeader
+          docTitle="TAX INVOICE"
+          docMetaRows={[invoice_no, `Date: ${issue_date}`, `Order: ${order_code}`]}
+        />
 
         <View style={styles.partyRow}>
           <View style={styles.party}>

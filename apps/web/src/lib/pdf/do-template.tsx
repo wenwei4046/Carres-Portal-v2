@@ -10,7 +10,7 @@
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
-import { LetterheadHeader } from "./letterhead";
+import { DocHeader } from "./letterhead";
 import type { DoTemplateData } from "./types";
 
 const BORDER = "#D9D2C7";
@@ -25,21 +25,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     color: "#1A1714",
   },
-  // 2026-05-16 — letterhead handles brand + accent rule; docMeta is its
-  // own right-aligned block below.
-  docMeta: {
-    alignItems: "flex-end",
-    marginBottom: 16,
-  },
-  docTitle: {
-    fontSize: 14,
-    fontWeight: 700,
-    marginBottom: 4,
-  },
-  docMetaRow: {
-    fontSize: 9,
-    color: MUTED,
-  },
+  // 2026-05-16 — header rendering moved to shared DocHeader.
   partyRow: {
     flexDirection: "row",
     marginBottom: 16,
@@ -135,13 +121,10 @@ export function DoTemplate(data: DoTemplateData) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <LetterheadHeader />
-        <View style={styles.docMeta}>
-          <Text style={styles.docTitle}>DELIVERY ORDER</Text>
-          <Text style={styles.docMetaRow}>{do_number}</Text>
-          <Text style={styles.docMetaRow}>Date: {issue_date}</Text>
-          <Text style={styles.docMetaRow}>Order: {order_code}</Text>
-        </View>
+        <DocHeader
+          docTitle="DELIVERY ORDER"
+          docMetaRows={[do_number, `Date: ${issue_date}`, `Order: ${order_code}`]}
+        />
 
         <View style={styles.partyRow}>
           <View style={styles.party}>
