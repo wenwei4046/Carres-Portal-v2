@@ -18,9 +18,9 @@
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
+import { LetterheadHeader } from "./letterhead";
 import type { PickupEventPrintPayload } from "@/lib/queries";
 
-const ACCENT = "#D64F20";
 const BORDER = "#D9D2C7";
 const MUTED = "#7A7268";
 
@@ -33,28 +33,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     color: "#1A1714",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    borderBottomWidth: 2,
-    borderBottomColor: ACCENT,
-    paddingBottom: 12,
-    marginBottom: 16,
-  },
-  brand: {
-    fontSize: 22,
-    fontWeight: 700,
-    color: ACCENT,
-    letterSpacing: 1,
-  },
-  brandSub: {
-    fontSize: 9,
-    color: MUTED,
-    marginTop: 2,
-  },
+  // 2026-05-16 — letterhead handles brand + accent rule; docMeta is its
+  // own right-aligned block below.
   docMeta: {
-    textAlign: "right",
+    alignItems: "flex-end",
+    marginBottom: 16,
   },
   docTitle: {
     fontSize: 14,
@@ -206,17 +189,12 @@ export function PickupEventTemplate(data: PickupEventPrintPayload) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.brand}>CARRES</Text>
-            <Text style={styles.brandSub}>HOUZS Venture Sdn Bhd</Text>
-          </View>
-          <View style={styles.docMeta}>
-            <Text style={styles.docTitle}>DELIVERY ORDER</Text>
-            <Text style={styles.docMetaRow}>{do_number}</Text>
-            <Text style={styles.docMetaRow}>Picked up: {pickedFormatted}</Text>
-            <Text style={styles.docMetaRow}>Ack: {ack_role}</Text>
-          </View>
+        <LetterheadHeader />
+        <View style={styles.docMeta}>
+          <Text style={styles.docTitle}>DELIVERY ORDER</Text>
+          <Text style={styles.docMetaRow}>{do_number}</Text>
+          <Text style={styles.docMetaRow}>Picked up: {pickedFormatted}</Text>
+          <Text style={styles.docMetaRow}>Ack: {ack_role}</Text>
         </View>
 
         <View style={styles.partyRow}>

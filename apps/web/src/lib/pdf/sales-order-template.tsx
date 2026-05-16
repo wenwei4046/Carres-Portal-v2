@@ -21,6 +21,7 @@
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
+import { LetterheadHeader } from "./letterhead";
 import type { SalesOrderTemplateData } from "./types";
 
 const ACCENT = "#D64F20";
@@ -37,18 +38,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     color: "#1A1714",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    borderBottomWidth: 2,
-    borderBottomColor: ACCENT,
-    paddingBottom: 12,
-    marginBottom: 16,
-  },
-  brand: { fontSize: 22, fontWeight: 700, color: ACCENT, letterSpacing: 1 },
-  brandSub: { fontSize: 9, color: MUTED, marginTop: 2 },
-  docMeta: { textAlign: "right" },
+  // 2026-05-16 — letterhead handles brand + accent rule; docMeta is a
+  // standalone right-aligned block below.
+  docMeta: { alignItems: "flex-end", marginBottom: 16 },
   docTitle: { fontSize: 14, fontWeight: 700, marginBottom: 4 },
   docMetaRow: { fontSize: 9, color: MUTED },
 
@@ -222,17 +214,12 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.brand}>CARRES</Text>
-            <Text style={styles.brandSub}>HOUZS Venture Sdn Bhd</Text>
-          </View>
-          <View style={styles.docMeta}>
-            <Text style={styles.docTitle}>SALES ORDER</Text>
-            <Text style={styles.docMetaRow}>{so_number}</Text>
-            <Text style={styles.docMetaRow}>Date: {issue_date}</Text>
-            <Text style={styles.docMetaRow}>Order: {order_code}</Text>
-          </View>
+        <LetterheadHeader />
+        <View style={styles.docMeta}>
+          <Text style={styles.docTitle}>SALES ORDER</Text>
+          <Text style={styles.docMetaRow}>{so_number}</Text>
+          <Text style={styles.docMetaRow}>Date: {issue_date}</Text>
+          <Text style={styles.docMetaRow}>Order: {order_code}</Text>
         </View>
 
         <View style={styles.metaBand}>
