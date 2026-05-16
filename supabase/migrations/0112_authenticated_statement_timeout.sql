@@ -1,0 +1,42 @@
+-- 0112 — role-level statement_timeout for `authenticated`
+--
+-- Background (Loo 2026-05-16):
+--
+-- Workers fetches into Supabase have an effective ~60s wall-clock ceiling
+-- (Wrangler dev kills the response stream at 60s; production CF Workers have
+-- their own request-time budget). When the fetch is cut while a PostgREST
+-- transaction is in flight, the server-side txn does NOT immediately abort.
+-- The connection enters `idle in transaction (aborted)` (if an exception was
+-- already raised) or just `idle in transaction` (if not), and **row locks held
+-- by that txn stay locked** until the connection times out at the PgBouncer
+-- /pooler idle limit. Subsequent RPCs that try to `FOR UPDATE` those rows
+-- block waiting on the zombie. Each new blocked call hits the same 60s
+-- Workers ceiling and creates ANOTHER zombie. Snowballs the cluster.
+--
+-- Observed cascade: a single `concurrent_claim` race in
+-- `_v3_claim_threads_for_po` ended in Workers cutting the response. The
+-- zombie txn held row-locks on `order_supplier_threads`. Every retry from
+-- the modal hung 60s and added another zombie. Cluster effectively wedged
+-- on PO creation until backends were manually `pg_terminate_backend`'d.
+--
+-- Fix: bound every PostgREST-issued statement at 25s server-side. Postgres
+-- raises `57014 query_canceled`, the txn rolls back cleanly, the connection
+-- returns to the pool. The Workers fetch still sees a 5xx but the cluster
+-- stays healthy. 25s leaves comfortable headroom under the 60s Workers
+-- ceiling without throttling legitimate long queries (typical RPC is
+-- <500ms; even worst-case batch ops are well under 25s).
+--
+-- Scope:
+--   - `authenticated`: every user-JWT PostgREST call. This is the cascade
+--     source — RPCs from Hono routes all run under this role.
+--   - `anon` unchanged: anon traffic is read-only and already cheap; no
+--     incident history.
+--   - `service_role` unchanged: cron + admin batch jobs can legitimately
+--     exceed 25s (e.g. bulk imports, reconciliation). They run from
+--     trusted code paths, not from Workers, and don't suffer the
+--     zombie-on-disconnect pattern because long jobs explicitly manage
+--     their own connection lifecycle.
+--
+-- Rollback: `alter role authenticated reset statement_timeout`.
+
+alter role authenticated set statement_timeout = '25s';
