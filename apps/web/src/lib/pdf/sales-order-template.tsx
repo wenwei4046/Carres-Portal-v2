@@ -195,7 +195,6 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     issue_date,
     order_code,
     status_label,
-    channel,
     customer,
     dealer,
     delivery,
@@ -209,12 +208,31 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     signed,
   } = data;
 
-  const isShowroom = channel === "showroom";
+  // Loo 2026-05-16 — Sales Orders show the showroom/outlet address in the
+  // letterhead instead of Carres HQ, so the customer sees where the sale
+  // actually happened. Brand (legal name + CARRES wordmark) stays Carres on
+  // every doc per the brand-consistency rule.
+  //
+  // Address resolution: prefer the outlet's address when present; fall back
+  // to dealer.contact if the channel is dealer-direct (no showroom) and the
+  // dealer's `contact` field carries an address. Otherwise the default
+  // Carres HQ address renders.
+  const outletAddressOverride =
+    dealer.outlet_address && dealer.outlet_address.trim().length > 0
+      ? [dealer.outlet_address.trim()]
+      : undefined;
+  const showroomSubTitle =
+    dealer.outlet_name && dealer.outlet_name.trim().length > 0
+      ? dealer.outlet_name.trim()
+      : null;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <LetterheadHeader />
+        <LetterheadHeader
+          addressLines={outletAddressOverride}
+          subTitle={showroomSubTitle}
+        />
         <View style={styles.docMeta}>
           <Text style={styles.docTitle}>SALES ORDER</Text>
           <Text style={styles.docMetaRow}>{so_number}</Text>
@@ -253,15 +271,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             <Text style={styles.partyLabel}>Sold By</Text>
             <Text style={styles.partyName}>{dealer.name}</Text>
             {dealer.contact ? <Text style={styles.partyLine}>{dealer.contact}</Text> : null}
-            {isShowroom && dealer.outlet_name ? (
-              <View style={styles.partyDivider}>
-                <Text style={styles.partyLabel}>Showroom</Text>
-                <Text style={styles.partyLine}>{dealer.outlet_name}</Text>
-                {dealer.outlet_address ? (
-                  <Text style={styles.partyLine}>{dealer.outlet_address}</Text>
-                ) : null}
-              </View>
-            ) : null}
+            {/* Showroom block lives in the letterhead now (Loo 2026-05-16) — no
+                duplication here. Salesperson stays since it's people-info, not
+                location-info. */}
             {dealer.salesperson_name ? (
               <View style={styles.partyDivider}>
                 <Text style={styles.partyLabel}>Salesperson</Text>
