@@ -5,6 +5,7 @@ import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useCatalog,
+  useLogisticsPoSourceOrders,
   type LogisticsPoListRow,
   type SupplierRow,
 } from "@/lib/queries";
@@ -101,7 +102,18 @@ export default function PoDetailModal({
   onReceive,
 }: Props) {
   const catalogQ = useCatalog();
+  const sourceOrdersQ = useLogisticsPoSourceOrders(po.id);
   const [printing, setPrinting] = useState(false);
+
+  // Loo 2026-05-16 — index source orders by dl so the Order refs block can
+  // render "#1001 · 2026-05-31" alongside each ref. When the fetch is still
+  // pending or a dl is missing (e.g. order purged), fall back to the bare
+  // "#1001" — never blocks the modal on this side-fetch.
+  const deliveryByDl = useMemo(() => {
+    const m = new Map<number, string | null>();
+    for (const o of sourceOrdersQ.data?.orders ?? []) m.set(o.dl, o.deliveryDate);
+    return m;
+  }, [sourceOrdersQ.data]);
 
   // Mirror the friendly-name pattern from LogisticsWarehouse.tsx:138 — model
   // name + variant joined as "Carres Cloud · King" instead of bare SKU code.
@@ -226,12 +238,30 @@ export default function PoDetailModal({
           />
           <KV
             label="Order refs"
-            value={
-              dlRefs.length === 0
-                ? "—"
-                : dlRefs.map((d) => `#${d}`).join(", ")
-            }
             mono
+            value={
+              dlRefs.length === 0 ? (
+                "—"
+              ) : (
+                <div className="flex flex-col gap-0.5" data-testid="po-detail-order-refs">
+                  {dlRefs.map((d) => {
+                    const eta = deliveryByDl.get(d);
+                    return (
+                      <div
+                        key={d}
+                        className="text-[12px] font-mono text-base-900"
+                        data-testid={`po-detail-order-ref-${d}`}
+                      >
+                        #{d}
+                        {eta ? (
+                          <span className="text-base-600"> · {eta}</span>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            }
           />
         </div>
 
@@ -375,19 +405,26 @@ function KV({
   valueStyle,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   mono?: boolean;
   valueStyle?: React.CSSProperties;
 }) {
+  // String values keep the existing typography; ReactNode children render
+  // as-is so callers (e.g. Order refs stacked list) control their own layout.
+  const isString = typeof value === "string";
   return (
     <div>
       <div className="label mb-0.5">{label}</div>
-      <div
-        className={`text-[12px] ${mono ? "font-mono" : "font-body"} text-base-900`}
-        style={valueStyle}
-      >
-        {value}
-      </div>
+      {isString ? (
+        <div
+          className={`text-[12px] ${mono ? "font-mono" : "font-body"} text-base-900`}
+          style={valueStyle}
+        >
+          {value}
+        </div>
+      ) : (
+        value
+      )}
     </div>
   );
 }

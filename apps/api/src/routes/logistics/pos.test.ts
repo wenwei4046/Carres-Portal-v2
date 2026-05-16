@@ -164,6 +164,116 @@ describe("GET /api/logistics/pos", () => {
   });
 });
 
+// Loo 2026-05-16 — per-source-order delivery dates for the PO detail modal.
+describe("GET /api/logistics/pos/:id/source-orders", () => {
+  function mockSourceOrders(opts: {
+    po?: { dl: number | null; dl_refs: number[] | null } | null;
+    orders?: { dl: number; delivery_date: string | null }[];
+  }) {
+    const fromImpl = vi.fn((table: string) => {
+      if (table === "purchase_orders") {
+        const maybeSingle = vi.fn().mockResolvedValue({
+          data: opts.po === undefined ? { dl: null, dl_refs: null } : opts.po,
+          error: null,
+        });
+        const eq = vi.fn(() => ({ maybeSingle }));
+        const select = vi.fn(() => ({ eq }));
+        return { select };
+      }
+      if (table === "orders") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ordersChain: any = {};
+        ordersChain.select = vi.fn(() => ordersChain);
+        ordersChain.in = vi.fn(() => ordersChain);
+        ordersChain.order = vi.fn().mockResolvedValue({
+          data: opts.orders ?? [],
+          error: null,
+        });
+        return ordersChain;
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
+    return fromImpl;
+  }
+
+  it("returns per-DL delivery dates for a bundle PO", async () => {
+    mockSourceOrders({
+      po: { dl: null, dl_refs: [1001, 1002, 1003] },
+      orders: [
+        { dl: 1001, delivery_date: "2026-05-31" },
+        { dl: 1002, delivery_date: "2026-06-04" },
+        { dl: 1003, delivery_date: "2026-06-04" },
+      ],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/PO-2032/source-orders", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      orders: { dl: number; deliveryDate: string | null }[];
+    };
+    expect(body.orders).toEqual([
+      { dl: 1001, deliveryDate: "2026-05-31" },
+      { dl: 1002, deliveryDate: "2026-06-04" },
+      { dl: 1003, deliveryDate: "2026-06-04" },
+    ]);
+  });
+
+  it("includes po.dl alongside dl_refs (single-order PO)", async () => {
+    mockSourceOrders({
+      po: { dl: 4001, dl_refs: null },
+      orders: [{ dl: 4001, delivery_date: "2026-05-15" }],
+    });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/PO-2030/source-orders", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      orders: { dl: number; deliveryDate: string | null }[];
+    };
+    expect(body.orders).toEqual([
+      { dl: 4001, deliveryDate: "2026-05-15" },
+    ]);
+  });
+
+  it("returns 404 when PO does not exist", async () => {
+    mockSourceOrders({ po: null });
+    const jwt = await makeJwt("logistics");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/PO-MISSING/source-orders", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 for non-logistics role", async () => {
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request("http://t/api/logistics/pos/PO-2032/source-orders", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(from).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/logistics/pos", () => {
   const SUPPLIER_ID = "00000000-0000-0000-0000-000000000a01";
   const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000b01";

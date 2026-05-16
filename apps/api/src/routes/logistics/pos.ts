@@ -506,6 +506,58 @@ logisticsPosRouter.get("/:id/print-data", requireLogistics, async (c) => {
   return c.json(templateData);
 });
 
+// ----- GET /:id/source-orders -----
+//
+// Loo 2026-05-16 — per-source-order delivery dates for the PO detail modal.
+// The PO list embeds nothing from `orders` because the (PO ↔ orders) link is
+// indirect (PO.dl_refs is an int[] of dealer-facing DL numbers, joined to
+// orders.dl). The modal needs each DL's `delivery_date` so the operator can
+// see customer ETAs alongside the PO-level ETA.
+//
+// Two PostgREST round-trips: fetch PO (RLS-scoped), then fetch orders by dl.
+// Cheap (<5 rows typically), only fires when the modal opens.
+logisticsPosRouter.get("/:id/source-orders", requireLogistics, async (c) => {
+  const poId = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: po, error: e1 } = await sb
+    .from("purchase_orders")
+    .select("dl, dl_refs")
+    .eq("id", poId)
+    .maybeSingle();
+  if (e1) {
+    const m = mapPgError(e1);
+    return c.json(m.body, m.status);
+  }
+  if (!po) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "PO not found" },
+      404,
+    );
+  }
+  const poRow = po as { dl: number | null; dl_refs: number[] | null };
+  const dls: number[] = [
+    ...((poRow.dl_refs ?? []) as number[]),
+    ...(poRow.dl != null ? [Number(poRow.dl)] : []),
+  ];
+  if (dls.length === 0) return c.json({ orders: [] });
+
+  const { data, error } = await sb
+    .from("orders")
+    .select("dl, delivery_date")
+    .in("dl", dls)
+    .order("dl");
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const orders = (data ?? []).map((r) => {
+    const row = r as { dl: unknown; delivery_date: string | null };
+    return { dl: Number(row.dl), deliveryDate: row.delivery_date };
+  });
+  return c.json({ orders });
+});
+
 // ----- POST / create -----
 //
 // T29 — reshape per-line `costSource` (camelCase wire) → `cost_source`

@@ -16,6 +16,9 @@ import type { LogisticsPoListRow, SupplierRow } from "@/lib/queries";
  */
 
 let catalogHookState: { data: CatalogResponse | undefined };
+let sourceOrdersHookState: {
+  data: { orders: { dl: number; deliveryDate: string | null }[] } | undefined;
+};
 
 vi.mock("@/lib/queries", async () => {
   const actual =
@@ -23,6 +26,7 @@ vi.mock("@/lib/queries", async () => {
   return {
     ...actual,
     useCatalog: () => catalogHookState,
+    useLogisticsPoSourceOrders: () => sourceOrdersHookState,
   };
 });
 
@@ -84,6 +88,8 @@ beforeEach(() => {
       floorConfig: { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 },
     },
   };
+  // Default — modal renders without per-DL ETAs; existing tests don't care.
+  sourceOrdersHookState = { data: undefined };
 });
 
 describe("PoDetailModal — Receive entry button (v3-S2.3)", () => {
@@ -241,5 +247,54 @@ describe("PoDetailModal — Receive entry button (v3-S2.3)", () => {
     );
     fireEvent.click(screen.getByTestId("po-detail-receive-button"));
     expect(onReceive).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Loo 2026-05-16 — per-source-order ETA list under Order refs.
+describe("PoDetailModal — per-DL ETA", () => {
+  it("renders each dl_ref with its own delivery date", () => {
+    sourceOrdersHookState = {
+      data: {
+        orders: [
+          { dl: 1001, deliveryDate: "2026-05-31" },
+          { dl: 1002, deliveryDate: "2026-06-04" },
+          { dl: 1003, deliveryDate: "2026-06-04" },
+          { dl: 1004, deliveryDate: "2026-06-04" },
+        ],
+      },
+    };
+    render(
+      wrap(
+        <PoDetailModal
+          po={makePo({ dl: null, dl_refs: [1001, 1002, 1003, 1004] })}
+          supplier={SUPPLIER}
+          warehouse={WAREHOUSE}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    const r1 = screen.getByTestId("po-detail-order-ref-1001");
+    const r2 = screen.getByTestId("po-detail-order-ref-1002");
+    expect(r1.textContent).toContain("#1001");
+    expect(r1.textContent).toContain("2026-05-31");
+    expect(r2.textContent).toContain("#1002");
+    expect(r2.textContent).toContain("2026-06-04");
+  });
+
+  it("falls back to bare #dl when source-orders fetch is pending", () => {
+    sourceOrdersHookState = { data: undefined };
+    render(
+      wrap(
+        <PoDetailModal
+          po={makePo({ dl: null, dl_refs: [1001, 1002] })}
+          supplier={SUPPLIER}
+          warehouse={WAREHOUSE}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    const r1 = screen.getByTestId("po-detail-order-ref-1001");
+    expect(r1.textContent).toContain("#1001");
+    expect(r1.textContent).not.toContain("·");
   });
 });

@@ -114,6 +114,12 @@ export const qk = {
     pos:       (filters?: LogisticsPoFilters) =>
       ["logistics", "pos", filters ?? {}] as const,
     po:        (id: string) => ["logistics", "pos", id] as const,
+    /** Loo 2026-05-16 — per-source-order ETA list for the PO detail modal.
+     *  Nested under "pos" so a blunt `["logistics","pos"]` invalidation after
+     *  a PO mutation also clears these. Cheap (1-row-per-DL select), and the
+     *  fetch only fires when the modal opens. */
+    poSourceOrders: (id: string) =>
+      ["logistics", "pos", id, "source-orders"] as const,
     /** Phase 4.5 Chunk 2 (T34) — per-supplier procurement tab list. Keyed by
      *  `slug` so each tab's cache stays distinct (otherwise switching tabs
      *  would thrash the same key). Nested under `pos` so a future blunt
@@ -1792,6 +1798,35 @@ export function useLogisticsPo(
     },
     enabled: false,
     staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/** Loo 2026-05-16 — per-source-order delivery date list for PoDetailModal.
+ *  Returns `[{dl, deliveryDate}]` for every dl in the PO's `dl + dl_refs`.
+ *  The PO list itself doesn't carry delivery_date because that lives on
+ *  `orders`, not on the PO row. */
+export interface LogisticsPoSourceOrder {
+  dl: number;
+  deliveryDate: string | null;
+}
+export interface LogisticsPoSourceOrdersResponse {
+  orders: LogisticsPoSourceOrder[];
+}
+export function useLogisticsPoSourceOrders(
+  poId: string | null,
+  opts?: Partial<UseQueryOptions<LogisticsPoSourceOrdersResponse>>,
+) {
+  return useQuery({
+    queryKey: poId
+      ? qk.logistics.poSourceOrders(poId)
+      : (["logistics", "pos", "null", "source-orders"] as const),
+    queryFn: () =>
+      apiFetch<LogisticsPoSourceOrdersResponse>(
+        `/api/logistics/pos/${encodeURIComponent(poId ?? "")}/source-orders`,
+      ),
+    enabled: !!poId,
+    staleTime: 30_000,
     ...opts,
   });
 }
