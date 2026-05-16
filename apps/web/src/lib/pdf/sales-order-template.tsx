@@ -21,7 +21,7 @@
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
-import { LetterheadHeader } from "./letterhead";
+import { CARRES_COMPANY } from "./letterhead";
 import type { SalesOrderTemplateData } from "./types";
 
 const ACCENT = "#D64F20";
@@ -38,9 +38,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     color: "#1A1714",
   },
-  // 2026-05-16 — letterhead handles brand + accent rule; docMeta is a
-  // standalone right-aligned block below.
-  docMeta: { alignItems: "flex-end", marginBottom: 16 },
+  // 2026-05-16 (Loo) — SO doesn't use the standalone letterhead band;
+  // company info is folded inline as the top-left of a 2-col header row,
+  // with the doc meta on the right. Data-only — no bold CARRES wordmark.
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingBottom: 10,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    gap: 16,
+  },
+  headerCompany: { flex: 1 },
+  companyName: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#1A1714",
+    letterSpacing: 0.3,
+  },
+  companyRegNo: { fontSize: 8, color: MUTED, marginTop: 1 },
+  companyOutlet: {
+    fontSize: 9.5,
+    color: "#1A1714",
+    fontWeight: 700,
+    marginTop: 5,
+  },
+  companyAddrLine: { fontSize: 8.5, color: "#3F3A33", marginTop: 1 },
+  docMeta: { alignItems: "flex-end" },
   docTitle: { fontSize: 14, fontWeight: 700, marginBottom: 4 },
   docMetaRow: { fontSize: 9, color: MUTED },
 
@@ -208,36 +234,44 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     signed,
   } = data;
 
-  // Loo 2026-05-16 — Sales Orders show the showroom/outlet address in the
-  // letterhead instead of Carres HQ, so the customer sees where the sale
-  // actually happened. Brand (legal name + CARRES wordmark) stays Carres on
-  // every doc per the brand-consistency rule.
-  //
-  // Address resolution: prefer the outlet's address when present; fall back
-  // to dealer.contact if the channel is dealer-direct (no showroom) and the
-  // dealer's `contact` field carries an address. Otherwise the default
-  // Carres HQ address renders.
-  const outletAddressOverride =
-    dealer.outlet_address && dealer.outlet_address.trim().length > 0
-      ? [dealer.outlet_address.trim()]
-      : undefined;
-  const showroomSubTitle =
+  // Loo 2026-05-16 — fold the company info inline into the SO's own header
+  // instead of using the standalone letterhead band. Data-only block:
+  // legal name + reg no + (showroom name + address when present, else the
+  // Carres HQ address). The doc meta sits on the right as before.
+  const outletName =
     dealer.outlet_name && dealer.outlet_name.trim().length > 0
       ? dealer.outlet_name.trim()
       : null;
+  const outletAddress =
+    dealer.outlet_address && dealer.outlet_address.trim().length > 0
+      ? dealer.outlet_address.trim()
+      : null;
+  const addressLines: string[] = outletAddress
+    ? [outletAddress]
+    : [...CARRES_COMPANY.addressLines];
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <LetterheadHeader
-          addressLines={outletAddressOverride}
-          subTitle={showroomSubTitle}
-        />
-        <View style={styles.docMeta}>
-          <Text style={styles.docTitle}>SALES ORDER</Text>
-          <Text style={styles.docMetaRow}>{so_number}</Text>
-          <Text style={styles.docMetaRow}>Date: {issue_date}</Text>
-          <Text style={styles.docMetaRow}>Order: {order_code}</Text>
+        <View style={styles.header}>
+          <View style={styles.headerCompany}>
+            <Text style={styles.companyName}>{CARRES_COMPANY.legalName}</Text>
+            <Text style={styles.companyRegNo}>{CARRES_COMPANY.regNo}</Text>
+            {outletName ? (
+              <Text style={styles.companyOutlet}>{outletName}</Text>
+            ) : null}
+            {addressLines.map((line, i) => (
+              <Text key={i} style={styles.companyAddrLine}>
+                {line}
+              </Text>
+            ))}
+          </View>
+          <View style={styles.docMeta}>
+            <Text style={styles.docTitle}>SALES ORDER</Text>
+            <Text style={styles.docMetaRow}>{so_number}</Text>
+            <Text style={styles.docMetaRow}>Date: {issue_date}</Text>
+            <Text style={styles.docMetaRow}>Order: {order_code}</Text>
+          </View>
         </View>
 
         <View style={styles.metaBand}>
