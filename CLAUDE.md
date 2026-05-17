@@ -716,6 +716,31 @@ Carry-forwards from this rename:
 
 
 
+**partner_pickup_threads SOP-aware fix restored (Loo 2026-05-18 ~00:30 GMT+8, screenshot bug)** — DL-1001..1004 (Carres KL Showroom, STANDARD mattress) auto-flipped to DISPATCHED on the operation kanban without operator pressing "Assign delivery". DL signature: `operation_stage='dispatched'`, `delivery_partner_id=NULL`, `dispatched_at=NULL`, `warehouse_id=NULL`, thread `pickup_event_id` set + `supplier_ready_at` set. Smoking signature of "pickup → buggy flat dispatched → rollup into orders".
+
+Root cause confirmed by `pg_get_functiondef`: live `partner_pickup_threads` body had **no** SOP CASE — it flat-set `operation_stage = 'dispatched'` for every picked thread regardless of SOP. The 0108 F2 fix (factory→WH→customer STANDARD threads must land at `ready_to_dispatch`, only SOFA_SPECIAL goes straight to `dispatched`) was silently clobbered by **0117** (auto-DO# feature) and again by **0118** (FOR UPDATE lock fix) — each `CREATE OR REPLACE FUNCTION` rewrote the body from the pre-0108 form and dropped the CASE both times. Sister RPC `operation_receive_threads` retains the 0108 F1 fix intact.
+
+Migration 0122 (`partner_pickup_threads_restore_sop_case`) applied to staging Supabase = prod via `apply_migration`. Two parts:
+1. CREATE OR REPLACE `partner_pickup_threads` with the 0108 SOP-aware CASE re-applied alongside the existing 0117 auto-DO# + 0118 CTE lock — comment block in the migration calls out the regression history so the next person touching this RPC sees it.
+2. One-shot backfill: 4 STANDARD threads matching the bug signature (sop=STANDARD, op_stage=dispatched, dpid=NULL, pickup_event=set) reverted to `ready_to_dispatch`; orders also force-rolled back where every thread of an order now agrees on `ready_to_dispatch` (defensive — the rollup trigger should have caught this but we belt-and-brace it).
+
+Verification queries post-apply:
+- Function body version check: `0122-fix-active` ✓
+- DL-1001..1005 orders.operation_stage: all `ready_to_dispatch` ✓
+- DL-1001..1004 threads.operation_stage: all `ready_to_dispatch` (was `dispatched`) ✓
+- DL-1005 thread: unchanged (had no pickup yet)
+- Remaining buggy threads (any tenant): 0 ✓
+
+Loo can now press "Assign delivery →" on each of DL-1001..1004 to properly transition them to dispatched with a real delivery_partner_id.
+
+Migration count: 122 files (was 121 in last §17 sync).
+
+Phase 10 NEW carry-forwards (2026-05-18):
+- `phase-10-partner-pickup-rpc-regression-guard` (medium) — any future CREATE OR REPLACE of `partner_pickup_threads` MUST preserve the SOP CASE. Adding either a regression test asserting the CASE is in pg_get_functiondef, OR a vitest assertion against the migration TEXT, would catch the next time someone copy-pastes from a pre-0108 body. Two prior regressions in 2 days is a pattern.
+- `phase-10-rollup-trigger-audit-after-partial-revert` (low) — the rollup trigger 0036/0040/0047 should propagate thread.operation_stage → orders.operation_stage automatically. In 0122 backfill I added a defensive direct UPDATE on orders too. Investigate whether the trigger is firing on UPDATE (vs only INSERT) and whether it handles the all-threads-agree case correctly. If it does, the defensive UPDATE in future similar backfills is unnecessary.
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)
