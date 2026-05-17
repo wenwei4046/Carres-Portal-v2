@@ -106,6 +106,13 @@ interface DraftLine {
   // fabric_name, fabric_surcharge}, Mattress=null. Submit gate refuses when
   // bedframe lacks color/gap or sofa lacks fabric_id.
   attrs: Record<string, unknown> | null;
+  // 2026-05-18 (Phase 3 — Loo) — when this line came from a bundle auto-fill
+  // (data.shortage[].bySo), `sourceSo` is the SO it serves. Drives per-SO
+  // PO splitting in `issuanceGroups`: each (supplier, sourceSo, sku, attrs)
+  // tuple becomes its own PO so 1 SO = at most 1 PO per (sku, attrs). For
+  // manually-added lines and single-SO scope (prefill.so), sourceSo is null
+  // and the existing per-supplier+per-variant grouping applies unchanged.
+  sourceSo: number | null;
 }
 
 // 2026-05-17 (Loo A→Z test bug A) — real DB SKUs (e.g. `B1201F-K`) don't carry
@@ -224,11 +231,14 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     prefill.so != null ||
     (prefill.soRefs != null && prefill.soRefs.length > 0);
   const [stockpile, setStockpile] = useState<boolean>(false);
-  // 0076 (Loo 2026-05-10): per-variant split. OFF (default) = one combined PO
-  // per supplier (bedframe workflow — multi-color in same PO). ON = one PO
-  // per (supplier, sku, attrs) tuple (sofa workflow — HoOKkA needs separate
-  // POs per fabric for production). Operator picks per situation.
-  const [splitPerVariant, setSplitPerVariant] = useState<boolean>(false);
+  // Phase 3 (2026-05-18 — Loo) — auto-split is always on. The previous
+  // `splitPerVariant` toggle is gone: every PO is keyed by (supplier,
+  // sourceSo, sku, attrs). The fanning happens at line build time
+  // (`autoFillFromShortage` populates DraftLine.sourceSo from bySo), and
+  // `issuanceGroups` below partitions on (supplierId + sourceSo + sku +
+  // canonAttrs). Single-SO scope collapses to per-(supplier, sku, attrs);
+  // bundle scope produces one PO per source SO; stockpile collapses to
+  // per-(supplier, sku, attrs) like before.
 
   const suppliers = suppliersQ.data?.suppliers ?? [];
   const warehouses = warehousesQ.data?.warehouses ?? [];
@@ -310,6 +320,10 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           cost: cs.cost,
           costSource: cs.costSource,
           attrs: l.attrs ?? null,
+          // Phase 3 (2026-05-18) — single-SO prefill attributes every line to
+          // that SO. Bundle prefill (`soRefs`) skips initialLines entirely
+          // (autoFillFromShortage fans out per-SO from the shortage response).
+          sourceSo: prefill.so ?? null,
         };
       });
     }
@@ -378,6 +392,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             cost: cs.cost,
             costSource: cs.costSource,
             attrs: null,
+            sourceSo: null,
           },
         ]);
       }
@@ -511,27 +526,46 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       // 0076 (Loo 2026-05-10): attrs now comes from the server response (the
       //       per-(sku, attrs) aggregation), so bedframe color/gap and sofa
       //       fabric pre-fill from the source order_lines.attrs instead of
-      //       forcing the operator to re-pick. attrs is `Record<string,
-      //       unknown> | null`; we cast through unknown because DraftLine's
-      //       attrs is the same nullable record shape.
-      setLines(
-        data.shortage.map((s) => {
-          const cs = lineCostFromSku(s.sku);
-          return {
-            modelId: modelIdForSku(s.sku, skuByCode),
-            sku: s.sku,
+      //       forcing the operator to re-pick.
+      //
+      // Phase 3 (2026-05-18) — bundle scope fans out by `bySo` so each
+      // resulting PO maps to a single source SO. Aggregated shortage rows
+      // (collapsed across SOs) are still consumed in non-bundle scope; in
+      // bundle scope we emit one DraftLine per (sku, attrs, source SO) where
+      // `bySo[i].shortage > 0`. Single-SO scope (prefill.so set) tags every
+      // line with that SO. Global / stockpile scope leaves sourceSo null.
+      const fanned: DraftLine[] = [];
+      for (const s of data.shortage) {
+        const cs = lineCostFromSku(s.sku);
+        const base: Omit<DraftLine, "qty" | "sourceSo"> = {
+          modelId: modelIdForSku(s.sku, skuByCode),
+          sku: s.sku,
+          cost: cs.cost,
+          costSource: cs.costSource,
+          attrs: s.attrs,
+        };
+        const bySo = s.bySo ?? [];
+        if (isBundleScope && bySo.length > 0) {
+          for (const b of bySo) {
+            if (b.shortage <= 0) continue;
+            fanned.push({ ...base, qty: b.shortage, sourceSo: b.so });
+          }
+        } else {
+          // Single-SO scope (prefill.so) or global awaiting (no scope).
+          fanned.push({
+            ...base,
             qty: s.shortage,
-            cost: cs.cost,
-            costSource: cs.costSource,
-            attrs: s.attrs,
-          };
-        }),
-      );
-      const totalUnits = data.shortage.reduce((acc, s) => acc + s.need, 0);
+            sourceSo: prefill.so ?? null,
+          });
+        }
+      }
+      setLines(fanned);
+      const totalUnits = fanned.reduce((acc, l) => acc + l.qty, 0);
+      const skuCount = new Set(fanned.map((l) => l.sku)).size;
       toast.success(
         isBundleScope
-          ? `Pre-filled ${data.shortage.length} SKU${data.shortage.length === 1 ? "" : "s"} from ${prefill.soRefs!.length} order${prefill.soRefs!.length === 1 ? "" : "s"} (${totalUnits} unit${totalUnits === 1 ? "" : "s"})`
-          : `Auto-filled ${data.shortage.length} SKU${data.shortage.length === 1 ? "" : "s"} from ${totalUnits} unit${totalUnits === 1 ? "" : "s"} pending`,
+          ? `Pre-filled ${fanned.length} line${fanned.length === 1 ? "" : "s"} (${skuCount} SKU) from ${prefill.soRefs!.length} order${prefill.soRefs!.length === 1 ? "" : "s"} · ${totalUnits} unit${totalUnits === 1 ? "" : "s"}`
+          : `Auto-filled ${fanned.length} line${fanned.length === 1 ? "" : "s"} from ${totalUnits} unit${totalUnits === 1 ? "" : "s"} pending`,
       );
     } catch (e: unknown) {
       if (e instanceof ApiError) toast.error(e.message || "Auto-fill failed");
@@ -602,6 +636,8 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           cost: cs.cost,
           costSource: cs.costSource,
           attrs: null,
+          // Stock-alert path is global / stockpile-shaped — no source SO.
+          sourceSo: null,
         };
       });
       setLines(nextLines);
@@ -650,6 +686,10 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         cost: cs.cost,
         costSource: cs.costSource,
         attrs: null,
+        // Manually-added line inherits the prefill's single-SO scope when
+        // applicable, otherwise null (stockpile / global). Bundle scope
+        // never adds lines manually — auto-fill produces fanned lines.
+        sourceSo: prefill.so ?? null,
       },
     ]);
   }
@@ -727,22 +767,22 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // bedframe behavior). ON: one entry per (supplier, sku, attrs) tuple — the
   // sofa workflow where HoOKkA needs separate POs per fabric.
   const issuanceGroups = useMemo(() => {
-    if (!splitPerVariant) return groups.groups;
+    // Phase 3 (2026-05-18 — Loo): no early-return; always split.
     const out: typeof groups.groups = [];
     for (const g of groups.groups) {
-      const byVariant = new Map<string, typeof g.lines>();
+      const byKey = new Map<string, typeof g.lines>();
       for (const l of g.lines) {
-        const key = `${l.sku}${canonAttrs(l.attrs)}`;
-        if (!byVariant.has(key)) byVariant.set(key, []);
-        byVariant.get(key)!.push(l);
+        const key = `${l.sourceSo ?? "null"}|${l.sku}|${canonAttrs(l.attrs)}`;
+        if (!byKey.has(key)) byKey.set(key, []);
+        byKey.get(key)!.push(l);
       }
-      for (const lines of byVariant.values()) {
+      for (const lines of byKey.values()) {
         out.push({ supplier: g.supplier, lines });
       }
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups.groups, splitPerVariant]);
+  }, [groups.groups]);
 
   const willSplit = issuanceGroups.length > 1;
 
@@ -771,6 +811,13 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           g.supplier.kind === "factory_pickup"
             ? partnerFor(g.supplier) || undefined
             : undefined;
+        // Phase 3 (2026-05-18 — Loo) — single-PO branch carries the source
+        // SO of its lines (constant within an issuance group). Single-SO
+        // prefill: sourceSo === prefill.so → uses single `so` field. Bundle
+        // prefill that auto-fans to exactly 1 PO: sourceSo is that one SO →
+        // wire as `so` (RPC accepts either). Stockpile + global: sourceSo
+        // null → omit both.
+        const lineSo = g.lines[0]?.sourceSo ?? null;
         await create.mutateAsync({
           supplierId: g.supplier.id,
           warehouseId: warehouseFor(g.supplier),
@@ -782,27 +829,28 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             costSource: l.costSource!,
             attrs: l.attrs ?? null,
           })),
-          ...(!stockpile && prefill.so ? { so: prefill.so } : {}),
-          ...(!stockpile && prefill.soRefs && prefill.soRefs.length > 0
-            ? { soRefs: prefill.soRefs }
-            : {}),
+          ...(!stockpile && lineSo != null ? { so: lineSo } : {}),
           etaDate: eta,
         });
         toast.success(
           `PO issued · ${lines.length} line${lines.length === 1 ? "" : "s"} · ${totalUnits} units`,
         );
       } else {
-        // 2+ POs → atomic batch RPC. Each entry carries its own warehouse
-        // pick. so_refs (if present) propagates onto every PO since a bundle
-        // PO is always cross-order. so (single) doesn't apply when splitting
-        // — the batch RPC's helper is bundle-shaped only.
-        // v3-S4.5: same stockpile carve-out as the single-PO branch.
+        // 2+ POs → atomic batch RPC. Each entry carries its own warehouse +
+        // its own soRefs (= just its source SO, set per-line by the Phase 3
+        // bySo fanout in autoFillFromShortage). This is what fixes the
+        // concurrent_claim bug from the per-variant batch flow: every PO in
+        // the batch now claims a disjoint set of threads (one specific
+        // (sourceSo, sku, attrs) tuple), so the batch's claim loop never
+        // sees a thread already taken by an earlier PO in the same batch.
+        // v3-S4.5: stockpile carve-out — sourceSo is null → omit soRefs.
         await createBatch.mutateAsync({
           pos: issuanceGroups.map((g) => {
             const partnerId =
               g.supplier.kind === "factory_pickup"
                 ? partnerFor(g.supplier) || undefined
                 : undefined;
+            const lineSo = g.lines[0]?.sourceSo ?? null;
             return {
               supplierId: g.supplier.id,
               warehouseId: warehouseFor(g.supplier),
@@ -816,8 +864,8 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                 costSource: l.costSource!,
                 attrs: l.attrs ?? null,
               })),
-              ...(!stockpile && prefill.soRefs && prefill.soRefs.length > 0
-                ? { soRefs: prefill.soRefs }
+              ...(!stockpile && lineSo != null
+                ? { soRefs: [lineSo] }
                 : {}),
               etaDate: eta,
             };
@@ -892,26 +940,6 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             Stockpile
           </span>
         )}
-      </div>
-
-      {/* 0076 (Loo 2026-05-10) — Split per variant. Sofa workflow needs one PO
-          per fabric (HoOKkA's production constraint); bedframe stays combined.
-          Operator chooses at submit time — no auto-detection. */}
-      <div className="mb-3 flex items-center gap-2 text-[12px] font-body">
-        <input
-          id="split-per-variant-toggle"
-          data-testid="split-per-variant-toggle"
-          type="checkbox"
-          checked={splitPerVariant}
-          onChange={(e) => setSplitPerVariant(e.target.checked)}
-          className="h-3.5 w-3.5"
-        />
-        <label htmlFor="split-per-variant-toggle" className="select-none">
-          <strong>Split per variant</strong>
-          <span className="text-base-600">
-            {" "}(one PO per (sku + color/gap/fabric) — use for sofa)
-          </span>
-        </label>
       </div>
 
       <div className="text-[12px] text-base-600 mb-3 font-body">
@@ -1355,17 +1383,17 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             border: "1px solid rgba(58,89,131,.25)",
           }}
         >
-          <strong>{splitPerVariant ? "Per-variant split:" : "Auto-split:"}</strong>{" "}
+          <strong>Auto-split:</strong>{" "}
           this will be issued as{" "}
           <strong>{issuanceGroups.length} separate POs</strong> —{" "}
-          {splitPerVariant ? "one per (sku + attrs)" : "one per supplier"}.{" "}
-          {!splitPerVariant &&
-            groups.groups
-              .map(
-                (g) =>
-                  `${g.supplier.name} (${g.lines.length} line${g.lines.length === 1 ? "" : "s"})`,
-              )
-              .join(" · ")}
+          one per (supplier, source SO, sku, variant).
+          {" "}
+          {groups.groups
+            .map(
+              (g) =>
+                `${g.supplier.name} (${g.lines.length} line${g.lines.length === 1 ? "" : "s"})`,
+            )
+            .join(" · ")}
         </div>
       )}
 

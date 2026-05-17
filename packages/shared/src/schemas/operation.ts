@@ -511,6 +511,20 @@ export const awaitingStockShortageResponse = z.object({
     need: z.number().int().nonnegative(),
     available: z.number().int(),
     shortage: z.number().int().positive(),
+    // 2026-05-18 (Loo) — per-source-SO breakdown. Populated only when the
+    // request carries `?dls=...`; empty array on global (no-dls) calls.
+    // Used by CreatePOModal to fan out the auto-fill into one PO per source
+    // SO (per-SO auto-split, Phase 3 of the per-SO PO refactor 2026-05-18).
+    //
+    // Invariant: sum-across-bySo of (need, available, shortage) equals the
+    // row-level totals. Entries with shortage=0 are kept so the FE knows
+    // which SOs contributed to a (sku, attrs) row even when fully covered.
+    bySo: z.array(z.object({
+      so: z.number().int(),
+      need: z.number().int().nonnegative(),
+      available: z.number().int().nonnegative(),
+      shortage: z.number().int().nonnegative(),
+    })).default([]),
   })),
   // 2026-05-16 (Loo) — bundle-scope companion: when the request carries
   // `?dls=...`, the route returns one row per selected so with its delivery

@@ -262,8 +262,11 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
   // 0076 (Loo 2026-05-10): also pull `attrs` so the per-(sku, attrs)
   // aggregation below can preserve color/gap/fabric for CreatePOModal's
   // cascade pre-fill. attrs is jsonb; NULL stays NULL for mattress lines.
+  // 2026-05-18 (Loo) — also pull `order_id` so per-(so, sku, attrs)
+  // aggregation can attribute each line back to its source SO for the
+  // `bySo` breakdown (Phase 3 per-SO PO auto-split).
   const [linesRes, stockRes] = await Promise.all([
-    sb.from("order_lines").select("sku, qty, attrs").in("order_id", orderIds),
+    sb.from("order_lines").select("order_id, sku, qty, attrs").in("order_id", orderIds),
     sb.from("stock_balances").select("sku, qty, reserved"),
   ]);
   if (linesRes.error) {
@@ -275,18 +278,30 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
     return c.json(m.body, m.status);
   }
 
-  // Step 3 — TS aggregation. Key is now (sku, attrs-canonical) so the same
-  // SKU with different bedframe colors / sofa fabrics surfaces as separate
-  // shortage rows. JSON.stringify with sorted keys keeps two semantically
-  // identical attrs objects on the same bucket regardless of source key
-  // order. `available` is still per-SKU (stock isn't variant-tracked) and
-  // gets divided across variants in declaration order — first variant takes
-  // available stock, later variants see 0. This is conservative (over-orders
-  // stock if the operator didn't explicitly want it on the same variant)
-  // but never under-orders. Matches the existing operation_calc_shortages
-  // semantics for single-variant orders byte-for-byte.
+  // Step 3 — TS aggregation. Two-level keying:
+  //   1. (sku, attrs-canonical) — surfaces same-SKU different-variant rows
+  //      separately so CreatePOModal can pre-fill the cascade picker per
+  //      variant (color / gap / fabric). JSON.stringify with sorted keys
+  //      keeps two semantically identical attrs objects on the same bucket
+  //      regardless of source key order.
+  //   2. (so, sku, attrs-canonical) — Phase 3 (2026-05-18) per-source-SO
+  //      breakdown so CreatePOModal can fan out one PO per source SO. Only
+  //      emitted to the wire when `?dls=...` is set (the FE auto-split
+  //      path); global calls return `bySo: []` to avoid shipping per-SO
+  //      context the FE doesn't use.
+  //
+  // `available` is still per-SKU (stock isn't variant- or SO-tracked) and
+  // gets divided across (sku, attrs, so) entries in deterministic
+  // (sku → canonAttrs → so) order. First entry absorbs available stock,
+  // later entries see whatever's left. Conservative: over-orders if the
+  // operator didn't explicitly want it on the same variant/so, but never
+  // under-orders. Matches the existing operation_calc_shortages semantics
+  // for single-variant orders byte-for-byte; row-level totals remain equal
+  // to sum-across-bySo so legacy callers reading aggregate `shortage` see
+  // the same numbers.
   type ShortageRow = AwaitingStockShortageResponse["shortage"][number];
   type Attrs = ShortageRow["attrs"];
+  type BySoEntry = ShortageRow["bySo"][number];
 
   const canonAttrs = (a: unknown): string => {
     if (a == null) return "";
@@ -298,15 +313,39 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
     return JSON.stringify(ordered);
   };
 
-  const needByKey = new Map<string, { sku: string; attrs: Attrs; need: number }>();
+  // Build order_id → so map from ordersRes. Only orders in
+  // awaiting_operation_action stage are fetched; the union of primary +
+  // legacy paths intersects with this set when dlsFilter is on, so every
+  // contributing order_id has a row here under the dls-scoped call. Orders
+  // missing a so (defensive) drop their per-so attribution but still
+  // contribute to row-level totals via the synthetic so=-1 bucket below.
+  const orderIdToSo = new Map<string, number>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const o of (ordersRes.data ?? []) as any[]) {
+    if (o.so != null) orderIdToSo.set(String(o.id), Number(o.so));
+  }
+
+  // Per-(so, sku, attrs) aggregation. The key shape `${so} ${sku} ${canon}`
+  // collides only when so + sku + canonAttrs all match, which is exactly
+  // the semantic we want (multiple order_lines from the same order with
+  // same variant collapse).
+  const needBySoKey = new Map<string, { so: number; sku: string; attrs: Attrs; need: number }>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const l of (linesRes.data ?? []) as any[]) {
     const sku = String(l.sku);
     const attrs = (l.attrs ?? null) as Attrs;
-    const key = `${sku} ${canonAttrs(attrs)}`;
-    const cur = needByKey.get(key);
+    const orderId = l.order_id != null ? String(l.order_id) : null;
+    const soLookup = orderId != null ? orderIdToSo.get(orderId) : undefined;
+    // When `so` is unknown (no orders row — happens if primary path
+    // admitted an order outside the ordersRes set in a global call), fold
+    // into a synthetic so=-1 bucket so row-level totals stay correct. The
+    // bySo emission step below filters this bucket out of the wire payload
+    // (negative `so` is invalid per the zod schema).
+    const so = soLookup ?? -1;
+    const key = `${so} ${sku} ${canonAttrs(attrs)}`;
+    const cur = needBySoKey.get(key);
     if (cur) cur.need += Number(l.qty);
-    else needByKey.set(key, { sku, attrs, need: Number(l.qty) });
+    else needBySoKey.set(key, { so, sku, attrs, need: Number(l.qty) });
   }
 
   const availBySku = new Map<string, number>();
@@ -317,28 +356,104 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
     availBySku.set(sku, (availBySku.get(sku) ?? 0) + avail);
   }
 
-  // Distribute SKU-level availability across variants in deterministic
-  // (sku, attrs canonical) order. First variant absorbs available stock;
-  // later variants see whatever's left.
-  const shortage: ShortageRow[] = [];
-  const remainingBySku = new Map(availBySku);
-  const ordered = [...needByKey.values()].sort((a, b) => {
-    const c = a.sku.localeCompare(b.sku);
-    return c !== 0 ? c : canonAttrs(a.attrs).localeCompare(canonAttrs(b.attrs));
+  // Distribute SKU-level availability across (sku, attrs, so) entries in
+  // deterministic (sku → canonAttrs → so) order. Each entry consumes
+  // min(remaining_for_sku, entry.need). The walk order is reproducible so
+  // tests can snapshot it. Entries are then collapsed back to (sku, attrs)
+  // rows for the wire shape; the per-so detail is preserved in `bySo` when
+  // `dlsFilter` is set.
+  const orderedBySoEntries = [...needBySoKey.values()].sort((a, b) => {
+    const cSku = a.sku.localeCompare(b.sku);
+    if (cSku !== 0) return cSku;
+    const cAttrs = canonAttrs(a.attrs).localeCompare(canonAttrs(b.attrs));
+    if (cAttrs !== 0) return cAttrs;
+    return a.so - b.so;
   });
-  for (const row of ordered) {
-    const remaining = remainingBySku.get(row.sku) ?? 0;
-    const consumed = Math.min(remaining, row.need);
-    remainingBySku.set(row.sku, remaining - consumed);
-    if (consumed < row.need) {
-      shortage.push({
-        sku: row.sku,
-        attrs: row.attrs,
-        need: row.need,
-        available: consumed,
-        shortage: row.need - consumed,
+  const remainingBySku = new Map(availBySku);
+  type PerSoConsumed = {
+    so: number;
+    sku: string;
+    attrs: Attrs;
+    need: number;
+    available: number;
+    shortage: number;
+  };
+  const consumedList: PerSoConsumed[] = [];
+  for (const e of orderedBySoEntries) {
+    const remaining = remainingBySku.get(e.sku) ?? 0;
+    const consumed = Math.min(remaining, e.need);
+    remainingBySku.set(e.sku, remaining - consumed);
+    consumedList.push({
+      so: e.so,
+      sku: e.sku,
+      attrs: e.attrs,
+      need: e.need,
+      available: consumed,
+      shortage: e.need - consumed,
+    });
+  }
+
+  // Collapse per-(so, sku, attrs) entries back to (sku, attrs) rows for the
+  // top-level response. Aggregate need/available/shortage = sum across
+  // matching so entries. `consumedList` is already sorted by
+  // (sku → canonAttrs → so), so first-seen wins for row order and per-row
+  // `bySo` is naturally so-ascending within the same (sku, attrs).
+  type RowAccumulator = {
+    sku: string;
+    attrs: Attrs;
+    need: number;
+    available: number;
+    shortage: number;
+    bySo: BySoEntry[];
+  };
+  const rowByKey = new Map<string, RowAccumulator>();
+  for (const c of consumedList) {
+    const rowKey = `${c.sku} ${canonAttrs(c.attrs)}`;
+    let row = rowByKey.get(rowKey);
+    if (!row) {
+      row = {
+        sku: c.sku,
+        attrs: c.attrs,
+        need: 0,
+        available: 0,
+        shortage: 0,
+        bySo: [],
+      };
+      rowByKey.set(rowKey, row);
+    }
+    row.need += c.need;
+    row.available += c.available;
+    row.shortage += c.shortage;
+    // Only emit valid SOs to bySo. The synthetic so=-1 bucket (for lines
+    // whose order_id had no matching row in ordersRes) is dropped from the
+    // breakdown but its totals still flow into the row sums above. This
+    // preserves the invariant `row.totals = sum(bySo) + dropped` only when
+    // every line maps to a valid so — which is the case under `?dls=` (the
+    // only mode where `bySo` is emitted to the wire).
+    if (c.so >= 1) {
+      row.bySo.push({
+        so: c.so,
+        need: c.need,
+        available: c.available,
+        shortage: c.shortage,
       });
     }
+  }
+
+  const shortage: ShortageRow[] = [];
+  for (const row of rowByKey.values()) {
+    if (row.shortage <= 0) continue;
+    shortage.push({
+      sku: row.sku,
+      attrs: row.attrs,
+      need: row.need,
+      available: row.available,
+      shortage: row.shortage,
+      // Per Phase 3 brief: `bySo` is only populated when the request
+      // carries `?dls=...`. Global awaiting calls return [] on every row
+      // to avoid shipping per-SO context the FE doesn't use.
+      bySo: dlsFilter ? row.bySo : [],
+    });
   }
 
   // 2026-05-16 (Loo) — bundle-scope per-order list. Only populated when the

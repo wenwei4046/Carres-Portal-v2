@@ -1236,14 +1236,24 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
           // Resolves at .in('order_id', [...]). Mock applies the same filter
           // so tests can provide lines for ALL orders and verify the route
           // narrowed the order set first (per v3-S2.1).
+          //
+          // 2026-05-18 (Phase 3 per-SO PO refactor): the route now SELECTs
+          // `order_id, sku, qty, attrs`. The mock used to strip `order_id`
+          // from the response; preserve it now so the route can attribute
+          // each line back to its source SO for the `bySo` breakdown.
+          // `attrs` defaults to null when not supplied by the test fixture.
           chain.in = vi.fn((col: string, ids: string[]) => {
             let rows = opts.orderLines ?? [];
             if (col === "order_id") {
               rows = rows.filter((l) => l.order_id === undefined || ids.includes(l.order_id));
             }
-            // Strip order_id from response — route only selects `sku, qty`.
             return promise(
-              rows.map((l) => ({ sku: l.sku, qty: l.qty })),
+              rows.map((l) => ({
+                order_id: l.order_id ?? null,
+                sku: l.sku,
+                qty: l.qty,
+                attrs: null,
+              })),
             );
           });
           break;
@@ -1340,6 +1350,9 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       need: 5,
       available: 3,
       shortage: 2,
+      // No `?dls=...` and no `so` on awaitingOrders → bySo is [] on every
+      // row regardless. Phase 3 (2026-05-18) per-source-SO breakdown.
+      bySo: [],
     });
   });
 
@@ -1396,6 +1409,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       need: 8,
       available: 6,
       shortage: 2,
+      bySo: [],
     });
   });
 
@@ -1443,7 +1457,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     };
     // Only order B's SKU surfaces — order A is covered by an open PO.
     expect(body.shortage).toEqual([
-      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2 },
+      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2, bySo: [] },
     ]);
   });
 
@@ -1485,7 +1499,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     };
     // Only order C's SKU surfaces — A and B are covered by the batch PO.
     expect(body.shortage).toEqual([
-      { sku: "mattress:cloud:King", attrs: null, need: 3, available: 1, shortage: 2 },
+      { sku: "mattress:cloud:King", attrs: null, need: 3, available: 1, shortage: 2, bySo: [] },
     ]);
   });
 
@@ -1526,7 +1540,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     };
     // Order A's SKU IS in shortage — received PO does not gate it.
     expect(body.shortage).toEqual([
-      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2 },
+      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2, bySo: [] },
     ]);
   });
 
@@ -1560,7 +1574,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     expect(body.shortage).toEqual([
-      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2 },
+      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2, bySo: [] },
     ]);
   });
 
@@ -1606,7 +1620,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     expect(body.shortage).toEqual([
-      { sku: "mattress:cloud:King", attrs: null, need: 4, available: 1, shortage: 3 },
+      { sku: "mattress:cloud:King", attrs: null, need: 4, available: 1, shortage: 3, bySo: [] },
     ]);
   });
 
@@ -1695,7 +1709,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     expect(body.shortage).toEqual([
-      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2 },
+      { sku: "sofa:nordic:3s", attrs: null, need: 2, available: 0, shortage: 2, bySo: [] },
     ]);
   });
 
@@ -1761,7 +1775,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     };
     // need = 3 (NOT 6 — no double count from the two paths).
     expect(body.shortage).toEqual([
-      { sku: "mattress:cloud:King", attrs: null, need: 3, available: 0, shortage: 3 },
+      { sku: "mattress:cloud:King", attrs: null, need: 3, available: 0, shortage: 3, bySo: [] },
     ]);
   });
 
@@ -1797,7 +1811,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     };
     // need = 5 (2 from A primary + 3 from B legacy), available = 1, shortage = 4.
     expect(body.shortage).toEqual([
-      { sku: "mattress:cloud:King", attrs: null, need: 5, available: 1, shortage: 4 },
+      { sku: "mattress:cloud:King", attrs: null, need: 5, available: 1, shortage: 4, bySo: [] },
     ]);
   });
 
@@ -1846,8 +1860,20 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     };
     // Only A + B's mattress line surfaces — sofa:nordic:3s (qty 99 from C) is
     // proof the so scope held: without it the sentinel would leak through.
+    // Phase 3 (2026-05-18) — `bySo` populated when `?dls=` is set; each
+    // source SO contributes its own slice, sorted by so ascending.
     expect(body.shortage).toEqual([
-      { sku: "mattress:cloud:King", attrs: null, need: 5, available: 0, shortage: 5 },
+      {
+        sku: "mattress:cloud:King",
+        attrs: null,
+        need: 5,
+        available: 0,
+        shortage: 5,
+        bySo: [
+          { so: 4001, need: 3, available: 0, shortage: 3 },
+          { so: 4002, need: 2, available: 0, shortage: 2 },
+        ],
+      },
     ]);
   });
 
@@ -1891,8 +1917,92 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     expect(body.shortage).toEqual([
-      { sku: "mattress:cloud:King", attrs: null, need: 4, available: 0, shortage: 4 },
+      {
+        sku: "mattress:cloud:King",
+        attrs: null,
+        need: 4,
+        available: 0,
+        shortage: 4,
+        bySo: [{ so: 5001, need: 4, available: 0, shortage: 4 }],
+      },
     ]);
+  });
+
+  // -------------------------------------------------------------------------
+  // Phase 3 (2026-05-18) — per-source-SO breakdown on bundle (?dls=) calls
+  //
+  // FE feeds this breakdown into CreatePOModal's auto-split: fan out one PO
+  // per source SO. The conservative stock-distribution algorithm (walk
+  // sku → canonAttrs → so order, each entry consumes min(remaining, need))
+  // means the first SO in canonical order absorbs available stock; later
+  // SOs see whatever's left. Sum-across-bySo for (need, available, shortage)
+  // must equal the row-level totals so legacy callers reading the aggregate
+  // see consistent numbers.
+  // -------------------------------------------------------------------------
+  it("populates bySo with per-SO need/available/shortage when ?dls= is set (partial coverage)", async () => {
+    // Two awaiting orders each need 3 Harbour Cotton Blend (same SKU+attrs).
+    // Stock = 4. Walk in (sku, attrs, so) order: first SO (so=1007) absorbs
+    // 3, second SO (so=1008) sees 1 remaining → shortage 2.
+    // Row totals: need=6, available=4, shortage=2.
+    const ID_A = "00000000-0000-0000-0000-000000000e01"; // so=1007
+    const ID_B = "00000000-0000-0000-0000-000000000e02"; // so=1008
+    mockShortageQueries({
+      awaitingOrders: [
+        { id: ID_A, so: 1007 },
+        { id: ID_B, so: 1008 },
+      ],
+      orderLines: [
+        { order_id: ID_A, sku: "sofa:harbour:3s", qty: 3 },
+        { order_id: ID_B, sku: "sofa:harbour:3s", qty: 3 },
+      ],
+      stockBalances: [
+        { sku: "sofa:harbour:3s", qty: 4, reserved: 0 },
+      ],
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(
+        "http://t/api/operation/pos/awaiting-stock-shortage?dls=1007,1008",
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      shortage: {
+        sku: string;
+        attrs: Record<string, unknown> | null;
+        need: number;
+        available: number;
+        shortage: number;
+        bySo: { so: number; need: number; available: number; shortage: number }[];
+      }[];
+    };
+    expect(body.shortage).toEqual([
+      {
+        sku: "sofa:harbour:3s",
+        attrs: null,
+        need: 6,
+        available: 4,
+        shortage: 2,
+        bySo: [
+          // so=1007 fully covered — kept anyway so FE knows which SOs
+          // contributed to this row (brief: "knowing which SOs participated
+          // helps with auditing/UI").
+          { so: 1007, need: 3, available: 3, shortage: 0 },
+          // so=1008 partially covered — this is the SO that needs a PO.
+          { so: 1008, need: 3, available: 1, shortage: 2 },
+        ],
+      },
+    ]);
+    // Sum-across-bySo invariant — must equal row-level totals.
+    const row = body.shortage[0]!;
+    const sumNeed = row.bySo.reduce((s, e) => s + e.need, 0);
+    const sumAvail = row.bySo.reduce((s, e) => s + e.available, 0);
+    const sumShort = row.bySo.reduce((s, e) => s + e.shortage, 0);
+    expect(sumNeed).toBe(row.need);
+    expect(sumAvail).toBe(row.available);
+    expect(sumShort).toBe(row.shortage);
   });
 
   it("returns per-order delivery dates when ?dls= is set (bundle scope)", async () => {

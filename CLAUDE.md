@@ -773,6 +773,51 @@ Phase 1 carry-forwards:
 
 
 
+**Phase 2: per-line thread granularity (Loo 2026-05-18, autonomous)** — second of three phases. Migration `0124_per_line_thread_granularity` swapped `order_supplier_threads`' unique key from `(order_id, supplier_id, category)` → `(order_line_id)`. New FK: `order_line_id REFERENCES order_lines(id) ON DELETE CASCADE`. Pre-flight survey confirmed every existing thread maps 1:1 to an order_line, so backfill was a clean column add + UPDATE — no row multiplication. 9 prod threads + 9 order_lines = 9 thread-line pairs. NOT NULL, FK, swap unique, add `ost_order_line_idx`. Done in one transaction.
+
+Two function bodies rewritten in the same migration:
+- `operation_confirm_proceed_request_v3` — iterates per order_line instead of `group by (supplier_id, category)`. Each line gets its own thread; SO with 2 sofa lines of different fabrics now produces 2 threads.
+- `_v3_claim_threads_for_po` — claims only threads whose underlying `order_line` matches a `(sku, attrs)` tuple on the PO. This is the actual fix for the `concurrent_claim` bug Loo hit on the per-variant batch flow earlier the same day. The previous version claimed every thread for `(supplier_id, so_refs)`, which over-grabbed when multiple POs in one batch served the same SO bundle.
+
+Read-side functions untouched: rollup trigger still aggregates threads per `order_id` (min stage wins), `partner_pickup_threads` + `operation_receive_threads` operate by `thread.id` (no schema dependency on the unique key shape). No FE / API code changes needed — the thread embed exposed to clients still has the same outward shape; `order_line_id` is internal-only.
+
+Verification: 8/8 post-apply schema checks pass. Tests: api 626/629, web 439/443 — same pre-existing fails as the Phase 1 baseline. Zero new fails. Migration count: 124.
+
+Phase 2 carry-forwards: none (all expected scope covered).
+
+
+
+**Phase 3: drop the Split-per-variant toggle, default to per-(SO, sku, attrs) auto-split (Loo 2026-05-18)** — third of three phases. This is the user-facing payoff: every PO is now keyed by (supplier, sourceSo, sku, attrs). No toggle to flip. 1 SO with 2 sofa fabrics → 2 POs. 3 SOs bundled, 3 different (sku, attrs) → 3 POs (one per source SO). HoOKkA's production constraint preserved (1 fabric per PO); per-SO traceability is now structural rather than a manual operator step.
+
+Three coordinated changes (server + types + client):
+
+1. **Server** (`apps/api/src/routes/operation/pos.ts` + `packages/shared/src/schemas/operation.ts`): the `awaiting-stock-shortage` endpoint now returns `bySo: [{ so, need, available, shortage }]` on each shortage row when `?dls=...` is passed. Stock distribution walks per-(so, sku, attrs) entries in deterministic order (sku → canonAttrs → so), recording per-entry available + shortage. Invariant preserved: sum-across-bySo of (need, available, shortage) === row-level totals. Empty array on global (no-dls) calls. Bonus housekeeping: stripped one stray `\x01` SOH byte that had been hiding in a template literal in `pos.ts` since some earlier rename pass — caused `git diff --stat` to misreport size; semantic diff stays small.
+
+2. **Shared schema**: zod schema extended with `bySo` field (default `[]`). Phase-3 zod default lets pre-Phase-3 mocks parse cleanly and Phase-3 callers branch on `bySo.length`.
+
+3. **Client** (`apps/web/src/pages/operation/components/CreatePOModal.tsx`):
+   - `DraftLine` gets `sourceSo: number | null`.
+   - `autoFillFromShortage` fans out: bundle scope iterates `s.bySo` and emits one DraftLine per `(so, sku, attrs)` with `shortage > 0`. Single-SO and stockpile paths leave `sourceSo` at `prefill.so ?? null`.
+   - `issuanceGroups` now always partitions by `(supplier.id, line.sourceSo, sku, canonAttrs(attrs))` — the legacy `splitPerVariant` early-return is gone. State + toggle UI + the dual-branch "Auto-split / Per-variant split" notice all removed.
+   - `submit()` per-PO payload: single-PO branch sends `so: lineSo` (from `g.lines[0].sourceSo`); batch branch sends `soRefs: [lineSo]` per entry. Stockpile + global lines keep `sourceSo: null` → payload omits both. This is the structural fix for the concurrent_claim bug — each PO now claims a disjoint set of threads.
+
+Resilience: `autoFillFromShortage` reads `s.bySo ?? []` so pre-Phase-3 test mocks (no `bySo` field) still parse and fall through to the legacy "fanned but single-SO" path. New mocks add `bySo: []` or explicit per-SO data.
+
+Verification:
+- typecheck clean across shared / api / web.
+- api tests: 627/630 — +1 new bySo unit test, all 3 fails are pre-existing.
+- web tests: 439/443 — same 4 pre-existing HoOKkASofaTab fails as baseline. Zero new from Phase 3.
+- Web build clean. SERVICE_ROLE leak audit (§4.4): 0 hits.
+- New web bundle hash: `index-BvwXH1Ka.js`.
+
+The per-variant batch concurrent_claim bug is now structurally impossible: every PO in a batch points at a different `sourceSo`, so the line-aware `_v3_claim_threads_for_po` only ever finds the threads matching THAT PO's lines.
+
+Phase 3 carry-forwards:
+- `phase-10-shortage-by-so-test-coverage` (low) — Phase 3 server endpoint has 1 dedicated bySo test (mid-coverage scenario: 2 SOs share a SKU, stock partial). Worth adding tests for: 3-SO fan-out with disjoint SKUs (the actual Loo-scenario), pure stockpile vs bundle scope, and empty bySo on global call.
+- `phase-10-issuance-groups-test-coverage` (low) — `CreatePOModal.test.tsx` doesn't yet have a test that exercises the per-(sourceSo, sku, attrs) grouping end-to-end. Existing tests cover the legacy splitPerVariant paths via the toggle which no longer exists; the toggle test stayed in (it asserts removed UI is gone) but a fresh assert on `issuanceGroups.length === N` for a bundle prefill would lock the behavior.
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)
