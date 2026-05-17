@@ -399,10 +399,9 @@ export default function PartnerFactoryPickupsPage() {
               hint="Supplier still producing · plan ahead"
               accent="muted"
               items={buckets.upcoming}
+              hideCalendarLine
               renderAction={(po) => (
-                <span className="block w-full text-center font-mono text-[10px] text-base-500 py-1.5">
-                  {po.eta_date ? `ETA ${po.eta_date}` : "ETA tbd"}
-                </span>
+                <DateBadge label="ETA" date={po.eta_date ?? null} />
               )}
               onOpen={setOpenId}
             />
@@ -411,7 +410,16 @@ export default function PartnerFactoryPickupsPage() {
               hint="Dispatched to you · accept to schedule"
               accent="warning"
               items={buckets.awaiting}
+              hideCalendarLine
               renderAction={(po) => {
+                // 2026-05-17 (Loo) — pickup date badge shared across all
+                // three branches below. `eta_date` is the supplier's promised
+                // ready/collect date — same meaning whether the partner is
+                // accepting a sofa receive, a per-thread pickup batch, or a
+                // legacy PO-level pickup.
+                const dateBadge = (
+                  <DateBadge label="Pickup" date={po.eta_date ?? null} tone="warning" />
+                );
                 // 2026-05-11 (Loo migration 0090) — branch on supplier kind:
                 //   own_logistics + ready_confirm_sent → Accept Receive +
                 //     Reject (sofa flow, supplier dispatches themselves to
@@ -423,33 +431,36 @@ export default function PartnerFactoryPickupsPage() {
                   po.sup_status === "ready_confirm_sent";
                 if (isReceiveFlow) {
                   return (
-                    <div className="flex flex-col gap-1.5">
-                      <button
-                        type="button"
-                        disabled={confirmReceive.isPending || rejectReceive.isPending}
-                        onClick={() => confirmReceive.mutate(po.id)}
-                        className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
-                        data-testid={`confirm-receive-${po.id}`}
-                      >
-                        ✓ Accept · Confirm receive
-                      </button>
-                      <button
-                        type="button"
-                        disabled={confirmReceive.isPending || rejectReceive.isPending}
-                        onClick={() => {
-                          const reason = window.prompt(
-                            "Why are you rejecting this incoming delivery? (≥4 chars, optional but recommended)",
-                            "",
-                          );
-                          if (reason === null) return;
-                          rejectReceive.mutate({ poId: po.id, reason });
-                        }}
-                        className="w-full px-3 py-1.5 bg-white border border-warning text-warning rounded text-[12px] font-semibold disabled:opacity-50"
-                        data-testid={`reject-receive-${po.id}`}
-                      >
-                        ✗ Reject · Relocate
-                      </button>
-                    </div>
+                    <>
+                      {dateBadge}
+                      <div className="flex flex-col gap-1.5">
+                        <button
+                          type="button"
+                          disabled={confirmReceive.isPending || rejectReceive.isPending}
+                          onClick={() => confirmReceive.mutate(po.id)}
+                          className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                          data-testid={`confirm-receive-${po.id}`}
+                        >
+                          ✓ Accept · Confirm receive
+                        </button>
+                        <button
+                          type="button"
+                          disabled={confirmReceive.isPending || rejectReceive.isPending}
+                          onClick={() => {
+                            const reason = window.prompt(
+                              "Why are you rejecting this incoming delivery? (≥4 chars, optional but recommended)",
+                              "",
+                            );
+                            if (reason === null) return;
+                            rejectReceive.mutate({ poId: po.id, reason });
+                          }}
+                          className="w-full px-3 py-1.5 bg-white border border-warning text-warning rounded text-[12px] font-semibold disabled:opacity-50"
+                          data-testid={`reject-receive-${po.id}`}
+                        >
+                          ✗ Reject · Relocate
+                        </button>
+                      </div>
+                    </>
                   );
                 }
                 // 2026-05-15 (Task 11) — per-thread pickup branch. When a
@@ -465,71 +476,77 @@ export default function PartnerFactoryPickupsPage() {
                   const selSet = selectedByPo.get(po.id) ?? new Set<string>();
                   const selectedCount = selSet.size;
                   return (
-                    <div className="flex flex-col gap-1.5">
-                      <div
-                        className="border border-base-200 rounded-[4px] bg-base-50 p-2 space-y-1"
-                        data-testid={`ready-threads-${po.id}`}
-                      >
-                        <div className="text-[10px] uppercase tracking-[0.06em] text-base-600 font-semibold">
-                          Ready threads ({ready.length})
+                    <>
+                      {dateBadge}
+                      <div className="flex flex-col gap-1.5">
+                        <div
+                          className="border border-base-200 rounded-[4px] bg-base-50 p-2 space-y-1"
+                          data-testid={`ready-threads-${po.id}`}
+                        >
+                          <div className="text-[10px] uppercase tracking-[0.06em] text-base-600 font-semibold">
+                            Ready threads ({ready.length})
+                          </div>
+                          {ready.map((t) => (
+                            <label
+                              key={t.id}
+                              className="flex items-center gap-2 cursor-pointer text-[11px] font-body"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selSet.has(t.id)}
+                                onChange={() => toggleThread(po.id, t.id)}
+                                className="accent-primary"
+                                aria-label={`Select thread for SO-${t.orders?.dl ?? "?"}`}
+                                data-testid={`thread-checkbox-${t.id}`}
+                              />
+                              <span className="truncate">
+                                <span className="font-mono font-semibold">
+                                  SO-{t.orders?.dl ?? "?"}
+                                </span>{" "}
+                                · {t.orders?.customer_name ?? "—"}
+                              </span>
+                            </label>
+                          ))}
                         </div>
-                        {ready.map((t) => (
-                          <label
-                            key={t.id}
-                            className="flex items-center gap-2 cursor-pointer text-[11px] font-body"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selSet.has(t.id)}
-                              onChange={() => toggleThread(po.id, t.id)}
-                              className="accent-primary"
-                              aria-label={`Select thread for SO-${t.orders?.dl ?? "?"}`}
-                              data-testid={`thread-checkbox-${t.id}`}
-                            />
-                            <span className="truncate">
-                              <span className="font-mono font-semibold">
-                                SO-{t.orders?.dl ?? "?"}
-                              </span>{" "}
-                              · {t.orders?.customer_name ?? "—"}
-                            </span>
-                          </label>
-                        ))}
+                        <button
+                          type="button"
+                          disabled={selectedCount === 0}
+                          onClick={() =>
+                            setOpenDialog({
+                              poId: po.id,
+                              threadIds: Array.from(selSet),
+                            })
+                          }
+                          className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                          data-testid={`pickup-selected-${po.id}`}
+                        >
+                          🚚 Pickup selected ({selectedCount})
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        disabled={selectedCount === 0}
-                        onClick={() =>
-                          setOpenDialog({
-                            poId: po.id,
-                            threadIds: Array.from(selSet),
-                          })
-                        }
-                        className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
-                        data-testid={`pickup-selected-${po.id}`}
-                      >
-                        🚚 Pickup selected ({selectedCount})
-                      </button>
-                    </div>
+                    </>
                   );
                 }
                 return (
-                  <button
-                    type="button"
-                    disabled={accept.isPending}
-                    onClick={() =>
-                      accept.mutate(po.id, {
-                        onSuccess: () =>
-                          toast.success(`${po.id} accepted · scheduled for pickup`),
-                        onError: (err) =>
-                          toast.error(
-                            err instanceof ApiError ? err.message : "Accept failed",
-                          ),
-                      })
-                    }
-                    className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
-                  >
-                    ✓ Accept pickup
-                  </button>
+                  <>
+                    {dateBadge}
+                    <button
+                      type="button"
+                      disabled={accept.isPending}
+                      onClick={() =>
+                        accept.mutate(po.id, {
+                          onSuccess: () =>
+                            toast.success(`${po.id} accepted · scheduled for pickup`),
+                          onError: (err) =>
+                            toast.error(
+                              err instanceof ApiError ? err.message : "Accept failed",
+                            ),
+                        })
+                      }
+                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                    >
+                      ✓ Accept pickup
+                    </button>
+                  </>
                 );
               }}
               onOpen={setOpenId}
@@ -539,6 +556,7 @@ export default function PartnerFactoryPickupsPage() {
               hint="Pickup booked · waiting for collection"
               accent="info"
               items={buckets.scheduled}
+              hideCalendarLine
               renderAction={(po) => {
                 // 2026-05-17 (Loo + migration 0119) — per-thread branch.
                 // When PO has un-departed pickup_events, use the new
@@ -548,8 +566,8 @@ export default function PartnerFactoryPickupsPage() {
                 const undeparted = (po.pickup_events ?? []).filter(
                   (e) => e.departed_at == null,
                 );
-                if (undeparted.length > 0) {
-                  return (
+                const button =
+                  undeparted.length > 0 ? (
                     <button
                       type="button"
                       disabled={markPickupCollected.isPending}
@@ -559,26 +577,30 @@ export default function PartnerFactoryPickupsPage() {
                     >
                       📦 Mark collected{undeparted.length > 1 ? ` (${undeparted.length})` : ""}
                     </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={markCollected.isPending}
+                      onClick={() =>
+                        markCollected.mutate(po.id, {
+                          onSuccess: () =>
+                            toast.success(`${po.id} collected · in transit`),
+                          onError: (err) =>
+                            toast.error(
+                              err instanceof ApiError ? err.message : "Mark failed",
+                            ),
+                        })
+                      }
+                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                    >
+                      📦 Mark collected
+                    </button>
                   );
-                }
                 return (
-                  <button
-                    type="button"
-                    disabled={markCollected.isPending}
-                    onClick={() =>
-                      markCollected.mutate(po.id, {
-                        onSuccess: () =>
-                          toast.success(`${po.id} collected · in transit`),
-                        onError: (err) =>
-                          toast.error(
-                            err instanceof ApiError ? err.message : "Mark failed",
-                          ),
-                      })
-                    }
-                    className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
-                  >
-                    📦 Mark collected
-                  </button>
+                  <>
+                    <DateBadge label="Pickup" date={po.eta_date ?? null} tone="info" />
+                    {button}
+                  </>
                 );
               }}
               onOpen={setOpenId}
@@ -588,16 +610,33 @@ export default function PartnerFactoryPickupsPage() {
               hint="Goods loaded · en route to warehouse"
               accent="info"
               items={buckets.in_transit}
-              renderAction={(po) => (
-                <button
-                  type="button"
-                  onClick={() => setReceivingPoId(po.id)}
-                  className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold"
-                  data-testid={`receive-at-wh-${po.id}`}
-                >
-                  🏢 Arrived at WH · Receive
-                </button>
-              )}
+              hideCalendarLine
+              renderAction={(po) => {
+                // 2026-05-17 (Loo) — for In Transit the relevant date is when
+                // the partner actually picked the goods up. Prefer the latest
+                // `departed_at` across pickup_events (truth from the action
+                // that flipped the card into this column); fall back to
+                // `eta_date` for legacy / stockpile POs with no events.
+                const departed = (po.pickup_events ?? [])
+                  .map((e) => e.departed_at)
+                  .filter((d): d is string => !!d)
+                  .sort()
+                  .pop();
+                const date = (departed ?? po.eta_date ?? null)?.slice(0, 10) ?? null;
+                return (
+                  <>
+                    <DateBadge label="Picked up" date={date} tone="info" />
+                    <button
+                      type="button"
+                      onClick={() => setReceivingPoId(po.id)}
+                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold"
+                      data-testid={`receive-at-wh-${po.id}`}
+                    >
+                      🏢 Arrived at WH · Receive
+                    </button>
+                  </>
+                );
+              }}
               onOpen={setOpenId}
             />
           </div>
@@ -719,6 +758,7 @@ function PipelineColumn({
   items,
   renderAction,
   onOpen,
+  hideCalendarLine = false,
 }: {
   label: string;
   hint: string;
@@ -726,6 +766,7 @@ function PipelineColumn({
   items: PickupRow[];
   renderAction: (p: PickupRow) => React.ReactNode;
   onOpen: (id: string) => void;
+  hideCalendarLine?: boolean;
 }) {
   const accentCls =
     accent === "warning"
@@ -758,6 +799,7 @@ function PipelineColumn({
               po={p}
               renderAction={() => renderAction(p)}
               onOpen={() => onOpen(p.id)}
+              hideCalendarLine={hideCalendarLine}
             />
           ))
         )}
@@ -770,10 +812,12 @@ function PipelineCard({
   po,
   renderAction,
   onOpen,
+  hideCalendarLine = false,
 }: {
   po: PickupRow;
   renderAction: () => React.ReactNode;
   onOpen: () => void;
+  hideCalendarLine?: boolean;
 }) {
   const { head, rest, totalQty } = lineSummary(po.lines);
   const summary = rest > 0 ? `${head} +${rest} more` : head;
@@ -792,9 +836,11 @@ function PipelineCard({
       <div className="font-body text-[11px] text-base-600 leading-[1.5]">
         🏢 → {po.warehouses?.name ?? "—"}
       </div>
-      <div className="font-mono text-[10px] text-base-500 mt-1">
-        📅 {po.eta_date ? `Pickup ${po.eta_date}` : "Pickup TBD"}
-      </div>
+      {!hideCalendarLine && (
+        <div className="font-mono text-[10px] text-base-500 mt-1">
+          📅 {po.eta_date ? `Pickup ${po.eta_date}` : "Pickup TBD"}
+        </div>
+      )}
       <div className="flex flex-col gap-1.5 mt-2.5">
         {renderAction()}
         <button
@@ -804,6 +850,44 @@ function PipelineCard({
         >
           Details ›
         </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Boxed date badge used inside `renderAction` of the Upcoming + Scheduled
+ * columns. Replaces the tiny `📅 Pickup XXX` calendar line for those two
+ * columns (passed via `hideCalendarLine` on PipelineColumn) so the date
+ * itself reads as the dominant piece of info on the card — what the
+ * partner actually plans around.
+ *
+ * Tones:
+ *   muted — Upcoming (supplier still producing, ETA is a forecast)
+ *   info  — Scheduled (pickup is booked, date is firm)
+ */
+function DateBadge({
+  label,
+  date,
+  tone = "muted",
+}: {
+  label: string;
+  date: string | null;
+  tone?: "muted" | "info" | "warning";
+}) {
+  const cls =
+    tone === "info"
+      ? { border: "border-info/40", bg: "bg-info-soft/40", label: "text-info" }
+      : tone === "warning"
+        ? { border: "border-warning/40", bg: "bg-warning-soft/40", label: "text-warning" }
+        : { border: "border-base-300", bg: "bg-base-50", label: "text-base-500" };
+  return (
+    <div className={`rounded-[4px] border ${cls.border} ${cls.bg} px-3 py-2 text-center`}>
+      <div className={`font-mono text-[9px] uppercase tracking-[0.14em] font-bold ${cls.label}`}>
+        {label}
+      </div>
+      <div className="font-mono text-[14px] font-semibold text-base-900 leading-tight mt-0.5">
+        {date ?? "TBD"}
       </div>
     </div>
   );

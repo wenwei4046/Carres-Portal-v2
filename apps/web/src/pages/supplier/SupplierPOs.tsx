@@ -574,16 +574,92 @@ function POCard({
             </div>
           );
         })}
-        <div className="font-mono text-[10.5px] text-muted-foreground mt-1.5 tracking-wide">
-          ETA {po.eta_date ?? "—"}
-          {po.do_number && ` · DO ${po.do_number}`}
+        {/* 2026-05-17 (Loo screenshot redesign) — supplier-perspective:
+            cut DL# + customer-name rows (HQ-internal noise + leaks customer
+            PII to external supplier). Only surface what supplier actually
+            needs for capacity planning: WHEN goods must be ready, broken
+            down only when SO due-dates differ. If every linked SO shares
+            the same customer ETA (common case), the header chip already
+            says it — body adds nothing. If 2+ distinct dates, show a
+            compact spread so supplier knows how many units block on the
+            earliest deadline vs the rest. */}
+        {(() => {
+          const threads = po.threads ?? [];
+          if (threads.length < 2) return null;
+          const buckets = new Map<string, number>();
+          for (const t of threads) {
+            const d = t.orders?.delivery_date ?? "TBD";
+            buckets.set(d, (buckets.get(d) ?? 0) + 1);
+          }
+          if (buckets.size < 2) return null;
+          const ordered = [...buckets.entries()].sort(([a], [b]) =>
+            a.localeCompare(b),
+          );
+          return (
+            <div
+              className="mt-3 pt-2.5 border-t border-dashed border-border/60"
+              data-testid={`eta-spread-${po.id}`}
+            >
+              <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground font-semibold mb-1.5">
+                Customer deadline spread
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1 text-[12px]">
+                {ordered.map(([date, count], i) => (
+                  <div
+                    key={date}
+                    className="flex items-baseline justify-between gap-2"
+                  >
+                    <span className="font-mono text-muted-foreground">
+                      {count} SO{count > 1 ? "s" : ""}
+                      {i === 0 && (
+                        <span className="ml-1 text-[9px] font-semibold text-destructive uppercase tracking-[0.1em]">
+                          earliest
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-mono font-semibold text-foreground whitespace-nowrap">
+                      {date}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 2026-05-17 (Loo) — collection ETA upgraded from a 10.5px gray line
+            to a labeled value matching the "Send to" header style. This is
+            the supplier's own promised pickup-ready date — distinct from the
+            per-SO customer ETAs above. DO# stays inline when present. */}
+        <div className="mt-3 pt-2.5 border-t border-dashed border-border/60 flex items-end justify-between gap-3">
+          <div>
+            <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
+              Collection ETA
+            </div>
+            <div
+              className="font-mono text-[14px] font-semibold text-foreground mt-0.5"
+              data-testid={`collection-eta-${po.id}`}
+            >
+              {po.eta_date ?? "—"}
+            </div>
+          </div>
+          {po.do_number && (
+            <div className="text-right">
+              <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
+                DO
+              </div>
+              <div className="font-mono text-[12px] font-semibold text-foreground mt-0.5">
+                {po.do_number}
+              </div>
+            </div>
+          )}
         </div>
         {/* Task 9 — deduped sku × qty roll-up from the server (sku_summary).
             Acts as a tooltip-style one-liner summary for at-a-glance scanning
             even when the multi-line block above is collapsed. */}
         {po.sku_summary && po.sku_summary.length > 0 && (
           <div
-            className="text-[11px] text-muted-foreground mt-1.5"
+            className="text-[11px] text-muted-foreground mt-2"
             data-testid={`sku-summary-${po.id}`}
           >
             {po.sku_summary.map((l) => `${l.sku} × ${l.qty}`).join(" · ")}

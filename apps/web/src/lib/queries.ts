@@ -3084,6 +3084,21 @@ export interface SupplierPoRow {
     picked: number;
     total: number;
   };
+  // 2026-05-17 (Loo screenshot) — per-thread enrichment server-side spliced
+  // into the list response so the card body can list every linked SO with
+  // its own customer ETA. `orders` is populated via supplier_orders_for_threads
+  // RPC (0116) and is null for threads whose order RLS lookup misses.
+  threads?: Array<{
+    id: string;
+    order_id: string;
+    supplier_ready_at: string | null;
+    pickup_event_id: string | null;
+    orders: {
+      dl: number;
+      customer_name: string;
+      delivery_date: string | null;
+    } | null;
+  }>;
 }
 
 export interface SupplierProductRow {
