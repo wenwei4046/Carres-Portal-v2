@@ -88,22 +88,6 @@ const styles = StyleSheet.create({
   colQty: { width: "10%", textAlign: "right" },
   colUnit: { width: "10%", textAlign: "left" },
   colTotal: { width: "18%", textAlign: "right" },
-  footer: {
-    marginTop: "auto",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingTop: 24,
-  },
-  signBlock: {
-    width: "45%",
-    borderTopWidth: 1,
-    borderTopColor: "#1A1714",
-    paddingTop: 4,
-  },
-  signLabel: {
-    fontSize: 8,
-    color: MUTED,
-  },
   disclaimer: {
     fontSize: 8,
     color: MUTED,
@@ -168,17 +152,8 @@ export function DoTemplate(data: DoTemplateData) {
           })}
         </View>
 
-        <View style={styles.footer}>
-          <View style={styles.signBlock}>
-            <Text style={styles.signLabel}>Issued by (Carres)</Text>
-          </View>
-          <View style={styles.signBlock}>
-            <Text style={styles.signLabel}>Received by (Customer)</Text>
-          </View>
-        </View>
-
         <Text style={styles.disclaimer}>
-          Goods received in good condition. Please verify quantity and description above before signing.
+          Goods received in good condition. Please verify quantity and description above on delivery.
         </Text>
       </Page>
     </Document>
