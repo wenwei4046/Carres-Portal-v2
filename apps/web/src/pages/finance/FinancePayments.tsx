@@ -97,7 +97,7 @@ export default function FinancePayments() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search customer or DL number…"
+          placeholder="Search customer or SO number…"
           className="flex-1 min-w-[240px] px-2.5 py-1.5 border border-border rounded text-[12.5px] bg-background outline-none"
         />
         <div className="flex gap-px bg-muted rounded p-0.5">
@@ -129,7 +129,7 @@ export default function FinancePayments() {
           className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-[10px] uppercase tracking-[0.06em] font-bold text-muted-foreground"
           style={{ gridTemplateColumns: "90px 1.2fr 1.1fr 110px 100px 100px 130px", minWidth: 920 }}
         >
-          <span>DL</span>
+          <span>SO</span>
           <span>Customer</span>
           <span>Dealer</span>
           <span className="text-right">Total</span>
@@ -168,7 +168,7 @@ function PaymentTableRow({ row }: { row: PaymentRow }) {
       className="grid items-center px-4 py-3 border-b border-border text-[12.5px]"
       style={{ gridTemplateColumns: "90px 1.2fr 1.1fr 110px 100px 100px 130px", minWidth: 920 }}
     >
-      <span className="font-mono font-semibold">DL-{row.dl}</span>
+      <span className="font-mono font-semibold">SO-{row.dl}</span>
       <span>{row.customer_name}</span>
       <span className="text-muted-foreground">{row.dealer_name ?? "—"}</span>
       <span className="font-mono text-right">{rm(row.total)}</span>

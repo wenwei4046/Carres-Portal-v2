@@ -11,19 +11,19 @@ import StageChip from "./StageChip";
  * Triggered from `LogisticsWarehouse`'s new "Reserved" tab when the user
  * clicks a SKU row. The dialog calls
  * `GET /api/logistics/warehouse/reserved-drilldown?warehouseId=…&sku=…`
- * and renders one row per order, with the order's #DL, customer name, stage
+ * and renders one row per order, with the order's #SO, customer name, stage
  * chip, and the reserved qty for that SKU.
  *
  * Why no deep-link: `LogisticsApp` uses tab-state, not URL params, so there's
  * no `?open=` URL pattern to navigate to. Instead, each order row exposes a
- * "Copy DL" button that copies `#DL{n}` to the clipboard — the user can then
+ * "Copy SO" button that copies `#SO{n}` to the clipboard — the user can then
  * search for it on the orders tab. Keeps the wiring simple and avoids
  * shoehorning a router into the logistics shell just for this drill-down.
  *
  * Layout (proto-style — no proto counterpart, plan-driven):
  *   - Header: "Reserved orders · {skuLabel} @ {warehouseName}"
  *   - Summary band: total qty + count of orders
- *   - List: one row per order — #DL · customer · stage chip · ×qty · Copy
+ *   - List: one row per order — #SO · customer · stage chip · ×qty · Copy
  *   - Empty state: "No orders are currently holding reserve for this SKU"
  *   - Loading state: skeleton rows
  *   - Error state: red banner with retry
@@ -53,7 +53,7 @@ export default function ReserveDrilldownDialog({
   const orders = data?.orders ?? [];
 
   async function copyDl(dl: number) {
-    const text = `#DL${dl}`;
+    const text = `#SO${dl}`;
     try {
       // navigator.clipboard is async + Promise-returning; toast on resolve.
       await navigator.clipboard.writeText(text);
@@ -142,7 +142,7 @@ export default function ReserveDrilldownDialog({
                   gridTemplateColumns: "100px minmax(0,1fr) 150px 90px 90px",
                 }}
               >
-                <div className="label">DL</div>
+                <div className="label">SO</div>
                 <div className="label">Customer</div>
                 <div className="label">Stage</div>
                 <div className="label text-right">Reserved</div>
@@ -158,7 +158,7 @@ export default function ReserveDrilldownDialog({
                   }}
                 >
                   <div className="font-mono text-[12px] font-semibold">
-                    #DL{o.dl}
+                    #SO{o.dl}
                   </div>
                   <div className="font-body text-[13px] truncate">
                     {o.customerName}
@@ -176,7 +176,7 @@ export default function ReserveDrilldownDialog({
                       className="btn-ghost text-[11px] py-1 px-2"
                       data-testid={`reserve-drilldown-copy-${o.id}`}
                     >
-                      Copy DL
+                      Copy SO
                     </button>
                   </div>
                 </div>

@@ -472,7 +472,7 @@ describe("GET /api/orders/:id/sales-order-data", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(body.so_number).toBe("SO-001001");
-    expect(body.order_code).toBe("DL-1001");
+    expect(body.order_code).toBe("SO-1001");
     expect(body.customer.name).toBe("Tan Mei Ling");
     expect(body.lines).toHaveLength(1);
     expect(body.addons).toHaveLength(1);

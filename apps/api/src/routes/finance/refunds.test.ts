@@ -193,7 +193,7 @@ describe("POST /api/finance/refunds/create", () => {
     expect(approvalsInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         kind:      "refund",
-        refers_to: "DL-1242",
+        refers_to: "SO-1242",
         amount:    2100,
         status:    "pending",
       }),

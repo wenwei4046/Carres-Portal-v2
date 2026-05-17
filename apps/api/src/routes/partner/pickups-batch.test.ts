@@ -59,13 +59,15 @@ beforeEach(() => {
 afterAll(() => _setJwksForTesting(null));
 
 describe("POST /api/partner/pickups/batch", () => {
+  // 2026-05-16 (migration 0117) — doNumber + doFilePath are optional (server
+  // auto-generates DO# when omitted). VALID stays maximal for the "all args
+  // forwarded" test; per-test minimal bodies cover the auto-DO# path.
   const VALID = {
     poId: PO_ID,
     threadIds: [THREAD_A, THREAD_B],
     doNumber: "DO-5301",
     doFilePath: `${PO_ID}/abc-do.pdf`,
     doNote: "Loading bay 3",
-    signed: true,
   };
 
   it("rejects non-partner role with 403", async () => {
@@ -94,7 +96,20 @@ describe("POST /api/partner/pickups/batch", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns 422 when doNumber is missing", async () => {
+  it("accepts request with NO doNumber (server auto-generates per 0117)", async () => {
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({
+        data: {
+          pickup_event_id: "ffffffff-ffff-ffff-ffff-ffffffffffff",
+          thread_count: 1,
+          do_number: "DO-PO-5301-001",
+          po_sup_status: "partially_shipped",
+        },
+        error: null,
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("partner", { partnerId: PARTNER_ID });
     const res = await app.fetch(
       new Request("http://t/api/partner/pickups/batch", {
@@ -103,16 +118,18 @@ describe("POST /api/partner/pickups/batch", () => {
         body: JSON.stringify({
           poId: PO_ID,
           threadIds: [THREAD_A],
-          doFilePath: "p/x.pdf",
-          signed: true,
         }),
       }),
       env,
     );
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith(
+      "partner_pickup_threads",
+      expect.objectContaining({ p_do_number: null, p_do_file_path: null }),
+    );
   });
 
-  it("returns 422 when doNumber < 3 chars", async () => {
+  it("returns 422 when doNumber present but < 3 chars (still validated when supplied)", async () => {
     const jwt = await makeJwt("partner", { partnerId: PARTNER_ID });
     const res = await app.fetch(
       new Request("http://t/api/partner/pickups/batch", {
@@ -138,28 +155,13 @@ describe("POST /api/partner/pickups/batch", () => {
     expect(res.status).toBe(422);
   });
 
-  it("returns 422 when signed is false (zod literal(true))", async () => {
+  it("rejects extra `signed` field per zod strict mode (was a required literal pre-0117)", async () => {
     const jwt = await makeJwt("partner", { partnerId: PARTNER_ID });
     const res = await app.fetch(
       new Request("http://t/api/partner/pickups/batch", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...VALID, signed: false }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("returns 422 when signed is missing (zod requires literal true)", async () => {
-    const jwt = await makeJwt("partner", { partnerId: PARTNER_ID });
-    const body: Record<string, unknown> = { ...VALID };
-    delete body.signed;
-    const res = await app.fetch(
-      new Request("http://t/api/partner/pickups/batch", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...VALID, signed: true }),
       }),
       env,
     );
@@ -172,6 +174,7 @@ describe("POST /api/partner/pickups/batch", () => {
         data: {
           pickup_event_id: "ffffffff-ffff-ffff-ffff-ffffffffffff",
           thread_count: 2,
+          do_number: "DO-5301",
           po_sup_status: "partially_shipped",
         },
         error: null,
@@ -200,6 +203,7 @@ describe("POST /api/partner/pickups/batch", () => {
     const body = (await res.json()) as {
       pickup_event_id: string;
       thread_count: number;
+      do_number: string;
       po_sup_status: string;
     };
     expect(body.thread_count).toBe(2);

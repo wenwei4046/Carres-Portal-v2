@@ -1,30 +1,19 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { usePartnerPickupBatch } from "@/lib/queries";
-import DOFileUploadField from "@/components/DOFileUploadField";
 
 /**
  * PickupBatchDialog — Task 11 (2026-05-15) of the Supplier Per-Thread Readiness plan.
  *
- * Partner-side modal that wraps `partner_pickup_threads` (migration 0107).
- * One DO paper = one physical trip = one `po_pickup_events` row covering N
- * supplier-ready threads on a single factory_pickup PO. Caller supplies:
+ * Partner-side modal that wraps `partner_pickup_threads`. One pickup trip =
+ * one `po_pickup_events` row covering N supplier-ready threads on a single
+ * factory_pickup PO.
  *
- *   - poId           — the PO whose threads are being picked up
- *   - selectedThreadIds — at least one thread, all in supplier_ready state
- *                         with no prior pickup_event_id (RPC re-validates)
- *   - onClose        — invoked after a successful submit OR Cancel
- *
- * UX gates the Submit button on the same triple the partner-side POD upload
- * dialog uses: DO# ≥ 3 chars, signed checkbox ticked, and a `doFilePath` from
- * `DOFileUploadField` (which streams to the `delivery-orders` Storage bucket
- * via the existing `/api/storage/dos/sign-upload` endpoint).
- *
- * Note on `DOFileUploadField` props: the real component takes
- * `{ poId, doNumber, onUploaded }` — different from the placeholder shape
- * in the plan doc (`{ bucket, signUploadUrl, signUploadBody, onChange }`).
- * The component is reused as-is to keep the Storage RLS / signed-URL flow
- * consistent with every other DO upload site in the app.
+ * 2026-05-16 (migration 0117 + Loo screenshot) — DO# auto-generated server-side
+ * as `DO-{poId}-{seq}`. Partner doesn't issue the DO so they shouldn't type
+ * the number; the legacy supplier paper-DO flow doesn't apply in a single
+ * digital workflow. Modal is now a one-click confirmation with an optional
+ * note. Future polish can add a receipt-photo upload but isn't required.
  */
 export default function PickupBatchDialog({
   poId,
@@ -35,27 +24,19 @@ export default function PickupBatchDialog({
   selectedThreadIds: string[];
   onClose: () => void;
 }) {
-  const [doNumber, setDoNumber] = useState("");
   const [doNote, setDoNote] = useState("");
-  const [signed, setSigned] = useState(false);
-  const [doFilePath, setDoFilePath] = useState<string | null>(null);
   const pickup = usePartnerPickupBatch();
-
-  const doNumberOk = doNumber.trim().length >= 3;
-  const canSubmit =
-    doNumberOk && signed && !!doFilePath && selectedThreadIds.length > 0;
 
   async function handleSubmit() {
     try {
       const res = await pickup.mutateAsync({
         poId,
         threadIds: selectedThreadIds,
-        doNumber: doNumber.trim(),
-        doFilePath: doFilePath!,
         doNote: doNote.trim() || undefined,
       });
+      const doStr = (res as { do_number?: string })?.do_number ?? "DO";
       toast.success(
-        `Picked up ${res.thread_count} thread(s) · DO ${doNumber.trim()}`,
+        `Picked up ${res.thread_count} thread(s) · ${doStr}`,
       );
       onClose();
     } catch (e) {
@@ -79,43 +60,11 @@ export default function PickupBatchDialog({
           <p className="text-[12px] text-base-500 font-mono mt-0.5">
             PO {poId}
           </p>
+          <p className="text-[11px] text-base-500 mt-2">
+            Carres will auto-generate the DO number for this pickup. Click
+            Pickup to confirm — no need to enter a number.
+          </p>
         </div>
-
-        <div>
-          <label
-            htmlFor="pickup-do-number"
-            className="block text-[10px] uppercase tracking-[0.06em] text-base-500 mb-1"
-          >
-            DO number *
-          </label>
-          <input
-            id="pickup-do-number"
-            type="text"
-            value={doNumber}
-            onChange={(e) => setDoNumber(e.target.value)}
-            className="w-full border border-base-300 rounded px-3 py-2 text-sm bg-white outline-none focus:border-primary"
-            placeholder="e.g. DO-PO9999-A"
-          />
-          {!doNumberOk && doNumber.length > 0 && (
-            <p className="text-[10px] text-destructive mt-1">
-              Min 3 characters
-            </p>
-          )}
-        </div>
-
-        {doNumberOk && (
-          <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
-            <div className="text-[11px] text-base-600 mb-2 font-body">
-              Attach signed DO file{" "}
-              <span className="text-base-400">(PDF/JPG/PNG · ≤10 MB)</span>
-            </div>
-            <DOFileUploadField
-              poId={poId}
-              doNumber={doNumber.trim()}
-              onUploaded={setDoFilePath}
-            />
-          </div>
-        )}
 
         <div>
           <label
@@ -128,20 +77,10 @@ export default function PickupBatchDialog({
             id="pickup-do-note"
             value={doNote}
             onChange={(e) => setDoNote(e.target.value)}
+            placeholder="e.g. driver name, plate, condition"
             className="w-full border border-base-300 rounded px-3 py-2 text-sm h-20 bg-white outline-none focus:border-primary resize-y"
           />
         </div>
-
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={signed}
-            onChange={(e) => setSigned(e.target.checked)}
-            className="accent-primary"
-            aria-label="Signed receipt confirmed"
-          />
-          <span className="text-sm font-body">Signed receipt confirmed</span>
-        </label>
 
         <div className="flex justify-end gap-2 pt-2">
           <button
@@ -153,7 +92,7 @@ export default function PickupBatchDialog({
           </button>
           <button
             type="button"
-            disabled={!canSubmit || pickup.isPending}
+            disabled={selectedThreadIds.length === 0 || pickup.isPending}
             onClick={handleSubmit}
             className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded disabled:opacity-50"
             data-testid="pickup-batch-submit"

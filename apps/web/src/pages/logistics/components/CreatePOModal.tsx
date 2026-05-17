@@ -108,18 +108,22 @@ interface DraftLine {
   attrs: Record<string, unknown> | null;
 }
 
-// Convention: SKUs are formatted `category:model:variant`. The first segment
-// is the category which `suppliers.cat_covered[]` is keyed by.
-function categoryForSku(sku: string): string {
-  return (sku || "").split(":")[0] || "";
+// 2026-05-17 (Loo A→Z test bug A) — real DB SKUs (e.g. `B1201F-K`) don't carry
+// a `category:model:variant` prefix the way the early proto seed did. We have
+// to walk product_skus → product_models.category instead. The two helpers
+// below take a SKU + the resolver maps the modal already builds.
+function categoryForSku(
+  sku: string,
+  skuByCode: Map<string, ProductSkuDto>,
+  models: ProductModelDto[],
+): string {
+  const skuRow = skuByCode.get(sku);
+  if (!skuRow) return "";
+  const model = models.find((m) => m.id === skuRow.modelId);
+  return model?.category ?? "";
 }
-function modelKeyOfSku(sku: string): string {
-  return (sku || "").split(":")[1] || "";
-}
-function modelIdForSku(sku: string, models: ProductModelDto[]): string {
-  const key = modelKeyOfSku(sku);
-  if (!key) return "";
-  return models.find((m) => m.modelKey === key)?.id ?? "";
+function modelIdForSku(sku: string, skuByCode: Map<string, ProductSkuDto>): string {
+  return skuByCode.get(sku)?.modelId ?? "";
 }
 function modelById(modelId: string, models: ProductModelDto[]): ProductModelDto | null {
   return models.find((m) => m.id === modelId) ?? null;
@@ -150,8 +154,20 @@ function attrsMissingForLine(
 function findSupplierForSku(
   sku: string,
   suppliers: SupplierRow[],
+  skuByCode: Map<string, ProductSkuDto>,
+  models: ProductModelDto[],
 ): SupplierRow | null {
-  const cat = categoryForSku(sku);
+  // 2026-05-17 — prefer the SKU's own supplier_id when the catalog row carries
+  // it; otherwise fall back to the cat_covered category match (multi-supplier
+  // category, e.g. mattress from two factories). Both paths cover the
+  // real-world data; the old proto-style category:model:variant split is gone.
+  const skuRow = skuByCode.get(sku);
+  if (skuRow?.supplierId) {
+    const direct = suppliers.find((s) => s.id === skuRow.supplierId);
+    if (direct) return direct;
+  }
+  const cat = categoryForSku(sku, skuByCode, models);
+  if (!cat) return null;
   return suppliers.find((s) => (s.cat_covered ?? []).includes(cat)) ?? null;
 }
 
@@ -288,7 +304,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       return prefill.lines.map((l) => {
         const cs = lineCostFromSku(l.sku);
         return {
-          modelId: modelIdForSku(l.sku, models),
+          modelId: modelIdForSku(l.sku, skuByCode),
           sku: l.sku,
           qty: l.qty,
           cost: cs.cost,
@@ -413,7 +429,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     const g = new Map<string, { supplier: SupplierRow; lines: DraftLine[] }>();
     const orphans: DraftLine[] = [];
     for (const l of lines) {
-      const sup = findSupplierForSku(l.sku, suppliers);
+      const sup = findSupplierForSku(l.sku, suppliers, skuByCode, models);
       if (!sup) {
         orphans.push(l);
         continue;
@@ -502,7 +518,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         data.shortage.map((s) => {
           const cs = lineCostFromSku(s.sku);
           return {
-            modelId: modelIdForSku(s.sku, models),
+            modelId: modelIdForSku(s.sku, skuByCode),
             sku: s.sku,
             qty: s.shortage,
             cost: cs.cost,
@@ -580,7 +596,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       const nextLines = Array.from(gapBySku.entries()).map(([sku, qty]) => {
         const cs = lineCostFromSku(sku);
         return {
-          modelId: modelIdForSku(sku, models),
+          modelId: modelIdForSku(sku, skuByCode),
           sku,
           qty,
           cost: cs.cost,
@@ -1022,7 +1038,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           <div></div>
         </div>
         {lines.map((l, i) => {
-          const sup = findSupplierForSku(l.sku, suppliers);
+          const sup = findSupplierForSku(l.sku, suppliers, skuByCode, models);
           // 0073 cascade picker (Loo 2026-05-09). Per-line we read the model
           // record + its variant/fabric lookups to render category-aware
           // sub-row dropdowns. modelId="" means the operator hasn't picked a

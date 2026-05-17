@@ -48,7 +48,7 @@ const SUMMARY_PAYLOAD = {
     { id: "00000000-0000-0000-0000-000000000d01", name: "BedHouse KL", region: "KL", status: "active", order_count: 5, gmv: 50000 },
   ],
   pending_approvals: [
-    { id: "a1", kind: "refund", title: "Refund · RM 100", actor: "F", refers_to: "DL-1", amount: 100, dealer_id: null, created_at: "2026-05-03T00:00:00Z" },
+    { id: "a1", kind: "refund", title: "Refund · RM 100", actor: "F", refers_to: "SO-1", amount: 100, dealer_id: null, created_at: "2026-05-03T00:00:00Z" },
   ],
   audit_recent: [
     { id: "e1", role: "principal", actor_text: "Sara", action: "Approved", dealer_id: null, ref: null, occurred_at: "2026-05-03T00:00:00Z" },

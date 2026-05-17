@@ -361,8 +361,8 @@ logisticsOrdersRouter.get("/:id/print-do-data", requireLogistics, async (c) => {
     do_number: String(ord.do_number),
     issue_date: issueDate,
     order_id: String(ord.id),
-    // Order code shown to dealer = `DL-${dl}` (matches existing UI conventions).
-    order_code: `DL-${ord.dl}`,
+    // Order code shown to dealer = `SO-${dl}` (matches existing UI conventions).
+    order_code: `SO-${ord.dl}`,
     customer: {
       name: String(ord.customer_name ?? ""),
       address: customerAddress,

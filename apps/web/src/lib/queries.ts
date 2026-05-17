@@ -116,7 +116,7 @@ export const qk = {
     po:        (id: string) => ["logistics", "pos", id] as const,
     /** Loo 2026-05-16 — per-source-order ETA list for the PO detail modal.
      *  Nested under "pos" so a blunt `["logistics","pos"]` invalidation after
-     *  a PO mutation also clears these. Cheap (1-row-per-DL select), and the
+     *  a PO mutation also clears these. Cheap (1-row-per-SO select), and the
      *  fetch only fires when the modal opens. */
     poSourceOrders: (id: string) =>
       ["logistics", "pos", id, "source-orders"] as const,
@@ -2288,7 +2288,7 @@ export function useCreatePoMutation(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
-      // If the PO is tied to a DL (single or via dl_refs), the awaiting_logistics_action
+      // If the PO is tied to a SO (single or via dl_refs), the awaiting_logistics_action
       // drawer for those orders should refresh. Bust the orders sub-tree too.
       await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
@@ -3075,6 +3075,15 @@ export interface SupplierPoRow {
   urgency?: "critical" | "urgent" | "normal" | null;
   behind_schedule?: boolean;
   sku_summary?: Array<{ sku: string; qty: number }>;
+  // 2026-05-16 (migration 0114) — per-thread state counts that drive the
+  // supplier kanban bucket placement + the "X of Y" card subtitle. Same PO
+  // can land in `po` (producing > 0) AND `ready` (ready > 0) when partial.
+  thread_state_counts?: {
+    producing: number;
+    ready: number;
+    picked: number;
+    total: number;
+  };
 }
 
 export interface SupplierProductRow {
@@ -3499,31 +3508,59 @@ export function useUnmarkThreadReady() {
 
 /** Partner batch pickup — picks N ready threads on a PO in one DO. Server
  *  creates one `pickup_events` row + stamps every selected thread's
- *  `pickup_event_id`. `signed: true` is hard-coded (matches the
- *  partner_attach_pod pattern — gating is server-side). */
+ *  `pickup_event_id`.
+ *
+ *  2026-05-16 (migration 0117) — `doNumber` + `doFilePath` are optional.
+ *  Server auto-generates `DO-{poId}-{seq}` when omitted; the partner doesn't
+ *  type a number for a doc they didn't issue. Response includes the final
+ *  do_number so the UI can echo it back in a toast.
+ */
 export function usePartnerPickupBatch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       poId: string;
       threadIds: string[];
-      doNumber: string;
-      doFilePath: string;
+      doNumber?: string;
+      doFilePath?: string;
       doNote?: string;
     }) => {
       return apiFetch<{
         pickup_event_id: string;
         thread_count: number;
+        do_number: string;
         po_sup_status: string;
       }>("/api/partner/pickups/batch", {
         method: "POST",
-        body: JSON.stringify({ ...input, signed: true }),
+        body: JSON.stringify(input),
       });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["partner"] });
       qc.invalidateQueries({ queryKey: ["pickupEvents"] });
       qc.invalidateQueries({ queryKey: ["supplierThreads"] });
+    },
+  });
+}
+
+/**
+ * Partner marks a pickup event as "physically collected · departing factory".
+ * Stamps po_pickup_events.departed_at = NOW() server-side. Drives the kanban
+ * PO from SCHEDULED → IN TRANSIT (the middle of the proto-faithful 3-step
+ * partner flow restored 2026-05-17 by migration 0119).
+ */
+export function usePartnerMarkPickupCollected() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (eventId: string) => {
+      return apiFetch<{ event_id: string; departed_at: string }>(
+        `/api/partner/pickups/events/${eventId}/collect`,
+        { method: "POST" },
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["partner"] });
+      qc.invalidateQueries({ queryKey: ["pickupEvents"] });
     },
   });
 }

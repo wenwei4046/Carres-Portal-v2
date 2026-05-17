@@ -55,6 +55,18 @@ partnerPickupsRouter.get("/", async (c) => {
   // 2026-05-15 (Task 6) — embed linked customer-leg threads + their orders'
   // delivery_date so the response can be enriched with customer_eta_min /
   // urgency / behind_schedule. Mirrors the supplier/pos enrichment.
+  //
+  // 2026-05-16 (Loo screenshot + migration 0115) — drop the nested
+  // `orders(...)` embed from threads. The orders_scoped_read policy admits
+  // partners only when `orders.delivery_partner_id = app_partner_id()` (the
+  // customer-leg LP), but procurement-leg partners legitimately need to read
+  // these orders before the customer-leg LP is assigned. We fetch the order
+  // info via the partner_orders_for_threads SECURITY DEFINER RPC instead
+  // (same pattern as supplier_threads_for_po, 0111).
+  // 2026-05-17 (Loo screenshot) — embed po_pickup_events so the drawer can
+  // resolve each thread.pickup_event_id to its DO# / picked-at timestamp for
+  // the "In transit" thread group. RLS policy pickup_events_partner_read
+  // (0107:494) admits the procurement-leg partner via procurement_partner_id.
   const { data, error } = await sb
     .from("purchase_orders")
     .select(
@@ -64,21 +76,61 @@ partnerPickupsRouter.get("/", async (c) => {
       suppliers(name, contact, kind),
       warehouses(name, address, kind, owning_partner_id),
       lines:purchase_order_lines(id, sku, qty, received_qty, attrs),
-      threads:order_supplier_threads(id, order_id, supplier_ready_at, pickup_event_id, orders(dl, delivery_date, customer_name))
+      threads:order_supplier_threads(id, order_id, supplier_ready_at, pickup_event_id),
+      pickup_events:po_pickup_events(id, do_number, picked_up_at, departed_at)
     `,
     )
     .order("placed_at", { ascending: false });
 
   if (error) throw new HTTPException(500, { message: error.message });
 
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+  // Collect every thread's order_id across all POs, then one RPC round-trip
+  // fetches dl / customer_name / delivery_date for those orders (scoped to
+  // this partner's POs internally).
+  const orderIds: string[] = [];
+  for (const po of rows) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const t of (((po as any).threads ?? []) as any[])) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const oid = (t as any)?.order_id as string | null | undefined;
+      if (oid) orderIds.push(oid);
+    }
+  }
+  const orderInfo = new Map<string, { dl: number; customer_name: string; delivery_date: string | null }>();
+  if (orderIds.length > 0) {
+    const { data: oRows, error: oErr } = await sb.rpc("partner_orders_for_threads", {
+      p_order_ids: orderIds,
+    });
+    if (oErr) {
+      const m = mapPgError(oErr);
+      return c.json(m.body, m.status);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of ((oRows ?? []) as any[])) {
+      orderInfo.set(String(r.id), {
+        dl: Number(r.dl),
+        customer_name: String(r.customer_name ?? ""),
+        delivery_date: (r.delivery_date as string | null) ?? null,
+      });
+    }
+  }
+
   // 2026-05-15 (Task 6) — enrich each PO row with 4 computed fields. Same
   // block as in apps/api/src/routes/supplier/pos.ts (2 callsites; inlined
   // per spec rather than extracted to a helper).
   const now = new Date();
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
   const enriched = rows.map((po) => {
+    // Splice the RPC-fetched order info back onto each thread under
+    // `orders` so the existing UI shape stays unchanged.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const threadEtas: string[] = (((po as any).threads ?? []) as any[])
+    const threadsArr = (((po as any).threads ?? []) as any[]).map((t: any) => {
+      const oid = t?.order_id as string | null | undefined;
+      const info = oid ? orderInfo.get(oid) ?? null : null;
+      return { ...t, orders: info };
+    });
+    const threadEtas: string[] = threadsArr
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((t: any) => t?.orders?.delivery_date)
       .filter((d: unknown): d is string => typeof d === "string" && d.length > 0);
@@ -100,6 +152,7 @@ partnerPickupsRouter.get("/", async (c) => {
     const skuSummary = [...skuMap.entries()].map(([sku, qty]) => ({ sku, qty }));
     return {
       ...po,
+      threads: threadsArr,
       customer_eta_min: customerEtaMin,
       urgency,
       behind_schedule: behindSchedule,
@@ -191,6 +244,33 @@ partnerPickupsRouter.post("/:id/reject-receive", async (c) => {
   const { data, error } = await sb.rpc("partner_reject_customer", {
     p_po_id: c.req.param("id"),
     p_reason: reason,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+/**
+ * POST /api/partner/pickups/events/:eventId/collect — Loo 2026-05-17.
+ *
+ * Stamps `po_pickup_events.departed_at = now()` for the per-thread pickup
+ * flow. Splits the legacy "Pickup Selected = booked + departed" collapse into
+ * proto's 3 partner phases: SCHEDULED (DO booked) → IN TRANSIT (collected,
+ * driving) → DELIVERED (arrived at WH).
+ *
+ * Wraps `partner_mark_pickup_collected` (migration 0119) which enforces the
+ * procurement_partner_id cross-tenant gate inside SECURITY DEFINER.
+ */
+partnerPickupsRouter.post("/events/:eventId/collect", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Only partner role with partner_id" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("partner_mark_pickup_collected", {
+    p_event_id: c.req.param("eventId"),
   });
   if (error) {
     const m = mapPgError(error);
@@ -539,7 +619,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
     do_number: String(ord.do_number),
     issue_date: issueDate,
     order_id: String(ord.id),
-    order_code: `DL-${ord.dl}`,
+    order_code: `SO-${ord.dl}`,
     customer: {
       name: String(ord.customer_name ?? ""),
       address: customerAddress,

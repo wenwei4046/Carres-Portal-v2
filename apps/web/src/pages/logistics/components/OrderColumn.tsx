@@ -19,7 +19,7 @@ import type { LogisticsStage } from "./StageChip";
  *
  * Pipeline v2 expand-to-zoom: when one column is expanded, click any column
  * header to swap the focus. Clicking the active column header collapses back
- * to equal-flex. Cards become compact (just `#DL`) when another column is
+ * to equal-flex. Cards become compact (just `#SO`) when another column is
  * expanded — keeps non-focus columns scannable rather than truncated mid-card.
  *
  * `bucketAction` is the bottom-right hint each card shows when not delivered

@@ -108,7 +108,7 @@ export default function FinanceRecon() {
       <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-[11.5px] text-muted-foreground flex gap-3">
         <span>💡</span>
         <span>
-          Auto-match runs nightly using FPX customer reference + amount. Unmatched lines need a finance person to manually link them — usually customer transferred without quoting their DL number.
+          Auto-match runs nightly using FPX customer reference + amount. Unmatched lines need a finance person to manually link them — usually customer transferred without quoting their SO number.
         </span>
       </div>
 

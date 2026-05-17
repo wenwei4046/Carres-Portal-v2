@@ -9,7 +9,7 @@ async function login(page: Page, email: string, password: string) {
 }
 
 // Pre-condition: pnpm seed:test-users && pnpm seed:e2e-fixtures
-//   - DL-9203: sofa order at logistics_stage='dispatched' with thread
+//   - SO-9203: sofa order at logistics_stage='dispatched' with thread
 //     supplier=HoOKkA, category='sofa', sop_name='SOFA_SPECIAL'.
 //
 // 2026-05-09 rewrite: original spec walked the LP-pre-flight 代按 flow

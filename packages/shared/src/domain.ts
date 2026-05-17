@@ -67,6 +67,12 @@ export interface ProductSku {
   // 0074 — fixed procurement cost per unit; auto-fills onto every Create-PO
   // line. Null = not yet set (Create-PO refuses lines whose SKU has null cost).
   cost: number | null;
+  // 2026-05-17 (Loo A→Z test bug A) — SKU-level supplier ownership. The DB
+  // column has been NOT NULL since migration 0074; surfacing it on the DTO
+  // lets CreatePOModal route lines to the right supplier group directly
+  // instead of parsing a `category:model:variant` prefix from the SKU string
+  // (the proto-era convention that's no longer how SKUs are formatted).
+  supplierId: string | null;
   discontinuedAt?: string | null;
 }
 

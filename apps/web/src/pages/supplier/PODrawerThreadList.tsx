@@ -58,21 +58,31 @@ export default function PODrawerThreadList({ poId }: { poId: string }) {
                   else markReady.mutate(t.id);
                 }}
                 className="mt-1"
-                aria-label={`Mark thread for DL-${t.order_dl} ready for pickup`}
+                aria-label={`Mark thread for SO-${t.order_dl} ready for pickup`}
                 data-testid={`thread-checkbox-${t.id}`}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono font-semibold text-sm">
-                    DL-{t.order_dl}
+                    SO-{t.order_dl}
                   </span>
                   <span className="text-[12px] text-muted-foreground truncate">
                     {t.customer_name}
                   </span>
                   <StatePill picked={isPicked} ready={isReady} />
                 </div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
-                  Customer ETA: {t.customer_delivery_date ?? "—"}
+                {/* 2026-05-16 (Loo) — customer delivery date is the supplier's
+                    only real deadline; it deserves real estate. Bumped from
+                    11px muted to 13px foreground with an inline calendar
+                    icon so it pops on the thread row. */}
+                <div className="text-[13px] text-foreground mt-1 flex items-center gap-1.5">
+                  <span aria-hidden="true">📅</span>
+                  <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                    Customer ETA
+                  </span>
+                  <span className="font-mono font-semibold">
+                    {t.customer_delivery_date ?? "—"}
+                  </span>
                 </div>
                 {(t.sku_lines ?? []).length > 0 && (
                   <div className="text-[11px] text-muted-foreground mt-1">

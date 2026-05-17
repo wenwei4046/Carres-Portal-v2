@@ -179,7 +179,7 @@ export default function ARDrawer({
               Order summary
             </div>
             <div className="bg-background/60 rounded-md border border-border px-3 py-2 text-[12.5px] flex justify-between">
-              <span>DL-{row.dl} · {row.status}</span>
+              <span>SO-{row.dl} · {row.status}</span>
               <span className="font-mono">{rm(row.total)}</span>
             </div>
             {/* 2026-05-12 (Loo) — reprint the customer Sales Order from AR. */}

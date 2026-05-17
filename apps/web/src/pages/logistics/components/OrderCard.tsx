@@ -14,7 +14,7 @@ import type { LogisticsStage } from "./StageChip";
  *   - Hover: border swaps to terracotta
  *   - Selected (awaiting_logistics_action + checkbox checked): peach signature-50 fill
  *     + terracotta border
- *   - Top row: `#DL` (mono 11px bold) and placed-at date (mono 10px base-500)
+ *   - Top row: `#SO` (mono 11px bold) and placed-at date (mono 10px base-500)
  *   - Customer name (CJK detect, 13px)
  *   - Channel: showroom badge (uppercase, slate outline) + dealer/showroom name
  *   - Delivery date or "Date TBD"
@@ -76,7 +76,7 @@ interface Props {
   /** Optional CTA hint (e.g. "Assign delivery →") shown bottom-right. */
   actionHint?: string;
   /** Pipeline v2 expand-to-zoom: when another column is expanded this column
-   *  shrinks to ~10% width, so we strip the card down to just `#DL` + customer
+   *  shrinks to ~10% width, so we strip the card down to just `#SO` + customer
    *  name to stay scannable. */
   compact?: boolean;
   /** 2026-05-12 (Loo) — current kanban stage. When set to a revertible stage

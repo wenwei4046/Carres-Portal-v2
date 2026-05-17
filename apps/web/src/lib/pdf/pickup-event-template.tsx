@@ -10,7 +10,7 @@
  *
  * Mirrors `do-template.tsx` (single-customer DO) but the "lines" section
  * is a per-thread table — one row per `order_supplier_threads` swept up
- * in this pickup. Each thread carries its parent order's DL# + customer +
+ * in this pickup. Each thread carries its parent order's SO# + customer +
  * customer delivery date + the SKUs being moved for that order.
  *
  * Page format: A4, Carres terracotta accent (#D64F20).
@@ -209,7 +209,7 @@ export function PickupEventTemplate(data: PickupEventPrintPayload) {
         {threads.map((t) => (
           <View key={t.thread_id} style={styles.threadBlock}>
             <View style={styles.threadHeader}>
-              <Text style={styles.threadDl}>DL-{t.order_dl}</Text>
+              <Text style={styles.threadDl}>SO-{t.order_dl}</Text>
               <Text style={styles.threadCustomer}>{t.customer_name}</Text>
               <Text style={styles.threadEta}>
                 ETA: {t.customer_delivery_date ?? "—"}

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ApiError, apiFetch } from "@/lib/api";
-import { qk } from "@/lib/queries";
+import { qk, usePartnerMarkPickupCollected } from "@/lib/queries";
 import PartnerReceiveAtWhModal from "./components/PartnerReceiveAtWhModal";
 import PickupBatchDialog from "./components/PickupBatchDialog";
 
@@ -55,6 +55,15 @@ type PickupThread = {
   orders: { dl: number; delivery_date: string | null; customer_name: string } | null;
 };
 
+type PickupEvent = {
+  id: string;
+  do_number: string;
+  picked_up_at: string | null;
+  // 2026-05-17 (migration 0119) — null = SCHEDULED (DO booked, partner has
+  // not yet physically collected); non-null = IN TRANSIT (loaded + driving).
+  departed_at: string | null;
+};
+
 type PickupRow = {
   id: string;
   dl: number | null;
@@ -73,6 +82,9 @@ type PickupRow = {
   warehouses: { name: string; address: string | null; kind: "own" | "logistics_partner" | null; owning_partner_id: string | null } | null;
   lines: PickupLine[];
   threads?: PickupThread[];
+  // 2026-05-17 — embedded so the drawer's In-transit section can resolve
+  // thread.pickup_event_id to its DO# without a second round-trip.
+  pickup_events?: PickupEvent[];
 };
 
 /**
@@ -86,36 +98,108 @@ function readyThreadsOf(p: PickupRow): PickupThread[] {
   );
 }
 
+/** Threads still being made at the supplier — not yet ready, not picked. */
+function producingThreadsOf(p: PickupRow): PickupThread[] {
+  return (p.threads ?? []).filter(
+    (t) => t.supplier_ready_at === null && t.pickup_event_id === null,
+  );
+}
+
+/** Threads attached to a pickup_event — partner has booked them.
+ *  Split below by event.departed_at into scheduled vs in-transit. */
+function pickedThreadsOf(p: PickupRow): PickupThread[] {
+  return (p.threads ?? []).filter((t) => t.pickup_event_id !== null);
+}
+
+/** Picked threads whose event has been booked but not yet physically
+ *  collected (event.departed_at IS NULL). PO surfaces in SCHEDULED. */
+function scheduledThreadsOf(p: PickupRow): PickupThread[] {
+  const eventById = new Map((p.pickup_events ?? []).map((e) => [e.id, e]));
+  return pickedThreadsOf(p).filter((t) => {
+    const e = t.pickup_event_id ? eventById.get(t.pickup_event_id) : null;
+    return e != null && e.departed_at == null;
+  });
+}
+
+/** Picked threads whose event has been physically collected (departed_at
+ *  IS NOT NULL). PO surfaces in IN TRANSIT. */
+function inTransitThreadsOf(p: PickupRow): PickupThread[] {
+  const eventById = new Map((p.pickup_events ?? []).map((e) => [e.id, e]));
+  return pickedThreadsOf(p).filter((t) => {
+    const e = t.pickup_event_id ? eventById.get(t.pickup_event_id) : null;
+    return e != null && e.departed_at != null;
+  });
+}
+
 type Stage = "upcoming" | "awaiting" | "scheduled" | "in_transit" | "delivered";
 
-function stageOf(p: PickupRow): Stage | null {
-  if (p.status !== "open") return null;
-  // 2026-05-11 (Loo): "Upcoming" — supplier still producing. Partner sees the
-  // PO + ETA early so they can plan capacity before it lands in Awaiting.
-  if (
-    p.sup_status === "pending" ||
-    p.sup_status === "acknowledged" ||
-    p.sup_status === "in_production"
-  )
-    return "upcoming";
-  if (
-    p.sup_status === "ready_confirm_sent" ||
-    p.sup_status === "ready_for_pickup" ||
-    p.sup_status === "pickup_assigned" ||
-    // 2026-05-15 (Task 11) — per-thread partial pickup keeps PO in
-    // "still has ready threads waiting for partner" bucket until all
-    // threads are picked. Stays surfaced on the Awaiting column so the
-    // partner can keep batching the remaining ones.
-    p.sup_status === "partially_shipped"
-  )
-    return "awaiting";
-  if (p.sup_status === "pickup_accepted") return "scheduled";
-  // 2026-05-15 (Task 11) — `shipped` is the post-thread-pickup terminal state
-  // (all linked threads have a pickup_event_id). Mirrors `picked_up` from the
-  // pre-0107 PO-level flow — partner is en route to the warehouse.
-  if (p.sup_status === "picked_up" || p.sup_status === "shipped") return "in_transit";
-  if (p.sup_status === "delivered") return "delivered";
-  return null;
+/**
+ * 2026-05-16 (Loo screenshot + migration 0114) — stage placement is
+ * thread-state-aware. Same PO can fall in BOTH `upcoming` (producing
+ * threads still on the floor) AND `awaiting` (ready threads waiting for
+ * partner pickup) when partial — returned as a list of stages, not a
+ * single stage. Caller buckets the PO into every matching stage.
+ *
+ * For stockpile / forecast POs (no threads) we keep the old sup_status
+ * fallback, since there are no thread booleans to read.
+ */
+function stagesOf(p: PickupRow): Stage[] {
+  if (p.status !== "open") return [];
+  const threads = p.threads ?? [];
+  // Stockpile fallback — no threads, classify by sup_status (legacy).
+  if (threads.length === 0) {
+    if (
+      p.sup_status === "pending" ||
+      p.sup_status === "acknowledged" ||
+      p.sup_status === "in_production"
+    )
+      return ["upcoming"];
+    if (
+      p.sup_status === "ready_confirm_sent" ||
+      p.sup_status === "ready_for_pickup" ||
+      p.sup_status === "pickup_assigned" ||
+      p.sup_status === "partially_shipped"
+    )
+      return ["awaiting"];
+    if (p.sup_status === "pickup_accepted") return ["scheduled"];
+    if (p.sup_status === "picked_up" || p.sup_status === "shipped") return ["in_transit"];
+    if (p.sup_status === "delivered") return ["delivered"];
+    return [];
+  }
+  // Terminal sup_status pinning — once the PO is fully delivered it leaves
+  // every other bucket.
+  if (p.sup_status === "delivered") return ["delivered"];
+  if (p.sup_status === "pickup_accepted") return ["scheduled"];
+  // 2026-05-17 (Loo screenshot + migration 0119) — partial PO can sit in
+  // MULTIPLE columns at once: producing threads → Upcoming, ready threads →
+  // Awaiting, picked threads with un-departed event → Scheduled, picked
+  // threads with departed event → In transit. The legacy picked_up/shipped
+  // early-return was removed because the scheduled vs in-transit split is
+  // now per-event (departed_at), not per-PO sup_status.
+  const events = p.pickup_events ?? [];
+  const eventById = new Map(events.map((e) => [e.id, e]));
+  const out: Stage[] = [];
+  const producing = threads.some(
+    (t) => t.supplier_ready_at === null && t.pickup_event_id === null,
+  );
+  const ready = threads.some(
+    (t) => t.supplier_ready_at !== null && t.pickup_event_id === null,
+  );
+  const scheduled = threads.some((t) => {
+    if (t.pickup_event_id == null) return false;
+    const e = eventById.get(t.pickup_event_id);
+    return e != null && e.departed_at == null;
+  });
+  const inTransit = threads.some((t) => {
+    if (t.pickup_event_id == null) return false;
+    const e = eventById.get(t.pickup_event_id);
+    return e != null && e.departed_at != null;
+  });
+  if (producing) out.push("upcoming");
+  if (ready) out.push("awaiting");
+  if (scheduled) out.push("scheduled");
+  if (inTransit) out.push("in_transit");
+  return out;
 }
 
 function lineSummary(lines: PickupLine[]): { head: string; rest: number; totalQty: number } {
@@ -216,6 +300,26 @@ export default function PartnerFactoryPickupsPage() {
       await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
     },
   });
+  // 2026-05-17 (migration 0119) — per-thread "Mark collected" stamps
+  // po_pickup_events.departed_at. Drives the SCHEDULED → IN TRANSIT
+  // transition for the per-thread flow.
+  const markPickupCollected = usePartnerMarkPickupCollected();
+  async function markAllUnDepartedCollected(po: PickupRow) {
+    const undeparted = (po.pickup_events ?? []).filter((e) => e.departed_at == null);
+    if (undeparted.length === 0) return;
+    try {
+      await Promise.all(undeparted.map((e) => markPickupCollected.mutateAsync(e.id)));
+      toast.success(
+        undeparted.length === 1
+          ? `${po.id} collected · in transit to WH`
+          : `${po.id} · ${undeparted.length} batches collected · in transit`,
+      );
+      await qc.invalidateQueries({ queryKey: qk.partner.pickups() });
+      await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Mark collected failed");
+    }
+  }
   // markArrived RPC kept on the API (POST /:id/arrived → partner_arrived_at_warehouse)
   // for the rare "I'm here but don't have DO yet" case, but no UI trigger now —
   // every code path goes through the receive modal instead.
@@ -237,8 +341,13 @@ export default function PartnerFactoryPickupsPage() {
     };
     for (const p of rows) {
       if (!matchSearch(p)) continue;
-      const stage = stageOf(p);
-      if (stage) out[stage].push(p);
+      // 2026-05-16 — a partially-ticked PO appears in BOTH `upcoming`
+      // (still has producing threads) AND `awaiting` (has ready threads
+      // ready for partner pickup). One row, two columns; partner sees
+      // the ready threads even while production continues on the rest.
+      for (const stage of stagesOf(p)) {
+        out[stage].push(p);
+      }
     }
     return out;
   }, [rows, search]);
@@ -374,12 +483,12 @@ export default function PartnerFactoryPickupsPage() {
                               checked={selSet.has(t.id)}
                               onChange={() => toggleThread(po.id, t.id)}
                               className="accent-primary"
-                              aria-label={`Select thread for DL-${t.orders?.dl ?? "?"}`}
+                              aria-label={`Select thread for SO-${t.orders?.dl ?? "?"}`}
                               data-testid={`thread-checkbox-${t.id}`}
                             />
                             <span className="truncate">
                               <span className="font-mono font-semibold">
-                                DL-{t.orders?.dl ?? "?"}
+                                SO-{t.orders?.dl ?? "?"}
                               </span>{" "}
                               · {t.orders?.customer_name ?? "—"}
                             </span>
@@ -430,25 +539,48 @@ export default function PartnerFactoryPickupsPage() {
               hint="Pickup booked · waiting for collection"
               accent="info"
               items={buckets.scheduled}
-              renderAction={(po) => (
-                <button
-                  type="button"
-                  disabled={markCollected.isPending}
-                  onClick={() =>
-                    markCollected.mutate(po.id, {
-                      onSuccess: () =>
-                        toast.success(`${po.id} collected · in transit`),
-                      onError: (err) =>
-                        toast.error(
-                          err instanceof ApiError ? err.message : "Mark failed",
-                        ),
-                    })
-                  }
-                  className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
-                >
-                  📦 Mark collected
-                </button>
-              )}
+              renderAction={(po) => {
+                // 2026-05-17 (Loo + migration 0119) — per-thread branch.
+                // When PO has un-departed pickup_events, use the new
+                // partner_mark_pickup_collected RPC (stamps departed_at).
+                // Falls back to the legacy partner_mark_picked_up RPC for
+                // stockpile/non-thread POs sitting at sup_status='pickup_accepted'.
+                const undeparted = (po.pickup_events ?? []).filter(
+                  (e) => e.departed_at == null,
+                );
+                if (undeparted.length > 0) {
+                  return (
+                    <button
+                      type="button"
+                      disabled={markPickupCollected.isPending}
+                      onClick={() => markAllUnDepartedCollected(po)}
+                      className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                      data-testid={`mark-collected-${po.id}`}
+                    >
+                      📦 Mark collected{undeparted.length > 1 ? ` (${undeparted.length})` : ""}
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    type="button"
+                    disabled={markCollected.isPending}
+                    onClick={() =>
+                      markCollected.mutate(po.id, {
+                        onSuccess: () =>
+                          toast.success(`${po.id} collected · in transit`),
+                        onError: (err) =>
+                          toast.error(
+                            err instanceof ApiError ? err.message : "Mark failed",
+                          ),
+                      })
+                    }
+                    className="w-full px-3 py-1.5 bg-primary text-white rounded text-[12px] font-semibold disabled:opacity-50"
+                  >
+                    📦 Mark collected
+                  </button>
+                );
+              }}
               onOpen={setOpenId}
             />
             <PipelineColumn
@@ -496,6 +628,16 @@ export default function PartnerFactoryPickupsPage() {
       {openPo && (
         <PickupDrawer
           po={openPo}
+          readyThreads={readyThreadsOf(openPo)}
+          selectedThreadIds={selectedByPo.get(openPo.id) ?? new Set<string>()}
+          onToggleThread={(threadId) => toggleThread(openPo.id, threadId)}
+          onPickupSelected={() => {
+            const sel = selectedByPo.get(openPo.id) ?? new Set<string>();
+            if (sel.size === 0) return;
+            const id = openPo.id;
+            setOpenDialog({ poId: id, threadIds: Array.from(sel) });
+            setOpenId(null);
+          }}
           onClose={() => setOpenId(null)}
           onAccept={() =>
             accept.mutate(openPo.id, {
@@ -507,7 +649,18 @@ export default function PartnerFactoryPickupsPage() {
                 toast.error(err instanceof ApiError ? err.message : "Accept failed"),
             })
           }
-          onMarkCollected={() =>
+          onMarkCollected={async () => {
+            // 2026-05-17 (Loo + migration 0119) — per-thread branch: stamp
+            // every un-departed pickup_event on this PO. Legacy fallback
+            // uses partner_mark_picked_up for stockpile/non-thread POs.
+            const undeparted = (openPo.pickup_events ?? []).filter(
+              (e) => e.departed_at == null,
+            );
+            if (undeparted.length > 0) {
+              setOpenId(null);
+              await markAllUnDepartedCollected(openPo);
+              return;
+            }
             markCollected.mutate(openPo.id, {
               onSuccess: () => {
                 toast.success(`${openPo.id} collected · in transit`);
@@ -515,8 +668,8 @@ export default function PartnerFactoryPickupsPage() {
               },
               onError: (err) =>
                 toast.error(err instanceof ApiError ? err.message : "Mark failed"),
-            })
-          }
+            });
+          }}
           onMarkArrived={() => {
             // Drawer's In-transit CTA now opens the receive modal too — same
             // pivot as the kanban-card button.
@@ -525,7 +678,7 @@ export default function PartnerFactoryPickupsPage() {
             setReceivingPoId(id);
           }}
           accepting={accept.isPending}
-          markingCollected={markCollected.isPending}
+          markingCollected={markCollected.isPending || markPickupCollected.isPending}
         />
       )}
 
@@ -687,6 +840,10 @@ function DeliveredRow({
 
 function PickupDrawer({
   po,
+  readyThreads,
+  selectedThreadIds,
+  onToggleThread,
+  onPickupSelected,
   onClose,
   onAccept,
   onMarkCollected,
@@ -695,6 +852,10 @@ function PickupDrawer({
   markingCollected,
 }: {
   po: PickupRow;
+  readyThreads: PickupThread[];
+  selectedThreadIds: Set<string>;
+  onToggleThread: (threadId: string) => void;
+  onPickupSelected: () => void;
   onClose: () => void;
   onAccept: () => void;
   onMarkCollected: () => void;
@@ -702,8 +863,34 @@ function PickupDrawer({
   accepting: boolean;
   markingCollected: boolean;
 }) {
-  const stage = stageOf(po);
+  // 2026-05-17 (Loo screenshot) — drawer must honor the SAME multi-stage
+  // bucketing as the kanban. A partial PO (`in_production` + 3 ready
+  // threads + 2 still producing) belongs to BOTH "upcoming" and "awaiting"
+  // simultaneously. Using stageOf() returned only the first ("upcoming")
+  // which hid the pickup CTA. Switch to stages.includes() membership and
+  // gate the Ready-threads section on hasReadyThreads alone — if any
+  // thread is supplier-ready-unpicked the partner can pick it regardless
+  // of overall sup_status.
+  const stages = stagesOf(po);
   const { totalQty } = lineSummary(po.lines);
+  const selectedCount = selectedThreadIds.size;
+  const hasReadyThreads = readyThreads.length > 0;
+  // 2026-05-17 (Loo) — replace LINES section with thread-grouped pipeline
+  // so the drawer shows what's actually still to collect (not the original
+  // PO procurement total, which is misleading once partial pickups land).
+  // 2026-05-17 (migration 0119) — Scheduled vs In-transit split mirrors
+  // the proto's 3-step partner flow: Scheduled = DO booked, awaiting
+  // physical collection. In transit = collected, on the road.
+  const producingThreads = producingThreadsOf(po);
+  const scheduledThreads = scheduledThreadsOf(po);
+  const inTransitThreads = inTransitThreadsOf(po);
+  const eventById = new Map((po.pickup_events ?? []).map((e) => [e.id, e]));
+  const hasAnyThreads =
+    producingThreads.length +
+      readyThreads.length +
+      scheduledThreads.length +
+      inTransitThreads.length >
+    0;
 
   return (
     <div
@@ -770,42 +957,114 @@ function PickupDrawer({
             </div>
           </div>
 
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-base-500 mb-2">
-              Lines
-            </div>
-            <div className="bg-white border border-base-100 rounded-md divide-y divide-base-100">
-              {po.lines.map((l) => {
-                const a = (l.attrs ?? {}) as {
-                  color?: string;
-                  gap?: string;
-                  fabric_name?: string;
-                };
-                const variant: string[] = [];
-                if (a.color) variant.push(a.color);
-                if (a.gap) variant.push(`gap ${a.gap}`);
-                if (a.fabric_name) variant.push(a.fabric_name);
-                return (
-                  <div
-                    key={l.id}
-                    className="flex justify-between items-baseline gap-3 px-3.5 py-2.5"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[12px] font-semibold truncate">
-                        {l.sku}
-                      </div>
-                      {variant.length > 0 && (
-                        <div className="text-[11px] text-primary mt-0.5">
-                          {variant.join(" · ")}
-                        </div>
-                      )}
+          {/* 2026-05-17 (Loo) — thread-grouped pipeline replaces the static
+              PO-line list. Each section tells the partner what's where:
+              still being made at the supplier (Producing), waiting at the
+              supplier dock (Ready), or already on the truck (In transit). */}
+          {hasAnyThreads && (
+            <div className="space-y-4">
+              {producingThreads.length > 0 && (
+                <ThreadGroup
+                  title="Producing"
+                  count={producingThreads.length}
+                  hint="Supplier still making — not ready to collect"
+                  testId={`drawer-producing-threads-${po.id}`}
+                >
+                  {producingThreads.map((t) => (
+                    <ThreadRow key={t.id} thread={t} />
+                  ))}
+                </ThreadGroup>
+              )}
+
+              {hasReadyThreads && (
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <div className="text-[10px] uppercase tracking-[0.12em] text-base-500">
+                      Ready for pickup ({readyThreads.length})
                     </div>
-                    <div className="font-mono text-[12px]">×{l.qty}</div>
+                    <div className="text-[10px] text-base-500">
+                      Tick to include in this pickup
+                    </div>
                   </div>
-                );
-              })}
+                  <div
+                    className="bg-base-50 border border-base-200 rounded-md divide-y divide-base-100"
+                    data-testid={`drawer-ready-threads-${po.id}`}
+                  >
+                    {readyThreads.map((t) => (
+                      <label
+                        key={t.id}
+                        className="flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer hover:bg-base-100"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedThreadIds.has(t.id)}
+                          onChange={() => onToggleThread(t.id)}
+                          className="accent-primary h-3.5 w-3.5"
+                          aria-label={`Select thread for SO-${t.orders?.dl ?? "?"}`}
+                          data-testid={`drawer-thread-checkbox-${t.id}`}
+                        />
+                        <span className="flex-1 min-w-0 text-[12px] truncate">
+                          <span className="font-mono font-semibold">
+                            SO-{t.orders?.dl ?? "?"}
+                          </span>{" "}
+                          · {t.orders?.customer_name ?? "—"}
+                        </span>
+                        {t.orders?.delivery_date && (
+                          <span className="font-mono text-[10px] text-base-500 shrink-0">
+                            {t.orders.delivery_date}
+                          </span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {scheduledThreads.length > 0 && (
+                <ThreadGroup
+                  title="Scheduled"
+                  count={scheduledThreads.length}
+                  hint="DO booked · awaiting physical collection"
+                  testId={`drawer-scheduled-threads-${po.id}`}
+                  accent="info"
+                >
+                  {scheduledThreads.map((t) => (
+                    <ThreadRow
+                      key={t.id}
+                      thread={t}
+                      doNumber={
+                        t.pickup_event_id
+                          ? eventById.get(t.pickup_event_id)?.do_number ?? null
+                          : null
+                      }
+                    />
+                  ))}
+                </ThreadGroup>
+              )}
+
+              {inTransitThreads.length > 0 && (
+                <ThreadGroup
+                  title="In transit"
+                  count={inTransitThreads.length}
+                  hint="Collected · driving to warehouse"
+                  testId={`drawer-in-transit-threads-${po.id}`}
+                  accent="info"
+                >
+                  {inTransitThreads.map((t) => (
+                    <ThreadRow
+                      key={t.id}
+                      thread={t}
+                      doNumber={
+                        t.pickup_event_id
+                          ? eventById.get(t.pickup_event_id)?.do_number ?? null
+                          : null
+                      }
+                    />
+                  ))}
+                </ThreadGroup>
+              )}
             </div>
-          </div>
+          )}
 
           <div>
             <div className="text-[10px] uppercase tracking-[0.12em] text-base-500 mb-1">
@@ -821,7 +1080,18 @@ function PickupDrawer({
         </div>
 
         <div className="px-6 py-4 border-t border-base-100 flex gap-2 justify-end">
-          {stage === "awaiting" && (
+          {hasReadyThreads && (
+            <button
+              type="button"
+              disabled={selectedCount === 0}
+              onClick={onPickupSelected}
+              className="px-5 py-2 bg-primary text-white rounded-md text-[13px] font-semibold disabled:opacity-50"
+              data-testid={`drawer-pickup-selected-${po.id}`}
+            >
+              🚚 Pickup selected ({selectedCount})
+            </button>
+          )}
+          {stages.includes("awaiting") && !hasReadyThreads && (
             <button
               type="button"
               disabled={accepting}
@@ -831,7 +1101,7 @@ function PickupDrawer({
               {accepting ? "Accepting…" : "✓ Accept pickup"}
             </button>
           )}
-          {stage === "scheduled" && (
+          {stages.includes("scheduled") && (
             <button
               type="button"
               disabled={markingCollected}
@@ -841,7 +1111,7 @@ function PickupDrawer({
               {markingCollected ? "Marking…" : "📦 Mark collected"}
             </button>
           )}
-          {stage === "in_transit" && (
+          {stages.includes("in_transit") && (
             <button
               type="button"
               onClick={onMarkArrived}
@@ -852,6 +1122,86 @@ function PickupDrawer({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * ThreadGroup — shared frame for the drawer's Producing / Ready / In transit
+ * sections. Keeps spacing + label typography consistent. `accent` switches
+ * the count pill color so In transit reads as "active" rather than "muted".
+ */
+function ThreadGroup({
+  title,
+  count,
+  hint,
+  testId,
+  accent,
+  children,
+}: {
+  title: string;
+  count: number;
+  hint?: string;
+  testId?: string;
+  accent?: "info";
+  children: React.ReactNode;
+}) {
+  const countCls =
+    accent === "info" ? "text-info" : "text-base-700";
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2 gap-3">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-base-500">
+          {title}{" "}
+          <span className={`font-mono font-semibold ${countCls}`}>({count})</span>
+        </div>
+        {hint && (
+          <div className="text-[10px] text-base-500 text-right truncate">{hint}</div>
+        )}
+      </div>
+      <div
+        className="bg-white border border-base-100 rounded-md divide-y divide-base-100"
+        data-testid={testId}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ThreadRow — SO# + customer + optional delivery_date + optional DO# pill.
+ * Used by the read-only Producing + In transit sections. The Ready section
+ * has its own checkbox-row layout inline above because of state coupling.
+ */
+function ThreadRow({
+  thread,
+  doNumber,
+}: {
+  thread: PickupThread;
+  doNumber?: string | null;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+      <span className="flex-1 min-w-0 text-[12px] truncate">
+        <span className="font-mono font-semibold">
+          SO-{thread.orders?.dl ?? "?"}
+        </span>{" "}
+        · {thread.orders?.customer_name ?? "—"}
+      </span>
+      {doNumber && (
+        <span
+          className="font-mono text-[10px] text-info bg-info/10 px-2 py-0.5 rounded-full shrink-0"
+          title="Picked under this DO"
+        >
+          🚚 {doNumber}
+        </span>
+      )}
+      {thread.orders?.delivery_date && (
+        <span className="font-mono text-[10px] text-base-500 shrink-0">
+          {thread.orders.delivery_date}
+        </span>
+      )}
     </div>
   );
 }

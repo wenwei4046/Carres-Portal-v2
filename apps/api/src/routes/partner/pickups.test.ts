@@ -109,6 +109,7 @@ describe("GET /api/partner/pickups", () => {
   // Task 6 (2026-05-15) — mirror supplier/pos enrichment on partner pickups.
   // Same 4 computed fields per PO row.
   it("returns urgency + sku_summary + customer_eta_min + behind_schedule per PO row", async () => {
+    // 2026-05-16 (migration 0115) — orders now fetched via RPC, not nested.
     const orderFn = vi.fn().mockResolvedValue({
       data: [
         {
@@ -119,18 +120,17 @@ describe("GET /api/partner/pickups", () => {
           eta_date: "2026-05-22",
           lines: [{ sku: "mattress:carres-original:King", qty: 5 }],
           threads: [
-            {
-              id: "t1",
-              order_id: "o1",
-              orders: { dl: 1001, delivery_date: "2026-05-20", customer_name: "A" },
-            },
-            {
-              id: "t2",
-              order_id: "o2",
-              orders: { dl: 1002, delivery_date: "2026-05-28", customer_name: "B" },
-            },
+            { id: "t1", order_id: "o1", supplier_ready_at: null, pickup_event_id: null },
+            { id: "t2", order_id: "o2", supplier_ready_at: null, pickup_event_id: null },
           ],
         },
+      ],
+      error: null,
+    });
+    const rpcFn = vi.fn().mockResolvedValue({
+      data: [
+        { id: "o1", dl: 1001, customer_name: "A", delivery_date: "2026-05-20" },
+        { id: "o2", dl: 1002, customer_name: "B", delivery_date: "2026-05-28" },
       ],
       error: null,
     });
@@ -138,6 +138,7 @@ describe("GET /api/partner/pickups", () => {
       from: vi.fn(() => ({
         select: vi.fn().mockReturnValue({ order: orderFn }),
       })),
+      rpc: rpcFn,
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
@@ -154,11 +155,13 @@ describe("GET /api/partner/pickups", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].customer_eta_min).toBe("2026-05-20");
     expect(rows[0].urgency).toMatch(/critical|urgent|normal/);
-    // eta_date 2026-05-22 >= customer_eta_min 2026-05-20 → supplier won't make it.
     expect(rows[0].behind_schedule).toBe(true);
     expect(rows[0].sku_summary).toEqual([
       { sku: "mattress:carres-original:King", qty: 5 },
     ]);
+    expect(rpcFn).toHaveBeenCalledWith("partner_orders_for_threads", {
+      p_order_ids: ["o1", "o2"],
+    });
   });
 
   it("defaults enrichment fields safely when threads + lines absent", async () => {

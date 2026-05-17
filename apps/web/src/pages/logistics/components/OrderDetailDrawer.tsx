@@ -32,7 +32,7 @@ import { SectionHead } from "./Modal";
  * (lines 261-396):
  *   - Backdrop: rgba(34,31,32,0.55)
  *   - Drawer: 560px wide, full-height, white, rounded-none on left edge
- *   - Header: #DL + StageChip + customer name (CJK detect) + dealer; right
+ *   - Header: #SO + StageChip + customer name (CJK detect) + dealer; right
  *     side has Print DO (when delivered) + close
  *   - Action bar: tinted base-50 surface, conditional buttons per stage
  *   - Section: Stock & warehouse (warehouse name + total items + line table)

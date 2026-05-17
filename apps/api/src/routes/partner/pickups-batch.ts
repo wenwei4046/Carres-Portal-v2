@@ -54,11 +54,14 @@ partnerPickupsBatchRouter.post("/batch", async (c) => {
     );
   }
   const sb = userClient(c.env, auth.jwt);
+  // 2026-05-16 (migration 0117) — doNumber + doFilePath are optional. RPC
+  // auto-generates DO# as `DO-{poId}-{seq}` when omitted; doFilePath stays
+  // NULL on the pickup event (column is nullable).
   const { data, error } = await sb.rpc("partner_pickup_threads", {
     p_po_id:        parsed.data.poId,
     p_thread_ids:   parsed.data.threadIds,
-    p_do_number:    parsed.data.doNumber,
-    p_do_file_path: parsed.data.doFilePath,
+    p_do_number:    parsed.data.doNumber ?? null,
+    p_do_file_path: parsed.data.doFilePath ?? null,
     p_do_note:      parsed.data.doNote ?? null,
   });
   if (error) {

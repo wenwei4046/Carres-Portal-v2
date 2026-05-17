@@ -56,6 +56,8 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   // 0074 — Postgres numeric arrives as string|number; coalesce to null when
   // the column is NULL (catalog admin's "cost not yet set" state).
   cost: r.cost == null ? null : Number(r.cost),
+  // 2026-05-17 — pass through SKU-level supplier ownership.
+  supplierId: r.supplier_id,
   discontinuedAt: r.discontinued_at,
 });
 

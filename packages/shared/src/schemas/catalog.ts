@@ -45,6 +45,9 @@ export const productSkuSchema = z.object({
   // still serialize cleanly; the Create-PO submit gate refuses lines whose
   // SKU has cost=null.
   cost: z.number().nullable(),
+  // 2026-05-17 — SKU-level supplier_id (NOT NULL on DB since 0074). Required
+  // for CreatePOModal to route lines to the right supplier group.
+  supplierId: z.string().uuid().nullable(),
   discontinuedAt: z.string().nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;

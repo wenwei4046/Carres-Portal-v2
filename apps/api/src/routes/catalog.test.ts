@@ -157,6 +157,7 @@ describe("GET /api/catalog", () => {
               variant: "queen",
               variant_kind: "size",
               price: 1500,
+              supplier_id: null,
             },
             {
               id: "00000000-0000-0000-0000-00000000bb02",
@@ -165,6 +166,7 @@ describe("GET /api/catalog", () => {
               variant: "queen",
               variant_kind: "size",
               price: 999,
+              supplier_id: null,
             },
           ],
           sofa_fabrics: [],

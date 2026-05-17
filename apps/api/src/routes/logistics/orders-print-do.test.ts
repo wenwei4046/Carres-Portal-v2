@@ -147,7 +147,7 @@ describe("GET /api/logistics/orders/:id/print-do-data", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(body.do_number).toBe("DO-9801");
-    expect(body.order_code).toBe("DL-4001");
+    expect(body.order_code).toBe("SO-4001");
     expect(body.customer.name).toBe("Tan Ah Kow");
     expect(body.dealer.name).toBe("BedHouse KL");
     expect(body.partner?.name).toBe("GD Express");

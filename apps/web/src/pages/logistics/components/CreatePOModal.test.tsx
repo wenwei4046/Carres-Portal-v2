@@ -211,6 +211,7 @@ function setLoaded() {
           // 0074 — fixed catalog cost; CreatePOModal auto-fills line.cost
           // from this and stamps cost_source='catalog' on submit.
           cost: 1500,
+          supplierId: null,
         },
         {
           id: "s2",
@@ -220,6 +221,7 @@ function setLoaded() {
           variantKind: "preset",
           price: 4500,
           cost: 2200,
+          supplierId: null,
         },
         {
           id: "s3",
@@ -229,6 +231,7 @@ function setLoaded() {
           variantKind: "size",
           price: 3000,
           cost: 1300,
+          supplierId: null,
         },
       ],
       sofaFabrics: [],
@@ -464,6 +467,7 @@ describe("CreatePOModal — Suggest from alerts (T22)", () => {
               // exercise actual cost numbers seed a real value via the main
               // `setLoaded()` fixture instead.
               cost: null,
+              supplierId: null,
             })),
         ],
         sofaFabrics: [],

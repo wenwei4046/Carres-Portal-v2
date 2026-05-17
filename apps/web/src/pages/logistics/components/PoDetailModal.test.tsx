@@ -81,6 +81,7 @@ beforeEach(() => {
           variantKind: "size",
           price: 3500,
           cost: null,
+          supplierId: null,
         },
       ],
       sofaFabrics: [],
@@ -88,7 +89,7 @@ beforeEach(() => {
       floorConfig: { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 },
     },
   };
-  // Default — modal renders without per-DL ETAs; existing tests don't care.
+  // Default — modal renders without per-SO ETAs; existing tests don't care.
   sourceOrdersHookState = { data: undefined };
 });
 
@@ -251,7 +252,7 @@ describe("PoDetailModal — Receive entry button (v3-S2.3)", () => {
 });
 
 // Loo 2026-05-16 — per-source-order ETA list under Order refs.
-describe("PoDetailModal — per-DL ETA", () => {
+describe("PoDetailModal — per-SO ETA", () => {
   it("renders each dl_ref with its own delivery date", () => {
     sourceOrdersHookState = {
       data: {

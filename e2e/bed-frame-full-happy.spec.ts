@@ -9,7 +9,7 @@ async function login(page: Page, email: string, password: string) {
 }
 
 // Pre-condition: pnpm seed:test-users && pnpm seed:e2e-fixtures
-//   - DL-9202: bedframe order at logistics_stage='dispatched' with thread
+//   - SO-9202: bedframe order at logistics_stage='dispatched' with thread
 //     supplier=HoOKkA, category='bedframe', sop_name='STANDARD'.
 //
 // 2026-05-09 rewrite: original spec was a half-stubbed multi-context flow

@@ -12,27 +12,27 @@ import { z } from 'zod';
  */
 
 /**
- * `partnerPickupBatchInput` — POST /api/partner/pickups/batch (migration 0107).
+ * `partnerPickupBatchInput` — POST /api/partner/pickups/batch (migration 0107
+ * + 0117 auto-DO).
  *
- * Maps to RPC `partner_pickup_batch(p_po_id, p_thread_ids, p_do_number,
+ * Maps to RPC `partner_pickup_threads(p_po_id, p_thread_ids, p_do_number,
  * p_do_file_path, p_do_note)`. Partner batch-acks 1+ ready threads off a single
  * factory_pickup PO in one trip: server creates a `po_pickup_events` row,
  * stamps `pickup_event_id` on every thread, and advances PO `sup_status` to
- * `picked_up` once every ready thread has been picked.
+ * `partially_shipped` or `shipped` depending on remaining ready threads.
  *
- * `signed` must be literal `true` — the partner-side "I have collected and
- * signed the DO" checkbox is required by the per-thread pickup UI.
- *
- * `doFilePath` is the canonical Storage path returned by
- * `/api/storage/dos/sign-upload` after the partner streams the signed DO file
- * to the `delivery-orders` bucket.
+ * 2026-05-16 (migration 0117) — `doNumber` is now OPTIONAL. If omitted the
+ * server auto-generates one in format `DO-{poId}-{seq}`. The partner is the
+ * receiving party at pickup; making them type a supplier-issued DO# was
+ * backwards. `doFilePath` is also optional (paper-receipt photo is a future
+ * polish). `signed` checkbox dropped — the act of clicking Pickup is the
+ * acknowledgement.
  */
 export const partnerPickupBatchInput = z.object({
   poId: z.string().min(1).max(50),
   threadIds: z.array(z.string().uuid()).min(1),
-  doNumber: z.string().trim().min(3).max(50),
-  doFilePath: z.string().trim().min(1).max(500),
+  doNumber: z.string().trim().min(3).max(50).optional(),
+  doFilePath: z.string().trim().min(1).max(500).optional(),
   doNote: z.string().max(500).optional(),
-  signed: z.literal(true),
 }).strict();
 export type PartnerPickupBatchInput = z.infer<typeof partnerPickupBatchInput>;

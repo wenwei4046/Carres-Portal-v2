@@ -257,7 +257,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
       if (draft.delivery.asap) {
         try {
           await proceedOrder.mutateAsync(created.id);
-          toast.success(`Order DL-${created.dl} auto-proceeded · ASAP`);
+          toast.success(`Order SO-${created.dl} auto-proceeded · ASAP`);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Auto-proceed failed";
           toast.warning(`Order created, but auto-proceed failed: ${msg}`);

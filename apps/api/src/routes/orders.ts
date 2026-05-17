@@ -814,7 +814,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     so_number,
     issue_date,
     order_id: id,
-    order_code: `DL-${o.dl}`,
+    order_code: `SO-${o.dl}`,
     status_label: statusLabel,
     channel,
     customer: {
@@ -943,7 +943,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     invoice_no: String(i.invoice_no),
     issue_date: String(i.issued_at).slice(0, 10),
     order_id: String(ord.id),
-    order_code: `DL-${ord.dl}`,
+    order_code: `SO-${ord.dl}`,
     customer: {
       name: String(ord.customer_name ?? ""),
       address: String(ord.customer_address ?? "—"),

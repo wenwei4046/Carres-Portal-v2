@@ -145,9 +145,14 @@ describe("PartnerFactoryPickupsPage — Task 11 multi-select pickup", () => {
     expect(screen.getByText(new RegExp(`PO ${PO_ID}`))).toBeInTheDocument();
   });
 
-  it("falls back to legacy Accept-pickup button when PO has no ready threads", async () => {
+  it("falls back to legacy Accept-pickup button for stockpile POs (no threads)", async () => {
+    // 2026-05-16 (migration 0114) — the legacy Accept-pickup path now means
+    // "stockpile PO with no linked customer-leg threads". A PO with threads
+    // shows the multi-select checklist scoped to the supplier-ready ones;
+    // a PO without threads has nothing to multi-select against, so the
+    // partner falls back to the old PO-level Accept-pickup button.
     vi.mocked(apiFetch).mockResolvedValueOnce([
-      poWithThreads({ readyCount: 0, total: 3 }),
+      { ...poWithThreads({ readyCount: 0, total: 0 }), threads: [] },
     ]);
     render(wrap(<PartnerFactoryPickupsPage />));
     await waitFor(() =>
@@ -155,5 +160,21 @@ describe("PartnerFactoryPickupsPage — Task 11 multi-select pickup", () => {
     );
     // No multi-select widget rendered for this PO.
     expect(screen.queryByTestId(`ready-threads-${PO_ID}`)).not.toBeInTheDocument();
+  });
+
+  it("partial-ready PO appears in BOTH Upcoming and Awaiting columns (migration 0114)", async () => {
+    // 1 ready thread + 2 producing → kanban shows the same PO in:
+    //   * Upcoming column (producing threads still on the floor)
+    //   * Awaiting column (1 ready thread waiting for partner)
+    vi.mocked(apiFetch).mockResolvedValueOnce([
+      { ...poWithThreads({ readyCount: 1, total: 3 }), sup_status: "in_production" },
+    ]);
+    render(wrap(<PartnerFactoryPickupsPage />));
+    await waitFor(() =>
+      expect(screen.getByTestId(`ready-threads-${PO_ID}`)).toBeInTheDocument(),
+    );
+    // Two PO cards in the kanban — one per column.
+    const cards = screen.getAllByText(PO_ID);
+    expect(cards.length).toBeGreaterThanOrEqual(2);
   });
 });

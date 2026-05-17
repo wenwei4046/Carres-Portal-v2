@@ -50,7 +50,7 @@ describe("ApprovalDrawer", () => {
             status: "pending",
             actor: "Finance",
             created_at: "2026-05-03T00:00:00Z",
-            refers_to: "DL-1",
+            refers_to: "SO-1",
             amount: 100,
           }}
           onClose={() => {}}
@@ -116,7 +116,7 @@ describe("ApprovalDrawer", () => {
             status: "pending",
             actor: "Finance",
             created_at: "2026-05-03T00:00:00Z",
-            refers_to: "DL-1",
+            refers_to: "SO-1",
             amount: 100,
           }}
           onClose={() => {}}

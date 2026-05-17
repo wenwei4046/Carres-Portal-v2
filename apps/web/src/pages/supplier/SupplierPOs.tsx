@@ -7,6 +7,7 @@ import {
   useStartProduction,
   useReadyForPickup,
   useMarkDelivered,
+  useSupplierThreadsForPo,
   type SupplierPoRow,
   type SupplierBucket,
   type SupplierSupStatus,
@@ -211,6 +212,42 @@ export default function SupplierPOs() {
   );
 }
 
+/**
+ * 2026-05-16 (Loo) — per-thread state subtitle next to the StatusPill.
+ * Renders the "X of Y" hint specific to the current column. Hidden on
+ * stockpile POs (total === 0; caller already gates that).
+ */
+function ThreadStateSubtitle({
+  counts,
+  stage,
+}: {
+  counts: { producing: number; ready: number; picked: number; total: number };
+  stage: SupplierBucket;
+}) {
+  if (stage === "po" && counts.producing > 0) {
+    return (
+      <span className="text-[11px] text-muted-foreground">
+        <strong className="text-foreground">{counts.producing} of {counts.total}</strong> still producing
+      </span>
+    );
+  }
+  if (stage === "ready" && counts.ready > 0) {
+    return (
+      <span className="text-[11px] text-primary">
+        <strong>{counts.ready} of {counts.total}</strong> ready · partner can pickup
+      </span>
+    );
+  }
+  if (stage === "delivered" && counts.picked > 0) {
+    return (
+      <span className="text-[11px] text-success">
+        <strong>{counts.picked} of {counts.total}</strong> picked up
+      </span>
+    );
+  }
+  return null;
+}
+
 function emptyHintFor(stage: SupplierBucket) {
   if (stage === "po")
     return "No incoming POs. New POs from Carres Procurement will land here.";
@@ -335,7 +372,16 @@ function POCard({
         </div>
 
         <div className="flex items-center gap-5 flex-1 flex-wrap">
-          <StatusPill ss={ss} kind={supplierKind} />
+          <div className="flex flex-col gap-1">
+            <StatusPill ss={ss} kind={supplierKind} />
+            {/* 2026-05-16 (Loo) — per-thread state subtitle. Same PO can land
+                in `po` and `ready` columns when partial; the subtitle tells
+                the supplier which subset of SOs each column is talking about
+                (3 of 4 still producing here, 1 of 4 ready in the other). */}
+            {po.thread_state_counts && po.thread_state_counts.total > 0 && (
+              <ThreadStateSubtitle counts={po.thread_state_counts} stage={stage} />
+            )}
+          </div>
           {po.expected_ready_date && (
             <div className="text-[11px] text-muted-foreground flex flex-col">
               <span className="text-[9px] uppercase tracking-[0.12em]">Ready by</span>
@@ -446,7 +492,14 @@ function POCard({
               Start production
             </button>
           )}
-          {stage === "po" && isProd && (
+          {/* 2026-05-16 (Loo) — legacy PO-level "Mark Ready" button is HIDDEN
+              when the PO has linked threads. The per-thread checklist inside
+              the PODrawer is the source of truth; this button used to flip
+              the whole PO's sup_status at once which bypassed the per-thread
+              state and produced ghost POs that showed up as "ready" without
+              any SO actually being ready. For stockpile / forecast POs (no
+              threads) it stays — those have no checklist to drive readiness. */}
+          {stage === "po" && isProd && (po.thread_state_counts?.total ?? 0) === 0 && (
             <button
               type="button"
               disabled={readyPick.isPending}
@@ -460,6 +513,21 @@ function POCard({
               className="px-4 py-2 text-[12px] font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
             >
               Mark Ready for Pickup
+            </button>
+          )}
+          {/* When the PO has threads, surface a hint button that opens the
+              drawer (where the per-thread checklist lives). */}
+          {stage === "po" && isProd && (po.thread_state_counts?.total ?? 0) > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen(po);
+              }}
+              className="px-4 py-2 text-[12px] font-semibold rounded-md border border-primary text-primary"
+              title="Open the PO drawer to mark individual SOs ready"
+            >
+              Tick SOs ready →
             </button>
           )}
         </div>
@@ -671,59 +739,15 @@ function PODrawer({
             )}
           </div>
 
-          {/* 2026-05-10 (Loo) — full line table. Variant suffix per row so
-              the supplier can build the right version even when the same
-              SKU appears multiple times (multi-variant bedframe POs). */}
-          <div className="mb-5">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
-              Line items
-            </div>
-            <div className="border border-border rounded-md divide-y divide-border">
-              {(po.lines ?? []).map((l) => {
-                const a = (l.attrs ?? {}) as {
-                  color?: string;
-                  gap?: string;
-                  fabric_name?: string;
-                  fabric_surcharge?: number;
-                };
-                const variantBits: string[] = [];
-                if (a.color) variantBits.push(a.color);
-                if (a.gap) variantBits.push(`gap ${a.gap}`);
-                if (a.fabric_name) {
-                  variantBits.push(
-                    a.fabric_surcharge && a.fabric_surcharge > 0
-                      ? `${a.fabric_name} (+RM ${a.fabric_surcharge})`
-                      : a.fabric_name,
-                  );
-                }
-                return (
-                  <div
-                    key={l.id}
-                    className="flex items-baseline justify-between gap-3 px-3 py-2.5"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-semibold truncate">
-                        {l.sku}
-                      </div>
-                      {variantBits.length > 0 && (
-                        <div className="text-[11px] text-primary mt-0.5">
-                          {variantBits.join(" · ")}
-                        </div>
-                      )}
-                    </div>
-                    <div className="font-mono text-[13px] text-foreground whitespace-nowrap">
-                      ×{l.qty}
-                      {l.received_qty > 0 && (
-                        <span className="text-muted-foreground text-[11px] ml-2">
-                          ({l.received_qty} rcv)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {/* 2026-05-16 (Loo) — Line items panel now thread-aware: aggregates
+              per-SKU from the linked customer threads' order_lines, showing
+              a running balance "× total · N remaining" that ticks down as the
+              supplier marks SOs ready. The per-thread state is the source of
+              truth — the legacy PO-level lines (purchase_order_lines) is the
+              HQ↔supplier accounting view and stays as a stockpile fallback
+              when there are no threads. */}
+          <LineItemsPanel po={po} />
+
 
           {/* Task 10 (2026-05-15) — per-thread production checklist. One row
               per linked customer-leg thread; supplier toggles each thread's
@@ -852,6 +876,162 @@ function PODrawer({
             </button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 2026-05-16 (Loo) — Line items panel with running balance derived from
+ * thread state. When the PO has linked threads, each SKU is aggregated across
+ * threads and shown as: "× total — N remaining" (N counts producing threads,
+ * decrementing as the supplier ticks SOs ready). Fully-ready SKUs flip to a
+ * green "✓ all ready" pill. Stockpile / forecast POs (no threads) fall back
+ * to the PO-level lines view since there's no per-thread state to drive
+ * the balance.
+ */
+function LineItemsPanel({ po }: { po: SupplierPoRow }) {
+  const hasThreads = (po.thread_state_counts?.total ?? 0) > 0;
+  const threadsQ = useSupplierThreadsForPo(hasThreads ? po.id : null);
+
+  if (!hasThreads) {
+    return <StockpileLineItems po={po} />;
+  }
+
+  if (threadsQ.isPending) {
+    return (
+      <div className="mb-5">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
+          Line items
+        </div>
+        <div className="border border-border rounded-md p-3 text-[13px] text-muted-foreground">
+          Loading running balance…
+        </div>
+      </div>
+    );
+  }
+
+  const threads = threadsQ.data ?? [];
+  // Aggregate per-SKU totals across all linked threads.
+  const skuMap = new Map<
+    string,
+    { total: number; remaining: number; ready: number; picked: number }
+  >();
+  for (const t of threads) {
+    const isReady = t.supplier_ready_at !== null;
+    const isPicked = t.pickup_event_id !== null;
+    for (const line of t.sku_lines ?? []) {
+      const cur = skuMap.get(line.sku) ?? {
+        total: 0,
+        remaining: 0,
+        ready: 0,
+        picked: 0,
+      };
+      cur.total += line.qty;
+      if (isPicked) cur.picked += line.qty;
+      else if (isReady) cur.ready += line.qty;
+      else cur.remaining += line.qty;
+      skuMap.set(line.sku, cur);
+    }
+  }
+  const rows = [...skuMap.entries()].map(([sku, c]) => ({ sku, ...c }));
+
+  return (
+    <div className="mb-5">
+      <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
+        Line items
+      </div>
+      <div className="border border-border rounded-md divide-y divide-border">
+        {rows.map((r) => {
+          const allDone = r.remaining === 0;
+          return (
+            <div
+              key={r.sku}
+              className="flex items-baseline justify-between gap-3 px-3 py-2.5"
+              data-testid={`line-items-row-${r.sku}`}
+            >
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold truncate">{r.sku}</div>
+                <div className="text-[11px] mt-0.5 flex items-center gap-2 flex-wrap">
+                  {allDone ? (
+                    <span className="text-success font-semibold">
+                      ✓ All {r.total} ready
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-foreground font-semibold">
+                        {r.remaining} remaining
+                      </span>
+                      {r.ready > 0 && (
+                        <span className="text-primary">· {r.ready} ready</span>
+                      )}
+                      {r.picked > 0 && (
+                        <span className="text-success">· {r.picked} picked</span>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="font-mono text-[13px] text-foreground whitespace-nowrap">
+                ×{r.total}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Stockpile fallback — purchase_order_lines view (legacy pre-thread). */
+function StockpileLineItems({ po }: { po: SupplierPoRow }) {
+  return (
+    <div className="mb-5">
+      <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
+        Line items
+      </div>
+      <div className="border border-border rounded-md divide-y divide-border">
+        {(po.lines ?? []).map((l) => {
+          const a = (l.attrs ?? {}) as {
+            color?: string;
+            gap?: string;
+            fabric_name?: string;
+            fabric_surcharge?: number;
+          };
+          const variantBits: string[] = [];
+          if (a.color) variantBits.push(a.color);
+          if (a.gap) variantBits.push(`gap ${a.gap}`);
+          if (a.fabric_name) {
+            variantBits.push(
+              a.fabric_surcharge && a.fabric_surcharge > 0
+                ? `${a.fabric_name} (+RM ${a.fabric_surcharge})`
+                : a.fabric_name,
+            );
+          }
+          return (
+            <div
+              key={l.id}
+              className="flex items-baseline justify-between gap-3 px-3 py-2.5"
+            >
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold truncate">{l.sku}</div>
+                {variantBits.length > 0 && (
+                  <div className="text-[11px] text-primary mt-0.5">
+                    {variantBits.join(" · ")}
+                  </div>
+                )}
+              </div>
+              <div className="font-mono text-[13px] text-foreground whitespace-nowrap">
+                ×{l.qty}
+                {l.received_qty > 0 && (
+                  <span className="text-muted-foreground text-[11px] ml-2">
+                    ({l.received_qty} rcv)
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

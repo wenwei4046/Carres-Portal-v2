@@ -179,6 +179,7 @@ function setLoaded(pos: LogisticsPoListRow[]) {
           variantKind: "size",
           price: 3500,
           cost: null,
+          supplierId: null,
         },
         {
           id: "s2",
@@ -188,6 +189,7 @@ function setLoaded(pos: LogisticsPoListRow[]) {
           variantKind: "preset",
           price: 4500,
           cost: null,
+          supplierId: null,
         },
       ],
       sofaFabrics: [],

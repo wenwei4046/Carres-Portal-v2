@@ -167,6 +167,7 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
           variantKind: "size",
           price: 3500,
           cost: null,
+          supplierId: null,
         },
         {
           id: "11111111-1111-1111-1111-000000000aa2",
@@ -176,6 +177,7 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
           variantKind: "size",
           price: 3000,
           cost: null,
+          supplierId: null,
         },
         {
           id: "11111111-1111-1111-1111-000000000aa3",
@@ -185,6 +187,7 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
           variantKind: "size",
           price: 1800,
           cost: null,
+          supplierId: null,
         },
         {
           id: "11111111-1111-1111-1111-000000000aa4",
@@ -194,6 +197,7 @@ function setLoaded(overrides: Partial<WarehouseListResponse> = {}) {
           variantKind: "preset",
           price: 4500,
           cost: null,
+          supplierId: null,
         },
       ],
       sofaFabrics: [],
@@ -597,11 +601,11 @@ describe("LogisticsWarehouse page", () => {
     const summary = screen.getByTestId("reserve-drilldown-summary");
     expect(summary.textContent).toMatch(/2 reserved across 1 order/i);
     expect(summary.textContent).toContain("KL Warehouse");
-    // Order row visible with #DL + customer + stage chip + qty.
+    // Order row visible with #SO + customer + stage chip + qty.
     const row = screen.getByTestId(
       "reserve-drilldown-row-33333333-3333-3333-3333-000000000a01",
     );
-    expect(row.textContent).toContain("#DL4001");
+    expect(row.textContent).toContain("#SO4001");
     expect(row.textContent).toContain("Ahmad Customer");
     expect(row.textContent?.toLowerCase()).toContain("ready to dispatch");
     expect(row.textContent).toContain("×2");
@@ -667,7 +671,7 @@ describe("LogisticsWarehouse page", () => {
     expect(drilldownRefetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("22. clicking Copy DL on a drill-down row writes #DL{n} to the clipboard", async () => {
+  it("22. clicking Copy SO on a drill-down row writes #SO{n} to the clipboard", async () => {
     setLoaded();
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
@@ -705,7 +709,7 @@ describe("LogisticsWarehouse page", () => {
       ),
     );
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith("#DL4007");
+      expect(writeText).toHaveBeenCalledWith("#SO4007");
     });
   });
 

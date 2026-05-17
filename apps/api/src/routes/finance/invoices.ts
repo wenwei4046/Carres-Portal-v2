@@ -279,7 +279,7 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
     invoice_no: String(inv.invoice_no),
     issue_date: String(inv.issued_at).slice(0, 10),
     order_id:   String(ord.id),
-    order_code: `DL-${ord.dl}`,
+    order_code: `SO-${ord.dl}`,
     customer: {
       name:    String(ord.customer_name ?? ""),
       address: String(ord.customer_address ?? "—"),

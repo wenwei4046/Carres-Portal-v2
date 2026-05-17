@@ -407,10 +407,10 @@ export default function ReceivePOModal({
                   checked={selectedThreadIds.has(t.id)}
                   onChange={() => toggleThread(t.id)}
                   className="accent-primary"
-                  aria-label={`Tick thread for DL-${t.order_dl}`}
+                  aria-label={`Tick thread for SO-${t.order_dl}`}
                 />
                 <span className="text-[12px] font-body">
-                  DL-{t.order_dl}
+                  SO-{t.order_dl}
                   {t.customer_name ? ` · ${t.customer_name}` : ""}
                 </span>
               </label>

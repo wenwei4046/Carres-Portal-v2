@@ -389,7 +389,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(body.invoice_no).toBe("INV-2026-1240");
-    expect(body.order_code).toBe("DL-1240");
+    expect(body.order_code).toBe("SO-1240");
     expect(body.total).toBe(5970);
     expect(body.lines).toHaveLength(1);
   });

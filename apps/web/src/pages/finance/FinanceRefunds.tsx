@@ -285,7 +285,7 @@ function IssueRefundModal({ onClose }: { onClose: () => void }) {
           <option value="">Select order…</option>
           {orders.map((o) => (
             <option key={o.order_id} value={o.order_id}>
-              DL-{o.dl} · {o.customer_name} · {rm(o.total)}
+              SO-{o.dl} · {o.customer_name} · {rm(o.total)}
             </option>
           ))}
         </select>

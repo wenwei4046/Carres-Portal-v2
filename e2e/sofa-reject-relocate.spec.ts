@@ -9,7 +9,7 @@ async function login(page: Page, email: string, password: string) {
 }
 
 // Pre-condition: pnpm seed:test-users && pnpm seed:e2e-fixtures
-//   - DL-9204: sofa-reject order at thread.logistics_stage='waiting' (per
+//   - SO-9204: sofa-reject order at thread.logistics_stage='waiting' (per
 //     0047 rollup, orders.logistics_stage rolls up to 'ready_to_dispatch'
 //     when any thread is at 'waiting'). Thread supplier=HoOKkA, sop_name=
 //     'SOFA_SPECIAL'.

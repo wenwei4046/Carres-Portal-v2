@@ -56,9 +56,9 @@ describe("PODrawerThreadList", () => {
     render(wrap(<PODrawerThreadList poId="PO-9999" />));
 
     await waitFor(() => {
-      expect(screen.getByText("DL-1001")).toBeInTheDocument();
+      expect(screen.getByText("SO-1001")).toBeInTheDocument();
     });
-    expect(screen.getByText("DL-1002")).toBeInTheDocument();
+    expect(screen.getByText("SO-1002")).toBeInTheDocument();
     // t1 → not ready, not picked → 🛠 Producing pill
     expect(screen.getByText(/Producing/)).toBeInTheDocument();
     // t2 → ready, not picked → ✅ Ready pill
@@ -106,7 +106,7 @@ describe("PODrawerThreadList", () => {
     render(wrap(<PODrawerThreadList poId="PO-9999" />));
 
     await waitFor(() => {
-      expect(screen.getByText("DL-1001")).toBeInTheDocument();
+      expect(screen.getByText("SO-1001")).toBeInTheDocument();
     });
 
     // First row (t1) is not-ready → click marks ready.
@@ -141,7 +141,7 @@ describe("PODrawerThreadList", () => {
     render(wrap(<PODrawerThreadList poId="PO-9999" />));
 
     await waitFor(() => {
-      expect(screen.getByText("DL-1002")).toBeInTheDocument();
+      expect(screen.getByText("SO-1002")).toBeInTheDocument();
     });
 
     // Second row (t2) is ready → click un-marks.
@@ -169,7 +169,7 @@ describe("PODrawerThreadList", () => {
     render(wrap(<PODrawerThreadList poId="PO-9999" />));
 
     await waitFor(() => {
-      expect(screen.getByText("DL-1001")).toBeInTheDocument();
+      expect(screen.getByText("SO-1001")).toBeInTheDocument();
     });
 
     const checkbox = screen.getByTestId(

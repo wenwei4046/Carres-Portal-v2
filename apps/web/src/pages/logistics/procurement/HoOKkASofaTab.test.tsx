@@ -97,6 +97,7 @@ vi.mock("@/lib/queries", async () => {
             variantKind: "preset",
             price: 4500,
             cost: null,
+            supplierId: null,
           },
         ],
         sofaFabrics: [],

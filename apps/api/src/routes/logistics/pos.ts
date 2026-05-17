@@ -510,8 +510,8 @@ logisticsPosRouter.get("/:id/print-data", requireLogistics, async (c) => {
 //
 // Loo 2026-05-16 — per-source-order delivery dates for the PO detail modal.
 // The PO list embeds nothing from `orders` because the (PO ↔ orders) link is
-// indirect (PO.dl_refs is an int[] of dealer-facing DL numbers, joined to
-// orders.dl). The modal needs each DL's `delivery_date` so the operator can
+// indirect (PO.dl_refs is an int[] of dealer-facing SO numbers, joined to
+// orders.dl). The modal needs each SO's `delivery_date` so the operator can
 // see customer ETAs alongside the PO-level ETA.
 //
 // Two PostgREST round-trips: fetch PO (RLS-scoped), then fetch orders by dl.

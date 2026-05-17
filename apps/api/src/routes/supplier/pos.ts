@@ -31,29 +31,27 @@ import type { AppEnv } from "../../types";
  */
 const supplierPosRouter = new Hono<AppEnv>();
 
-const PIPELINE_BUCKETS = {
+/**
+ * 2026-05-16 (Loo screenshot + migration 0114) — bucket membership is
+ * derived from per-thread state for thread-linked POs; sup_status is only
+ * a fallback for stockpile / forecast POs (no threads). A single PO can
+ * therefore appear in BOTH the `po` and `ready` columns when partially
+ * ticked — the supplier still has work to do on some SOs (showing in `po`)
+ * AND has ready SOs waiting for the partner to come pick up (showing in
+ * `ready`). Same card, different column subset.
+ *
+ * Stockpile fallback retained for legacy / no-thread POs (forecast / stock
+ * replenishment): the supplier still needs the 3-column kanban to work
+ * without a linked customer-leg thread.
+ */
+const STOCKPILE_FALLBACK = {
   po: ["pending", "acknowledged", "in_production"] as const,
   ready: [
     "ready_for_pickup",
-    // ready_confirm_sent is the actual post-press state for HoOKkA flows
-    // (logistics_supplier_ready_confirm RPC, 0034:270) — it was missing from
-    // the bucket which made the PO disappear from the supplier's view after
-    // pressing "Mark Ready for Pickup". Surfaced 2026-05-09 by phase-6
-    // E2E spec.
     "ready_confirm_sent",
-    // partner_confirmed (0090 sofa flow) — partner WH owner accepted the
-    // supplier-delivered goods; supplier now self-dispatches + marks
-    // delivered. Without this entry the PO falls out of the supplier's
-    // Ready-to-Pickup tab after partner accept, leaving HoOKkA with no
-    // way to track it (Loo 2026-05-11 screenshot bug).
     "partner_confirmed",
     "pickup_assigned",
     "pickup_accepted",
-    // 2026-05-15 (Task 14) — `partially_shipped` (migration 0107) is the
-    // mid-pickup state where at least one but not all linked threads have a
-    // pickup_event_id. The PO still has ready threads waiting; supplier needs
-    // to keep seeing it in the Ready-to-Pickup tab until every thread is
-    // picked (state then converges to `delivered` per 0108 F3 fix).
     "partially_shipped",
     "shipped",
     "reassign_needed",
@@ -94,21 +92,60 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
   // delivery_date so the response can be enriched with customer_eta_min /
   // urgency / behind_schedule below. ost_supplier_read RLS (0033) admits
   // threads on POs the supplier owns.
-  let q = sb
+  // 2026-05-16 (migration 0114) — `supplier_ready_at` + `pickup_event_id`
+  // join the threads embed so we can compute thread_state_counts and derive
+  // bucket membership without a sup_status filter. We pull all POs the
+  // supplier owns (RLS already scopes via app_supplier_id()), then partition
+  // them in JS — same PO can land in two buckets when partial. Total row
+  // count is bounded by `purchase_orders` per supplier, which Loo has stated
+  // is well under 100 active POs per supplier; no pagination needed.
+  // 2026-05-16 (Loo screenshot + migration 0116) — orders is no longer
+  // nested into the threads embed. Under orders_scoped_read RLS the
+  // supplier role can't read orders directly, so the nested embed
+  // returned null and urgency/customer_eta_min never rendered. Bulk
+  // enrichment now goes through supplier_orders_for_threads RPC after
+  // the main SELECT.
+  const q = sb
     .from("purchase_orders")
     .select(
       "*, " +
         "lines:purchase_order_lines(id, sku, qty, received_qty, attrs), " +
         "warehouses(id, name, address, kind, owning_partner_id, owner:delivery_partners(id, name, contact)), " +
-        "threads:order_supplier_threads(id, order_id, orders(dl, delivery_date, customer_name))",
+        "threads:order_supplier_threads(id, order_id, supplier_ready_at, pickup_event_id)",
     )
     .order("placed_at", { ascending: false });
-  if (f.bucket) {
-    q = q.in("sup_status", PIPELINE_BUCKETS[f.bucket] as unknown as string[]);
-  }
 
   const { data, error } = await q;
   if (error) throw new HTTPException(500, { message: error.message });
+
+  // Enrich each thread.orders via SECURITY DEFINER RPC (0116). One round-trip
+  // per request, scoped to this supplier internally.
+  const orderIds: string[] = [];
+  for (const po of ((data ?? []) as unknown as Array<Record<string, unknown>>)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const t of (((po as any).threads ?? []) as any[])) {
+      const oid = t?.order_id as string | null | undefined;
+      if (oid) orderIds.push(oid);
+    }
+  }
+  const orderInfo = new Map<string, { dl: number; customer_name: string; delivery_date: string | null }>();
+  if (orderIds.length > 0) {
+    const { data: oRows, error: oErr } = await sb.rpc("supplier_orders_for_threads", {
+      p_order_ids: orderIds,
+    });
+    if (oErr) {
+      const m = mapPgError(oErr);
+      return c.json(m.body, m.status);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of ((oRows ?? []) as any[])) {
+      orderInfo.set(String(r.id), {
+        dl: Number(r.dl),
+        customer_name: String(r.customer_name ?? ""),
+        delivery_date: (r.delivery_date as string | null) ?? null,
+      });
+    }
+  }
 
   // 2026-05-15 (Task 6) — enrich each PO row with 4 computed fields:
   //   customer_eta_min — min(orders.delivery_date) across linked threads
@@ -124,8 +161,16 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
   const now = new Date();
   const rows = ((data ?? []) as unknown) as Array<Record<string, unknown>>;
   const enriched = rows.map((po) => {
+    // Splice RPC-fetched order info back onto each thread under `orders`
+    // so the existing downstream shape (urgency / customer_eta_min / UI
+    // rendering) stays unchanged.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const threadEtas: string[] = (((po as any).threads ?? []) as any[])
+    const threads = (((po as any).threads ?? []) as any[]).map((t: any) => {
+      const oid = t?.order_id as string | null | undefined;
+      const info = oid ? orderInfo.get(oid) ?? null : null;
+      return { ...t, orders: info };
+    });
+    const threadEtas: string[] = threads
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((t: any) => t?.orders?.delivery_date)
       .filter((d: unknown): d is string => typeof d === "string" && d.length > 0);
@@ -146,15 +191,64 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
       skuMap.set(sku, (skuMap.get(sku) ?? 0) + Number(l?.qty ?? 0));
     }
     const skuSummary = [...skuMap.entries()].map(([sku, qty]) => ({ sku, qty }));
+    // 2026-05-16 — per-thread state buckets. `producing` = no supplier_ready
+    // tick yet; `ready` = ticked but not picked; `picked` = partner pulled
+    // it. UI subtitle ("3 of 4 still producing" / "1 of 4 ready") reads
+    // these directly.
+    let producing = 0;
+    let ready = 0;
+    let picked = 0;
+    for (const t of threads) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tt = t as any;
+      if (tt?.pickup_event_id) picked += 1;
+      else if (tt?.supplier_ready_at) ready += 1;
+      else producing += 1;
+    }
     return {
       ...po,
+      threads,
       customer_eta_min: customerEtaMin,
       urgency,
       behind_schedule: behindSchedule,
       sku_summary: skuSummary,
+      thread_state_counts: { producing, ready, picked, total: threads.length },
     };
   });
-  return c.json(enriched);
+
+  // Bucket categorization: thread-state-based for linked POs, sup_status
+  // fallback for stockpile / forecast (no threads). Same PO can satisfy
+  // multiple buckets — the caller filters by the active tab.
+  function inBucket(po: typeof enriched[number], bucket: "po" | "ready" | "delivered"): boolean {
+    const counts = po.thread_state_counts;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ss = (po as any).sup_status as string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const status = (po as any).status as string;
+    // 2026-05-16 (Loo) — cancelled POs are out of the active kanban
+    // entirely. Without this guard a cancelled stockpile PO sitting at
+    // sup_status='ready_for_pickup' (legacy data, e.g. PO-2031) would
+    // ghost-appear in the Ready column forever.
+    if (status === "cancelled") return false;
+    // Stockpile fallback — no threads on this PO, classify by sup_status.
+    if (counts.total === 0) {
+      return (STOCKPILE_FALLBACK[bucket] as readonly string[]).includes(ss);
+    }
+    // Terminal sup_status overrides thread state — a fully delivered PO
+    // belongs nowhere except the `delivered` column even if some thread
+    // states haven't been backfilled.
+    if (ss === "delivered") return bucket === "delivered";
+    if (bucket === "po") return counts.producing > 0;
+    if (bucket === "ready") return counts.ready > 0;
+    // bucket === "delivered" — every thread picked, none still in
+    // production or ready.
+    return counts.picked > 0 && counts.producing === 0 && counts.ready === 0;
+  }
+
+  const filtered = f.bucket
+    ? enriched.filter((po) => inBucket(po, f.bucket as "po" | "ready" | "delivered"))
+    : enriched;
+  return c.json(filtered);
 });
 
 /**

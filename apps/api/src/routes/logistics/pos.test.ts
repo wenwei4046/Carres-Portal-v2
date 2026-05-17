@@ -198,7 +198,7 @@ describe("GET /api/logistics/pos/:id/source-orders", () => {
     return fromImpl;
   }
 
-  it("returns per-DL delivery dates for a bundle PO", async () => {
+  it("returns per-SO delivery dates for a bundle PO", async () => {
     mockSourceOrders({
       po: { dl: null, dl_refs: [1001, 1002, 1003] },
       orders: [

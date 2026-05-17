@@ -349,8 +349,8 @@ describe("ReceivePOModal — Task 12 own_logistics per-thread receive", () => {
       ).toBeInTheDocument(),
     );
     expect(screen.getByText(/Ready threads \(2\)/)).toBeInTheDocument();
-    expect(screen.getByText(/DL-1001/)).toBeInTheDocument();
-    expect(screen.getByText(/DL-1002/)).toBeInTheDocument();
+    expect(screen.getByText(/SO-1001/)).toBeInTheDocument();
+    expect(screen.getByText(/SO-1002/)).toBeInTheDocument();
   });
 
   it("filters out threads with pickup_event_id (already picked up)", async () => {
@@ -368,8 +368,8 @@ describe("ReceivePOModal — Task 12 own_logistics per-thread receive", () => {
     await waitFor(() =>
       expect(screen.getByText(/Ready threads \(1\)/)).toBeInTheDocument(),
     );
-    expect(screen.getByText(/DL-1001/)).toBeInTheDocument();
-    expect(screen.queryByText(/DL-1003/)).not.toBeInTheDocument();
+    expect(screen.getByText(/SO-1001/)).toBeInTheDocument();
+    expect(screen.queryByText(/SO-1003/)).not.toBeInTheDocument();
   });
 
   it("does NOT render the section for factory_pickup suppliers (even with ready threads)", async () => {
@@ -427,17 +427,17 @@ describe("ReceivePOModal — Task 12 own_logistics per-thread receive", () => {
     expect(btn).toHaveTextContent(/Receive 0 threads/);
     // Tick first thread → label flips to "Receive 1 thread".
     fireEvent.click(
-      screen.getByLabelText(`Tick thread for DL-${THREAD_A.order_dl}`),
+      screen.getByLabelText(`Tick thread for SO-${THREAD_A.order_dl}`),
     );
     expect(btn).toHaveTextContent(/Receive 1 thread/);
     // Tick second → label flips to "Receive 2 threads".
     fireEvent.click(
-      screen.getByLabelText(`Tick thread for DL-${THREAD_B.order_dl}`),
+      screen.getByLabelText(`Tick thread for SO-${THREAD_B.order_dl}`),
     );
     expect(btn).toHaveTextContent(/Receive 2 threads/);
     // Untick first → drops to "Receive 1 thread".
     fireEvent.click(
-      screen.getByLabelText(`Tick thread for DL-${THREAD_A.order_dl}`),
+      screen.getByLabelText(`Tick thread for SO-${THREAD_A.order_dl}`),
     );
     expect(btn).toHaveTextContent(/Receive 1 thread/);
   });
@@ -459,7 +459,7 @@ describe("ReceivePOModal — Task 12 own_logistics per-thread receive", () => {
     expect(btn).toBeDisabled();
     // Tick thread.
     fireEvent.click(
-      screen.getByLabelText(`Tick thread for DL-${THREAD_A.order_dl}`),
+      screen.getByLabelText(`Tick thread for SO-${THREAD_A.order_dl}`),
     );
     // Still disabled — no file uploaded yet (signed unchecked too).
     expect(btn).toBeDisabled();
@@ -493,10 +493,10 @@ describe("ReceivePOModal — Task 12 own_logistics per-thread receive", () => {
     const btn = await screen.findByTestId("receive-po-receive-threads-btn");
     // Tick both threads.
     fireEvent.click(
-      screen.getByLabelText(`Tick thread for DL-${THREAD_A.order_dl}`),
+      screen.getByLabelText(`Tick thread for SO-${THREAD_A.order_dl}`),
     );
     fireEvent.click(
-      screen.getByLabelText(`Tick thread for DL-${THREAD_B.order_dl}`),
+      screen.getByLabelText(`Tick thread for SO-${THREAD_B.order_dl}`),
     );
     // Tick signed.
     fireEvent.click(

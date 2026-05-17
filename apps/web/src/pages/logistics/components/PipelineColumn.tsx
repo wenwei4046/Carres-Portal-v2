@@ -12,7 +12,7 @@ import { cjkClassName } from "@/lib/cjk";
  *     mono count, base-500 hint underneath
  *   - Body: padding 8, min-height 200
  *   - Order card: white background, base-100 border, 4px radius, hover →
- *     terracotta border. Two rows: "#DL · total RM" then customer name (CJK
+ *     terracotta border. Two rows: "#SO · total RM" then customer name (CJK
  *     font detect), then dealer · delivery date.
  *
  * The proto fetches the orders list once at the dashboard level and filters

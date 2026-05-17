@@ -37,7 +37,7 @@ export interface PipelineHeaderProps {
   /** Sub-filter chip state — controlled by the parent. */
   subFilter: PipelineSubFilter;
   onSubFilterChange: (next: PipelineSubFilter) => void;
-  /** Search box value (DL number / customer name / phone). */
+  /** Search box value (SO number / customer name / phone). */
   search: string;
   onSearchChange: (next: string) => void;
 }

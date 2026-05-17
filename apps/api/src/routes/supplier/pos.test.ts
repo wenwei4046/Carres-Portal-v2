@@ -80,14 +80,43 @@ describe("GET /api/supplier/pos", () => {
     expect(((await res.json()) as unknown[]).length).toBe(2);
   });
 
-  it("filters by bucket=po (pending|acknowledged|in_production)", async () => {
-    const inFn = vi.fn().mockResolvedValue({ data: [], error: null });
-    const orderChain = { in: inFn };
+  it("filters by bucket=po — keeps POs with producing threads + stockpile in/ack/prod", async () => {
+    // Post-0114 bucket logic: thread-state-aware for linked POs, sup_status
+    // fallback for stockpile (no threads). Same PO can land in both `po` and
+    // `ready` columns when partial.
+    const orderFn = vi.fn().mockResolvedValue({
+      data: [
+        // Partial-ready PO: 1 thread ready, 2 threads still producing → in `po`
+        {
+          id: "PO-A",
+          sup_status: "in_production",
+          supplier_id: "e1",
+          threads: [
+            { id: "t1", supplier_ready_at: "2026-05-16T00:00:00Z", pickup_event_id: null, orders: null },
+            { id: "t2", supplier_ready_at: null, pickup_event_id: null, orders: null },
+            { id: "t3", supplier_ready_at: null, pickup_event_id: null, orders: null },
+          ],
+        },
+        // All-ready PO: 2 threads ready, 0 producing → NOT in `po`
+        {
+          id: "PO-B",
+          sup_status: "in_production",
+          supplier_id: "e1",
+          threads: [
+            { id: "t4", supplier_ready_at: "2026-05-16T00:00:00Z", pickup_event_id: null, orders: null },
+            { id: "t5", supplier_ready_at: "2026-05-16T00:00:00Z", pickup_event_id: null, orders: null },
+          ],
+        },
+        // Stockpile PO with sup_status=pending → in `po` via fallback
+        { id: "PO-C", sup_status: "pending", supplier_id: "e1", threads: [] },
+        // Stockpile PO with sup_status=delivered → NOT in `po`
+        { id: "PO-D", sup_status: "delivered", supplier_id: "e1", threads: [] },
+      ],
+      error: null,
+    });
     const sb = {
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          order: vi.fn().mockReturnValue(orderChain),
-        }),
+        select: vi.fn().mockReturnValue({ order: orderFn }),
       }),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,20 +130,88 @@ describe("GET /api/supplier/pos", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(inFn).toHaveBeenCalledWith("sup_status", [
-      "pending",
-      "acknowledged",
-      "in_production",
-    ]);
+    const rows = ((await res.json()) as Array<{ id: string }>).map((r) => r.id);
+    expect(rows).toEqual(["PO-A", "PO-C"]);
   });
 
-  it("filters by bucket=delivered (picked_up|delivered)", async () => {
-    const inFn = vi.fn().mockResolvedValue({ data: [], error: null });
+  it("filters by bucket=ready — keeps POs with any ready threads + stockpile fallback", async () => {
+    const orderFn = vi.fn().mockResolvedValue({
+      data: [
+        // Partial-ready PO → in `po` AND `ready`
+        {
+          id: "PO-A",
+          sup_status: "in_production",
+          supplier_id: "e1",
+          threads: [
+            { id: "t1", supplier_ready_at: "2026-05-16T00:00:00Z", pickup_event_id: null, orders: null },
+            { id: "t2", supplier_ready_at: null, pickup_event_id: null, orders: null },
+          ],
+        },
+        // No ready threads, only producing → NOT in `ready`
+        {
+          id: "PO-X",
+          sup_status: "in_production",
+          supplier_id: "e1",
+          threads: [
+            { id: "tx", supplier_ready_at: null, pickup_event_id: null, orders: null },
+          ],
+        },
+        // Stockpile PO with sup_status=ready_for_pickup → in `ready` via fallback
+        { id: "PO-S", sup_status: "ready_for_pickup", supplier_id: "e1", threads: [] },
+      ],
+      error: null,
+    });
     const sb = {
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          order: vi.fn().mockReturnValue({ in: inFn }),
-        }),
+        select: vi.fn().mockReturnValue({ order: orderFn }),
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("supplier");
+    const res = await app.fetch(
+      new Request("http://t/api/supplier/pos?bucket=ready", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = ((await res.json()) as Array<{ id: string }>).map((r) => r.id);
+    expect(rows).toEqual(["PO-A", "PO-S"]);
+  });
+
+  it("filters by bucket=delivered — keeps all-picked POs + sup_status=delivered fallback", async () => {
+    const orderFn = vi.fn().mockResolvedValue({
+      data: [
+        // All threads picked → in `delivered`
+        {
+          id: "PO-A",
+          sup_status: "shipped",
+          supplier_id: "e1",
+          threads: [
+            { id: "t1", supplier_ready_at: "x", pickup_event_id: "p1", orders: null },
+            { id: "t2", supplier_ready_at: "x", pickup_event_id: "p1", orders: null },
+          ],
+        },
+        // Partial pickup → NOT in `delivered`
+        {
+          id: "PO-B",
+          sup_status: "partially_shipped",
+          supplier_id: "e1",
+          threads: [
+            { id: "t3", supplier_ready_at: "x", pickup_event_id: "p2", orders: null },
+            { id: "t4", supplier_ready_at: null, pickup_event_id: null, orders: null },
+          ],
+        },
+        // Stockpile delivered → in `delivered` via fallback
+        { id: "PO-C", sup_status: "delivered", supplier_id: "e1", threads: [] },
+      ],
+      error: null,
+    });
+    const sb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ order: orderFn }),
       }),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,7 +225,8 @@ describe("GET /api/supplier/pos", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(inFn).toHaveBeenCalledWith("sup_status", ["picked_up", "delivered"]);
+    const rows = ((await res.json()) as Array<{ id: string }>).map((r) => r.id);
+    expect(rows).toEqual(["PO-A", "PO-C"]);
   });
 
   it("rejects invalid bucket with 422", async () => {
@@ -158,6 +256,8 @@ describe("GET /api/supplier/pos", () => {
   // Urgency value depends on today's date relative to customer ETA, so we
   // assert it's one of the valid enum values rather than a specific bucket.
   it("returns urgency + sku_summary + customer_eta_min + behind_schedule per PO row", async () => {
+    // 2026-05-16 (migration 0116) — orders are now fetched via RPC, not
+    // nested under threads. Mock both the main SELECT and the rpc call.
     const orderFn = vi.fn().mockResolvedValue({
       data: [
         {
@@ -166,18 +266,17 @@ describe("GET /api/supplier/pos", () => {
           eta_date: "2026-05-22",
           lines: [{ sku: "mattress:carres-original:King", qty: 5 }],
           threads: [
-            {
-              id: "t1",
-              order_id: "o1",
-              orders: { dl: 1001, delivery_date: "2026-05-20", customer_name: "A" },
-            },
-            {
-              id: "t2",
-              order_id: "o2",
-              orders: { dl: 1002, delivery_date: "2026-05-28", customer_name: "B" },
-            },
+            { id: "t1", order_id: "o1", supplier_ready_at: null, pickup_event_id: null },
+            { id: "t2", order_id: "o2", supplier_ready_at: null, pickup_event_id: null },
           ],
         },
+      ],
+      error: null,
+    });
+    const rpcFn = vi.fn().mockResolvedValue({
+      data: [
+        { id: "o1", dl: 1001, customer_name: "A", delivery_date: "2026-05-20" },
+        { id: "o2", dl: 1002, customer_name: "B", delivery_date: "2026-05-28" },
       ],
       error: null,
     });
@@ -185,6 +284,7 @@ describe("GET /api/supplier/pos", () => {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({ order: orderFn }),
       }),
+      rpc: rpcFn,
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
@@ -201,11 +301,13 @@ describe("GET /api/supplier/pos", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].customer_eta_min).toBe("2026-05-20");
     expect(rows[0].urgency).toMatch(/critical|urgent|normal/);
-    // eta_date 2026-05-22 >= customer_eta_min 2026-05-20 → supplier won't make it.
     expect(rows[0].behind_schedule).toBe(true);
     expect(rows[0].sku_summary).toEqual([
       { sku: "mattress:carres-original:King", qty: 5 },
     ]);
+    expect(rpcFn).toHaveBeenCalledWith("supplier_orders_for_threads", {
+      p_order_ids: ["o1", "o2"],
+    });
   });
 
   it("defaults enrichment fields safely when threads + lines absent", async () => {
