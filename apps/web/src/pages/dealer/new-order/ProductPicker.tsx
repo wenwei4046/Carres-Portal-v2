@@ -229,10 +229,27 @@ export default function ProductPicker({ catalog, onAddLine, draftLines }: Props)
             <MattressConfigurator model={selected} skus={selectedSkus} onAdd={handleAdd} />
           )}
           {selected.category === "bedframe" && (
-            <BedframeConfigurator model={selected} skus={selectedSkus} onAdd={handleAdd} />
+            // 2026-05-18 (Loo screenshot — DL-1006 saved no fabric / no color).
+            // `key={selected.id}` forces a remount on model switch so
+            // useState(model.colors?.[0]) + useState(model.gaps?.[0]) re-init
+            // with the new model's defaults. Without the key, dropdown state
+            // leaked across models — stale color/gap id matched nothing in
+            // the new model's options, dropdown silently rendered blank, and
+            // the line was added with `attrs: null`.
+            <BedframeConfigurator key={selected.id} model={selected} skus={selectedSkus} onAdd={handleAdd} />
           )}
           {selected.category === "sofa" && (
+            // 2026-05-18 (Loo screenshot — DL-1006 Kestrel L-shape saved
+            // `attrs = { mode: "preset" }` with NO fabric even though Kestrel
+            // has 2 fabrics configured). Same root cause as bedframe above:
+            // useState(fabrics[0]?.id) only runs on initial mount, so
+            // switching from one sofa model to another within a wizard
+            // session kept the OLD model's fabric id in `fabricId`. The id
+            // didn't match any new-model option → `fabrics.find(...)` returned
+            // undefined → `if (fabric)` branch skipped → attrs saved blank.
+            // `key={selected.id}` forces a fresh mount per model.
             <SofaConfigurator
+              key={selected.id}
               model={selected}
               skus={selectedSkus}
               fabrics={selectedFabrics}
