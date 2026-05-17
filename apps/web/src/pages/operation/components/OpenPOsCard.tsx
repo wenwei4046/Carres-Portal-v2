@@ -64,7 +64,7 @@ export default function OpenPOsCard({ pos, onViewAll }: Props) {
               </span>
               <div className="min-w-0">
                 <div className="text-[12px] text-base-900 truncate">
-                  {po.dl ? `For #${po.dl}` : "Multi-order PO"}
+                  {po.so ? `For #${po.so}` : "Multi-order PO"}
                 </div>
                 <div className="text-[11px] text-base-500 truncate">
                   ETA {po.eta_date ?? "—"} · {po.sup_status.replace(/_/g, " ")}

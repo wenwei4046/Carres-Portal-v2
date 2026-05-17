@@ -741,6 +741,38 @@ Phase 10 NEW carry-forwards (2026-05-18):
 
 
 
+**Rename `dl` → `so` everywhere (Loo 2026-05-18 ~02:30 GMT+8, autonomous Phase 1 of 3)** — `dl` was an outdated legacy name; user-facing language has always been SO (Sales Order). Loo asked to align the whole stack, schema included. Mirrors the 0121 logistics→operation rename pattern in scope and execution shape. This is Phase 1 of a 3-phase refactor (Phase 2 = per-line thread granularity, Phase 3 = auto split-per-SO replacing the manual variant toggle).
+
+Migration 0123 (`rename_dl_to_so`) applied to staging Supabase = prod via `apply_migration`. Three-pass:
+1. Snapshot every function definition that touches dl-ish tokens into a TEMP table (22 functions matched).
+2. DROP those functions (none are trigger functions, none have RLS deps — pg_trigger join confirmed empty). Then `ALTER TABLE orders RENAME COLUMN dl TO so`; `ALTER TABLE purchase_orders RENAME COLUMN dl TO so`, `RENAME COLUMN dl_refs TO so_refs`; `ALTER SEQUENCE orders_dl_seq RENAME TO orders_so_seq`; rename indexes `orders_dl_key` + `po_dl_refs_idx`.
+3. Recreate each function from snapshot with longest-first text replacements (compound tokens before bare `dl`): `p_dl_refs`→`p_so_refs`, `dl_refs`→`so_refs`, `orders_dl_seq`→`orders_so_seq`, `'DL-`→`'SO-`, `v_dl`→`v_so`, `p_dl`→`p_so`, `orders.dl`→`orders.so` etc., plus regex-bounded bare `dl`→`so` for `RETURNING dl,`, `(dl integer)` RECORD field declarations, and column-list-positions.
+
+`CREATE OR REPLACE FUNCTION` was the first attempt but PG rejects renaming input parameter names without a prior DROP (error 42P13). Hence the snapshot→DROP→ALTER→recreate three-pass.
+
+Cosmetic backfill in same migration: `audit_log`, `order_history.text`, `po_history.text` rows had "DL-1003" style refs → swapped to "SO-1003" via `replace()`.
+
+Code-side rename via `scripts/rename-dl-to-so.ps1` (committed). 4 case-sensitive PowerShell `-creplace` passes in longest-first order: `dlRefs`→`soRefs`, `dl_refs`→`so_refs`, quoted `'DL-'` / `"DL-"` / `` `DL-` `` literals → `SO-`, then bare `\bdl\b` → `so`. 88 source files edited across `apps/`, `packages/`, `e2e/`. Skipped: `supabase/migrations/0001-0122/*.sql` (frozen per §14 #6), `reference/`, `node_modules/`, build artifact dirs, `.git/`, plus all historical docs (`docs/superpowers/{plans,specs,audits}/`, `phase-*-reflection.md`) per the §17 precedent set by 0121 — historical text stays as historical record.
+
+One sweep-gone-wrong caught by typecheck: `\bdl\b` matched the HTML `<dl>` (definition list) tag in `apps/web/src/pages/Me.tsx` + `DealerSettings.tsx`. 6 tag instances reverted to `<dl>`. No other false positives.
+
+One test assertion `codex-fixes.test.ts > F6` reads frozen migration 0046 TEXT and asserted on `NEW.dl IS DISTINCT FROM OLD.dl`. Migration 0046 text still has `NEW.dl`, so the assertion now intentionally uses `NEW.dl` (with comment calling out the historical-vocab pattern, mirroring the 0121 precedent in 2 other migration-text tests).
+
+Verification:
+- DB: `orders.so` + `purchase_orders.so` + `purchase_orders.so_refs` exist; old columns gone; `orders_so_seq` exists; 0 functions still reference dl-ish tokens; 0 audit_log rows still say "DL-".
+- Web typecheck clean, API typecheck clean, shared typecheck clean.
+- Web build clean: 1006 → 2623 KiB (same as last build, no regression).
+- Web tests: 439/443 — same 4 pre-existing HoOKkASofaTab fails as before rename. **Zero new fails.**
+- API tests: 626/629 — same 3 pre-existing fails as before. **Zero new fails.**
+- SERVICE_ROLE leak audit (§4.4 RED LINE): 0 hits in dist/ bundle. ✓
+
+Migration count: 123 files.
+
+Phase 1 carry-forwards:
+- `phase-10-frozen-migration-vocab-drift` (low) — same pattern as 0121: 700+ `dl` references stay in `supabase/migrations/0001-0122/*.sql` and in `docs/superpowers/{plans,specs,audits}/*.md` as historical record. Anyone joining the project post-rename will see both vocabs; a glossary footnote could help.
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)

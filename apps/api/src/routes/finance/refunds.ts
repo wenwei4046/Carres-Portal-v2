@@ -31,7 +31,7 @@ import type { AppEnv } from "../../types";
  *                     paid flow. status='pending' if amount > 1000 (also
  *                     creates approvals row kind='refund'); status
  *                     ='approved' immediately if amount <= 1000. UI derives
- *                     "RF-{dl}" prefix for display.
+ *                     "RF-{so}" prefix for display.
  *
  * Routes:
  *   GET    /            list refunds (status, dealerId, from, to filters)
@@ -78,11 +78,11 @@ financeRefundsRouter.post("/create", requireFinance, async (c) => {
 
   const sb = userClient(c.env, auth.jwt);
 
-  // Read the source order for dl + dealer_id (needed for refunds.dealer_id
-  // and approvals.refers_to format `SO-{dl}`).
+  // Read the source order for so + dealer_id (needed for refunds.dealer_id
+  // and approvals.refers_to format `SO-{so}`).
   const { data: order, error: ordErr } = await sb
     .from("orders")
-    .select("dl, dealer_id, customer_name")
+    .select("so, dealer_id, customer_name")
     .eq("id", body.data.orderId)
     .single();
   if (ordErr || !order) {
@@ -91,7 +91,7 @@ financeRefundsRouter.post("/create", requireFinance, async (c) => {
       404,
     );
   }
-  const ord = order as { dl: number; dealer_id: string; customer_name: string };
+  const ord = order as { so: number; dealer_id: string; customer_name: string };
 
   // Decide approval gate:
   //   kind=refund AND amount > 1000  -> needs principal approval (status=pending)
@@ -103,7 +103,7 @@ financeRefundsRouter.post("/create", requireFinance, async (c) => {
 
   // Credit notes get an auto-generated CN number from the dedicated
   // sequence (migration 0065). Refunds keep credit_note_no=NULL — UI
-  // derives "RF-{dl}" for display from the row's order SO number.
+  // derives "RF-{so}" for display from the row's order SO number.
   let creditNoteNo: string | null = null;
   if (body.data.kind === "credit") {
     const { data: cn, error: cnErr } = await sb.rpc("next_credit_note_no");
@@ -140,7 +140,7 @@ financeRefundsRouter.post("/create", requireFinance, async (c) => {
       kind:       "refund",
       title:      `Refund · RM ${body.data.amount.toFixed(2)} · ${body.data.reason.slice(0, 80)}`,
       actor:      auth.email,
-      refers_to:  `SO-${ord.dl}`,
+      refers_to:  `SO-${ord.so}`,
       amount:     body.data.amount,
       dealer_id:  ord.dealer_id,
       reason:     body.data.reason,
@@ -163,7 +163,7 @@ financeRefundsRouter.post("/create", requireFinance, async (c) => {
     actor_text: auth.email,
     action:     `Refund created · ${body.data.kind} · RM ${body.data.amount.toFixed(2)} · ${body.data.reason.slice(0, 100)}`,
     dealer_id:  ord.dealer_id,
-    ref:        `SO-${ord.dl}`,
+    ref:        `SO-${ord.so}`,
   });
 
   return c.json({

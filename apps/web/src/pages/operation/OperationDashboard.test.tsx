@@ -91,8 +91,8 @@ const baseSummary: operationDashboardResponse = {
       sup_status: "in_production",
       eta_date: "2026-05-10",
       placed_at: "2026-05-01T00:00:00Z",
-      dl: 9001,
-      dl_refs: null,
+      so: 9001,
+      so_refs: null,
     },
   ],
   low_stock: [
@@ -120,7 +120,7 @@ function makeOrder(
 ): operationOrderListRow {
   return {
     id: "ord-" + Math.random().toString(36).slice(2, 10),
-    dl: 9000 + Math.floor(Math.random() * 999),
+    so: 9000 + Math.floor(Math.random() * 999),
     status: "proceed_order",
     operation_stage: "awaiting_operation_action",
     warehouse_id: "wh-1",
@@ -201,7 +201,7 @@ describe("OperationDashboard", () => {
     const orders = Array.from({ length: 7 }, (_, i) =>
       makeOrder({
         id: `ord-${i}`,
-        dl: 9100 + i,
+        so: 9100 + i,
         customer_name: `Customer ${i}`,
         operation_stage: "awaiting_operation_action",
       }),

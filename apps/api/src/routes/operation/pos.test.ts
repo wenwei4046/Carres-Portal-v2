@@ -58,8 +58,8 @@ describe("GET /api/operation/pos", () => {
     warehouse_id: "00000000-0000-0000-0000-000000000b01",
     status: "open",
     sup_status: "pending",
-    dl: 4001,
-    dl_refs: null,
+    so: 4001,
+    so_refs: null,
     eta_date: "2026-05-15",
     placed_at: "2026-05-03T10:00:00Z",
     purchase_order_lines: [
@@ -167,13 +167,13 @@ describe("GET /api/operation/pos", () => {
 // Loo 2026-05-16 — per-source-order delivery dates for the PO detail modal.
 describe("GET /api/operation/pos/:id/source-orders", () => {
   function mockSourceOrders(opts: {
-    po?: { dl: number | null; dl_refs: number[] | null } | null;
-    orders?: { dl: number; delivery_date: string | null }[];
+    po?: { so: number | null; so_refs: number[] | null } | null;
+    orders?: { so: number; delivery_date: string | null }[];
   }) {
     const fromImpl = vi.fn((table: string) => {
       if (table === "purchase_orders") {
         const maybeSingle = vi.fn().mockResolvedValue({
-          data: opts.po === undefined ? { dl: null, dl_refs: null } : opts.po,
+          data: opts.po === undefined ? { so: null, so_refs: null } : opts.po,
           error: null,
         });
         const eq = vi.fn(() => ({ maybeSingle }));
@@ -200,11 +200,11 @@ describe("GET /api/operation/pos/:id/source-orders", () => {
 
   it("returns per-SO delivery dates for a bundle PO", async () => {
     mockSourceOrders({
-      po: { dl: null, dl_refs: [1001, 1002, 1003] },
+      po: { so: null, so_refs: [1001, 1002, 1003] },
       orders: [
-        { dl: 1001, delivery_date: "2026-05-31" },
-        { dl: 1002, delivery_date: "2026-06-04" },
-        { dl: 1003, delivery_date: "2026-06-04" },
+        { so: 1001, delivery_date: "2026-05-31" },
+        { so: 1002, delivery_date: "2026-06-04" },
+        { so: 1003, delivery_date: "2026-06-04" },
       ],
     });
     const jwt = await makeJwt("operation");
@@ -216,19 +216,19 @@ describe("GET /api/operation/pos/:id/source-orders", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      orders: { dl: number; deliveryDate: string | null }[];
+      orders: { so: number; deliveryDate: string | null }[];
     };
     expect(body.orders).toEqual([
-      { dl: 1001, deliveryDate: "2026-05-31" },
-      { dl: 1002, deliveryDate: "2026-06-04" },
-      { dl: 1003, deliveryDate: "2026-06-04" },
+      { so: 1001, deliveryDate: "2026-05-31" },
+      { so: 1002, deliveryDate: "2026-06-04" },
+      { so: 1003, deliveryDate: "2026-06-04" },
     ]);
   });
 
-  it("includes po.dl alongside dl_refs (single-order PO)", async () => {
+  it("includes po.so alongside so_refs (single-order PO)", async () => {
     mockSourceOrders({
-      po: { dl: 4001, dl_refs: null },
-      orders: [{ dl: 4001, delivery_date: "2026-05-15" }],
+      po: { so: 4001, so_refs: null },
+      orders: [{ so: 4001, delivery_date: "2026-05-15" }],
     });
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -239,10 +239,10 @@ describe("GET /api/operation/pos/:id/source-orders", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      orders: { dl: number; deliveryDate: string | null }[];
+      orders: { so: number; deliveryDate: string | null }[];
     };
     expect(body.orders).toEqual([
-      { dl: 4001, deliveryDate: "2026-05-15" },
+      { so: 4001, deliveryDate: "2026-05-15" },
     ]);
   });
 
@@ -285,7 +285,7 @@ describe("POST /api/operation/pos", () => {
     supplierId: SUPPLIER_ID,
     warehouseId: WAREHOUSE_ID,
     lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, costSource: "hand_entered" as const }],
-    dl: 4001,
+    so: 4001,
     // 0083 (Loo 2026-05-10) — etaDate now required (ISO date).
     etaDate: "2026-06-01",
   };
@@ -303,7 +303,7 @@ describe("POST /api/operation/pos", () => {
 
   it("returns 200 on success and calls RPC with snake_case args", async () => {
     const rpc = vi.fn().mockResolvedValue({
-      data: { id: "PO-2050", supplier_id: SUPPLIER_ID, warehouse_id: WAREHOUSE_ID, status: "open", sup_status: "pending", dl: 4001, dl_refs: null }, error: null,
+      data: { id: "PO-2050", supplier_id: SUPPLIER_ID, warehouse_id: WAREHOUSE_ID, status: "open", sup_status: "pending", so: 4001, so_refs: null }, error: null,
     });
     const fromMock = makeFromMock();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -347,7 +347,7 @@ describe("POST /api/operation/pos", () => {
     expect(fromMock.eq).toHaveBeenCalledWith("id", "PO-2050");
   });
 
-  it("supports combined PO with dlRefs[] (and no dl)", async () => {
+  it("supports combined PO with soRefs[] (and no so)", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { id: "PO-2051" }, error: null });
     const fromMock = makeFromMock();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -361,7 +361,7 @@ describe("POST /api/operation/pos", () => {
           supplierId: SUPPLIER_ID,
           warehouseId: WAREHOUSE_ID,
           lines: [{ sku: "MAT-K-001", qty: 5, cost: 1500, costSource: "hand_entered" }],
-          dlRefs: [4001, 4002, 4003],
+          soRefs: [4001, 4002, 4003],
           // 0083: required.
           etaDate: "2026-07-15",
         }),
@@ -1173,14 +1173,14 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       operation_stage: string;
       po_id: string | null;
     }[];
-    awaitingOrders?: { id: string; dl?: number | null; delivery_date?: string | null }[];
+    awaitingOrders?: { id: string; so?: number | null; delivery_date?: string | null }[];
     // v3-S2.1: lines may optionally carry `order_id` so the mock can mirror
     // `.in("order_id", [...])` filtering — tests supply lines for ALL orders
     // and assert the route narrows the input set BEFORE this fetch. Lines
     // without order_id always pass through (preserves existing tests).
     orderLines?: { sku: string; qty: number; order_id?: string }[];
     stockBalances?: { sku: string; qty: number; reserved: number }[];
-    pos?: { status: string; dl: number | null; dl_refs: number[] | null }[];
+    pos?: { status: string; so: number | null; so_refs: number[] | null }[];
   }) {
     const fromImpl = vi.fn((table: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1203,10 +1203,10 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
         case "orders": {
           // The orders chain has to be both thenable (when the route awaits
           // `.eq("operation_stage", ...)` directly) AND chainable (when the
-          // route additionally calls `.in("dl", [...])` for a `?dls=`-scoped
+          // route additionally calls `.in("so", [...])` for a `?dls=`-scoped
           // bundle request). Tracking `dlScope` lets the mock narrow the
           // resolved data the same way Postgres would, so tests can supply a
-          // superset of awaitingOrders and assert dl filtering pruned the
+          // superset of awaitingOrders and assert so filtering pruned the
           // out-of-scope ones.
           let dlScope: number[] | null = null;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1214,7 +1214,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
           ordersChain.select = vi.fn(() => ordersChain);
           ordersChain.eq = vi.fn(() => ordersChain);
           ordersChain.in = vi.fn((col: string, vals: unknown[]) => {
-            if (col === "dl") dlScope = vals as number[];
+            if (col === "so") dlScope = vals as number[];
             return ordersChain;
           });
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1222,7 +1222,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
             let rows = opts.awaitingOrders ?? [];
             if (dlScope) {
               rows = rows.filter(
-                (o) => o.dl != null && dlScope!.includes(o.dl),
+                (o) => o.so != null && dlScope!.includes(o.so),
               );
             }
             return Promise.resolve({ data: rows, error: null }).then(
@@ -1259,7 +1259,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
           chain.eq = vi.fn((col: string, val: string) => {
             let rows = opts.pos ?? [];
             if (col === "status") rows = rows.filter((p) => p.status === val);
-            return promise(rows.map((p) => ({ dl: p.dl, dl_refs: p.dl_refs })));
+            return promise(rows.map((p) => ({ so: p.so, so_refs: p.so_refs })));
           });
           break;
       }
@@ -1402,10 +1402,10 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   // -------------------------------------------------------------------------
   // v3-S2.1 — exclude orders already covered by an open PO (Bug 7 partial fix)
   // -------------------------------------------------------------------------
-  it("filters out awaiting_operation_action orders covered by open POs via dl", async () => {
-    // Two awaiting_operation_action orders. Order A (dl=4001) is covered by an open PO
-    // that targets dl=4001 directly → its lines must NOT contribute to
-    // shortage. Order B (dl=4002) is uncovered → its lines DO contribute.
+  it("filters out awaiting_operation_action orders covered by open POs via so", async () => {
+    // Two awaiting_operation_action orders. Order A (so=4001) is covered by an open PO
+    // that targets so=4001 directly → its lines must NOT contribute to
+    // shortage. Order B (so=4002) is uncovered → its lines DO contribute.
     // Lines for BOTH orders are supplied to the mock; the mock filters by
     // the order_id list the route passes to `.in()`, so if the route
     // failed to drop order A, order A's `mattress` line would surface.
@@ -1413,8 +1413,8 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     const ID_B = "00000000-0000-0000-0000-000000000a02";
     mockShortageQueries({
       awaitingOrders: [
-        { id: ID_A, dl: 4001 },
-        { id: ID_B, dl: 4002 },
+        { id: ID_A, so: 4001 },
+        { id: ID_B, so: 4002 },
       ],
       orderLines: [
         // Order A — would surface if route fails to filter.
@@ -1427,7 +1427,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
         { sku: "sofa:nordic:3s", qty: 0, reserved: 0 },
       ],
       pos: [
-        { status: "open", dl: 4001, dl_refs: null },
+        { status: "open", so: 4001, so_refs: null },
       ],
     });
     const jwt = await makeJwt("operation");
@@ -1447,17 +1447,17 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     ]);
   });
 
-  it("filters out awaiting_operation_action orders covered by open POs via dl_refs array", async () => {
-    // Order A (dl=4001) and Order B (dl=4002) are both covered by ONE batch
-    // PO with dl=null and dl_refs=[4001, 4002]. Order C (dl=4003) is not.
+  it("filters out awaiting_operation_action orders covered by open POs via so_refs array", async () => {
+    // Order A (so=4001) and Order B (so=4002) are both covered by ONE batch
+    // PO with so=null and so_refs=[4001, 4002]. Order C (so=4003) is not.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     const ID_B = "00000000-0000-0000-0000-000000000a02";
     const ID_C = "00000000-0000-0000-0000-000000000a03";
     mockShortageQueries({
       awaitingOrders: [
-        { id: ID_A, dl: 4001 },
-        { id: ID_B, dl: 4002 },
-        { id: ID_C, dl: 4003 },
+        { id: ID_A, so: 4001 },
+        { id: ID_B, so: 4002 },
+        { id: ID_C, so: 4003 },
       ],
       orderLines: [
         { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
@@ -1469,7 +1469,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
         { sku: "sofa:nordic:3s", qty: 0, reserved: 0 },
       ],
       pos: [
-        { status: "open", dl: null, dl_refs: [4001, 4002] },
+        { status: "open", so: null, so_refs: [4001, 4002] },
       ],
     });
     const jwt = await makeJwt("operation");
@@ -1501,7 +1501,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     mockShortageQueries({
       awaitingOrders: [
-        { id: ID_A, dl: 4001 },
+        { id: ID_A, so: 4001 },
       ],
       orderLines: [
         { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
@@ -1510,7 +1510,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
         { sku: "sofa:nordic:3s", qty: 0, reserved: 0 },
       ],
       pos: [
-        { status: "received", dl: 4001, dl_refs: null },
+        { status: "received", so: 4001, so_refs: null },
       ],
     });
     const jwt = await makeJwt("operation");
@@ -1536,7 +1536,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     mockShortageQueries({
       awaitingOrders: [
-        { id: ID_A, dl: 4001 },
+        { id: ID_A, so: 4001 },
       ],
       orderLines: [
         { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
@@ -1545,7 +1545,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
         { sku: "sofa:nordic:3s", qty: 0, reserved: 0 },
       ],
       pos: [
-        { status: "cancelled", dl: 4001, dl_refs: null },
+        { status: "cancelled", so: 4001, so_refs: null },
       ],
     });
     const jwt = await makeJwt("operation");
@@ -1570,7 +1570,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   // After v3-S4 (migration 0033) every confirmed order is split into per-
   // (supplier, category) threads. A thread with operation_stage =
   // 'awaiting_operation_action' AND po_id IS NULL is the "not yet covered by
-  // a PO" auto-fill target. The dl/dl_refs join from v3-S2.1 is now the
+  // a PO" auto-fill target. The so/so_refs join from v3-S2.1 is now the
   // SECONDARY (legacy) path for orders that exist but have no thread rows
   // (pre-v3 data, or confirm_proceed_request_v3 not yet called).
   // -------------------------------------------------------------------------
@@ -1671,12 +1671,12 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
 
   it("v3 legacy fallback: order in awaiting_operation_action with no thread + no covering open PO contributes lines", async () => {
     // Order A is pre-v3 / unsplit data: orders.operation_stage='awaiting_operation_action'
-    // but no row exists in order_supplier_threads. The dl/dl_refs filter
+    // but no row exists in order_supplier_threads. The so/so_refs filter
     // against open POs runs as v2 did and leaves the order in play.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     mockShortageQueries({
       threads: [],
-      awaitingOrders: [{ id: ID_A, dl: 4001 }],
+      awaitingOrders: [{ id: ID_A, so: 4001 }],
       orderLines: [
         { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
       ],
@@ -1702,7 +1702,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   it("v3 legacy fallback: order WITH any thread is excluded from legacy path (split orders go through primary only)", async () => {
     // Order A has a thread (in dispatched stage, no po_id yet — unusual but
     // possible mid-pipeline). The fact that it has ANY thread means it has
-    // been split, so the legacy path should NOT pick it up by orders.dl.
+    // been split, so the legacy path should NOT pick it up by orders.so.
     // The primary path won't pick it up either (stage != awaiting_operation_action).
     // Net: order A contributes nothing — it's mid-pipeline, not a procurement target.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
@@ -1710,7 +1710,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       threads: [
         { order_id: ID_A, operation_stage: "dispatched", po_id: null },
       ],
-      awaitingOrders: [{ id: ID_A, dl: 4001 }], // orders.operation_stage rolled up to awaiting_operation_action
+      awaitingOrders: [{ id: ID_A, so: 4001 }], // orders.operation_stage rolled up to awaiting_operation_action
       orderLines: [
         { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
       ],
@@ -1741,7 +1741,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       threads: [
         { order_id: ID_A, operation_stage: "awaiting_operation_action", po_id: null },
       ],
-      awaitingOrders: [{ id: ID_A, dl: 4001 }],
+      awaitingOrders: [{ id: ID_A, so: 4001 }],
       orderLines: [
         { order_id: ID_A, sku: "mattress:cloud:King", qty: 3 },
       ],
@@ -1768,7 +1768,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   it("v3 union: primary thread + separate legacy order both contribute to aggregated shortage", async () => {
     // Real-world v3 transition: order A has been split (thread, primary path
     // active), order B is pre-v3 legacy data (no thread, falls through to the
-    // dl/dl_refs filter against open POs which matches nothing). Both should
+    // so/so_refs filter against open POs which matches nothing). Both should
     // surface and their lines aggregated by SKU.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     const ID_B = "00000000-0000-0000-0000-000000000a02";
@@ -1776,7 +1776,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       threads: [
         { order_id: ID_A, operation_stage: "awaiting_operation_action", po_id: null },
       ],
-      awaitingOrders: [{ id: ID_B, dl: 4002 }],
+      awaitingOrders: [{ id: ID_B, so: 4002 }],
       orderLines: [
         { order_id: ID_A, sku: "mattress:cloud:King", qty: 2 },
         { order_id: ID_B, sku: "mattress:cloud:King", qty: 3 },
@@ -1804,13 +1804,13 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   // -------------------------------------------------------------------------
   // ?dls= scoping — bundle PO from CrossOrderBundleSheet
   //
-  // The CreatePOModal opens with `prefill.dlRefs` set to the operator's
+  // The CreatePOModal opens with `prefill.soRefs` set to the operator's
   // selected orders. The hook re-issues this request with `?dls=...`, and the
   // route must narrow shortage to exactly those orders (otherwise the
   // pre-fill leaks lines from unrelated awaiting orders, which is the bug
   // memory 1790 / 1793 documented).
   // -------------------------------------------------------------------------
-  it("scopes shortage to ?dls= when present (legacy path narrows by dl)", async () => {
+  it("scopes shortage to ?dls= when present (legacy path narrows by so)", async () => {
     // Three awaiting orders. dls=[4001,4002] → only A and B should contribute.
     // C's lines must NOT surface.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
@@ -1818,9 +1818,9 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     const ID_C = "00000000-0000-0000-0000-000000000a03";
     mockShortageQueries({
       awaitingOrders: [
-        { id: ID_A, dl: 4001 },
-        { id: ID_B, dl: 4002 },
-        { id: ID_C, dl: 9999 },
+        { id: ID_A, so: 4001 },
+        { id: ID_B, so: 4002 },
+        { id: ID_C, so: 9999 },
       ],
       orderLines: [
         { order_id: ID_A, sku: "mattress:cloud:King", qty: 3 },
@@ -1845,27 +1845,27 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
       shortage: { sku: string; attrs: Record<string, unknown> | null; need: number; available: number; shortage: number }[];
     };
     // Only A + B's mattress line surfaces — sofa:nordic:3s (qty 99 from C) is
-    // proof the dl scope held: without it the sentinel would leak through.
+    // proof the so scope held: without it the sentinel would leak through.
     expect(body.shortage).toEqual([
       { sku: "mattress:cloud:King", attrs: null, need: 5, available: 0, shortage: 5 },
     ]);
   });
 
   it("intersects ?dls= with primary-path threads (out-of-scope thread doesn't leak)", async () => {
-    // Threads carry no dl, so when ?dls= is present the route must intersect
-    // primaryOrderIds with the dl-scoped orders set. Without that step, an
+    // Threads carry no so, so when ?dls= is present the route must intersect
+    // primaryOrderIds with the so-scoped orders set. Without that step, an
     // awaiting + po_id-null thread for an order outside the user's selection
     // would re-introduce its lines into the shortage feed.
-    const ID_IN = "00000000-0000-0000-0000-000000000b01"; // dl=5001 (in scope)
-    const ID_OUT = "00000000-0000-0000-0000-000000000b02"; // dl=5099 (NOT in scope)
+    const ID_IN = "00000000-0000-0000-0000-000000000b01"; // so=5001 (in scope)
+    const ID_OUT = "00000000-0000-0000-0000-000000000b02"; // so=5099 (NOT in scope)
     mockShortageQueries({
       threads: [
         { order_id: ID_IN, operation_stage: "awaiting_operation_action", po_id: null },
         { order_id: ID_OUT, operation_stage: "awaiting_operation_action", po_id: null },
       ],
       awaitingOrders: [
-        { id: ID_IN, dl: 5001 },
-        { id: ID_OUT, dl: 5099 },
+        { id: ID_IN, so: 5001 },
+        { id: ID_OUT, so: 5099 },
       ],
       orderLines: [
         { order_id: ID_IN, sku: "mattress:cloud:King", qty: 4 },
@@ -1900,12 +1900,12 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     // order's delivery_date so operation can see WHY this bundle exists.
     // Global (no-dls) calls must still return orders: [] to avoid shipping
     // the full awaiting cohort over the wire.
-    const ID_A = "00000000-0000-0000-0000-000000000c01"; // dl=6001
-    const ID_B = "00000000-0000-0000-0000-000000000c02"; // dl=6002 (TBD)
+    const ID_A = "00000000-0000-0000-0000-000000000c01"; // so=6001
+    const ID_B = "00000000-0000-0000-0000-000000000c02"; // so=6002 (TBD)
     mockShortageQueries({
       awaitingOrders: [
-        { id: ID_A, dl: 6001, delivery_date: "2026-06-15" },
-        { id: ID_B, dl: 6002, delivery_date: null },
+        { id: ID_A, so: 6001, delivery_date: "2026-06-15" },
+        { id: ID_B, so: 6002, delivery_date: null },
       ],
       orderLines: [
         { order_id: ID_A, sku: "mattress:cloud:King", qty: 1 },
@@ -1926,18 +1926,18 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       shortage: unknown[];
-      orders: { dl: number; deliveryDate: string | null }[];
+      orders: { so: number; deliveryDate: string | null }[];
     };
     expect(body.orders).toEqual([
-      { dl: 6001, deliveryDate: "2026-06-15" },
-      { dl: 6002, deliveryDate: null },
+      { so: 6001, deliveryDate: "2026-06-15" },
+      { so: 6002, deliveryDate: null },
     ]);
   });
 
   it("returns orders: [] for global (no-dls) shortage calls", async () => {
     mockShortageQueries({
       awaitingOrders: [
-        { id: "00000000-0000-0000-0000-000000000d01", dl: 7001, delivery_date: "2026-07-01" },
+        { id: "00000000-0000-0000-0000-000000000d01", so: 7001, delivery_date: "2026-07-01" },
       ],
       orderLines: [
         { order_id: "00000000-0000-0000-0000-000000000d01", sku: "mattress:cloud:King", qty: 1 },
@@ -2043,7 +2043,7 @@ describe("POST /api/operation/pos/batch", () => {
           // 0083 (Loo 2026-05-10) — etaDate now propagated from caller into
           // RPC's JSONB input, no longer hard-coded null.
           eta_date: "2026-06-01",
-          dl_refs: null,
+          so_refs: null,
           note: null,
         },
         {
@@ -2052,7 +2052,7 @@ describe("POST /api/operation/pos/batch", () => {
           procurement_partner_id: null,
           lines: [{ sku: "sofa:oak:3-seater", qty: 1, cost: 2200, cost_source: "prev_po", attrs: null }],
           eta_date: "2026-06-15",
-          dl_refs: null,
+          so_refs: null,
           note: null,
         },
       ],

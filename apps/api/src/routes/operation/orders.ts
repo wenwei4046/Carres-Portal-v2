@@ -109,7 +109,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   let q = sb
     .from("orders")
     .select(
-      "id, dl, status, operation_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -131,7 +131,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   if (search) {
     const asInt = Number.parseInt(search, 10);
     if (Number.isFinite(asInt)) {
-      q = q.or(`customer_name.ilike.%${search}%,dl.eq.${asInt}`);
+      q = q.or(`customer_name.ilike.%${search}%,so.eq.${asInt}`);
     } else {
       q = q.ilike("customer_name", `%${search}%`);
     }
@@ -154,7 +154,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   const { data: order, error: e1 } = await sb
     .from("orders")
     .select(
-      "id, dl, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -220,11 +220,11 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     }
   }
 
-  // Linked POs (own dl OR within dl_refs[]).
+  // Linked POs (own so OR within so_refs[]).
   const { data: pos, error: e_pos } = await sb
     .from("purchase_orders")
-    .select("id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta_date")
-    .or(`dl.eq.${order.dl},dl_refs.cs.{${order.dl}}`);
+    .select("id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date")
+    .or(`so.eq.${order.so},so_refs.cs.{${order.so}}`);
   if (e_pos) { const m = mapPgError(e_pos); return c.json(m.body, m.status); }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let poLinesByPo: Record<string, any[]> = {};
@@ -275,7 +275,7 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
   const { data: order, error: e1 } = await sb
     .from("orders")
     .select(
-      "id, dl, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners(name)",
+      "id, so, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -361,8 +361,8 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
     do_number: String(ord.do_number),
     issue_date: issueDate,
     order_id: String(ord.id),
-    // Order code shown to dealer = `SO-${dl}` (matches existing UI conventions).
-    order_code: `SO-${ord.dl}`,
+    // Order code shown to dealer = `SO-${so}` (matches existing UI conventions).
+    order_code: `SO-${ord.so}`,
     customer: {
       name: String(ord.customer_name ?? ""),
       address: customerAddress,

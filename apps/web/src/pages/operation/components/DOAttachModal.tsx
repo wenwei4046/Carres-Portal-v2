@@ -135,7 +135,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
         signed: true,
         doFilePath,
       });
-      toast.success(`#${order.dl} delivered · stock deducted`);
+      toast.success(`#${order.so} delivered · stock deducted`);
       onClose();
     } catch (e: unknown) {
       if (e instanceof ApiError) toast.error(e.message || "Mark delivered failed");
@@ -144,7 +144,7 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
   }
 
   return (
-    <Modal title={`Attach Delivery Order · #${order.dl}`} onClose={onClose}>
+    <Modal title={`Attach Delivery Order · #${order.so}`} onClose={onClose}>
       <div className="text-[12px] text-base-600 mb-3.5 font-body">
         Once attached, the order moves to <strong>Delivered</strong> and{" "}
         {itemCount} item{itemCount === 1 ? "" : "s"} will be deducted from{" "}

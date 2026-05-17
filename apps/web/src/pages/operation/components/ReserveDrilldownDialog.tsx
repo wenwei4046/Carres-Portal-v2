@@ -52,8 +52,8 @@ export default function ReserveDrilldownDialog({
   const data = drilldown.data;
   const orders = data?.orders ?? [];
 
-  async function copyDl(dl: number) {
-    const text = `#SO${dl}`;
+  async function copyDl(so: number) {
+    const text = `#SO${so}`;
     try {
       // navigator.clipboard is async + Promise-returning; toast on resolve.
       await navigator.clipboard.writeText(text);
@@ -158,7 +158,7 @@ export default function ReserveDrilldownDialog({
                   }}
                 >
                   <div className="font-mono text-[12px] font-semibold">
-                    #SO{o.dl}
+                    #SO{o.so}
                   </div>
                   <div className="font-body text-[13px] truncate">
                     {o.customerName}
@@ -172,7 +172,7 @@ export default function ReserveDrilldownDialog({
                   <div className="text-right">
                     <button
                       type="button"
-                      onClick={() => void copyDl(o.dl)}
+                      onClick={() => void copyDl(o.so)}
                       className="btn-ghost text-[11px] py-1 px-2"
                       data-testid={`reserve-drilldown-copy-${o.id}`}
                     >

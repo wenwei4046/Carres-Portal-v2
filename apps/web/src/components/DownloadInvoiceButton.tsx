@@ -18,7 +18,7 @@ import type { InvoiceTemplateData } from "@/lib/pdf/types";
  *
  * Props:
  *   - orderId: UUID
- *   - dl:      integer (filename + toast text)
+ *   - so:      integer (filename + toast text)
  *   - role:    current user role; hides on partner / supplier / dealer /
  *              showroom / salesperson (no invoice access for them)
  *   - variant: "primary" / "secondary" — matches Submit / outline styling
@@ -44,7 +44,7 @@ const ALLOWED: ReadonlySet<Role> = new Set([
 
 interface Props {
   orderId: string;
-  dl: number;
+  so: number;
   role: Role;
   variant?: "primary" | "secondary";
   className?: string;
@@ -52,7 +52,7 @@ interface Props {
 
 export default function DownloadInvoiceButton({
   orderId,
-  dl,
+  so,
   role,
   variant = "secondary",
   className,
@@ -71,7 +71,7 @@ export default function DownloadInvoiceButton({
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      toast.success(`Invoice INV-${String(dl).padStart(6, "0")} opened`);
+      toast.success(`Invoice INV-${String(so).padStart(6, "0")} opened`);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : String(e);
       toast.error(`Invoice PDF failed: ${msg}`);
@@ -91,7 +91,7 @@ export default function DownloadInvoiceButton({
       onClick={onClick}
       disabled={busy}
       className={`px-3.5 py-2 rounded-md text-[12.5px] disabled:opacity-50 transition-colors ${baseCls} ${className ?? ""}`}
-      data-testid={`download-invoice-${dl}`}
+      data-testid={`download-invoice-${so}`}
     >
       {busy ? "Opening…" : "Print Invoice"}
     </button>

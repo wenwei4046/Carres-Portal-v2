@@ -26,21 +26,21 @@ function wrap(ui: React.ReactNode) {
 const PAYLOAD = {
   rows: [
     {
-      order_id: "o1", dl: 1240, customer_name: "Tan Wei Ling",
+      order_id: "o1", so: 1240, customer_name: "Tan Wei Ling",
       dealer_id: "d1", dealer_name: "Showroom KL",
       placed_at: "2026-04-30T00:00:00Z", days: 8, aging: "0-30",
       total: 5970, paid: 0, outstanding: 5970,
       invoice_no: "INV-2026-1240", status: "place",
     },
     {
-      order_id: "o2", dl: 1241, customer_name: "Lee Kah Hong",
+      order_id: "o2", so: 1241, customer_name: "Lee Kah Hong",
       dealer_id: "d2", dealer_name: "Showroom Penang",
       placed_at: "2026-04-25T00:00:00Z", days: 13, aging: "0-30",
       total: 4000, paid: 2000, outstanding: 2000,
       invoice_no: "INV-2026-1241", status: "proceed_order",
     },
     {
-      order_id: "o3", dl: 1239, customer_name: "Ng Sue Mei",
+      order_id: "o3", so: 1239, customer_name: "Ng Sue Mei",
       dealer_id: "d1", dealer_name: "Showroom KL",
       placed_at: "2026-04-20T00:00:00Z", days: 18, aging: "0-30",
       total: 5970, paid: 5970, outstanding: 0,

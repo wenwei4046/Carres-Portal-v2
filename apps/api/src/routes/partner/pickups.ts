@@ -31,7 +31,7 @@ import type { DoTemplateData } from "../../lib/pdf/types";
  *
  * SELECT shape (NO `qty` — that column does not exist on purchase_orders;
  * line-item quantities live on purchase_order_lines):
- *   id, dl, supplier_id, warehouse_id, sup_status,
+ *   id, so, supplier_id, warehouse_id, sup_status,
  *   delivery_partners(name)
  */
 const partnerPickupsRouter = new Hono<AppEnv>();
@@ -71,7 +71,7 @@ partnerPickupsRouter.get("/", async (c) => {
     .from("purchase_orders")
     .select(
       `
-      id, dl, supplier_id, warehouse_id, sup_status, status, eta_date, placed_at,
+      id, so, supplier_id, warehouse_id, sup_status, status, eta_date, placed_at,
       procurement_partner_id,
       suppliers(name, contact, kind),
       warehouses(name, address, kind, owning_partner_id),
@@ -87,7 +87,7 @@ partnerPickupsRouter.get("/", async (c) => {
   const rows = (data ?? []) as Array<Record<string, unknown>>;
 
   // Collect every thread's order_id across all POs, then one RPC round-trip
-  // fetches dl / customer_name / delivery_date for those orders (scoped to
+  // fetches so / customer_name / delivery_date for those orders (scoped to
   // this partner's POs internally).
   const orderIds: string[] = [];
   for (const po of rows) {
@@ -98,7 +98,7 @@ partnerPickupsRouter.get("/", async (c) => {
       if (oid) orderIds.push(oid);
     }
   }
-  const orderInfo = new Map<string, { dl: number; customer_name: string; delivery_date: string | null }>();
+  const orderInfo = new Map<string, { so: number; customer_name: string; delivery_date: string | null }>();
   if (orderIds.length > 0) {
     const { data: oRows, error: oErr } = await sb.rpc("partner_orders_for_threads", {
       p_order_ids: orderIds,
@@ -110,7 +110,7 @@ partnerPickupsRouter.get("/", async (c) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of ((oRows ?? []) as any[])) {
       orderInfo.set(String(r.id), {
-        dl: Number(r.dl),
+        so: Number(r.so),
         customer_name: String(r.customer_name ?? ""),
         delivery_date: (r.delivery_date as string | null) ?? null,
       });
@@ -421,7 +421,7 @@ partnerPickupsRouter.get("/rfd-pending", async (c) => {
  * Used by PartnerPickupsPage to render the "In Transit" section + the
  * Mark Delivered button (POD upload flow).
  *
- * Joins orders.customer_name + orders.dl for display. RLS on
+ * Joins orders.customer_name + orders.so for display. RLS on
  * order_supplier_threads (`ost_partner_read` 0033:96) admits the partner
  * as procurement-leg owner; for customer-leg threads (delivery_partner_id =
  * me but procurement_partner_id may belong to a different partner), the
@@ -553,7 +553,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
   const { data: order, error: e1 } = await sb
     .from("orders")
     .select(
-      "id, dl, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners(name)",
+      "id, so, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -619,7 +619,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
     do_number: String(ord.do_number),
     issue_date: issueDate,
     order_id: String(ord.id),
-    order_code: `SO-${ord.dl}`,
+    order_code: `SO-${ord.so}`,
     customer: {
       name: String(ord.customer_name ?? ""),
       address: customerAddress,

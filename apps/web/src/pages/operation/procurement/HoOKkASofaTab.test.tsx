@@ -121,8 +121,8 @@ function makeSofaPo(
     warehouse_id: WAREHOUSE_KL.id,
     status: "open",
     sup_status: "in_production",
-    dl: 9100,
-    dl_refs: null,
+    so: 9100,
+    so_refs: null,
     eta_date: "2026-06-15",
     placed_at: "2026-05-02T00:00:00Z",
     purchase_order_lines: [

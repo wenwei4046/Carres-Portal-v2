@@ -31,7 +31,7 @@ function wrap(ui: React.ReactNode) {
 
 const ROW_MATCHED = {
   po_id:               "PO-2050",
-  dl:                  1240,
+  so:                  1240,
   supplier_id:         "s1",
   supplier_name:       "Acme Bedworks",
   warehouse_id:        "w1",

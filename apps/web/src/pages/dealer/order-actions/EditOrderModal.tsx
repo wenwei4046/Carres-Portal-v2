@@ -39,7 +39,7 @@ export default function EditOrderModal({ order, onClose }: Props) {
 
   const updateMut = useUpdateOrder(order.id, {
     onSuccess: () => {
-      toast.success(`Order #${order.dl} updated`);
+      toast.success(`Order #${order.so} updated`);
       onClose();
     },
     onError: (err) => {
@@ -100,7 +100,7 @@ export default function EditOrderModal({ order, onClose }: Props) {
   return (
     <ModalShell onClose={onClose}>
       <header className="px-7 pt-5 pb-3.5 border-b border-base-100">
-        <p className="kicker">Edit · #{order.dl}</p>
+        <p className="kicker">Edit · #{order.so}</p>
         <h2 className="font-display text-[22px] mt-0.5 tracking-[-0.02em] leading-[1.2] font-semibold">
           Order details
         </h2>

@@ -105,9 +105,9 @@ export type AbandonOrderInput = z.infer<typeof abandonOrderInput>;
 
 /**
  * `createPoInput` — POST /api/operation/pos.
- * Maps to `operation_create_po(supplier_id, warehouse_id, lines, dl, dl_refs)`
- * RPC. Used by NewPODialog for both single-order POs (`dl` set) and combined
- * cross-order bundles (`dlRefs` array, per A7). At least one line required;
+ * Maps to `operation_create_po(supplier_id, warehouse_id, lines, so, so_refs)`
+ * RPC. Used by NewPODialog for both single-order POs (`so` set) and combined
+ * cross-order bundles (`soRefs` array, per A7). At least one line required;
  * each line's qty must be a positive integer.
  *
  * Phase 4.5 Chunk 2 Sprint E (T25) migration 0055 — each line carries
@@ -148,8 +148,8 @@ export const createPoInput = z.object({
     // lacks fabric, so the API edge accepts any record shape.
     attrs: z.record(z.unknown()).nullable().optional(),
   })).min(1),
-  dl: z.number().int().positive().optional(),
-  dlRefs: z.array(z.number().int().positive()).optional(),
+  so: z.number().int().positive().optional(),
+  soRefs: z.array(z.number().int().positive()).optional(),
   // 0083 (Loo 2026-05-10) — required ISO date string. Pre-0083 rows had this
   // field captured by the modal but never sent (input-shape carry-forward
   // closed). Supplier/Finance AP-aging both read `purchase_orders.eta_date`;
@@ -324,7 +324,7 @@ export type ReassignPoWarehouseInput = z.infer<typeof reassignPoWarehouseInput>;
  *   in the route since pre-push orders don't necessarily have stage written
  *   yet) and 'proceed_request' (post-proceed_order, pre-triage).
  * channel: 'all' (default) | 'dealers' | 'showrooms'.
- * search: free-text matched against customer_name (ILIKE) AND parsed as int for dl exact match.
+ * search: free-text matched against customer_name (ILIKE) AND parsed as int for so exact match.
  */
 export const ListOperationOrdersQuery = z.object({
   stage: z.enum(['all', 'placed', 'proceed_request', 'awaiting_operation_action', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
@@ -469,7 +469,7 @@ export const reservedDrilldownResponse = z.object({
   total: z.number().int().nonnegative(),
   orders: z.array(z.object({
     id: z.string().uuid(),
-    dl: z.number().int().positive(),
+    so: z.number().int().positive(),
     customerName: z.string(),
     operationStage: z.enum(['ready_to_dispatch', 'dispatched']),
     reservedQty: z.number().int().positive(),
@@ -513,12 +513,12 @@ export const awaitingStockShortageResponse = z.object({
     shortage: z.number().int().positive(),
   })),
   // 2026-05-16 (Loo) — bundle-scope companion: when the request carries
-  // `?dls=...`, the route returns one row per selected dl with its delivery
+  // `?dls=...`, the route returns one row per selected so with its delivery
   // date so CreatePOModal can show `#1004 · 2026-06-15` per order instead of
   // a flat number list. Always [] in the global (no-dls) call to avoid
   // shipping the entire awaiting cohort.
   orders: z.array(z.object({
-    dl: z.number().int(),
+    so: z.number().int(),
     deliveryDate: z.string().nullable(),
   })).default([]),
 });

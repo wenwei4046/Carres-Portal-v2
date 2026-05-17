@@ -176,7 +176,7 @@ describe("GET /api/finance/reconciliations/suggest/:bankStmtId", () => {
     const payload = {
       bank_statement: { id: BS_ID, statement_date: "2026-04-26", description: "x", amount: 5970, reference: null },
       candidates: [
-        { dl: 1240, customer_name: "Tan", dealer_name: "KL", total: 5970, paid: 0, outstanding: 5970, invoice_no: "INV-2026-1240", distance: 0 },
+        { so: 1240, customer_name: "Tan", dealer_name: "KL", total: 5970, paid: 0, outstanding: 5970, invoice_no: "INV-2026-1240", distance: 0 },
       ],
     };
     const sb = { rpc: vi.fn().mockResolvedValue({ data: payload, error: null }) };

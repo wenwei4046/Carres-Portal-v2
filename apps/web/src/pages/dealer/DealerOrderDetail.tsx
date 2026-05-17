@@ -46,7 +46,7 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
       >
         <header className="px-7 py-5 border-b border-base-100 flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="font-mono text-xs text-base-500">{order ? `#${order.dl}` : "—"}</div>
+            <div className="font-mono text-xs text-base-500">{order ? `#${order.so}` : "—"}</div>
             <div className="font-display text-2xl mt-0.5 tracking-[-0.02em] truncate">{order?.customer.name ?? "Loading…"}</div>
             {order?.customer.phone && (
               <div className="font-mono text-xs text-base-500 mt-0.5">{order.customer.phone}</div>
@@ -62,7 +62,7 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
             {order && role && (
               <DownloadSalesOrderButton
                 orderId={order.id}
-                dl={order.dl}
+                so={order.so}
                 role={role}
                 variant="secondary"
               />
@@ -257,7 +257,7 @@ function ActionPanel({ order }: { order: Order }) {
 
   const proceedMut = useProceedOrder({
     onSuccess: () => {
-      toast.success(`Order #${order.dl} sent to operation`);
+      toast.success(`Order #${order.so} sent to operation`);
     },
     onError: (err) => {
       // 422 with a known blocker code → show the matching label so the dealer

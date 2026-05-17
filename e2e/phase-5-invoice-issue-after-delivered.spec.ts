@@ -41,7 +41,7 @@ test("phase-5 A2: order delivered → finance issues invoice → toast confirms"
   // Using exact:true to disambiguate from the second Segmented's "All ages".
   await fpage.getByRole("button", { name: "All", exact: true }).click();
 
-  // AR row text is invoice_no (INV-{YYYY}-{dl}) — SO is not in the row.
+  // AR row text is invoice_no (INV-{YYYY}-{so}) — SO is not in the row.
   const row = fpage
     .getByText(new RegExp(`INV-\\d{4}-${SEED_DL}\\b`))
     .locator("xpath=ancestor::div[contains(@class, 'grid')]")
@@ -55,7 +55,7 @@ test("phase-5 A2: order delivered → finance issues invoice → toast confirms"
 
   await issueBtn.click();
 
-  // Sonner toast: "Invoice issued for INV-{YYYY}-{dl}". Default duration ~4s,
+  // Sonner toast: "Invoice issued for INV-{YYYY}-{so}". Default duration ~4s,
   // give it 5s to materialize. After CF#2 ARDrawer change (commit c6cc72d) the
   // drawer no longer auto-closes — the Download button replaces Issue, but
   // we don't assert that here (separate ARDrawer.test.tsx unit covers it).

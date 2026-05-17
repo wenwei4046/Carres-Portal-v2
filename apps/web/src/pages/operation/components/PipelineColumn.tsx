@@ -145,7 +145,7 @@ function PipelineOrderCard({ order, onClick }: OrderCardProps) {
     <>
       <div className="flex items-baseline justify-between">
         <span className="font-mono text-[11px] font-semibold text-base-900">
-          #{order.dl}
+          #{order.so}
         </span>
         <span className="font-mono text-[11px] text-base-500">
           {deliveryDate === "TBD" ? "TBD" : deliveryDate}

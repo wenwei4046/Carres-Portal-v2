@@ -156,7 +156,7 @@ function StatusColumn({
               className="block w-full bg-white border border-base-100 rounded px-3 py-2.5 mb-1.5 hover:border-primary/60 transition-colors"
             >
               <div className="flex items-baseline justify-between">
-                <span className="font-mono text-[11px] font-semibold">#{o.dl}</span>
+                <span className="font-mono text-[11px] font-semibold">#{o.so}</span>
                 <span className="font-mono text-[11px] text-base-500">
                   {typeof o.totalAmount === "number" ? RM(o.totalAmount) : `${o.lineCount ?? 0} item${(o.lineCount ?? 0) === 1 ? "" : "s"}`}
                 </span>

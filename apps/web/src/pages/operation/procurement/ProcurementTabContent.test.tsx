@@ -131,8 +131,8 @@ function makePo(overrides: Partial<operationPoListRow> = {}): operationPoListRow
     warehouse_id: WAREHOUSE_KL.id,
     status: "open",
     sup_status: "pending",
-    dl: 1234,
-    dl_refs: null,
+    so: 1234,
+    so_refs: null,
     eta_date: "2026-05-15",
     placed_at: "2026-05-01T00:00:00Z",
     purchase_order_lines: [

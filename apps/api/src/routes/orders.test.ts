@@ -41,7 +41,7 @@ const DEALER_B = "00000000-0000-0000-0000-000000000d02";
 function makeOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: "11111111-1111-1111-1111-111111111111",
-    dl: 1001,
+    so: 1001,
     status: "place",
     channel: "dealer",
     dealer_id: DEALER_A,
@@ -141,7 +141,7 @@ function buildSb(
  * can assert on what was sent and on rpc-returned errors. Use for POST flow.
  */
 function buildSbForCreate(opts: {
-  rpcResult?: { id: string; dl: number; placed_at: string };
+  rpcResult?: { id: string; so: number; placed_at: string };
   rpcError?: { code?: string; message?: string; details?: string };
   fetchedRow?: unknown;
 }) {
@@ -559,11 +559,11 @@ describe("POST /api/orders", () => {
 
   it("happy path → calls RPC, then refetches order with rels, returns 201 + full order", async () => {
     const sb = buildSbForCreate({
-      rpcResult: { id: NEW_ORDER_ID, dl: 1251, placed_at: "2026-05-02T10:00:00Z" },
+      rpcResult: { id: NEW_ORDER_ID, so: 1251, placed_at: "2026-05-02T10:00:00Z" },
       fetchedRow: {
         ...makeOrderRow({
           id: NEW_ORDER_ID,
-          dl: 1251,
+          so: 1251,
           dealer_id: DEALER_A,
           customer_name: "Tan Mei Ling",
           paid: "750",
@@ -602,9 +602,9 @@ describe("POST /api/orders", () => {
       env,
     );
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { id: string; dl: number; lines: unknown[]; history: unknown[] };
+    const body = (await res.json()) as { id: string; so: number; lines: unknown[]; history: unknown[] };
     expect(body.id).toBe(NEW_ORDER_ID);
-    expect(body.dl).toBe(1251);
+    expect(body.so).toBe(1251);
     expect(body.lines).toHaveLength(1);
     expect(body.history).toHaveLength(1);
 
@@ -855,7 +855,7 @@ function buildSbForProceed(opts: {
           return { data: null, error: opts.rpcError };
         }
         return {
-          data: { id: "11111111-1111-1111-1111-111111111111", dl: 1001, status: "proceed_order" },
+          data: { id: "11111111-1111-1111-1111-111111111111", so: 1001, status: "proceed_order" },
           error: null,
         };
       },

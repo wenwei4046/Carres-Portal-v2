@@ -19,7 +19,7 @@ import type {
  * fixtures below grew SUPPLIER_B + WAREHOUSE_PG for the 2-supplier auto-fill
  * test. The original v3-S4.5 stockpile + T22 alerts coverage stays as-is.
  *
- * Stockpile PO = a PO with no `dl` / `dlRefs` — pure inventory replenishment
+ * Stockpile PO = a PO with no `so` / `soRefs` — pure inventory replenishment
  * ahead of customer demand. v3 spec §17.1 A3 promotes this from an audit-trail
  * edge case to a 1st-class flow with explicit UI.
  */
@@ -291,7 +291,7 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
     expect(dialog.textContent ?? "").toMatch(/[Ss]tockpile/);
   });
 
-  it("Submit in stockpile mode sends dl=null and dlRefs=null", async () => {
+  it("Submit in stockpile mode sends so=null and soRefs=null", async () => {
     render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
 
     // Toggle stockpile on
@@ -319,8 +319,8 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
       supplierId: string;
       warehouseId: string;
       lines: { sku: string; qty: number; cost: number; costSource: string }[];
-      dl?: number | null;
-      dlRefs?: number[] | null;
+      so?: number | null;
+      soRefs?: number[] | null;
       etaDate?: string;
     };
     expect(callArg.supplierId).toBe(SUPPLIER_A.id);
@@ -329,11 +329,11 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
     // 0074 — every emitted line carries the catalog cost + costSource='catalog'.
     expect(callArg.lines[0].cost).toBe(1500);
     expect(callArg.lines[0].costSource).toBe("catalog");
-    // The contract: stockpile mode forces dl/dlRefs out of the payload.
+    // The contract: stockpile mode forces so/soRefs out of the payload.
     // Either omitted or explicitly null is acceptable per the API zod
-    // (dl/dlRefs are .optional()), but neither must carry a value.
-    expect(callArg.dl ?? null).toBeNull();
-    expect(callArg.dlRefs ?? null).toBeNull();
+    // (so/soRefs are .optional()), but neither must carry a value.
+    expect(callArg.so ?? null).toBeNull();
+    expect(callArg.soRefs ?? null).toBeNull();
     // 0083 — etaDate forwarded.
     expect(callArg.etaDate).toBe(ETA_FIXTURE);
   });
@@ -345,7 +345,7 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
       wrap(
         <CreatePOModal
           prefill={{
-            dl: 4321,
+            so: 4321,
             lines: [{ sku: "mattress:carres-cloud:King", qty: 3 }],
           }}
           onClose={() => {}}
@@ -361,7 +361,7 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
       wrap(
         <CreatePOModal
           prefill={{
-            dlRefs: [101, 102],
+            soRefs: [101, 102],
             lines: [{ sku: "mattress:carres-cloud:King", qty: 5 }],
           }}
           onClose={() => {}}
@@ -376,7 +376,7 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
     unmount();
   });
 
-  it("Form valid without dl when stockpile mode on", () => {
+  it("Form valid without so when stockpile mode on", () => {
     render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
 
     // Issue button starts disabled (warehouse blank).
@@ -435,7 +435,7 @@ describe("CreatePOModal — Stockpile PO mode (v3-S4.5)", () => {
  *   2. Empty alerts: refetch returns [] → button shows "No stock alerts" copy
  *      and disables; lines untouched
  *   3. Override semantics: existing lines are replaced (Q3=A) on click
- *   4. Visibility: hidden when modal opened with order-prefill (`prefill.dl`)
+ *   4. Visibility: hidden when modal opened with order-prefill (`prefill.so`)
  *   5. Qty clamp: a degenerate alert row where the gap rounds non-positive
  *      still produces qty=1 (defensive `Math.max(1, …)`)
  */
@@ -641,12 +641,12 @@ describe("CreatePOModal — Suggest from alerts (T22)", () => {
     });
   });
 
-  it("hidden when modal opened with prefill.dl (order-driven flow already knows the lines)", () => {
+  it("hidden when modal opened with prefill.so (order-driven flow already knows the lines)", () => {
     render(
       wrap(
         <CreatePOModal
           prefill={{
-            dl: 4321,
+            so: 4321,
             lines: [{ sku: SKU_KING, qty: 3 }],
           }}
           onClose={() => {}}
@@ -880,23 +880,23 @@ describe("CreatePOModal — base modal flows (migrated from operationProcurement
 describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
   const SKU_KING = "mattress:carres-cloud:King";
 
-  it("button is visible when no prefill.dl and no prefill.dlRefs", () => {
+  it("button is visible when no prefill.so and no prefill.soRefs", () => {
     render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
     expect(screen.getByTestId("auto-fill-shortage-button")).toBeInTheDocument();
   });
 
-  it("button is HIDDEN when prefill.dl is set (single-order shortage flow)", () => {
-    render(wrap(<CreatePOModal prefill={{ dl: 1234 }} onClose={() => {}} />));
+  it("button is HIDDEN when prefill.so is set (single-order shortage flow)", () => {
+    render(wrap(<CreatePOModal prefill={{ so: 1234 }} onClose={() => {}} />));
     expect(
       screen.queryByTestId("auto-fill-shortage-button"),
     ).not.toBeInTheDocument();
   });
 
-  it("button is HIDDEN when prefill.dlRefs is non-empty (bundle flow)", () => {
+  it("button is HIDDEN when prefill.soRefs is non-empty (bundle flow)", () => {
     render(
       wrap(
         <CreatePOModal
-          prefill={{ dlRefs: [4001, 4002, 4003] }}
+          prefill={{ soRefs: [4001, 4002, 4003] }}
           onClose={() => {}}
         />,
       ),
@@ -1105,11 +1105,11 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
 // ---------------------------------------------------------------------------
 // Bundle auto-prefill (2026-05-10) — fixes memory 1790/1793.
 //
-// CrossOrderBundleSheet → "+ Create combined PO" sets `prefill.dlRefs` on
+// CrossOrderBundleSheet → "+ Create combined PO" sets `prefill.soRefs` on
 // CreatePOModal. Pre-fix, the modal seeded a placeholder `qty=5` line with the
 // first catalog SKU because nothing else had populated `lines`. Loo's retest
 // surfaced this as "wrong qty / wrong SKU on bundle PO". Post-fix:
-//   1. The placeholder seeding skips when prefill.dlRefs is set.
+//   1. The placeholder seeding skips when prefill.soRefs is set.
 //   2. A one-shot useEffect calls autoFillFromShortage() on mount, which
 //      (with the hook now scoped via ?dls=…) populates lines with the actual
 //      aggregated shortage for those orders.
@@ -1133,7 +1133,7 @@ describe("CreatePOModal — Bundle auto-prefill (2026-05-10)", () => {
     render(
       wrap(
         <CreatePOModal
-          prefill={{ dlRefs: [1003, 1002] }}
+          prefill={{ soRefs: [1003, 1002] }}
           onClose={() => {}}
         />,
       ),
@@ -1156,7 +1156,7 @@ describe("CreatePOModal — Bundle auto-prefill (2026-05-10)", () => {
     expect(screen.queryByDisplayValue("Carres Cloud · King")).toBeNull();
   });
 
-  it("does NOT seed the first-SKU placeholder when prefill.dlRefs is set", async () => {
+  it("does NOT seed the first-SKU placeholder when prefill.soRefs is set", async () => {
     // Server returns empty shortage — modal should still skip the placeholder
     // line. Prior to the fix, the effect at L301-319 would re-seed
     // "Carres Cloud · King · qty=5" once initialLines was empty.
@@ -1170,7 +1170,7 @@ describe("CreatePOModal — Bundle auto-prefill (2026-05-10)", () => {
     render(
       wrap(
         <CreatePOModal
-          prefill={{ dlRefs: [4001, 4002] }}
+          prefill={{ soRefs: [4001, 4002] }}
           onClose={() => {}}
         />,
       ),
@@ -1200,7 +1200,7 @@ describe("CreatePOModal — Bundle auto-prefill (2026-05-10)", () => {
       wrap(
         <CreatePOModal
           prefill={{
-            dlRefs: [9001, 9002],
+            soRefs: [9001, 9002],
             lines: [{ sku: "mattress:carres-cloud:King", qty: 7 }],
           }}
           onClose={() => {}}

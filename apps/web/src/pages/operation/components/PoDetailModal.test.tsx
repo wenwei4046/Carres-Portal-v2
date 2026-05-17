@@ -17,7 +17,7 @@ import type { operationPoListRow, SupplierRow } from "@/lib/queries";
 
 let catalogHookState: { data: CatalogResponse | undefined };
 let sourceOrdersHookState: {
-  data: { orders: { dl: number; deliveryDate: string | null }[] } | undefined;
+  data: { orders: { so: number; deliveryDate: string | null }[] } | undefined;
 };
 
 vi.mock("@/lib/queries", async () => {
@@ -57,8 +57,8 @@ function makePo(overrides: Partial<operationPoListRow> = {}): operationPoListRow
     warehouse_id: WAREHOUSE.id,
     status: "open",
     sup_status: "pending",
-    dl: 1234,
-    dl_refs: null,
+    so: 1234,
+    so_refs: null,
     eta_date: "2026-05-15",
     placed_at: "2026-05-01T00:00:00Z",
     purchase_order_lines: [
@@ -257,17 +257,17 @@ describe("PoDetailModal — per-SO ETA", () => {
     sourceOrdersHookState = {
       data: {
         orders: [
-          { dl: 1001, deliveryDate: "2026-05-31" },
-          { dl: 1002, deliveryDate: "2026-06-04" },
-          { dl: 1003, deliveryDate: "2026-06-04" },
-          { dl: 1004, deliveryDate: "2026-06-04" },
+          { so: 1001, deliveryDate: "2026-05-31" },
+          { so: 1002, deliveryDate: "2026-06-04" },
+          { so: 1003, deliveryDate: "2026-06-04" },
+          { so: 1004, deliveryDate: "2026-06-04" },
         ],
       },
     };
     render(
       wrap(
         <PoDetailModal
-          po={makePo({ dl: null, dl_refs: [1001, 1002, 1003, 1004] })}
+          po={makePo({ so: null, so_refs: [1001, 1002, 1003, 1004] })}
           supplier={SUPPLIER}
           warehouse={WAREHOUSE}
           onClose={() => {}}
@@ -282,12 +282,12 @@ describe("PoDetailModal — per-SO ETA", () => {
     expect(r2.textContent).toContain("2026-06-04");
   });
 
-  it("falls back to bare #dl when source-orders fetch is pending", () => {
+  it("falls back to bare #so when source-orders fetch is pending", () => {
     sourceOrdersHookState = { data: undefined };
     render(
       wrap(
         <PoDetailModal
-          po={makePo({ dl: null, dl_refs: [1001, 1002] })}
+          po={makePo({ so: null, so_refs: [1001, 1002] })}
           supplier={SUPPLIER}
           warehouse={WAREHOUSE}
           onClose={() => {}}

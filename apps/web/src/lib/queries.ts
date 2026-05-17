@@ -133,7 +133,7 @@ export const qk = {
      *  invalidations on `["operation","pos"]` reach this cache too (e.g. when
      *  a PO is issued, the awaiting_operation_action pool changes).
      *
-     *  `dls` (optional, sorted) scopes shortage to a specific dl set, used by
+     *  `dls` (optional, sorted) scopes shortage to a specific so set, used by
      *  the cross-order bundle prefill flow. Sorting keeps the cache key stable
      *  across permutations of the same selection. */
     awaitingStockShortage: (dls?: number[]) =>
@@ -265,7 +265,7 @@ export interface FinanceRefundsFilters {
 // ---------------------------------------------------------------------------
 export interface FinanceArAgingRow {
   order_id:      string;
-  dl:            number;
+  so:            number;
   customer_name: string;
   dealer_id:     string | null;
   dealer_name:   string | null;
@@ -312,7 +312,7 @@ export interface FinanceApAgingHistoryEntry {
 }
 export interface FinanceApAgingRow {
   po_id:               string;
-  dl:                  number | null;
+  so:                  number | null;
   supplier_id:         string | null;
   supplier_name:       string | null;
   warehouse_id:        string | null;
@@ -410,7 +410,7 @@ export interface FinanceRefundRow {
 
 // finance_recon_suggest_matches RPC payload.
 export interface FinanceReconCandidate {
-  dl:            number;
+  so:            number;
   customer_name: string;
   dealer_name:   string | null;
   total:         number;
@@ -946,7 +946,7 @@ export interface PrincipalDealerDetailDealer {
 }
 export interface PrincipalDealerRecentOrder {
   id: string;
-  dl: number;
+  so: number;
   status: string;
   customerName: string;
   paid: number;
@@ -1211,8 +1211,8 @@ export interface operationOpenPoRow {
   sup_status: string;
   eta_date: string | null;
   placed_at: string;
-  dl: number | null;
-  dl_refs: number[] | null;
+  so: number | null;
+  so_refs: number[] | null;
 }
 export interface operationLowStockRow {
   sku: string;
@@ -1317,7 +1317,7 @@ export interface operationOrderThreadRow {
  *  threads to honor multi-supplier scenarios. */
 export interface operationOrderListRow {
   id: string;
-  dl: number;
+  so: number;
   status: "place" | "proceed_order" | "delivered";
   operation_stage:
     | "placed"
@@ -1352,7 +1352,7 @@ export interface operationOrdersListResponse {
 /** GET /api/operation/orders/:id — composed drawer payload (orders.ts §97). */
 export interface operationOrderDetailOrder {
   id: string;
-  dl: number;
+  so: number;
   status: string;
   operation_stage:
     | "placed"
@@ -1432,8 +1432,8 @@ export interface operationOrderDetailPo {
   warehouse_id: string;
   status: string;
   sup_status: string;
-  dl: number | null;
-  dl_refs: number[] | null;
+  so: number | null;
+  so_refs: number[] | null;
   eta_date: string | null;
   lines: operationOrderDetailPoLine[];
 }
@@ -1461,8 +1461,8 @@ export interface operationPoListRow {
   warehouse_id: string;
   status: "open" | "received" | "cancelled";
   sup_status: string;
-  dl: number | null;
-  dl_refs: number[] | null;
+  so: number | null;
+  so_refs: number[] | null;
   eta_date: string | null;
   placed_at: string;
   purchase_order_lines: {
@@ -1807,11 +1807,11 @@ export function useOperationPo(
 }
 
 /** Loo 2026-05-16 — per-source-order delivery date list for PoDetailModal.
- *  Returns `[{dl, deliveryDate}]` for every dl in the PO's `dl + dl_refs`.
+ *  Returns `[{so, deliveryDate}]` for every so in the PO's `so + so_refs`.
  *  The PO list itself doesn't carry delivery_date because that lives on
  *  `orders`, not on the PO row. */
 export interface operationPoSourceOrder {
-  dl: number;
+  so: number;
   deliveryDate: string | null;
 }
 export interface operationPoSourceOrdersResponse {
@@ -2059,12 +2059,12 @@ export function useAbandonOrderMutation(
  *  current stage. */
 export function useRevertOrderProceedMutation(
   orderId: string,
-  opts?: Partial<UseMutationOptions<{ order_id: string; dl: number }, ApiError, void>>,
+  opts?: Partial<UseMutationOptions<{ order_id: string; so: number }, ApiError, void>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ order_id: string; dl: number }, ApiError, void>({
+  return useMutation<{ order_id: string; so: number }, ApiError, void>({
     mutationFn: () =>
-      apiFetch<{ order_id: string; dl: number }>(
+      apiFetch<{ order_id: string; so: number }>(
         `/api/operation/orders/${orderId}/revert-proceed`,
         { method: "POST" },
       ),
@@ -2083,17 +2083,17 @@ export function useRevertOrderProceedMutation(
 export function useRevertOrderDispatchMutation(
   orderId: string,
   opts?: Partial<
-    UseMutationOptions<{ order_id: string; dl: number; threads_reverted: number }, ApiError, void>
+    UseMutationOptions<{ order_id: string; so: number; threads_reverted: number }, ApiError, void>
   >,
 ) {
   const qc = useQueryClient();
   return useMutation<
-    { order_id: string; dl: number; threads_reverted: number },
+    { order_id: string; so: number; threads_reverted: number },
     ApiError,
     void
   >({
     mutationFn: () =>
-      apiFetch<{ order_id: string; dl: number; threads_reverted: number }>(
+      apiFetch<{ order_id: string; so: number; threads_reverted: number }>(
         `/api/operation/orders/${orderId}/revert-dispatch`,
         { method: "POST" },
       ),
@@ -2292,7 +2292,7 @@ export function useCreatePoMutation(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      // If the PO is tied to a SO (single or via dl_refs), the awaiting_operation_action
+      // If the PO is tied to a SO (single or via so_refs), the awaiting_operation_action
       // drawer for those orders should refresh. Bust the orders sub-tree too.
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
@@ -3039,7 +3039,7 @@ export interface SupplierPoLine {
 
 export interface SupplierPoRow {
   id: string;
-  dl: number | null;
+  so: number | null;
   supplier_id: string;
   warehouse_id: string;
   // 2026-05-10 (Loo) — was scalar `sku`/`qty` (read from dropped columns
@@ -3098,7 +3098,7 @@ export interface SupplierPoRow {
     supplier_ready_at: string | null;
     pickup_event_id: string | null;
     orders: {
-      dl: number;
+      so: number;
       customer_name: string;
       delivery_date: string | null;
     } | null;

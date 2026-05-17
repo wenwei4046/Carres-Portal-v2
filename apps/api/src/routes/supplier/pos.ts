@@ -128,7 +128,7 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
       if (oid) orderIds.push(oid);
     }
   }
-  const orderInfo = new Map<string, { dl: number; customer_name: string; delivery_date: string | null }>();
+  const orderInfo = new Map<string, { so: number; customer_name: string; delivery_date: string | null }>();
   if (orderIds.length > 0) {
     const { data: oRows, error: oErr } = await sb.rpc("supplier_orders_for_threads", {
       p_order_ids: orderIds,
@@ -140,7 +140,7 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of ((oRows ?? []) as any[])) {
       orderInfo.set(String(r.id), {
-        dl: Number(r.dl),
+        so: Number(r.so),
         customer_name: String(r.customer_name ?? ""),
         delivery_date: (r.delivery_date as string | null) ?? null,
       });
@@ -288,7 +288,7 @@ supplierPosRouter.get("/:id", requireSupplier, async (c) => {
 /**
  * Task 10 (2026-05-15) — per-thread checklist source for the supplier
  * PODrawer. Returns one row per `order_supplier_threads` linked to this PO,
- * each row carrying its parent order's `dl` + customer + delivery date +
+ * each row carrying its parent order's `so` + customer + delivery date +
  * the per-order SKU lines (so the supplier sees what to build for each
  * customer). RLS via `ost_supplier_read` (0033) — supplier sees only
  * threads on POs they own.

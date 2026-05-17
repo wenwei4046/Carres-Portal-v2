@@ -64,7 +64,7 @@ operationReceiveThreadsRouter.get("/:poId/threads", async (c) => {
   const { data, error } = await sb
     .from("order_supplier_threads")
     .select(
-      "id, order_id, supplier_ready_at, pickup_event_id, orders(dl, customer_name, delivery_date)",
+      "id, order_id, supplier_ready_at, pickup_event_id, orders(so, customer_name, delivery_date)",
     )
     .eq("po_id", poId);
   if (error) {
@@ -97,7 +97,7 @@ operationReceiveThreadsRouter.get("/:poId/threads", async (c) => {
     rows.map((r) => ({
       id: r.id,
       order_id: r.order_id,
-      order_dl: r.orders?.dl ?? null,
+      order_dl: r.orders?.so ?? null,
       customer_name: r.orders?.customer_name ?? null,
       customer_delivery_date: r.orders?.delivery_date ?? null,
       supplier_ready_at: r.supplier_ready_at,

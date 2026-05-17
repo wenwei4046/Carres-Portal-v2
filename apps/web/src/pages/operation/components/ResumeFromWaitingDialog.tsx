@@ -8,7 +8,7 @@ import { qk } from "../../../lib/queries";
  * Surfaces the "Resume to Dispatch" entry-point for an order whose supplier
  * threads are parked at `at_warehouse_waiting` (PO-level `sup_status`) after a
  * partner-rejection ⇢ relocate flow. Confirming POSTs to
- * `/api/operation/orders/:dl/resume-dispatch` (Task 35), which invokes RPC
+ * `/api/operation/orders/:so/resume-dispatch` (Task 35), which invokes RPC
  * `operation_resume_from_waiting` (migration 0045) to revive threads
  * (`waiting` → `ready_to_dispatch`) and bring the order back into the active
  * dispatch flow.
@@ -26,16 +26,16 @@ import { qk } from "../../../lib/queries";
  * so the kanban + dashboard counts refresh on success.
  */
 export default function ResumeFromWaitingDialog({
-  dl,
+  so,
   onClose,
 }: {
-  dl: number;
+  so: number;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
   const resume = useMutation({
     mutationFn: () =>
-      apiFetch(`/api/operation/orders/${dl}/resume-dispatch`, {
+      apiFetch(`/api/operation/orders/${so}/resume-dispatch`, {
         method: "POST",
         body: JSON.stringify({}),
       }),
@@ -51,7 +51,7 @@ export default function ResumeFromWaitingDialog({
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
         <h2 className="text-lg font-semibold mb-4">Resume from at_warehouse_waiting</h2>
         <p className="text-sm text-base-600 mb-4">
-          Order #{dl} threads will be advanced from <code>waiting</code> →{" "}
+          Order #{so} threads will be advanced from <code>waiting</code> →{" "}
           <code>ready_to_dispatch</code>. Customer date confirmation is off-system;
           click only after customer has confirmed.
         </p>

@@ -105,13 +105,13 @@ export default function PoDetailModal({
   const sourceOrdersQ = useOperationPoSourceOrders(po.id);
   const [printing, setPrinting] = useState(false);
 
-  // Loo 2026-05-16 — index source orders by dl so the Order refs block can
+  // Loo 2026-05-16 — index source orders by so so the Order refs block can
   // render "#1001 · 2026-05-31" alongside each ref. When the fetch is still
-  // pending or a dl is missing (e.g. order purged), fall back to the bare
+  // pending or a so is missing (e.g. order purged), fall back to the bare
   // "#1001" — never blocks the modal on this side-fetch.
   const deliveryByDl = useMemo(() => {
     const m = new Map<number, string | null>();
-    for (const o of sourceOrdersQ.data?.orders ?? []) m.set(o.dl, o.deliveryDate);
+    for (const o of sourceOrdersQ.data?.orders ?? []) m.set(o.so, o.deliveryDate);
     return m;
   }, [sourceOrdersQ.data]);
 
@@ -142,7 +142,7 @@ export default function PoDetailModal({
     0,
   );
   const status = poDisplay(po);
-  const dlRefs = po.dl_refs ?? (po.dl != null ? [po.dl] : []);
+  const soRefs = po.so_refs ?? (po.so != null ? [po.so] : []);
   const poShortId = po.id.slice(0, 8);
 
   // v3-S2.3 — Receive eligibility mirrors the ActionCell carve-out in
@@ -240,11 +240,11 @@ export default function PoDetailModal({
             label="Order refs"
             mono
             value={
-              dlRefs.length === 0 ? (
+              soRefs.length === 0 ? (
                 "—"
               ) : (
                 <div className="flex flex-col gap-0.5" data-testid="po-detail-order-refs">
-                  {dlRefs.map((d) => {
+                  {soRefs.map((d) => {
                     const eta = deliveryByDl.get(d);
                     return (
                       <div

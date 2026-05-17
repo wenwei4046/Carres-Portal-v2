@@ -275,8 +275,8 @@ describe("GET /api/supplier/pos", () => {
     });
     const rpcFn = vi.fn().mockResolvedValue({
       data: [
-        { id: "o1", dl: 1001, customer_name: "A", delivery_date: "2026-05-20" },
-        { id: "o2", dl: 1002, customer_name: "B", delivery_date: "2026-05-28" },
+        { id: "o1", so: 1001, customer_name: "A", delivery_date: "2026-05-20" },
+        { id: "o2", so: 1002, customer_name: "B", delivery_date: "2026-05-28" },
       ],
       error: null,
     });
@@ -788,14 +788,14 @@ describe("GET /api/supplier/pos/:poId/threads", () => {
           order_id: "o1",
           supplier_ready_at: null,
           pickup_event_id: null,
-          orders: { dl: 1001, customer_name: "Tan", delivery_date: "2026-05-20" },
+          orders: { so: 1001, customer_name: "Tan", delivery_date: "2026-05-20" },
         },
         {
           id: "t2",
           order_id: "o2",
           supplier_ready_at: "2026-05-15T10:00:00Z",
           pickup_event_id: null,
-          orders: { dl: 1002, customer_name: "Lim", delivery_date: "2026-05-28" },
+          orders: { so: 1002, customer_name: "Lim", delivery_date: "2026-05-28" },
         },
       ],
       error: null,

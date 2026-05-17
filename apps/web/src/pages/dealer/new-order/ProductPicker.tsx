@@ -229,7 +229,7 @@ export default function ProductPicker({ catalog, onAddLine, draftLines }: Props)
             <MattressConfigurator model={selected} skus={selectedSkus} onAdd={handleAdd} />
           )}
           {selected.category === "bedframe" && (
-            // 2026-05-18 (Loo screenshot — DL-1006 saved no fabric / no color).
+            // 2026-05-18 (Loo screenshot — SO-1006 saved no fabric / no color).
             // `key={selected.id}` forces a remount on model switch so
             // useState(model.colors?.[0]) + useState(model.gaps?.[0]) re-init
             // with the new model's defaults. Without the key, dropdown state
@@ -239,7 +239,7 @@ export default function ProductPicker({ catalog, onAddLine, draftLines }: Props)
             <BedframeConfigurator key={selected.id} model={selected} skus={selectedSkus} onAdd={handleAdd} />
           )}
           {selected.category === "sofa" && (
-            // 2026-05-18 (Loo screenshot — DL-1006 Kestrel L-shape saved
+            // 2026-05-18 (Loo screenshot — SO-1006 Kestrel L-shape saved
             // `attrs = { mode: "preset" }` with NO fabric even though Kestrel
             // has 2 fabrics configured). Same root cause as bedframe above:
             // useState(fabrics[0]?.id) only runs on initial mount, so

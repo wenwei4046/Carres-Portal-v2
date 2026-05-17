@@ -30,19 +30,19 @@ function wrap(ui: React.ReactNode) {
 }
 
 const ROW_PAID = {
-  order_id: "00000000-0000-0000-0000-0000000000a1", dl: 1240,
+  order_id: "00000000-0000-0000-0000-0000000000a1", so: 1240,
   customer_name: "Tan Wei Ling", dealer_id: "d1", dealer_name: "Showroom KL",
   placed_at: "2026-04-30T00:00:00Z", days: 8, aging: "0-30",
   total: 5970, paid: 5970, outstanding: 0,
   invoice_no: "INV-2026-1240", status: "delivered",
 };
 const ROW_UNPAID = {
-  ...ROW_PAID, order_id: "00000000-0000-0000-0000-0000000000a2", dl: 1241,
+  ...ROW_PAID, order_id: "00000000-0000-0000-0000-0000000000a2", so: 1241,
   customer_name: "Lee Kah Hong", paid: 0, outstanding: 5970,
   invoice_no: "INV-2026-1241", status: "place",
 };
 const ROW_PARTIAL = {
-  ...ROW_PAID, order_id: "00000000-0000-0000-0000-0000000000a3", dl: 1242,
+  ...ROW_PAID, order_id: "00000000-0000-0000-0000-0000000000a3", so: 1242,
   customer_name: "Wong Mei Lin", paid: 2985, outstanding: 2985,
   invoice_no: "INV-2026-1242", status: "operation",
 };

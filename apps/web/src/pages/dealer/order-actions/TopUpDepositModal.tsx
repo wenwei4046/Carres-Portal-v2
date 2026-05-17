@@ -11,7 +11,7 @@ import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
  */
 export interface TopUpTarget {
   id: string;
-  dl: number;
+  so: number;
   dealerId: string;
   paid: number;
 }
@@ -79,7 +79,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
 
   const topUpMut = useTopUpOrder(order.id, {
     onSuccess: () => {
-      toast.success(`Recorded ${RM(amount)} for #${order.dl}`);
+      toast.success(`Recorded ${RM(amount)} for #${order.so}`);
       onClose();
     },
     onError: (err) => {
@@ -187,7 +187,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
     <ModalShell onClose={onClose}>
       {/* Header */}
       <header className="px-7 pt-5 pb-3.5 border-b border-base-100">
-        <p className="kicker">Record payment · #{order.dl}</p>
+        <p className="kicker">Record payment · #{order.so}</p>
         <h2 className="font-display text-[22px] mt-0.5 tracking-[-0.02em] leading-[1.2] font-semibold">
           Top up deposit
         </h2>

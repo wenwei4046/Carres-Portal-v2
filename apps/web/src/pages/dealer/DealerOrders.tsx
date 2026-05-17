@@ -135,7 +135,7 @@ function OrderRow({ order, onClick }: { order: Order; onClick: () => void }) {
     >
       <div>
         <div className="font-mono text-[10px] text-base-500">#</div>
-        <div className="font-mono text-sm font-semibold">{order.dl}</div>
+        <div className="font-mono text-sm font-semibold">{order.so}</div>
       </div>
       <div>
         <div className="text-sm font-semibold truncate">{order.customer.name}</div>

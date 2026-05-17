@@ -122,7 +122,7 @@ procurementTabsRouter.get("/:slug", async (c) => {
     const { data, error } = await sb
       .from("purchase_orders")
       .select(
-        "id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
+        "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
       )
       .in("id", matchedIds)
       .order("placed_at", { ascending: false })
@@ -139,7 +139,7 @@ procurementTabsRouter.get("/:slug", async (c) => {
   const { data, error } = await sb
     .from("purchase_orders")
     .select(
-      "id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
+      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
     )
     .eq("suppliers.slug", supplierSlug)
     .order("placed_at", { ascending: false })

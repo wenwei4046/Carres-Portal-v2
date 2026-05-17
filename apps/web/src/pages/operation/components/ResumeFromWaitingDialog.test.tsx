@@ -15,7 +15,7 @@ describe("ResumeFromWaitingDialog", () => {
   it("calls resume-dispatch API on confirm", async () => {
     vi.mocked(apiFetch).mockResolvedValue({ threads_resumed: 1 });
     const onClose = vi.fn();
-    render(wrap(<ResumeFromWaitingDialog dl={4001} onClose={onClose} />));
+    render(wrap(<ResumeFromWaitingDialog so={4001} onClose={onClose} />));
     fireEvent.click(screen.getByRole("button", { name: /resume to dispatch/i }));
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith(

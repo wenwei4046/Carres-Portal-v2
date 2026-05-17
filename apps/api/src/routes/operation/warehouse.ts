@@ -176,7 +176,7 @@ operationWarehouseRouter.get("/reserved-drilldown", async (c) => {
   const { data, error } = await sb
     .from("order_lines")
     .select(
-      "qty, sku, orders:orders!inner(id, dl, customer_name, operation_stage, warehouse_id)",
+      "qty, sku, orders:orders!inner(id, so, customer_name, operation_stage, warehouse_id)",
     )
     .eq("sku", sku)
     .eq("orders.warehouse_id", warehouseId)
@@ -194,14 +194,14 @@ operationWarehouseRouter.get("/reserved-drilldown", async (c) => {
     orders:
       | {
           id: string;
-          dl: number;
+          so: number;
           customer_name: string;
           operation_stage: "ready_to_dispatch" | "dispatched";
           warehouse_id: string;
         }
       | Array<{
           id: string;
-          dl: number;
+          so: number;
           customer_name: string;
           operation_stage: "ready_to_dispatch" | "dispatched";
           warehouse_id: string;
@@ -216,7 +216,7 @@ operationWarehouseRouter.get("/reserved-drilldown", async (c) => {
     string,
     {
       id: string;
-      dl: number;
+      so: number;
       customerName: string;
       operationStage: "ready_to_dispatch" | "dispatched";
       reservedQty: number;
@@ -235,15 +235,15 @@ operationWarehouseRouter.get("/reserved-drilldown", async (c) => {
     } else {
       grouped.set(orderRow.id, {
         id: orderRow.id,
-        dl: orderRow.dl,
+        so: orderRow.so,
         customerName: orderRow.customer_name,
         operationStage: orderRow.operation_stage,
         reservedQty: qty,
       });
     }
   }
-  // Sort by dl desc — newest order first, matches the spec query order.
-  const orders = Array.from(grouped.values()).sort((a, b) => b.dl - a.dl);
+  // Sort by so desc — newest order first, matches the spec query order.
+  const orders = Array.from(grouped.values()).sort((a, b) => b.so - a.so);
   return c.json({ warehouseId, sku, total, orders });
 });
 

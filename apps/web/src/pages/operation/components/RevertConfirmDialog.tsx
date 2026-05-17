@@ -18,7 +18,7 @@ import {
 
 type Props = {
   orderId: string;
-  dl: number;
+  so: number;
   kind: "proceed" | "dispatch";
   onClose: () => void;
 };
@@ -37,7 +37,7 @@ const COPY = {
   },
 } as const;
 
-export default function RevertConfirmDialog({ orderId, dl, kind, onClose }: Props) {
+export default function RevertConfirmDialog({ orderId, so, kind, onClose }: Props) {
   // Call BOTH hooks unconditionally so React keeps the same hook order across
   // renders. We pick which mutation to fire on confirm based on `kind`.
   const revertProceed = useRevertOrderProceedMutation(orderId);
@@ -48,7 +48,7 @@ export default function RevertConfirmDialog({ orderId, dl, kind, onClose }: Prop
   function onConfirm() {
     active.mutate(undefined, {
       onSuccess: () => {
-        toast.success(`Order #${dl} reverted to ${c.toLabel}`);
+        toast.success(`Order #${so} reverted to ${c.toLabel}`);
         onClose();
       },
       onError: (err) => {
@@ -71,7 +71,7 @@ export default function RevertConfirmDialog({ orderId, dl, kind, onClose }: Prop
           Revert order
         </div>
         <div className="font-display text-[18px] text-foreground mb-3 leading-tight">
-          Revert order #{dl} from {c.fromLabel} to {c.toLabel}?
+          Revert order #{so} from {c.fromLabel} to {c.toLabel}?
         </div>
         <div className="text-[12.5px] text-base-700 mb-5 leading-relaxed">
           {c.sideEffect}

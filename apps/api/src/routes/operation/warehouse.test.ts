@@ -530,8 +530,8 @@ describe("GET /api/operation/warehouse/reserved-drilldown", () => {
       qty: number;
       sku: string;
       orders:
-        | { id: string; dl: number; customer_name: string; operation_stage: string; warehouse_id: string }
-        | Array<{ id: string; dl: number; customer_name: string; operation_stage: string; warehouse_id: string }>
+        | { id: string; so: number; customer_name: string; operation_stage: string; warehouse_id: string }
+        | Array<{ id: string; so: number; customer_name: string; operation_stage: string; warehouse_id: string }>
         | null;
     }>;
     error?: { code?: string; message?: string };
@@ -572,7 +572,7 @@ describe("GET /api/operation/warehouse/reserved-drilldown", () => {
           sku: SKU,
           orders: {
             id: ORDER_A,
-            dl: 4001,
+            so: 4001,
             customer_name: "Ahmad",
             operation_stage: "ready_to_dispatch",
             warehouse_id: WAREHOUSE_ID,
@@ -583,7 +583,7 @@ describe("GET /api/operation/warehouse/reserved-drilldown", () => {
           sku: SKU,
           orders: {
             id: ORDER_A,
-            dl: 4001,
+            so: 4001,
             customer_name: "Ahmad",
             operation_stage: "ready_to_dispatch",
             warehouse_id: WAREHOUSE_ID,
@@ -595,7 +595,7 @@ describe("GET /api/operation/warehouse/reserved-drilldown", () => {
           sku: SKU,
           orders: {
             id: ORDER_B,
-            dl: 4002,
+            so: 4002,
             customer_name: "Bee",
             operation_stage: "dispatched",
             warehouse_id: WAREHOUSE_ID,
@@ -611,13 +611,13 @@ describe("GET /api/operation/warehouse/reserved-drilldown", () => {
       warehouseId: string;
       sku: string;
       total: number;
-      orders: Array<{ id: string; dl: number; customerName: string; operationStage: string; reservedQty: number }>;
+      orders: Array<{ id: string; so: number; customerName: string; operationStage: string; reservedQty: number }>;
     };
     expect(body.warehouseId).toBe(WAREHOUSE_ID);
     expect(body.sku).toBe(SKU);
     expect(body.total).toBe(4); // 1 + 2 + 1
     expect(body.orders).toHaveLength(2);
-    // Sorted by dl desc → B (4002) first, A (4001) second.
+    // Sorted by so desc → B (4002) first, A (4001) second.
     expect(body.orders[0]?.id).toBe(ORDER_B);
     expect(body.orders[0]?.reservedQty).toBe(1);
     expect(body.orders[0]?.operationStage).toBe("dispatched");

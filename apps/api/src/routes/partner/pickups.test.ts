@@ -49,8 +49,8 @@ describe("GET /api/partner/pickups", () => {
           eq: vi.fn().mockReturnValue({
             order: vi.fn().mockResolvedValue({
               data: [
-                { id: "po1", dl: 1, sup_status: "pickup_assigned" },
-                { id: "po2", dl: 2, sup_status: "delivered" },
+                { id: "po1", so: 1, sup_status: "pickup_assigned" },
+                { id: "po2", so: 2, sup_status: "delivered" },
               ],
               error: null,
             }),
@@ -114,7 +114,7 @@ describe("GET /api/partner/pickups", () => {
       data: [
         {
           id: "PO-9999",
-          dl: 1001,
+          so: 1001,
           sup_status: "pickup_assigned",
           status: "open",
           eta_date: "2026-05-22",
@@ -129,8 +129,8 @@ describe("GET /api/partner/pickups", () => {
     });
     const rpcFn = vi.fn().mockResolvedValue({
       data: [
-        { id: "o1", dl: 1001, customer_name: "A", delivery_date: "2026-05-20" },
-        { id: "o2", dl: 1002, customer_name: "B", delivery_date: "2026-05-28" },
+        { id: "o1", so: 1001, customer_name: "A", delivery_date: "2026-05-20" },
+        { id: "o2", so: 1002, customer_name: "B", delivery_date: "2026-05-28" },
       ],
       error: null,
     });
@@ -166,7 +166,7 @@ describe("GET /api/partner/pickups", () => {
 
   it("defaults enrichment fields safely when threads + lines absent", async () => {
     const orderFn = vi.fn().mockResolvedValue({
-      data: [{ id: "PO-9000", dl: 1, sup_status: "pickup_assigned", status: "open" }],
+      data: [{ id: "PO-9000", so: 1, sup_status: "pickup_assigned", status: "open" }],
       error: null,
     });
     const sb = {

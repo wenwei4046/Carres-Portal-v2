@@ -333,14 +333,14 @@ describe("GET /api/operation/pos/:poId/threads", () => {
         order_id: "ord-a",
         supplier_ready_at: "2026-05-15T10:00:00Z",
         pickup_event_id: null,
-        orders: { dl: 1001, customer_name: "Aiman", delivery_date: "2026-05-20" },
+        orders: { so: 1001, customer_name: "Aiman", delivery_date: "2026-05-20" },
       },
       {
         id: THREAD_B,
         order_id: "ord-b",
         supplier_ready_at: null,
         pickup_event_id: null,
-        orders: { dl: 1002, customer_name: "Lim", delivery_date: "2026-05-22" },
+        orders: { so: 1002, customer_name: "Lim", delivery_date: "2026-05-22" },
       },
     ];
     const lines = [

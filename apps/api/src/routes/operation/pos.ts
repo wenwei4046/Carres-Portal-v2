@@ -60,7 +60,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   let q = sb
     .from("purchase_orders")
     .select(
-      "id, supplier_id, warehouse_id, status, sup_status, dl, dl_refs, eta_date, placed_at, purchase_order_lines(sku, qty, received_qty, attrs)",
+      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, purchase_order_lines(sku, qty, received_qty, attrs)",
     );
 
   if (status !== "all") q = q.eq("status", status);
@@ -88,15 +88,15 @@ operationPosRouter.get("/", requireOperation, async (c) => {
 //    confirm_proceed_request_v3 (migration 0034) every order is split into
 //    per-(supplier, category) threads; a thread with po_id NULL is the exact
 //    "not yet covered by a PO" target. This filter is correct by construction
-//    (no dl/dl_refs string matching against open POs), and the v3-S4 batch
+//    (no so/so_refs string matching against open POs), and the v3-S4 batch
 //    RPC closes the race window with SELECT ... FOR UPDATE on the same rows.
 //
-// 2. LEGACY FALLBACK (v3-S2.1 dl/dl_refs filter): orders in
+// 2. LEGACY FALLBACK (v3-S2.1 so/so_refs filter): orders in
 //    operation_stage='awaiting_operation_action' that have NO row in
 //    order_supplier_threads — i.e. legacy/unsplit data, or orders where
 //    confirm_proceed_request_v3 has not yet been called. For these we apply
-//    the v3-S2.1 v2-style filter: drop orders whose `dl` matches an OPEN PO's
-//    `dl` or appears in `dl_refs`. status='open' is the discriminator;
+//    the v3-S2.1 v2-style filter: drop orders whose `so` matches an OPEN PO's
+//    `so` or appears in `so_refs`. status='open' is the discriminator;
 //    received/cancelled POs leave the order in play.
 //
 // The two order_id sets are union-ed (Set dedupes natively) before the
@@ -115,9 +115,9 @@ operationPosRouter.get("/", requireOperation, async (c) => {
 // changes needed.
 //
 // Optional `?dls=1003,1002` query — when present, scopes the shortage feed to
-// the orders matching those dl numbers (used by CrossOrderBundleSheet so the
+// the orders matching those so numbers (used by CrossOrderBundleSheet so the
 // modal pre-fills lines for the user's exact selection, not the global pool).
-// Comma-separated positive integers. The orders fetch becomes dl-scoped and
+// Comma-separated positive integers. The orders fetch becomes so-scoped and
 // `primaryOrderIds` is intersected with that scope so threads-side rows can't
 // leak orders the user didn't pick. Without this param, the endpoint returns
 // global awaiting shortage as before.
@@ -160,22 +160,22 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
 
   // Step 1 — three parallel fetches: threads (primary path source), legacy
   // candidate orders (alias-aware), and open POs (for the legacy
-  // dl/dl_refs filter). All independent; Promise.all is the same pattern as
+  // so/so_refs filter). All independent; Promise.all is the same pattern as
   // the order_lines + stock_balances pair below. When dlsFilter is set, the
   // orders fetch narrows to those dls — `legacyOrderIds` then auto-scopes
   // through `ordersRes.data`, and `primaryOrderIds` (from threads, which
-  // don't carry dl) is intersected with the same scope below.
+  // don't carry so) is intersected with the same scope below.
   const ordersBuilder = sb
     .from("orders")
-    .select("id, dl, delivery_date")
+    .select("id, so, delivery_date")
     .eq("operation_stage", "awaiting_operation_action");
   const ordersQuery = dlsFilter
-    ? ordersBuilder.in("dl", dlsFilter)
+    ? ordersBuilder.in("so", dlsFilter)
     : ordersBuilder;
   const [threadsRes, ordersRes, posRes] = await Promise.all([
     sb.from("order_supplier_threads").select("order_id, operation_stage, po_id"),
     ordersQuery,
-    sb.from("purchase_orders").select("dl, dl_refs").eq("status", "open"),
+    sb.from("purchase_orders").select("so, so_refs").eq("status", "open"),
   ]);
   if (threadsRes.error) {
     const m = mapPgError(threadsRes.error);
@@ -209,14 +209,14 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
     }
   }
 
-  // Legacy fallback path: build the dl-coverage Set from open POs the same
-  // way v3-S2.1 did. A PO covers a dl if (po.dl = dl) OR (dl = ANY(po.dl_refs)).
+  // Legacy fallback path: build the so-coverage Set from open POs the same
+  // way v3-S2.1 did. A PO covers a so if (po.so = so) OR (so = ANY(po.so_refs)).
   const coveredDls = new Set<number>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const p of (posRes.data ?? []) as any[]) {
-    if (p.dl != null) coveredDls.add(Number(p.dl));
-    if (Array.isArray(p.dl_refs)) {
-      for (const ref of p.dl_refs) {
+    if (p.so != null) coveredDls.add(Number(p.so));
+    if (Array.isArray(p.so_refs)) {
+      for (const ref of p.so_refs) {
         if (ref != null) coveredDls.add(Number(ref));
       }
     }
@@ -224,20 +224,20 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
 
   // Legacy candidate orders → keep only those that (a) have NO thread row
   // (i.e. unsplit / pre-v3) AND (b) are NOT covered by any open PO. The
-  // null-`dl` defensive branch from v3-S2.1 is preserved.
+  // null-`so` defensive branch from v3-S2.1 is preserved.
   const legacyOrderIds = new Set<string>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const o of (ordersRes.data ?? []) as any[]) {
     const oid = String(o.id);
     if (orderIdsWithAnyThread.has(oid)) continue; // split — handled by primary
-    const dl = o.dl;
-    if (dl != null && coveredDls.has(Number(dl))) continue; // already covered by an open PO
+    const so = o.so;
+    if (so != null && coveredDls.has(Number(so))) continue; // already covered by an open PO
     legacyOrderIds.add(oid);
   }
 
   // When dlsFilter is set, threads-side primaryOrderIds may include orders
-  // outside the user's selection (threads carry no dl). Intersect with the
-  // dl-scoped orders set so the union honors the bundle scope.
+  // outside the user's selection (threads carry no so). Intersect with the
+  // so-scoped orders set so the union honors the bundle scope.
   const inScopeOrderIds = dlsFilter
     ? new Set((ordersRes.data ?? []).map((o: { id: unknown }) => String(o.id)))
     : null;
@@ -349,13 +349,13 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
   if (dlsFilter) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const o of (ordersRes.data ?? []) as any[]) {
-      if (o.dl == null) continue;
+      if (o.so == null) continue;
       orders.push({
-        dl: Number(o.dl),
+        so: Number(o.so),
         deliveryDate: o.delivery_date ?? null,
       });
     }
-    orders.sort((a, b) => a.dl - b.dl);
+    orders.sort((a, b) => a.so - b.so);
   }
 
   const response: AwaitingStockShortageResponse = { shortage, orders };
@@ -387,7 +387,7 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
   const { data: po, error: e1 } = await sb
     .from("purchase_orders")
     .select(
-      "id, status, sup_status, dl, dl_refs, eta_date, placed_at, supplier_id, warehouse_id, suppliers(name, contact), warehouses(name, address)",
+      "id, status, sup_status, so, so_refs, eta_date, placed_at, supplier_id, warehouse_id, suppliers(name, contact), warehouses(name, address)",
     )
     .eq("id", poId)
     .maybeSingle();
@@ -510,11 +510,11 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
 //
 // Loo 2026-05-16 — per-source-order delivery dates for the PO detail modal.
 // The PO list embeds nothing from `orders` because the (PO ↔ orders) link is
-// indirect (PO.dl_refs is an int[] of dealer-facing SO numbers, joined to
-// orders.dl). The modal needs each SO's `delivery_date` so the operator can
+// indirect (PO.so_refs is an int[] of dealer-facing SO numbers, joined to
+// orders.so). The modal needs each SO's `delivery_date` so the operator can
 // see customer ETAs alongside the PO-level ETA.
 //
-// Two PostgREST round-trips: fetch PO (RLS-scoped), then fetch orders by dl.
+// Two PostgREST round-trips: fetch PO (RLS-scoped), then fetch orders by so.
 // Cheap (<5 rows typically), only fires when the modal opens.
 operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
   const poId = c.req.param("id");
@@ -522,7 +522,7 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 
   const { data: po, error: e1 } = await sb
     .from("purchase_orders")
-    .select("dl, dl_refs")
+    .select("so, so_refs")
     .eq("id", poId)
     .maybeSingle();
   if (e1) {
@@ -535,25 +535,25 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
       404,
     );
   }
-  const poRow = po as { dl: number | null; dl_refs: number[] | null };
+  const poRow = po as { so: number | null; so_refs: number[] | null };
   const dls: number[] = [
-    ...((poRow.dl_refs ?? []) as number[]),
-    ...(poRow.dl != null ? [Number(poRow.dl)] : []),
+    ...((poRow.so_refs ?? []) as number[]),
+    ...(poRow.so != null ? [Number(poRow.so)] : []),
   ];
   if (dls.length === 0) return c.json({ orders: [] });
 
   const { data, error } = await sb
     .from("orders")
-    .select("dl, delivery_date")
-    .in("dl", dls)
-    .order("dl");
+    .select("so, delivery_date")
+    .in("so", dls)
+    .order("so");
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
   const orders = (data ?? []).map((r) => {
-    const row = r as { dl: unknown; delivery_date: string | null };
-    return { dl: Number(row.dl), deliveryDate: row.delivery_date };
+    const row = r as { so: unknown; delivery_date: string | null };
+    return { so: Number(row.so), deliveryDate: row.delivery_date };
   });
   return c.json({ orders });
 });
@@ -582,8 +582,8 @@ operationPosRouter.post("/", requireOperation, async (c) => {
     p_supplier_id: parsed.data.supplierId,
     p_warehouse_id: parsed.data.warehouseId,
     p_lines: linesForRpc,
-    p_dl: parsed.data.dl ?? null,
-    p_dl_refs: parsed.data.dlRefs ?? null,
+    p_dl: parsed.data.so ?? null,
+    p_dl_refs: parsed.data.soRefs ?? null,
     // 0079 (Loo 2026-05-10) — pre-assign the procurement-leg LP at PO
     // creation. Modal already validates that factory_pickup suppliers have
     // a partner picked; own_logistics suppliers omit the field and the RPC
@@ -654,7 +654,7 @@ operationPosRouter.post("/batch", requireOperation, async (c) => {
     // off each JSONB entry and casts to date (0055b:300-303); empty string
     // falls back to null but our zod (.date()) blocks empty.
     eta_date: p.etaDate,
-    dl_refs: p.dlRefs ?? null,
+    so_refs: p.soRefs ?? null,
     note: null as string | null,
   }));
 

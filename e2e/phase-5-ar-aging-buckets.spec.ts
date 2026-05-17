@@ -45,12 +45,12 @@ test("phase-5 A3: AR aging buckets — dashboard renders + AR filter pills work"
   // / All). Use exact:true to disambiguate from "All ages".
   await fpage.getByRole("button", { name: "All", exact: true }).click();
 
-  // Each seeded SO surfaces as INV-{YYYY}-{dl} on the AR page (invoice_no
-  // is synthesized from dl by finance_ar_aging RPC even pre-issuance).
+  // Each seeded SO surfaces as INV-{YYYY}-{so} on the AR page (invoice_no
+  // is synthesized from so by finance_ar_aging RPC even pre-issuance).
   // Verify all 4 are visible at once under no aging filter ("All ages").
-  for (const dl of [9101, 9102, 9103, 9104]) {
+  for (const so of [9101, 9102, 9103, 9104]) {
     await expect(
-      fpage.getByText(new RegExp(`INV-\\d{4}-${dl}\\b`)),
+      fpage.getByText(new RegExp(`INV-\\d{4}-${so}\\b`)),
     ).toBeVisible({ timeout: 5_000 });
   }
 

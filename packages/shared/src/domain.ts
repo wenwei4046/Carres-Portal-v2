@@ -185,7 +185,7 @@ export interface OrderHistory {
 
 export interface Order {
   id: string;
-  dl: number;
+  so: number;
   status: "place" | "proceed_order" | "delivered" | "cancelled";
   channel: string;
   dealerId: string;
@@ -298,9 +298,9 @@ export interface OrderSupplierThread {
 
 export interface PurchaseOrder {
   id: string;
-  dl: number | null;
+  so: number | null;
   // Cross-order bundle backrefs (migration 0017). See PurchaseOrderRow comment.
-  dlRefs: number[] | null;
+  soRefs: number[] | null;
   supplierId: string;
   warehouseId: string;
   // Single-sku/qty columns dropped in 0017 — lines live in purchase_order_lines.

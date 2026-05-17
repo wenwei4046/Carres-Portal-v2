@@ -91,7 +91,7 @@ export default function TransferReadyDialog({
     if (!valid) return;
     try {
       await transfer.mutateAsync({ warehouseId });
-      toast.success(`#${order.dl} stock reserved · ready to dispatch`);
+      toast.success(`#${order.so} stock reserved · ready to dispatch`);
       onClose();
     } catch (e: unknown) {
       if (e instanceof ApiError) {
@@ -119,7 +119,7 @@ export default function TransferReadyDialog({
   const selectedWh = allWarehouses.find((w) => w.id === warehouseId);
 
   return (
-    <Modal title={`Transfer to ready · #${order.dl}`} onClose={onClose}>
+    <Modal title={`Transfer to ready · #${order.so}`} onClose={onClose}>
       <div className="text-[12px] text-base-600 mb-3.5 font-body">
         Use this when stock is already on-hand (not via a tracked PO receipt).
         We&rsquo;ll reserve stock at the chosen warehouse and flip the order to{" "}

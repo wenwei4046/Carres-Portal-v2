@@ -123,6 +123,12 @@ describe("Codex F1-F12 fix verification (Phase 4.5 Chunk 1 v3)", () => {
   });
 
   it("F6: enforce_partner_po_column_whitelist references NEW.dl (NOT NEW.order_id)", () => {
+    // 2026-05-18 — assertion intentionally uses NEW.dl (historical name).
+    // Migration 0046 is frozen per CLAUDE.md §14 #6; the column was renamed
+    // to `so` in migration 0123, but the historical migration text still
+    // contains `NEW.dl`. Same precedent as 0121 logistics→operation rename
+    // (see §17 entry: "assertion strings in 2 migration-content test files
+    // reverted to historical vocab").
     expect(MIG_0046).toMatch(/NEW\.dl\s+IS DISTINCT FROM\s+OLD\.dl/);
     // The whole migration must NEVER reference NEW.order_id (purchase_orders
     // has no order_id column — Codex F6 caught a phantom column).

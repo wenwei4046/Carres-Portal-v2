@@ -248,7 +248,7 @@ export interface StockMovementRow {
 
 export interface OrderRow {
   id: string;
-  dl: number;
+  so: number;
   status: OrderStatus;
   channel: string;
   dealer_id: string;
@@ -369,11 +369,11 @@ export interface OrderSupplierThreadRow {
 
 export interface PurchaseOrderRow {
   id: string;
-  dl: number | null;
+  so: number | null;
   // Cross-order PO bundle backrefs (migration 0017). Combined POs that group
-  // SKUs across N source orders populate this; single-order POs use `dl`.
-  // GIN-indexed for `= ANY(dl_refs)` lookups (drawer + linked-PO queries).
-  dl_refs: number[] | null;
+  // SKUs across N source orders populate this; single-order POs use `so`.
+  // GIN-indexed for `= ANY(so_refs)` lookups (drawer + linked-PO queries).
+  so_refs: number[] | null;
   supplier_id: string;
   warehouse_id: string;
   // Single-line `sku` + `qty` columns were dropped in migration 0017; lines

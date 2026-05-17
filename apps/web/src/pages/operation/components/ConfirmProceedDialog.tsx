@@ -94,8 +94,8 @@ export default function ConfirmProceedDialog({
       await confirm.mutateAsync({ warehouseId });
       toast.success(
         preflight?.sufficient
-          ? `#${order.dl} stock reserved · ready to dispatch`
-          : `#${order.dl} triaged · awaiting stock`,
+          ? `#${order.so} stock reserved · ready to dispatch`
+          : `#${order.so} triaged · awaiting stock`,
       );
       onClose();
     } catch (e: unknown) {
@@ -119,7 +119,7 @@ export default function ConfirmProceedDialog({
   const selectedWh = allWarehouses.find((w) => w.id === warehouseId);
 
   return (
-    <Modal title={`Confirm proceed · #${order.dl}`} onClose={onClose}>
+    <Modal title={`Confirm proceed · #${order.so}`} onClose={onClose}>
       <div className="text-[12px] text-base-600 mb-3.5 font-body">
         Pick a source warehouse. The system will reserve stock if all lines are
         covered, otherwise the order moves to <strong>Awaiting operation Action</strong>{" "}

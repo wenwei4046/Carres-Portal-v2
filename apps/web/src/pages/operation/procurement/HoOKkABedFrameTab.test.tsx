@@ -32,8 +32,8 @@ vi.mock("@/lib/queries", async () => {
             warehouse_id: "22222222-2222-2222-2222-000000000001",
             status: "open",
             sup_status: "in_production",
-            dl: 9200,
-            dl_refs: null,
+            so: 9200,
+            so_refs: null,
             eta_date: "2026-06-20",
             placed_at: "2026-05-03T00:00:00Z",
             purchase_order_lines: [

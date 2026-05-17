@@ -698,7 +698,7 @@ describe('resumeDispatchInput (Phase 4.5 Chunk 2 Sprint B)', () => {
   it('accepts a valid uuid threadId', () => {
     expect(resumeDispatchInput.safeParse({ threadId: UUID }).success).toBe(true);
   });
-  it('rejects a non-uuid threadId (e.g. legacy order dl int)', () => {
+  it('rejects a non-uuid threadId (e.g. legacy order so int)', () => {
     expect(resumeDispatchInput.safeParse({ threadId: '4001' }).success).toBe(false);
   });
   it('rejects an empty body (threadId required)', () => {

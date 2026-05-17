@@ -736,7 +736,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   const { data, error } = await sb
     .from("orders")
     .select(
-      "id, dl, status, channel, customer_name, customer_phone, customer_address, " +
+      "id, so, status, channel, customer_name, customer_phone, customer_address, " +
         "delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift, " +
         "paid, signature_url, placed_at, " +
         "order_lines(sku, qty, unit_price, attrs), " +
@@ -793,8 +793,8 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   const paid = Number(o.paid ?? 0);
   const balance_due = total - paid;
 
-  // proto `soNumber` → "SO-001001" (6-digit zero-padded dl).
-  const so_number = `SO-${String(o.dl).padStart(6, "0")}`;
+  // proto `soNumber` → "SO-001001" (6-digit zero-padded so).
+  const so_number = `SO-${String(o.so).padStart(6, "0")}`;
   const issue_date = (o.placed_at as string | null)?.slice(0, 10) ?? "—";
   const statusLabel =
     o.status === "place"
@@ -814,7 +814,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     so_number,
     issue_date,
     order_id: id,
-    order_code: `SO-${o.dl}`,
+    order_code: `SO-${o.so}`,
     status_label: statusLabel,
     channel,
     customer: {
@@ -880,7 +880,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   const { data: order, error: ordErr } = await sb
     .from("orders")
     .select(
-      "id, dl, status, invoice_no, invoiced_at, customer_name, customer_phone, customer_address, dealer_id, dealers(name, contact)",
+      "id, so, status, invoice_no, invoiced_at, customer_name, customer_phone, customer_address, dealer_id, dealers(name, contact)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -943,7 +943,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     invoice_no: String(i.invoice_no),
     issue_date: String(i.issued_at).slice(0, 10),
     order_id: String(ord.id),
-    order_code: `SO-${ord.dl}`,
+    order_code: `SO-${ord.so}`,
     customer: {
       name: String(ord.customer_name ?? ""),
       address: String(ord.customer_address ?? "—"),

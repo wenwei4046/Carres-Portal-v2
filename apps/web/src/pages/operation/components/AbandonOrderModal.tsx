@@ -41,8 +41,8 @@ export default function AbandonOrderModal({ order, onClose }: Props) {
       await abandon.mutateAsync({ reason: reason.trim() });
       toast.success(
         hadReserve
-          ? `#${order.dl} abandoned · stock released`
-          : `#${order.dl} abandoned`,
+          ? `#${order.so} abandoned · stock released`
+          : `#${order.so} abandoned`,
       );
       onClose();
     } catch (e: unknown) {
@@ -52,7 +52,7 @@ export default function AbandonOrderModal({ order, onClose }: Props) {
   }
 
   return (
-    <Modal title={`Abandon order · #${order.dl}`} onClose={onClose}>
+    <Modal title={`Abandon order · #${order.so}`} onClose={onClose}>
       <div className="text-[12px] text-base-600 mb-3.5 font-body">
         This will set the order to <strong>cancelled</strong>.
         {hadReserve ? (

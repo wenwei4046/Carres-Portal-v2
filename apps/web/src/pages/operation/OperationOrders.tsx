@@ -52,7 +52,7 @@ import type { OperationStage } from "./components/StageChip";
  *   - phase-pipeline-resume-mode-restore — the prior "At Warehouse Waiting"
  *     filter chip + ResumeFromWaitingDialog routing was dropped from the
  *     header for layout simplicity. The dialog still mounts when something
- *     calls `setResumeFor(dl)`, but no UI surfaces it today. Re-add as a
+ *     calls `setResumeFor(so)`, but no UI surfaces it today. Re-add as a
  *     ready_to_dispatch detail-drawer action when Loo needs it back.
  */
 const operation_FLOW: ReadonlyArray<{
@@ -101,7 +101,7 @@ export default function OperationOrders() {
   const [resumeFor, setResumeFor] = useState<number | null>(null);
   // 2026-05-12 (Loo) — back-arrow on Proceed Request + Dispatched cards.
   const [revertFor, setRevertFor] = useState<
-    { orderId: string; dl: number; kind: "proceed" | "dispatch" } | null
+    { orderId: string; so: number; kind: "proceed" | "dispatch" } | null
   >(null);
 
   // Server applies search; we always fetch the full list and bucket
@@ -180,11 +180,11 @@ export default function OperationOrders() {
     return buckets;
   }, [filteredOrders]);
 
-  const toggleSelect = (dl: number) => {
+  const toggleSelect = (so: number) => {
     setSelectedDls((prev) => {
       const next = new Set(prev);
-      if (next.has(dl)) next.delete(dl);
-      else next.add(dl);
+      if (next.has(so)) next.delete(so);
+      else next.add(so);
       return next;
     });
   };
@@ -197,7 +197,7 @@ export default function OperationOrders() {
   const selectedOrderIds = useMemo(() => {
     return allOrders
       .filter(
-        (o) => selectedDls.has(o.dl) && stageOf(o) === "awaiting_operation_action",
+        (o) => selectedDls.has(o.so) && stageOf(o) === "awaiting_operation_action",
       )
       .map((o) => o.id);
   }, [allOrders, selectedDls]);
@@ -205,14 +205,14 @@ export default function OperationOrders() {
   function selectAllInColumn(stageKey: OperationStage) {
     if (stageKey !== "awaiting_operation_action") return;
     const stageOrders = ordersByStage.awaiting_operation_action;
-    const stageDls = stageOrders.map((o) => o.dl);
-    const allSelected = stageDls.every((dl) => selectedDls.has(dl));
+    const stageDls = stageOrders.map((o) => o.so);
+    const allSelected = stageDls.every((so) => selectedDls.has(so));
     setSelectedDls((prev) => {
       const next = new Set(prev);
       if (allSelected) {
-        for (const dl of stageDls) next.delete(dl);
+        for (const so of stageDls) next.delete(so);
       } else {
-        for (const dl of stageDls) next.add(dl);
+        for (const so of stageDls) next.add(so);
       }
       return next;
     });
@@ -278,9 +278,9 @@ export default function OperationOrders() {
           onBundleClick={(orderIds) => {
             const dls = allOrders
               .filter((o) => orderIds.includes(o.id))
-              .map((o) => o.dl);
+              .map((o) => o.so);
             setBundlePrefill({
-              dlRefs: dls,
+              soRefs: dls,
               note: `Bundle from ${dls.length} orders: ${dls.map((d) => `#${d}`).join(", ")}`,
             });
           }}
@@ -310,8 +310,8 @@ export default function OperationOrders() {
               onToggleExpand={() =>
                 setExpandedStage((prev) => (prev === s.key ? null : s.key))
               }
-              onRevert={(orderId, dl, kind) =>
-                setRevertFor({ orderId, dl, kind })
+              onRevert={(orderId, so, kind) =>
+                setRevertFor({ orderId, so, kind })
               }
             />
           ))}
@@ -354,13 +354,13 @@ export default function OperationOrders() {
                     key={o.id}
                     order={o}
                     selectable={activeStage === "awaiting_operation_action"}
-                    selected={selectedDls.has(o.dl)}
-                    onToggleSelect={() => toggleSelect(o.dl)}
+                    selected={selectedDls.has(o.so)}
+                    onToggleSelect={() => toggleSelect(o.so)}
                     onOpen={() => setOpenOrderId(o.id)}
                     actionHint={action ? `${action} →` : undefined}
                     stage={activeStage}
                     onRevert={(kind) =>
-                      setRevertFor({ orderId: o.id, dl: o.dl, kind })
+                      setRevertFor({ orderId: o.id, so: o.so, kind })
                     }
                   />
                 );
@@ -387,14 +387,14 @@ export default function OperationOrders() {
       )}
       {resumeFor !== null && (
         <ResumeFromWaitingDialog
-          dl={resumeFor}
+          so={resumeFor}
           onClose={() => setResumeFor(null)}
         />
       )}
       {revertFor && (
         <RevertConfirmDialog
           orderId={revertFor.orderId}
-          dl={revertFor.dl}
+          so={revertFor.so}
           kind={revertFor.kind}
           onClose={() => setRevertFor(null)}
         />

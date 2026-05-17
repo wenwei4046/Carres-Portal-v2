@@ -155,9 +155,9 @@ export default function OrderCard({
       }}
       role="button"
       tabIndex={0}
-      aria-label={`Order #${order.dl} for ${customer}`}
+      aria-label={`Order #${order.so} for ${customer}`}
       className={containerCls}
-      data-testid={`order-card-${order.dl}`}
+      data-testid={`order-card-${order.so}`}
     >
       {selectable && (
         <div
@@ -198,7 +198,7 @@ export default function OrderCard({
       <div className="flex-1 min-w-0 px-3 py-2.5">
         <div className="flex items-baseline justify-between">
           <span className="font-mono text-[11px] font-semibold text-base-900">
-            #{order.dl}
+            #{order.so}
           </span>
           {!compact && (
             <span className="font-mono text-[10px] text-base-500">
@@ -262,7 +262,7 @@ export default function OrderCard({
             <div className="flex items-baseline justify-between mt-1.5 gap-2">
               {poChipState !== "none" ? (
                 <span
-                  data-testid={`order-card-po-chip-${order.dl}`}
+                  data-testid={`order-card-po-chip-${order.so}`}
                   className="inline-flex items-center font-semibold"
                   style={{
                     fontSize: "9.5px",
@@ -307,8 +307,8 @@ export default function OrderCard({
                 }}
                 onKeyDown={(e) => e.stopPropagation()}
                 className="mt-1.5 text-[10px] text-base-500 hover:text-primary underline-offset-2 hover:underline transition-colors"
-                data-testid={`order-card-revert-${order.dl}`}
-                aria-label={`Revert order ${order.dl} to previous stage`}
+                data-testid={`order-card-revert-${order.so}`}
+                aria-label={`Revert order ${order.so} to previous stage`}
               >
                 &#x21B6; Revert
               </button>

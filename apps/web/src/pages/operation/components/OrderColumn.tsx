@@ -51,7 +51,7 @@ interface Props {
   bucketAction: string | null;
   orders: operationOrderListRow[];
   selectedDls: Set<number>;
-  onToggleSelect: (dl: number) => void;
+  onToggleSelect: (so: number) => void;
   onOpenOrder: (id: string) => void;
   onSelectAll: () => void;
   /** Pipeline v2 expand state. `expanded` is true for the focused column,
@@ -62,7 +62,7 @@ interface Props {
   onToggleExpand: () => void;
   /** 2026-05-12 (Loo) — fires when a card's `↶ Revert` link is clicked.
    *  Parent owns the confirm dialog + mutation. */
-  onRevert?: (orderId: string, dl: number, kind: "proceed" | "dispatch") => void;
+  onRevert?: (orderId: string, so: number, kind: "proceed" | "dispatch") => void;
 }
 
 export default function OrderColumn({
@@ -83,11 +83,11 @@ export default function OrderColumn({
   const accentText = STAGE_ACCENT_TEXT[stage];
   const accentBorder = STAGE_ACCENT_BORDER[stage];
   const selectable = stage === "awaiting_operation_action";
-  const itemDls = orders.map((o) => o.dl);
+  const itemDls = orders.map((o) => o.so);
   const allSelected =
-    selectable && itemDls.length > 0 && itemDls.every((dl) => selectedDls.has(dl));
+    selectable && itemDls.length > 0 && itemDls.every((so) => selectedDls.has(so));
   const someSelected =
-    selectable && itemDls.some((dl) => selectedDls.has(dl)) && !allSelected;
+    selectable && itemDls.some((so) => selectedDls.has(so)) && !allSelected;
 
   // Compact mode: another column is expanded; render trimmed cards so the
   // non-focus columns stay readable at a glance.
@@ -158,15 +158,15 @@ export default function OrderColumn({
               key={o.id}
               order={o}
               selectable={selectable}
-              selected={selectedDls.has(o.dl)}
-              onToggleSelect={() => onToggleSelect(o.dl)}
+              selected={selectedDls.has(o.so)}
+              onToggleSelect={() => onToggleSelect(o.so)}
               onOpen={() => onOpenOrder(o.id)}
               actionHint={bucketAction ?? undefined}
               compact={compact}
               stage={stage}
               onRevert={
                 onRevert
-                  ? (kind) => onRevert(o.id, o.dl, kind)
+                  ? (kind) => onRevert(o.id, o.so, kind)
                   : undefined
               }
             />

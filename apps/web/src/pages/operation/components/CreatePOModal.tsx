@@ -41,12 +41,12 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  *
  * Prefill cases:
  *   - {} : empty new PO; user picks SKU/qty manually.
- *   - { dl: 1234, lines: [...] } : single-order shortage prefill.
- *   - { dlRefs: [12, 34], lines: [...] } : cross-order bundle prefill (M5.2 →
+ *   - { so: 1234, lines: [...] } : single-order shortage prefill.
+ *   - { soRefs: [12, 34], lines: [...] } : cross-order bundle prefill (M5.2 →
  *     M5.3 wire-up). The aggregated lines come from the parent.
  *
  * Mirrors proto §18.4 visual conventions:
- *   - intro line + Auto-match button (only when no dl)
+ *   - intro line + Auto-match button (only when no so)
  *   - lines table with auto-supplier column + add/remove SKU
  *   - duplicate-SKU warning band
  *   - auto-split notice band when N>1 suppliers
@@ -66,10 +66,10 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  *   migration 0025).
  */
 export interface CreatePoPrefill {
-  /** Single-order PO — sets the `dl` foreign key. */
-  dl?: number;
-  /** Cross-order bundle PO — sets `dl_refs` (array of order DLs). */
-  dlRefs?: number[];
+  /** Single-order PO — sets the `so` foreign key. */
+  so?: number;
+  /** Cross-order bundle PO — sets `so_refs` (array of order DLs). */
+  soRefs?: number[];
   /** Pre-filled line items (sku + qty + optional attrs); comes from order
    * shortage aggregation. 0076: attrs is now carried through so bedframe
    * color/gap and sofa fabric pre-fill the cascade picker. NULL/undefined
@@ -185,12 +185,12 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // order/bundle prefill (those flows already know the lines and we don't
   // want to clobber them).
   //
-  // 2026-05-10 — bundle prefill (`prefill.dlRefs`) re-uses this same hook
+  // 2026-05-10 — bundle prefill (`prefill.soRefs`) re-uses this same hook
   // with `?dls=...` scoping so the cross-order bundle modal pre-fills the
   // exact lines for the operator's selection. The auto-fire effect below
-  // calls `autoFillFromShortage()` once on mount when dlRefs is set; the
-  // button itself stays hidden (showAutoFill checks dlRefs).
-  const shortageQ = useAwaitingStockShortage(prefill.dlRefs);
+  // calls `autoFillFromShortage()` once on mount when soRefs is set; the
+  // button itself stays hidden (showAutoFill checks soRefs).
+  const shortageQ = useAwaitingStockShortage(prefill.soRefs);
 
   // Phase 4.5 Chunk 2 T22 — "Suggest from alerts" button. Same lazy pattern as
   // the shortage hook above: `enabled: false` so the network call only fires
@@ -211,18 +211,18 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
 
   // v3-S4.5 — Stockpile PO mode. When the user wants to procure inventory
   // ahead of demand (no specific customer order to cover), they tick this
-  // toggle. The submission then drops `dl` / `dlRefs` from the payload —
+  // toggle. The submission then drops `so` / `soRefs` from the payload —
   // backend RPC accepts NULL for both (validated against migration 0019/0025).
   // Spec §17.1 A3 promotes this from edge-case to 1st-class flow.
   //
   // Mutually exclusive with auto-fill prefill: when the modal is opened with
-  // `dl` / `dlRefs` set, the toggle is disabled (you can't stockpile if the
+  // `so` / `soRefs` set, the toggle is disabled (you can't stockpile if the
   // caller already pinned the order ref). UI-locked rather than hidden so the
   // operator sees the option exists but understands why it's not available
   // here.
   const autoFillPrefilled =
-    prefill.dl != null ||
-    (prefill.dlRefs != null && prefill.dlRefs.length > 0);
+    prefill.so != null ||
+    (prefill.soRefs != null && prefill.soRefs.length > 0);
   const [stockpile, setStockpile] = useState<boolean>(false);
   // 0076 (Loo 2026-05-10): per-variant split. OFF (default) = one combined PO
   // per supplier (bedframe workflow — multi-color in same PO). ON = one PO
@@ -355,7 +355,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // we started with zero prefill lines). 0074: cost auto-fills from the SKU.
   //
   // 2026-05-10 — skip when the modal was opened with a specific order ref
-  // (`prefill.dl`) or a cross-order bundle (`prefill.dlRefs`). The placeholder
+  // (`prefill.so`) or a cross-order bundle (`prefill.soRefs`). The placeholder
   // line was misleading operators in the bundle case: a `qty=5` row with the
   // first catalog SKU has no relationship to the orders the user selected, so
   // it looked like the modal had auto-aggregated wrong totals (memory 1790,
@@ -364,8 +364,8 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // SKUs manually. The placeholder is reserved for the truly empty case
   // (stockpile / fresh PO from scratch with no caller hint).
   useEffect(() => {
-    if (prefill.dl != null) return;
-    if (prefill.dlRefs != null && prefill.dlRefs.length > 0) return;
+    if (prefill.so != null) return;
+    if (prefill.soRefs != null && prefill.soRefs.length > 0) return;
     if (lines.length === 0 && initialLines.length === 0) {
       const firstSku = catalogQ.data?.skus?.[0];
       if (firstSku) {
@@ -386,16 +386,16 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   }, [lines.length, catalogQ.data, initialLines.length]);
 
   // 2026-05-10 — bundle auto-prefill on mount. When the modal opens with
-  // `prefill.dlRefs` (CrossOrderBundleSheet → "+ Create combined PO" →
+  // `prefill.soRefs` (CrossOrderBundleSheet → "+ Create combined PO" →
   // setBundlePrefill), kick off `autoFillFromShortage()` exactly once so the
   // shortage fetch (now scoped to those dls via the hook) pre-fills the
   // lines table with the actual aggregated need from the source orders.
   // Ref guard keeps it idempotent across re-renders without coupling to the
-  // dlRefs identity (parents recreate arrays on every render of the kanban).
+  // soRefs identity (parents recreate arrays on every render of the kanban).
   const bundleAutoFetchRan = useRef(false);
   useEffect(() => {
     if (bundleAutoFetchRan.current) return;
-    if (prefill.dlRefs == null || prefill.dlRefs.length === 0) return;
+    if (prefill.soRefs == null || prefill.soRefs.length === 0) return;
     // Caller-supplied lines win — if the parent already aggregated, don't
     // clobber its work with a server fetch.
     if (prefill.lines && prefill.lines.length > 0) return;
@@ -447,7 +447,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // driven; stockpile by definition has no order to drive from).
   const showAutoFill =
     !stockpile &&
-    prefill.dl == null && (prefill.dlRefs == null || prefill.dlRefs.length === 0);
+    prefill.so == null && (prefill.soRefs == null || prefill.soRefs.length === 0);
 
   // T22 — "Suggest from alerts" visibility. Same prefill-guard as auto-fill
   // (don't clobber order-driven flows), but stays visible in stockpile mode —
@@ -493,7 +493,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       }
       const data = res.data;
       const isBundleScope =
-        prefill.dlRefs != null && prefill.dlRefs.length > 0;
+        prefill.soRefs != null && prefill.soRefs.length > 0;
       if (!data || data.shortage.length === 0) {
         toast(
           isBundleScope
@@ -530,7 +530,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       const totalUnits = data.shortage.reduce((acc, s) => acc + s.need, 0);
       toast.success(
         isBundleScope
-          ? `Pre-filled ${data.shortage.length} SKU${data.shortage.length === 1 ? "" : "s"} from ${prefill.dlRefs!.length} order${prefill.dlRefs!.length === 1 ? "" : "s"} (${totalUnits} unit${totalUnits === 1 ? "" : "s"})`
+          ? `Pre-filled ${data.shortage.length} SKU${data.shortage.length === 1 ? "" : "s"} from ${prefill.soRefs!.length} order${prefill.soRefs!.length === 1 ? "" : "s"} (${totalUnits} unit${totalUnits === 1 ? "" : "s"})`
           : `Auto-filled ${data.shortage.length} SKU${data.shortage.length === 1 ? "" : "s"} from ${totalUnits} unit${totalUnits === 1 ? "" : "s"} pending`,
       );
     } catch (e: unknown) {
@@ -759,7 +759,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         // Single PO → keep using the existing single-PO RPC.
         // This preserves the legacy contract (operation_create_po) for the
         // common case and avoids touching tests that assert this path.
-        // v3-S4.5: stockpile mode forces dl/dlRefs out of the payload —
+        // v3-S4.5: stockpile mode forces so/soRefs out of the payload —
         // backend RPC accepts NULL for both (= "this PO covers no specific
         // customer order"). Spread guards apply only when NOT stockpile.
         const g = issuanceGroups[0];
@@ -782,9 +782,9 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             costSource: l.costSource!,
             attrs: l.attrs ?? null,
           })),
-          ...(!stockpile && prefill.dl ? { dl: prefill.dl } : {}),
-          ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
-            ? { dlRefs: prefill.dlRefs }
+          ...(!stockpile && prefill.so ? { so: prefill.so } : {}),
+          ...(!stockpile && prefill.soRefs && prefill.soRefs.length > 0
+            ? { soRefs: prefill.soRefs }
             : {}),
           etaDate: eta,
         });
@@ -793,8 +793,8 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         );
       } else {
         // 2+ POs → atomic batch RPC. Each entry carries its own warehouse
-        // pick. dl_refs (if present) propagates onto every PO since a bundle
-        // PO is always cross-order. dl (single) doesn't apply when splitting
+        // pick. so_refs (if present) propagates onto every PO since a bundle
+        // PO is always cross-order. so (single) doesn't apply when splitting
         // — the batch RPC's helper is bundle-shaped only.
         // v3-S4.5: same stockpile carve-out as the single-PO branch.
         await createBatch.mutateAsync({
@@ -816,8 +816,8 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                 costSource: l.costSource!,
                 attrs: l.attrs ?? null,
               })),
-              ...(!stockpile && prefill.dlRefs && prefill.dlRefs.length > 0
-                ? { dlRefs: prefill.dlRefs }
+              ...(!stockpile && prefill.soRefs && prefill.soRefs.length > 0
+                ? { soRefs: prefill.soRefs }
                 : {}),
               etaDate: eta,
             };
@@ -838,21 +838,21 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   // with a "Stockpile" pill below in the body.
   const titleSuffix = stockpile
     ? ""
-    : prefill.dl
-      ? ` · for order #${prefill.dl}`
-      : prefill.dlRefs && prefill.dlRefs.length > 0
-        ? ` · bundle of ${prefill.dlRefs.length} orders`
+    : prefill.so
+      ? ` · for order #${prefill.so}`
+      : prefill.soRefs && prefill.soRefs.length > 0
+        ? ` · bundle of ${prefill.soRefs.length} orders`
         : "";
   const baseTitle = stockpile
     ? "New stockpile PO"
-    : prefill.dl || prefill.dlRefs?.length
+    : prefill.so || prefill.soRefs?.length
       ? `New PO${titleSuffix}`
       : "New purchase order";
 
   return (
     <Modal title={baseTitle} onClose={onClose} size="lg">
       {/* v3-S4.5 — Stockpile PO toggle. Disabled when caller pre-pinned an
-          order ref (single dl or bundle dlRefs); the prefill there dictates
+          order ref (single so or bundle soRefs); the prefill there dictates
           the lines and dropping it would lose the link. */}
       <div className="mb-3 flex items-center gap-2 text-[12px] font-body">
         <input
@@ -921,15 +921,15 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             replenishment only — it won&rsquo;t be linked to any specific
             customer order.
           </>
-        ) : prefill.dl ? (
+        ) : prefill.so ? (
           <>
-            Auto-routed from order <strong>#{prefill.dl}</strong>. SKUs are
+            Auto-routed from order <strong>#{prefill.so}</strong>. SKUs are
             matched to suppliers automatically.
           </>
-        ) : prefill.dlRefs && prefill.dlRefs.length > 0 ? (
+        ) : prefill.soRefs && prefill.soRefs.length > 0 ? (
           <>
             Bundling shortages from{" "}
-            <strong>{prefill.dlRefs.length} orders</strong>. SKUs matched to
+            <strong>{prefill.soRefs.length} orders</strong>. SKUs matched to
             suppliers automatically.
           </>
         ) : (
@@ -940,18 +940,18 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       {/* 2026-05-16 (Loo) — per-order detail card for bundle prefill. Shows each
           selected SO with its customer delivery date so the operator can see
           WHY this bundle exists. Data lands from `shortageQ.data.orders` after
-          the auto-fill fetch resolves; falls back to the flat dl list when the
+          the auto-fill fetch resolves; falls back to the flat so list when the
           fetch is still pending. */}
-      {prefill.dlRefs && prefill.dlRefs.length > 0 && (
+      {prefill.soRefs && prefill.soRefs.length > 0 && (
         <div className="mb-3 px-3 py-2 rounded-[4px] border border-base-200 bg-base-50 font-body">
           <div className="text-[11px] uppercase tracking-wide text-base-500 mb-1.5">
-            Source orders ({prefill.dlRefs.length})
+            Source orders ({prefill.soRefs.length})
           </div>
           {shortageQ.data?.orders && shortageQ.data.orders.length > 0 ? (
             <ul className="space-y-0.5 text-[12px] text-base-700">
               {shortageQ.data.orders.map((o) => (
-                <li key={o.dl} className="flex items-center gap-2">
-                  <span className="font-mono font-semibold">#{o.dl}</span>
+                <li key={o.so} className="flex items-center gap-2">
+                  <span className="font-mono font-semibold">#{o.so}</span>
                   <span className="text-base-400">·</span>
                   <span>
                     {o.deliveryDate ? (
@@ -965,7 +965,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             </ul>
           ) : (
             <div className="text-[12px] text-base-500 font-mono">
-              {prefill.dlRefs.map((d) => `#${d}`).join(", ")}
+              {prefill.soRefs.map((d) => `#${d}`).join(", ")}
             </div>
           )}
         </div>

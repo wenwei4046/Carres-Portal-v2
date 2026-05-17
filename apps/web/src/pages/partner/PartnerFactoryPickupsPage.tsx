@@ -52,7 +52,7 @@ type PickupThread = {
   order_id: string;
   supplier_ready_at: string | null;
   pickup_event_id: string | null;
-  orders: { dl: number; delivery_date: string | null; customer_name: string } | null;
+  orders: { so: number; delivery_date: string | null; customer_name: string } | null;
 };
 
 type PickupEvent = {
@@ -66,7 +66,7 @@ type PickupEvent = {
 
 type PickupRow = {
   id: string;
-  dl: number | null;
+  so: number | null;
   supplier_id: string;
   warehouse_id: string;
   sup_status: string;
@@ -496,12 +496,12 @@ export default function PartnerFactoryPickupsPage() {
                                 checked={selSet.has(t.id)}
                                 onChange={() => toggleThread(po.id, t.id)}
                                 className="accent-primary"
-                                aria-label={`Select thread for SO-${t.orders?.dl ?? "?"}`}
+                                aria-label={`Select thread for SO-${t.orders?.so ?? "?"}`}
                                 data-testid={`thread-checkbox-${t.id}`}
                               />
                               <span className="truncate">
                                 <span className="font-mono font-semibold">
-                                  SO-{t.orders?.dl ?? "?"}
+                                  SO-{t.orders?.so ?? "?"}
                                 </span>{" "}
                                 · {t.orders?.customer_name ?? "—"}
                               </span>
@@ -1084,12 +1084,12 @@ function PickupDrawer({
                           checked={selectedThreadIds.has(t.id)}
                           onChange={() => onToggleThread(t.id)}
                           className="accent-primary h-3.5 w-3.5"
-                          aria-label={`Select thread for SO-${t.orders?.dl ?? "?"}`}
+                          aria-label={`Select thread for SO-${t.orders?.so ?? "?"}`}
                           data-testid={`drawer-thread-checkbox-${t.id}`}
                         />
                         <span className="flex-1 min-w-0 text-[12px] truncate">
                           <span className="font-mono font-semibold">
-                            SO-{t.orders?.dl ?? "?"}
+                            SO-{t.orders?.so ?? "?"}
                           </span>{" "}
                           · {t.orders?.customer_name ?? "—"}
                         </span>
@@ -1269,7 +1269,7 @@ function ThreadRow({
     <div className="flex items-center gap-2.5 px-3.5 py-2.5">
       <span className="flex-1 min-w-0 text-[12px] truncate">
         <span className="font-mono font-semibold">
-          SO-{thread.orders?.dl ?? "?"}
+          SO-{thread.orders?.so ?? "?"}
         </span>{" "}
         · {thread.orders?.customer_name ?? "—"}
       </span>

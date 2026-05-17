@@ -7,7 +7,7 @@ import { isProceedReady, proceedBlockers } from "./order-blockers";
 function readyOrder(over: Partial<Order> = {}): Order {
   return {
     id: "11111111-1111-1111-1111-111111111111",
-    dl: 42,
+    so: 42,
     status: "place",
     channel: "dealer",
     dealerId: "00000000-0000-0000-0000-000000000d01",

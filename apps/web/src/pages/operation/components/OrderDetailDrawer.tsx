@@ -164,9 +164,9 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
     navigate(`/operation/procurement/${slug}`, {
       state: {
         prefill: {
-          dl: data.order.dl,
+          so: data.order.so,
           lines: prefillLines,
-          note: `From order #${data.order.dl} · ${prefillLines.length} short line${prefillLines.length === 1 ? "" : "s"}`,
+          note: `From order #${data.order.so} · ${prefillLines.length} short line${prefillLines.length === 1 ? "" : "s"}`,
         },
       },
     });
@@ -249,7 +249,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
               <TopUpDepositModal
                 order={{
                   id: data.order.id,
-                  dl: data.order.dl,
+                  so: data.order.so,
                   dealerId: data.order.dealer_id,
                   paid: data.order.paid,
                 }}
@@ -385,7 +385,7 @@ function DrawerBody({
         <div className="min-w-0 flex-1">
           <div className="flex gap-2.5 items-center">
             <span className="font-mono text-[12px] text-base-500">
-              #{order.dl}
+              #{order.so}
             </span>
             <StageChip stage={stage} />
           </div>
@@ -408,7 +408,7 @@ function DrawerBody({
           {role && stage !== "dispatched" && stage !== "delivered" && (
             <DownloadSalesOrderButton
               orderId={order.id}
-              dl={order.dl}
+              so={order.so}
               role={role}
               variant="secondary"
             />
@@ -416,7 +416,7 @@ function DrawerBody({
           {role && (stage === "dispatched" || stage === "delivered") && order.invoice_no && (
             <DownloadInvoiceButton
               orderId={order.id}
-              dl={order.dl}
+              so={order.so}
               role={role}
               variant="secondary"
             />
@@ -440,7 +440,7 @@ function DrawerBody({
         <ActionBar
           stage={stage}
           orderId={order.id}
-          dl={order.dl}
+          so={order.so}
           warehouseName={warehouse?.name ?? null}
           shortageCount={shortages.length}
           partnerAssigned={anyThreadPartnerAssigned}
@@ -597,7 +597,7 @@ function KV({
 interface ActionBarProps {
   stage: OperationStage;
   orderId: string;
-  dl: number;
+  so: number;
   warehouseName: string | null;
   shortageCount: number;
   partnerAssigned: boolean;

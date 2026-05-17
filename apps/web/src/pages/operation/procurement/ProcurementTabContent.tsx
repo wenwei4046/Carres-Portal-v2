@@ -311,15 +311,15 @@ export default function ProcurementTabContent({
                     </div>
                   );
                 })}
-                {po.dl && (
+                {po.so && (
                   <div className="text-[10px] text-base-500 mt-1 font-body">
-                    for order #{po.dl}
+                    for order #{po.so}
                   </div>
                 )}
-                {po.dl_refs && po.dl_refs.length > 0 && (
+                {po.so_refs && po.so_refs.length > 0 && (
                   <div className="text-[10px] text-base-500 mt-1 font-body">
-                    bundle of {po.dl_refs.length} orders ·{" "}
-                    {po.dl_refs.map((d) => `#${d}`).join(", ")}
+                    bundle of {po.so_refs.length} orders ·{" "}
+                    {po.so_refs.map((d) => `#${d}`).join(", ")}
                   </div>
                 )}
                 {lines.length > 1 && (

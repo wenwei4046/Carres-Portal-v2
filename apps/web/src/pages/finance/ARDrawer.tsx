@@ -179,7 +179,7 @@ export default function ARDrawer({
               Order summary
             </div>
             <div className="bg-background/60 rounded-md border border-border px-3 py-2 text-[12.5px] flex justify-between">
-              <span>SO-{row.dl} · {row.status}</span>
+              <span>SO-{row.so} · {row.status}</span>
               <span className="font-mono">{rm(row.total)}</span>
             </div>
             {/* 2026-05-12 (Loo) — reprint the customer Sales Order from AR. */}
@@ -187,7 +187,7 @@ export default function ARDrawer({
               <div className="mt-2">
                 <DownloadSalesOrderButton
                   orderId={row.order_id}
-                  dl={row.dl}
+                  so={row.so}
                   role={role}
                   variant="secondary"
                   className="w-full"

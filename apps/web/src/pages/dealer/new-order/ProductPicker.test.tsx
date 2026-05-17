@@ -76,7 +76,7 @@ describe("lockedCategoriesFor", () => {
 });
 
 // -----------------------------------------------------------------------------
-// 2026-05-18 (Loo screenshot — DL-1006 Kestrel L-shape saved with
+// 2026-05-18 (Loo screenshot — SO-1006 Kestrel L-shape saved with
 // `attrs = { mode: "preset" }` despite Kestrel having 2 fabrics configured).
 // Regression test for the model-switch state-leak bug in SofaConfigurator:
 // useState(fabrics[0]?.id) ran only on initial mount, so switching from sofa

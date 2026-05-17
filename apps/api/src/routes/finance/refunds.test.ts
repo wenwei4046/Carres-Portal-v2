@@ -47,14 +47,14 @@ const DEALER_ID = "00000000-0000-0000-0000-000000bb1003";
 
 /**
  * Helper that mocks a chained `.from(...)` such that:
- *   - "orders"    select.eq.single -> { dl, dealer_id, customer_name }
+ *   - "orders"    select.eq.single -> { so, dealer_id, customer_name }
  *   - "refunds"   insert.select.single -> the inserted refund row
  *   - "approvals" insert -> ok
  *   - "audit_log" insert -> ok
  *   - other tables mockable via `extra`
  */
 function mockSb(opts: {
-  orderRow?: { dl: number; dealer_id: string; customer_name: string } | null;
+  orderRow?: { so: number; dealer_id: string; customer_name: string } | null;
   orderErr?: { code: string; message: string } | null;
   refundInsertRow?: { id: string; status: string; amount: number };
   refundInsertErr?: { code: string; message: string } | null;
@@ -149,7 +149,7 @@ describe("GET /api/finance/refunds", () => {
 describe("POST /api/finance/refunds/create", () => {
   it("kind=refund amount<=1000 -> direct approved (no approval row)", async () => {
     const { sb, approvalsInsert } = mockSb({
-      orderRow:        { dl: 1240, dealer_id: DEALER_ID, customer_name: "Tan" },
+      orderRow:        { so: 1240, dealer_id: DEALER_ID, customer_name: "Tan" },
       refundInsertRow: { id: REFUND_ID, status: "approved", amount: 500 },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,7 +172,7 @@ describe("POST /api/finance/refunds/create", () => {
 
   it("kind=refund amount>1000 -> pending + creates approval row", async () => {
     const { sb, approvalsInsert } = mockSb({
-      orderRow:        { dl: 1242, dealer_id: DEALER_ID, customer_name: "Lee" },
+      orderRow:        { so: 1242, dealer_id: DEALER_ID, customer_name: "Lee" },
       refundInsertRow: { id: REFUND_ID, status: "pending", amount: 2100 },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -202,7 +202,7 @@ describe("POST /api/finance/refunds/create", () => {
 
   it("kind=credit -> direct approved (regardless of amount)", async () => {
     const { sb, approvalsInsert } = mockSb({
-      orderRow:        { dl: 1238, dealer_id: DEALER_ID, customer_name: "Ng" },
+      orderRow:        { so: 1238, dealer_id: DEALER_ID, customer_name: "Ng" },
       refundInsertRow: { id: REFUND_ID, status: "approved", amount: 3290 },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

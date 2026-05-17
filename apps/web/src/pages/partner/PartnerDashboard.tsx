@@ -31,7 +31,7 @@ type DashboardPickupLine = {
 
 type DashboardPickupRow = {
   id: string;
-  dl: number | null;
+  so: number | null;
   sup_status: string;
   status: string;
   eta_date: string | null;

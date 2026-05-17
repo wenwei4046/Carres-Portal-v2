@@ -102,7 +102,7 @@ describe("GET /api/finance/reports/ar-aging", () => {
     const payload = {
       rows: [
         {
-          order_id: "o1", dl: 1240, customer_name: "Tan",
+          order_id: "o1", so: 1240, customer_name: "Tan",
           dealer_id: "d1", dealer_name: "Showroom KL",
           placed_at: "2026-04-30T00:00:00Z", days: 8, aging: "0-30",
           total: 5970, paid: 0, outstanding: 5970,

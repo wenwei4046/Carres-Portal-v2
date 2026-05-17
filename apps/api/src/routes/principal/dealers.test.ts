@@ -215,7 +215,7 @@ describe("GET /api/principal/dealers/:id", () => {
     const ordersRows = [
       {
         id: "o1",
-        dl: 1001,
+        so: 1001,
         status: "active",
         customer_name: "Ali",
         paid: "500",
@@ -225,7 +225,7 @@ describe("GET /api/principal/dealers/:id", () => {
       },
       {
         id: "o2",
-        dl: 1002,
+        so: 1002,
         status: "completed",
         customer_name: "Mei",
         paid: "3000",
@@ -253,7 +253,7 @@ describe("GET /api/principal/dealers/:id", () => {
       dealer: { id: string; name: string };
       recentOrders: Array<{
         id: string;
-        dl: number;
+        so: number;
         status: string;
         customerName: string;
         paid: number;

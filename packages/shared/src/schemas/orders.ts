@@ -57,7 +57,7 @@ const orderHistorySchema = z.object({
 
 export const orderSchema = z.object({
   id: z.string().uuid(),
-  dl: z.number().int(),
+  so: z.number().int(),
   status: orderStatusSchema,
   channel: z.string(),
   dealerId: z.string().uuid(),

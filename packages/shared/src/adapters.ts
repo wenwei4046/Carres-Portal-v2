@@ -174,7 +174,7 @@ export const orderFromRow = (
   rels?: { lines?: DB.OrderLineRow[]; addons?: DB.OrderAddonRow[]; history?: DB.OrderHistoryRow[] },
 ): D.Order => ({
   id: r.id,
-  dl: r.dl,
+  so: r.so,
   status: r.status,
   channel: r.channel,
   dealerId: r.dealer_id,
@@ -278,8 +278,8 @@ export const purchaseOrderFromRow = (
   rels?: { lines?: DB.PurchaseOrderLineRow[] },
 ): D.PurchaseOrder => ({
   id: r.id,
-  dl: r.dl,
-  dlRefs: r.dl_refs,
+  so: r.so,
+  soRefs: r.so_refs,
   supplierId: r.supplier_id,
   warehouseId: r.warehouse_id,
   status: r.status,

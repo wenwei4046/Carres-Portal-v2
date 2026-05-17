@@ -14,7 +14,7 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  *
  * Mirrors `reference/proto/operation-orders.jsx` `DispatchDialog`
  * (lines 463-490):
- *   - Title: "Assign delivery partner · #{dl}"
+ *   - Title: "Assign delivery partner · #{so}"
  *   - Body intro: explains stock allocation + names the source warehouse
  *   - Required <select> with all delivery partners ("name · zones" labels)
  *   - Preview panel below: bold name + mono contact + zones (base-50 fill)
@@ -50,7 +50,7 @@ export default function DispatchModal({ order, warehouse, onClose }: Props) {
     try {
       await assign.mutateAsync({ partnerId });
       toast.success(
-        `#${order.dl} dispatched${partner ? ` to ${partner.name}` : ""}`,
+        `#${order.so} dispatched${partner ? ` to ${partner.name}` : ""}`,
       );
       onClose();
     } catch (e: unknown) {
@@ -61,7 +61,7 @@ export default function DispatchModal({ order, warehouse, onClose }: Props) {
 
   return (
     <Modal
-      title={`Assign delivery partner · #${order.dl}`}
+      title={`Assign delivery partner · #${order.so}`}
       onClose={onClose}
     >
       <div className="text-[12px] text-base-600 mb-3.5 font-body">

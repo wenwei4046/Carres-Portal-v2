@@ -54,7 +54,7 @@ afterAll(() => _setJwksForTesting(null));
 describe("GET /api/operation/orders", () => {
   const ORDER_ROW = {
     id: "00000000-0000-0000-0000-000000000a01",
-    dl: 4001,
+    so: 4001,
     status: "proceed_order",
     operation_stage: "awaiting_operation_action",
     warehouse_id: "00000000-0000-0000-0000-000000000w01",
@@ -99,7 +99,7 @@ describe("GET /api/operation/orders", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { orders: typeof ORDER_ROW[] };
     expect(body.orders).toHaveLength(1);
-    expect(body.orders[0]?.dl).toBe(4001);
+    expect(body.orders[0]?.so).toBe(4001);
     // Pipeline v2 (C3): status filter now includes 'place' so the kanban
     // can render the "Placed" column.
     expect(inFn).toHaveBeenCalledWith("status", ["place", "proceed_order", "delivered"]);
@@ -111,7 +111,7 @@ describe("GET /api/operation/orders", () => {
     const PLACE_ROW = {
       ...ORDER_ROW,
       id: "00000000-0000-0000-0000-000000000a02",
-      dl: 4002,
+      so: 4002,
       status: "place",
       operation_stage: null,
       warehouse_id: null,
@@ -312,7 +312,7 @@ describe("GET /api/operation/orders/:id", () => {
   it("returns aggregated detail for an awaiting_operation_action order", async () => {
     mockDetailQueries({
       order: {
-        id: ORDER_ID, dl: 4001, status: "proceed_order", operation_stage: "awaiting_operation_action",
+        id: ORDER_ID, so: 4001, status: "proceed_order", operation_stage: "awaiting_operation_action",
         warehouse_id: "00000000-0000-0000-0000-000000000w01",
         customer_name: "Tan Ah Kow", customer_phone: "+60123456789", customer_address: "...",
         delivery_date: "2026-05-10", placed_at: "2026-05-03T10:00:00Z",
@@ -326,7 +326,7 @@ describe("GET /api/operation/orders/:id", () => {
       ],
       addons: [{ addon_key: "PIL-001", qty: 4, unit_price: 50 }],
       history: [{ text: "Order placed", by_role: "dealer", occurred_at: "2026-05-03T09:00:00Z" }],
-      pos: [{ id: "PO-2030", supplier_id: "00000000-0000-0000-0000-000000000s01", warehouse_id: "00000000-0000-0000-0000-000000000w01", status: "open", sup_status: "pending", dl: 4001, dl_refs: null }],
+      pos: [{ id: "PO-2030", supplier_id: "00000000-0000-0000-0000-000000000s01", warehouse_id: "00000000-0000-0000-0000-000000000w01", status: "open", sup_status: "pending", so: 4001, so_refs: null }],
       poLines: [{ po_id: "PO-2030", sku: "MAT-K-001", qty: 2, received_qty: 0 }],
       warehouse: { id: "00000000-0000-0000-0000-000000000w01", name: "KL HQ", address: "..." },
       stockBalances: [
@@ -345,7 +345,7 @@ describe("GET /api/operation/orders/:id", () => {
     expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
-    expect(body.order.dl).toBe(4001);
+    expect(body.order.so).toBe(4001);
     expect(body.lines).toHaveLength(2);
     expect(body.addons).toHaveLength(1);
     expect(body.total).toBe(2 * 1500 + 1 * 800 + 4 * 50);
@@ -880,7 +880,7 @@ describe("POST /api/operation/orders/:id/confirm-proceed", () => {
     const rpc = vi.fn().mockResolvedValue({
       data: {
         order_id: ORDER_ID,
-        dl: 4001,
+        so: 4001,
         operation_stage: "awaiting_operation_action",
         auto_skipped: false,
         po_id: null,
@@ -912,7 +912,7 @@ describe("POST /api/operation/orders/:id/confirm-proceed", () => {
     const rpc = vi.fn().mockResolvedValue({
       data: {
         order_id: ORDER_ID,
-        dl: 4001,
+        so: 4001,
         operation_stage: "awaiting_operation_action",
         auto_skipped: false,
         po_id: null,
@@ -1186,7 +1186,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     const rpc = vi.fn().mockResolvedValue({
       data: {
         order_id: ORDER_ID,
-        dl: 4001,
+        so: 4001,
         operation_stage: "ready_to_dispatch",
         auto_skipped: true,
         po_id: null,
@@ -1247,7 +1247,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     const rpc = vi.fn().mockResolvedValue({
       data: {
         order_id: ORDER_ID,
-        dl: 4001,
+        so: 4001,
         operation_stage: "awaiting_operation_action",
         auto_skipped: false,
         po_id: null,
@@ -1294,7 +1294,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     const rpc = vi.fn().mockResolvedValue({
       data: {
         order_id: ORDER_ID,
-        dl: 4002,
+        so: 4002,
         operation_stage: "awaiting_operation_action",
         auto_skipped: false,
         po_id: null,
@@ -1463,7 +1463,7 @@ describe("POST /api/operation/orders/:id/revert-proceed", () => {
 
   it("returns 200 on success and calls the right RPC", async () => {
     const rpc = vi.fn().mockResolvedValue({
-      data: { order_id: ORDER_ID, dl: 1001, status: "place", operation_stage: "placed" },
+      data: { order_id: ORDER_ID, so: 1001, status: "place", operation_stage: "placed" },
       error: null,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1484,7 +1484,7 @@ describe("POST /api/operation/orders/:id/revert-proceed", () => {
 
   it("admits principal role too (Loo's de-facto admin)", async () => {
     const rpc = vi.fn().mockResolvedValue({
-      data: { order_id: ORDER_ID, dl: 1001, status: "place", operation_stage: "placed" },
+      data: { order_id: ORDER_ID, so: 1001, status: "place", operation_stage: "placed" },
       error: null,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1548,7 +1548,7 @@ describe("POST /api/operation/orders/:id/revert-dispatch", () => {
 
   it("returns 200 + threads_reverted on success", async () => {
     const rpc = vi.fn().mockResolvedValue({
-      data: { order_id: ORDER_ID, dl: 1002, threads_reverted: 2 },
+      data: { order_id: ORDER_ID, so: 1002, threads_reverted: 2 },
       error: null,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -105,7 +105,7 @@ function wrap(node: React.ReactNode, initialPath = "/operation/orders") {
 function makeOrder(overrides: Partial<operationOrderListRow> = {}): operationOrderListRow {
   return {
     id: "ord-" + Math.random().toString(36).slice(2, 10),
-    dl: 9000 + Math.floor(Math.random() * 999),
+    so: 9000 + Math.floor(Math.random() * 999),
     status: "proceed_order",
     operation_stage: "awaiting_operation_action",
     warehouse_id: "wh-1",
@@ -130,7 +130,7 @@ function makeDetail(): operationOrderDetailResponse {
   return {
     order: {
       id: "ord-1",
-      dl: 9001,
+      so: 9001,
       status: "proceed_order",
       operation_stage: "ready_to_dispatch",
       warehouse_id: "wh-1",
@@ -233,8 +233,8 @@ describe("OperationOrders — kanban", () => {
 
   it("2. clicking a pipeline chip navigates to the per-stage page (URL + view both update)", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 1, operation_stage: "awaiting_operation_action", customer_name: "Awaiting" }),
-      makeOrder({ id: "b", dl: 2, operation_stage: "ready_to_dispatch", customer_name: "Ready" }),
+      makeOrder({ id: "a", so: 1, operation_stage: "awaiting_operation_action", customer_name: "Awaiting" }),
+      makeOrder({ id: "b", so: 2, operation_stage: "ready_to_dispatch", customer_name: "Ready" }),
     ]);
     render(wrap(<OperationOrders />));
     // Overall view shows BOTH orders (kanban with all 6 columns).
@@ -278,8 +278,8 @@ describe("OperationOrders — kanban", () => {
 
   it("4. search input updates state (header search box, new aria label)", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 9001, customer_name: "Alice" }),
-      makeOrder({ id: "b", dl: 9002, customer_name: "Bob" }),
+      makeOrder({ id: "a", so: 9001, customer_name: "Alice" }),
+      makeOrder({ id: "b", so: 9002, customer_name: "Bob" }),
     ]);
     render(wrap(<OperationOrders />));
     const search = screen.getByLabelText(/Search by order ID/);
@@ -314,7 +314,7 @@ describe("OperationOrders — kanban", () => {
 
   it("5. clicking an order card opens the detail drawer", () => {
     setLoaded([
-      makeOrder({ id: "ord-1", dl: 1234, customer_name: "Click Me" }),
+      makeOrder({ id: "ord-1", so: 1234, customer_name: "Click Me" }),
     ]);
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Click Me"));
@@ -323,7 +323,7 @@ describe("OperationOrders — kanban", () => {
 
   it("6. drawer shows the right action buttons for ready_to_dispatch", () => {
     setLoaded([
-      makeOrder({ id: "ord-1", dl: 9001, customer_name: "Click Me", operation_stage: "ready_to_dispatch" }),
+      makeOrder({ id: "ord-1", so: 9001, customer_name: "Click Me", operation_stage: "ready_to_dispatch" }),
     ]);
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Click Me"));
@@ -337,8 +337,8 @@ describe("OperationOrders — kanban", () => {
 
   it("7. multi-select awaiting_operation_action orders → bundle sheet appears", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 1, operation_stage: "awaiting_operation_action" }),
-      makeOrder({ id: "b", dl: 2, operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", so: 1, operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "b", so: 2, operation_stage: "awaiting_operation_action" }),
     ]);
     render(wrap(<OperationOrders />));
     expect(screen.queryByTestId("cross-order-bundle-sheet")).not.toBeInTheDocument();
@@ -357,7 +357,7 @@ describe("OperationOrders — kanban", () => {
 
   it("8. Bundle 'Clear' resets the selection and hides the sheet", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 1, operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", so: 1, operation_stage: "awaiting_operation_action" }),
     ]);
     render(wrap(<OperationOrders />));
     const awaitingCol = screen.getByTestId("stage-column-awaiting_operation_action");
@@ -370,10 +370,10 @@ describe("OperationOrders — kanban", () => {
 
   it("9. checkbox is rendered ONLY on awaiting_operation_action cards", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 1, operation_stage: "awaiting_operation_action" }),
-      makeOrder({ id: "b", dl: 2, operation_stage: "ready_to_dispatch" }),
-      makeOrder({ id: "c", dl: 3, operation_stage: "dispatched" }),
-      makeOrder({ id: "d", dl: 4, operation_stage: "delivered" }),
+      makeOrder({ id: "a", so: 1, operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "b", so: 2, operation_stage: "ready_to_dispatch" }),
+      makeOrder({ id: "c", so: 3, operation_stage: "dispatched" }),
+      makeOrder({ id: "d", so: 4, operation_stage: "delivered" }),
     ]);
     render(wrap(<OperationOrders />));
     const awaitingCol = screen.getByTestId("stage-column-awaiting_operation_action");
@@ -391,7 +391,7 @@ describe("OperationOrders — kanban", () => {
 
   it("10. CJK customer name receives font-cjk class on the card", () => {
     setLoaded([
-      makeOrder({ id: "a", dl: 1, customer_name: "王小明", operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", so: 1, customer_name: "王小明", operation_stage: "awaiting_operation_action" }),
     ]);
     render(wrap(<OperationOrders />));
     const node = screen.getByText("王小明");
@@ -400,7 +400,7 @@ describe("OperationOrders — kanban", () => {
 
   it("11. CJK customer name receives font-cjk class on the drawer header", () => {
     setLoaded([
-      makeOrder({ id: "ord-1", dl: 9001, customer_name: "王小明" }),
+      makeOrder({ id: "ord-1", so: 9001, customer_name: "王小明" }),
     ]);
     detailHookState = {
       ...detailHookState,
@@ -418,7 +418,7 @@ describe("OperationOrders — kanban", () => {
   });
 
   it("12. drawer ESC key closes the drawer", () => {
-    setLoaded([makeOrder({ id: "ord-1", dl: 9001, customer_name: "Alice" })]);
+    setLoaded([makeOrder({ id: "ord-1", so: 9001, customer_name: "Alice" })]);
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Alice"));
     expect(screen.getByTestId("order-detail-drawer")).toBeInTheDocument();
@@ -472,7 +472,7 @@ describe("OperationOrders — kanban", () => {
   });
 
   it("15. drawer 'Print DO' button only renders when order is delivered", () => {
-    setLoaded([makeOrder({ id: "ord-1", dl: 9001, customer_name: "Alice" })]);
+    setLoaded([makeOrder({ id: "ord-1", so: 9001, customer_name: "Alice" })]);
     detailHookState = {
       ...detailHookState,
       data: {
@@ -492,7 +492,7 @@ describe("OperationOrders — kanban", () => {
 
   it("16. drawer awaiting_operation_action action bar shows Re-check stock + Issue POs + Abandon", () => {
     setLoaded([
-      makeOrder({ id: "ord-1", dl: 9001, customer_name: "Alice", operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "ord-1", so: 9001, customer_name: "Alice", operation_stage: "awaiting_operation_action" }),
     ]);
     detailHookState = {
       ...detailHookState,
@@ -523,7 +523,7 @@ describe("OperationOrders — kanban", () => {
 
   it("17. drawer dispatched stage shows only Mark delivered (no Abandon)", () => {
     setLoaded([
-      makeOrder({ id: "ord-1", dl: 9001, customer_name: "Alice", operation_stage: "dispatched" }),
+      makeOrder({ id: "ord-1", so: 9001, customer_name: "Alice", operation_stage: "dispatched" }),
     ]);
     detailHookState = {
       ...detailHookState,
@@ -550,7 +550,7 @@ describe("OperationOrders — kanban", () => {
     setLoaded([
       makeOrder({
         id: "ord-place",
-        dl: 7001,
+        so: 7001,
         status: "place",
         // Place orders may have operation_stage NULL (legacy seed) or 'placed'
         // (post-C2). The kanban must bucket them by status, not stage.
@@ -572,7 +572,7 @@ describe("OperationOrders — kanban", () => {
     setLoaded([
       makeOrder({
         id: "ord-1",
-        dl: 9001,
+        so: 9001,
         customer_name: "Alice",
         status: "proceed_order",
         operation_stage: "proceed_request",
@@ -605,7 +605,7 @@ describe("OperationOrders — kanban", () => {
     setLoaded([
       makeOrder({
         id: "ord-placed",
-        dl: 9050,
+        so: 9050,
         customer_name: "Awaiting Push",
         status: "place",
         operation_stage: null,
@@ -679,7 +679,7 @@ describe("OperationOrders — kanban", () => {
     setLoaded([
       makeOrder({
         id: "ord-1",
-        dl: 9001,
+        so: 9001,
         customer_name: "Alice",
         operation_stage: "awaiting_operation_action",
       }),
@@ -705,7 +705,7 @@ describe("OperationOrders — kanban", () => {
     setLoaded([
       makeOrder({
         id: "ord-1",
-        dl: 9001,
+        so: 9001,
         customer_name: "Alice",
         operation_stage: "awaiting_operation_action",
       }),
@@ -768,7 +768,7 @@ describe("OperationOrders — kanban", () => {
     setLoaded([
       makeOrder({
         id: "ord-no-lp",
-        dl: 9100,
+        so: 9100,
         customer_name: "Unassigned Anya",
         operation_stage: "ready_to_dispatch",
         // Order-level delivery_partner_id deliberately set; Chunk 2 ignores it
@@ -792,7 +792,7 @@ describe("OperationOrders — kanban", () => {
     setLoaded([
       makeOrder({
         id: "ord-single-lp",
-        dl: 9101,
+        so: 9101,
         customer_name: "Single Sam",
         operation_stage: "ready_to_dispatch",
         delivery_partner_id: null,
@@ -852,7 +852,7 @@ describe("OperationOrders — kanban", () => {
     setLoaded([
       makeOrder({
         id: "ord-fallback-lp",
-        dl: 9103,
+        so: 9103,
         customer_name: "Fallback Fred",
         operation_stage: "ready_to_dispatch",
         delivery_partner_id: null,
@@ -886,7 +886,7 @@ describe("OperationOrders — kanban", () => {
     setLoaded([
       makeOrder({
         id: "ord-multi-lp",
-        dl: 9102,
+        so: 9102,
         customer_name: "Multi Mei",
         operation_stage: "ready_to_dispatch",
         delivery_partner_id: null,
@@ -950,7 +950,7 @@ describe("OperationOrders — kanban", () => {
     setLoaded([
       makeOrder({
         id: "ord-threads-no-lp",
-        dl: 9103,
+        so: 9103,
         customer_name: "Pending Priya",
         operation_stage: "awaiting_operation_action",
         delivery_partner_id: null,

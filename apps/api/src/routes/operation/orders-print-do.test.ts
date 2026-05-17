@@ -63,7 +63,7 @@ afterAll(() => _setJwksForTesting(null));
 function makeOrderRow(overrides: Record<string, unknown> = {}) {
   return {
     id: ORDER_ID,
-    dl: 4001,
+    so: 4001,
     status: "delivered",
     do_number: "DO-9801",
     do_note: "Customer signed at lobby",

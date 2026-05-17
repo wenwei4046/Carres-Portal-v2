@@ -54,7 +54,7 @@ export default function FinancePayments() {
       if (search) {
         const q = search.toLowerCase();
         const c = (r.customer_name ?? "").toLowerCase();
-        if (!c.includes(q) && !String(r.dl).includes(q)) return false;
+        if (!c.includes(q) && !String(r.so).includes(q)) return false;
       }
       return true;
     });
@@ -168,7 +168,7 @@ function PaymentTableRow({ row }: { row: PaymentRow }) {
       className="grid items-center px-4 py-3 border-b border-border text-[12.5px]"
       style={{ gridTemplateColumns: "90px 1.2fr 1.1fr 110px 100px 100px 130px", minWidth: 920 }}
     >
-      <span className="font-mono font-semibold">SO-{row.dl}</span>
+      <span className="font-mono font-semibold">SO-{row.so}</span>
       <span>{row.customer_name}</span>
       <span className="text-muted-foreground">{row.dealer_name ?? "—"}</span>
       <span className="font-mono text-right">{rm(row.total)}</span>

@@ -65,14 +65,14 @@ function poWithThreads(opts: { readyCount: number; total: number }) {
     supplier_ready_at: i < opts.readyCount ? "2026-05-14T10:00:00Z" : null,
     pickup_event_id: null,
     orders: {
-      dl: 1000 + i,
+      so: 1000 + i,
       delivery_date: "2026-05-25",
       customer_name: `Customer ${i + 1}`,
     },
   }));
   return {
     id: PO_ID,
-    dl: 999,
+    so: 999,
     supplier_id: "supplier-1",
     warehouse_id: "wh-1",
     sup_status: "ready_for_pickup",

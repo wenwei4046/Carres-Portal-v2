@@ -143,7 +143,7 @@ export type InvoicesListQuery = z.infer<typeof invoicesListQuery>;
  * Behavior (matches proto finance-refunds.jsx:13-46):
  *   - Always inserts a refunds row with reason + amount.
  *   - For `kind=refund` AND amount > RM 1000, ALSO inserts an approvals
- *     row with kind='refund', refers_to=`SO-{dl}`, dealer_id, amount.
+ *     row with kind='refund', refers_to=`SO-{so}`, dealer_id, amount.
  *     Refunds row stays at status='pending' until approval_decide
  *     (existing 0016 RPC) flips it via the kind=refund side-effect.
  *   - For `kind=refund` AND amount <= RM 1000, refunds row is created

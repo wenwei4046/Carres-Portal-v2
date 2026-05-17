@@ -37,7 +37,7 @@ describe("RevertConfirmDialog", () => {
   it("calls the proceed revert endpoint when kind=proceed", async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce({
       order_id: "ord-1",
-      dl: 1001,
+      so: 1001,
       status: "place",
     });
     const onClose = vi.fn();
@@ -46,7 +46,7 @@ describe("RevertConfirmDialog", () => {
       wrap(
         <RevertConfirmDialog
           orderId="ord-1"
-          dl={1001}
+          so={1001}
           kind="proceed"
           onClose={onClose}
         />,
@@ -71,7 +71,7 @@ describe("RevertConfirmDialog", () => {
   it("calls the dispatch revert endpoint when kind=dispatch", async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce({
       order_id: "ord-2",
-      dl: 1002,
+      so: 1002,
       threads_reverted: 2,
     });
     const onClose = vi.fn();
@@ -80,7 +80,7 @@ describe("RevertConfirmDialog", () => {
       wrap(
         <RevertConfirmDialog
           orderId="ord-2"
-          dl={1002}
+          so={1002}
           kind="dispatch"
           onClose={onClose}
         />,
@@ -110,7 +110,7 @@ describe("RevertConfirmDialog", () => {
       wrap(
         <RevertConfirmDialog
           orderId="ord-3"
-          dl={1003}
+          so={1003}
           kind="proceed"
           onClose={onClose}
         />,

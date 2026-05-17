@@ -22,7 +22,7 @@ import type { AppEnv } from "../../types";
  *     'at_warehouse_waiting', flips PO sup_status to 'delivered' (preserves
  *     Chunk-1 single-thread Sofa behaviour).
  *
- * Body shape changed from `{}` (with :dl = order display number path param)
+ * Body shape changed from `{}` (with :so = order display number path param)
  * to `{ threadId }`. Path param dropped — the thread uuid is now in the body.
  *
  * Mounted as a sibling sub-router under `/operation/orders`; the inline

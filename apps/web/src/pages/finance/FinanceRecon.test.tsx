@@ -59,12 +59,12 @@ const SUGGEST_PAYLOAD = {
   },
   candidates: [
     {
-      dl: 1240, customer_name: "Tan Wei Ling", dealer_name: "Showroom KL",
+      so: 1240, customer_name: "Tan Wei Ling", dealer_name: "Showroom KL",
       total: 5970, paid: 4470, outstanding: 1500,
       invoice_no: "INV-2026-1240", distance: 0,
     },
     {
-      dl: 1241, customer_name: "Lee Kah Hong", dealer_name: "Showroom JB",
+      so: 1241, customer_name: "Lee Kah Hong", dealer_name: "Showroom JB",
       total: 2000, paid: 0, outstanding: 2000,
       invoice_no: "INV-2026-1241", distance: 500,
     },

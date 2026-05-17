@@ -64,7 +64,7 @@ export default function TabbedProcurementShell() {
   // T42-C2 — restore the "+ New PO" entry point that lived on the deleted
   // operationProcurement.tsx (T36). The shell is now the only mount point for
   // the procurement section, so the create-PO button + CreatePOModal mount
-  // belong here. Stockpile mode (no `dl` / `dlRefs` prefill) is the default;
+  // belong here. Stockpile mode (no `so` / `soRefs` prefill) is the default;
   // the user can still tick the in-modal stockpile toggle or use the
   // "Suggest from alerts" / auto-fill buttons inside the modal.
   const [createPrefill, setCreatePrefill] = useState<CreatePoPrefill | null>(

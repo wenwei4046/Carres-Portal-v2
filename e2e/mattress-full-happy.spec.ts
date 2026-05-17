@@ -30,8 +30,8 @@ test("Mattress (SOP_STANDARD) — order surfaces on operation dispatched tab", a
   // the Dispatched column. We only assert visibility — column-position is
   // implicit via the SOP_STANDARD rollup trigger (0036+0047) reflecting
   // thread state into orders.operation_stage.
-  // Match by the dl-number text inside the order-card button (the testid
-  // `order-card-{dl}` is on a wrapper that may have render quirks; the
+  // Match by the so-number text inside the order-card button (the testid
+  // `order-card-{so}` is on a wrapper that may have render quirks; the
   // button text "#9201" is the user-visible signal).
   await expect(page.getByRole("button", { name: /#9201/ })).toBeAttached({ timeout: 10_000 });
 });

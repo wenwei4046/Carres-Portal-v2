@@ -578,7 +578,7 @@ describe("OperationWarehouse page", () => {
         orders: [
           {
             id: "33333333-3333-3333-3333-000000000a01",
-            dl: 4001,
+            so: 4001,
             customerName: "Ahmad Customer",
             operationStage: "ready_to_dispatch",
             reservedQty: 2,
@@ -686,7 +686,7 @@ describe("OperationWarehouse page", () => {
         orders: [
           {
             id: "33333333-3333-3333-3333-000000000a02",
-            dl: 4007,
+            so: 4007,
             customerName: "Bee",
             operationStage: "dispatched",
             reservedQty: 1,

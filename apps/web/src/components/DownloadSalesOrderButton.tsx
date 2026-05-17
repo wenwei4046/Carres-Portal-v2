@@ -20,7 +20,7 @@ import type { SalesOrderTemplateData } from "@/lib/pdf/types";
  *
  * Props:
  *   - orderId: UUID
- *   - dl:      integer (only used for the filename + toast)
+ *   - so:      integer (only used for the filename + toast)
  *   - role:    current user role; button hides on operation/partner/supplier
  *   - variant: "primary" matches the Submit-class buttons (filled
  *              terracotta), "secondary" matches the outline-class
@@ -46,7 +46,7 @@ const DENIED: ReadonlySet<Role> = new Set(["partner", "supplier"]);
 
 interface Props {
   orderId: string;
-  dl: number;
+  so: number;
   role: Role;
   variant?: "primary" | "secondary";
   className?: string;
@@ -54,7 +54,7 @@ interface Props {
 
 export default function DownloadSalesOrderButton({
   orderId,
-  dl,
+  so,
   role,
   variant = "secondary",
   className,
@@ -75,7 +75,7 @@ export default function DownloadSalesOrderButton({
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      toast.success(`Sales Order SO-${String(dl).padStart(6, "0")} opened`);
+      toast.success(`Sales Order SO-${String(so).padStart(6, "0")} opened`);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : String(e);
       toast.error(`Sales Order PDF failed: ${msg}`);
@@ -95,7 +95,7 @@ export default function DownloadSalesOrderButton({
       onClick={onClick}
       disabled={busy}
       className={`px-3.5 py-2 rounded-md text-[12.5px] disabled:opacity-50 transition-colors ${baseCls} ${className ?? ""}`}
-      data-testid={`download-sales-order-${dl}`}
+      data-testid={`download-sales-order-${so}`}
     >
       {busy ? "Opening…" : "Download Sales Order PDF"}
     </button>
