@@ -11,7 +11,7 @@ async function login(page: Page, email: string, password: string) {
 // supplier-nf user + portal_enabled=true) + dev server running.
 //
 // Phase 6 supplier acceptance (per spec docs/superpowers/specs/2026-05-09-phase-6-supplier-spec.md §8):
-//   1. Supplier 账号能看到 logistics 创建的 PO
+//   1. Supplier 账号能看到 operation 创建的 PO
 //   2. Supplier 能 acknowledge PO，状态 pending → acknowledged
 //   3. Supplier 能更新 sup_status (in_production → ready_for_pickup → delivered)
 //
@@ -83,9 +83,9 @@ test("phase-6 happy: supplier acknowledges PO → production → ready → DO up
   await page.getByRole("button", { name: /^Ready to Pickup/i }).click();
   await expect(page.locator(`[data-testid="po-card-${poId}"]`)).toBeVisible();
 
-  // ----- 5. (Out of supplier scope: logistics assigns partner, partner
+  // ----- 5. (Out of supplier scope: operation assigns partner, partner
   //          accepts pickup → sup_status moves to pickup_accepted) -----------
-  // Mock-jump via direct DB update OR rely on parallel logistics+partner
+  // Mock-jump via direct DB update OR rely on parallel operation+partner
   // E2E happy paths to walk the chain. For this V1 happy spec we assume
   // the seed has at least one pickup_accepted PO ready for DO upload.
 

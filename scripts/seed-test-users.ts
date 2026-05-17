@@ -20,7 +20,7 @@
  *
  * Test users created:
  *   dealer-test@x.com     / dealer-test-password    / role=dealer    / dealer=BedHouse KL
- *   logistics-test@x.com  / logistics-test-password / role=logistics
+ *   operation-test@x.com  / operation-test-password / role=operation
  *   finance-test@x.com    / finance-test-password   / role=finance
  *   lp-test@x.com         / lp-test-password        / role=partner   / partner=JT Express
  *
@@ -110,7 +110,7 @@ interface TestUser {
   email:      string;
   password:   string;
   name:       string;
-  role:       "dealer" | "logistics" | "finance" | "partner";
+  role:       "dealer" | "operation" | "finance" | "partner";
   dealerId?:  string | null;
   partnerId?: string | null;
 }
@@ -124,10 +124,10 @@ const USERS: TestUser[] = [
     dealerId: DEALER_ID_BEDHOUSE_KL,
   },
   {
-    email:    "logistics-test@x.com",
-    password: "logistics-test-password",
-    name:     "E2E Test · Logistics",
-    role:     "logistics",
+    email:    "operation-test@x.com",
+    password: "operation-test-password",
+    name:     "E2E Test · operation",
+    role:     "operation",
   },
   {
     email:    "finance-test@x.com",
@@ -249,7 +249,7 @@ const SEED_USER_PATCHES: Array<{ email: string; meta: Record<string, string | nu
   { email: "principal@carres.com",   meta: { role: "principal"   } },
   { email: "dealer@carres.com",      meta: { role: "dealer",      dealer_id: "00000000-0000-0000-0000-000000000d01" } },
   { email: "salesperson@carres.com", meta: { role: "salesperson", dealer_id: "00000000-0000-0000-0000-000000000d01", outlet_id: "00000000-0000-0000-0000-0000000000a1" } },
-  { email: "logistics@carres.com",   meta: { role: "logistics"   } },
+  { email: "operation@carres.com",   meta: { role: "operation"   } },
   { email: "finance@carres.com",     meta: { role: "finance"     } },
   { email: "supplier@carres.com",    meta: { role: "supplier",    supplier_id: "00000000-0000-0000-0000-0000000000e1" } },
   { email: "partner@carres.com",     meta: { role: "partner",     partner_id:  "00000000-0000-0000-0000-0000000000f1" } },

@@ -14,7 +14,7 @@ import type { AppEnv } from "../../types";
  *
  * Codex F11 — RED LINE: this endpoint signs with the caller's USER JWT
  * (`userClient(env, jwt)`), NEVER `adminClient`. Storage RLS from migration
- * 0042 (logistics + principal write to `delivery-orders/<po_id>/...`) is the
+ * 0042 (operation + principal write to `delivery-orders/<po_id>/...`) is the
  * security boundary — Hono only enforces caller role, mime/size validation,
  * and path shape. If we used service_role here we'd bypass RLS and lose the
  * per-PO scoping that 0042 provides.
@@ -42,9 +42,9 @@ const signUploadSchema = z.object({
   size_bytes: z.number().int().positive().max(MAX_SIZE),
 });
 
-// Order-level DO uploads (logistics → customer final delivery). Path prefix
+// Order-level DO uploads (operation → customer final delivery). Path prefix
 // `order-<order_uuid>/...` keeps these distinct from PO-level files at
-// `<po_id>/...`. Bucket + RLS unchanged from PO uploads — logistics +
+// `<po_id>/...`. Bucket + RLS unchanged from PO uploads — operation +
 // principal short-circuit both read and write; the partner branch's
 // purchase_orders lookup fails for the `order-*` prefix so partner reads are
 // correctly denied for order DOs. Migration 0087 (Loo 2026-05-11).
@@ -64,7 +64,7 @@ function extForMime(mime: (typeof ALLOWED_MIMES)[number]): string {
 dosRouter.post("/sign-upload", async (c) => {
   const auth = c.var.auth;
   // 2026-05-11 (Loo): partner role added — the new partner-side receive flow
-  // collapses "Arrived at WH" + "Logistics Receive" into one step, so the
+  // collapses "Arrived at WH" + "operation Receive" into one step, so the
   // partner driver uploads the DO directly. Storage RLS (migration 0084)
   // scopes partner writes to POs where procurement_partner_id matches their
   // JWT app_partner_id, so cross-partner uploads still 403 at the RLS layer
@@ -73,9 +73,9 @@ dosRouter.post("/sign-upload", async (c) => {
   // added — supplier_mark_delivered now requires the signed DO file (migration
   // 0094). Storage RLS scopes supplier writes to POs whose supplier_id matches
   // app_supplier_id(); cross-supplier uploads 403 at the RLS layer.
-  if (!["logistics", "principal", "partner", "supplier"].includes(auth.role)) {
+  if (!["operation", "principal", "partner", "supplier"].includes(auth.role)) {
     throw new HTTPException(403, {
-      message: "Logistics, principal, partner, or supplier role required",
+      message: "operation, principal, partner, or supplier role required",
     });
   }
   if (auth.role === "partner" && !auth.partnerId) {
@@ -121,19 +121,19 @@ dosRouter.post("/sign-upload", async (c) => {
 });
 
 // ----------------------------------------------------------------------------
-// POST /api/storage/dos/sign-order-upload — order-level DO upload (logistics
+// POST /api/storage/dos/sign-order-upload — order-level DO upload (operation
 // final-delivery flow, migration 0087 Loo 2026-05-11).
 //
 // Same bucket (`delivery-orders`), different path prefix: `order-<order_id>`
 // instead of `<po_id>`. Partner role is intentionally excluded — the partner
 // uploads POD via `/api/partner/pod/sign-upload` to a different bucket
-// (`proof-of-delivery`); the final order-level DO is logistics' artefact.
+// (`proof-of-delivery`); the final order-level DO is operation' artefact.
 // ----------------------------------------------------------------------------
 dosRouter.post("/sign-order-upload", async (c) => {
   const auth = c.var.auth;
-  if (!["logistics", "principal"].includes(auth.role)) {
+  if (!["operation", "principal"].includes(auth.role)) {
     throw new HTTPException(403, {
-      message: "Logistics or principal role required",
+      message: "operation or principal role required",
     });
   }
 
@@ -157,7 +157,7 @@ dosRouter.post("/sign-order-upload", async (c) => {
   const ext = extForMime(mime_type);
   const path = `order-${order_id}/${crypto.randomUUID()}-${safeDo}.${ext}`;
 
-  // USER JWT — Storage RLS (0042 + 0084 logistics/principal short-circuit)
+  // USER JWT — Storage RLS (0042 + 0084 operation/principal short-circuit)
   // gates writes; this endpoint only enforces caller role + path shape.
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.storage

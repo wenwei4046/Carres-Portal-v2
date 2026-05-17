@@ -60,7 +60,7 @@ const BASE: FinanceApAgingRow = {
     },
   ],
   history: [
-    { text: "PO created", occurred_at: "2026-04-29T08:00:00Z", by_role: "logistics" },
+    { text: "PO created", occurred_at: "2026-04-29T08:00:00Z", by_role: "operation" },
   ],
 };
 

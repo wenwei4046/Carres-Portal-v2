@@ -196,7 +196,7 @@ describe("orderSupplierThreadFromRow", () => {
       supplier_id: "00000000-0000-0000-0000-0000000a0003",
       category: "mattress",
       sop_name: "STANDARD",
-      logistics_stage: "ready_to_dispatch",
+      operation_stage: "ready_to_dispatch",
       po_id: "PO-2026-0001",
       warehouse_id: "00000000-0000-0000-0000-0000000a0004",
       reserved_at: "2026-05-06T10:00:00.000Z",
@@ -231,7 +231,7 @@ describe("orderSupplierThreadFromRow", () => {
     expect(out.orderId).toBe("00000000-0000-0000-0000-0000000a0002");
     expect(out.supplierId).toBe("00000000-0000-0000-0000-0000000a0003");
     expect(out.sopName).toBe("STANDARD");
-    expect(out.logisticsStage).toBe("ready_to_dispatch");
+    expect(out.operationStage).toBe("ready_to_dispatch");
     expect(out.poId).toBe("PO-2026-0001");
     expect(out.deliveryPartnerId).toBe("00000000-0000-0000-0000-0000000b0001");
     expect(out.confirmDeliveryDate).toBe("2026-05-15");

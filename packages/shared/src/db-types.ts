@@ -5,18 +5,18 @@
  */
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
-  | "logistics" | "supplier" | "partner" | "finance" | "bd";
+  | "operation" | "supplier" | "partner" | "finance" | "bd";
 
 export type OrderStatus       = "place" | "proceed_order" | "delivered" | "cancelled";
-// `awaiting_logistics_action` and `waiting` added in migration 0028 (v3-S3).
+// `awaiting_operation_action` and `waiting` added in migration 0028 (v3-S3).
 // Phase 4.5a T5 (2026-05-05): legacy `awaiting_stock` alias removed from FE
 // vocabulary in lockstep with migrations 0038/0038b/0039 (RPC body sweep).
 // Phase 4.5a T6 (2026-05-05): migration 0040 dropped `awaiting_stock` from the
 // DB-side enum via DROP TYPE … CASCADE recreate. DB and FE vocabularies are
 // now back in sync. Tuple matches Supabase-generated types verbatim.
-export type LogisticsStage    =
+export type OperationStage    =
   | "placed" | "proceed_request"
-  | "awaiting_logistics_action"
+  | "awaiting_operation_action"
   | "ready_to_dispatch" | "dispatched"
   | "waiting" | "delivered";
 export type PartnerStage      = "assigned" | "picked_from_wh" | "en_route" | "delivered";
@@ -49,17 +49,17 @@ export type ProductCategory   = "mattress" | "bedframe" | "sofa";
 export type VariantKind       = "size" | "preset" | "part";
 export type StockMovementKind = "in" | "out" | "adjust";
 // Migration 0027 (v3-S3). 'own' = HQ-controlled warehouse (default for legacy
-// rows). 'logistics_partner' = partner-owned WH; pairs with owning_partner_id
+// rows). 'operation_partner' = partner-owned WH; pairs with owning_partner_id
 // on warehouses (CHECK constraint warehouses_partner_kind_check).
-export type WarehouseKind     = "own" | "logistics_partner";
+export type WarehouseKind     = "own" | "operation_partner";
 // Phase 4.5 Chunk 2 Sprint E migration 0055 (T24). Enum labels matching
 // `cost_source_enum` in DB. Drives `purchase_order_lines.cost_source`:
-//   - 'hand_entered'      logistics user typed the cost manually.
+//   - 'hand_entered'      operation user typed the cost manually.
 //   - 'prev_po'           auto-filled from the most-recent received PO for the
-//                         same SKU (logistics_recent_po_cost RPC, T27).
+//                         same SKU (operation_recent_po_cost RPC, T27).
 //   - 'system_suggested'  heuristic suggestion (e.g. 110% of prev_po).
 //   - 'auto_issued'       sentinel for system-issued PO lines from
-//                         logistics_issue_pos_for_order when no historical cost
+//                         operation_issue_pos_for_order when no historical cost
 //                         existed (migration 0057 — T42 codex C1 fix). When a
 //                         recent received-PO cost IS found, the auto-issue RPC
 //                         persists 'prev_po' instead. 'auto_issued' rows always
@@ -136,7 +136,7 @@ export interface ProductSkuRow {
   // phase-4-v3-skus-supplier-id-not-null-tighten).
   supplier_id: string | null;
   // 0074 — fixed procurement cost per unit. NULL = "not yet set" (Create-PO
-  // refuses lines whose SKU has cost=null until logistics sets a value via
+  // refuses lines whose SKU has cost=null until operation sets a value via
   // the catalog admin UI).
   cost: number | null;
   // 0074 — soft-delete flag for the catalog admin UI.
@@ -176,7 +176,7 @@ export interface WarehouseRow {
   address: string | null;
   // Added in migration 0027 (v3-S3). NOT NULL with default 'own' so legacy
   // rows fall back to 'own'. owning_partner_id required when kind =
-  // 'logistics_partner' (CHECK constraint warehouses_partner_kind_check).
+  // 'operation_partner' (CHECK constraint warehouses_partner_kind_check).
   kind: WarehouseKind;
   owning_partner_id: string | null;
 }
@@ -273,7 +273,7 @@ export interface OrderRow {
   payment_method: "online" | "credit" | "installment" | null;
   approval_code: string | null;
   installment_months: 6 | 12 | null;
-  logistics_stage: LogisticsStage | null;
+  operation_stage: OperationStage | null;
   warehouse_id: string | null;
   delivery_partner_id: string | null;
   partner_stage: PartnerStage | null;
@@ -281,8 +281,8 @@ export interface OrderRow {
   partner_eta: string | null;
   do_number: string | null;
   do_note: string | null;
-  // Logistics timestamps (migration 0019). `dispatched_at` set by
-  // logistics_assign_partner; `delivered_at` set by logistics_attach_do_and_deliver.
+  // operation timestamps (migration 0019). `dispatched_at` set by
+  // operation_assign_partner; `delivered_at` set by operation_attach_do_and_deliver.
   dispatched_at: string | null;
   delivered_at: string | null;
   invoice_no: string | null;
@@ -321,7 +321,7 @@ export interface OrderHistoryRow {
 /**
  * `order_supplier_threads` (migration 0033, v3-S4). One row per
  * (order, supplier, category) — UNIQUE constraint enforces this. Drives the
- * v3 logistics pipeline so each fulfillment slice of an order has its own
+ * v3 operation pipeline so each fulfillment slice of an order has its own
  * SOP-driven kanban presence (a single order with mattress + sofa lines from
  * different suppliers spawns 2 threads, one per supplier×category).
  *
@@ -335,7 +335,7 @@ export interface OrderSupplierThreadRow {
   supplier_id: string;
   category: string;
   sop_name: "STANDARD" | "SOFA_SPECIAL";
-  logistics_stage: LogisticsStage;
+  operation_stage: OperationStage;
   po_id: string | null;
   warehouse_id: string | null;
   reserved_at: string | null;
@@ -358,7 +358,7 @@ export interface OrderSupplierThreadRow {
   // threads pre-0107 have no per-thread readiness signal (the supplier marked
   // the whole PO ready instead). `supplier_ready_at` flips when a supplier
   // calls supplier_mark_thread_ready; `pickup_event_id` is stamped when a
-  // partner / logistics batch-picks the thread off its PO.
+  // partner / operation batch-picks the thread off its PO.
   supplier_ready_at: string | null;
   supplier_ready_by: string | null;
   pickup_event_id: string | null;
@@ -529,12 +529,12 @@ export interface InquiryRow {
 
 /**
  * `po_pickup_events` (migration 0107). One row = one physical DO paper = one
- * trip. Created when a partner (factory_pickup flow) or logistics (own_logistics
+ * trip. Created when a partner (factory_pickup flow) or operation (own_logistics
  * delivers to HQ warehouse) batch-acks 1+ ready threads off a PO. Threads
  * involved in the same trip share the same `pickup_event_id`, which is the
  * grouping key for "1 DO covers N threads".
  *
- * `ack_role` records which side captured the pickup — 'partner' or 'logistics'.
+ * `ack_role` records which side captured the pickup — 'partner' or 'operation'.
  * `do_file_path` is the canonical Storage path in the `delivery-orders` bucket;
  * `do_note` is an optional free-text field for the picker.
  */
@@ -546,6 +546,6 @@ export interface PoPickupEventsRow {
   do_note: string | null;
   picked_up_at: string;
   picked_up_by: string | null;
-  ack_role: "partner" | "logistics";
+  ack_role: "partner" | "operation";
   created_at: string;
 }

@@ -21,7 +21,7 @@ import { qk } from "../../../lib/queries";
  * `order_supplier_threads`, not `purchase_orders`.
  *
  * The accept-rfd RPC takes `threadId` only — there is no longer a
- * partner-supplied confirm-delivery-date on the accept path. Logistics sets
+ * partner-supplied confirm-delivery-date on the accept path. operation sets
  * the date on the RFD origin (DispatchPartnerDialog), not the partner reply.
  *
  * Props:
@@ -33,7 +33,7 @@ import { qk } from "../../../lib/queries";
  *   - Modal panel uses `bg-card` (HSL 40 53% 97% — Loo's three-layer cream
  *     intentional offset from proto white). See Modal.tsx for the canonical
  *     overlay/panel pattern; this dialog is intentionally simpler because the
- *     Partner pages don't share the logistics Modal primitive yet.
+ *     Partner pages don't share the operation Modal primitive yet.
  *   - Raw HTML buttons styled with warm-linen Tailwind tokens (no shadcn).
  */
 export default function PartnerRequestForDeliveryDialog({

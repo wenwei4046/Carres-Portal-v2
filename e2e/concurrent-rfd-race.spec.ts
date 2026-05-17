@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
 // Load apps/api/.dev.vars so process.env has SUPABASE_URL + SUPABASE_ANON_KEY
-// for the supabase-js sign-in (we need a real logistics JWT for the API call).
+// for the supabase-js sign-in (we need a real operation JWT for the API call).
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEV_VARS = path.resolve(__dirname, "..", "apps", "api", ".dev.vars");
 if (fs.existsSync(DEV_VARS)) {
@@ -28,22 +28,22 @@ const THREAD_ID = "99999999-7777-7777-7777-000000007777";
 const PARTNER_JT_EXPRESS = "00000000-0000-0000-0000-0000000000f1";
 
 // Race-condition regression: dispatch-customer-leg uses
-// logistics_dispatch_customer_leg RPC (migration 0051). The RPC takes
+// operation_dispatch_customer_leg RPC (migration 0051). The RPC takes
 // FOR UPDATE on the thread row. Two concurrent forceDispatch calls serialize:
 // the first wins (200, thread → 'dispatched'), the second sees the new
-// state via state guard (logistics_stage <> 'ready_to_dispatch') → SQLSTATE
+// state via state guard (operation_stage <> 'ready_to_dispatch') → SQLSTATE
 // 22023 → mapPgError → HTTP 422.
 //
 // 2026-05-09 rewrite: original spec used pre-Chunk-2 URL/body shape (path
 // param :id, snake_case body, partner_id `0001f1`). Chunk 2 (Sprint B,
-// migration 0051 + apps/api/src/routes/logistics/dispatch-customer-leg.ts)
+// migration 0051 + apps/api/src/routes/operation/dispatch-customer-leg.ts)
 // rewrote the route: thread-id in body, camelCase, no path param, partner =
 // JT Express (the seeded partner). Plus pre-condition is now seeded by
 // `pnpm seed:e2e-fixtures` (thread `99999999-7777-...-000000007777` at
-// logistics_stage='ready_to_dispatch'). Fixture's idempotent reset DELETE
+// operation_stage='ready_to_dispatch'). Fixture's idempotent reset DELETE
 // + reinsert ensures every run starts clean.
 test("Concurrent dispatch-customer-leg on same thread: exactly one succeeds", async () => {
-  // ----- Get a real logistics JWT via supabase-js sign-in --------------------
+  // ----- Get a real operation JWT via supabase-js sign-in --------------------
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY;
   expect(SUPABASE_URL).toBeTruthy();
@@ -51,8 +51,8 @@ test("Concurrent dispatch-customer-leg on same thread: exactly one succeeds", as
 
   const sb = createClient(SUPABASE_URL!, SUPABASE_ANON!);
   const { data: signInData, error: signInErr } = await sb.auth.signInWithPassword({
-    email: "logistics-test@x.com",
-    password: "logistics-test-password",
+    email: "operation-test@x.com",
+    password: "operation-test-password",
   });
   expect(signInErr).toBeNull();
   const jwt = signInData.session?.access_token;
@@ -69,7 +69,7 @@ test("Concurrent dispatch-customer-leg on same thread: exactly one succeeds", as
     confirmDeliveryDate: "2026-05-25",
     forceDispatch: true,
   });
-  const url = `${API_URL}/api/logistics/pos/dispatch-customer-leg`;
+  const url = `${API_URL}/api/operation/pos/dispatch-customer-leg`;
 
   // Two independent request contexts so HTTP/2 multiplexing doesn't serialize
   // the calls before they reach the API. (Playwright's `request` fixture

@@ -132,8 +132,8 @@ describe("GET /api/finance/reports/ar-aging", () => {
     expect(await res.json()).toEqual(payload);
   });
 
-  it("rejects logistics with 403", async () => {
-    const jwt = await makeJwt("logistics");
+  it("rejects operation with 403", async () => {
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/finance/reports/ar-aging", {
         headers: { Authorization: `Bearer ${jwt}` },

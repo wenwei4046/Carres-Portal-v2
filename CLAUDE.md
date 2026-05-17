@@ -657,6 +657,65 @@ Phase 2 smoke takeaways that survive cleanup (data-independent):
 - Real bugs caught + fixed: 0109 supplier RLS on threads, 0111 SECURITY DEFINER RPC pattern (replaced infinite-recursion 0110).
 - Carry-forwards `phase-10-supplier-pos-list-urgency-blank` (medium) + `phase-10-partner-pickup-rpc-bypass-role-check` (low) still open.
 
+
+
+**Role rename "logistics" → "operation" (Loo 2026-05-17 ~21:00 GMT+8, autonomous)** — Cross-cutting rename of the HQ-internal role from "Logistics" to "Operations". Loo's framing was "wording issue" but the explicit scope was DB + RLS + RPC + code + URL + file paths + display labels. Authorised in-conversation per §8 #4 (RLS change) + §7 (schema change) + §14 #2 (single-instance approval).
+
+Migration 0121 (`rename_role_logistics_to_operation`) applied to staging Supabase = prod:
+- `app_role` enum: `'logistics'` → `'operation'` (atomic ALTER TYPE RENAME VALUE; 1 app_user + 14 audit_log rows auto-migrated by enum oid)
+- `warehouse_kind` enum: `'logistics_partner'` → `'operation_partner'`
+- `logistics_stage` enum value: `'awaiting_logistics_action'` → `'awaiting_operation_action'`
+- `logistics_stage` enum TYPE → renamed to `operation_stage` (auto-cascades to column types via oid)
+- `orders.logistics_stage` + `order_supplier_threads.logistics_stage` columns → `operation_stage`
+- `orders_logistics_idx` index → `orders_operation_idx`
+- 33 functions renamed: `logistics_*()` → `operation_*()`, `is_logistics()` → `is_operation()`, `_logistics_*()` → `_operation_*()`
+- 26 other functions: body literals + column refs updated via CREATE OR REPLACE (or DROP+CREATE for the one function with RETURN TABLE signature change — `partner_threads_to_deliver`)
+- 15 RLS policies dropped + recreated with replaced literals + renamed policy names (e.g., `ost_logistics_read` → `ost_operation_read`)
+
+Migration approach: snapshot pg_proc + pg_policies BEFORE renames, drop them, ALTER structures, regenerate function/policy bodies via text replacement pipeline (compound literals first, then column/type identifiers, then plain role literal, then function name patterns). Single transaction; signature-change exception handler catches the one PG 42P13 case (`partner_threads_to_deliver`) and falls back to DROP CASCADE + CREATE.
+
+KEPT (noun usage of "logistics", not the role — same logic Loo chose earlier for `own_logistics`):
+- `supplier_kind.own_logistics` (supplier handles their own shipping)
+- Historical migration filenames (e.g., `0019_logistics_rpcs.sql`) — frozen per §14 #6
+- Historical §17 entries above this one (they describe what happened under the old name)
+- CARRES_PORTAL_V2_PLAN.md + `docs/superpowers/{specs,plans}/*` (historical documentation)
+
+App user: `logistics@carres.com` → `operation@carres.com` (auth.users email updated via execute_sql; password unchanged at '111'). `app_users.name` "Logistics · Carres HQ" → "Operations · Carres HQ".
+
+Code sweep (~250 files modified via 3-pass PowerShell scripts + targeted edits):
+- Pass 1 (`scripts/rename-logistics-to-operation.ps1`): quoted literals, specific identifier names, URL paths, email addresses, query keys
+- Pass 2 (`scripts/rename-logistics-pass2.ps1`): camelCase + unquoted snake_case in comments
+- Pass 3 (`scripts/rename-logistics-pass3.ps1`): mid-word PascalCase (`useLogisticsDashboard`) + policy name compounds
+- Type-case fix-up (`scripts/fix-type-name-case.ps1`): restored PascalCase type name `OperationStage` (case-insensitive `-replace` default had collapsed it)
+- Surgical fixes: 3 duplicate type re-exports removed from `packages/shared/src/index.ts`; assertion strings in 2 migration-content test files (`pos-vocab-v3-sweep.test.ts`, `codex-fixes.test.ts`) reverted to historical vocab (those tests read frozen migration files which still contain pre-rename literals)
+
+Directory renames (via `git mv`):
+- `apps/web/src/pages/logistics/` → `apps/web/src/pages/operation/`
+- `apps/api/src/routes/logistics/` → `apps/api/src/routes/operation/`
+- `packages/shared/src/schemas/logistics.ts` → `packages/shared/src/schemas/operation.ts` (+ `.test.ts`)
+- `apps/web/src/pages/catalog/LogisticsCatalog.tsx` → `OperationCatalog.tsx`
+- 12 `Logistics*.tsx` page/component files → `Operation*.tsx`
+
+URL paths changed: `/logistics/*` → `/operation/*` on web, `/api/logistics/*` → `/api/operation/*` on API.
+
+Tests post-rename: 1052 unit tests run, 1043 pass, 3 pre-existing API failures + 4 pre-existing web failures (all 7 documented in §17 as unrelated to this PR — `partner/pickups.test.ts > returns LP's POs` mock-stale post-0090, `supplier/pos.test.ts > GET /api/supplier/pos/:poId/threads` 2 tests mock `.from()` while route uses `.rpc("supplier_threads_for_po")` after 0111, `HoOKkASofaTab.test.tsx` 4 fails from earlier Direct-receive UI change). **Zero new test failures from this rename.** Typecheck clean across shared + api + web.
+
+Files NOT touched:
+- `supabase/migrations/0001-0120/*.sql` — frozen historical migrations per §14 #6
+- CARRES_PORTAL_V2_PLAN.md + 15+ historical plan/spec docs in `docs/superpowers/` (Loo declined to update — they're a log of what was built under the old role name)
+- `MEMORY.md` auto-memory entries that reference "logistics" historically
+
+Loo action items post-deploy:
+- Log out of current session, log back in as `operation@carres.com` / `111` → fresh JWT carries `role: "operation"`
+- Test: Operations dashboard loads, sidebar reads "Operations", /operation/* URLs route correctly, create-PO + dispatch flows work
+
+Carry-forwards from this rename:
+- `phase-10-rotate-passwords-after-rename` (HIGH) — still `phase-10-rotate-alpha-test-passwords`; the email rename doesn't change the urgency
+- `phase-10-historical-doc-vocab-mismatch` (low) — the 600+ "logistics" references in plan/spec docs now describe Phase 4 as "the Logistics phase" while the live role is "Operations". Acceptable for historical context, but onboarding doc may need a glossary footnote
+- `phase-10-bundle-size-regression` (low) — web build jumped from ~1064 KiB to ~2620 KiB raw (~266 → ~781 gzipped). Investigate whether the rename affected tree-shaking somehow, or whether unrelated drift since last build. Doesn't block deploy (Pages handles ~3 MB fine).
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)

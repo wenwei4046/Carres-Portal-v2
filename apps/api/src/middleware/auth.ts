@@ -30,7 +30,7 @@ export function _setJwksForTesting(jwks: JWTVerifyGetKey | null): void {
 
 const VALID_ROLES: ReadonlyArray<Role> = [
   "principal", "dealer", "salesperson", "showroom",
-  "logistics", "supplier", "partner", "finance", "bd",
+  "operation", "supplier", "partner", "finance", "bd",
 ];
 
 function isRole(v: unknown): v is Role {

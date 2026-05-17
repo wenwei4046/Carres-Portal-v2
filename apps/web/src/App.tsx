@@ -7,7 +7,7 @@ import Login from "@/pages/Login";
 import Me from "@/pages/Me";
 import DealerApp from "@/pages/dealer/DealerApp";
 import PrincipalApp from "@/pages/principal/PrincipalApp";
-import LogisticsApp from "@/pages/logistics/LogisticsApp";
+import OperationApp from "@/pages/operation/OperationApp";
 import PartnerApp from "@/pages/partner/PartnerApp";
 import FinanceApp from "@/pages/finance/FinanceApp";
 import SupplierApp from "@/pages/supplier/SupplierApp";
@@ -27,7 +27,7 @@ function HomeRedirect() {
   }
   if (!session) return <Navigate to="/login" replace />;
   if (role === "principal") return <Navigate to="/principal" replace />;
-  if (role === "logistics") return <Navigate to="/logistics" replace />;
+  if (role === "operation") return <Navigate to="/operation" replace />;
   if (role === "partner") return <Navigate to="/delivery-partner" replace />;
   if (role === "finance") return <Navigate to="/finance" replace />;
   if (role === "supplier") return <Navigate to="/supplier" replace />;
@@ -86,11 +86,11 @@ export default function App() {
           }
         />
         <Route
-          path="/logistics/*"
+          path="/operation/*"
           element={
             <RequireAuth>
-              <RequireRole roles={["logistics"]}>
-                <LogisticsApp />
+              <RequireRole roles={["operation"]}>
+                <OperationApp />
               </RequireRole>
             </RequireAuth>
           }

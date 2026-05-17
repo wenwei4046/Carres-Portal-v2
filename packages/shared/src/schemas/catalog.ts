@@ -117,7 +117,7 @@ export type SalespersonsListResponse = z.infer<typeof salespersonsListResponseSc
 
 // ---------------------------------------------------------------------------
 // 0074 — Catalog admin CRUD (Loo 2026-05-09 Q2=c, Q3=b, Q4=c).
-// Both principal + logistics can create/patch/soft-delete catalog entities.
+// Both principal + operation can create/patch/soft-delete catalog entities.
 // is_internal() RLS write covers both roles natively, so the API just forwards
 // the user JWT — no extra guard needed beyond the standard auth middleware.
 // ---------------------------------------------------------------------------

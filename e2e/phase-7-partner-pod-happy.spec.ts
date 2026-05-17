@@ -10,11 +10,11 @@ async function login(page: Page, email: string, password: string) {
 
 // Pre-condition: pnpm seed:test-users && pnpm seed:e2e-fixtures
 //   - lp-test@x.com seeded (JT Express partner)
-//   - thread `99999999-aabb-aabb-aabb-000000007077` at logistics_stage=
+//   - thread `99999999-aabb-aabb-aabb-000000007077` at operation_stage=
 //     'dispatched' with delivery_partner_id = JT Express
 //
 // Phase 7 master-plan §8 acceptance:
-//   ✅ Phase 4 logistics 出库后 partner 能看到 assignment (covered: per-leg-lp-split)
+//   ✅ Phase 4 operation 出库后 partner 能看到 assignment (covered: per-leg-lp-split)
 //   ✅ Partner 能 upload POD 照片到 Supabase Storage (this spec)
 //   ✅ Mark delivered 后 order 状态正确流转 (this spec via partner_attach_pod RPC)
 //

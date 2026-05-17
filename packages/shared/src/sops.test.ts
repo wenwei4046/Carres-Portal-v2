@@ -7,7 +7,7 @@ import {
   PROCUREMENT_TAB_SLUGS,
   deriveProcurementSlug,
   type SopDef,
-  type LogisticsStageV3,
+  type OperationStageV3,
   type ProcurementTabSlug,
 } from './sops';
 
@@ -42,25 +42,25 @@ describe('SOP shape invariants', () => {
     ['SOP_SOFA_SPECIAL', SOP_SOFA_SPECIAL],
   ];
 
-  it.each(sops)('%s starts with awaiting_logistics_action', (_name, sop) => {
-    expect(sop.stages[0]).toBe<LogisticsStageV3>('awaiting_logistics_action');
+  it.each(sops)('%s starts with awaiting_operation_action', (_name, sop) => {
+    expect(sop.stages[0]).toBe<OperationStageV3>('awaiting_operation_action');
   });
 
   it.each(sops)('%s ends with delivered', (_name, sop) => {
-    expect(sop.stages[sop.stages.length - 1]).toBe<LogisticsStageV3>('delivered');
+    expect(sop.stages[sop.stages.length - 1]).toBe<OperationStageV3>('delivered');
   });
 
   it.each(sops)('%s transitions form a DAG (no cycles reachable)', (_name, sop) => {
     // For each starting stage, follow every outgoing transition path —
     // visited set must never see the same stage twice along any path.
-    const adjacency = new Map<LogisticsStageV3, LogisticsStageV3[]>();
+    const adjacency = new Map<OperationStageV3, OperationStageV3[]>();
     for (const t of sop.transitions) {
       const tos = adjacency.get(t.from) ?? [];
       tos.push(t.to);
       adjacency.set(t.from, tos);
     }
 
-    const visit = (node: LogisticsStageV3, path: Set<LogisticsStageV3>): void => {
+    const visit = (node: OperationStageV3, path: Set<OperationStageV3>): void => {
       if (path.has(node)) {
         throw new Error(`Cycle detected at ${node} (path: ${[...path].join(' -> ')})`);
       }
@@ -94,9 +94,9 @@ describe('SOP shape invariants', () => {
     }
   });
 
-  it('SOP_SOFA_SPECIAL allows two transitions from awaiting_logistics_action via receive RPC', () => {
+  it('SOP_SOFA_SPECIAL allows two transitions from awaiting_operation_action via receive RPC', () => {
     const matches = SOP_SOFA_SPECIAL.transitions.filter(
-      t => t.from === 'awaiting_logistics_action' && t.rpc === 'logistics_receive_po_with_do'
+      t => t.from === 'awaiting_operation_action' && t.rpc === 'operation_receive_po_with_do'
     );
     expect(matches).toHaveLength(2);
     const tos = matches.map(t => t.to).sort();

@@ -25,7 +25,7 @@ import type { AppEnv } from "../../types";
  *   GET  /:id                           get one PO (RLS-scoped)
  *   POST /:id/acknowledge               supplier_acknowledge (own_logistics)
  *   POST /:id/start-production          supplier_start_production
- *   POST /:id/ready-for-pickup          logistics_supplier_ready_confirm
+ *   POST /:id/ready-for-pickup          operation_supplier_ready_confirm
  *                                       (existing 0034 RPC, supplier-callable)
  *   POST /:id/mark-delivered            supplier_mark_delivered (DO upload)
  */
@@ -407,7 +407,7 @@ supplierPosRouter.post("/:id/ready-for-pickup", requireSupplier, async (c) => {
   const auth = c.var.auth;
   const id = c.req.param("id");
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("logistics_supplier_ready_confirm", {
+  const { data, error } = await sb.rpc("operation_supplier_ready_confirm", {
     p_po_id: id,
   });
   if (error) {

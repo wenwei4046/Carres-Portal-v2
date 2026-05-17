@@ -14,7 +14,7 @@ import type { DoTemplateData } from "../../lib/pdf/types";
  * GET /api/partner/pickups — Phase 4.5 Chunk 1 (Task 24).
  *
  * Returns the full list of purchase orders assigned to the authenticated
- * Logistics Partner (LP). Sorted by placed_at desc (newest first).
+ * operation Partner (LP). Sorted by placed_at desc (newest first).
  *
  * Read path uses `userClient` (forwards caller JWT) so RLS on `purchase_orders`
  * applies. Migration 0046 LP-role RLS restricts to rows where
@@ -216,7 +216,7 @@ partnerPickupsRouter.post("/:id/mark-picked-up", async (c) => {
 // rights at sup_status='ready_confirm_sent'.
 //
 //   accept → partner_confirmed → supplier dispatches
-//   reject → customer_rejected → Logistics relocates warehouse
+//   reject → customer_rejected → operation relocates warehouse
 partnerPickupsRouter.post("/:id/confirm-receive", async (c) => {
   const auth = c.var.auth;
   if (auth.role !== "partner" || !auth.partnerId) {
@@ -306,21 +306,21 @@ partnerPickupsRouter.post("/:id/arrived", async (c) => {
 /**
  * POST /api/partner/pickups/:id/receive — Loo 2026-05-11
  *
- * Collapses the old two-step "Arrived at WH" → "Logistics Receive" flow into
+ * Collapses the old two-step "Arrived at WH" → "operation Receive" flow into
  * one. Partner driver at the warehouse uploads the signed DO + ticks per-line
  * received_qty; the PO flips straight to status='received' (atomic).
  *
- * Wraps the same `logistics_receive_po_with_do` RPC the Logistics route uses
+ * Wraps the same `operation_receive_po_with_do` RPC the operation route uses
  * (migration 0076). The RPC's role gate already admits partners and verifies
  * `purchase_orders.procurement_partner_id = auth.app_partner_id()` — so a
  * cross-partner call returns 42501 → 403, matching the cross-partner guard
  * on /accept, /mark-picked-up, /arrived.
  *
- * Body shape: receivePoWithDoInput (camelCase, same as the logistics route)
+ * Body shape: receivePoWithDoInput (camelCase, same as the operation route)
  * — { doNumber, doFilePath, lines: [{ id, receivedQty }] }. Reshaped to
  * snake_case for the RPC's `p_lines` jsonb at the boundary.
  *
- * Logistics still has /api/logistics/pos/:id/receive (different auth gate)
+ * operation still has /api/operation/pos/:id/receive (different auth gate)
  * for the Direct-receive escape hatch when DO arrives via supplier or
  * warehouse-direct channels (skipping the partner entirely).
  */
@@ -333,7 +333,7 @@ partnerPickupsRouter.post("/:id/receive", async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("logistics_receive_po_with_do", {
+  const { data, error } = await sb.rpc("operation_receive_po_with_do", {
     p_po_id: c.req.param("id"),
     p_do_file_path: parsed.data.doFilePath,
     p_do_number: parsed.data.doNumber,
@@ -353,9 +353,9 @@ partnerPickupsRouter.post("/:id/receive", async (c) => {
  * GET /api/partner/pickups/rfd-pending — carry-forward
  * `phase-4.5-chunk-2-partner-rfd-page-rebuild`.
  *
- * Lists customer-leg threads where Logistics has raised an RFD against this
+ * Lists customer-leg threads where operation has raised an RFD against this
  * partner and the partner has not yet accepted or rejected. Wraps the
- * SECURITY DEFINER RPC `logistics_partner_rfd_pending` (migration 0059)
+ * SECURITY DEFINER RPC `operation_partner_rfd_pending` (migration 0059)
  * which self-filters by `app_partner_id()` and joins `orders.customer_name`.
  *
  * Why an RPC and not a raw select: the existing `ost_partner_read` policy
@@ -371,7 +371,7 @@ partnerPickupsRouter.post("/:id/receive", async (c) => {
  *
  * Sort: most-recently-raised RFD first.
  *
- * Role guard: partner with partnerId only. Logistics / dealer / principal
+ * Role guard: partner with partnerId only. operation / dealer / principal
  * receive 403.
  */
 partnerPickupsRouter.get("/rfd-pending", async (c) => {
@@ -381,7 +381,7 @@ partnerPickupsRouter.get("/rfd-pending", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("logistics_partner_rfd_pending");
+  const { data, error } = await sb.rpc("operation_partner_rfd_pending");
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json(data ?? []);
 });
@@ -389,15 +389,15 @@ partnerPickupsRouter.get("/rfd-pending", async (c) => {
 /**
  * POST /api/partner/pickups/accept-rfd — Phase 4.5 Chunk 2 Sprint B (Task 7).
  *
- * LP accepts a Request-For-Delivery (RFD) raised by Logistics on an
- * `order_supplier_threads` row. Calls `logistics_partner_accept_rfd` RPC
+ * LP accepts a Request-For-Delivery (RFD) raised by operation on an
+ * `order_supplier_threads` row. Calls `operation_partner_accept_rfd` RPC
  * (migration 0051) which:
  *   - Verifies caller is the assigned partner for the THREAD
  *     (thread.delivery_partner_id = auth.partnerId)
  *   - Verifies RFD is pending (request_for_delivery_at IS NOT NULL,
  *     no prior accept/reject stamp)
  *   - Stamps partner_accepted_at on the thread
- *   - Advances thread.logistics_stage to 'dispatched'
+ *   - Advances thread.operation_stage to 'dispatched'
  *
  * Pivoted from Chunk 1's PO-scoped flow: the customer-leg RFD now lives on
  * the per-supplier thread row, not the PO. Body shape changes from
@@ -412,11 +412,11 @@ partnerPickupsRouter.get("/rfd-pending", async (c) => {
 /**
  * GET /api/partner/pickups/to-deliver — Phase 7 Sprint 1.
  *
- * Lists customer-leg threads where Logistics has dispatched and the partner
+ * Lists customer-leg threads where operation has dispatched and the partner
  * is now in transit / awaiting delivery. Sourced from
  * `order_supplier_threads` where:
  *   - delivery_partner_id = auth.app_partner_id() (RLS scopes per partner)
- *   - logistics_stage = 'dispatched'
+ *   - operation_stage = 'dispatched'
  *
  * Used by PartnerPickupsPage to render the "In Transit" section + the
  * Mark Delivered button (POD upload flow).
@@ -453,7 +453,7 @@ partnerPickupsRouter.post("/accept-rfd", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("logistics_partner_accept_rfd", {
+  const { data, error } = await sb.rpc("operation_partner_accept_rfd", {
     p_thread_id: parsed.data.threadId,
   });
   if (error) {
@@ -466,12 +466,12 @@ partnerPickupsRouter.post("/accept-rfd", async (c) => {
 /**
  * POST /api/partner/pickups/reject-rfd — Phase 4.5 Chunk 2 Sprint B (Task 7).
  *
- * LP rejects a pending RFD on a thread. Calls `logistics_partner_reject_rfd`
+ * LP rejects a pending RFD on a thread. Calls `operation_partner_reject_rfd`
  * (migration 0051) which clears request_for_delivery_at and stamps
  * partner_rejected_at on the thread. Per F9 invariant from Chunk 1, the LP
- * stays assigned (thread.delivery_partner_id is NOT cleared) so logistics
+ * stays assigned (thread.delivery_partner_id is NOT cleared) so operation
  * can re-RFD or relocate via DispatchPartnerDialog without a re-assignment
- * step. thread.logistics_stage stays at 'ready_to_dispatch'.
+ * step. thread.operation_stage stays at 'ready_to_dispatch'.
  *
  * Body shape: `{ threadId, reason? }`. Reason is audit-only (max 500 chars).
  */
@@ -490,7 +490,7 @@ partnerPickupsRouter.post("/reject-rfd", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("logistics_partner_reject_rfd", {
+  const { data, error } = await sb.rpc("operation_partner_reject_rfd", {
     p_thread_id: parsed.data.threadId,
     p_reason: parsed.data.reason ?? "",
   });
@@ -505,7 +505,7 @@ partnerPickupsRouter.post("/reject-rfd", async (c) => {
  * GET /api/partner/deliveries/:id/print-do-data — Loo 2026-05-13.
  *
  * Customer-facing DO data for the LP to print + take on the delivery run.
- * Mirrors GET /api/logistics/orders/:id/print-do-data shape but admits the
+ * Mirrors GET /api/operation/orders/:id/print-do-data shape but admits the
  * partner role and lets RLS narrow.
  *
  * Required state: order has do_number (set by 0098 trigger when status

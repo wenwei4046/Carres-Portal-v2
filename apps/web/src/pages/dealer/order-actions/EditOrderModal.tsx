@@ -106,7 +106,7 @@ export default function EditOrderModal({ order, onClose }: Props) {
         </h2>
         <p className="text-xs text-base-600 mt-1">
           Editable while order is in <strong>Place</strong>. Once proceeded,
-          changes go through logistics.
+          changes go through operation.
         </p>
       </header>
 
@@ -164,7 +164,7 @@ export default function EditOrderModal({ order, onClose }: Props) {
             </div>
             {addressUnknown ? (
               <div className="rounded bg-base-50 border border-dashed border-base-200 px-3 py-2.5 text-xs text-base-500">
-                Address will be required before this order can move to logistics.
+                Address will be required before this order can move to operation.
               </div>
             ) : (
               <textarea

@@ -362,7 +362,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             2. Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow QR, and cheque accepted.
           </Text>
           <Text style={styles.termsLine}>
-            3. Delivery date is best-effort and may shift ±3 working days subject to logistics confirmation.
+            3. Delivery date is best-effort and may shift ±3 working days subject to operation confirmation.
           </Text>
           <Text style={styles.termsLine}>
             4. Stair-carry surcharges (if any) are billed on this sales order and are not invoiced separately on the DO.

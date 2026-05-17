@@ -3,7 +3,7 @@
  * convert from snake_case DB rows to these.
  */
 
-import type { CostSource, LogisticsStage } from "./db-types";
+import type { CostSource, OperationStage } from "./db-types";
 
 // Re-exported so UI code can write `import type { CostSource } from
 // "@carres/shared/domain"` alongside the rest of the camelCase surface.
@@ -13,7 +13,7 @@ export type { CostSource };
 
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
-  | "logistics" | "supplier" | "partner" | "finance" | "bd";
+  | "operation" | "supplier" | "partner" | "finance" | "bd";
 
 export interface Dealer {
   id: string;
@@ -220,13 +220,13 @@ export interface Order {
   approvalCode: string | null;
   installmentMonths: 6 | 12 | null;
 
-  // v3-S3 (migration 0028) added `awaiting_logistics_action` + `waiting`.
+  // v3-S3 (migration 0028) added `awaiting_operation_action` + `waiting`.
   // Phase 4.5a (2026-05-05): legacy `awaiting_stock` value fully removed —
   // T5 swept FE/tests, T6 (migration 0040) dropped it from the DB enum.
-  // logistics_stage now matches this union 1:1.
-  logisticsStage:
+  // operation_stage now matches this union 1:1.
+  operationStage:
     | "placed" | "proceed_request"
-    | "awaiting_logistics_action"
+    | "awaiting_operation_action"
     | "ready_to_dispatch" | "dispatched"
     | "waiting" | "delivered"
     | null;
@@ -237,7 +237,7 @@ export interface Order {
   partnerEta: string | null;
   doNumber: string | null;
   doNote: string | null;
-  // Logistics timestamps (migration 0019). dispatchedAt set on D1 step 1;
+  // operation timestamps (migration 0019). dispatchedAt set on D1 step 1;
   // deliveredAt set on D1 step 2 (DO attach + sign).
   dispatchedAt: string | null;
   deliveredAt: string | null;
@@ -254,7 +254,7 @@ export interface Order {
 
 /**
  * camelCase mirror of `OrderSupplierThreadRow` (migration 0033, v3-S4). One row
- * per (order, supplier, category). Drives the v3 logistics pipeline so each
+ * per (order, supplier, category). Drives the v3 operation pipeline so each
  * fulfillment slice of an order has its own SOP-driven kanban presence.
  *
  * `sopName` mirrors `SopName` from `sops.ts` ('STANDARD' | 'SOFA_SPECIAL').
@@ -266,11 +266,11 @@ export interface OrderSupplierThread {
   supplierId: string;
   category: string;
   sopName: "STANDARD" | "SOFA_SPECIAL";
-  // Mirrors `OrderSupplierThreadRow.logistics_stage` which is non-null
+  // Mirrors `OrderSupplierThreadRow.operation_stage` which is non-null
   // (migration 0033 line 51 declares the column NOT NULL). Reuses the named
-  // `LogisticsStage` type from db-types.ts so FE and DB stay 1:1 if the enum
+  // `operationStage` type from db-types.ts so FE and DB stay 1:1 if the enum
   // changes.
-  logisticsStage: LogisticsStage;
+  operationStage: OperationStage;
   poId: string | null;
   warehouseId: string | null;
   reservedAt: string | null;
@@ -435,12 +435,12 @@ export type Urgency = "critical" | "urgent" | "normal";
 
 /**
  * camelCase mirror of `PoPickupEventsRow` (migration 0107). One row per
- * physical DO paper / one trip. Created when a partner or logistics user
+ * physical DO paper / one trip. Created when a partner or operation user
  * batch-picks one or more ready threads off a PO; the new event id is then
  * stamped onto every collected thread (`OrderSupplierThread.pickupEventId`).
  *
  * `ackRole` records which side recorded the pickup — partner (factory_pickup
- * supplier) or logistics (own_logistics supplier delivers to HQ warehouse).
+ * supplier) or operation (own_logistics supplier delivers to HQ warehouse).
  */
 export type PickupEvent = {
   id: string;
@@ -450,13 +450,13 @@ export type PickupEvent = {
   doNote: string | null;
   pickedUpAt: string;
   pickedUpBy: string | null;
-  ackRole: "partner" | "logistics";
+  ackRole: "partner" | "operation";
   createdAt: string;
 };
 
 /**
  * Hydrated row shape for the per-thread readiness UI (supplier "Ready" tab +
- * partner pickup batch screen + logistics receive-threads screen). Joins
+ * partner pickup batch screen + operation receive-threads screen). Joins
  * `order_supplier_threads` with parent order customer fields + the optional
  * pickup event DO number.
  *

@@ -36,14 +36,14 @@ import PickupHistoryList from "./PickupHistoryList";
 /**
  * Status label is kind-aware: own_logistics suppliers run goods to the WH
  * themselves so "awaiting partner" is nonsensical for them — they're
- * waiting for Logistics to receive at the warehouse. factory_pickup
+ * waiting for operation to receive at the warehouse. factory_pickup
  * suppliers stage at the factory waiting for a partner pickup, which is
  * where the "awaiting partner" wording applies (Loo 2026-05-11).
  */
 function labelFor(ss: SupplierSupStatus, kind: "own_logistics" | "factory_pickup" | null): string {
   if (ss === "ready_for_pickup" || ss === "ready_confirm_sent") {
     return kind === "own_logistics"
-      ? "Ready · awaiting logistics receive"
+      ? "Ready · awaiting operation receive"
       : "Ready · awaiting partner";
   }
   switch (ss) {
@@ -68,7 +68,7 @@ function labelFor(ss: SupplierSupStatus, kind: "own_logistics" | "factory_pickup
 
 function readyTabHint(kind: "own_logistics" | "factory_pickup" | null): string {
   return kind === "own_logistics"
-    ? "Staged · awaiting logistics receive"
+    ? "Staged · awaiting operation receive"
     : "Staged · awaiting partner";
 }
 
@@ -506,7 +506,7 @@ function POCard({
               onClick={(e) => {
                 e.stopPropagation();
                 readyPick.mutate(po.id, {
-                  onSuccess: () => toast.success(`${po.id} marked ready · Logistics notified`),
+                  onSuccess: () => toast.success(`${po.id} marked ready · operation notified`),
                   onError: (err) => toast.error(err.message),
                 });
               }}
@@ -704,7 +704,7 @@ function PODrawer({
               <div className="border border-border rounded-md p-3 bg-card">
                 <div className="font-display text-[15px] font-semibold text-foreground">
                   {po.warehouses.name}
-                  {po.warehouses.kind === "logistics_partner" && (
+                  {po.warehouses.kind === "operation_partner" && (
                     <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-warning/15 text-warning">
                       LP-OWNED
                     </span>
@@ -717,7 +717,7 @@ function PODrawer({
                 )}
                 {po.warehouses.owner && (
                   <div className="text-[11.5px] mt-2 pt-2 border-t border-border">
-                    <span className="text-muted-foreground">Logistics Partner: </span>
+                    <span className="text-muted-foreground">operation Partner: </span>
                     <span className="font-semibold text-foreground">
                       {po.warehouses.owner.name}
                     </span>

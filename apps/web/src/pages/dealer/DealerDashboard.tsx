@@ -92,7 +92,7 @@ export default function DealerDashboard() {
           <p className="text-[12px] text-base-600 mt-1">
             {readyToProceed.length === 0
               ? "All in-flight orders need more info"
-              : `order${readyToProceed.length === 1 ? "" : "s"} ready to push to logistics`}
+              : `order${readyToProceed.length === 1 ? "" : "s"} ready to push to operation`}
           </p>
           <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-base-700 mt-2.5">
             View orders →
@@ -115,7 +115,7 @@ export default function DealerDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         <StatusColumn title="Place" hint="Awaiting completion" count={place.length} accent="text-warning" orders={place.slice(0, 4)} />
-        <StatusColumn title="Proceed" hint="Sent to logistics" count={proceed.length} accent="text-info" orders={proceed.slice(0, 4)} />
+        <StatusColumn title="Proceed" hint="Sent to operation" count={proceed.length} accent="text-info" orders={proceed.slice(0, 4)} />
         <StatusColumn title="Delivered" hint="DO submitted" count={delivered.length} accent="text-success" orders={delivered.slice(0, 4)} />
       </div>
     </div>

@@ -134,7 +134,7 @@ describe("SupplierDashboard", () => {
     expect(screen.getByText("mattress")).toBeInTheDocument();
     expect(screen.getByText("10–14 days")).toBeInTheDocument();
     expect(screen.getByText("ops@cloudmattress.my")).toBeInTheDocument();
-    expect(screen.getByText("Own logistics")).toBeInTheDocument();
+    expect(screen.getByText("Own operation")).toBeInTheDocument();
   });
 
   it("renders factory_pickup workflow badge when kind=factory_pickup", async () => {

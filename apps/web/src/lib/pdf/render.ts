@@ -50,7 +50,7 @@ export function renderPoPdf(data: PoTemplateData): Promise<Blob> {
 }
 
 /** Task 13 (2026-05-15) — pickup-event DO render (supplier / partner /
- *  logistics reprint). Data assembled server-side by
+ *  operation reprint). Data assembled server-side by
  *  `/api/pickup-events/:id/print` (RLS-scoped per role via 0107 RPC);
  *  browser renders via @react-pdf/renderer. */
 export function renderPickupEventPdf(

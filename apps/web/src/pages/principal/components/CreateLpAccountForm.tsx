@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ApiError, apiFetch } from "@/lib/api";
 
 /**
- * Principal-side form to create a new Logistics Partner (LP) account.
+ * Principal-side form to create a new operation Partner (LP) account.
  *
  * Calls `POST /api/principal/partners` (Task 19), which atomically creates:
  *   1. delivery_partners row

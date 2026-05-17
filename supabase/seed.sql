@@ -55,7 +55,7 @@ on conflict (id) do nothing;
 -- DELIVERY PARTNERS + FLEET
 -- -----------------------------------------------------------------------------
 insert into delivery_partners (id, name, contact, zones, onboarded_date, rate_card) values
-  ('00000000-0000-0000-0000-0000000000f1', 'JT Express Logistics', '012-7788991', 'KL · Selangor',
+  ('00000000-0000-0000-0000-0000000000f1', 'JT Express operation', '012-7788991', 'KL · Selangor',
    '2022-04-12',
    jsonb_build_object('00000000-0000-0000-0000-0000000000c1',
      jsonb_build_object('base',60,'per_floor_walk_up',25,'per_km',1.8))),
@@ -208,16 +208,16 @@ update stock_balances set qty = 1 where sku = 'mattress:premier-set:King'  and w
 -- STOCK MOVEMENTS
 -- -----------------------------------------------------------------------------
 insert into stock_movements (sku, warehouse_id, qty, kind, ref, note, by_role, occurred_at) values
-  ('mattress:carres-cloud:King',     '00000000-0000-0000-0000-0000000000c1', 2,  'out', 'DL #1244', 'delivered to BedHouse KL',     'logistics',  now() - interval '5 hours'),
-  ('bedframe:l1202f:Queen',          '00000000-0000-0000-0000-0000000000c1', 1,  'out', 'DL #1243', 'delivered to Showroom Setia',  'logistics',  now() - interval '8 hours'),
-  ('mattress:premier-set:Queen',     '00000000-0000-0000-0000-0000000000c1', 8,  'in',  'PO-3318',  'DO #DO-77321 from Nice Future','logistics',  now() - interval '1 day'),
-  ('mattress:carres-cloud:Queen',    '00000000-0000-0000-0000-0000000000c1', 12, 'in',  'PO-3317',  'DO #DO-77320 from Nice Future','logistics',  now() - interval '1.4 days'),
-  ('sofa:harbour:preset:3-seater',   '00000000-0000-0000-0000-0000000000c2', 1,  'out', 'DL #1240', 'delivered to Dreamline JB',    'logistics',  now() - interval '2 days'),
-  ('bedframe:l1202f:King',           '00000000-0000-0000-0000-0000000000c1', 4,  'in',  'PO-3315',  'DO #DO-77318 from HoOKkA',     'logistics',  now() - interval '3 days'),
-  ('mattress:carres-cloud:King',     '00000000-0000-0000-0000-0000000000c1', 6,  'in',  'PO-3310',  'DO #DO-77310 from Nice Future','logistics',  now() - interval '7 days'),
-  ('mattress:carres-cloud:Queen',    '00000000-0000-0000-0000-0000000000c2', 3,  'out', 'DL #1235', 'delivered to SleepWell Penang','logistics',  now() - interval '14 days'),
-  ('sofa:harbour:preset:2-seater',   '00000000-0000-0000-0000-0000000000c2', 2,  'in',  'PO-3305',  'DO #DO-77295 from HoOKkA',     'logistics',  now() - interval '21 days'),
-  ('mattress:premier-set:King',      '00000000-0000-0000-0000-0000000000c1', 6,  'in',  'PO-3298',  'DO #DO-77280 from Nice Future','logistics',  now() - interval '35 days');
+  ('mattress:carres-cloud:King',     '00000000-0000-0000-0000-0000000000c1', 2,  'out', 'DL #1244', 'delivered to BedHouse KL',     'operation',  now() - interval '5 hours'),
+  ('bedframe:l1202f:Queen',          '00000000-0000-0000-0000-0000000000c1', 1,  'out', 'DL #1243', 'delivered to Showroom Setia',  'operation',  now() - interval '8 hours'),
+  ('mattress:premier-set:Queen',     '00000000-0000-0000-0000-0000000000c1', 8,  'in',  'PO-3318',  'DO #DO-77321 from Nice Future','operation',  now() - interval '1 day'),
+  ('mattress:carres-cloud:Queen',    '00000000-0000-0000-0000-0000000000c1', 12, 'in',  'PO-3317',  'DO #DO-77320 from Nice Future','operation',  now() - interval '1.4 days'),
+  ('sofa:harbour:preset:3-seater',   '00000000-0000-0000-0000-0000000000c2', 1,  'out', 'DL #1240', 'delivered to Dreamline JB',    'operation',  now() - interval '2 days'),
+  ('bedframe:l1202f:King',           '00000000-0000-0000-0000-0000000000c1', 4,  'in',  'PO-3315',  'DO #DO-77318 from HoOKkA',     'operation',  now() - interval '3 days'),
+  ('mattress:carres-cloud:King',     '00000000-0000-0000-0000-0000000000c1', 6,  'in',  'PO-3310',  'DO #DO-77310 from Nice Future','operation',  now() - interval '7 days'),
+  ('mattress:carres-cloud:Queen',    '00000000-0000-0000-0000-0000000000c2', 3,  'out', 'DL #1235', 'delivered to SleepWell Penang','operation',  now() - interval '14 days'),
+  ('sofa:harbour:preset:2-seater',   '00000000-0000-0000-0000-0000000000c2', 2,  'in',  'PO-3305',  'DO #DO-77295 from HoOKkA',     'operation',  now() - interval '21 days'),
+  ('mattress:premier-set:King',      '00000000-0000-0000-0000-0000000000c1', 6,  'in',  'PO-3298',  'DO #DO-77280 from Nice Future','operation',  now() - interval '35 days');
 
 -- -----------------------------------------------------------------------------
 -- INQUIRIES (BD pipeline)
@@ -244,11 +244,11 @@ insert into approvals (kind, title, actor, refers_to, amount, dealer_id, reason,
 -- -----------------------------------------------------------------------------
 insert into audit_log (role, actor_text, action, dealer_id, ref, occurred_at) values
   ('finance',   'Aisha · Finance',    'Recorded receipt RM 2,945 · INV-1245',          '00000000-0000-0000-0000-000000000d01', 'INV-1245', now() - interval '5 minutes'),
-  ('logistics', 'Daniel · Logistics', 'Dispatched DL-1242 to JT Express',              '00000000-0000-0000-0000-000000000d01', 'DL-1242',  now() - interval '12 minutes'),
+  ('operation', 'Daniel · operation', 'Dispatched DL-1242 to JT Express',              '00000000-0000-0000-0000-000000000d01', 'DL-1242',  now() - interval '12 minutes'),
   ('supplier',  'CMS',                'Marked PO-2044 in production',                  null,                                     'PO-2044',  now() - interval '1 hour'),
   ('principal', 'Sara · Principal',   'Approved refund AP-1005 · RM 6,070',            '00000000-0000-0000-0000-000000000d01', 'AP-1005',  now() - interval '2 hours'),
   ('dealer',    'BedHouse KL',        'Created order DL-1247 · RM 5,970',              '00000000-0000-0000-0000-000000000d01', 'DL-1247',  now() - interval '3 hours'),
-  ('logistics', 'Procurement',        'Issued PO-2045 to CMS · 2 × Carres Cloud King', null,                                     'PO-2045',  now() - interval '5 hours'),
+  ('operation', 'Procurement',        'Issued PO-2045 to CMS · 2 × Carres Cloud King', null,                                     'PO-2045',  now() - interval '5 hours'),
   ('principal', 'Sara · Principal',   'Updated price · Carres Cloud King → RM 5,890',  null,                                     null,       now() - interval '6 hours'),
   ('principal', 'Sara · Principal',   'Suspended dealer · CozyHome Kuching',           '00000000-0000-0000-0000-000000000d05', null,       now() - interval '1 day'),
   ('finance',   'Aisha · Finance',    'Issued credit note CN-7732 · RM 480',           '00000000-0000-0000-0000-000000000d02', 'CN-7732',  now() - interval '1 day');
@@ -281,7 +281,7 @@ insert into orders (
   customer_name, customer_phone, customer_address, customer_billing,
   customer_emergency, delivery_date, delivery_floor, delivery_has_lift,
   paid, terms_accepted, signature_url,
-  logistics_stage, warehouse_id, delivery_partner_id,
+  operation_stage, warehouse_id, delivery_partner_id,
   do_number, do_note, invoice_no, invoiced_at,
   placed_at
 ) values (
@@ -301,7 +301,7 @@ insert into order_lines (order_id, sku, qty, unit_price) values
 insert into order_history (order_id, text, by_role, occurred_at) values
   ('00000000-0000-0000-0000-000000001240', 'Order placed', 'dealer', now() - interval '5 days'),
   ('00000000-0000-0000-0000-000000001240', 'Proceeded · delivery scheduled', 'dealer', now() - interval '3 days'),
-  ('00000000-0000-0000-0000-000000001240', 'DO submitted · delivered', 'logistics', now() - interval '2 days'),
+  ('00000000-0000-0000-0000-000000001240', 'DO submitted · delivered', 'operation', now() - interval '2 days'),
   ('00000000-0000-0000-0000-000000001240', 'Tax invoice issued · INV-2026-1240', 'finance', now() - interval '2 days');
 
 insert into invoices (invoice_no, order_id, amount, issued_at) values
@@ -327,11 +327,11 @@ insert into purchase_orders (
 on conflict (id) do nothing;
 
 insert into po_history (po_id, text, by_role, occurred_at) values
-  ('PO-2045', 'Issued by Logistics · partner pre-assigned: JT Express',                 'logistics', now() - interval '2 hours'),
-  ('PO-2044', 'Issued by Logistics',                                                    'logistics', now() - interval '1 day'),
+  ('PO-2045', 'Issued by operation · partner pre-assigned: JT Express',                 'operation', now() - interval '2 hours'),
+  ('PO-2044', 'Issued by operation',                                                    'operation', now() - interval '1 day'),
   ('PO-2044', 'Acknowledged · production scheduled',                                    'supplier',  now() - interval '22 hours'),
   ('PO-2044', 'Production started',                                                     'supplier',  now() - interval '4 hours'),
-  ('PO-2041', 'Issued by Logistics · partner pre-assigned: JT Express',                 'logistics', now() - interval '5 days'),
+  ('PO-2041', 'Issued by operation · partner pre-assigned: JT Express',                 'operation', now() - interval '5 days'),
   ('PO-2041', 'Marked in production',                                                   'supplier',  now() - interval '3 days'),
   ('PO-2041', 'Ready for pickup · partner notified',                                    'supplier',  now() - interval '6 hours');
 
@@ -357,8 +357,8 @@ insert into auth.users (
    'salesperson@carres.com',crypt('111', gen_salt('bf')), now(),
    jsonb_build_object('name','Aisha · BedHouse KL Bangsar'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000004', 'authenticated', 'authenticated',
-   'logistics@carres.com',  crypt('111', gen_salt('bf')), now(),
-   jsonb_build_object('name','Daniel · Logistics'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
+   'operation@carres.com',  crypt('111', gen_salt('bf')), now(),
+   jsonb_build_object('name','Daniel · operation'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-000000000005', 'authenticated', 'authenticated',
    'finance@carres.com',    crypt('111', gen_salt('bf')), now(),
    jsonb_build_object('name','Aisha · Finance'),'{"provider":"email","providers":["email"]}'::jsonb, now(), now()),
@@ -400,7 +400,7 @@ insert into app_users (id, email, name, role, status, dealer_id, supplier_id, pa
   ('11111111-1111-1111-1111-000000000001','principal@carres.com', 'Sara · Principal',                'principal',   'active', null,                                     null,                                     null,                                     null),
   ('11111111-1111-1111-1111-000000000002','dealer@carres.com',    'Lily · BedHouse KL',              'dealer',      'active', '00000000-0000-0000-0000-000000000d01',   null,                                     null,                                     null),
   ('11111111-1111-1111-1111-000000000003','salesperson@carres.com','Aisha · BedHouse KL Bangsar',     'salesperson', 'active', '00000000-0000-0000-0000-000000000d01',   null,                                     null,                                     '00000000-0000-0000-0000-0000000000a1'),
-  ('11111111-1111-1111-1111-000000000004','logistics@carres.com', 'Daniel · Logistics',              'logistics',   'active', null,                                     null,                                     null,                                     null),
+  ('11111111-1111-1111-1111-000000000004','operation@carres.com', 'Daniel · operation',              'operation',   'active', null,                                     null,                                     null,                                     null),
   ('11111111-1111-1111-1111-000000000005','finance@carres.com',   'Aisha · Finance',                 'finance',     'active', null,                                     null,                                     null,                                     null),
   ('11111111-1111-1111-1111-000000000006','supplier@carres.com',  'Alex · HoOKkA',                   'supplier',    'active', null,                                     '00000000-0000-0000-0000-0000000000e1',   null,                                     null),
   ('11111111-1111-1111-1111-000000000007','partner@carres.com',   'JT Express dispatcher',           'partner',     'active', null,                                     null,                                     '00000000-0000-0000-0000-0000000000f1',   null),

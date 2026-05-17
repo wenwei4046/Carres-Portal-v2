@@ -8,7 +8,7 @@ import type { SalesOrderTemplateData } from "@/lib/pdf/types";
  * 2026-05-12 (Loo) — Customer-facing Sales Order PDF download button.
  *
  * Hits GET /api/orders/:id/sales-order-pdf which is gated server-side to
- * dealer / showroom / salesperson / finance / principal / bd (logistics /
+ * dealer / showroom / salesperson / finance / principal / bd (operation /
  * partner / supplier are 403'd). RLS narrows to orders the caller can
  * read regardless. apiFetchBlob → ObjectURL → window.open opens the PDF
  * in a new tab so the customer can preview / print without leaving the
@@ -21,7 +21,7 @@ import type { SalesOrderTemplateData } from "@/lib/pdf/types";
  * Props:
  *   - orderId: UUID
  *   - dl:      integer (only used for the filename + toast)
- *   - role:    current user role; button hides on logistics/partner/supplier
+ *   - role:    current user role; button hides on operation/partner/supplier
  *   - variant: "primary" matches the Submit-class buttons (filled
  *              terracotta), "secondary" matches the outline-class
  *              buttons (default; less visual weight inside detail drawers)
@@ -32,14 +32,14 @@ type Role =
   | "dealer"
   | "showroom"
   | "salesperson"
-  | "logistics"
+  | "operation"
   | "finance"
   | "partner"
   | "supplier"
   | "principal"
   | "bd";
 
-// Loo 2026-05-12 ~20:00 — logistics dropped from the deny list (they
+// Loo 2026-05-12 ~20:00 — operation dropped from the deny list (they
 // surface this on their own drawer when handing over a delivery). Partner
 // has POD and Supplier has PO, so the SO doc stays off their UIs.
 const DENIED: ReadonlySet<Role> = new Set(["partner", "supplier"]);

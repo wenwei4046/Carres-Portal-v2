@@ -6,8 +6,8 @@ import { z } from 'zod';
  * Spec: docs/superpowers/plans/2026-05-15-supplier-thread-pickup-plan.md Task 2.
  *
  * Partner-side schemas were previously inlined inside individual route files
- * or co-located with logistics schemas (see `partnerAcceptRfdInput` /
- * `partnerRejectRfdInput` in `./logistics.ts`). This file collects the new
+ * or co-located with operation schemas (see `partnerAcceptRfdInput` /
+ * `partnerRejectRfdInput` in `./operation.ts`). This file collects the new
  * partner-driven batch endpoints from the supplier per-thread pickup feature.
  */
 

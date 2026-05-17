@@ -38,7 +38,7 @@ describe("PickupHistoryList", () => {
         id: "evt-2",
         do_number: "DO-9000",
         picked_up_at: "2026-05-14T10:00:00Z",
-        ack_role: "logistics",
+        ack_role: "operation",
         thread_count: 1,
       },
     ]);
@@ -51,7 +51,7 @@ describe("PickupHistoryList", () => {
     expect(screen.getByText("DO-9000")).toBeInTheDocument();
     // 2 threads → plural; 1 thread → singular
     expect(screen.getByText(/partner · 2 threads/)).toBeInTheDocument();
-    expect(screen.getByText(/logistics · 1 thread$/)).toBeInTheDocument();
+    expect(screen.getByText(/operation · 1 thread$/)).toBeInTheDocument();
     // Reprint buttons one per row
     expect(screen.getByTestId("reprint-do-evt-1")).toBeInTheDocument();
     expect(screen.getByTestId("reprint-do-evt-2")).toBeInTheDocument();

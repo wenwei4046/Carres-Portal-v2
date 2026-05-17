@@ -49,7 +49,7 @@ beforeEach(() => {
 afterAll(() => _setJwksForTesting(null));
 
 describe("POST /api/storage/dos/sign-upload", () => {
-  it("returns signed upload URL for logistics caller", async () => {
+  it("returns signed upload URL for operation caller", async () => {
     const sb = {
       storage: {
         from: vi.fn(() => ({
@@ -63,7 +63,7 @@ describe("POST /api/storage/dos/sign-upload", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/storage/dos/sign-upload", {
         method: "POST",
@@ -86,7 +86,7 @@ describe("POST /api/storage/dos/sign-upload", () => {
   });
 
   it("rejects mime not in allowlist", async () => {
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/storage/dos/sign-upload", {
         method: "POST",
@@ -104,7 +104,7 @@ describe("POST /api/storage/dos/sign-upload", () => {
   });
 
   it("rejects size > 10MB", async () => {
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/storage/dos/sign-upload", {
         method: "POST",
@@ -121,7 +121,7 @@ describe("POST /api/storage/dos/sign-upload", () => {
     expect(res.status).toBe(422);
   });
 
-  it("rejects dealer caller with 403 (only logistics/principal/partner/supplier admitted)", async () => {
+  it("rejects dealer caller with 403 (only operation/principal/partner/supplier admitted)", async () => {
     const jwt = await makeJwt("dealer");
     const res = await app.fetch(
       new Request("http://t/api/storage/dos/sign-upload", {
@@ -251,11 +251,11 @@ describe("POST /api/storage/dos/sign-upload", () => {
 });
 
 // Loo 2026-05-11 — order-level DO upload (migration 0087 added file storage
-// to logistics "Mark delivered" flow).
+// to operation "Mark delivered" flow).
 describe("POST /api/storage/dos/sign-order-upload", () => {
   const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
 
-  it("returns signed upload URL for logistics caller with order- prefix", async () => {
+  it("returns signed upload URL for operation caller with order- prefix", async () => {
     const createSignedUploadUrl = vi.fn().mockResolvedValue({
       data: { token: "otok", path: `order-${ORDER_ID}/uuid-DO-1.pdf` },
       error: null,
@@ -264,7 +264,7 @@ describe("POST /api/storage/dos/sign-order-upload", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/storage/dos/sign-order-upload", {
         method: "POST",
@@ -288,7 +288,7 @@ describe("POST /api/storage/dos/sign-order-upload", () => {
   });
 
   it("rejects non-UUID order_id", async () => {
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/storage/dos/sign-order-upload", {
         method: "POST",
@@ -306,7 +306,7 @@ describe("POST /api/storage/dos/sign-order-upload", () => {
   });
 
   it("rejects mime not in allowlist", async () => {
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/storage/dos/sign-order-upload", {
         method: "POST",
@@ -323,7 +323,7 @@ describe("POST /api/storage/dos/sign-order-upload", () => {
     expect(res.status).toBe(422);
   });
 
-  it("rejects partner caller (order DO is logistics-only)", async () => {
+  it("rejects partner caller (order DO is operation-only)", async () => {
     const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
     const res = await app.fetch(
       new Request("http://t/api/storage/dos/sign-order-upload", {

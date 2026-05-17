@@ -240,8 +240,8 @@ describe("GET /api/supplier/pos", () => {
     expect(res.status).toBe(422);
   });
 
-  it("rejects logistics with 403 (supplier-only guard)", async () => {
-    const jwt = await makeJwt("logistics");
+  it("rejects operation with 403 (supplier-only guard)", async () => {
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/supplier/pos", {
         headers: { Authorization: `Bearer ${jwt}` },
@@ -490,7 +490,7 @@ describe("POST /api/supplier/pos/:id/start-production", () => {
 });
 
 describe("POST /api/supplier/pos/:id/ready-for-pickup", () => {
-  it("calls existing logistics_supplier_ready_confirm RPC", async () => {
+  it("calls existing operation_supplier_ready_confirm RPC", async () => {
     const sb = {
       rpc: vi.fn().mockResolvedValue({
         data: { po_id: PO_ID, sup_status: "ready_confirm_sent" },
@@ -509,7 +509,7 @@ describe("POST /api/supplier/pos/:id/ready-for-pickup", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_supplier_ready_confirm", {
+    expect(sb.rpc).toHaveBeenCalledWith("operation_supplier_ready_confirm", {
       p_po_id: PO_ID,
     });
   });
@@ -642,8 +642,8 @@ describe("POST /api/supplier/pos/:id/mark-delivered", () => {
 // Task 13 (2026-05-15) — pickup history for a single PO. Powers the Pickup
 // history section in the supplier PODrawer + the Reprint DO button per row.
 describe("GET /api/supplier/pos/:poId/pickup-events", () => {
-  it("rejects logistics with 403 (supplier-only guard)", async () => {
-    const jwt = await makeJwt("logistics");
+  it("rejects operation with 403 (supplier-only guard)", async () => {
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request(`http://t/api/supplier/pos/${PO_ID}/pickup-events`, {
         headers: { Authorization: `Bearer ${jwt}` },
@@ -667,7 +667,7 @@ describe("GET /api/supplier/pos/:poId/pickup-events", () => {
           id: "evt-2",
           do_number: "DO-9000",
           picked_up_at: "2026-05-14T10:00:00Z",
-          ack_role: "logistics",
+          ack_role: "operation",
         },
       ],
       error: null,
@@ -721,7 +721,7 @@ describe("GET /api/supplier/pos/:poId/pickup-events", () => {
         id: "evt-2",
         do_number: "DO-9000",
         picked_up_at: "2026-05-14T10:00:00Z",
-        ack_role: "logistics",
+        ack_role: "operation",
         thread_count: 1,
       },
     ]);
@@ -766,8 +766,8 @@ describe("GET /api/supplier/pos/:poId/pickup-events", () => {
 // PODrawer. Returns one row per `order_supplier_threads` linked to this PO,
 // each row carrying its parent order's customer + delivery date + SKU lines.
 describe("GET /api/supplier/pos/:poId/threads", () => {
-  it("rejects logistics with 403 (supplier-only guard)", async () => {
-    const jwt = await makeJwt("logistics");
+  it("rejects operation with 403 (supplier-only guard)", async () => {
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request(`http://t/api/supplier/pos/${PO_ID}/threads`, {
         headers: { Authorization: `Bearer ${jwt}` },

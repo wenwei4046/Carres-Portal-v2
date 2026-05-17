@@ -4,7 +4,7 @@ import { apiFetch } from "@/lib/api";
 import CreateLpAccountForm from "./components/CreateLpAccountForm";
 
 /**
- * Principal · Logistics Partners admin — Phase 4.5 Chunk 1 Task 22.
+ * Principal · operation Partners admin — Phase 4.5 Chunk 1 Task 22.
  *
  * Two stacked sections:
  *   1. Create new LP account form (wraps `CreateLpAccountForm` from Task 20)
@@ -39,7 +39,7 @@ export default function PrincipalPartners() {
       <div>
         <div className="kicker">HQ · Network</div>
         <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-tight font-semibold">
-          Logistics Partners
+          operation Partners
         </h1>
       </div>
 
@@ -60,7 +60,7 @@ export default function PrincipalPartners() {
           <p className="text-[13px] text-base-600">Loading…</p>
         ) : !lps || lps.length === 0 ? (
           <p className="text-[13px] text-base-500">
-            No logistics partners yet.
+            No operation partners yet.
           </p>
         ) : (
           <ul className="divide-y divide-base-200 border border-base-200 rounded">

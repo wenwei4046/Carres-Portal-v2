@@ -152,7 +152,7 @@ describe("POST /api/supplier/threads/:threadId/ready", () => {
 
 describe("DELETE /api/supplier/threads/:threadId/ready", () => {
   it("rejects non-supplier roles with 403", async () => {
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request(`http://t/api/supplier/threads/${THREAD_ID}/ready`, {
         method: "DELETE",

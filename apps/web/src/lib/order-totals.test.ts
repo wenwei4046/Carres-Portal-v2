@@ -29,7 +29,7 @@ function baseOrder(over: Partial<Order> = {}): Order {
     paymentMethod: null,
     approvalCode: null,
     installmentMonths: null,
-    logisticsStage: null,
+    operationStage: null,
     warehouseId: null,
     deliveryPartnerId: null,
     partnerStage: null,

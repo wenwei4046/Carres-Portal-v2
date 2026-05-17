@@ -15,7 +15,7 @@ import PartnerProfile from "./PartnerProfile";
  * Mirrors DealerApp's React Router subroute pattern (NavLink-driven nav,
  * routes inside a `<Routes>`) so partners can deep-link to `/delivery-partner/
  * pickups` and have it work — useful for WhatsApp-shared links to today's
- * jobs. Different from the Logistics/Principal shells which use state tabs.
+ * jobs. Different from the operation/Principal shells which use state tabs.
  */
 export default function PartnerApp() {
   return (

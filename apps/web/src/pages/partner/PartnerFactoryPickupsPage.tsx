@@ -23,7 +23,7 @@ import PickupBatchDialog from "./components/PickupBatchDialog";
  *   In transit      → "Arrived at WH"            (partner_arrived_at_warehouse)
  *
  * After "Arrived at WH" the PO drops into the delivered tail and the
- * warehouse-side receive flow (logistics_receive_po_with_do, migration
+ * warehouse-side receive flow (operation_receive_po_with_do, migration
  * 0076) takes over to close it (status='received').
  *
  * Customer-leg deliveries (RFD pending / customer dispatch / POD) live on
@@ -79,7 +79,7 @@ type PickupRow = {
   // warehouse.kind + owning_partner_id surface so the UI can label
   // partner-WH-owned PO rows distinctly from procurement-assignment ones.
   suppliers: { name: string; contact: string | null; kind: "own_logistics" | "factory_pickup" | null } | null;
-  warehouses: { name: string; address: string | null; kind: "own" | "logistics_partner" | null; owning_partner_id: string | null } | null;
+  warehouses: { name: string; address: string | null; kind: "own" | "operation_partner" | null; owning_partner_id: string | null } | null;
   lines: PickupLine[];
   threads?: PickupThread[];
   // 2026-05-17 — embedded so the drawer's In-transit section can resolve
@@ -262,7 +262,7 @@ export default function PartnerFactoryPickupsPage() {
   });
   // 2026-05-11 (Loo migration 0090) — own_logistics + ready_confirm_sent
   // branch. The supplier dispatches the goods themselves; partner only
-  // confirms receipt at the partner-WH OR rejects so logistics relocates.
+  // confirms receipt at the partner-WH OR rejects so operation relocates.
   const confirmReceive = useMutation({
     mutationFn: (poId: string) =>
       apiFetch(`/api/partner/pickups/${poId}/confirm-receive`, { method: "POST" }),
@@ -285,7 +285,7 @@ export default function PartnerFactoryPickupsPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: qk.partner.pickups() });
       await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
-      toast.success("Rejected · Logistics will relocate the warehouse");
+      toast.success("Rejected · operation will relocate the warehouse");
     },
     onError: (err: unknown) => {
       const msg = err instanceof ApiError ? err.message : "Reject failed";

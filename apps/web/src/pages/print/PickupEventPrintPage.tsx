@@ -7,7 +7,7 @@ import { renderPickupEventPdf } from "@/lib/pdf/render";
  * Task 13 (2026-05-15) — pickup-event DO reprint landing page.
  *
  * Opened via `window.open("/print/pickup-event/:eventId")` from the
- * Pickup history section in supplier / partner / logistics PO drawers.
+ * Pickup history section in supplier / partner / operation PO drawers.
  * Hits `/api/pickup-events/:id/print` which RLS-scopes per role via the
  * `pickup_event_render_payload` RPC (0107), renders the PDF in-browser via
  * @react-pdf/renderer (Workers WASM ban — commit `fa47433`), and replaces

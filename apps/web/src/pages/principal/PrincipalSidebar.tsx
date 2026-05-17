@@ -32,7 +32,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Network",
     items: [
       { k: "dealers", t: "Dealers", icon: "▤", enabled: true },
-      { k: "partners", t: "Logistics Partners", icon: "▦", enabled: true },
+      { k: "partners", t: "operation Partners", icon: "▦", enabled: true },
       { k: "suppliers", t: "Suppliers", icon: "▥", enabled: false, phase: "Phase 6" },
     ],
   },
@@ -41,7 +41,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       // 0074 catalog admin (Loo 2026-05-09 Q1=b, Q2=c) — promoted from
       // Phase-5 stub to live link; same page also mounts under
-      // /logistics/catalog. RLS write covers principal+logistics via
+      // /operation/catalog. RLS write covers principal+operation via
       // is_internal().
       { k: "catalog", t: "Catalog & Pricing", icon: "▭", enabled: true },
     ],

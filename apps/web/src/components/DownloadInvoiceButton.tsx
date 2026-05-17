@@ -5,13 +5,13 @@ import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
 
 /**
- * 2026-05-13 (Loo) — Sales Invoice PDF reprint button for the Logistics
+ * 2026-05-13 (Loo) — Sales Invoice PDF reprint button for the operation
  * drawer at dispatched / delivered status.
  *
- * Hits GET /api/orders/:id/invoice-pdf-data which gates to logistics /
+ * Hits GET /api/orders/:id/invoice-pdf-data which gates to operation /
  * finance / principal / bd. The invoice row + invoice_no are auto-issued
  * by the orders_auto_issue_on_dispatched_trg trigger (migration 0098) when
- * an order's logistics_stage transitions to 'dispatched', so this button
+ * an order's operation_stage transitions to 'dispatched', so this button
  * is safe to surface alongside Print DO at and after that stage.
  *
  * Returns null on denied roles to avoid a click that always 403s.
@@ -28,7 +28,7 @@ type Role =
   | "dealer"
   | "showroom"
   | "salesperson"
-  | "logistics"
+  | "operation"
   | "finance"
   | "partner"
   | "supplier"
@@ -36,7 +36,7 @@ type Role =
   | "bd";
 
 const ALLOWED: ReadonlySet<Role> = new Set([
-  "logistics",
+  "operation",
   "finance",
   "principal",
   "bd",

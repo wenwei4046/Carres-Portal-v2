@@ -4,7 +4,7 @@ import { usePickupEventsForPo } from "@/lib/queries";
  * Task 13 (2026-05-15) — pickup history list for the supplier PODrawer.
  *
  * Lists every `po_pickup_events` row for this PO (newest first). Each row
- * carries DO# + timestamp + which role acked (partner / logistics) + how
+ * carries DO# + timestamp + which role acked (partner / operation) + how
  * many threads were swept up in that pickup. Reprint button opens the
  * `/print/pickup-event/:eventId` route in a new tab — that page hits the
  * `/api/pickup-events/:id/print` endpoint (server JSON payload) and
@@ -12,7 +12,7 @@ import { usePickupEventsForPo } from "@/lib/queries";
  * commit `fa47433`).
  *
  * Data source: `GET /api/supplier/pos/:poId/pickup-events` (this same task).
- * Reusable across supplier / partner / logistics roles — the print endpoint
+ * Reusable across supplier / partner / operation roles — the print endpoint
  * already gates per-role via `pickup_event_render_payload` RPC (0107).
  */
 export default function PickupHistoryList({ poId }: { poId: string }) {

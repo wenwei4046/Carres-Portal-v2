@@ -262,7 +262,7 @@ export default function SupplierDashboard() {
               >
                 {me.data.kind === "factory_pickup"
                   ? "Factory pickup"
-                  : "Own logistics"}
+                  : "Own operation"}
               </span>
             </div>
           </div>

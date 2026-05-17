@@ -89,7 +89,7 @@ describe("GET /api/pickup-events/:id/print", () => {
     expect(res.status).toBe(403);
   });
 
-  it.each(["supplier", "partner", "logistics", "principal"] as const)(
+  it.each(["supplier", "partner", "operation", "principal"] as const)(
     "200 — %s gets RPC payload",
     async (role) => {
       const payload = {

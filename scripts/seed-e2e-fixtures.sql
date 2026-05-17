@@ -222,7 +222,7 @@ VALUES (
 );
 
 INSERT INTO order_supplier_threads (
-  id, order_id, po_id, supplier_id, category, sop_name, logistics_stage,
+  id, order_id, po_id, supplier_id, category, sop_name, operation_stage,
   delivery_partner_id, request_for_delivery_at, history
 )
 VALUES (
@@ -237,8 +237,8 @@ VALUES (
 );
 
 -- ----- Race-condition fixture for concurrent-rfd-race E2E spec -----
--- A thread at logistics_stage='ready_to_dispatch'. Two concurrent calls to
--- logistics_dispatch_customer_leg(force=true) should serialize via FOR UPDATE:
+-- A thread at operation_stage='ready_to_dispatch'. Two concurrent calls to
+-- operation_dispatch_customer_leg(force=true) should serialize via FOR UPDATE:
 -- first wins (200), second sees state='dispatched' → 22023 → 422 (mapPgError).
 --
 -- Idempotent reset: delete + reinsert. Ensures the thread starts fresh at
@@ -264,7 +264,7 @@ VALUES (
 );
 
 INSERT INTO order_supplier_threads (
-  id, order_id, supplier_id, category, sop_name, logistics_stage, history
+  id, order_id, supplier_id, category, sop_name, operation_stage, history
 )
 VALUES (
   '99999999-7777-7777-7777-000000007777'::uuid,
@@ -276,7 +276,7 @@ VALUES (
 
 -- ----- SOP/SKU smoke fixtures for full-happy specs --------------------
 -- 4 orders + threads, one per SOP+SKU combo. Each spec asserts its order
--- card is visible on the logistics kanban (validates SOP routing + RLS).
+-- card is visible on the operations kanban (validates SOP routing + RLS).
 -- Idempotent: DELETE-then-INSERT.
 DELETE FROM order_supplier_threads WHERE order_id IN (
   '99999999-a000-a000-a000-000000000aa1'::uuid,  -- mattress
@@ -299,7 +299,7 @@ INSERT INTO orders (
   id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
-  paid, terms_accepted, placed_at, logistics_stage
+  paid, terms_accepted, placed_at, operation_stage
 ) VALUES
   ('99999999-a000-a000-a000-000000000aa1'::uuid, 9201, 'proceed_order', 'dealer',
    '00000000-0000-0000-0000-000000000d01',
@@ -331,7 +331,7 @@ INSERT INTO orders (
    0, true, now(), 'waiting');
 
 INSERT INTO order_supplier_threads (
-  id, order_id, supplier_id, category, sop_name, logistics_stage, history
+  id, order_id, supplier_id, category, sop_name, operation_stage, history
 ) VALUES
   ('99999999-aa11-aa11-aa11-000000000aa1'::uuid, '99999999-a000-a000-a000-000000000aa1'::uuid,
    '00000000-0000-0000-0000-0000000000e2',  -- Nice Future
@@ -347,7 +347,7 @@ INSERT INTO order_supplier_threads (
    'sofa', 'SOFA_SPECIAL', 'waiting', '[]'::jsonb);
 
 -- ----- Phase 7 POD upload fixture --------------------
--- Thread at logistics_stage='dispatched' with delivery_partner_id=JT Express
+-- Thread at operation_stage='dispatched' with delivery_partner_id=JT Express
 -- (lp-test partner) for the phase-7-partner-pod-happy E2E spec. Idempotent.
 DELETE FROM order_supplier_threads WHERE id = '99999999-aabb-aabb-aabb-000000007077'::uuid;
 DELETE FROM orders WHERE id = '99999999-7077-7077-7077-000000007077'::uuid;
@@ -356,7 +356,7 @@ INSERT INTO orders (
   id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
-  paid, terms_accepted, placed_at, logistics_stage
+  paid, terms_accepted, placed_at, operation_stage
 )
 VALUES (
   '99999999-7077-7077-7077-000000007077'::uuid,
@@ -370,7 +370,7 @@ VALUES (
 );
 
 INSERT INTO order_supplier_threads (
-  id, order_id, supplier_id, category, sop_name, logistics_stage,
+  id, order_id, supplier_id, category, sop_name, operation_stage,
   delivery_partner_id, history
 )
 VALUES (
@@ -399,9 +399,9 @@ VALUES (
 
 -- Stockpile threshold fixture for stockpile-alert-to-po E2E spec.
 -- mattress:carres-cloud:Queen at warehouse c1 has qty=4 in seed (line 200 of
--- seed.sql). Setting low_threshold=50 guarantees logistics_stock_alerts()
+-- seed.sql). Setting low_threshold=50 guarantees operation_stock_alerts()
 -- returns this row (effective 4 < threshold 50) so the StockAlertsTile on
--- /logistics dashboard renders the alert.
+-- /operation dashboard renders the alert.
 UPDATE stock_balances
    SET low_threshold = 50
  WHERE sku = 'mattress:carres-cloud:Queen'

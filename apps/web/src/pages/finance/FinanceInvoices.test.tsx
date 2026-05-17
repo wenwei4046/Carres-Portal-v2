@@ -44,7 +44,7 @@ const ROW_UNPAID = {
 const ROW_PARTIAL = {
   ...ROW_PAID, order_id: "00000000-0000-0000-0000-0000000000a3", dl: 1242,
   customer_name: "Wong Mei Lin", paid: 2985, outstanding: 2985,
-  invoice_no: "INV-2026-1242", status: "logistics",
+  invoice_no: "INV-2026-1242", status: "operation",
 };
 
 const PAYLOAD = {

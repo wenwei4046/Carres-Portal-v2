@@ -65,7 +65,7 @@ function makeOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
     payment_method: null,
     approval_code: null,
     installment_months: null,
-    logistics_stage: null,
+    operation_stage: null,
     warehouse_id: null,
     delivery_partner_id: null,
     partner_stage: null,
@@ -478,9 +478,9 @@ describe("GET /api/orders/:id/sales-order-data", () => {
     expect(body.addons).toHaveLength(1);
   });
 
-  it("admits logistics (revised 2026-05-12 — they need it on handover)", async () => {
+  it("admits operation (revised 2026-05-12 — they need it on handover)", async () => {
     vi.mocked(userClient).mockReturnValue(buildSb({ one: makeJoinedRow() }));
-    const jwt = await makeJwt("logistics", null);
+    const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
         headers: { Authorization: `Bearer ${jwt}` },

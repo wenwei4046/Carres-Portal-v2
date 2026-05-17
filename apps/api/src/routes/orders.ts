@@ -96,7 +96,7 @@ ordersRouter.get("/", async (c) => {
   if (
     dealerId &&
     (auth.role === "principal" ||
-      auth.role === "logistics" ||
+      auth.role === "operation" ||
       auth.role === "finance" ||
       auth.role === "bd")
   ) {
@@ -143,7 +143,7 @@ ordersRouter.post("/", async (c) => {
   const auth = c.var.auth;
 
   if (auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
-      auth.role !== "principal" && auth.role !== "logistics" &&
+      auth.role !== "principal" && auth.role !== "operation" &&
       auth.role !== "finance" && auth.role !== "bd") {
     throw new HTTPException(403, { message: "Role cannot create orders" });
   }
@@ -165,7 +165,7 @@ ordersRouter.post("/", async (c) => {
     });
   }
   if (!auth.dealerId) {
-    // Internal roles (principal/logistics/finance/bd) creating on behalf of a
+    // Internal roles (principal/operation/finance/bd) creating on behalf of a
     // dealer must Phase 3 — for 2B only dealers/salespersons create.
     throw new HTTPException(403, { message: "Phase 2B only supports dealer-self order creation" });
   }
@@ -373,7 +373,7 @@ ordersRouter.post("/:id/proceed", async (c) => {
 
   if (
     auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
-    auth.role !== "principal" && auth.role !== "logistics" &&
+    auth.role !== "principal" && auth.role !== "operation" &&
     auth.role !== "finance" && auth.role !== "bd"
   ) {
     throw new HTTPException(403, { message: "Role cannot proceed orders" });
@@ -443,7 +443,7 @@ async function dispatchOrderMutation<TBody>(
 
   if (
     auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
-    auth.role !== "principal" && auth.role !== "logistics" &&
+    auth.role !== "principal" && auth.role !== "operation" &&
     auth.role !== "finance" && auth.role !== "bd"
   ) {
     throw new HTTPException(403, { message: "Role cannot mutate orders" });
@@ -550,7 +550,7 @@ ordersRouter.post("/:id/date", (c) =>
 );
 
 /** POST /api/orders/:id/cancel — Phase 2C.3 dealer cancel. Only Place
- *  orders cancelable; once proceeded, logistics owns the rollback flow. */
+ *  orders cancelable; once proceeded, operation owns the rollback flow. */
 ordersRouter.post("/:id/cancel", (c) =>
   dispatchOrderMutation(c, {
     schema: cancelOrderInputSchema,
@@ -583,7 +583,7 @@ ordersRouter.patch("/:id", async (c) => {
 
   if (
     auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
-    auth.role !== "principal" && auth.role !== "logistics" &&
+    auth.role !== "principal" && auth.role !== "operation" &&
     auth.role !== "finance" && auth.role !== "bd"
   ) {
     throw new HTTPException(403, { message: "Role cannot edit orders" });
@@ -712,7 +712,7 @@ ordersRouter.get("/:id", async (c) => {
 // because Workers blocks the yoga-layout WASM compile. The route stays
 // here for the SQL joins + role gate + RLS scoping.
 //
-// Customer-facing doc. Dealer / Showroom / Salesperson / Logistics / Finance
+// Customer-facing doc. Dealer / Showroom / Salesperson / operation / Finance
 // / Principal / BD can pull; Partner / Supplier are denied at the route gate
 // (Partner has POD, Supplier has PO — they shouldn't be handing out the
 // customer SO). RLS on `orders` narrows further to rows each role can read.
@@ -851,13 +851,13 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
 /**
  * GET /api/orders/:id/invoice-pdf-data — Loo 2026-05-13.
  *
- * Sales Invoice PDF data for the Logistics drawer "Print Invoice" button.
+ * Sales Invoice PDF data for the operation drawer "Print Invoice" button.
  * Mirrors the Finance route at /api/finance/invoices/:id/pdf-data shape
  * but keyed by order_id (not invoice_id) and gated permissively so the
- * Logistics user can re-print at dispatch handover without bouncing
+ * operation user can re-print at dispatch handover without bouncing
  * through Finance.
  *
- * Available to logistics, finance, principal, bd. Partner / supplier /
+ * Available to operation, finance, principal, bd. Partner / supplier /
  * dealer / showroom / salesperson denied (invoice is an internal/tax
  * doc; the customer-facing SO PDF is already wired elsewhere).
  *
@@ -868,7 +868,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
 ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   const auth = c.var.auth;
   const role = auth.role;
-  if (!["logistics", "finance", "principal", "bd"].includes(String(role))) {
+  if (!["operation", "finance", "principal", "bd"].includes(String(role))) {
     throw new HTTPException(403, { message: "Invoice PDF not available for this role" });
   }
   const id = c.req.param("id");
@@ -891,7 +891,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   const ord: any = order;
   if (!ord.invoice_no) {
     throw new HTTPException(422, {
-      message: "Invoice not yet issued (auto-issued at dispatch — wait until logistics_stage='dispatched')",
+      message: "Invoice not yet issued (auto-issued at dispatch — wait until operation_stage='dispatched')",
     });
   }
 

@@ -412,7 +412,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
   it("returns 422 when order not delivered", async () => {
     const sb = mockChain(
       { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
-      { id: ORDER_ID, dl: 1240, status: "logistics", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: 5970, dealers: null },
+      { id: ORDER_ID, dl: 1240, status: "operation", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: 5970, dealers: null },
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);

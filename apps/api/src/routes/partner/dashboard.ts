@@ -6,7 +6,7 @@ import type { AppEnv } from "../../types";
 /**
  * GET /api/partner/dashboard — Phase 4.5 Chunk 1 (Task 24).
  *
- * Returns KPI counts for the authenticated Logistics Partner (LP):
+ * Returns KPI counts for the authenticated operation Partner (LP):
  *   - assigned   : sup_status = 'pickup_assigned'
  *   - accepted   : sup_status = 'pickup_accepted'
  *   - in_transit : sup_status = 'picked_up'

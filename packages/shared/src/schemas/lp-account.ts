@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Phase 4.5 Chunk 1 — Logistics Partner (LP) account creation input.
+ * Phase 4.5 Chunk 1 — operation Partner (LP) account creation input.
  *
  * Used by `POST /api/principal/partners` to atomically create a new LP:
  *   1. `delivery_partners` row (companyName, contactNumber, address)

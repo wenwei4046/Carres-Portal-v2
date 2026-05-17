@@ -34,7 +34,7 @@ export type DoTemplateData = {
     contact: string | null;
   };
 
-  /** Delivery partner / logistics carrier (optional — null pre-dispatch). */
+  /** Delivery partner / operation carrier (optional — null pre-dispatch). */
   partner: {
     name: string;
   } | null;

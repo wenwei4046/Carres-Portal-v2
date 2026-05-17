@@ -9,37 +9,37 @@ import type { AppEnv } from "../types";
  * Hono v4's `app.route(path, subapp)` flattens the sub-app's routes onto the
  * parent at `path`. A blanket `subapp.use("*", ...)` becomes equivalent to
  * `app.use(path + "/*", ...)` — which then matches every sibling sub-router
- * mounted at the same `path`. That's why earlier `logisticsPosRouter.use("*",
- * logisticsOnly)` silently 403'd `principal` and `partner` traffic to the
+ * mounted at the same `path`. That's why earlier `operationPosRouter.use("*",
+ * operationOnly)` silently 403'd `principal` and `partner` traffic to the
  * sibling routers `lpInboundRouter` and `dispatchCustomerLegRouter`, even
  * though those routers' inline allowlists tried to admit those roles.
  *
  * The fix is per-route middleware: passing a guard as the second argument to
  * `router.get(path, guard, handler)` binds it to that specific path on this
  * router only, so siblings stay isolated. Sub-routers that legitimately need
- * to admit non-logistics roles enforce that in their own per-route handlers
+ * to admit non-operation roles enforce that in their own per-route handlers
  * (or guards) instead of inheriting an upstream blanket.
  *
  * Usage:
- *   logisticsPosRouter.get("/", requireLogistics, async (c) => { ... });
- *   logisticsPosRouter.post("/:id/cancel", requireLogistics, async (c) => { ... });
+ *   operationPosRouter.get("/", requireOperation, async (c) => { ... });
+ *   operationPosRouter.post("/:id/cancel", requireOperation, async (c) => { ... });
  */
-export const requireLogistics: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (c.var.auth?.role !== "logistics") {
-    throw new HTTPException(403, { message: "Logistics only" });
+export const requireOperation: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.var.auth?.role !== "operation") {
+    throw new HTTPException(403, { message: "operation only" });
   }
   await next();
 };
 
 /**
- * 2026-05-12 (Loo) — admits `logistics` OR `principal`. Used by the revert
- * RPCs (`logistics_revert_order_*`) so the principal can rewind orders even
- * when no logistics staff are around. Mirrors the role gate inside the RPCs.
+ * 2026-05-12 (Loo) — admits `operation` OR `principal`. Used by the revert
+ * RPCs (`operation_revert_order_*`) so the principal can rewind orders even
+ * when no operation staff are around. Mirrors the role gate inside the RPCs.
  */
-export const requireLogisticsOrPrincipal: MiddlewareHandler<AppEnv> = async (c, next) => {
+export const requireOperationOrPrincipal: MiddlewareHandler<AppEnv> = async (c, next) => {
   const role = c.var.auth?.role;
-  if (role !== "logistics" && role !== "principal") {
-    throw new HTTPException(403, { message: "Logistics or Principal only" });
+  if (role !== "operation" && role !== "principal") {
+    throw new HTTPException(403, { message: "operation or Principal only" });
   }
   await next();
 };

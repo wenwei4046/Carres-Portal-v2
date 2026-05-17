@@ -20,7 +20,7 @@ import { test, expect, type Page } from "@playwright/test";
  * Cross-references:
  *   • Filter audit (Task 14) — supplier/products.ts OPEN_SUP_STATUSES,
  *     supplier/pos.ts PIPELINE_BUCKETS.ready, partner/dashboard.ts,
- *     logistics/badges.ts all include `partially_shipped`. This spec is the
+ *     operation/badges.ts all include `partially_shipped`. This spec is the
  *     end-to-end proof that the partial PO stays surfaced to every role
  *     through the in-between state.
  *
@@ -32,7 +32,7 @@ import { test, expect, type Page } from "@playwright/test";
  *       - 3 mattress+bedframe orders → NiceFuture mattress threads +
  *                                       HoOKkA bedframe threads
  *       - 4 mattress-only orders → NiceFuture mattress threads
- *   • `logistics_create_pos_batch` bundles them into 2 POs:
+ *   • `operation_create_pos_batch` bundles them into 2 POs:
  *       - PO-FIX-NF-PARTIAL (NiceFuture mattress, 10 threads total = 3+3+4)
  *       - PO-FIX-HK-COMBINED (HoOKkA sofa + bedframe, mixed-category)
  *   • Both POs advanced to `sup_status='in_production'` so the supplier-side

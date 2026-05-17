@@ -13,14 +13,14 @@ import type { AppEnv } from "../../types";
  *
  * The `pickup_event_render_payload(p_event_id uuid)` RPC (migration 0107)
  * does the per-role gating (supplier owns thread / partner assigned to pickup
- * / logistics + principal full). This route just validates uuid + role
+ * / operation + principal full). This route just validates uuid + role
  * allowlist; cross-tenant 42501s from the RPC surface as 403 via
  * `mapPgError`.
  */
 const pickupEventsRouter = new Hono<AppEnv>();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ALLOWED_ROLES = new Set(["supplier", "partner", "logistics", "principal"]);
+const ALLOWED_ROLES = new Set(["supplier", "partner", "operation", "principal"]);
 
 pickupEventsRouter.get("/:id/print", async (c) => {
   const auth = c.var.auth;

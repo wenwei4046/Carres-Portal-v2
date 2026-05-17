@@ -3,13 +3,13 @@ import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useAttachPod, type PartnerToDeliverRow } from "@/lib/queries";
-import { INPUT_CLS, Modal, ModalActions } from "../../logistics/components/Modal";
+import { INPUT_CLS, Modal, ModalActions } from "../../operation/components/Modal";
 
 /**
  * PODUploadDialog — Phase 7 Sprint 2, redesigned 2026-05-11 (Loo).
  *
  * Two-stage flow + shared Carres Modal chrome + same 3-field set as the
- * logistics DOAttachModal so an operator switching roles doesn't re-learn
+ * operation DOAttachModal so an operator switching roles doesn't re-learn
  * the action surface:
  *
  *   1. Pick photo → upload to `proof-of-delivery` Storage bucket. NOTHING
@@ -17,7 +17,7 @@ import { INPUT_CLS, Modal, ModalActions } from "../../logistics/components/Modal
  *   2. User fills DO# + (optional) note + ticks "customer signed" → clicks
  *      "Mark delivered" → calls partner_attach_pod RPC (migration 0088
  *      5-arg signature) which sets pod_url + pod_do_number + pod_note +
- *      advances thread.logistics_stage='delivered'.
+ *      advances thread.operation_stage='delivered'.
  *
  * Field order matches DOAttachModal: DO# → Note → File → Signed checkbox.
  *

@@ -10,7 +10,7 @@ interface Props {
  * Brand lockup — heart-pulse mark + "Carres." wordmark in DM Sans bold,
  * terracotta. Mirrors `reference/shared/brand.jsx CarresLockup` so every
  * shell that mounted that proto component (dealer / principal / finance /
- * logistics / partner / bd) renders the same mark in v2.
+ * operation / partner / bd) renders the same mark in v2.
  */
 export default function CarresLockup({ showPortal = false, size = 26 }: Props) {
   return (

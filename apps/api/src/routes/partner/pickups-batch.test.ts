@@ -83,8 +83,8 @@ describe("POST /api/partner/pickups/batch", () => {
     expect(res.status).toBe(403);
   });
 
-  it("rejects logistics role with 403", async () => {
-    const jwt = await makeJwt("logistics");
+  it("rejects operation role with 403", async () => {
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/partner/pickups/batch", {
         method: "POST",

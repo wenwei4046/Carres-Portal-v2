@@ -59,7 +59,7 @@ insert into delivery_partners (name, contact, zones, onboarded_date, rate_card) 
 -- WAREHOUSES — 1 (Carres Klang)
 -- -----------------------------------------------------------------------------
 insert into warehouses (name, address) values
-  ('Carres Klang Warehouse', 'Address TBD — please update via Logistics → Warehouses');
+  ('Carres Klang Warehouse', 'Address TBD — please update via Operations → Warehouses');
 
 -- -----------------------------------------------------------------------------
 -- LOO'S OWN principal app_users row — rename from "Sara · Principal" demo
@@ -78,7 +78,7 @@ commit;
 --  | Role          | Email                        | Linked entity              |
 --  |---------------|------------------------------|----------------------------|
 --  | finance       | finance@carres.com           | none                       |
---  | logistics     | logistics@carres.com         | none                       |
+--  | operation     | operation@carres.com         | none                       |
 --  | bd            | BD@carres.com                | none                       |
 --  | dealer        | mattress@carres.com          | Mattress King              |
 --  | salesperson   | sales-mk@carres.com          | Mattress King + Main outlet|

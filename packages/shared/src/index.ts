@@ -11,7 +11,7 @@ export * as Adapters from "./adapters";
 
 // Phase 4.5 Chunk 2 Sprint E migration 0055 (T25). Top-level type re-export
 // so consumers can `import type { CostSource } from "@carres/shared"` without
-// having to dip into the DB.* namespace. Mirrors how Role + LogisticsStage are
+// having to dip into the DB.* namespace. Mirrors how Role + operationStage are
 // implicitly available via DB.* — but CostSource is referenced widely enough
 // (CreatePoInput line shape, CogsLineEditor T28, recent-cost RPC T27) to
 // warrant the top-level alias.
@@ -71,7 +71,7 @@ export {
   sopFor,
   PROCUREMENT_TAB_SLUGS,
   deriveProcurementSlug,
-  type LogisticsStageV3,
+  type OperationStageV3,
   type SopName,
   type SopDef,
   type ProcurementTabSlug,
@@ -151,7 +151,7 @@ export {
   recheckStockInput,
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
-  listLogisticsOrdersQuery,
+  ListOperationOrdersQuery,
   listPurchaseOrdersQuery,
   cancelPoInput,
   listMovementsQuery,
@@ -160,14 +160,14 @@ export {
   reservedDrilldownQuery,
   reservedDrilldownResponse,
   awaitingStockShortageResponse,
-  logisticsBadgesResponse,
+  OperationBadgesResponse,
   partnerAcceptRfdInput,
   partnerRejectRfdInput,
   dispatchCustomerLegInput,
   resumeDispatchInput,
   setThresholdInput,
   // Migration 0107 — supplier per-thread pickup feature.
-  logisticsReceiveThreadsInput,
+  OperationReceiveThreadsInput,
   type AssignPartnerInput,
   type AttachDoInput,
   type ReceivePoWithDoInput,
@@ -181,7 +181,6 @@ export {
   type RecheckStockInput,
   type AssignPickupPartnerInput,
   type ReassignPoWarehouseInput,
-  type ListLogisticsOrdersQuery,
   type ListPurchaseOrdersQuery,
   type CancelPoInput,
   type ListMovementsQuery,
@@ -190,14 +189,12 @@ export {
   type ReservedDrilldownQuery,
   type ReservedDrilldownResponse,
   type AwaitingStockShortageResponse,
-  type LogisticsBadgesResponse,
   type PartnerAcceptRfdInput,
   type PartnerRejectRfdInput,
   type DispatchCustomerLegInput,
   type ResumeDispatchInput,
   type SetThresholdInput,
-  type LogisticsReceiveThreadsInput,
-} from "./schemas/logistics";
+} from "./schemas/operation";
 
 export {
   paymentMethodEnum,

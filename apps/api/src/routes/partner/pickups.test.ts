@@ -194,7 +194,7 @@ describe("GET /api/partner/pickups", () => {
 });
 
 describe("GET /api/partner/pickups/rfd-pending", () => {
-  it("calls logistics_partner_rfd_pending RPC and returns rows", async () => {
+  it("calls operation_partner_rfd_pending RPC and returns rows", async () => {
     const rows = [
       {
         thread_id: "00000000-0000-0000-0000-0000000200a1",
@@ -215,7 +215,7 @@ describe("GET /api/partner/pickups/rfd-pending", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_rfd_pending");
+    expect(sb.rpc).toHaveBeenCalledWith("operation_partner_rfd_pending");
     expect(await res.json()).toEqual(rows);
   });
 
@@ -255,10 +255,10 @@ describe("GET /api/partner/pickups/rfd-pending", () => {
 const THREAD_ID = "00000000-0000-0000-0000-00000000beef";
 
 describe("POST /api/partner/pickups/accept-rfd", () => {
-  it("calls logistics_partner_accept_rfd RPC with p_thread_id", async () => {
+  it("calls operation_partner_accept_rfd RPC with p_thread_id", async () => {
     const sb = {
       rpc: vi.fn().mockResolvedValue({
-        data: { thread_id: THREAD_ID, partner_accepted_at: "2026-05-15T00:00:00Z", logistics_stage: "dispatched" },
+        data: { thread_id: THREAD_ID, partner_accepted_at: "2026-05-15T00:00:00Z", operation_stage: "dispatched" },
         error: null,
       }),
     };
@@ -275,7 +275,7 @@ describe("POST /api/partner/pickups/accept-rfd", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_accept_rfd", {
+    expect(sb.rpc).toHaveBeenCalledWith("operation_partner_accept_rfd", {
       p_thread_id: THREAD_ID,
     });
   });
@@ -349,14 +349,14 @@ describe("POST /api/partner/pickups/accept-rfd", () => {
       env,
     );
     expect(res.status).toBe(403);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_accept_rfd", {
+    expect(sb.rpc).toHaveBeenCalledWith("operation_partner_accept_rfd", {
       p_thread_id: THREAD_ID,
     });
   });
 });
 
 describe("POST /api/partner/pickups/reject-rfd", () => {
-  it("calls logistics_partner_reject_rfd RPC with p_thread_id + p_reason", async () => {
+  it("calls operation_partner_reject_rfd RPC with p_thread_id + p_reason", async () => {
     const sb = {
       rpc: vi.fn().mockResolvedValue({
         data: { thread_id: THREAD_ID, rfd_cleared: true, lp_kept_assigned: true },
@@ -375,7 +375,7 @@ describe("POST /api/partner/pickups/reject-rfd", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_reject_rfd", {
+    expect(sb.rpc).toHaveBeenCalledWith("operation_partner_reject_rfd", {
       p_thread_id: THREAD_ID,
       p_reason: "capacity full",
     });
@@ -400,7 +400,7 @@ describe("POST /api/partner/pickups/reject-rfd", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_reject_rfd", {
+    expect(sb.rpc).toHaveBeenCalledWith("operation_partner_reject_rfd", {
       p_thread_id: THREAD_ID,
       p_reason: "",
     });
@@ -461,7 +461,7 @@ describe("POST /api/partner/pickups/reject-rfd", () => {
     const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/partner/pickups/reject-rfd", {
         method: "POST",
@@ -484,7 +484,7 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
     ],
   };
 
-  it("calls logistics_receive_po_with_do RPC and returns the result", async () => {
+  it("calls operation_receive_po_with_do RPC and returns the result", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: { po_id: "PO-9001", po_status: "received", sup_status: "delivered" },
       error: null,
@@ -501,7 +501,7 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
       env,
     );
     expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("logistics_receive_po_with_do", {
+    expect(rpc).toHaveBeenCalledWith("operation_receive_po_with_do", {
       p_po_id: "PO-9001",
       p_do_file_path: VALID_BODY.doFilePath,
       p_do_number: VALID_BODY.doNumber,
@@ -530,7 +530,7 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/partner/pickups/PO-9001/receive", {
         method: "POST",

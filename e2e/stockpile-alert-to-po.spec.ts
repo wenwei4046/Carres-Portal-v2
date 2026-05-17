@@ -14,10 +14,10 @@ async function login(page: Page, email: string, password: string) {
 //
 // Phase 4.5 Chunk 2 Sprint D shipped stockpile thresholds (migration 0054):
 //   • stock_balances.low_threshold + .high_threshold columns + CHECKs.
-//   • RPC logistics_stock_alerts() returns rows where (qty - reserved) <
+//   • RPC operation_stock_alerts() returns rows where (qty - reserved) <
 //     low_threshold (i.e. effective < low_threshold).
-//   • Frontend: StockAlertsTile on LogisticsDashboard, SetThresholdDialog
-//     inline-edit on LogisticsWarehouse (only on the reserved-drilldown view,
+//   • Frontend: StockAlertsTile on OperationDashboard, SetThresholdDialog
+//     inline-edit on OperationWarehouse (only on the reserved-drilldown view,
 //     so editing thresholds via UI requires a SKU with reservations — out
 //     of scope for this spec).
 //
@@ -31,15 +31,15 @@ async function login(page: Page, email: string, password: string) {
 test("phase-4.5-chunk-2: stockpile alert tile shows below-threshold SKUs", async ({ page }) => {
   const TEST_SKU = "mattress:carres-cloud:Queen";
 
-  await login(page, "logistics-test@x.com", "logistics-test-password");
+  await login(page, "operation-test@x.com", "operation-test-password");
 
-  // ----- LogisticsDashboard renders StockAlertsTile -------------------------
-  await page.goto("/logistics");
+  // ----- OperationDashboard renders StockAlertsTile -------------------------
+  await page.goto("/operation");
   const tile = page.getByTestId("stock-alerts-tile");
   await expect(tile).toBeVisible({ timeout: 10_000 });
 
   // ----- Tile shows the seeded below-threshold SKU --------------------------
-  // qty=4 (seed) < low_threshold=50 (fixture) → logistics_stock_alerts() RPC
+  // qty=4 (seed) < low_threshold=50 (fixture) → operation_stock_alerts() RPC
   // returns this row → tile renders <div data-testid="stock-alerts-row-{sku}">.
   await expect(
     page.getByTestId(`stock-alerts-row-${TEST_SKU}`),

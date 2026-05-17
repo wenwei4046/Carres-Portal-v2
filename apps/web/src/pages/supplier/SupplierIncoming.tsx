@@ -21,7 +21,7 @@ export default function SupplierIncoming() {
   // 2026-05-10 (Loo) — `openQty` is committed via PO; `pendingQty` is
   // pre-commit demand from sales orders with matching cat_covered. Surface
   // both so the supplier can plan production capacity without waiting for
-  // logistics to formalise every order into a PO.
+  // operation to formalise every order into a PO.
   // 2026-05-15 (Loo) — "Pending ack" KPI removed. It was a sub-status of
   // committed POs (sup_status='pending') and didn't belong in a demand
   // forecast view; supplier reads PO ack state on the POs page anyway.

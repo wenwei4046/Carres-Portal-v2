@@ -31,7 +31,7 @@ function readyOrder(over: Partial<Order> = {}): Order {
     paymentMethod: "online",
     approvalCode: null,
     installmentMonths: null,
-    logisticsStage: null,
+    operationStage: null,
     warehouseId: null,
     deliveryPartnerId: null,
     partnerStage: null,

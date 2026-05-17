@@ -154,7 +154,7 @@ describe("POST /api/finance/bank-statements", () => {
   });
 
   it("rejects non-finance role with 403", async () => {
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/finance/bank-statements", {
         method: "POST",

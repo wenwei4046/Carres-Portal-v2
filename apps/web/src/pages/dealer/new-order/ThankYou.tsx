@@ -41,7 +41,7 @@ export default function ThankYou({ order, onNewOrder, onClose }: Props) {
             Order sits in <strong>Place</strong> until you click <em>Proceed</em> when the
             customer is ready.
           </li>
-          <li>Logistics will issue a PO and prepare the goods.</li>
+          <li>operation will issue a PO and prepare the goods.</li>
           <li>
             Once the DO is submitted, the order moves to <strong>Delivered</strong>.
           </li>
