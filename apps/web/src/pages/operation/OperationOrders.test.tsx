@@ -786,8 +786,9 @@ describe("OperationOrders — kanban", () => {
     ).toBeNull();
   });
 
-  it("26. (Chunk 2 T9) renders single LP pill when all threads share the same delivery_partner_id", () => {
+  it("26. (Chunk 2 T9 + 2026-05-18 name join) renders LP pill with partner NAME when threads share the same delivery_partner_id + joined name", () => {
     const PARTNER_ID = "00000000-0000-0000-0000-0000000abcde";
+    const PARTNER_NAME = "Nets Sdn Bhd";
     setLoaded([
       makeOrder({
         id: "ord-single-lp",
@@ -803,6 +804,7 @@ describe("OperationOrders — kanban", () => {
             operation_stage: "ready_to_dispatch",
             po_id: "PO-1",
             delivery_partner_id: PARTNER_ID,
+            delivery_partners: { id: PARTNER_ID, name: PARTNER_NAME },
             confirm_delivery_date: "2026-05-08",
             request_for_delivery_at: "2026-05-04T08:00:00Z",
             partner_accepted_at: "2026-05-04T09:00:00Z",
@@ -816,6 +818,7 @@ describe("OperationOrders — kanban", () => {
             po_id: "PO-2",
             // Same partner across both threads → pill is single.
             delivery_partner_id: PARTNER_ID,
+            delivery_partners: { id: PARTNER_ID, name: PARTNER_NAME },
             confirm_delivery_date: "2026-05-08",
             request_for_delivery_at: "2026-05-04T08:00:00Z",
             partner_accepted_at: "2026-05-04T09:00:00Z",
@@ -833,12 +836,50 @@ describe("OperationOrders — kanban", () => {
       '[data-testid="order-card-lp-pill-partner"]',
     );
     expect(partnerPill).not.toBeNull();
-    // Pill renders an 8-char slug of the partner id (no name join in list endpoint).
-    expect(partnerPill?.textContent).toContain(PARTNER_ID.slice(0, 8));
+    // 2026-05-18 — pill now renders the partner NAME from the joined embed.
+    // UUID slug is the fallback when the name embed is null (kept covered in
+    // the dedicated fallback test below).
+    expect(partnerPill?.textContent).toContain(PARTNER_NAME);
+    expect(partnerPill?.textContent).not.toContain(PARTNER_ID.slice(0, 8));
     // The "multi" variant is mutually exclusive with single.
     expect(
       card.querySelector('[data-testid="order-card-lp-pill-multi"]'),
     ).toBeNull();
+  });
+
+  it("26b. (2026-05-18) falls back to LP-<uuid-slug> when delivery_partners embed is null", () => {
+    const PARTNER_ID = "00000000-0000-0000-0000-0000000abcde";
+    setLoaded([
+      makeOrder({
+        id: "ord-fallback-lp",
+        dl: 9103,
+        customer_name: "Fallback Fred",
+        operation_stage: "ready_to_dispatch",
+        delivery_partner_id: null,
+        order_supplier_threads: [
+          {
+            id: "thread-fb",
+            supplier_id: "sup-1",
+            category: "mattress",
+            operation_stage: "ready_to_dispatch",
+            po_id: "PO-FB",
+            delivery_partner_id: PARTNER_ID,
+            // Embed missing (legacy data or RLS-hidden delivery_partner row).
+            delivery_partners: null,
+            confirm_delivery_date: "2026-05-08",
+            request_for_delivery_at: "2026-05-04T08:00:00Z",
+            partner_accepted_at: "2026-05-04T09:00:00Z",
+            partner_rejected_at: null,
+          },
+        ],
+      }),
+    ]);
+    render(wrap(<OperationOrders />));
+
+    const partnerPill = screen
+      .getByTestId("order-card-9103")
+      .querySelector('[data-testid="order-card-lp-pill-partner"]');
+    expect(partnerPill?.textContent).toContain(`LP-${PARTNER_ID.slice(0, 8)}`);
   });
 
   it("27. (Chunk 2 T9) renders Multi-LP hint when threads disagree on delivery_partner_id", () => {
@@ -857,6 +898,10 @@ describe("OperationOrders — kanban", () => {
             operation_stage: "ready_to_dispatch",
             po_id: "PO-A",
             delivery_partner_id: "00000000-0000-0000-0000-000000000aaa",
+            delivery_partners: {
+              id: "00000000-0000-0000-0000-000000000aaa",
+              name: "Partner Alpha",
+            },
             confirm_delivery_date: "2026-05-08",
             request_for_delivery_at: "2026-05-04T08:00:00Z",
             partner_accepted_at: "2026-05-04T09:00:00Z",
@@ -870,6 +915,10 @@ describe("OperationOrders — kanban", () => {
             po_id: "PO-B",
             // Different partner → multi-LP summary.
             delivery_partner_id: "00000000-0000-0000-0000-000000000bbb",
+            delivery_partners: {
+              id: "00000000-0000-0000-0000-000000000bbb",
+              name: "Partner Bravo",
+            },
             confirm_delivery_date: "2026-05-09",
             request_for_delivery_at: "2026-05-04T08:00:00Z",
             partner_accepted_at: "2026-05-04T10:00:00Z",
@@ -913,6 +962,7 @@ describe("OperationOrders — kanban", () => {
             operation_stage: "awaiting_operation_action",
             po_id: "PO-X",
             delivery_partner_id: null,
+            delivery_partners: null,
             confirm_delivery_date: null,
             request_for_delivery_at: null,
             partner_accepted_at: null,
@@ -925,6 +975,7 @@ describe("OperationOrders — kanban", () => {
             operation_stage: "awaiting_operation_action",
             po_id: "PO-Y",
             delivery_partner_id: null,
+            delivery_partners: null,
             confirm_delivery_date: null,
             request_for_delivery_at: null,
             partner_accepted_at: null,

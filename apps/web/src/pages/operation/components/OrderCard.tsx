@@ -43,7 +43,7 @@ import type { OperationStage } from "./StageChip";
  *  "Multi-LP" sentinel so the user knows to open the drawer for detail. */
 type LpSummary =
   | { kind: "none" }
-  | { kind: "single"; partnerId: string }
+  | { kind: "single"; partnerId: string; partnerName: string | null }
   | { kind: "multi"; count: number };
 
 function summariseThreadLps(
@@ -61,7 +61,13 @@ function summariseThreadLps(
   const distinct = new Set(assigned.map((t) => t.delivery_partner_id));
   if (distinct.size === 1) {
     const [partnerId] = distinct;
-    return { kind: "single", partnerId };
+    // 2026-05-18 (Loo) — read partner name from the joined
+    // `delivery_partners` embed. First thread with a non-null name wins;
+    // null fallback drops back to UUID slug rendering downstream.
+    const partnerName =
+      assigned.find((t) => t.delivery_partners?.name)?.delivery_partners
+        ?.name ?? null;
+    return { kind: "single", partnerId, partnerName };
   }
   return { kind: "multi", count: distinct.size };
 }
@@ -236,10 +242,12 @@ export default function OrderCard({
                 </span>
                 {lpSummary.kind === "single" ? (
                   <span
-                    className="font-mono text-[10px] text-base-700"
+                    className="text-[10px] text-base-700 font-semibold"
                     data-testid="order-card-lp-pill-partner"
+                    title={`LP id: ${lpSummary.partnerId}`}
                   >
-                    LP-{lpSummary.partnerId.slice(0, 8)}
+                    {lpSummary.partnerName ??
+                      `LP-${lpSummary.partnerId.slice(0, 8)}`}
                   </span>
                 ) : (
                   <span
