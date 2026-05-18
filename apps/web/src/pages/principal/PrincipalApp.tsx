@@ -7,6 +7,7 @@ import PrincipalPartners from "./PrincipalPartners";
 import PrincipalAccounts from "./PrincipalAccounts";
 import PrincipalAudit from "./PrincipalAudit";
 import PrincipalSuppliers from "./PrincipalSuppliers";
+import PrincipalOrders from "./PrincipalOrders";
 import OperationCatalog from "@/pages/catalog/OperationCatalog";
 import { usePrincipalDashboard } from "@/lib/queries";
 
@@ -48,6 +49,7 @@ export default function PrincipalApp() {
         {tab === "accounts" && <PrincipalAccounts />}
         {tab === "audit" && <PrincipalAudit />}
         {tab === "suppliers" && <PrincipalSuppliers />}
+        {tab === "orders" && <PrincipalOrders />}
       </main>
     </div>
   );
