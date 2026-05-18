@@ -27,22 +27,25 @@ principalStockRouter.use("*", async (c, next) => {
 principalStockRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  const [warehousesRes, balancesRes, skusRes, posRes] = await Promise.all([
+  const [warehousesRes, balancesRes, skusRes, poLinesRes] = await Promise.all([
     sb.from("warehouses").select("id, name").order("name"),
     sb.from("stock_balances").select("sku, warehouse_id, qty, reserved, low_threshold"),
     sb
       .from("product_skus")
       .select("sku, price, product_models(name, category)")
       .is("discontinued_at", null),
+    // `purchase_orders.sku/qty` was retired in Phase 4.5 Chunk 2; the live
+    // shape is per-line via `purchase_order_lines`. Outstanding = qty -
+    // received_qty so partially-received POs still count their remainder.
     sb
-      .from("purchase_orders")
-      .select("sku, qty, status")
-      .eq("status", "open"),
+      .from("purchase_order_lines")
+      .select("sku, qty, received_qty, purchase_orders!inner(status)")
+      .eq("purchase_orders.status", "open"),
   ]);
   if (warehousesRes.error) throw new HTTPException(500, { message: warehousesRes.error.message });
   if (balancesRes.error) throw new HTTPException(500, { message: balancesRes.error.message });
   if (skusRes.error) throw new HTTPException(500, { message: skusRes.error.message });
-  if (posRes.error) throw new HTTPException(500, { message: posRes.error.message });
+  if (poLinesRes.error) throw new HTTPException(500, { message: poLinesRes.error.message });
 
   const warehouses = (warehousesRes.data ?? []).map((w) => ({ id: w.id, name: w.name }));
 
@@ -64,9 +67,14 @@ principalStockRouter.get("/", async (c) => {
   });
 
   const incomingMap = new Map<string, number>();
-  (posRes.data ?? []).forEach((p) => {
-    if (!p.sku) return;
-    incomingMap.set(p.sku, (incomingMap.get(p.sku) ?? 0) + Number(p.qty ?? 0));
+  let openPoLineCount = 0;
+  (poLinesRes.data ?? []).forEach((l) => {
+    if (!l.sku) return;
+    const outstanding = Math.max(Number(l.qty ?? 0) - Number(l.received_qty ?? 0), 0);
+    if (outstanding > 0) {
+      incomingMap.set(l.sku, (incomingMap.get(l.sku) ?? 0) + outstanding);
+      openPoLineCount += 1;
+    }
   });
 
   const skus = (skusRes.data ?? []).map((s) => {
@@ -104,7 +112,7 @@ principalStockRouter.get("/", async (c) => {
     summary: {
       totalSkus: skus.length,
       lowStockCount: skus.filter((s) => s.available <= Math.max(s.lowThreshold, 1)).length,
-      openPos: (posRes.data ?? []).length,
+      openPos: openPoLineCount,
     },
   });
 });
