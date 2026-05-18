@@ -5,6 +5,7 @@ import CarresLockup from "@/components/CarresLockup";
 const NAV_ITEMS = [
   { to: "/bd/dashboard", label: "Dashboard", icon: "◆" },
   { to: "/bd/inquiries", label: "Inquiries", icon: "▣" },
+  { to: "/bd/dealers",   label: "Dealers",   icon: "▤" },
 ] as const;
 
 export default function BDSidebar() {
