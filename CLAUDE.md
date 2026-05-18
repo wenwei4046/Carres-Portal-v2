@@ -985,6 +985,36 @@ Migration count: 130 files.
 
 
 
+**Supplier mark-ready PO rollup (Loo 2026-05-18 "b" / Path B)** — closes asymmetric-write gap on the procurement leg. Mirror of the operation→thread cascade fixes (0128 / 0129) but in the reverse direction: thread-side state should propagate UP to PO-level sup_status.
+
+**Bug**: `supplier_mark_thread_ready` only updates `thread.supplier_ready_at` — never touches PO `sup_status`. So supplier finishes all threads, but PO stays at `in_production` forever. No visual signal anywhere (LP can't see "Awaiting Accept", Operation can't see "Ready"). Loo's 5 HoOKkA POs (PO-2033/34/35/36 all going to Carres Klang) were stuck at `in_production` even though all their threads had `supplier_ready_at` set.
+
+**Design (Loo confirmed)**: target sup_status depends on warehouse ownership:
+- `warehouses.owning_partner_id IS NOT NULL` (LP-owned WH) → `ready_confirm_sent` (LP sees "Awaiting Accept" in their Factory Pickups kanban; accepts via `lp_accept_inbound_delivery`)
+- `warehouses.owning_partner_id IS NULL` (Carres own WH) → `ready_for_pickup` (Operation sees the signal on procurement page; receives goods via `operation_receive_po_with_do` when supplier delivers — that RPC has no sup_status gate, accepts any non-`received` state)
+
+Loo's prior misunderstanding clarified: he expected Nets to see HoOKkA POs going to Carres Klang. **Correct behavior is that Nets doesn't see them** (Carres Klang is own WH, not Nets's WH). Nets only sees POs going to LP-owned WHs.
+
+Migration 0131 (`supplier_mark_ready_po_rollup`) applied to staging Supabase = prod. Three parts:
+- **PART A** — `supplier_mark_thread_ready` rewritten with post-mark PO rollup. After updating thread.supplier_ready_at, queries `bool_and(supplier_ready_at IS NOT NULL)` across all non-picked threads of the PO. If all ready AND current PO sup_status is in (`acknowledged`, `in_production`), advances to target state (LP confirm or pickup ready). Adds po_history audit + returns `po_advanced` in the response.
+- **PART B** — `supplier_unmark_thread_ready` rewritten with symmetric reverse rollup. After unmarking, if NOT all threads ready AND PO at `ready_confirm_sent`/`ready_for_pickup`, reverts to `in_production`. Won't touch downstream-advanced states (`partner_confirmed`, `partially_shipped`, etc.).
+- **PART C** — backfill any PO with all-threads-ready stuck at `acknowledged`/`in_production`. Carres Klang (own WH) → `ready_for_pickup`. LP-owned WH (none currently in master data) would → `ready_confirm_sent`.
+- **PART D** — sanity check raises EXCEPTION if any all-threads-ready PO is still stuck at `in_production`.
+
+Post-apply for Loo's 5 stuck HoOKkA POs:
+- PO-2033/34/35/36 → `ready_for_pickup` ✓ (all 4 had every thread ready)
+- PO-2037 → stayed at `in_production` ✓ (1 thread not ready — correct, backfill only fires when ALL ready)
+
+When Loo's HoOKkA supplier later marks PO-2037's remaining thread ready, the new rollup logic fires automatically → PO-2037 advances to `ready_for_pickup`.
+
+Migration count: 131 files.
+
+0131 NEW carry-forwards (added 2026-05-18):
+- `phase-10-test-lp-confirm-flow` (medium) — to actually exercise the LP confirm path (where Nets sees "Awaiting Accept"), need a warehouse with `owning_partner_id = Nets`. Master data only has Carres Klang (own WH). Either add a new LP-owned WH for testing, OR change Carres Klang's `owning_partner_id` to Nets. Once an LP-owned WH exists, supplier marks all threads ready → PO → `ready_confirm_sent` → Nets sees Awaiting Accept on Factory Pickups page.
+- `phase-10-operation-procurement-page-ready-pill` (low) — Operation's procurement page should surface a "Ready" pill/banner when sup_status = `ready_for_pickup` so the Operation user sees the signal immediately. The UI already has a `ready_confirm_sent` branch (`ProcurementTabContent.tsx:515`) but verify there's an equivalent for `ready_for_pickup` to close the visibility loop on own-WH flow.
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)
