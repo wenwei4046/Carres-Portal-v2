@@ -908,6 +908,28 @@ Migration count: 127 files.
 
 
 
+**Cascade Operation mark-delivered to threads (Loo 2026-05-18 screenshot — partner kanban still showed #1003 in SCHEDULED after Operation marked it delivered)** — Asymmetric write bug. Partner side (`partner_attach_pod`) updates thread + rollup trigger propagates UP to order. But Operation side (`operation_attach_do_and_deliver`) updates `orders` directly and **never propagates DOWN to `order_supplier_threads`**. Threads stayed at `operation_stage='dispatched'` after Operation override. Partner kanban reads from `partner_threads_to_deliver()` which filters on thread stage, so partner saw the order as still pending.
+
+Function was added before the per-thread architecture (Phase 4.5 Chunk 2 → 0107+) and never updated for it.
+
+Migration 0128 (`cascade_operation_mark_delivered_to_threads`) applied to staging Supabase = prod:
+- **PART A** — backfill any `order_supplier_threads.operation_stage` that's `<> 'delivered'` for orders where `orders.status='delivered' AND operation_stage='delivered'`. `COALESCE(t.delivered_at, o.delivered_at, now())` preserves any existing thread `delivered_at` (idempotent on mixed states where partner had already marked some threads).
+- **PART B** — `CREATE OR REPLACE operation_attach_do_and_deliver` with new UPDATE-threads block injected before INSERT order_history. Cascade runs in same transaction as orders update. Returns `threads_advanced` count in response. History/audit text gains "· N thread(s) advanced" suffix for visibility.
+- **PART C** — sanity check raises EXCEPTION if any thread still `<> 'delivered'` while its order is delivered.
+
+Post-fix verification for #1003: `order_stage=thread_stage=delivered, thread.delivered_at=2026-05-18T07:33:17 (matches order.delivered_at)`. Zero orphan threads across DB.
+
+Post-fix behavior:
+- Operation marks delivered → all threads cascade to delivered → partner kanban shows in DELIVERED column instead of SCHEDULED. `pod_url`/`pod_do_number` on thread stay NULL (Operation-marked orders don't capture partner POD; the order's DO file lives at `orders.do_file_path`).
+- Partner marks delivered first (via `partner_attach_pod`) → thread.delivered → rollup → order.delivered (existing path, unchanged).
+
+Migration count: 128 files.
+
+0128 NEW carry-forwards (added 2026-05-18):
+- `phase-10-operation-to-thread-cascade-audit` (medium) — `operation_attach_do_and_deliver` is patched; other Operation-side RPCs that mutate order state without touching threads may have the same asymmetric-write gap. Candidates: `operation_revert_order_dispatched_to_ready`, `operation_revert_order_proceed_to_placed`, `operation_abandon_order`, `operation_cancel_po`, `operation_warehouse_pick`. Audit each and add thread cascade where partner/supplier kanbans would otherwise show stale data.
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)
