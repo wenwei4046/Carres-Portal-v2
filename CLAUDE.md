@@ -926,7 +926,37 @@ Post-fix behavior:
 Migration count: 128 files.
 
 0128 NEW carry-forwards (added 2026-05-18):
-- `phase-10-operation-to-thread-cascade-audit` (medium) — `operation_attach_do_and_deliver` is patched; other Operation-side RPCs that mutate order state without touching threads may have the same asymmetric-write gap. Candidates: `operation_revert_order_dispatched_to_ready`, `operation_revert_order_proceed_to_placed`, `operation_abandon_order`, `operation_cancel_po`, `operation_warehouse_pick`. Audit each and add thread cascade where partner/supplier kanbans would otherwise show stale data.
+- `phase-10-operation-to-thread-cascade-audit` (medium) — `operation_attach_do_and_deliver` is patched; other Operation-side RPCs that mutate order state without touching threads may have the same asymmetric-write gap. Candidates: `operation_revert_order_dispatched_to_ready`, `operation_revert_order_proceed_to_placed`, `operation_abandon_order`, `operation_cancel_po`, `operation_warehouse_pick`. **Closed by 0129.**
+
+
+
+**Deep cascade audit + fixes (Loo 2026-05-18 "deep audit one time" / "go")** — followed 0128's pattern audit to its full scope. Two-layer audit ran across prod:
+
+**DB-state audit** (6 dimensions): order/thread stage rollup, thread/PO state coherence, stock anomalies, thread delivered_at vs operation_stage, orphan threads, warehouse_id chain drift + pickup event linkage. **All 6 returned ZERO inconsistencies** post-0127+0128 backfills.
+
+**Function-body audit** (23 RPCs): inspected every `operation_*` / `partner_*` / `supplier_*` function for asymmetric-write patterns. Found 3 real cascade gaps + 1 dead-code function.
+
+Migration 0129 (`deep_audit_cascade_fixes`) applied to staging Supabase = prod via `apply_migration`. Four fixes in one transaction:
+
+1. **HIGH — `partner_threads_to_deliver` filters cancelled orders.** `operation_abandon_order` sets `orders.status='cancelled', operation_stage=null` but threads stay at their existing operation_stage (no 'cancelled' value in the enum). Without this filter the Logistics Partner kanban shows ghost orders post-abandon. Cleanest fix is at the READ layer: `AND o.status <> 'cancelled'` in the SECURITY DEFINER RPC. Same outcome as a cascade write, without needing an enum extension.
+
+2. **MEDIUM — `operation_warehouse_pick` cascades warehouse_id to threads.** Function changed `orders.warehouse_id` but didn't update threads, creating chain drift (especially after `operation_cancel_po` left threads with the cancelled PO's warehouse hint). Added `UPDATE order_supplier_threads SET warehouse_id = p_warehouse_id WHERE order_id = p_order_id AND warehouse_id IS DISTINCT FROM ...`. Returns `threads_synced` count.
+
+3. **LOW — `operation_cancel_po` also nullifies `thread.warehouse_id`.** Previously only nulled `po_id`, leaving the cancelled PO's warehouse hint indefinitely. Now both nulled together; next claim or warehouse_pick refreshes.
+
+4. **LOW — DROP legacy `operation_confirm_proceed_request(uuid, uuid)`.** v1 predates per-thread architecture. API route at `apps/api/src/routes/operation/orders.ts:493` calls `_v3` exclusively. Verified zero callers in pg_proc / apps/web / apps/api (only comment references). Dead code dropped.
+
+**Sanity check** (embedded `DO $sanity$`): verifies all 4 conditions hold post-apply — legacy v1 gone, partner filter present, warehouse cascade present, cancel_po warehouse null cascade present. RAISE EXCEPTION rolls back if any fails. All 4 passed clean.
+
+**Verified safe (NOT bugs)**:
+- `operation_revert_order_proceed_to_placed` — v3 creates threads at confirm-proceed time (with operation_stage='awaiting_operation_action'). Revert runs ONLY when order is at proceed_request, which is BEFORE v3 has created threads. So no cascade needed.
+- `operation_revert_order_dispatched_to_ready` — updates `thread.operation_stage`; rollup trigger propagates to `orders.operation_stage`. Symmetric writes via rollup ✓.
+
+Migration count: 129 files.
+
+0129 NEW carry-forwards (added 2026-05-18):
+- `phase-10-cancelled-order-filter-audit` (medium) — 7 other functions join `orders` without `status <> 'cancelled'` filter: `supplier_pending_demand`, `dealer_with_stats`, `dealers_with_stats_list`, `partner_orders_for_threads`, `supplier_threads_for_po`, `supplier_orders_for_threads`, `partner_confirm_receive`. Most are caller-driven (filtered upstream by API routes), but a per-function audit + filter addition would be defense-in-depth before Day 1 volume. Highest priority: `supplier_pending_demand` (supplier dashboard forecast) and `dealer_with_stats` / `dealers_with_stats_list` (dealer dashboard counts).
+- `phase-10-drop-other-pre-thread-legacy-functions` (low) — if `operation_confirm_proceed_request` (v1) was dead code, other pre-thread-era functions may also be dead. Survey pg_proc for functions superseded by `_v3` / `_v2` versions; DROP the unused predecessors.
 
 
 
