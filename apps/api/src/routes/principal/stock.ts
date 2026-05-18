@@ -1,0 +1,112 @@
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { userClient } from "../../lib/supabase";
+import type { AppEnv } from "../../types";
+
+/**
+ * /api/principal/stock — Phase 10 read-only view of stock balances across
+ * every warehouse + per-SKU price + threshold + incoming PO counts. Mirrors
+ * `reference/proto/principal-views.jsx` L80-138.
+ *
+ * GET /
+ *   - returns warehouses[], skus[] (with per-warehouse qty/reserved/available),
+ *     and a tally of POs in-flight per SKU as `incoming`.
+ *
+ * Read-only — operation role owns the mutation surface.
+ */
+const principalStockRouter = new Hono<AppEnv>();
+
+principalStockRouter.use("*", async (c, next) => {
+  const role = c.var.auth?.role;
+  if (role !== "principal") {
+    throw new HTTPException(403, { message: "Principal only" });
+  }
+  await next();
+});
+
+principalStockRouter.get("/", async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const [warehousesRes, balancesRes, skusRes, posRes] = await Promise.all([
+    sb.from("warehouses").select("id, name").order("name"),
+    sb.from("stock_balances").select("sku, warehouse_id, qty, reserved, low_threshold"),
+    sb
+      .from("product_skus")
+      .select("sku, price, product_models(name, category)")
+      .is("discontinued_at", null),
+    sb
+      .from("purchase_orders")
+      .select("sku, qty, status")
+      .eq("status", "open"),
+  ]);
+  if (warehousesRes.error) throw new HTTPException(500, { message: warehousesRes.error.message });
+  if (balancesRes.error) throw new HTTPException(500, { message: balancesRes.error.message });
+  if (skusRes.error) throw new HTTPException(500, { message: skusRes.error.message });
+  if (posRes.error) throw new HTTPException(500, { message: posRes.error.message });
+
+  const warehouses = (warehousesRes.data ?? []).map((w) => ({ id: w.id, name: w.name }));
+
+  type Balance = { qty: number; reserved: number };
+  const balanceMap = new Map<string, Map<string, Balance>>();
+  const lowThresholdMap = new Map<string, number>();
+  (balancesRes.data ?? []).forEach((b) => {
+    if (!b.sku || !b.warehouse_id) return;
+    let perSku = balanceMap.get(b.sku);
+    if (!perSku) {
+      perSku = new Map();
+      balanceMap.set(b.sku, perSku);
+    }
+    perSku.set(b.warehouse_id, {
+      qty: Number(b.qty ?? 0),
+      reserved: Number(b.reserved ?? 0),
+    });
+    lowThresholdMap.set(b.sku, Number(b.low_threshold ?? 0));
+  });
+
+  const incomingMap = new Map<string, number>();
+  (posRes.data ?? []).forEach((p) => {
+    if (!p.sku) return;
+    incomingMap.set(p.sku, (incomingMap.get(p.sku) ?? 0) + Number(p.qty ?? 0));
+  });
+
+  const skus = (skusRes.data ?? []).map((s) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const model = Array.isArray((s as any).product_models) ? (s as any).product_models[0] : (s as any).product_models;
+    const perWh = balanceMap.get(s.sku) ?? new Map<string, Balance>();
+    const totals = Array.from(perWh.values()).reduce(
+      (acc, b) => ({ qty: acc.qty + b.qty, reserved: acc.reserved + b.reserved }),
+      { qty: 0, reserved: 0 },
+    );
+    const available = totals.qty - totals.reserved;
+    return {
+      sku: s.sku,
+      name: model?.name ?? s.sku,
+      category: model?.category ?? null,
+      price: Number(s.price ?? 0),
+      available,
+      lowThreshold: lowThresholdMap.get(s.sku) ?? 0,
+      incoming: incomingMap.get(s.sku) ?? 0,
+      perWarehouse: Object.fromEntries(
+        warehouses.map((w) => [
+          w.id,
+          {
+            qty: perWh.get(w.id)?.qty ?? 0,
+            reserved: perWh.get(w.id)?.reserved ?? 0,
+          },
+        ]),
+      ),
+    };
+  });
+
+  return c.json({
+    warehouses,
+    skus,
+    summary: {
+      totalSkus: skus.length,
+      lowStockCount: skus.filter((s) => s.available <= Math.max(s.lowThreshold, 1)).length,
+      openPos: (posRes.data ?? []).length,
+    },
+  });
+});
+
+export default principalStockRouter;
