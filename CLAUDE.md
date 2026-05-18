@@ -881,6 +881,33 @@ Migration count: 126 files (was 125 in last §17 sync; this entry adds 0126).
 
 
 
+**Propagate warehouse_id thread→order chain (Loo 2026-05-18 screenshot "ATTACH DO & MARK DELIVERED" crash on #1003)** — order #1003 (Carres KL Showroom, post-Phase-9 wipe) reached `operation_stage='dispatched'` but `orders.warehouse_id` AND `order_supplier_threads.warehouse_id` were BOTH null even though PO-2031 (warehouse c03) had received stock and reserved 3 units. Pressing the deliver button crashed with `null value in column "warehouse_id" of relation "stock_movements" violates not-null constraint`.
+
+Root cause (chain):
+1. `_v3_claim_threads_for_po` claims threads (sets `thread.po_id`) but **never set `thread.warehouse_id`** from `po.warehouse_id`. Threads end up with po_id set but warehouse_id null forever.
+2. `operation_assign_partner` (per 0086) reads the first ready_to_dispatch thread with `warehouse_id IS NOT NULL` to derive `orders.warehouse_id`. If no thread has warehouse_id → `orders.warehouse_id` stays null.
+3. Downstream `operation_attach_do_and_deliver` reads `orders.warehouse_id` → null → `stock_movements` INSERT crashes.
+
+PO-2031 is a cross-order bundle (`so_refs: [1001, 1002, 1003]`), so similar bugs likely sat dormant on #1001 + #1002 too.
+
+Migration 0127 (`propagate_warehouse_id_thread_chain`) applied to staging Supabase = prod. Three parts:
+- **PART A** — backfill `order_supplier_threads.warehouse_id` from `purchase_orders.warehouse_id` for every thread with po_id set but warehouse_id null.
+- **PART B** — backfill `orders.warehouse_id` from the first thread (lowest id) on that order with warehouse_id not null. Runs after PART A so it benefits from the just-backfilled threads.
+- **PART C** — patch `_v3_claim_threads_for_po` (CREATE OR REPLACE) so future PO claims propagate `warehouse_id` from PO → thread atomically in the same UPDATE statement.
+- **PART D** — sanity check raises EXCEPTION if any thread/order is still in the broken state post-backfill.
+
+Post-apply verification for #1003: `order_warehouse = thread_warehouse = po_warehouse = c03 ✓`. Zero threads or orders still in broken state across the whole DB.
+
+Scope notes: PART A only touches threads where `po_id IS NOT NULL` (stockpile threads with po_id null are correctly left alone). PART B only touches orders where `warehouse_id IS NULL` (existing non-null values preserved). Edge case where PO itself has `warehouse_id IS NULL` is tolerated by the sanity check.
+
+Migration count: 127 files.
+
+0127 NEW carry-forwards (added 2026-05-18):
+- `phase-10-thread-reserved-at-null-but-stock-reserved` (low) — thread #534e59eb of #1003 had `reserved_at IS NULL` even though stock_balances showed `reserved=3` at c03. Reservation happened via some path that doesn't set `thread.reserved_at`. Investigate which RPC reserved (likely cross-order bundled PO receive flow). Cosmetic — doesn't block deliver.
+- `phase-10-operation-attach-do-defensive-fallback` (low) — `operation_attach_do_and_deliver` could be made defensive (fall back to first thread's warehouse_id if `orders.warehouse_id IS NULL`). Currently relies on 0127's upstream fix. Defensive fallback would protect against future code paths that bypass the claim-time propagation.
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)
