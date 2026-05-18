@@ -955,8 +955,33 @@ Migration 0129 (`deep_audit_cascade_fixes`) applied to staging Supabase = prod v
 Migration count: 129 files.
 
 0129 NEW carry-forwards (added 2026-05-18):
-- `phase-10-cancelled-order-filter-audit` (medium) — 7 other functions join `orders` without `status <> 'cancelled'` filter: `supplier_pending_demand`, `dealer_with_stats`, `dealers_with_stats_list`, `partner_orders_for_threads`, `supplier_threads_for_po`, `supplier_orders_for_threads`, `partner_confirm_receive`. Most are caller-driven (filtered upstream by API routes), but a per-function audit + filter addition would be defense-in-depth before Day 1 volume. Highest priority: `supplier_pending_demand` (supplier dashboard forecast) and `dealer_with_stats` / `dealers_with_stats_list` (dealer dashboard counts).
+- `phase-10-cancelled-order-filter-audit` (medium) — 7 other functions join `orders` without `status <> 'cancelled'` filter. **Closed by 0130.**
 - `phase-10-drop-other-pre-thread-legacy-functions` (low) — if `operation_confirm_proceed_request` (v1) was dead code, other pre-thread-era functions may also be dead. Survey pg_proc for functions superseded by `_v3` / `_v2` versions; DROP the unused predecessors.
+
+
+
+**Cancelled-order filter audit + fixes (Loo 2026-05-18 "ok go with next first")** — closes the `phase-10-cancelled-order-filter-audit` carry-forward from 0129. Per-function review of the 7 candidates:
+
+| Function | Verdict | Reason |
+|---|---|---|
+| `dealer_with_stats` | ✅ Fixed | order_count / gmv / outstanding inflated by cancelled |
+| `dealers_with_stats_list` | ✅ Fixed | Same |
+| `partner_orders_for_threads` | ✅ Fixed | Defense-in-depth (caller-driven but cached IDs may carry cancelled) |
+| `supplier_orders_for_threads` | ✅ Fixed | Same |
+| `supplier_threads_for_po` | ✅ Fixed | Supplier Production checklist shouldn't surface threads of abandoned orders |
+| `supplier_pending_demand` | ❌ Skipped | Already filters via `o.status not in ('delivered', 'cancelled')` — false positive in 0129 audit regex (only matched `<>` form) |
+| `partner_confirm_receive` | ❌ Skipped | Write action with PO sup_status gate, not a read surface |
+
+Migration 0130 (`cancelled_order_filter_audit`) applied to staging Supabase = prod. 5 `CREATE OR REPLACE FUNCTION` statements adding `o.status <> 'cancelled'` to each WHERE clause. For `supplier_threads_for_po` the form is `(o.status IS NULL OR o.status <> 'cancelled')` so threads with broken order refs (defensive — shouldn't exist with FK) don't accidentally disappear.
+
+Sanity check verifies all 5 function bodies contain `'cancelled'` string post-apply.
+
+**For dealer stats specifically**: pre-fix a dealer with 10 orders (2 cancelled) showed `order_count=10, gmv=full inflated, outstanding=full inflated`. Post-fix shows `order_count=8` with active-only GMV + outstanding — matches the business intent (cancelled = no revenue, no debt).
+
+Migration count: 130 files.
+
+0130 NEW carry-forwards (added 2026-05-18):
+- `phase-10-abandon-cascade-to-po` (medium) — `operation_abandon_order` updates orders only; threads + linked POs stay in their existing state. If a PO is mid-flight when its only linked order is abandoned, the PO continues being worked by supplier/partner. Need cascade: when abandoning, identify linked POs and either cancel them (if no other SOs depend) or notify supplier. Currently the supplier_threads_for_po filter (0130 fix #5) hides the dead threads, but the PO itself is still open and could waste supplier production capacity.
 
 
 
