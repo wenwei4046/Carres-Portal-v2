@@ -7,9 +7,9 @@
 -- Which executes: supabase db query --linked --file scripts/seed-e2e-fixtures.sql
 --
 -- What this seeds (matches the pre-condition comments in the e2e/*.spec.ts files):
---   • DL-9001 — delivered + fully-paid order (no invoice yet) for
+--   • SO-9001 — delivered + fully-paid order (no invoice yet) for
 --               phase-5-invoice-issue-after-delivered (A2 acceptance).
---   • DL-9101..9104 — 4 orders with synthetic placed_at offsets (5/35/65/95
+--   • SO-9101..9104 — 4 orders with synthetic placed_at offsets (5/35/65/95
 --                     days ago) so each lands in a distinct aging bucket
 --                     (0-30 / 31-60 / 61-90 / 90+) for phase-5-ar-aging-buckets
 --                     (A3 acceptance). All have paid=0 (outstanding > 0).
@@ -29,7 +29,7 @@
 -- Reset step (idempotent rebuild): clear any existing test invoices + reset
 -- the orders.invoice_no/invoiced_at fields so the spec can re-run from a
 -- clean state. Without this, the second run hits the unique constraint on
--- invoices.invoice_no (each DL-9001 issue creates INV-{YYYY}-9001).
+-- invoices.invoice_no (each SO-9001 issue creates INV-{YYYY}-9001).
 DELETE FROM invoices WHERE order_id IN (
   '99999999-9001-9001-9001-000000009001'::uuid,
   '99999999-9101-9101-9101-000000009101'::uuid,
@@ -47,13 +47,13 @@ UPDATE orders
    '99999999-9104-9104-9104-000000009104'::uuid
  );
 
--- DL-9001: delivered + fully paid (5000 paid, but only 2500 expected... let's
+-- SO-9001: delivered + fully paid (5000 paid, but only 2500 expected... let's
 -- be precise: 1 unit @ 2500 = total 2500, paid = 2500, outstanding = 0).
 -- Used by phase-5-invoice-issue-after-delivered:
 --   client gate (ARDrawer canIssue): row.outstanding <= 0.01 ✓ AND row.status === 'delivered' ✓
 --   server gate (route /issue):       order.status === 'delivered' ✓
 INSERT INTO orders (
-  id, dl, status, channel,
+  id, so, status, channel,
   dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
@@ -76,7 +76,7 @@ VALUES (
   true,
   now() - interval '7 days'
 )
-ON CONFLICT (dl) DO NOTHING;
+ON CONFLICT (so) DO NOTHING;
 
 INSERT INTO order_lines (order_id, sku, qty, unit_price)
 SELECT '99999999-9001-9001-9001-000000009001'::uuid, 'mattress:carres-cloud:Queen', 1, 2500
@@ -84,9 +84,9 @@ WHERE NOT EXISTS (
   SELECT 1 FROM order_lines WHERE order_id = '99999999-9001-9001-9001-000000009001'::uuid
 );
 
--- DL-9101: aging bucket "0-30" (placed 5 days ago, paid=0)
+-- SO-9101: aging bucket "0-30" (placed 5 days ago, paid=0)
 INSERT INTO orders (
-  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  id, so, status, channel, dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
   paid, terms_accepted, placed_at
@@ -101,14 +101,14 @@ VALUES (
   current_date + 7, false, 1, false,
   0, true, now() - interval '5 days'
 )
-ON CONFLICT (dl) DO NOTHING;
+ON CONFLICT (so) DO NOTHING;
 INSERT INTO order_lines (order_id, sku, qty, unit_price)
 SELECT '99999999-9101-9101-9101-000000009101'::uuid, 'mattress:carres-cloud:Queen', 1, 2500
 WHERE NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = '99999999-9101-9101-9101-000000009101'::uuid);
 
--- DL-9102: aging bucket "31-60" (placed 35 days ago)
+-- SO-9102: aging bucket "31-60" (placed 35 days ago)
 INSERT INTO orders (
-  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  id, so, status, channel, dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
   paid, terms_accepted, placed_at
@@ -123,14 +123,14 @@ VALUES (
   null, true, 1, false,
   0, true, now() - interval '35 days'
 )
-ON CONFLICT (dl) DO NOTHING;
+ON CONFLICT (so) DO NOTHING;
 INSERT INTO order_lines (order_id, sku, qty, unit_price)
 SELECT '99999999-9102-9102-9102-000000009102'::uuid, 'mattress:carres-cloud:Queen', 1, 2500
 WHERE NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = '99999999-9102-9102-9102-000000009102'::uuid);
 
--- DL-9103: aging bucket "61-90" (placed 65 days ago)
+-- SO-9103: aging bucket "61-90" (placed 65 days ago)
 INSERT INTO orders (
-  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  id, so, status, channel, dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
   paid, terms_accepted, placed_at
@@ -145,14 +145,14 @@ VALUES (
   null, true, 1, false,
   0, true, now() - interval '65 days'
 )
-ON CONFLICT (dl) DO NOTHING;
+ON CONFLICT (so) DO NOTHING;
 INSERT INTO order_lines (order_id, sku, qty, unit_price)
 SELECT '99999999-9103-9103-9103-000000009103'::uuid, 'mattress:carres-cloud:Queen', 1, 2500
 WHERE NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = '99999999-9103-9103-9103-000000009103'::uuid);
 
--- DL-9104: aging bucket "90+" (placed 95 days ago)
+-- SO-9104: aging bucket "90+" (placed 95 days ago)
 INSERT INTO orders (
-  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  id, so, status, channel, dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
   paid, terms_accepted, placed_at
@@ -167,14 +167,14 @@ VALUES (
   null, true, 1, false,
   0, true, now() - interval '95 days'
 )
-ON CONFLICT (dl) DO NOTHING;
+ON CONFLICT (so) DO NOTHING;
 INSERT INTO order_lines (order_id, sku, qty, unit_price)
 SELECT '99999999-9104-9104-9104-000000009104'::uuid, 'mattress:carres-cloud:Queen', 1, 2500
 WHERE NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = '99999999-9104-9104-9104-000000009104'::uuid);
 
--- Bump the dl sequence past 9104 so future auto-allocated dl values don't
+-- Bump the so sequence past 9104 so future auto-allocated so values don't
 -- collide with our explicit fixture ids. Idempotent: setval to MAX(9104, current).
-SELECT setval('orders_dl_seq', GREATEST(9104, last_value)) FROM orders_dl_seq;
+SELECT setval('orders_so_seq', GREATEST(9104, last_value)) FROM orders_so_seq;
 
 -- ----- LP cross-tenant fixtures -----
 -- POs assigned to LP-A and LP-B (synthetic E2E partners) for the
@@ -205,7 +205,7 @@ ON CONFLICT (id) DO NOTHING;
 -- LP (LP-Y) + an RFD raised (request_for_delivery_at NOT NULL) so it surfaces
 -- on /api/partner/pickups/rfd-pending for LP-Y.
 INSERT INTO orders (
-  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  id, so, status, channel, dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
   paid, terms_accepted, placed_at
@@ -247,7 +247,7 @@ DELETE FROM order_supplier_threads WHERE id = '99999999-7777-7777-7777-000000007
 DELETE FROM orders WHERE id = '99999999-7000-7000-7000-000000007000';
 
 INSERT INTO orders (
-  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  id, so, status, channel, dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
   paid, terms_accepted, placed_at
@@ -291,12 +291,12 @@ DELETE FROM orders WHERE id IN (
   '99999999-a000-a000-a000-000000000aa4'::uuid
 );
 
--- DL-9201: Mattress (SOP_STANDARD, dispatched) — mattress-full-happy
--- DL-9202: Bedframe (SOP_STANDARD, dispatched) — bed-frame-full-happy
--- DL-9203: Sofa Accept (SOP_SOFA_SPECIAL, dispatched) — sofa-accept-happy
--- DL-9204: Sofa Reject (SOP_SOFA_SPECIAL, waiting) — sofa-reject-relocate
+-- SO-9201: Mattress (SOP_STANDARD, dispatched) — mattress-full-happy
+-- SO-9202: Bedframe (SOP_STANDARD, dispatched) — bed-frame-full-happy
+-- SO-9203: Sofa Accept (SOP_SOFA_SPECIAL, dispatched) — sofa-accept-happy
+-- SO-9204: Sofa Reject (SOP_SOFA_SPECIAL, waiting) — sofa-reject-relocate
 INSERT INTO orders (
-  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  id, so, status, channel, dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
   paid, terms_accepted, placed_at, operation_stage
@@ -353,7 +353,7 @@ DELETE FROM order_supplier_threads WHERE id = '99999999-aabb-aabb-aabb-000000007
 DELETE FROM orders WHERE id = '99999999-7077-7077-7077-000000007077'::uuid;
 
 INSERT INTO orders (
-  id, dl, status, channel, dealer_id, outlet_id, salesperson_id,
+  id, so, status, channel, dealer_id, outlet_id, salesperson_id,
   customer_name, customer_phone, customer_address, customer_address_unknown,
   delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift,
   paid, terms_accepted, placed_at, operation_stage
@@ -409,7 +409,7 @@ UPDATE stock_balances
    AND (low_threshold IS DISTINCT FROM 50);
 
 -- Visibility check
-SELECT dl, status, paid, placed_at::date AS placed_date
+SELECT so, status, paid, placed_at::date AS placed_date
 FROM orders
-WHERE dl IN (9001, 9101, 9102, 9103, 9104)
-ORDER BY dl;
+WHERE so IN (9001, 9101, 9102, 9103, 9104)
+ORDER BY so;
