@@ -83,6 +83,18 @@ export const qk = {
       ["principal", "dealers", filters ?? {}] as const,
     dealer:    (id: string) => ["principal", "dealers", id] as const,
     partners:  () => ["principal", "partners"] as const,
+    /** Phase 10 — principal accounts admin (PrincipalAccounts page). */
+    accounts:  () => ["principal", "accounts"] as const,
+    /** Phase 10 — read-only orders list across all dealers (PrincipalOrders). */
+    orders:    (filters?: Record<string, unknown>) =>
+      ["principal", "orders", filters ?? {}] as const,
+    /** Phase 10 — supplier roster + per-supplier stats (PrincipalSuppliers). */
+    suppliers: () => ["principal", "suppliers"] as const,
+    /** Phase 10 — stock balances across all warehouses (PrincipalStock). */
+    stock:     () => ["principal", "stock"] as const,
+    /** Phase 10 — audit log (PrincipalAudit). */
+    audit:     (filters?: Record<string, unknown>) =>
+      ["principal", "audit", filters ?? {}] as const,
   },
   // Phase 4.5 Chunk 1 — operation Partner (LP) namespace. Nested keys mirror
   // `principal` so we can blast `["partner"]` to invalidate the whole sub-tree
@@ -1156,6 +1168,154 @@ export function useDealerSetStatus(
         queryKey: qk.principal.dashboard(),
         exact: true,
       });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+  });
+}
+
+// ===========================================================================
+// Phase 10 — Principal Accounts admin
+// ===========================================================================
+// Closes phase-10-rotate-alpha-test-passwords HIGH carry-forward by giving
+// the principal a UI surface for create / disable / re-enable / reset-password
+// instead of needing direct SQL + auth.admin.updateUserById on the server.
+
+export type AppRole =
+  | "principal"
+  | "dealer"
+  | "salesperson"
+  | "showroom"
+  | "operation"
+  | "supplier"
+  | "partner"
+  | "finance"
+  | "bd";
+
+export interface AccountRow {
+  id: string;
+  email: string;
+  name: string;
+  role: AppRole;
+  title: string | null;
+  status: "active" | "invited" | "disabled";
+  dealerId: string | null;
+  supplierId: string | null;
+  partnerId: string | null;
+  outletId: string | null;
+  orgName: string | null;
+  createdBy: string | null;
+  lastSeenAt: string | null;
+  createdAt: string;
+}
+
+export function usePrincipalAccounts() {
+  return useQuery<{ users: AccountRow[] }, ApiError>({
+    queryKey: qk.principal.accounts(),
+    queryFn: () => apiFetch("/api/principal/accounts"),
+  });
+}
+
+export function useCreateAccount(
+  opts?: Partial<
+    UseMutationOptions<
+      {
+        id: string;
+        email: string;
+        name: string;
+        role: AppRole;
+        dealerId: string | null;
+        supplierId: string | null;
+        partnerId: string | null;
+      },
+      ApiError,
+      {
+        name: string;
+        email: string;
+        role: AppRole;
+        title?: string | null;
+        companyName?: string;
+        region?: string;
+        tempPassword: string;
+      }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) =>
+      apiFetch<{
+        id: string;
+        email: string;
+        name: string;
+        role: AppRole;
+        dealerId: string | null;
+        supplierId: string | null;
+        partnerId: string | null;
+      }>("/api/principal/accounts", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.principal.accounts() });
+      await qc.invalidateQueries({ queryKey: qk.principal.audit() });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+  });
+}
+
+export function useSetAccountStatus(
+  userId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; status: "active" | "disabled" },
+      ApiError,
+      { status: "active" | "disabled"; reason?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; status: "active" | "disabled" }>(
+        `/api/principal/accounts/${userId}/status`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.principal.accounts() });
+      await qc.invalidateQueries({ queryKey: qk.principal.audit() });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+  });
+}
+
+export function useResetAccountPassword(
+  userId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; ok: true },
+      ApiError,
+      { tempPassword: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; ok: true }>(
+        `/api/principal/accounts/${userId}/reset-password`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.principal.audit() });
       opts?.onSuccess?.(
         ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
       );

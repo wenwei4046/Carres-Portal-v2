@@ -57,7 +57,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Admin",
     items: [
-      { k: "accounts", t: "Accounts", icon: "◐", enabled: false, phase: "Phase 8" },
+      { k: "accounts", t: "Accounts", icon: "◐", enabled: true },
     ],
   },
 ];

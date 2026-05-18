@@ -138,6 +138,17 @@ export {
 } from "./schemas/lp-account";
 
 export {
+  APP_ROLES,
+  createAccountInput,
+  setAccountStatusInput,
+  resetPasswordInput,
+  type AppRole,
+  type CreateAccountInput,
+  type SetAccountStatusInput,
+  type ResetPasswordInput,
+} from "./schemas/principal-accounts";
+
+export {
   assignPartnerInput,
   attachDoInput,
   receivePoWithDoInput,
