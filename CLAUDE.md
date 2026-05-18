@@ -312,7 +312,7 @@ Don't burn an hour spinning. Surface and ask.
 | API URL | https://carres-portal-v2-api.wwch.workers.dev |
 | DB | staging Supabase = prod, project_id `kfprgpjpaffedghytstl` |
 | Latest migration | **0131** `supplier_mark_ready_po_rollup` |
-| Test count | api 627/630 · web 439/443 · shared 154/154 (4 web + 3 api pre-existing failures, see §17.7) |
+| Test count | api 629/632 · web 439/443 · shared 154/154 (4 web + 3 api pre-existing failures, see §17.7) |
 | Web bundle | 2620 KiB raw / 781 KiB gzipped (regression flagged, see CFs §17.5) |
 | API bundle | 4744 KiB raw / 993 KiB gzipped (31 KiB under Workers Free 1024 KiB limit) |
 
@@ -427,6 +427,19 @@ Chronological — each entry = one logical session. Commit hashes preserved.
 - Post-apply: PO-2033/34/35/36 → `ready_for_pickup` ✓; PO-2037 stayed `in_production` ✓ (1 thread not ready)
 - **Loo's prior misunderstanding clarified**: Nets does NOT see HoOKkA POs going to Carres Klang (own WH). Nets only sees LP-owned WH POs.
 
+**2026-05-18 · Procurement Orders column + prominent ETAs · commit `41cc96f`** — Loo's C+D ask from Procurement-tab UX discussion. PO list rows were missing who-customer + when-needed, and dates that were shown were muted to invisibility.
+- **Row layout** 7-col → 5-col: dropped Supplier (redundant within supplier-specific tab), dropped Warehouse (only 1 WH currently), dropped standalone PO ETA col (folded into Items).
+- **New Orders col**: one row per source SO showing `#SO · customer · DUE · MM-DD · 🔴/🟡/🟢`. Aggregate footer `Σ N orders` for bundles; italic stockpile note when `po.so` + `po.so_refs[]` both null.
+- **Server** (`apps/api/src/routes/operation/procurement-tabs.ts`): new Pass C `enrichPosWithOrders()` — batched SELECT against `orders` for every distinct source SO across fetched POs (union of `so` + `so_refs[]`). Returns per-PO `orders: [{ so, customer_name, delivery_date }]` + worst-case PO-level `urgency: 'critical' | 'urgent' | 'normal' | null`. Mirrors supplier-side enrichment from earlier Phase 10 work.
+- **Urgency tiers** (smallest delivery_date diff from today): <7d → critical 🔴, 7-14d → urgent 🟡, ≥14d → normal 🟢
+- **Date visibility** (Loo follow-up): per-SO Customer ETA 11px muted → 12px font-semibold base-900 with uppercase "DUE" micro-label; PO ETA 10px muted footer → 12px font-semibold base-900 with "PO ETA" label.
+- Tests: api +2 (procurement-tabs Pass C + stockpile short-circuit, `vi.useFakeTimers` locks today).
+
+**2026-05-18 · Seed SQL rename sweep · commit `947ec01`** — Closes long-standing `phase-4.5-chunk-2-seed-sql-stale` CF. `rename-dl-to-so.ps1` + earlier logistics→operation sweep both omitted `*.sql` from `includeExts`, so seed files survived with stale schema + rename artifacts.
+- `scripts/seed-e2e-fixtures.sql`: `dl` column refs, `orders_dl_seq → orders_so_seq`, DL- comments + fixture refs
+- `supabase/seed.sql`: `dl → so` column refs · PO INSERT rewritten for per-line schema (sku/qty split to `purchase_order_lines` via WHERE-NOT-EXISTS idempotency) · `delivery_partner_id → procurement_partner_id` · DL-#### string literals in approvals.refers_to + audit_log + stock_movements.ref · rename artifacts (`JT Express operation → JT Express`, `Daniel · operation → Daniel · Operations`, `Issued by operation → Issued by Operations`)
+- Validated via BEGIN…ROLLBACK dry-run on live DB.
+
 ### 17.4 Business model (locked 2026-05-03)
 
 - Dealer just sells. Customer pays HQ direct. No HQ→dealer credit/debt.
@@ -475,7 +488,6 @@ Chronological — each entry = one logical session. Commit hashes preserved.
 - `phase-9-secret-rotation-cadence` — Quarterly rotation policy for Workers secrets.
 
 **Pre-Phase-10 still open (low, deferred)** — full list in git history:
-- `phase-4.5-chunk-2-seed-sql-stale` — `supabase/seed.sql` references old PO column names + cols dropped by 0017
 - `phase-4.5-chunk-2-alerts-tab-routing` — StockAlertsTile useNavigate URL/tab desync
 - `phase-4.5-chunk-2-stock-alerts-high-threshold-expose` — `logistics_stock_alerts()` returns `low_threshold` only
 - `phase-4.5-chunk-1-lp-whitelist-tighten` — Trigger covers 20 of 29 PO columns; switch to allow-list
