@@ -70,15 +70,17 @@ bdDealersRouter.get("/:id", async (c) => {
   }
   const dealer = Array.isArray(dealerRes.data) ? dealerRes.data[0] : dealerRes.data;
 
-  // Pull recent 30 orders for the BD's drill-down table.
+  // Pull recent 50 orders for the BD's drill-down table. We grab
+  // `operation_stage` too so the FE can bucket them into Place / Process /
+  // Delivery sections without a second round-trip.
   const ordersRes = await sb
     .from("orders")
     .select(
-      "id, so, status, customer_name, paid, placed_at, delivery_date, order_lines(unit_price, qty), order_addons(unit_price, qty)",
+      "id, so, status, operation_stage, customer_name, paid, placed_at, delivery_date, order_lines(unit_price, qty), order_addons(unit_price, qty)",
     )
     .eq("dealer_id", id)
     .order("placed_at", { ascending: false, nullsFirst: false })
-    .limit(30);
+    .limit(50);
   if (ordersRes.error) {
     const m = mapPgError(ordersRes.error);
     return c.json(m.body, m.status);
@@ -105,6 +107,7 @@ bdDealersRouter.get("/:id", async (c) => {
       id: o.id,
       so: o.so,
       status: o.status,
+      operationStage: o.operation_stage,
       customerName: o.customer_name,
       paid: Number(o.paid ?? 0),
       total: lineTotal + addonTotal,
