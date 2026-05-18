@@ -440,6 +440,24 @@ Chronological — each entry = one logical session. Commit hashes preserved.
 - `supabase/seed.sql`: `dl → so` column refs · PO INSERT rewritten for per-line schema (sku/qty split to `purchase_order_lines` via WHERE-NOT-EXISTS idempotency) · `delivery_partner_id → procurement_partner_id` · DL-#### string literals in approvals.refers_to + audit_log + stock_movements.ref · rename artifacts (`JT Express operation → JT Express`, `Daniel · operation → Daniel · Operations`, `Issued by operation → Issued by Operations`)
 - Validated via BEGIN…ROLLBACK dry-run on live DB.
 
+**2026-05-18 · Principal sidebar wake — 5 missing pages built** — Loo's screenshot showed 5 sidebar tabs unclickable (Suppliers / All orders / Stock / Audit log / Accounts). They'd been stubbed at `enabled:false` since their Phase 4/5/6/8 ships and never woken up — typical dormant-ship pattern. Built all 5 to proto fidelity:
+- **PrincipalAccounts** (`941c665`) — closes `phase-10-rotate-alpha-test-passwords` HIGH CF. GET list + POST create (service_role admin API + conditional dealer/supplier/partner org row + JWT `app_metadata` seed) + POST :id/status (disable signs out via auth.admin.signOut, principal cannot be disabled) + POST :id/reset-password. Per-role colored avatars + chips; CreateAccountModal with role picker grid; ResetPasswordModal with regenerate-able temp password. Schema already had `title / status / last_seen_at / created_by` — no migration needed.
+- **PrincipalAudit** (`926ad43`) — GET endpoint with `?role=&limit=` filter (max 500). 7 role chips at top; proto's `logistics` → `operation`, `system` dropped.
+- **PrincipalSuppliers** (`63b41e2`) — GET list + GET :id/pos drawer. 2-col card grid + Own Logistics / Factory Pickup kind chips + 3-stat row + cat_covered list.
+- **PrincipalOrders** (`160210d`) — GET cross-dealer feed with `?dealer=&status=&q=` filters. Paid cell green when ≥ total, terracotta otherwise.
+- **PrincipalStock** (`2a1959f`) — GET single endpoint joining stock_balances + product_skus + open POs. 2-tab view (Low / All) + per-warehouse columns + low-stock terracotta highlight.
+
+All 5 routes use principal-only inline guard before any service_role call (CLAUDE.md §4.4 RED LINE upheld). Tailwind tokens (`bg-base-*` / `text-base-*` / `text-primary` / `text-success`) match proto's CSS var palette. Layout strictly matches proto `32px 36px 56px` padding + kicker + 30px h1. Typecheck clean across shared / api / web after each commit.
+
+Sidebar comment updated; `PrincipalSidebar` no longer has any `enabled:false` entries.
+
+5 NEW carry-forwards (all low):
+- `phase-10-principal-pages-tests` — wrote 0 tests for the 5 new pages; next session add unit + msw coverage
+- `phase-10-principal-stock-no-mutation` — Stock is observation-only; Loo switches to operation role for adjust + thresholds
+- `phase-10-principal-orders-detail-drawer` — proto + v2 row is non-clickable; add OrderDetailDrawer if drilldown wanted
+- `phase-10-audit-cursor-pagination` — `audit_log` capped at 500 rows; cursor paginate once table grows past ~10k
+- `phase-10-resend-invite-email-template` — Accounts only does temp-password mode (no email invite — needs Supabase email-template config)
+
 ### 17.4 Business model (locked 2026-05-03)
 
 - Dealer just sells. Customer pays HQ direct. No HQ→dealer credit/debt.
@@ -449,7 +467,7 @@ Chronological — each entry = one logical session. Commit hashes preserved.
 ### 17.5 Open carry-forwards
 
 **HIGH**:
-- `phase-10-rotate-alpha-test-passwords` — 9 alpha users at password='111' (sales / operation / hookka / nicefuture / nets / finance / bd / mattress / sales-mk). Rotate before sharing portal externally OR opening to non-trusted parties.
+- `phase-10-rotate-alpha-test-passwords` — 9 alpha users at password='111' (sales / operation / hookka / nicefuture / nets / finance / bd / mattress / sales-mk). PrincipalAccounts UI built 2026-05-18 (commit `941c665`) gives Loo Reset password per row — rotate via UI before sharing portal externally.
 - `phase-9-rotate-principal-password` — principal@carres.com still at password='111' (Phase 9 known-risk; rotate Week 2). If brute-force detected: `update auth.users set encrypted_password = crypt('<new>', gen_salt('bf')) where email='principal@carres.com'`. PDPA fine up to RM 300k if principal-level breach.
 
 **MEDIUM**:
