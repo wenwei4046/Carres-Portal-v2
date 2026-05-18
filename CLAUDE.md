@@ -818,6 +818,29 @@ Phase 3 carry-forwards:
 
 
 
+**Close 0123 dl→so rename gap (Loo 2026-05-18, screenshot bug "column p.dl does not exist")** — operation dashboard 500'd on every load with `column p.dl does not exist`. Root cause: migration 0123's snapshot+recreate text replacements covered aliases `o.dl`, `ord.dl`, `orders.dl`, `v_order.dl` but NOT bare `<other-alias>.dl`. Three live function bodies survived 0123 with broken column refs:
+
+| Function | Survivor | User impact |
+|---|---|---|
+| `operation_dashboard_summary` | `p.dl` (×1, alias for `purchase_orders p`) | **The dashboard 500 Loo screenshot'd** |
+| `finance_ar_aging` | `ot.dl` (×2, CTE alias) | Finance AR aging page would 500 (not yet exercised on prod) |
+| `operation_receive_po_line` | `v_target_order.dl` (×3, RECORD variable) | Receive-PO auto-promote-to-order would 500 (not yet exercised on prod) |
+
+Diagnosis path: grep'd `p.dl` against codebase (returned only frozen historical migrations as expected). Confirmed via `pg_get_functiondef` scan on prod Supabase that the LIVE function bodies still had the broken refs. Broadened the scan with regex `(?<![a-z_])[a-z_][a-z0-9_]{0,15}\.dl(?![a-z_])` to find the full surface — 3 functions, 6 occurrences.
+
+Migration 0125 (`fix_alias_dl_after_0123_rename`) applied to staging Supabase = prod via `apply_migration`. CREATE OR REPLACE each function with bare `<alias>.dl` rewritten to `<alias>.so`. No behavioral change — the underlying column was already renamed by 0123. Output JSON contracts preserved exactly as 0123 left them; `operation_dashboard_summary.open_pos[]` now keys `so` (matches `apps/web/src/lib/queries.ts:1214` type `operationOpenPoRow { so: number | null }` + `OpenPOsCard.tsx:67` reading `po.so`). Embedded `DO $sanity$` block at end of migration RAISE EXCEPTIONs if any function still references `<alias>.dl` — passed clean.
+
+Post-fix verification: scan returned `[]` (0 leftover offenders). Inner SELECT smoke (`select p.id, …, p.so, p.so_refs from purchase_orders p where p.status='open'`) compiled clean on prod.
+
+NOT amending 0123 per §14 #6 — frozen migration history stays as-is; a fresh-DB replay of 0123 followed by 0125 lands at identical end state.
+
+Migration count: 125 files (was 124 in last §17 sync; this entry adds 0125).
+
+0125 NEW carry-forwards (added 2026-05-18):
+- `phase-10-rename-script-blind-spot-doc` (low) — both 0121 (logistics→operation) and 0123 (dl→so) used the same snapshot+text-replace pattern and both missed alias-style references not enumerated in the replacement list. Future renames should enumerate ALL likely alias patterns (single-letter `p.`, `o.`, `f.`; CTE aliases `ot.`, `od.`, `il.`; loop-variable `v_*.`) upfront, OR write the replacement as a single regex `(?<![a-z_])[a-z_][a-z0-9_]*\.<col>(?![a-z_])` → `.<new_col>`. A short "alias-rename pitfalls" doc in `docs/superpowers/` could prevent the 3rd occurrence.
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)
