@@ -51,7 +51,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { k: "orders", t: "All orders", icon: "▣", enabled: false, phase: "Phase 5" },
       { k: "stock", t: "Stock", icon: "□", enabled: false, phase: "Phase 4" },
-      { k: "audit", t: "Audit log", icon: "≡", enabled: false, phase: "Phase 5" },
+      { k: "audit", t: "Audit log", icon: "≡", enabled: true },
     ],
   },
   {
