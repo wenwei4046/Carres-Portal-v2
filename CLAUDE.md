@@ -841,6 +841,46 @@ Migration count: 125 files (was 124 in last §17 sync; this entry adds 0125).
 
 
 
+**Close ALL residual 0123 dl→so rename gaps (Loo 2026-05-18 "do now")** — cross-check sweep after 0125 uncovered 17 MORE functions still referencing `dl` token. 0123's snapshot+text-replace pipeline had 5 blind spots:
+(a) `<other-alias>.dl` patterns beyond `o./ord./orders./v_order.`
+(b) `'dl'` JSON literal keys in `jsonb_build_object` output
+(c) `NEW.dl` / `OLD.dl` inside trigger function bodies
+(d) bare `dl` column refs in `WHERE/SELECT/UPDATE SET/RETURNS TABLE` positions 0123's positional regex didn't match
+(e) `RETURNS TABLE(... dl integer, ...)` signature column names (requires DROP+CREATE)
+
+Scope — 17 functions, 3 categories:
+
+**Cat A — RUNTIME 500 once invoked (11)**:
+1. `orders_auto_issue_on_dispatched` (TRIGGER on orders) — `NEW.dl ×3`, catastrophic on every dispatch
+2. `enforce_partner_po_column_whitelist` (TRIGGER on POs) — `NEW.dl IS DISTINCT FROM OLD.dl`, partner can't UPDATE POs
+3. `approval_decide` — `where dl::text =`
+4. `invoice_issue` — `select dl from orders`
+5. `finance_record_receipt` — `select dl, dealer_id`
+6. `finance_apply_credit_note` — `select dl into v_target_dl`
+7. `operation_create_po` — `update set dl = p_so`
+8. `operation_cancel_po` — `where dl = v_po.so`
+9. `operation_issue_pos_for_order` — `where (dl = v_order.so OR ...)`
+10. `operation_warehouse_pick` — `where (dl = v_order.so OR ...)`
+11. `operation_revert_order_dispatched_to_ready` — `select dl into v_so`
+
+**Cat B — silent JSON contract mismatch (6)**: `create_order`, `proceed_order`, `operation_abandon_order`, `operation_assign_partner`, `operation_attach_do_and_deliver`, `operation_revert_order_proceed_to_placed` — all output `'dl', value` JSON keys; frontend reads `.so` (renamed by 0123 PowerShell pass) → `undefined`. Silent UI failures.
+
+**Cat C — RETURNS TABLE signature rename (2, needs DROP+CREATE)**: `partner_orders_for_threads` + `supplier_orders_for_threads`. Both declared `RETURNS TABLE(id uuid, dl integer, customer_name text, delivery_date date)`. API routes at `apps/api/src/routes/partner/pickups.ts:113` + `apps/api/src/routes/supplier/pos.ts:143` already read `r.so`, so pre-fix these enrichment paths were silently returning `NaN` SO numbers on partner/supplier thread lists.
+
+Migration 0126 (`close_remaining_dl_rename_gaps`) applied to staging Supabase = prod via `apply_migration`. Snapshot+regex pattern mirrors 0123's PASS A/B/C shape but with one comprehensive regex `(?<![a-z_])dl(?![a-z_]) → so` that catches all 5 blind-spot categories in a single pass. For Cat C, a separate detection regex identifies RETURNS TABLE column-name renames and issues DROP first.
+
+**First apply attempt failed** because the detection regex used `\b` (PG's ARE regex treats `\b` as backspace character, not word boundary). Fixed by switching to lookbehind `(?<![a-z_])` form which 0125 had already used successfully. Both the migration file and applied SQL match.
+
+Post-apply verification: external pg_proc scan returns `leftover_standalone_dl: 0`; partner+supplier `RETURNS TABLE` signatures now have `so integer`; trigger functions have `NEW.so` ✓.
+
+Migration count: 126 files (was 125 in last §17 sync; this entry adds 0126).
+
+0126 NEW carry-forwards (added 2026-05-18):
+- `phase-10-pg-regex-word-boundary` (low) — PG ARE regex `\b` is backspace, NOT word boundary. Use `\y` (PG-specific) or lookbehind `(?<![a-z_])` instead. Tripped 0126 PASS B on first apply.
+- `phase-10-historical-dl-literal-strings` (cosmetic) — audit_log + order_history + format() messages still embed `'DL-'`/`Auto-promoted DL-%s` text literals. Per 0123 stance these are intentionally kept as historical record. No fix needed unless Chairman wants user-facing SO/DL vocab fully aligned.
+
+
+
 ---
 
 ## 18. Reference files (in `reference/`, gitignored)
