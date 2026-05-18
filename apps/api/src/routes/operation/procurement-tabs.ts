@@ -64,6 +64,112 @@ function resolveSlugFilters(slug: ProcurementTabSlug): {
   }
 }
 
+type PoRow = {
+  id: string;
+  so: number | null;
+  so_refs: number[] | null;
+  [k: string]: unknown;
+};
+
+type OrderEnrichment = {
+  so: number;
+  customer_name: string;
+  delivery_date: string | null;
+};
+
+type PoUrgency = "critical" | "urgent" | "normal" | null;
+
+/**
+ * 2026-05-18 (Loo C+D) — Per-PO Orders enrichment + worst-case urgency.
+ *
+ * Adds two fields to each PO row before returning:
+ *   • `orders: [{ so, customer_name, delivery_date }]`
+ *     One entry per source SO this PO serves (po.so for single, po.so_refs[]
+ *     for bundle). Order rows live in the `orders` table; we do one batched
+ *     SELECT after fetching POs so the FE can show "#1003 · Tan ML · 5-25"
+ *     per source SO instead of just the bare numbers.
+ *   • `urgency: 'critical' | 'urgent' | 'normal' | null`
+ *     Worst-case across orders: smallest (delivery_date - today). <7d critical,
+ *     7-14d urgent, >14d normal. NULL when no orders / all delivery_date NULL.
+ *
+ * Mirrors the supplier-side enrichment pattern from Phase 10 (supplier/pos.ts).
+ * Operation role has full RLS read on `orders`, so a single .in('so', distinct)
+ * query suffices.
+ */
+async function enrichPosWithOrders(
+  sb: ReturnType<typeof userClient>,
+  pos: PoRow[],
+): Promise<Array<PoRow & { orders: OrderEnrichment[]; urgency: PoUrgency }>> {
+  if (pos.length === 0) return [];
+
+  // Collect distinct source SOs across all POs (union of po.so + po.so_refs).
+  const distinctSos = new Set<number>();
+  for (const p of pos) {
+    if (typeof p.so === "number") distinctSos.add(p.so);
+    for (const ref of p.so_refs ?? []) {
+      if (typeof ref === "number") distinctSos.add(ref);
+    }
+  }
+
+  // No source SOs (all stockpile POs) → short-circuit empty orders+null urgency.
+  if (distinctSos.size === 0) {
+    return pos.map((p) => ({ ...p, orders: [], urgency: null }));
+  }
+
+  // Batched lookup. Orders RLS for operation role admits all rows.
+  const { data: orderRows, error } = await sb
+    .from("orders")
+    .select("so, customer_name, delivery_date")
+    .in("so", [...distinctSos]);
+  if (error) throw error;
+
+  const orderBySo = new Map<number, OrderEnrichment>();
+  for (const r of (orderRows ?? []) as Array<{
+    so: number;
+    customer_name: string;
+    delivery_date: string | null;
+  }>) {
+    orderBySo.set(Number(r.so), {
+      so: Number(r.so),
+      customer_name: r.customer_name,
+      delivery_date: r.delivery_date,
+    });
+  }
+
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  function computeUrgency(orders: OrderEnrichment[]): PoUrgency {
+    let minDaysAhead: number | null = null;
+    for (const o of orders) {
+      if (!o.delivery_date) continue;
+      const d = new Date(o.delivery_date + "T00:00:00Z");
+      const days = Math.floor((d.getTime() - today.getTime()) / 86400000);
+      if (minDaysAhead === null || days < minDaysAhead) minDaysAhead = days;
+    }
+    if (minDaysAhead === null) return null;
+    if (minDaysAhead < 7) return "critical";
+    if (minDaysAhead < 14) return "urgent";
+    return "normal";
+  }
+
+  return pos.map((p) => {
+    const sosForPo: number[] = [];
+    if (typeof p.so === "number") sosForPo.push(p.so);
+    for (const ref of p.so_refs ?? []) {
+      if (typeof ref === "number" && !sosForPo.includes(ref)) sosForPo.push(ref);
+    }
+    const orders = sosForPo
+      .map((so) => orderBySo.get(so))
+      .filter((o): o is OrderEnrichment => o !== undefined);
+    return {
+      ...p,
+      orders,
+      urgency: computeUrgency(orders),
+    };
+  });
+}
+
 procurementTabsRouter.get("/:slug", async (c) => {
   // 1. Validate slug against the shared whitelist. Anything outside
   //    PROCUREMENT_TAB_SLUGS → 422 before we touch Supabase.
@@ -98,6 +204,8 @@ procurementTabsRouter.get("/:slug", async (c) => {
   // Two-pass query instead:
   //   Pass A — find parent PO IDs whose lines match category prefix
   //   Pass B — refetch full POs by id with the FULL embedded line array
+  //   Pass C — enrich with per-source-SO orders + urgency (added 2026-05-18)
+  let pos: PoRow[] = [];
   if (category !== null) {
     // Pass A: narrow ids via the lines table directly.
     const { data: lineRows, error: lineErr } = await sb
@@ -131,24 +239,33 @@ procurementTabsRouter.get("/:slug", async (c) => {
       const m = mapPgError(error);
       return c.json(m.body, m.status);
     }
-    return c.json({ pos: data ?? [] });
+    pos = (data ?? []) as PoRow[];
+  } else {
+    // 3. No category filter — single-pass query. Embed lines without inner so
+    //    POs with zero lines still surface.
+    const { data, error } = await sb
+      .from("purchase_orders")
+      .select(
+        "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
+      )
+      .eq("suppliers.slug", supplierSlug)
+      .order("placed_at", { ascending: false })
+      .limit(200);
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    pos = (data ?? []) as PoRow[];
   }
 
-  // 3. No category filter — single-pass query. Embed lines without inner so
-  //    POs with zero lines still surface.
-  const { data, error } = await sb
-    .from("purchase_orders")
-    .select(
-      "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
-    )
-    .eq("suppliers.slug", supplierSlug)
-    .order("placed_at", { ascending: false })
-    .limit(200);
-  if (error) {
-    const m = mapPgError(error);
+  // Pass C — enrich with per-source-SO orders + worst-case urgency.
+  try {
+    const enriched = await enrichPosWithOrders(sb, pos);
+    return c.json({ pos: enriched });
+  } catch (err) {
+    const m = mapPgError(err as { code?: string; message?: string });
     return c.json(m.body, m.status);
   }
-  return c.json({ pos: data ?? [] });
 });
 
 export default procurementTabsRouter;

@@ -1479,6 +1479,19 @@ export interface operationPoListRow {
     // {fabric_id, fabric_name, fabric_surcharge}.
     attrs?: Record<string, unknown> | null;
   }[];
+  /** 2026-05-18 (Loo C+D) — per-source-SO enrichment from
+   *  /api/operation/procurement/:slug. One entry per SO this PO serves
+   *  (po.so for single, po.so_refs[] for bundle). Empty for stockpile POs
+   *  or non-procurement-tabs endpoints (the global /api/operation/pos still
+   *  returns the bare row without this field — treat as []). */
+  orders?: {
+    so: number;
+    customer_name: string;
+    delivery_date: string | null;
+  }[];
+  /** 2026-05-18 (Loo C+D) — worst-case urgency across source SOs. NULL when
+   *  the PO has no source SOs (stockpile) or all delivery_date are NULL. */
+  urgency?: "critical" | "urgent" | "normal" | null;
 }
 export interface operationPosListResponse {
   pos: operationPoListRow[];

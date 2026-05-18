@@ -225,29 +225,35 @@ export default function ProcurementTabContent({
         ))}
       </div>
 
+      {/*
+        2026-05-18 (Loo C+D) — row redesign:
+        - Dropped Supplier column (redundant per supplier tab)
+        - Dropped Warehouse column (only 1 WH currently, zero info)
+        - Dropped standalone ETA column (PO eta_date now footer text in Items)
+        - Added Orders column (per-source-SO: #SO · customer · MM-DD · 🔴/🟡/🟢)
+        Urgency dots are per-SO (visual transparency) but PO.urgency is the
+        worst-case used for any aggregate sorting/filter logic.
+      */}
       <div className="card p-0" data-testid={`po-list-table-${slug}`}>
         <div
           className="grid items-center gap-4 px-[18px] py-3 bg-base-50 border-b border-base-200"
           style={{
-            gridTemplateColumns: "96px 2.4fr 1.2fr 1fr 96px 120px 130px",
+            gridTemplateColumns: "96px 1.5fr 2.2fr 110px 130px",
           }}
         >
           <div className="label">PO #</div>
           <div className="label">Items</div>
-          <div className="label">Supplier</div>
-          <div className="label">Warehouse</div>
-          <div className="label">ETA</div>
+          <div className="label">Orders</div>
           <div className="label text-right">Status</div>
           <div className="label text-right">Action</div>
         </div>
         {filtered.map((po) => {
-          const supp = supplierById.get(po.supplier_id);
-          const wh = warehouseById.get(po.warehouse_id);
           const lines = po.purchase_order_lines ?? [];
           const total = poTotalQty(po);
           const got = poReceivedQty(po);
           const st = poDisplayStatus(po);
           const stColor = statusColor(st);
+          const orders = po.orders ?? [];
           return (
             <div
               key={po.id}
@@ -261,13 +267,13 @@ export default function ProcurementTabContent({
                   setDetailPo(po);
                 }
               }}
-              className="grid items-center gap-4 px-[18px] py-3 border-t border-base-100 hover:bg-base-50 transition-colors cursor-pointer"
+              className="grid items-start gap-4 px-[18px] py-3 border-t border-base-100 hover:bg-base-50 transition-colors cursor-pointer"
               style={{
-                gridTemplateColumns: "96px 2.4fr 1.2fr 1fr 96px 120px 130px",
+                gridTemplateColumns: "96px 1.5fr 2.2fr 110px 130px",
               }}
             >
               <div
-                className="font-mono text-[12px] font-semibold"
+                className="font-mono text-[12px] font-semibold pt-0.5"
                 title={po.id}
               >
                 {po.id.slice(0, 8)}
@@ -311,31 +317,41 @@ export default function ProcurementTabContent({
                     </div>
                   );
                 })}
-                {po.so && (
-                  <div className="text-[10px] text-base-500 mt-1 font-body">
-                    for order #{po.so}
-                  </div>
-                )}
-                {po.so_refs && po.so_refs.length > 0 && (
-                  <div className="text-[10px] text-base-500 mt-1 font-body">
-                    bundle of {po.so_refs.length} orders ·{" "}
-                    {po.so_refs.map((d) => `#${d}`).join(", ")}
-                  </div>
-                )}
                 {lines.length > 1 && (
                   <div className="font-mono text-[10px] text-base-500 mt-1">
                     Σ {got}/{total} units
                   </div>
                 )}
+                {po.eta_date && (
+                  <div className="mt-1.5 flex items-baseline gap-1.5">
+                    <span className="font-ui text-[9px] uppercase tracking-[0.12em] text-base-500 font-semibold">
+                      PO ETA
+                    </span>
+                    <span className="font-mono text-[12px] text-base-900 font-semibold">
+                      {po.eta_date}
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="text-[12px] font-body">
-                {supp?.name ?? "—"}
+              <div className="min-w-0">
+                {orders.length === 0 ? (
+                  <div className="text-[11px] text-base-500 italic font-body">
+                    Stockpile · no source order
+                  </div>
+                ) : (
+                  <>
+                    {orders.map((o) => (
+                      <OrdersRow key={o.so} order={o} />
+                    ))}
+                    {orders.length > 1 && (
+                      <div className="font-mono text-[10px] text-base-500 mt-1">
+                        Σ {orders.length} orders
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-              <div className="text-[12px] font-body">{wh?.name ?? "—"}</div>
-              <div className="font-mono text-[11px] text-base-600">
-                {po.eta_date ?? "—"}
-              </div>
-              <div className="text-right">
+              <div className="text-right pt-0.5">
                 <span
                   className="font-ui font-bold uppercase border rounded-[3px]"
                   style={{
@@ -591,6 +607,73 @@ function ActionCell({
     >
       Receive →
     </button>
+  );
+}
+
+/**
+ * 2026-05-18 (Loo C+D) — per-source-SO row in the Orders column.
+ * Shows: `#SO · Customer · MM-DD · urgency-dot`. Customer name truncates with
+ * ellipsis; dot color comes from per-SO delivery_date diff from today
+ * (matches the server-side `urgency` calc one-for-one):
+ *   < 7 days  → 🔴 critical (var(--danger))
+ *   7-14 days → 🟡 urgent   (var(--warning))
+ *   >= 14 days → 🟢 normal   (var(--success))
+ *   no date   → muted dot   (var(--base-300))
+ *
+ * Kept in this file (not factored to its own component) because it has zero
+ * standalone use — only the procurement-tabs list embeds it.
+ */
+function OrdersRow({
+  order,
+}: {
+  order: { so: number; customer_name: string; delivery_date: string | null };
+}) {
+  const dot = (() => {
+    if (!order.delivery_date) return "var(--base-300)";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(order.delivery_date + "T00:00:00");
+    const days = Math.floor((target.getTime() - today.getTime()) / 86400000);
+    if (days < 7) return "var(--danger, #dc2626)";
+    if (days < 14) return "var(--warning)";
+    return "var(--success)";
+  })();
+  const dateLabel = order.delivery_date
+    ? order.delivery_date.slice(5) // "MM-DD" from "YYYY-MM-DD"
+    : "TBD";
+  return (
+    <div className="text-[12px] leading-[1.5] flex gap-1.5 items-baseline font-body">
+      <span className="font-mono text-[11px] text-base-700 flex-shrink-0">
+        #{order.so}
+      </span>
+      <span
+        className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-base-700"
+        title={order.customer_name}
+      >
+        {order.customer_name}
+      </span>
+      {/* Customer ETA — Loo 2026-05-18: bumped to be visually prominent
+          (was 11px muted, easy to miss). Bold + dark + a uppercase "DUE"
+          micro-label so the operator can scan customer deadlines at a glance
+          without confusing it with the PO ETA. The urgency dot to the right
+          encodes the same info in color. */}
+      <span className="font-ui text-[9px] uppercase tracking-[0.12em] text-base-500 font-semibold whitespace-nowrap">
+        DUE
+      </span>
+      <span className="font-mono text-[12px] text-base-900 font-semibold whitespace-nowrap">
+        {dateLabel}
+      </span>
+      <span
+        className="rounded-full flex-shrink-0"
+        style={{
+          width: 8,
+          height: 8,
+          background: dot,
+          transform: "translateY(-1px)",
+        }}
+        aria-hidden
+      />
+    </div>
   );
 }
 

@@ -43,29 +43,65 @@ afterAll(() => _setJwksForTesting(null));
 
 describe("GET /api/operation/procurement/:slug", () => {
   /**
-   * Mock the supabase query chain for the no-category path (`nice-future` only).
-   * Single-pass:
-   *   sb.from("purchase_orders").select(...).eq(...).order(...).limit(...)
-   *   → { data, error }
+   * 2026-05-18 (Loo C+D enrichment) — Pass C orders mock factory.
+   *
+   * After Pass A/B fetches POs, the route enriches each row with per-source-SO
+   * orders + worst-case urgency via:
+   *   sb.from("orders").select("so, customer_name, delivery_date").in("so", […])
+   *
+   * Default: returns empty rows so existing tests that don't care about
+   * enrichment keep passing (the route then sets orders=[] urgency=null).
+   * Tests that exercise enrichment behavior pass `passCRows` explicitly.
    */
-  function mockSinglePass(rows: unknown[]) {
+  function makePassCMock(passCRows: Array<{
+    so: number;
+    customer_name: string;
+    delivery_date: string | null;
+  }> = []) {
+    const passCIn = vi.fn().mockResolvedValue({ data: passCRows, error: null });
+    const passCSelect = vi.fn().mockReturnValue({ in: passCIn });
+    return { passCSelect, passCIn };
+  }
+
+  /**
+   * Mock the supabase query chain for the no-category path (`nice-future` only).
+   * Single-pass for the PO list + Pass C for the orders enrichment:
+   *   sb.from("purchase_orders").select(...).eq(...).order(...).limit(...)
+   *   sb.from("orders").select(...).in("so", [...])
+   */
+  function mockSinglePass(
+    rows: unknown[],
+    passCRows: Array<{
+      so: number;
+      customer_name: string;
+      delivery_date: string | null;
+    }> = [],
+  ) {
     const limit = vi.fn().mockResolvedValue({ data: rows, error: null });
     const order = vi.fn().mockReturnValue({ limit });
     const eq = vi.fn().mockReturnValue({ order });
     const select = vi.fn().mockReturnValue({ eq });
-    const from = vi.fn().mockReturnValue({ select });
+    const { passCSelect, passCIn } = makePassCMock(passCRows);
+
+    const from = vi.fn((table: string) => {
+      if (table === "purchase_orders") return { select };
+      if (table === "orders") return { select: passCSelect };
+      throw new Error(`unexpected table: ${table}`);
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ from } as any);
-    return { from, select, eq, order, limit };
+    return { from, select, eq, order, limit, passCSelect, passCIn };
   }
 
   /**
    * Mock the two-pass chain for category-filtered tabs (`hookka-sofa` /
-   * `hookka-bedframe`):
+   * `hookka-bedframe`) + Pass C orders enrichment:
    *   Pass A — sb.from("purchase_order_lines").select(...).like(...).eq(...)
    *            → { data: matchedLineRows, error }
    *   Pass B — sb.from("purchase_orders").select(...).in("id", ids).order(...).limit(...)
    *            → { data: parentRows, error }
+   *   Pass C — sb.from("orders").select(...).in("so", [...])
+   *            → { data: passCRows, error }
    *
    * T42-pass3-C4 — split into two passes so the embedded line array on the
    * parent rows isn't truncated by an inner-join filter.
@@ -73,6 +109,11 @@ describe("GET /api/operation/procurement/:slug", () => {
   function mockTwoPass(opts: {
     matchedLines: Array<{ po_id: string }>;
     parentRows: unknown[];
+    passCRows?: Array<{
+      so: number;
+      customer_name: string;
+      delivery_date: string | null;
+    }>;
   }) {
     // Pass A chain
     const passAEq = vi.fn().mockResolvedValue({ data: opts.matchedLines, error: null });
@@ -85,9 +126,13 @@ describe("GET /api/operation/procurement/:slug", () => {
     const passBIn = vi.fn().mockReturnValue({ order: passBOrder });
     const passBSelect = vi.fn().mockReturnValue({ in: passBIn });
 
+    // Pass C chain
+    const { passCSelect, passCIn } = makePassCMock(opts.passCRows ?? []);
+
     const from = vi.fn((table: string) => {
       if (table === "purchase_order_lines") return { select: passASelect };
       if (table === "purchase_orders") return { select: passBSelect };
+      if (table === "orders") return { select: passCSelect };
       throw new Error(`unexpected table: ${table}`);
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,6 +146,8 @@ describe("GET /api/operation/procurement/:slug", () => {
       passBIn,
       passBOrder,
       passBLimit,
+      passCSelect,
+      passCIn,
     };
   }
 
@@ -323,6 +370,97 @@ describe("GET /api/operation/procurement/:slug", () => {
       env,
     );
     expect(res.status).toBe(500);
+  });
+
+  // ----- 2026-05-18 (Loo C+D) — Pass C enrichment: orders[] + urgency -----
+  it("enriches each PO with per-source-SO orders + worst-case urgency", async () => {
+    // 2 source SOs total: 5001 (single, today + 30 days = normal),
+    // and PO with so_refs [5001, 5002] (bundle, 5002 today + 5 days = critical).
+    const today = new Date("2026-06-01T00:00:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(today);
+    try {
+      const SINGLE_PO = {
+        ...NICE_FUTURE_PO,
+        id: "PO-3001",
+        so: 5001,
+        so_refs: null,
+      };
+      const BUNDLE_PO = {
+        ...NICE_FUTURE_PO,
+        id: "PO-3002",
+        so: null,
+        so_refs: [5001, 5002],
+      };
+      const m = mockSinglePass(
+        [SINGLE_PO, BUNDLE_PO],
+        [
+          // so 5001 — 30 days out → normal
+          { so: 5001, customer_name: "Aisha", delivery_date: "2026-07-01" },
+          // so 5002 — 5 days out → critical (drives the BUNDLE_PO urgency)
+          { so: 5002, customer_name: "Lim", delivery_date: "2026-06-06" },
+        ],
+      );
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request("http://t/api/operation/procurement/nice-future", {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        pos: Array<{
+          id: string;
+          orders: Array<{ so: number; customer_name: string; delivery_date: string | null }>;
+          urgency: "critical" | "urgent" | "normal" | null;
+        }>;
+      };
+
+      const singlePo = body.pos.find((p) => p.id === "PO-3001");
+      const bundlePo = body.pos.find((p) => p.id === "PO-3002");
+      expect(singlePo?.orders).toHaveLength(1);
+      expect(singlePo?.orders[0]).toMatchObject({ so: 5001, customer_name: "Aisha" });
+      expect(singlePo?.urgency).toBe("normal");
+
+      expect(bundlePo?.orders).toHaveLength(2);
+      expect(bundlePo?.orders.map((o) => o.so).sort()).toEqual([5001, 5002]);
+      // Worst-case across [normal, critical] → critical
+      expect(bundlePo?.urgency).toBe("critical");
+
+      // Pass C fired once with the union of source SOs.
+      expect(m.passCIn).toHaveBeenCalledTimes(1);
+      const [col, vals] = m.passCIn.mock.calls[0]!;
+      expect(col).toBe("so");
+      expect([...(vals as number[])].sort()).toEqual([5001, 5002]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stockpile POs (no so + no so_refs) skip Pass C and get orders=[] urgency=null", async () => {
+    const STOCKPILE_PO = {
+      ...NICE_FUTURE_PO,
+      id: "PO-3099",
+      so: null,
+      so_refs: null,
+    };
+    const m = mockSinglePass([STOCKPILE_PO]);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/procurement/nice-future", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      pos: Array<{ orders: unknown[]; urgency: string | null }>;
+    };
+    expect(body.pos[0]?.orders).toEqual([]);
+    expect(body.pos[0]?.urgency).toBeNull();
+    // No source SOs → route short-circuits before Pass C; mock never called.
+    expect(m.passCIn).not.toHaveBeenCalled();
   });
 
   // ----- 500 supabase error mapping (single-pass / nice-future) -----
