@@ -73,13 +73,14 @@ export const requireSupplier: MiddlewareHandler<AppEnv> = async (c, next) => {
 };
 
 /**
- * Ops Panel (Jess COO 2026-05-14). Phase 1 admits `principal` + `logistics`
- * until 'ops' role is added in Phase 2 when ops staff (Samantha/Sasha/Mia)
- * onboard. Mirrors the route gate in apps/web/src/App.tsx for /ops/*.
+ * Ops Panel (Jess COO). wenwei renamed `logistics`→`operation` in migration
+ * 0121 (shared DB). Canonical role = `operation`; `logistics` kept
+ * transitionally until rename fully propagates; `principal` = admin fallback.
+ * Mirrors the route gate in apps/web/src/App.tsx for /ops/*.
  */
 export const requireOps: MiddlewareHandler<AppEnv> = async (c, next) => {
   const role = c.var.auth?.role;
-  if (role !== "principal" && role !== "logistics") {
+  if (role !== "principal" && role !== "operation" && role !== "logistics") {
     throw new HTTPException(403, { message: "Ops access only" });
   }
   await next();

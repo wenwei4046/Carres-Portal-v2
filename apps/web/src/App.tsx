@@ -135,13 +135,16 @@ export default function App() {
             </RequireAuth>
           }
         />
-        {/* Ops Panel (Jess COO 2026-05-14). Phase 1 gates by principal+logistics
-            until 'ops' role is added in Phase 2 when ops staff onboard. */}
+        {/* Ops Panel (Jess COO). wenwei renamed logistics→operation in
+            migration 0121, so the canonical role is now `operation`.
+            `logistics` kept transitionally in case the rename hasn't
+            propagated to every session yet; `principal` is the admin
+            fallback. */}
         <Route
           path="/ops/*"
           element={
             <RequireAuth>
-              <RequireRole roles={["principal", "logistics"]}>
+              <RequireRole roles={["principal", "operation", "logistics"]}>
                 <OpsApp />
               </RequireRole>
             </RequireAuth>

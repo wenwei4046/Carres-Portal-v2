@@ -26,6 +26,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Stock",
     items: [
+      { k: "ready-stock", t: "Ready Stock", icon: "★" },
       { k: "stock-inventory", t: "Inventory", icon: "□" },
       { k: "stock-transfer", t: "Transfer", icon: "⇄" },
       { k: "stock-adjust", t: "Adjust (Excel)", icon: "✎", disabled: true },

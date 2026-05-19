@@ -44,6 +44,7 @@ import dosRouter from "./routes/storage/dos";
 import opsOrdersRouter from "./routes/ops/orders";
 import opsActivityRouter from "./routes/ops/activity";
 import opsInventoryRouter from "./routes/ops/inventory";
+import opsReadyStockRouter from "./routes/ops/ready-stock";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -103,6 +104,7 @@ api.route("/storage/dos", dosRouter);
 api.route("/ops/orders", opsOrdersRouter);
 api.route("/ops/activity", opsActivityRouter);
 api.route("/ops/inventory", opsInventoryRouter);
+api.route("/ops/ready-stock", opsReadyStockRouter);
 
 app.route("/api", api);
 
