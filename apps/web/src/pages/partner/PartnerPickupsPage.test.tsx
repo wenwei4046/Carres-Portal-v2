@@ -27,7 +27,7 @@ const THREAD_ID = "00000000-0000-0000-0000-0000000200a1";
 
 // Phase 4.5 Chunk 2 carry-forward `phase-4.5-chunk-2-partner-rfd-page-rebuild`
 // rebuilt this page with two sections — RFD Pending (customer-leg, sourced
-// from `GET /api/partner/pickups/rfd-pending` via RPC `logistics_partner_rfd_pending`)
+// from `GET /api/partner/pickups/rfd-pending` via RPC `operation_partner_rfd_pending`)
 // and All Pickups (procurement-leg, sourced from `GET /api/partner/pickups`).
 // Customer-leg state lives on `order_supplier_threads` post-0052; the
 // PO-sourced indicator that disappeared with the column drop is now restored

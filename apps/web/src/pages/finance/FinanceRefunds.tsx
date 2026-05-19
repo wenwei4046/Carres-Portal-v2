@@ -11,7 +11,7 @@ import { rm } from "@/lib/format-currency";
 type RefundKind = "credit" | "refund";
 
 interface RefundDisplayRow extends FinanceRefundRow {
-  noteId:      string;       // CN-{n} or RF-{dl} for display
+  noteId:      string;       // CN-{n} or RF-{so} for display
   kind:        RefundKind;
   uiStatus:    "pending" | "approved" | "rejected" | "paid" | "issued" | "applied";
   uiStatusLabel: string;
@@ -285,7 +285,7 @@ function IssueRefundModal({ onClose }: { onClose: () => void }) {
           <option value="">Select order…</option>
           {orders.map((o) => (
             <option key={o.order_id} value={o.order_id}>
-              DL-{o.dl} · {o.customer_name} · {rm(o.total)}
+              SO-{o.so} · {o.customer_name} · {rm(o.total)}
             </option>
           ))}
         </select>

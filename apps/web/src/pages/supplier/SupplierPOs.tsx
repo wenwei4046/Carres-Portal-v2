@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   useSupplierPos,
@@ -7,12 +7,15 @@ import {
   useStartProduction,
   useReadyForPickup,
   useMarkDelivered,
+  useSupplierThreadsForPo,
   type SupplierPoRow,
   type SupplierBucket,
   type SupplierSupStatus,
   type SupplierMe,
 } from "@/lib/queries";
 import DOFileUploadField from "@/components/DOFileUploadField";
+import PODrawerThreadList from "./PODrawerThreadList";
+import PickupHistoryList from "./PickupHistoryList";
 
 /**
  * Supplier · Purchase Orders page — Phase 6 spec §6.
@@ -33,14 +36,14 @@ import DOFileUploadField from "@/components/DOFileUploadField";
 /**
  * Status label is kind-aware: own_logistics suppliers run goods to the WH
  * themselves so "awaiting partner" is nonsensical for them — they're
- * waiting for Logistics to receive at the warehouse. factory_pickup
+ * waiting for operation to receive at the warehouse. factory_pickup
  * suppliers stage at the factory waiting for a partner pickup, which is
  * where the "awaiting partner" wording applies (Loo 2026-05-11).
  */
 function labelFor(ss: SupplierSupStatus, kind: "own_logistics" | "factory_pickup" | null): string {
   if (ss === "ready_for_pickup" || ss === "ready_confirm_sent") {
     return kind === "own_logistics"
-      ? "Ready · awaiting logistics receive"
+      ? "Ready · awaiting operation receive"
       : "Ready · awaiting partner";
   }
   switch (ss) {
@@ -51,6 +54,10 @@ function labelFor(ss: SupplierSupStatus, kind: "own_logistics" | "factory_pickup
     case "partner_confirmed":  return "Partner accepted · ready to dispatch";
     case "pickup_assigned":    return "Partner assigned";
     case "pickup_accepted":    return "Pickup scheduled";
+    // 2026-05-15 (Task 14): per-thread pickup mid-state (migration 0107). At
+    // least one thread is picked but not all — partner can still come back
+    // for the remainder.
+    case "partially_shipped":  return "Partially picked · partner returning";
     case "shipped":            return "Shipped";
     case "picked_up":          return "Picked up";
     case "delivered":          return "Delivered";
@@ -61,7 +68,7 @@ function labelFor(ss: SupplierSupStatus, kind: "own_logistics" | "factory_pickup
 
 function readyTabHint(kind: "own_logistics" | "factory_pickup" | null): string {
   return kind === "own_logistics"
-    ? "Staged · awaiting logistics receive"
+    ? "Staged · awaiting operation receive"
     : "Staged · awaiting partner";
 }
 
@@ -77,8 +84,16 @@ const TAB_HINTS: Record<SupplierBucket, (kind: "own_logistics" | "factory_pickup
   delivered: () => "DO uploaded · closed",
 };
 
+/** Sort modes for the PO list. `urgency` is the default — surfaces
+ *  closest customer ETA at top so the supplier sees what to build first.
+ *  `created` keeps the API order (server returns newest-first). */
+type SortKey = "urgency" | "po_id" | "po_eta" | "created";
+
+const URGENCY_RANK: Record<string, number> = { critical: 0, urgent: 1, normal: 2 };
+
 export default function SupplierPOs() {
   const [active, setActive] = useState<SupplierBucket>("po");
+  const [sortBy, setSortBy] = useState<SortKey>("urgency");
   const [openPo, setOpenPo] = useState<SupplierPoRow | null>(null);
 
   const pos = useSupplierPos(active);
@@ -86,18 +101,53 @@ export default function SupplierPOs() {
   const rows = pos.data ?? [];
   const supplierKind = me.data?.kind ?? null;
 
+  const sortedRows = useMemo(() => {
+    const arr = [...rows];
+    if (sortBy === "urgency") {
+      arr.sort((a, b) => {
+        const ra = URGENCY_RANK[a.urgency ?? "normal"] ?? 99;
+        const rb = URGENCY_RANK[b.urgency ?? "normal"] ?? 99;
+        if (ra !== rb) return ra - rb;
+        // tiebreak by customer_eta_min (earlier delivery first).
+        return (a.customer_eta_min ?? "9999").localeCompare(b.customer_eta_min ?? "9999");
+      });
+    } else if (sortBy === "po_eta") {
+      arr.sort((a, b) => (a.eta_date ?? "9999").localeCompare(b.eta_date ?? "9999"));
+    } else if (sortBy === "po_id") {
+      arr.sort((a, b) => a.id.localeCompare(b.id));
+    }
+    // "created" → leave server order (placed_at desc).
+    return arr;
+  }, [rows, sortBy]);
+
   return (
     <div className="p-9 max-w-[1400px] mx-auto">
-      <header className="mb-7">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-          Operations
+      <header className="mb-7 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            Operations
+          </div>
+          <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
+            Purchase Orders
+          </h1>
+          <div className="text-[13px] text-muted-foreground">
+            Three-stage pipeline · PO → Ready to Pickup → Delivered
+          </div>
         </div>
-        <h1 className="font-display text-[32px] mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
-          Purchase Orders
-        </h1>
-        <div className="text-[13px] text-muted-foreground">
-          Three-stage pipeline · PO → Ready to Pickup → Delivered
-        </div>
+        <label className="flex items-center gap-2 text-[11px] text-muted-foreground self-end">
+          <span className="uppercase tracking-[0.08em]">Sort</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortKey)}
+            data-testid="supplier-pos-sort"
+            className="border border-border bg-card rounded px-2.5 py-1 text-[12px] text-foreground"
+          >
+            <option value="urgency">Urgency</option>
+            <option value="po_eta">PO ETA</option>
+            <option value="po_id">PO ID</option>
+            <option value="created">Created</option>
+          </select>
+        </label>
       </header>
 
       {/* Stage tabs */}
@@ -135,11 +185,11 @@ export default function SupplierPOs() {
       {/* Stage body */}
       {pos.isLoading ? (
         <Empty hint="Loading…" />
-      ) : rows.length === 0 ? (
+      ) : sortedRows.length === 0 ? (
         <Empty hint={emptyHintFor(active)} />
       ) : (
         <div className="flex flex-col gap-2.5">
-          {rows.map((p) => (
+          {sortedRows.map((p) => (
             <POCard
               key={p.id}
               po={p}
@@ -160,6 +210,42 @@ export default function SupplierPOs() {
       )}
     </div>
   );
+}
+
+/**
+ * 2026-05-16 (Loo) — per-thread state subtitle next to the StatusPill.
+ * Renders the "X of Y" hint specific to the current column. Hidden on
+ * stockpile POs (total === 0; caller already gates that).
+ */
+function ThreadStateSubtitle({
+  counts,
+  stage,
+}: {
+  counts: { producing: number; ready: number; picked: number; total: number };
+  stage: SupplierBucket;
+}) {
+  if (stage === "po" && counts.producing > 0) {
+    return (
+      <span className="text-[11px] text-muted-foreground">
+        <strong className="text-foreground">{counts.producing} of {counts.total}</strong> still producing
+      </span>
+    );
+  }
+  if (stage === "ready" && counts.ready > 0) {
+    return (
+      <span className="text-[11px] text-primary">
+        <strong>{counts.ready} of {counts.total}</strong> ready · partner can pickup
+      </span>
+    );
+  }
+  if (stage === "delivered" && counts.picked > 0) {
+    return (
+      <span className="text-[11px] text-success">
+        <strong>{counts.picked} of {counts.total}</strong> picked up
+      </span>
+    );
+  }
+  return null;
 }
 
 function emptyHintFor(stage: SupplierBucket) {
@@ -245,8 +331,31 @@ function POCard({
     >
       <div className="flex items-center gap-7 flex-wrap">
         <div className="min-w-[120px]">
-          <div className="font-mono text-[14px] font-bold tracking-wide">
-            {po.id}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="font-mono text-[14px] font-bold tracking-wide">
+              {po.id}
+            </div>
+            {/* Task 9 — urgency badge derived from min(customer ETA) across
+                linked threads. critical <7d · urgent 7-13d · normal >=14d.
+                Null when no threads (forecast/stockpile PO) → hidden. */}
+            {po.urgency && (
+              <span
+                className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.06em] ${
+                  po.urgency === "critical"
+                    ? "bg-destructive/10 text-destructive"
+                    : po.urgency === "urgent"
+                      ? "bg-warning/15 text-warning"
+                      : "bg-success/10 text-success"
+                }`}
+                data-testid={`urgency-${po.id}`}
+              >
+                {po.urgency === "critical"
+                  ? "🔴 Critical"
+                  : po.urgency === "urgent"
+                    ? "🟠 Urgent"
+                    : "🟢 Normal"}
+              </span>
+            )}
           </div>
           <div className="text-[11px] text-muted-foreground mt-0.5">
             Placed {new Date(po.placed_at).toLocaleDateString()}
@@ -263,13 +372,40 @@ function POCard({
         </div>
 
         <div className="flex items-center gap-5 flex-1 flex-wrap">
-          <StatusPill ss={ss} kind={supplierKind} />
+          <div className="flex flex-col gap-1">
+            <StatusPill ss={ss} kind={supplierKind} />
+            {/* 2026-05-16 (Loo) — per-thread state subtitle. Same PO can land
+                in `po` and `ready` columns when partial; the subtitle tells
+                the supplier which subset of SOs each column is talking about
+                (3 of 4 still producing here, 1 of 4 ready in the other). */}
+            {po.thread_state_counts && po.thread_state_counts.total > 0 && (
+              <ThreadStateSubtitle counts={po.thread_state_counts} stage={stage} />
+            )}
+          </div>
           {po.expected_ready_date && (
             <div className="text-[11px] text-muted-foreground flex flex-col">
               <span className="text-[9px] uppercase tracking-[0.12em]">Ready by</span>
               <span className="font-semibold text-primary">
                 {po.expected_ready_date}
               </span>
+            </div>
+          )}
+          {/* Task 9 — customer's promised delivery date (min across threads).
+              Sits next to "Ready by" so supplier sees their PO ETA vs the
+              customer's required date side-by-side. */}
+          {po.customer_eta_min && (
+            <div className="text-[11px] text-muted-foreground flex flex-col">
+              <span className="text-[9px] uppercase tracking-[0.12em]">
+                Customer ETA
+              </span>
+              <span className="font-mono font-semibold text-foreground">
+                {po.customer_eta_min}
+              </span>
+              {po.behind_schedule && (
+                <span className="text-[10px] text-destructive font-semibold mt-0.5">
+                  ⚠ Behind schedule
+                </span>
+              )}
             </div>
           )}
           {po.warehouses && (
@@ -356,20 +492,42 @@ function POCard({
               Start production
             </button>
           )}
-          {stage === "po" && isProd && (
+          {/* 2026-05-16 (Loo) — legacy PO-level "Mark Ready" button is HIDDEN
+              when the PO has linked threads. The per-thread checklist inside
+              the PODrawer is the source of truth; this button used to flip
+              the whole PO's sup_status at once which bypassed the per-thread
+              state and produced ghost POs that showed up as "ready" without
+              any SO actually being ready. For stockpile / forecast POs (no
+              threads) it stays — those have no checklist to drive readiness. */}
+          {stage === "po" && isProd && (po.thread_state_counts?.total ?? 0) === 0 && (
             <button
               type="button"
               disabled={readyPick.isPending}
               onClick={(e) => {
                 e.stopPropagation();
                 readyPick.mutate(po.id, {
-                  onSuccess: () => toast.success(`${po.id} marked ready · Logistics notified`),
+                  onSuccess: () => toast.success(`${po.id} marked ready · operation notified`),
                   onError: (err) => toast.error(err.message),
                 });
               }}
               className="px-4 py-2 text-[12px] font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
             >
               Mark Ready for Pickup
+            </button>
+          )}
+          {/* When the PO has threads, surface a hint button that opens the
+              drawer (where the per-thread checklist lives). */}
+          {stage === "po" && isProd && (po.thread_state_counts?.total ?? 0) > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen(po);
+              }}
+              className="px-4 py-2 text-[12px] font-semibold rounded-md border border-primary text-primary"
+              title="Open the PO drawer to mark individual SOs ready"
+            >
+              Tick SOs ready →
             </button>
           )}
         </div>
@@ -416,10 +574,97 @@ function POCard({
             </div>
           );
         })}
-        <div className="font-mono text-[10.5px] text-muted-foreground mt-1.5 tracking-wide">
-          ETA {po.eta_date ?? "—"}
-          {po.do_number && ` · DO ${po.do_number}`}
+        {/* 2026-05-17 (Loo screenshot redesign) — supplier-perspective:
+            cut DL# + customer-name rows (HQ-internal noise + leaks customer
+            PII to external supplier). Only surface what supplier actually
+            needs for capacity planning: WHEN goods must be ready, broken
+            down only when SO due-dates differ. If every linked SO shares
+            the same customer ETA (common case), the header chip already
+            says it — body adds nothing. If 2+ distinct dates, show a
+            compact spread so supplier knows how many units block on the
+            earliest deadline vs the rest. */}
+        {(() => {
+          const threads = po.threads ?? [];
+          if (threads.length < 2) return null;
+          const buckets = new Map<string, number>();
+          for (const t of threads) {
+            const d = t.orders?.delivery_date ?? "TBD";
+            buckets.set(d, (buckets.get(d) ?? 0) + 1);
+          }
+          if (buckets.size < 2) return null;
+          const ordered = [...buckets.entries()].sort(([a], [b]) =>
+            a.localeCompare(b),
+          );
+          return (
+            <div
+              className="mt-3 pt-2.5 border-t border-dashed border-border/60"
+              data-testid={`eta-spread-${po.id}`}
+            >
+              <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground font-semibold mb-1.5">
+                Customer deadline spread
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1 text-[12px]">
+                {ordered.map(([date, count], i) => (
+                  <div
+                    key={date}
+                    className="flex items-baseline justify-between gap-2"
+                  >
+                    <span className="font-mono text-muted-foreground">
+                      {count} SO{count > 1 ? "s" : ""}
+                      {i === 0 && (
+                        <span className="ml-1 text-[9px] font-semibold text-destructive uppercase tracking-[0.1em]">
+                          earliest
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-mono font-semibold text-foreground whitespace-nowrap">
+                      {date}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 2026-05-17 (Loo) — collection ETA upgraded from a 10.5px gray line
+            to a labeled value matching the "Send to" header style. This is
+            the supplier's own promised pickup-ready date — distinct from the
+            per-SO customer ETAs above. DO# stays inline when present. */}
+        <div className="mt-3 pt-2.5 border-t border-dashed border-border/60 flex items-end justify-between gap-3">
+          <div>
+            <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
+              Collection ETA
+            </div>
+            <div
+              className="font-mono text-[14px] font-semibold text-foreground mt-0.5"
+              data-testid={`collection-eta-${po.id}`}
+            >
+              {po.eta_date ?? "—"}
+            </div>
+          </div>
+          {po.do_number && (
+            <div className="text-right">
+              <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
+                DO
+              </div>
+              <div className="font-mono text-[12px] font-semibold text-foreground mt-0.5">
+                {po.do_number}
+              </div>
+            </div>
+          )}
         </div>
+        {/* Task 9 — deduped sku × qty roll-up from the server (sku_summary).
+            Acts as a tooltip-style one-liner summary for at-a-glance scanning
+            even when the multi-line block above is collapsed. */}
+        {po.sku_summary && po.sku_summary.length > 0 && (
+          <div
+            className="text-[11px] text-muted-foreground mt-2"
+            data-testid={`sku-summary-${po.id}`}
+          >
+            {po.sku_summary.map((l) => `${l.sku} × ${l.qty}`).join(" · ")}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -535,7 +780,7 @@ function PODrawer({
               <div className="border border-border rounded-md p-3 bg-card">
                 <div className="font-display text-[15px] font-semibold text-foreground">
                   {po.warehouses.name}
-                  {po.warehouses.kind === "logistics_partner" && (
+                  {po.warehouses.kind === "operation_partner" && (
                     <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-warning/15 text-warning">
                       LP-OWNED
                     </span>
@@ -548,7 +793,7 @@ function PODrawer({
                 )}
                 {po.warehouses.owner && (
                   <div className="text-[11.5px] mt-2 pt-2 border-t border-border">
-                    <span className="text-muted-foreground">Logistics Partner: </span>
+                    <span className="text-muted-foreground">operation Partner: </span>
                     <span className="font-semibold text-foreground">
                       {po.warehouses.owner.name}
                     </span>
@@ -570,59 +815,39 @@ function PODrawer({
             )}
           </div>
 
-          {/* 2026-05-10 (Loo) — full line table. Variant suffix per row so
-              the supplier can build the right version even when the same
-              SKU appears multiple times (multi-variant bedframe POs). */}
-          <div className="mb-5">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
-              Line items
-            </div>
-            <div className="border border-border rounded-md divide-y divide-border">
-              {(po.lines ?? []).map((l) => {
-                const a = (l.attrs ?? {}) as {
-                  color?: string;
-                  gap?: string;
-                  fabric_name?: string;
-                  fabric_surcharge?: number;
-                };
-                const variantBits: string[] = [];
-                if (a.color) variantBits.push(a.color);
-                if (a.gap) variantBits.push(`gap ${a.gap}`);
-                if (a.fabric_name) {
-                  variantBits.push(
-                    a.fabric_surcharge && a.fabric_surcharge > 0
-                      ? `${a.fabric_name} (+RM ${a.fabric_surcharge})`
-                      : a.fabric_name,
-                  );
-                }
-                return (
-                  <div
-                    key={l.id}
-                    className="flex items-baseline justify-between gap-3 px-3 py-2.5"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-semibold truncate">
-                        {l.sku}
-                      </div>
-                      {variantBits.length > 0 && (
-                        <div className="text-[11px] text-primary mt-0.5">
-                          {variantBits.join(" · ")}
-                        </div>
-                      )}
-                    </div>
-                    <div className="font-mono text-[13px] text-foreground whitespace-nowrap">
-                      ×{l.qty}
-                      {l.received_qty > 0 && (
-                        <span className="text-muted-foreground text-[11px] ml-2">
-                          ({l.received_qty} rcv)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {/* 2026-05-16 (Loo) — Line items panel now thread-aware: aggregates
+              per-SKU from the linked customer threads' order_lines, showing
+              a running balance "× total · N remaining" that ticks down as the
+              supplier marks SOs ready. The per-thread state is the source of
+              truth — the legacy PO-level lines (purchase_order_lines) is the
+              HQ↔supplier accounting view and stays as a stockpile fallback
+              when there are no threads. */}
+          <LineItemsPanel po={po} />
+
+
+          {/* Task 10 (2026-05-15) — per-thread production checklist. One row
+              per linked customer-leg thread; supplier toggles each thread's
+              "ready for pickup" state independently via mark-ready /
+              unmark-ready RPCs (migrations 0107/0108). Forecast / stockpile
+              POs (no threads) render an empty-state hint. */}
+          <section className="mb-5">
+            <h3 className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-3">
+              Production checklist
+            </h3>
+            <PODrawerThreadList poId={po.id} />
+          </section>
+
+          {/* Task 13 (2026-05-15) — pickup history. Lists every
+              po_pickup_events row for this PO with a "Reprint DO" button
+              per row that opens `/print/pickup-event/:eventId` in a new
+              tab. PDF rendered browser-side per Workers WASM constraint
+              (commit `fa47433`). */}
+          <section className="mb-5">
+            <h3 className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-3">
+              Pickup history
+            </h3>
+            <PickupHistoryList poId={po.id} />
+          </section>
 
           {showDOForm && (
             <form
@@ -727,6 +952,162 @@ function PODrawer({
             </button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 2026-05-16 (Loo) — Line items panel with running balance derived from
+ * thread state. When the PO has linked threads, each SKU is aggregated across
+ * threads and shown as: "× total — N remaining" (N counts producing threads,
+ * decrementing as the supplier ticks SOs ready). Fully-ready SKUs flip to a
+ * green "✓ all ready" pill. Stockpile / forecast POs (no threads) fall back
+ * to the PO-level lines view since there's no per-thread state to drive
+ * the balance.
+ */
+function LineItemsPanel({ po }: { po: SupplierPoRow }) {
+  const hasThreads = (po.thread_state_counts?.total ?? 0) > 0;
+  const threadsQ = useSupplierThreadsForPo(hasThreads ? po.id : null);
+
+  if (!hasThreads) {
+    return <StockpileLineItems po={po} />;
+  }
+
+  if (threadsQ.isPending) {
+    return (
+      <div className="mb-5">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
+          Line items
+        </div>
+        <div className="border border-border rounded-md p-3 text-[13px] text-muted-foreground">
+          Loading running balance…
+        </div>
+      </div>
+    );
+  }
+
+  const threads = threadsQ.data ?? [];
+  // Aggregate per-SKU totals across all linked threads.
+  const skuMap = new Map<
+    string,
+    { total: number; remaining: number; ready: number; picked: number }
+  >();
+  for (const t of threads) {
+    const isReady = t.supplier_ready_at !== null;
+    const isPicked = t.pickup_event_id !== null;
+    for (const line of t.sku_lines ?? []) {
+      const cur = skuMap.get(line.sku) ?? {
+        total: 0,
+        remaining: 0,
+        ready: 0,
+        picked: 0,
+      };
+      cur.total += line.qty;
+      if (isPicked) cur.picked += line.qty;
+      else if (isReady) cur.ready += line.qty;
+      else cur.remaining += line.qty;
+      skuMap.set(line.sku, cur);
+    }
+  }
+  const rows = [...skuMap.entries()].map(([sku, c]) => ({ sku, ...c }));
+
+  return (
+    <div className="mb-5">
+      <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
+        Line items
+      </div>
+      <div className="border border-border rounded-md divide-y divide-border">
+        {rows.map((r) => {
+          const allDone = r.remaining === 0;
+          return (
+            <div
+              key={r.sku}
+              className="flex items-baseline justify-between gap-3 px-3 py-2.5"
+              data-testid={`line-items-row-${r.sku}`}
+            >
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold truncate">{r.sku}</div>
+                <div className="text-[11px] mt-0.5 flex items-center gap-2 flex-wrap">
+                  {allDone ? (
+                    <span className="text-success font-semibold">
+                      ✓ All {r.total} ready
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-foreground font-semibold">
+                        {r.remaining} remaining
+                      </span>
+                      {r.ready > 0 && (
+                        <span className="text-primary">· {r.ready} ready</span>
+                      )}
+                      {r.picked > 0 && (
+                        <span className="text-success">· {r.picked} picked</span>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="font-mono text-[13px] text-foreground whitespace-nowrap">
+                ×{r.total}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Stockpile fallback — purchase_order_lines view (legacy pre-thread). */
+function StockpileLineItems({ po }: { po: SupplierPoRow }) {
+  return (
+    <div className="mb-5">
+      <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">
+        Line items
+      </div>
+      <div className="border border-border rounded-md divide-y divide-border">
+        {(po.lines ?? []).map((l) => {
+          const a = (l.attrs ?? {}) as {
+            color?: string;
+            gap?: string;
+            fabric_name?: string;
+            fabric_surcharge?: number;
+          };
+          const variantBits: string[] = [];
+          if (a.color) variantBits.push(a.color);
+          if (a.gap) variantBits.push(`gap ${a.gap}`);
+          if (a.fabric_name) {
+            variantBits.push(
+              a.fabric_surcharge && a.fabric_surcharge > 0
+                ? `${a.fabric_name} (+RM ${a.fabric_surcharge})`
+                : a.fabric_name,
+            );
+          }
+          return (
+            <div
+              key={l.id}
+              className="flex items-baseline justify-between gap-3 px-3 py-2.5"
+            >
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold truncate">{l.sku}</div>
+                {variantBits.length > 0 && (
+                  <div className="text-[11px] text-primary mt-0.5">
+                    {variantBits.join(" · ")}
+                  </div>
+                )}
+              </div>
+              <div className="font-mono text-[13px] text-foreground whitespace-nowrap">
+                ×{l.qty}
+                {l.received_qty > 0 && (
+                  <span className="text-muted-foreground text-[11px] ml-2">
+                    ({l.received_qty} rcv)
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

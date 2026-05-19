@@ -56,6 +56,8 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   // 0074 — Postgres numeric arrives as string|number; coalesce to null when
   // the column is NULL (catalog admin's "cost not yet set" state).
   cost: r.cost == null ? null : Number(r.cost),
+  // 2026-05-17 — pass through SKU-level supplier ownership.
+  supplierId: r.supplier_id,
   discontinuedAt: r.discontinued_at,
 });
 
@@ -172,7 +174,7 @@ export const orderFromRow = (
   rels?: { lines?: DB.OrderLineRow[]; addons?: DB.OrderAddonRow[]; history?: DB.OrderHistoryRow[] },
 ): D.Order => ({
   id: r.id,
-  dl: r.dl,
+  so: r.so,
   status: r.status,
   channel: r.channel,
   dealerId: r.dealer_id,
@@ -206,7 +208,7 @@ export const orderFromRow = (
   paymentMethod: r.payment_method ?? null,
   approvalCode: r.approval_code ?? null,
   installmentMonths: r.installment_months ?? null,
-  logisticsStage: r.logistics_stage,
+  operationStage: r.operation_stage,
   warehouseId: r.warehouse_id,
   deliveryPartnerId: r.delivery_partner_id,
   partnerStage: r.partner_stage,
@@ -233,7 +235,7 @@ export const orderSupplierThreadFromRow = (
   supplierId: r.supplier_id,
   category: r.category,
   sopName: r.sop_name,
-  logisticsStage: r.logistics_stage,
+  operationStage: r.operation_stage,
   poId: r.po_id,
   warehouseId: r.warehouse_id,
   reservedAt: r.reserved_at,
@@ -246,6 +248,11 @@ export const orderSupplierThreadFromRow = (
   requestForDeliveryAt: r.request_for_delivery_at,
   partnerAcceptedAt: r.partner_accepted_at,
   partnerRejectedAt: r.partner_rejected_at,
+  // Supplier per-thread pickup feature (migration 0107). `?? null` keeps the
+  // adapter safe against rows fetched before the migration shipped.
+  supplierReadyAt: r.supplier_ready_at ?? null,
+  supplierReadyBy: r.supplier_ready_by ?? null,
+  pickupEventId: r.pickup_event_id ?? null,
   history: r.history,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -271,8 +278,8 @@ export const purchaseOrderFromRow = (
   rels?: { lines?: DB.PurchaseOrderLineRow[] },
 ): D.PurchaseOrder => ({
   id: r.id,
-  dl: r.dl,
-  dlRefs: r.dl_refs,
+  so: r.so,
+  soRefs: r.so_refs,
   supplierId: r.supplier_id,
   warehouseId: r.warehouse_id,
   status: r.status,

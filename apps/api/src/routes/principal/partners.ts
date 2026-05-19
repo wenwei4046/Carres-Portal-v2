@@ -7,7 +7,7 @@ import type { AppEnv } from "../../types";
 /**
  * /api/principal/partners — Phase 4.5 Chunk 1 (Task 19).
  *
- * POST / — Atomically create a Logistics Partner (LP) account.
+ * POST / — Atomically create a operation Partner (LP) account.
  *
  * Three-step write (service_role required because step 2 calls
  * `auth.admin.createUser` which only works with the service-role key):

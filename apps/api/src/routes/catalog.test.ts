@@ -157,6 +157,7 @@ describe("GET /api/catalog", () => {
               variant: "queen",
               variant_kind: "size",
               price: 1500,
+              supplier_id: null,
             },
             {
               id: "00000000-0000-0000-0000-00000000bb02",
@@ -165,6 +166,7 @@ describe("GET /api/catalog", () => {
               variant: "queen",
               variant_kind: "size",
               price: 999,
+              supplier_id: null,
             },
           ],
           sofa_fabrics: [],
@@ -337,7 +339,7 @@ describe("GET /api/salespersons", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 0074 catalog admin (Loo 2026-05-09 Q2=c). Principal + logistics manage the
+// 0074 catalog admin (Loo 2026-05-09 Q2=c). Principal + operation manage the
 // SKU catalog. Tests use a small write-aware mock since buildSb above only
 // covers read chains.
 // ---------------------------------------------------------------------------
@@ -424,7 +426,7 @@ describe("Catalog admin — POST /api/catalog/models", () => {
         },
       }),
     );
-    const jwt = await makeJwt("logistics", null);
+    const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/models", {
         method: "POST",
@@ -444,7 +446,7 @@ describe("Catalog admin — POST /api/catalog/models", () => {
   });
 
   it("422s on invalid modelKey (not kebab-case)", async () => {
-    const jwt = await makeJwt("logistics", null);
+    const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/models", {
         method: "POST",
@@ -480,7 +482,7 @@ describe("Catalog admin — PATCH /api/catalog/models/:id", () => {
         },
       }),
     );
-    const jwt = await makeJwt("logistics", null);
+    const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}`, {
         method: "PATCH",
@@ -498,7 +500,7 @@ describe("Catalog admin — PATCH /api/catalog/models/:id", () => {
   });
 
   it("422s when the patch body is empty", async () => {
-    const jwt = await makeJwt("logistics", null);
+    const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}`, {
         method: "PATCH",
@@ -520,7 +522,7 @@ describe("Catalog admin — DELETE /api/catalog/models/:id (soft-delete)", () =>
         writeReturn: { id: MODEL_ID_LIVE },
       }),
     );
-    const jwt = await makeJwt("logistics", null);
+    const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}`, {
         method: "DELETE",
@@ -552,7 +554,7 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
             },
           ],
           // 0074 — POST /skus auto-resolves the supplier from
-          // suppliers.cat_covered so logistics doesn't have to pick one.
+          // suppliers.cat_covered so operation doesn't have to pick one.
           // Stub a mattress-covering supplier here.
           suppliers: [
             {
@@ -575,7 +577,7 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
         },
       }),
     );
-    const jwt = await makeJwt("logistics", null);
+    const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/skus", {
         method: "POST",
@@ -618,7 +620,7 @@ describe("Catalog admin — PATCH /api/catalog/skus/:id", () => {
         },
       }),
     );
-    const jwt = await makeJwt("logistics", null);
+    const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/skus/00000000-0000-0000-0000-00000000bb01", {
         method: "PATCH",
@@ -648,7 +650,7 @@ describe("Catalog admin — sofa fabrics CRUD", () => {
         },
       }),
     );
-    const jwt = await makeJwt("logistics", null);
+    const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/sofa-fabrics", {
         method: "POST",
@@ -680,7 +682,7 @@ describe("Catalog admin — sofa fabrics CRUD", () => {
         writeReturn: { id: "00000000-0000-0000-0000-00000000cc01" },
       }),
     );
-    const jwt = await makeJwt("logistics", null);
+    const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/sofa-fabrics/00000000-0000-0000-0000-00000000cc01", {
         method: "DELETE",

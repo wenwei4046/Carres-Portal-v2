@@ -27,13 +27,9 @@ export default function SupplierDashboard() {
 
   const rows: SupplierPoRow[] = pos.data ?? [];
 
-  // 2026-05-10 (Loo) — was reading dropped column `purchase_orders.qty`
-  // (post-0017 it lives on the embedded lines). Sum across the new lines[].
-  const totalUnits = rows.reduce(
-    (s, p) =>
-      s + (p.lines ?? []).reduce((ss, l) => ss + (l.qty ?? 0), 0),
-    0,
-  );
+  // 2026-05-15 (Loo) — "Total open units" KPI dropped in favour of the new
+  // demand-side hero card (Committed (POs) reads the same units via
+  // `useSupplierDemand`). totalUnits computation also dropped.
   const pendingAck = rows.filter((p) => p.sup_status === "pending").length;
   const inProd = rows.filter(
     (p) => p.sup_status === "acknowledged" || p.sup_status === "in_production",
@@ -46,7 +42,10 @@ export default function SupplierDashboard() {
       // goods; supplier (own_logistics) now self-dispatches. Mirrors the
       // API ready bucket in apps/api/src/routes/supplier/pos.ts:49 so the
       // Dashboard pipeline counter matches the Ready-to-Pickup tab.
-      p.sup_status === "partner_confirmed",
+      p.sup_status === "partner_confirmed" ||
+      // Task 14 (2026-05-15) — `partially_shipped` (migration 0107) keeps
+      // un-picked threads visible; supplier still owes those threads.
+      p.sup_status === "partially_shipped",
   ).length;
 
   const stagePo = rows.filter((p) =>
@@ -59,6 +58,9 @@ export default function SupplierDashboard() {
       "partner_confirmed",
       "pickup_assigned",
       "pickup_accepted",
+      // Task 14 (2026-05-15) — partial PO still in ready stage until every
+      // thread is picked (mirrors `readyAwaiting` above + API bucket).
+      "partially_shipped",
       "shipped",
       "reassign_needed",
     ].includes(p.sup_status),
@@ -67,8 +69,28 @@ export default function SupplierDashboard() {
     ["picked_up", "delivered"].includes(p.sup_status),
   ).length;
 
-  const topDemand = (demand.data ?? []).slice(0, 4);
-  const maxDemand = topDemand[0]?.openQty ?? 0;
+  // 2026-05-15 (Loo) — Top demand displays Total = committed (openQty from
+  // issued POs) + pending (pendingQty from sales orders not yet POed). The
+  // prior "open POs only" view hid the existence of inbound sales orders that
+  // hadn't been formalised into POs yet, producing the confusing UX where a
+  // SKU surfaced in the list but showed a big 0. Now mirrors the Forecast
+  // page's "Total demand" semantic — sort + display use the combined number.
+  const demandRows = demand.data ?? [];
+  const demandWithTotal = demandRows.map((d) => ({
+    ...d,
+    total: d.openQty + (d.pendingQty ?? 0),
+  }));
+  const topDemand = demandWithTotal
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 4);
+  const maxDemand = topDemand[0]?.total ?? 0;
+
+  // 2026-05-15 (Loo) — Mirror Forecast hero KPI row on Dashboard so the
+  // supplier sees Total Demand = Committed + Pending front-and-center,
+  // not just inside the Forecast sub-page.
+  const totalCommitted = demandRows.reduce((s, r) => s + r.openQty, 0);
+  const totalPending = demandRows.reduce((s, r) => s + (r.pendingQty ?? 0), 0);
+  const totalDemand = totalCommitted + totalPending;
 
   const isLoading = pos.isLoading || demand.isLoading;
 
@@ -86,10 +108,59 @@ export default function SupplierDashboard() {
         </div>
       </header>
 
-      {/* KPI row — 4 cards (proto's 5 cards minus Incoming, deferred to
-          SupplierIncoming page where the data fetch lives) */}
+      {/* Demand KPI row — Total demand hero + Committed + Pending. Mirrors
+          the Forecast page's KPI layout (1.5fr/1fr/1fr) so the math is
+          visible at a glance. Total = Committed + Pending. */}
       <div
-        className="grid grid-cols-4 gap-3.5 mb-5"
+        className="grid grid-cols-[1.5fr_1fr_1fr] gap-3.5 mb-5"
+        data-testid="supplier-dashboard-demand-kpis"
+      >
+        <div
+          className={`border-2 rounded-md p-5 bg-primary/[0.04] ${
+            totalDemand > 0 ? "border-primary/40" : "border-border"
+          }`}
+        >
+          <div
+            className={`text-[10px] uppercase tracking-[0.06em] ${
+              totalDemand > 0 ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            Total demand
+          </div>
+          <div className="flex items-baseline gap-3 mt-2">
+            <div className="font-display text-[44px] leading-none">
+              {totalDemand}
+            </div>
+            {totalDemand > 0 && (
+              <div className="text-[12px] text-muted-foreground leading-snug">
+                = <span className="font-mono">{totalCommitted}</span> committed
+                {" + "}
+                <span className="font-mono">{totalPending}</span> pending
+              </div>
+            )}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-2">
+            Across {demandRows.length} SKU{demandRows.length === 1 ? "" : "s"}
+          </div>
+        </div>
+        <Kpi
+          label="Committed (POs)"
+          value={totalCommitted}
+          hint="Already-issued PO lines"
+        />
+        <Kpi
+          label="Pending (orders)"
+          value={totalPending}
+          hint="Sales orders not yet POed"
+          accent={totalPending > 0}
+        />
+      </div>
+
+      {/* Pipeline KPI row — what's mid-flight on this supplier's POs right
+          now. "Total open units" KPI dropped 2026-05-15 (Loo) since it
+          duplicates the new Committed (POs) card above. */}
+      <div
+        className="grid grid-cols-3 gap-3.5 mb-5"
         data-testid="supplier-dashboard-kpis"
       >
         <Kpi
@@ -108,11 +179,6 @@ export default function SupplierDashboard() {
           value={readyAwaiting}
           hint="Goods staged at factory"
           accent={readyAwaiting > 0}
-        />
-        <Kpi
-          label="Total open units"
-          value={totalUnits}
-          hint={`${rows.length} POs across pipeline`}
         />
       </div>
 
@@ -196,7 +262,7 @@ export default function SupplierDashboard() {
               >
                 {me.data.kind === "factory_pickup"
                   ? "Factory pickup"
-                  : "Own logistics"}
+                  : "Own operation"}
               </span>
             </div>
           </div>
@@ -245,42 +311,52 @@ export default function SupplierDashboard() {
       {/* Top SKUs */}
       <div className="border border-border rounded-md p-5 bg-card">
         <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-4">
-          Top demand · open POs
+          Top demand · committed + pending
         </div>
         {isLoading ? (
           <div className="text-[13px] text-muted-foreground py-6">Loading…</div>
         ) : topDemand.length === 0 ? (
           <div className="text-[13px] text-muted-foreground py-6">
-            No open demand right now.
+            No demand right now.
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {topDemand.map((d) => (
-              <div
-                key={d.sku}
-                className="grid grid-cols-[1fr_auto] gap-3 items-center"
-              >
-                <div className="min-w-0">
-                  <div className="text-[13px] font-semibold truncate">
-                    {d.sku}
+            {topDemand.map((d) => {
+              const pendingCount = d.pendingOrderCount ?? 0;
+              return (
+                <div
+                  key={d.sku}
+                  className="grid grid-cols-[1fr_auto] gap-3 items-center"
+                >
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold truncate">
+                      {d.sku}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      Across {d.poCount} PO{d.poCount === 1 ? "" : "s"}
+                      {pendingCount > 0 && (
+                        <>
+                          {" · "}
+                          {pendingCount} pending order
+                          {pendingCount === 1 ? "" : "s"}
+                        </>
+                      )}
+                    </div>
+                    <div className="h-1.5 bg-secondary rounded mt-1.5 overflow-hidden">
+                      <div
+                        className="h-full bg-primary"
+                        style={{
+                          width: `${maxDemand ? (d.total / maxDemand) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    Across {d.poCount} PO{d.poCount === 1 ? "" : "s"}
-                  </div>
-                  <div className="h-1.5 bg-secondary rounded mt-1.5 overflow-hidden">
-                    <div
-                      className="h-full bg-primary"
-                      style={{
-                        width: `${maxDemand ? (d.openQty / maxDemand) * 100 : 0}%`,
-                      }}
-                    />
+                  <div className="font-mono text-[18px] font-bold min-w-[42px] text-right">
+                    {d.total}
                   </div>
                 </div>
-                <div className="font-mono text-[18px] font-bold min-w-[42px] text-right">
-                  {d.openQty}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -1,7 +1,7 @@
 /**
  * CJK detection helpers — pick the right font family for mixed-language text.
  *
- * The HQ logistics surfaces (Phase 4 M5) display dealer + customer + warehouse
+ * The HQ operation surfaces (Phase 4 M5) display dealer + customer + warehouse
  * names that often mix Chinese and English (e.g. "Loo 王小明", "Carres 北区仓"),
  * and the proto reserves DM Sans for ASCII while Noto Sans SC carries CJK
  * glyphs cleanly. `cjkClassName(s)` returns the matching Tailwind family token

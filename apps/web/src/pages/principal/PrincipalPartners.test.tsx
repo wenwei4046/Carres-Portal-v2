@@ -40,6 +40,6 @@ describe("PrincipalPartners page", () => {
   it("shows empty state when no LPs exist", async () => {
     vi.mocked(apiFetch).mockResolvedValue([]);
     render(wrap(<PrincipalPartners />));
-    await waitFor(() => expect(screen.getByText(/no logistics partners/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/no operation partners/i)).toBeInTheDocument());
   });
 });

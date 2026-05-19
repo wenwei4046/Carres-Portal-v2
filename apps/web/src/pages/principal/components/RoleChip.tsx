@@ -9,7 +9,7 @@
  */
 const ROLE_TEXT: Record<string, string> = {
   dealer: "text-[#3c5a78]",
-  logistics: "text-[#8b5e3c]",
+  operation: "text-[#8b5e3c]",
   finance: "text-success",
   supplier: "text-[#7a3f86]",
   principal: "text-primary",

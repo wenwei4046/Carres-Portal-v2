@@ -31,7 +31,7 @@ function wrap(ui: React.ReactNode) {
 
 const ROW_OPEN = {
   order_id:      "00000000-0000-0000-0000-000000000a01",
-  dl:            1240,
+  so:            1240,
   customer_name: "Tan Wei Ling",
   dealer_id:     "d1",
   dealer_name:   "Showroom KL",
@@ -47,7 +47,7 @@ const ROW_OPEN = {
 const ROW_SETTLED = {
   ...ROW_OPEN,
   order_id:      "00000000-0000-0000-0000-000000000a02",
-  dl:            1239,
+  so:            1239,
   customer_name: "Lee Kah Hong",
   outstanding:   0,
   paid:          5970,

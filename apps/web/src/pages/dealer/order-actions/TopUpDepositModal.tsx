@@ -5,13 +5,13 @@ import { useTopUpOrder } from "@/lib/queries";
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 
 /**
- * Minimal shape the modal needs. Dealer side passes a full `Order`; logistics
- * side passes a slim adapter from `LogisticsOrderDetailOrder`. Structural
+ * Minimal shape the modal needs. Dealer side passes a full `Order`; operation
+ * side passes a slim adapter from `operationOrderDetailOrder`. Structural
  * typing — Order already satisfies these fields, no change needed dealer-side.
  */
 export interface TopUpTarget {
   id: string;
-  dl: number;
+  so: number;
   dealerId: string;
   paid: number;
 }
@@ -49,7 +49,7 @@ interface PhotoSlot {
  */
 export default function TopUpDepositModal({ order, total, onClose }: Props) {
   // 2026-05-13 (Loo) — derive dealer scope from the order, not the caller's
-  // JWT. Lets logistics / finance / principal record top-ups on dealer-owned
+  // JWT. Lets operation / finance / principal record top-ups on dealer-owned
   // orders without needing a dealer JWT claim. Storage paths still nest under
   // the order's dealer folder so RLS on orders-attachments stays scoped.
   const dealerId = order.dealerId;
@@ -79,7 +79,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
 
   const topUpMut = useTopUpOrder(order.id, {
     onSuccess: () => {
-      toast.success(`Recorded ${RM(amount)} for #${order.dl}`);
+      toast.success(`Recorded ${RM(amount)} for #${order.so}`);
       onClose();
     },
     onError: (err) => {
@@ -187,7 +187,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
     <ModalShell onClose={onClose}>
       {/* Header */}
       <header className="px-7 pt-5 pb-3.5 border-b border-base-100">
-        <p className="kicker">Record payment · #{order.dl}</p>
+        <p className="kicker">Record payment · #{order.so}</p>
         <h2 className="font-display text-[22px] mt-0.5 tracking-[-0.02em] leading-[1.2] font-semibold">
           Top up deposit
         </h2>

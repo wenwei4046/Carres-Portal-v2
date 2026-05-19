@@ -370,7 +370,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
   it("returns JSON template data when invoice + order + lines all valid", async () => {
     const sb = mockChain(
       { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
-      { id: ORDER_ID, dl: 1240, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "10 Lorong KL", dealer_id: "d1", paid: 5970, dealers: { name: "KL Showroom", contact: "Aisha" } },
+      { id: ORDER_ID, so: 1240, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "10 Lorong KL", dealer_id: "d1", paid: 5970, dealers: { name: "KL Showroom", contact: "Aisha" } },
       [{ sku: "SKU-A", qty: 1, unit_price: 5970 }],
       [{ sku: "SKU-A", variant: "Mattress · Queen" }],
     );
@@ -389,7 +389,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(body.invoice_no).toBe("INV-2026-1240");
-    expect(body.order_code).toBe("DL-1240");
+    expect(body.order_code).toBe("SO-1240");
     expect(body.total).toBe(5970);
     expect(body.lines).toHaveLength(1);
   });
@@ -412,7 +412,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
   it("returns 422 when order not delivered", async () => {
     const sb = mockChain(
       { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
-      { id: ORDER_ID, dl: 1240, status: "logistics", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: 5970, dealers: null },
+      { id: ORDER_ID, so: 1240, status: "operation", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: 5970, dealers: null },
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
@@ -432,7 +432,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
   it("returns 422 when paid < amount", async () => {
     const sb = mockChain(
       { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
-      { id: ORDER_ID, dl: 1240, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: 1000, dealers: null },
+      { id: ORDER_ID, so: 1240, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: 1000, dealers: null },
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);

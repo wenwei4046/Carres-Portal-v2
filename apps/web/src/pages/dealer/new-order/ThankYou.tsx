@@ -14,7 +14,7 @@ interface Props {
  * Post-submit confirmation screen — proto-faithful: solid sage success badge
  * + "Thank you" hero + "What's next" 3-step list + two CTA buttons.
  *
- * Order ID format: `CO-{dl}` where dl is the dealer-local sequence (the DB
+ * Order ID format: `CO-{so}` where so is the dealer-local sequence (the DB
  * column populated by create_order RPC). Same display string the dealer
  * sees on the kanban card.
  */
@@ -30,7 +30,7 @@ export default function ThankYou({ order, onNewOrder, onClose }: Props) {
           Thank you
         </div>
         <div className="text-sm text-base-600 mt-1.5">
-          Order <span className="font-mono font-semibold text-base-900">CO-{order.dl}</span> has
+          Order <span className="font-mono font-semibold text-base-900">CO-{order.so}</span> has
           been submitted to Carres.
         </div>
       </div>
@@ -41,7 +41,7 @@ export default function ThankYou({ order, onNewOrder, onClose }: Props) {
             Order sits in <strong>Place</strong> until you click <em>Proceed</em> when the
             customer is ready.
           </li>
-          <li>Logistics will issue a PO and prepare the goods.</li>
+          <li>operation will issue a PO and prepare the goods.</li>
           <li>
             Once the DO is submitted, the order moves to <strong>Delivered</strong>.
           </li>
@@ -51,7 +51,7 @@ export default function ThankYou({ order, onNewOrder, onClose }: Props) {
             <div className="label mb-1.5">Print for customer</div>
             <DownloadSalesOrderButton
               orderId={order.id}
-              dl={order.dl}
+              so={order.so}
               role={role}
               variant="secondary"
               className="w-full"

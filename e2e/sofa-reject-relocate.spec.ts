@@ -9,19 +9,19 @@ async function login(page: Page, email: string, password: string) {
 }
 
 // Pre-condition: pnpm seed:test-users && pnpm seed:e2e-fixtures
-//   - DL-9204: sofa-reject order at thread.logistics_stage='waiting' (per
-//     0047 rollup, orders.logistics_stage rolls up to 'ready_to_dispatch'
+//   - SO-9204: sofa-reject order at thread.operation_stage='waiting' (per
+//     0047 rollup, orders.operation_stage rolls up to 'ready_to_dispatch'
 //     when any thread is at 'waiting'). Thread supplier=HoOKkA, sop_name=
 //     'SOFA_SPECIAL'.
 //
 // 2026-05-09 rewrite: original spec walked the Sofa Reject Relocate flow
-// (LP Pre-flight Reject → Logistics Relocate to new wh → at_warehouse_waiting
+// (LP Pre-flight Reject → operation Relocate to new wh → at_warehouse_waiting
 // → customer-confirm → Resume). Most complex SOP. Pivoted to a smoke
 // asserting the order with a 'waiting' thread surfaces on the kanban —
 // the rollup behavior (waiting → ready_to_dispatch column) was a
 // frequently-broken path during Phase 4.5 development.
-test("Sofa Reject (SOP_SOFA_SPECIAL, waiting) — order surfaces on logistics kanban", async ({ page }) => {
-  await login(page, "logistics-test@x.com", "logistics-test-password");
-  await page.goto("/logistics/orders");
+test("Sofa Reject (SOP_SOFA_SPECIAL, waiting) — order surfaces on operation kanban", async ({ page }) => {
+  await login(page, "operation-test@x.com", "operation-test-password");
+  await page.goto("/operation/orders");
   await expect(page.getByRole("button", { name: /#9204/ })).toBeAttached({ timeout: 10_000 });
 });

@@ -46,7 +46,7 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
       >
         <header className="px-7 py-5 border-b border-base-100 flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="font-mono text-xs text-base-500">{order ? `#${order.dl}` : "—"}</div>
+            <div className="font-mono text-xs text-base-500">{order ? `#${order.so}` : "—"}</div>
             <div className="font-display text-2xl mt-0.5 tracking-[-0.02em] truncate">{order?.customer.name ?? "Loading…"}</div>
             {order?.customer.phone && (
               <div className="font-mono text-xs text-base-500 mt-0.5">{order.customer.phone}</div>
@@ -54,7 +54,7 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Edit + Cancel only on Place orders — once proceeded, changes
-             *  and cancellation go through logistics. Mirrors proto's
+             *  and cancellation go through operation. Mirrors proto's
              *  customer editor button + the implicit cancel intent. */}
             {/* 2026-05-12 (Loo) — customer-facing Sales Order PDF.
              *  Always available on the detail drawer regardless of order
@@ -62,7 +62,7 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
             {order && role && (
               <DownloadSalesOrderButton
                 orderId={order.id}
-                dl={order.dl}
+                so={order.so}
                 role={role}
                 variant="secondary"
               />
@@ -238,7 +238,7 @@ function OrderBody({
  *   • status === 'place' + blockers    → warning-soft callout + blocker list +
  *                                         3 resolution buttons + disabled
  *                                         "Locked (N pending)" button
- *   • status === 'proceed_order'       → info-soft "In logistics' hands" panel
+ *   • status === 'proceed_order'       → info-soft "In operation' hands" panel
  *   • else (delivered / cancelled)     → no panel
  *
  * Each resolution button opens a focused modal (AddAddress / ConfirmDate /
@@ -257,7 +257,7 @@ function ActionPanel({ order }: { order: Order }) {
 
   const proceedMut = useProceedOrder({
     onSuccess: () => {
-      toast.success(`Order #${order.dl} sent to logistics`);
+      toast.success(`Order #${order.so} sent to operation`);
     },
     onError: (err) => {
       // 422 with a known blocker code → show the matching label so the dealer
@@ -277,9 +277,9 @@ function ActionPanel({ order }: { order: Order }) {
   if (order.status === "proceed_order") {
     return (
       <div className="rounded p-4 mb-5 bg-info-soft border border-info">
-        <div className="text-[13px] font-semibold text-info">In logistics&rsquo; hands</div>
+        <div className="text-[13px] font-semibold text-info">In operation&rsquo; hands</div>
         <p className="text-xs text-base-700 mt-0.5">
-          Order will move to <strong>Delivered</strong> when logistics submits the DO.
+          Order will move to <strong>Delivered</strong> when operation submits the DO.
         </p>
       </div>
     );
@@ -297,7 +297,7 @@ function ActionPanel({ order }: { order: Order }) {
       <div className="rounded p-4 mb-5 bg-success-soft border border-success">
         <div className="text-[13px] font-semibold text-success mb-1">✓ Ready to proceed</div>
         <p className="text-xs text-base-700">
-          Customer info complete and payment ≥ 50%. You can push this order to logistics.
+          Customer info complete and payment ≥ 50%. You can push this order to operation.
         </p>
         <button
           type="button"
@@ -305,7 +305,7 @@ function ActionPanel({ order }: { order: Order }) {
           disabled={proceedMut.isPending}
           className="btn-primary w-full mt-3"
         >
-          {proceedMut.isPending ? "Sending…" : "Proceed → Send to logistics"}
+          {proceedMut.isPending ? "Sending…" : "Proceed → Send to operation"}
         </button>
       </div>
     );

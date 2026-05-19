@@ -1,4 +1,4 @@
-import { useSupplierDemand, useSupplierPos } from "@/lib/queries";
+import { useSupplierDemand } from "@/lib/queries";
 
 /**
  * Supplier · Incoming — Phase 6 V1.
@@ -16,19 +16,18 @@ import { useSupplierDemand, useSupplierPos } from "@/lib/queries";
  */
 export default function SupplierIncoming() {
   const demand = useSupplierDemand();
-  const pendingPos = useSupplierPos("po");
 
   const rows = demand.data ?? [];
   // 2026-05-10 (Loo) — `openQty` is committed via PO; `pendingQty` is
   // pre-commit demand from sales orders with matching cat_covered. Surface
   // both so the supplier can plan production capacity without waiting for
-  // logistics to formalise every order into a PO.
+  // operation to formalise every order into a PO.
+  // 2026-05-15 (Loo) — "Pending ack" KPI removed. It was a sub-status of
+  // committed POs (sup_status='pending') and didn't belong in a demand
+  // forecast view; supplier reads PO ack state on the POs page anyway.
   const totalOpenUnits = rows.reduce((s, r) => s + r.openQty, 0);
   const totalPendingUnits = rows.reduce((s, r) => s + (r.pendingQty ?? 0), 0);
   const totalUnits = totalOpenUnits + totalPendingUnits;
-  const pendingAck = (pendingPos.data ?? []).filter(
-    (p) => p.sup_status === "pending",
-  ).length;
 
   // Group by category prefix (proto:715-720). SKU format: cat:model:variant.
   const byCat: Record<string, typeof rows> = {};
@@ -54,13 +53,39 @@ export default function SupplierIncoming() {
         </div>
       </header>
 
-      <div className="grid grid-cols-4 gap-3.5 mb-5">
-        <Kpi
-          label="Total demand"
-          value={totalUnits}
-          accent={totalUnits > 0}
-          hint={`Across ${rows.length} SKU${rows.length === 1 ? "" : "s"}`}
-        />
+      {/* KPI row — Total demand is the hero (wider + tinted + bigger number
+          + inline breakdown), Committed and Pending are smaller peer cards
+          showing the two components that sum to Total. Visual hierarchy
+          mirrors the math: Total = Committed + Pending. */}
+      <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-3.5 mb-5">
+        <div
+          className={`border-2 rounded-md p-5 bg-primary/[0.04] ${
+            totalUnits > 0 ? "border-primary/40" : "border-border"
+          }`}
+        >
+          <div
+            className={`text-[10px] uppercase tracking-[0.06em] ${
+              totalUnits > 0 ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            Total demand
+          </div>
+          <div className="flex items-baseline gap-3 mt-2">
+            <div className="font-display text-[44px] leading-none">
+              {totalUnits}
+            </div>
+            {totalUnits > 0 && (
+              <div className="text-[12px] text-muted-foreground leading-snug">
+                = <span className="font-mono">{totalOpenUnits}</span> committed
+                {" + "}
+                <span className="font-mono">{totalPendingUnits}</span> pending
+              </div>
+            )}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-2">
+            Across {rows.length} SKU{rows.length === 1 ? "" : "s"}
+          </div>
+        </div>
         <Kpi
           label="Committed (POs)"
           value={totalOpenUnits}
@@ -71,12 +96,6 @@ export default function SupplierIncoming() {
           value={totalPendingUnits}
           hint="Sales orders not yet POed"
           accent={totalPendingUnits > 0}
-        />
-        <Kpi
-          label="Pending ack"
-          value={pendingAck}
-          hint="Awaiting supplier acknowledgement"
-          accent={pendingAck > 0}
         />
       </div>
 

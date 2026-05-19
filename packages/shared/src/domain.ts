@@ -3,7 +3,7 @@
  * convert from snake_case DB rows to these.
  */
 
-import type { CostSource, LogisticsStage } from "./db-types";
+import type { CostSource, OperationStage } from "./db-types";
 
 // Re-exported so UI code can write `import type { CostSource } from
 // "@carres/shared/domain"` alongside the rest of the camelCase surface.
@@ -13,7 +13,7 @@ export type { CostSource };
 
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
-  | "logistics" | "supplier" | "partner" | "finance" | "bd";
+  | "operation" | "supplier" | "partner" | "finance" | "bd";
 
 export interface Dealer {
   id: string;
@@ -67,6 +67,12 @@ export interface ProductSku {
   // 0074 — fixed procurement cost per unit; auto-fills onto every Create-PO
   // line. Null = not yet set (Create-PO refuses lines whose SKU has null cost).
   cost: number | null;
+  // 2026-05-17 (Loo A→Z test bug A) — SKU-level supplier ownership. The DB
+  // column has been NOT NULL since migration 0074; surfacing it on the DTO
+  // lets CreatePOModal route lines to the right supplier group directly
+  // instead of parsing a `category:model:variant` prefix from the SKU string
+  // (the proto-era convention that's no longer how SKUs are formatted).
+  supplierId: string | null;
   discontinuedAt?: string | null;
 }
 
@@ -179,7 +185,7 @@ export interface OrderHistory {
 
 export interface Order {
   id: string;
-  dl: number;
+  so: number;
   status: "place" | "proceed_order" | "delivered" | "cancelled";
   channel: string;
   dealerId: string;
@@ -214,13 +220,13 @@ export interface Order {
   approvalCode: string | null;
   installmentMonths: 6 | 12 | null;
 
-  // v3-S3 (migration 0028) added `awaiting_logistics_action` + `waiting`.
+  // v3-S3 (migration 0028) added `awaiting_operation_action` + `waiting`.
   // Phase 4.5a (2026-05-05): legacy `awaiting_stock` value fully removed —
   // T5 swept FE/tests, T6 (migration 0040) dropped it from the DB enum.
-  // logistics_stage now matches this union 1:1.
-  logisticsStage:
+  // operation_stage now matches this union 1:1.
+  operationStage:
     | "placed" | "proceed_request"
-    | "awaiting_logistics_action"
+    | "awaiting_operation_action"
     | "ready_to_dispatch" | "dispatched"
     | "waiting" | "delivered"
     | null;
@@ -231,7 +237,7 @@ export interface Order {
   partnerEta: string | null;
   doNumber: string | null;
   doNote: string | null;
-  // Logistics timestamps (migration 0019). dispatchedAt set on D1 step 1;
+  // operation timestamps (migration 0019). dispatchedAt set on D1 step 1;
   // deliveredAt set on D1 step 2 (DO attach + sign).
   dispatchedAt: string | null;
   deliveredAt: string | null;
@@ -248,7 +254,7 @@ export interface Order {
 
 /**
  * camelCase mirror of `OrderSupplierThreadRow` (migration 0033, v3-S4). One row
- * per (order, supplier, category). Drives the v3 logistics pipeline so each
+ * per (order, supplier, category). Drives the v3 operation pipeline so each
  * fulfillment slice of an order has its own SOP-driven kanban presence.
  *
  * `sopName` mirrors `SopName` from `sops.ts` ('STANDARD' | 'SOFA_SPECIAL').
@@ -260,11 +266,11 @@ export interface OrderSupplierThread {
   supplierId: string;
   category: string;
   sopName: "STANDARD" | "SOFA_SPECIAL";
-  // Mirrors `OrderSupplierThreadRow.logistics_stage` which is non-null
+  // Mirrors `OrderSupplierThreadRow.operation_stage` which is non-null
   // (migration 0033 line 51 declares the column NOT NULL). Reuses the named
-  // `LogisticsStage` type from db-types.ts so FE and DB stay 1:1 if the enum
+  // `operationStage` type from db-types.ts so FE and DB stay 1:1 if the enum
   // changes.
-  logisticsStage: LogisticsStage;
+  operationStage: OperationStage;
   poId: string | null;
   warehouseId: string | null;
   reservedAt: string | null;
@@ -280,6 +286,11 @@ export interface OrderSupplierThread {
   requestForDeliveryAt: string | null;
   partnerAcceptedAt: string | null;
   partnerRejectedAt: string | null;
+  // Supplier per-thread pickup feature (migration 0107). Mirrors snake_case
+  // `OrderSupplierThreadRow.supplier_ready_at` / `_by` / `pickup_event_id` 1:1.
+  supplierReadyAt: string | null;
+  supplierReadyBy: string | null;
+  pickupEventId: string | null;
   history: unknown[];
   createdAt: string;
   updatedAt: string;
@@ -287,9 +298,9 @@ export interface OrderSupplierThread {
 
 export interface PurchaseOrder {
   id: string;
-  dl: number | null;
+  so: number | null;
   // Cross-order bundle backrefs (migration 0017). See PurchaseOrderRow comment.
-  dlRefs: number[] | null;
+  soRefs: number[] | null;
   supplierId: string;
   warehouseId: string;
   // Single-sku/qty columns dropped in 0017 — lines live in purchase_order_lines.
@@ -412,3 +423,55 @@ export interface Inquiry {
   linkedDealerId: string | null;
   createdAt: string;
 }
+
+/**
+ * Supplier per-thread pickup feature (migration 0107). Urgency is a derived
+ * UI badge for `ThreadReadinessRow`, ranked by customer delivery date proximity:
+ *   - critical  → delivery date is past or within 3 days
+ *   - urgent    → 4-7 days out
+ *   - normal    → 8+ days, null, or unset
+ */
+export type Urgency = "critical" | "urgent" | "normal";
+
+/**
+ * camelCase mirror of `PoPickupEventsRow` (migration 0107). One row per
+ * physical DO paper / one trip. Created when a partner or operation user
+ * batch-picks one or more ready threads off a PO; the new event id is then
+ * stamped onto every collected thread (`OrderSupplierThread.pickupEventId`).
+ *
+ * `ackRole` records which side recorded the pickup — partner (factory_pickup
+ * supplier) or operation (own_logistics supplier delivers to HQ warehouse).
+ */
+export type PickupEvent = {
+  id: string;
+  poId: string;
+  doNumber: string;
+  doFilePath: string | null;
+  doNote: string | null;
+  pickedUpAt: string;
+  pickedUpBy: string | null;
+  ackRole: "partner" | "operation";
+  createdAt: string;
+};
+
+/**
+ * Hydrated row shape for the per-thread readiness UI (supplier "Ready" tab +
+ * partner pickup batch screen + operation receive-threads screen). Joins
+ * `order_supplier_threads` with parent order customer fields + the optional
+ * pickup event DO number.
+ *
+ * `skuLines` lists the per-thread SKU breakdown so users can verify the
+ * physical goods match what they're acknowledging. Sourced from the threaded
+ * subset of `order_lines` filtered by `(order_id, category)`.
+ */
+export type ThreadReadinessRow = {
+  threadId: string;
+  orderId: string;
+  orderDl: number;
+  customerName: string;
+  customerDeliveryDate: string | null;
+  supplierReadyAt: string | null;
+  pickupEventId: string | null;
+  pickupDoNumber: string | null;
+  skuLines: Array<{ sku: string; qty: number }>;
+};

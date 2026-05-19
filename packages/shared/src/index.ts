@@ -11,7 +11,7 @@ export * as Adapters from "./adapters";
 
 // Phase 4.5 Chunk 2 Sprint E migration 0055 (T25). Top-level type re-export
 // so consumers can `import type { CostSource } from "@carres/shared"` without
-// having to dip into the DB.* namespace. Mirrors how Role + LogisticsStage are
+// having to dip into the DB.* namespace. Mirrors how Role + operationStage are
 // implicitly available via DB.* — but CostSource is referenced widely enough
 // (CreatePoInput line shape, CogsLineEditor T28, recent-cost RPC T27) to
 // warrant the top-level alias.
@@ -71,7 +71,7 @@ export {
   sopFor,
   PROCUREMENT_TAB_SLUGS,
   deriveProcurementSlug,
-  type LogisticsStageV3,
+  type OperationStageV3,
   type SopName,
   type SopDef,
   type ProcurementTabSlug,
@@ -138,6 +138,17 @@ export {
 } from "./schemas/lp-account";
 
 export {
+  APP_ROLES,
+  createAccountInput,
+  setAccountStatusInput,
+  resetPasswordInput,
+  type AppRole,
+  type CreateAccountInput,
+  type SetAccountStatusInput,
+  type ResetPasswordInput,
+} from "./schemas/principal-accounts";
+
+export {
   assignPartnerInput,
   attachDoInput,
   receivePoWithDoInput,
@@ -151,7 +162,7 @@ export {
   recheckStockInput,
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
-  listLogisticsOrdersQuery,
+  ListOperationOrdersQuery,
   listPurchaseOrdersQuery,
   cancelPoInput,
   listMovementsQuery,
@@ -160,12 +171,14 @@ export {
   reservedDrilldownQuery,
   reservedDrilldownResponse,
   awaitingStockShortageResponse,
-  logisticsBadgesResponse,
+  OperationBadgesResponse,
   partnerAcceptRfdInput,
   partnerRejectRfdInput,
   dispatchCustomerLegInput,
   resumeDispatchInput,
   setThresholdInput,
+  // Migration 0107 — supplier per-thread pickup feature.
+  OperationReceiveThreadsInput,
   type AssignPartnerInput,
   type AttachDoInput,
   type ReceivePoWithDoInput,
@@ -179,7 +192,6 @@ export {
   type RecheckStockInput,
   type AssignPickupPartnerInput,
   type ReassignPoWarehouseInput,
-  type ListLogisticsOrdersQuery,
   type ListPurchaseOrdersQuery,
   type CancelPoInput,
   type ListMovementsQuery,
@@ -188,13 +200,12 @@ export {
   type ReservedDrilldownQuery,
   type ReservedDrilldownResponse,
   type AwaitingStockShortageResponse,
-  type LogisticsBadgesResponse,
   type PartnerAcceptRfdInput,
   type PartnerRejectRfdInput,
   type DispatchCustomerLegInput,
   type ResumeDispatchInput,
   type SetThresholdInput,
-} from "./schemas/logistics";
+} from "./schemas/operation";
 
 export {
   paymentMethodEnum,
@@ -243,3 +254,30 @@ export {
   type SupplierMarkDeliveredInput,
   type SupplierPosListQuery,
 } from "./schemas/supplier";
+
+// Migration 0107 — supplier per-thread pickup feature. Path-only POST that
+// flips `order_supplier_threads.supplier_ready_at` for a single thread.
+export {
+  markThreadReadyInput,
+  type MarkThreadReadyInput,
+} from "./schemas/supplier-threads";
+
+// Migration 0107 — partner-side batch pickup of ready threads (factory_pickup
+// flow). One DO covers N threads on a single PO.
+export {
+  partnerPickupBatchInput,
+  type PartnerPickupBatchInput,
+} from "./schemas/partner";
+
+// Migration 0132 — AutoCount order-import door. See
+// docs/autocount-import-contract.md.
+export {
+  autocountImportRowSchema,
+  autocountImportInput,
+  autocountImportResultSchema,
+  autocountImportResponseSchema,
+  type AutocountImportRow,
+  type AutocountImportInput,
+  type AutocountImportResult,
+  type AutocountImportResponse,
+} from "./schemas/autocount-import";

@@ -21,7 +21,7 @@ export default function CancelOrderDialog({ order, onClose }: Props) {
   const [reason, setReason] = useState("");
   const cancelMut = useCancelOrder(order.id, {
     onSuccess: () => {
-      toast.success(`Order #${order.dl} cancelled`);
+      toast.success(`Order #${order.so} cancelled`);
       onClose();
     },
     onError: (err) => {
@@ -44,7 +44,7 @@ export default function CancelOrderDialog({ order, onClose }: Props) {
   return (
     <ModalShell onClose={onClose}>
       <header className="px-7 pt-5 pb-3.5 border-b border-base-100">
-        <p className="kicker text-warning">Cancel order · #{order.dl}</p>
+        <p className="kicker text-warning">Cancel order · #{order.so}</p>
         <h2 className="font-display text-[22px] mt-0.5 tracking-[-0.02em] leading-[1.2] font-semibold">
           Cancel this order?
         </h2>

@@ -86,7 +86,7 @@ catalogRouter.get("/", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// Catalog admin (0074, Loo 2026-05-09 Q2=c). Principal + logistics manage the
+// Catalog admin (0074, Loo 2026-05-09 Q2=c). Principal + operation manage the
 // SKU catalog; RLS write policies (catalog_write_internal /
 // skus_write_internal / fabrics_write_internal) enforce the role gate via
 // is_internal() — we forward the user JWT and let RLS reject other roles
@@ -193,7 +193,7 @@ catalogRouter.post("/skus", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   // SKU code = `<category>:<model_key>:<variant>` to match the existing
-  // catalog convention (split_part used by logistics_calc_shortages,
+  // catalog convention (split_part used by operation_calc_shortages,
   // CreatePOModal, etc.). Server resolves category + model_key from the
   // model row so the FE doesn't need to send them.
   const { data: modelRow, error: modelErr } = await sb

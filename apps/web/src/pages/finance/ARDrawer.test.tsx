@@ -36,7 +36,7 @@ function wrap(ui: React.ReactNode) {
 
 const PAID_DELIVERED_ROW: FinanceArAgingRow = {
   order_id:      "11111111-1111-1111-1111-000000000001",
-  dl:            1240,
+  so:            1240,
   customer_name: "Tan Wei Ming",
   dealer_id:     "d1",
   dealer_name:   "Carres KL",

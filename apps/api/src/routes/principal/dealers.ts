@@ -86,7 +86,7 @@ principalDealersRouter.get("/:id", async (c) => {
   const { data: ordRows, error: e2 } = await sb
     .from("orders")
     .select(
-      "id, dl, status, customer_name, paid, placed_at, order_lines(unit_price, qty), order_addons(unit_price, qty)",
+      "id, so, status, customer_name, paid, placed_at, order_lines(unit_price, qty), order_addons(unit_price, qty)",
     )
     .eq("dealer_id", id)
     .order("placed_at", { ascending: false })
@@ -110,7 +110,7 @@ principalDealersRouter.get("/:id", async (c) => {
     );
     return {
       id: o.id,
-      dl: o.dl,
+      so: o.so,
       status: o.status,
       customerName: o.customer_name,
       paid: Number(o.paid ?? 0),

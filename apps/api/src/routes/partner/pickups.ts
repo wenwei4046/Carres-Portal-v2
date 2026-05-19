@@ -14,7 +14,7 @@ import type { DoTemplateData } from "../../lib/pdf/types";
  * GET /api/partner/pickups — Phase 4.5 Chunk 1 (Task 24).
  *
  * Returns the full list of purchase orders assigned to the authenticated
- * Logistics Partner (LP). Sorted by placed_at desc (newest first).
+ * operation Partner (LP). Sorted by placed_at desc (newest first).
  *
  * Read path uses `userClient` (forwards caller JWT) so RLS on `purchase_orders`
  * applies. Migration 0046 LP-role RLS restricts to rows where
@@ -31,7 +31,7 @@ import type { DoTemplateData } from "../../lib/pdf/types";
  *
  * SELECT shape (NO `qty` — that column does not exist on purchase_orders;
  * line-item quantities live on purchase_order_lines):
- *   id, dl, supplier_id, warehouse_id, sup_status,
+ *   id, so, supplier_id, warehouse_id, sup_status,
  *   delivery_partners(name)
  */
 const partnerPickupsRouter = new Hono<AppEnv>();
@@ -52,22 +52,127 @@ partnerPickupsRouter.get("/", async (c) => {
   // narrow `.eq("procurement_partner_id", ...)` so the kanban surfaces both.
   // supplier.kind is now in the SELECT so the UI can branch button labels
   // (Accept Pickup vs Accept Receive) per Loo's sofa-acceptance flow.
+  // 2026-05-15 (Task 6) — embed linked customer-leg threads + their orders'
+  // delivery_date so the response can be enriched with customer_eta_min /
+  // urgency / behind_schedule. Mirrors the supplier/pos enrichment.
+  //
+  // 2026-05-16 (Loo screenshot + migration 0115) — drop the nested
+  // `orders(...)` embed from threads. The orders_scoped_read policy admits
+  // partners only when `orders.delivery_partner_id = app_partner_id()` (the
+  // customer-leg LP), but procurement-leg partners legitimately need to read
+  // these orders before the customer-leg LP is assigned. We fetch the order
+  // info via the partner_orders_for_threads SECURITY DEFINER RPC instead
+  // (same pattern as supplier_threads_for_po, 0111).
+  // 2026-05-17 (Loo screenshot) — embed po_pickup_events so the drawer can
+  // resolve each thread.pickup_event_id to its DO# / picked-at timestamp for
+  // the "In transit" thread group. RLS policy pickup_events_partner_read
+  // (0107:494) admits the procurement-leg partner via procurement_partner_id.
   const { data, error } = await sb
     .from("purchase_orders")
     .select(
       `
-      id, dl, supplier_id, warehouse_id, sup_status, status, eta_date, placed_at,
+      id, so, supplier_id, warehouse_id, sup_status, status, eta_date, placed_at,
       procurement_partner_id,
       suppliers(name, contact, kind),
       warehouses(name, address, kind, owning_partner_id),
-      lines:purchase_order_lines(id, sku, qty, received_qty, attrs)
+      lines:purchase_order_lines(id, sku, qty, received_qty, attrs),
+      threads:order_supplier_threads(id, order_id, supplier_ready_at, pickup_event_id),
+      pickup_events:po_pickup_events(id, do_number, picked_up_at, departed_at)
     `,
     )
     .order("placed_at", { ascending: false });
 
   if (error) throw new HTTPException(500, { message: error.message });
-  return c.json(data ?? []);
+
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+  // Collect every thread's order_id across all POs, then one RPC round-trip
+  // fetches so / customer_name / delivery_date for those orders (scoped to
+  // this partner's POs internally).
+  const orderIds: string[] = [];
+  for (const po of rows) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const t of (((po as any).threads ?? []) as any[])) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const oid = (t as any)?.order_id as string | null | undefined;
+      if (oid) orderIds.push(oid);
+    }
+  }
+  const orderInfo = new Map<string, { so: number; customer_name: string; delivery_date: string | null }>();
+  if (orderIds.length > 0) {
+    const { data: oRows, error: oErr } = await sb.rpc("partner_orders_for_threads", {
+      p_order_ids: orderIds,
+    });
+    if (oErr) {
+      const m = mapPgError(oErr);
+      return c.json(m.body, m.status);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of ((oRows ?? []) as any[])) {
+      orderInfo.set(String(r.id), {
+        so: Number(r.so),
+        customer_name: String(r.customer_name ?? ""),
+        delivery_date: (r.delivery_date as string | null) ?? null,
+      });
+    }
+  }
+
+  // 2026-05-15 (Task 6) — enrich each PO row with 4 computed fields. Same
+  // block as in apps/api/src/routes/supplier/pos.ts (2 callsites; inlined
+  // per spec rather than extracted to a helper).
+  const now = new Date();
+  const enriched = rows.map((po) => {
+    // Splice the RPC-fetched order info back onto each thread under
+    // `orders` so the existing UI shape stays unchanged.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const threadsArr = (((po as any).threads ?? []) as any[]).map((t: any) => {
+      const oid = t?.order_id as string | null | undefined;
+      const info = oid ? orderInfo.get(oid) ?? null : null;
+      return { ...t, orders: info };
+    });
+    const threadEtas: string[] = threadsArr
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((t: any) => t?.orders?.delivery_date)
+      .filter((d: unknown): d is string => typeof d === "string" && d.length > 0);
+    const customerEtaMin = threadEtas.length > 0 ? [...threadEtas].sort()[0] : null;
+    const daysUntilCustomer = customerEtaMin
+      ? Math.floor((new Date(customerEtaMin).getTime() - now.getTime()) / 86_400_000)
+      : null;
+    const urgency = computePartnerUrgency(daysUntilCustomer);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const etaDate = (po as any).eta_date as string | null | undefined;
+    const behindSchedule = !!(customerEtaMin && etaDate && etaDate >= customerEtaMin);
+    const skuMap = new Map<string, number>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const l of (((po as any).lines ?? []) as any[])) {
+      const sku = String(l?.sku ?? "");
+      if (!sku) continue;
+      skuMap.set(sku, (skuMap.get(sku) ?? 0) + Number(l?.qty ?? 0));
+    }
+    const skuSummary = [...skuMap.entries()].map(([sku, qty]) => ({ sku, qty }));
+    return {
+      ...po,
+      threads: threadsArr,
+      customer_eta_min: customerEtaMin,
+      urgency,
+      behind_schedule: behindSchedule,
+      sku_summary: skuSummary,
+    };
+  });
+  return c.json(enriched);
 });
+
+/**
+ * Urgency bucket from days-until-customer-promise (Task 6, mirrors supplier).
+ */
+function computePartnerUrgency(
+  daysUntil: number | null,
+): "critical" | "urgent" | "normal" | null {
+  if (daysUntil == null) return null;
+  if (daysUntil < 7) return "critical";
+  if (daysUntil < 14) return "urgent";
+  return "normal";
+}
 
 // 2026-05-10 (Loo) — partner state-progression endpoints. Both wrap RPCs
 // from migration 0080. ready_confirm_sent → pickup_accepted → picked_up,
@@ -111,7 +216,7 @@ partnerPickupsRouter.post("/:id/mark-picked-up", async (c) => {
 // rights at sup_status='ready_confirm_sent'.
 //
 //   accept → partner_confirmed → supplier dispatches
-//   reject → customer_rejected → Logistics relocates warehouse
+//   reject → customer_rejected → operation relocates warehouse
 partnerPickupsRouter.post("/:id/confirm-receive", async (c) => {
   const auth = c.var.auth;
   if (auth.role !== "partner" || !auth.partnerId) {
@@ -147,6 +252,33 @@ partnerPickupsRouter.post("/:id/reject-receive", async (c) => {
   return c.json(data);
 });
 
+/**
+ * POST /api/partner/pickups/events/:eventId/collect — Loo 2026-05-17.
+ *
+ * Stamps `po_pickup_events.departed_at = now()` for the per-thread pickup
+ * flow. Splits the legacy "Pickup Selected = booked + departed" collapse into
+ * proto's 3 partner phases: SCHEDULED (DO booked) → IN TRANSIT (collected,
+ * driving) → DELIVERED (arrived at WH).
+ *
+ * Wraps `partner_mark_pickup_collected` (migration 0119) which enforces the
+ * procurement_partner_id cross-tenant gate inside SECURITY DEFINER.
+ */
+partnerPickupsRouter.post("/events/:eventId/collect", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "partner" || !auth.partnerId) {
+    throw new HTTPException(403, { message: "Only partner role with partner_id" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("partner_mark_pickup_collected", {
+    p_event_id: c.req.param("eventId"),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
 // 2026-05-10 (Loo) — third partner-side state transition. picked_up →
 // delivered (sup_status only; status stays 'open' so the warehouse-side
 // receive flow still has work to do). Wraps migration 0082 RPC.
@@ -174,21 +306,21 @@ partnerPickupsRouter.post("/:id/arrived", async (c) => {
 /**
  * POST /api/partner/pickups/:id/receive — Loo 2026-05-11
  *
- * Collapses the old two-step "Arrived at WH" → "Logistics Receive" flow into
+ * Collapses the old two-step "Arrived at WH" → "operation Receive" flow into
  * one. Partner driver at the warehouse uploads the signed DO + ticks per-line
  * received_qty; the PO flips straight to status='received' (atomic).
  *
- * Wraps the same `logistics_receive_po_with_do` RPC the Logistics route uses
+ * Wraps the same `operation_receive_po_with_do` RPC the operation route uses
  * (migration 0076). The RPC's role gate already admits partners and verifies
  * `purchase_orders.procurement_partner_id = auth.app_partner_id()` — so a
  * cross-partner call returns 42501 → 403, matching the cross-partner guard
  * on /accept, /mark-picked-up, /arrived.
  *
- * Body shape: receivePoWithDoInput (camelCase, same as the logistics route)
+ * Body shape: receivePoWithDoInput (camelCase, same as the operation route)
  * — { doNumber, doFilePath, lines: [{ id, receivedQty }] }. Reshaped to
  * snake_case for the RPC's `p_lines` jsonb at the boundary.
  *
- * Logistics still has /api/logistics/pos/:id/receive (different auth gate)
+ * operation still has /api/operation/pos/:id/receive (different auth gate)
  * for the Direct-receive escape hatch when DO arrives via supplier or
  * warehouse-direct channels (skipping the partner entirely).
  */
@@ -201,7 +333,7 @@ partnerPickupsRouter.post("/:id/receive", async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("logistics_receive_po_with_do", {
+  const { data, error } = await sb.rpc("operation_receive_po_with_do", {
     p_po_id: c.req.param("id"),
     p_do_file_path: parsed.data.doFilePath,
     p_do_number: parsed.data.doNumber,
@@ -221,9 +353,9 @@ partnerPickupsRouter.post("/:id/receive", async (c) => {
  * GET /api/partner/pickups/rfd-pending — carry-forward
  * `phase-4.5-chunk-2-partner-rfd-page-rebuild`.
  *
- * Lists customer-leg threads where Logistics has raised an RFD against this
+ * Lists customer-leg threads where operation has raised an RFD against this
  * partner and the partner has not yet accepted or rejected. Wraps the
- * SECURITY DEFINER RPC `logistics_partner_rfd_pending` (migration 0059)
+ * SECURITY DEFINER RPC `operation_partner_rfd_pending` (migration 0059)
  * which self-filters by `app_partner_id()` and joins `orders.customer_name`.
  *
  * Why an RPC and not a raw select: the existing `ost_partner_read` policy
@@ -239,7 +371,7 @@ partnerPickupsRouter.post("/:id/receive", async (c) => {
  *
  * Sort: most-recently-raised RFD first.
  *
- * Role guard: partner with partnerId only. Logistics / dealer / principal
+ * Role guard: partner with partnerId only. operation / dealer / principal
  * receive 403.
  */
 partnerPickupsRouter.get("/rfd-pending", async (c) => {
@@ -249,7 +381,7 @@ partnerPickupsRouter.get("/rfd-pending", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("logistics_partner_rfd_pending");
+  const { data, error } = await sb.rpc("operation_partner_rfd_pending");
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json(data ?? []);
 });
@@ -257,15 +389,15 @@ partnerPickupsRouter.get("/rfd-pending", async (c) => {
 /**
  * POST /api/partner/pickups/accept-rfd — Phase 4.5 Chunk 2 Sprint B (Task 7).
  *
- * LP accepts a Request-For-Delivery (RFD) raised by Logistics on an
- * `order_supplier_threads` row. Calls `logistics_partner_accept_rfd` RPC
+ * LP accepts a Request-For-Delivery (RFD) raised by operation on an
+ * `order_supplier_threads` row. Calls `operation_partner_accept_rfd` RPC
  * (migration 0051) which:
  *   - Verifies caller is the assigned partner for the THREAD
  *     (thread.delivery_partner_id = auth.partnerId)
  *   - Verifies RFD is pending (request_for_delivery_at IS NOT NULL,
  *     no prior accept/reject stamp)
  *   - Stamps partner_accepted_at on the thread
- *   - Advances thread.logistics_stage to 'dispatched'
+ *   - Advances thread.operation_stage to 'dispatched'
  *
  * Pivoted from Chunk 1's PO-scoped flow: the customer-leg RFD now lives on
  * the per-supplier thread row, not the PO. Body shape changes from
@@ -280,16 +412,16 @@ partnerPickupsRouter.get("/rfd-pending", async (c) => {
 /**
  * GET /api/partner/pickups/to-deliver — Phase 7 Sprint 1.
  *
- * Lists customer-leg threads where Logistics has dispatched and the partner
+ * Lists customer-leg threads where operation has dispatched and the partner
  * is now in transit / awaiting delivery. Sourced from
  * `order_supplier_threads` where:
  *   - delivery_partner_id = auth.app_partner_id() (RLS scopes per partner)
- *   - logistics_stage = 'dispatched'
+ *   - operation_stage = 'dispatched'
  *
  * Used by PartnerPickupsPage to render the "In Transit" section + the
  * Mark Delivered button (POD upload flow).
  *
- * Joins orders.customer_name + orders.dl for display. RLS on
+ * Joins orders.customer_name + orders.so for display. RLS on
  * order_supplier_threads (`ost_partner_read` 0033:96) admits the partner
  * as procurement-leg owner; for customer-leg threads (delivery_partner_id =
  * me but procurement_partner_id may belong to a different partner), the
@@ -321,7 +453,7 @@ partnerPickupsRouter.post("/accept-rfd", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("logistics_partner_accept_rfd", {
+  const { data, error } = await sb.rpc("operation_partner_accept_rfd", {
     p_thread_id: parsed.data.threadId,
   });
   if (error) {
@@ -334,12 +466,12 @@ partnerPickupsRouter.post("/accept-rfd", async (c) => {
 /**
  * POST /api/partner/pickups/reject-rfd — Phase 4.5 Chunk 2 Sprint B (Task 7).
  *
- * LP rejects a pending RFD on a thread. Calls `logistics_partner_reject_rfd`
+ * LP rejects a pending RFD on a thread. Calls `operation_partner_reject_rfd`
  * (migration 0051) which clears request_for_delivery_at and stamps
  * partner_rejected_at on the thread. Per F9 invariant from Chunk 1, the LP
- * stays assigned (thread.delivery_partner_id is NOT cleared) so logistics
+ * stays assigned (thread.delivery_partner_id is NOT cleared) so operation
  * can re-RFD or relocate via DispatchPartnerDialog without a re-assignment
- * step. thread.logistics_stage stays at 'ready_to_dispatch'.
+ * step. thread.operation_stage stays at 'ready_to_dispatch'.
  *
  * Body shape: `{ threadId, reason? }`. Reason is audit-only (max 500 chars).
  */
@@ -358,7 +490,7 @@ partnerPickupsRouter.post("/reject-rfd", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("logistics_partner_reject_rfd", {
+  const { data, error } = await sb.rpc("operation_partner_reject_rfd", {
     p_thread_id: parsed.data.threadId,
     p_reason: parsed.data.reason ?? "",
   });
@@ -373,7 +505,7 @@ partnerPickupsRouter.post("/reject-rfd", async (c) => {
  * GET /api/partner/deliveries/:id/print-do-data — Loo 2026-05-13.
  *
  * Customer-facing DO data for the LP to print + take on the delivery run.
- * Mirrors GET /api/logistics/orders/:id/print-do-data shape but admits the
+ * Mirrors GET /api/operation/orders/:id/print-do-data shape but admits the
  * partner role and lets RLS narrow.
  *
  * Required state: order has do_number (set by 0098 trigger when status
@@ -421,7 +553,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
   const { data: order, error: e1 } = await sb
     .from("orders")
     .select(
-      "id, dl, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners(name)",
+      "id, so, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -487,7 +619,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
     do_number: String(ord.do_number),
     issue_date: issueDate,
     order_id: String(ord.id),
-    order_code: `DL-${ord.dl}`,
+    order_code: `SO-${ord.so}`,
     customer: {
       name: String(ord.customer_name ?? ""),
       address: customerAddress,

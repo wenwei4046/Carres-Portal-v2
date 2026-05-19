@@ -34,7 +34,7 @@ export type DoTemplateData = {
     contact: string | null;
   };
 
-  /** Delivery partner / logistics carrier (optional — null pre-dispatch). */
+  /** Delivery partner / operation carrier (optional — null pre-dispatch). */
   partner: {
     name: string;
   } | null;
@@ -60,7 +60,7 @@ export type InvoiceTemplateData = {
   issue_date: string;
   /** Underlying order PK for cross-reference (printed on doc footer). */
   order_id: string;
-  /** Order code shown on the doc body (the dealer-facing reference, "DL-{dl}"). */
+  /** Order code shown on the doc body (the dealer-facing reference, "SO-{so}"). */
   order_code: string;
 
   /** Customer block — buyer at the receiving end. */
@@ -109,13 +109,13 @@ export type InvoiceTemplateData = {
  * apps/web/src/lib/pdf/types.ts now.
  */
 export type SalesOrderTemplateData = {
-  /** Sales Order number, e.g. "SO-001001" (6-digit zero-padded `orders.dl`). */
+  /** Sales Order number, e.g. "SO-001001" (6-digit zero-padded `orders.so`). */
   so_number: string;
   /** Issue date (orders.placed_at as ISO yyyy-mm-dd). */
   issue_date: string;
   /** Underlying order PK for cross-reference. */
   order_id: string;
-  /** Dealer-facing reference ("DL-{dl}"). Printed alongside SO# for ops. */
+  /** Dealer-facing reference ("SO-{so}"). Printed alongside SO# for ops. */
   order_code: string;
   /** orders.status display label, e.g. "Awaiting fulfilment". */
   status_label: string;

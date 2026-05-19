@@ -207,7 +207,7 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
                 inputMode="numeric"
                 value={draft.delivery.floor}
                 onChange={(e) => setFloor(parseInt(e.target.value, 10) || 1)}
-                className="flex-1 text-center text-sm font-mono bg-transparent outline-none border-none py-1"
+                className="flex-1 min-w-0 text-center text-sm font-mono bg-transparent outline-none border-none py-1"
               />
               <button
                 type="button"
@@ -245,7 +245,7 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
                   setDelivery({ stairItems: safe });
                 }}
                 disabled={itemsTotal === 0}
-                className="flex-1 text-center text-sm font-mono bg-transparent outline-none border-none py-1 disabled:opacity-50"
+                className="flex-1 min-w-0 text-center text-sm font-mono bg-transparent outline-none border-none py-1 disabled:opacity-50"
               />
               <button
                 type="button"
@@ -466,7 +466,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function pillClass(active: boolean) {
   return [
-    "px-3 py-2 rounded border-[1.5px] text-sm font-semibold transition-colors",
+    "px-3 py-2.5 rounded border-[1.5px] text-sm font-semibold transition-colors",
     active
       ? "border-primary bg-signature-50 text-primary"
       : "border-base-300 bg-white text-base-700 hover:border-primary/40",

@@ -108,7 +108,7 @@ describe("POST /api/partner/pod/sign-upload", () => {
   });
 
   it("rejects non-partner roles with 403", async () => {
-    const jwt = await makeJwt("logistics", { partnerId: PARTNER_ID });
+    const jwt = await makeJwt("operation", { partnerId: PARTNER_ID });
     const res = await app.fetch(
       new Request("http://t/api/partner/pod/sign-upload", {
         method: "POST",
@@ -171,7 +171,7 @@ describe("POST /api/partner/pod/:threadId/attach", () => {
   it("calls partner_attach_pod RPC with 5 args and returns 200", async () => {
     const sb = {
       rpc: vi.fn().mockResolvedValue({
-        data: { thread_id: THREAD_ID, logistics_stage: "delivered", pod_url: POD_PATH },
+        data: { thread_id: THREAD_ID, operation_stage: "delivered", pod_url: POD_PATH },
         error: null,
       }),
     };
@@ -288,8 +288,8 @@ describe("POST /api/partner/pod/:threadId/attach", () => {
     expect(res.status).toBe(422);
   });
 
-  it("rejects logistics with 403", async () => {
-    const jwt = await makeJwt("logistics");
+  it("rejects operation with 403", async () => {
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request(`http://t/api/partner/pod/${THREAD_ID}/attach`, {
         method: "POST",

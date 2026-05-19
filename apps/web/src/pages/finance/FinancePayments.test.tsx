@@ -26,21 +26,21 @@ function wrap(ui: React.ReactNode) {
 const PAYLOAD = {
   rows: [
     {
-      order_id: "o1", dl: 1240, customer_name: "Tan Wei Ling",
+      order_id: "o1", so: 1240, customer_name: "Tan Wei Ling",
       dealer_id: "d1", dealer_name: "Showroom KL",
       placed_at: "2026-04-30T00:00:00Z", days: 8, aging: "0-30",
       total: 5970, paid: 0, outstanding: 5970,
       invoice_no: "INV-2026-1240", status: "place",
     },
     {
-      order_id: "o2", dl: 1241, customer_name: "Lee Kah Hong",
+      order_id: "o2", so: 1241, customer_name: "Lee Kah Hong",
       dealer_id: "d2", dealer_name: "Showroom Penang",
       placed_at: "2026-04-25T00:00:00Z", days: 13, aging: "0-30",
       total: 4000, paid: 2000, outstanding: 2000,
       invoice_no: "INV-2026-1241", status: "proceed_order",
     },
     {
-      order_id: "o3", dl: 1239, customer_name: "Ng Sue Mei",
+      order_id: "o3", so: 1239, customer_name: "Ng Sue Mei",
       dealer_id: "d1", dealer_name: "Showroom KL",
       placed_at: "2026-04-20T00:00:00Z", days: 18, aging: "0-30",
       total: 5970, paid: 5970, outstanding: 0,
@@ -61,49 +61,49 @@ describe("FinancePayments page", () => {
     render(wrap(<FinancePayments />));
 
     await waitFor(() => {
-      expect(screen.getByText("DL-1240")).toBeInTheDocument();
+      expect(screen.getByText("SO-1240")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("DL-1241")).toBeInTheDocument();
-    expect(screen.getByText("DL-1239")).toBeInTheDocument();
+    expect(screen.getByText("SO-1241")).toBeInTheDocument();
+    expect(screen.getByText("SO-1239")).toBeInTheDocument();
   });
 
-  it("filters to 'Unpaid' (only DL-1240 with paid=0)", async () => {
+  it("filters to 'Unpaid' (only SO-1240 with paid=0)", async () => {
     vi.mocked(apiFetch).mockResolvedValue(PAYLOAD);
     render(wrap(<FinancePayments />));
 
     await waitFor(() => {
-      expect(screen.getByText("DL-1240")).toBeInTheDocument();
+      expect(screen.getByText("SO-1240")).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Unpaid" }));
-    expect(screen.getByText("DL-1240")).toBeInTheDocument();
-    expect(screen.queryByText("DL-1241")).not.toBeInTheDocument();
-    expect(screen.queryByText("DL-1239")).not.toBeInTheDocument();
+    expect(screen.getByText("SO-1240")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1241")).not.toBeInTheDocument();
+    expect(screen.queryByText("SO-1239")).not.toBeInTheDocument();
   });
 
-  it("filters to 'Fully paid' (only DL-1239 with paid=total)", async () => {
+  it("filters to 'Fully paid' (only SO-1239 with paid=total)", async () => {
     vi.mocked(apiFetch).mockResolvedValue(PAYLOAD);
     render(wrap(<FinancePayments />));
 
     await waitFor(() => {
-      expect(screen.getByText("DL-1239")).toBeInTheDocument();
+      expect(screen.getByText("SO-1239")).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Fully paid" }));
-    expect(screen.getByText("DL-1239")).toBeInTheDocument();
-    expect(screen.queryByText("DL-1240")).not.toBeInTheDocument();
+    expect(screen.getByText("SO-1239")).toBeInTheDocument();
+    expect(screen.queryByText("SO-1240")).not.toBeInTheDocument();
   });
 
   it("KPI 'Balance to collect' sums outstanding across visible rows", async () => {
     vi.mocked(apiFetch).mockResolvedValue(PAYLOAD);
     render(wrap(<FinancePayments />));
 
-    // wait for actual data to land (DL-1240 row); the KPI labels appear
+    // wait for actual data to land (SO-1240 row); the KPI labels appear
     // immediately even during loading (rendering with 0 totals), so waiting
     // for them isn't enough.
     await waitFor(() => {
-      expect(screen.getByText("DL-1240")).toBeInTheDocument();
+      expect(screen.getByText("SO-1240")).toBeInTheDocument();
     });
 
     // Default "All" filter:

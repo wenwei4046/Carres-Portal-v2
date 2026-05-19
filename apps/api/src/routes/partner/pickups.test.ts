@@ -49,8 +49,8 @@ describe("GET /api/partner/pickups", () => {
           eq: vi.fn().mockReturnValue({
             order: vi.fn().mockResolvedValue({
               data: [
-                { id: "po1", dl: 1, sup_status: "pickup_assigned" },
-                { id: "po2", dl: 2, sup_status: "delivered" },
+                { id: "po1", so: 1, sup_status: "pickup_assigned" },
+                { id: "po2", so: 2, sup_status: "delivered" },
               ],
               error: null,
             }),
@@ -105,10 +105,96 @@ describe("GET /api/partner/pickups", () => {
     expect(sql).toMatch(/(?<!_)status\s*,/);
     expect(sql).toMatch(/sup_status\s*,/);
   });
+
+  // Task 6 (2026-05-15) — mirror supplier/pos enrichment on partner pickups.
+  // Same 4 computed fields per PO row.
+  it("returns urgency + sku_summary + customer_eta_min + behind_schedule per PO row", async () => {
+    // 2026-05-16 (migration 0115) — orders now fetched via RPC, not nested.
+    const orderFn = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "PO-9999",
+          so: 1001,
+          sup_status: "pickup_assigned",
+          status: "open",
+          eta_date: "2026-05-22",
+          lines: [{ sku: "mattress:carres-original:King", qty: 5 }],
+          threads: [
+            { id: "t1", order_id: "o1", supplier_ready_at: null, pickup_event_id: null },
+            { id: "t2", order_id: "o2", supplier_ready_at: null, pickup_event_id: null },
+          ],
+        },
+      ],
+      error: null,
+    });
+    const rpcFn = vi.fn().mockResolvedValue({
+      data: [
+        { id: "o1", so: 1001, customer_name: "A", delivery_date: "2026-05-20" },
+        { id: "o2", so: 1002, customer_name: "B", delivery_date: "2026-05-28" },
+      ],
+      error: null,
+    });
+    const sb = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnValue({ order: orderFn }),
+      })),
+      rpc: rpcFn,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].customer_eta_min).toBe("2026-05-20");
+    expect(rows[0].urgency).toMatch(/critical|urgent|normal/);
+    expect(rows[0].behind_schedule).toBe(true);
+    expect(rows[0].sku_summary).toEqual([
+      { sku: "mattress:carres-original:King", qty: 5 },
+    ]);
+    expect(rpcFn).toHaveBeenCalledWith("partner_orders_for_threads", {
+      p_order_ids: ["o1", "o2"],
+    });
+  });
+
+  it("defaults enrichment fields safely when threads + lines absent", async () => {
+    const orderFn = vi.fn().mockResolvedValue({
+      data: [{ id: "PO-9000", so: 1, sup_status: "pickup_assigned", status: "open" }],
+      error: null,
+    });
+    const sb = {
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnValue({ order: orderFn }),
+      })),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("partner", "11111111-1111-1111-1111-aaaaaaaaaaaa");
+    const res = await app.fetch(
+      new Request("http://t/api/partner/pickups", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    expect(rows[0].customer_eta_min).toBeNull();
+    expect(rows[0].urgency).toBeNull();
+    expect(rows[0].behind_schedule).toBe(false);
+    expect(rows[0].sku_summary).toEqual([]);
+  });
 });
 
 describe("GET /api/partner/pickups/rfd-pending", () => {
-  it("calls logistics_partner_rfd_pending RPC and returns rows", async () => {
+  it("calls operation_partner_rfd_pending RPC and returns rows", async () => {
     const rows = [
       {
         thread_id: "00000000-0000-0000-0000-0000000200a1",
@@ -129,7 +215,7 @@ describe("GET /api/partner/pickups/rfd-pending", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_rfd_pending");
+    expect(sb.rpc).toHaveBeenCalledWith("operation_partner_rfd_pending");
     expect(await res.json()).toEqual(rows);
   });
 
@@ -169,10 +255,10 @@ describe("GET /api/partner/pickups/rfd-pending", () => {
 const THREAD_ID = "00000000-0000-0000-0000-00000000beef";
 
 describe("POST /api/partner/pickups/accept-rfd", () => {
-  it("calls logistics_partner_accept_rfd RPC with p_thread_id", async () => {
+  it("calls operation_partner_accept_rfd RPC with p_thread_id", async () => {
     const sb = {
       rpc: vi.fn().mockResolvedValue({
-        data: { thread_id: THREAD_ID, partner_accepted_at: "2026-05-15T00:00:00Z", logistics_stage: "dispatched" },
+        data: { thread_id: THREAD_ID, partner_accepted_at: "2026-05-15T00:00:00Z", operation_stage: "dispatched" },
         error: null,
       }),
     };
@@ -189,7 +275,7 @@ describe("POST /api/partner/pickups/accept-rfd", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_accept_rfd", {
+    expect(sb.rpc).toHaveBeenCalledWith("operation_partner_accept_rfd", {
       p_thread_id: THREAD_ID,
     });
   });
@@ -263,14 +349,14 @@ describe("POST /api/partner/pickups/accept-rfd", () => {
       env,
     );
     expect(res.status).toBe(403);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_accept_rfd", {
+    expect(sb.rpc).toHaveBeenCalledWith("operation_partner_accept_rfd", {
       p_thread_id: THREAD_ID,
     });
   });
 });
 
 describe("POST /api/partner/pickups/reject-rfd", () => {
-  it("calls logistics_partner_reject_rfd RPC with p_thread_id + p_reason", async () => {
+  it("calls operation_partner_reject_rfd RPC with p_thread_id + p_reason", async () => {
     const sb = {
       rpc: vi.fn().mockResolvedValue({
         data: { thread_id: THREAD_ID, rfd_cleared: true, lp_kept_assigned: true },
@@ -289,7 +375,7 @@ describe("POST /api/partner/pickups/reject-rfd", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_reject_rfd", {
+    expect(sb.rpc).toHaveBeenCalledWith("operation_partner_reject_rfd", {
       p_thread_id: THREAD_ID,
       p_reason: "capacity full",
     });
@@ -314,7 +400,7 @@ describe("POST /api/partner/pickups/reject-rfd", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("logistics_partner_reject_rfd", {
+    expect(sb.rpc).toHaveBeenCalledWith("operation_partner_reject_rfd", {
       p_thread_id: THREAD_ID,
       p_reason: "",
     });
@@ -375,7 +461,7 @@ describe("POST /api/partner/pickups/reject-rfd", () => {
     const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/partner/pickups/reject-rfd", {
         method: "POST",
@@ -398,7 +484,7 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
     ],
   };
 
-  it("calls logistics_receive_po_with_do RPC and returns the result", async () => {
+  it("calls operation_receive_po_with_do RPC and returns the result", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: { po_id: "PO-9001", po_status: "received", sup_status: "delivered" },
       error: null,
@@ -415,7 +501,7 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
       env,
     );
     expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("logistics_receive_po_with_do", {
+    expect(rpc).toHaveBeenCalledWith("operation_receive_po_with_do", {
       p_po_id: "PO-9001",
       p_do_file_path: VALID_BODY.doFilePath,
       p_do_number: VALID_BODY.doNumber,
@@ -444,7 +530,7 @@ describe("POST /api/partner/pickups/:id/receive — Loo 2026-05-11 collapse arri
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/partner/pickups/PO-9001/receive", {
         method: "POST",

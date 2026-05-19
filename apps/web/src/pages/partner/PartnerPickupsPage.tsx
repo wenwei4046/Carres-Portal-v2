@@ -13,14 +13,14 @@ import PODUploadDialog from "./components/PODUploadDialog";
  *
  * 2026-05-13 (Loo): re-bucketed to a 3-column lifecycle kanban:
  *
- *   1. **Awaiting accept** — Logistics raised an RFD, partner needs to
+ *   1. **Awaiting accept** — operation raised an RFD, partner needs to
  *      accept or reject. Source: GET /api/partner/pickups/rfd-pending
- *      (wraps `logistics_partner_rfd_pending` SECURITY DEFINER RPC, 0059).
+ *      (wraps `operation_partner_rfd_pending` SECURITY DEFINER RPC, 0059).
  *
  *   2. **Scheduled** — accepted + dispatched. LP prints DO + delivers +
  *      uploads signed POD here. Print DO + Mark Delivered both surface.
  *
- *   3. **Delivered** — POD captured, thread.logistics_stage='delivered'.
+ *   3. **Delivered** — POD captured, thread.operation_stage='delivered'.
  *      Last 30 days only (RPC 0101 clamps the window). Print DO stays
  *      for re-print, Mark Delivered drops.
  *
@@ -29,7 +29,7 @@ import PODUploadDialog from "./components/PODUploadDialog";
  * 2026-05-13: that bucket doesn't match the mental model — drivers want
  * to see "what's done" not "what's actively in transit." Migration 0101
  * widens partner_threads_to_deliver to include delivered threads + adds
- * `logistics_stage` + `delivered_at` so the UI buckets by stage instead
+ * `operation_stage` + `delivered_at` so the UI buckets by stage instead
  * of by date.
  */
 type RfdPendingRow = {
@@ -65,7 +65,7 @@ export default function PartnerPickupsPage() {
       delivered: [] as PartnerToDeliverRow[],
     };
     for (const r of toDeliverRows) {
-      if (r.logistics_stage === "delivered") {
+      if (r.operation_stage === "delivered") {
         out.delivered.push(r);
       } else {
         out.scheduled.push(r);
@@ -108,7 +108,7 @@ export default function PartnerPickupsPage() {
           data-testid="partner-deliveries-empty"
         >
           No RFD requests waiting for your response. Accepted RFDs will surface
-          here once Logistics dispatches.
+          here once operation dispatches.
         </div>
       ) : (
         <>
@@ -116,7 +116,7 @@ export default function PartnerPickupsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             <PipelineColumn
               label="Awaiting accept"
-              hint="RFD raised by Logistics · accept to schedule"
+              hint="RFD raised by operation · accept to schedule"
               accent="warning"
               count={buckets.awaiting.length}
             >

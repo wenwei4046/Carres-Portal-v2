@@ -4,6 +4,8 @@ import { z } from "zod";
 import {
   Adapters,
   DB,
+  autocountImportInput,
+  autocountImportResponseSchema,
   cancelOrderInputSchema,
   createOrderInputSchema,
   isProceedBlockerCode,
@@ -14,6 +16,7 @@ import {
   setOrderDateInputSchema,
   topUpOrderInputSchema,
   updateOrderInputSchema,
+  type AutocountImportResult,
 } from "@carres/shared";
 import { userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
@@ -96,7 +99,7 @@ ordersRouter.get("/", async (c) => {
   if (
     dealerId &&
     (auth.role === "principal" ||
-      auth.role === "logistics" ||
+      auth.role === "operation" ||
       auth.role === "finance" ||
       auth.role === "bd")
   ) {
@@ -143,7 +146,7 @@ ordersRouter.post("/", async (c) => {
   const auth = c.var.auth;
 
   if (auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
-      auth.role !== "principal" && auth.role !== "logistics" &&
+      auth.role !== "principal" && auth.role !== "operation" &&
       auth.role !== "finance" && auth.role !== "bd") {
     throw new HTTPException(403, { message: "Role cannot create orders" });
   }
@@ -165,7 +168,7 @@ ordersRouter.post("/", async (c) => {
     });
   }
   if (!auth.dealerId) {
-    // Internal roles (principal/logistics/finance/bd) creating on behalf of a
+    // Internal roles (principal/operation/finance/bd) creating on behalf of a
     // dealer must Phase 3 — for 2B only dealers/salespersons create.
     throw new HTTPException(403, { message: "Phase 2B only supports dealer-self order creation" });
   }
@@ -247,6 +250,174 @@ ordersRouter.post("/", async (c) => {
     history: row.order_history ?? [],
   });
   return c.json(orderSchema.parse(order), 201);
+});
+
+// ---------------------------------------------------------------------------
+// AutoCount import door — POST /api/orders/import
+// Contract: docs/autocount-import-contract.md. Mirrors create_order's table
+// writes via the sibling RPC import_autocount_order (migration 0132).
+// create_order is NOT reused (requires wizard-only fields; can't store the
+// AutoCount Ref/PO# the idempotency key needs).
+// ---------------------------------------------------------------------------
+
+/** Split a combined Ref ("TCF0282/CR1009", "TCF0282 + CR1009") → sorted uniq. */
+function normalizeRefs(ref: string): string[] {
+  return Array.from(
+    new Set(
+      ref
+        .split(/[/+,]/)
+        .map((r) => r.trim().toUpperCase())
+        .filter((r) => r.length > 0),
+    ),
+  ).sort();
+}
+
+const CORE_ITEM_RE = /mattress|bed ?fram|sofa/i;
+function isCoreItem(itemGroup: string): boolean {
+  return CORE_ITEM_RE.test(itemGroup);
+}
+
+/** §5: CR = Carres PJ Showroom → showroom channel; everything else dealer. */
+function deriveChannel(refs: string[]): string {
+  return refs.some((r) => r.startsWith("CR")) ? "showroom" : "dealer";
+}
+
+function buildAddress(row: {
+  addr1?: string | null;
+  addr2?: string | null;
+  addr3?: string | null;
+  addr4?: string | null;
+  deliveryLocation?: string | null;
+}): string | null {
+  const parts = [row.addr1, row.addr2, row.addr3, row.addr4, row.deliveryLocation]
+    .map((p) => (p ?? "").trim())
+    .filter((p) => p.length > 0);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+/** "RM3322 Paid" → 3322; "RM874" / "" → 0 (treated as outstanding). */
+function parsePaid(balance?: string | null | undefined): number {
+  if (!balance || !/paid/i.test(balance)) return 0;
+  const m = balance.replace(/,/g, "").match(/RM\s*(\d+(?:\.\d+)?)/i);
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * SKU resolution seam. The SKU master (scripts/ops-seed/carres-sku-master.xlsx)
+ * is not yet seeded into product_skus (contract §9 open item #3 — separate
+ * task). Until then this returns null: the line stores the raw AutoCount
+ * Description as `sku` (nothing lost), and core items are flagged in the
+ * import report so operation can reconcile. Wiring real Description→Item Code
+ * resolution later is a one-function change here.
+ */
+function resolveSku(_detailDescription: string): string | null {
+  return null;
+}
+
+ordersRouter.post("/import", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "operation" && auth.role !== "principal") {
+    throw new HTTPException(403, { message: "Import is operation/principal only" });
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+
+  const parsed = autocountImportInput.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid import input: " + parsed.error.issues[0]?.message,
+    });
+  }
+  const { dealerId, sourceSystem, rows } = parsed.data;
+
+  // Group rows into orders by normalized Ref set.
+  const groups = new Map<string, { sourceRef: string[]; rows: typeof rows }>();
+  for (const row of rows) {
+    const refs = normalizeRefs(row.ref);
+    if (refs.length === 0) continue;
+    const key = refs.join("|");
+    let g = groups.get(key);
+    if (!g) {
+      g = { sourceRef: refs, rows: [] };
+      groups.set(key, g);
+    }
+    g.rows.push(row);
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const results: AutocountImportResult[] = [];
+
+  for (const g of groups.values()) {
+    const first = g.rows[0];
+    const unmatched: string[] = [];
+    const lines = g.rows.map((r) => {
+      const resolved = resolveSku(r.detailDescription);
+      if (!resolved && isCoreItem(r.itemGroup)) unmatched.push(r.detailDescription);
+      return {
+        sku: resolved ?? r.detailDescription,
+        qty: r.qty,
+        attrs: null,
+        unit_price: 0, // listing carries no price; financials stay in AutoCount
+        source_po: r.poDocNo ?? null,
+      };
+    });
+
+    const payload = {
+      dealer_id: dealerId,
+      source_system: sourceSystem,
+      source_ref: g.sourceRef,
+      channel: deriveChannel(g.sourceRef),
+      customer_name: first.debtorName,
+      customer_phone: first.phone ?? null,
+      customer_address: buildAddress(first),
+      customer_address_unknown: false,
+      delivery_date: first.deliveryDate ?? null,
+      delivery_date_tbd: !first.deliveryDate,
+      paid: parsePaid(first.balance),
+      lines,
+    };
+
+    const { data, error } = await sb.rpc("import_autocount_order", { payload });
+    if (error) {
+      results.push({
+        sourceRef: g.sourceRef,
+        result: "error",
+        orderId: null,
+        so: null,
+        unmatchedDescriptions: unmatched,
+        error: error.message,
+      });
+      continue;
+    }
+    const d = data as {
+      id: string;
+      so: number;
+      result: "created" | "updated" | "skipped_locked";
+    };
+    results.push({
+      sourceRef: g.sourceRef,
+      result: d.result,
+      orderId: d.id,
+      so: d.so,
+      unmatchedDescriptions: unmatched,
+      error: null,
+    });
+  }
+
+  const resp = {
+    ordersTotal: results.length,
+    created: results.filter((r) => r.result === "created").length,
+    updated: results.filter((r) => r.result === "updated").length,
+    skippedLocked: results.filter((r) => r.result === "skipped_locked").length,
+    errored: results.filter((r) => r.result === "error").length,
+    results,
+  };
+  return c.json(autocountImportResponseSchema.parse(resp));
 });
 
 /**
@@ -373,7 +544,7 @@ ordersRouter.post("/:id/proceed", async (c) => {
 
   if (
     auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
-    auth.role !== "principal" && auth.role !== "logistics" &&
+    auth.role !== "principal" && auth.role !== "operation" &&
     auth.role !== "finance" && auth.role !== "bd"
   ) {
     throw new HTTPException(403, { message: "Role cannot proceed orders" });
@@ -443,7 +614,7 @@ async function dispatchOrderMutation<TBody>(
 
   if (
     auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
-    auth.role !== "principal" && auth.role !== "logistics" &&
+    auth.role !== "principal" && auth.role !== "operation" &&
     auth.role !== "finance" && auth.role !== "bd"
   ) {
     throw new HTTPException(403, { message: "Role cannot mutate orders" });
@@ -550,7 +721,7 @@ ordersRouter.post("/:id/date", (c) =>
 );
 
 /** POST /api/orders/:id/cancel — Phase 2C.3 dealer cancel. Only Place
- *  orders cancelable; once proceeded, logistics owns the rollback flow. */
+ *  orders cancelable; once proceeded, operation owns the rollback flow. */
 ordersRouter.post("/:id/cancel", (c) =>
   dispatchOrderMutation(c, {
     schema: cancelOrderInputSchema,
@@ -583,7 +754,7 @@ ordersRouter.patch("/:id", async (c) => {
 
   if (
     auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom" &&
-    auth.role !== "principal" && auth.role !== "logistics" &&
+    auth.role !== "principal" && auth.role !== "operation" &&
     auth.role !== "finance" && auth.role !== "bd"
   ) {
     throw new HTTPException(403, { message: "Role cannot edit orders" });
@@ -712,7 +883,7 @@ ordersRouter.get("/:id", async (c) => {
 // because Workers blocks the yoga-layout WASM compile. The route stays
 // here for the SQL joins + role gate + RLS scoping.
 //
-// Customer-facing doc. Dealer / Showroom / Salesperson / Logistics / Finance
+// Customer-facing doc. Dealer / Showroom / Salesperson / operation / Finance
 // / Principal / BD can pull; Partner / Supplier are denied at the route gate
 // (Partner has POD, Supplier has PO — they shouldn't be handing out the
 // customer SO). RLS on `orders` narrows further to rows each role can read.
@@ -736,7 +907,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   const { data, error } = await sb
     .from("orders")
     .select(
-      "id, dl, status, channel, customer_name, customer_phone, customer_address, " +
+      "id, so, status, channel, customer_name, customer_phone, customer_address, " +
         "delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift, " +
         "paid, signature_url, placed_at, " +
         "order_lines(sku, qty, unit_price, attrs), " +
@@ -793,8 +964,8 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   const paid = Number(o.paid ?? 0);
   const balance_due = total - paid;
 
-  // proto `soNumber` → "SO-001001" (6-digit zero-padded dl).
-  const so_number = `SO-${String(o.dl).padStart(6, "0")}`;
+  // proto `soNumber` → "SO-001001" (6-digit zero-padded so).
+  const so_number = `SO-${String(o.so).padStart(6, "0")}`;
   const issue_date = (o.placed_at as string | null)?.slice(0, 10) ?? "—";
   const statusLabel =
     o.status === "place"
@@ -814,7 +985,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     so_number,
     issue_date,
     order_id: id,
-    order_code: `DL-${o.dl}`,
+    order_code: `SO-${o.so}`,
     status_label: statusLabel,
     channel,
     customer: {
@@ -851,13 +1022,13 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
 /**
  * GET /api/orders/:id/invoice-pdf-data — Loo 2026-05-13.
  *
- * Sales Invoice PDF data for the Logistics drawer "Print Invoice" button.
+ * Sales Invoice PDF data for the operation drawer "Print Invoice" button.
  * Mirrors the Finance route at /api/finance/invoices/:id/pdf-data shape
  * but keyed by order_id (not invoice_id) and gated permissively so the
- * Logistics user can re-print at dispatch handover without bouncing
+ * operation user can re-print at dispatch handover without bouncing
  * through Finance.
  *
- * Available to logistics, finance, principal, bd. Partner / supplier /
+ * Available to operation, finance, principal, bd. Partner / supplier /
  * dealer / showroom / salesperson denied (invoice is an internal/tax
  * doc; the customer-facing SO PDF is already wired elsewhere).
  *
@@ -868,7 +1039,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
 ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   const auth = c.var.auth;
   const role = auth.role;
-  if (!["logistics", "finance", "principal", "bd"].includes(String(role))) {
+  if (!["operation", "finance", "principal", "bd"].includes(String(role))) {
     throw new HTTPException(403, { message: "Invoice PDF not available for this role" });
   }
   const id = c.req.param("id");
@@ -880,7 +1051,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   const { data: order, error: ordErr } = await sb
     .from("orders")
     .select(
-      "id, dl, status, invoice_no, invoiced_at, customer_name, customer_phone, customer_address, dealer_id, dealers(name, contact)",
+      "id, so, status, invoice_no, invoiced_at, customer_name, customer_phone, customer_address, dealer_id, dealers(name, contact)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -891,7 +1062,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   const ord: any = order;
   if (!ord.invoice_no) {
     throw new HTTPException(422, {
-      message: "Invoice not yet issued (auto-issued at dispatch — wait until logistics_stage='dispatched')",
+      message: "Invoice not yet issued (auto-issued at dispatch — wait until operation_stage='dispatched')",
     });
   }
 
@@ -943,7 +1114,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     invoice_no: String(i.invoice_no),
     issue_date: String(i.issued_at).slice(0, 10),
     order_id: String(ord.id),
-    order_code: `DL-${ord.dl}`,
+    order_code: `SO-${ord.so}`,
     customer: {
       name: String(ord.customer_name ?? ""),
       address: String(ord.customer_address ?? "—"),

@@ -29,7 +29,7 @@ import { rm, rmCompact } from "@/lib/format-currency";
  *   - MatchModal queries suggest endpoint, shows top-6 candidates as
  *     radio buttons sorted by abs(outstanding - amount)
  *   - User picks one, clicks Confirm match → POST /reconciliations with
- *     manualRef = "INV-2026-{dl}"
+ *     manualRef = "INV-2026-{so}"
  *   - matched_ref shows up on the list after qk invalidates
  */
 export default function FinanceRecon() {
@@ -108,7 +108,7 @@ export default function FinanceRecon() {
       <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-[11.5px] text-muted-foreground flex gap-3">
         <span>💡</span>
         <span>
-          Auto-match runs nightly using FPX customer reference + amount. Unmatched lines need a finance person to manually link them — usually customer transferred without quoting their DL number.
+          Auto-match runs nightly using FPX customer reference + amount. Unmatched lines need a finance person to manually link them — usually customer transferred without quoting their SO number.
         </span>
       </div>
 
@@ -242,7 +242,7 @@ function MatchModal({
               No open invoices to match against.
             </div>
           ) : (
-            candidates.map((c) => <CandidateRow key={c.dl} c={c} pick={pick} setPick={setPick} bankAmount={line.amount} />)
+            candidates.map((c) => <CandidateRow key={c.so} c={c} pick={pick} setPick={setPick} bankAmount={line.amount} />)
           )}
         </div>
 
@@ -277,7 +277,7 @@ function CandidateRow({
   bankAmount: number;
 }) {
   const close = Math.abs(c.outstanding - bankAmount) < 1;
-  const selected = pick === c.dl;
+  const selected = pick === c.so;
   return (
     <label
       className={`flex items-center gap-2.5 px-3 py-2 rounded border cursor-pointer ${
@@ -289,7 +289,7 @@ function CandidateRow({
       <input
         type="radio"
         checked={selected}
-        onChange={() => setPick(c.dl)}
+        onChange={() => setPick(c.so)}
         className="accent-primary"
       />
       <div className="flex-1 min-w-0">

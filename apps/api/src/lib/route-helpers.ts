@@ -12,12 +12,12 @@ import type { ZodTypeAny, infer as ZodInfer } from "zod";
  *
  * 40001 is raised by v3 RPCs that take a SELECT ... FOR UPDATE lock and find
  * the protected invariant already broken (e.g. _v3_claim_threads_for_po in
- * migration 0037 — two logistics users issued POs for the same threads).
+ * migration 0037 — two operation users issued POs for the same threads).
  * Surfaces as 409 Conflict so the FE can show "Refresh and try again"
  * distinctly from generic 422 validation failures.
  *
  * TODO (Pipeline v2 follow-up): v2 detail-passthrough is currently scoped to
- * `mapPipelineV2Error` in routes/logistics/orders.ts (it forwards the RPC's
+ * `mapPipelineV2Error` in routes/operation/orders.ts (it forwards the RPC's
  * `detail` as `code` for 22023 too, plus a `hint` field). Hoist that 22023
  * detail handling here when other routes need it (attach_do, warehouse routes
  * flagged in C3.1 review). Out of scope for C3.1 — wider blast radius.

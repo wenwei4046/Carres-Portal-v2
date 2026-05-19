@@ -31,7 +31,7 @@ type DashboardPickupLine = {
 
 type DashboardPickupRow = {
   id: string;
-  dl: number | null;
+  so: number | null;
   sup_status: string;
   status: string;
   eta_date: string | null;
@@ -83,11 +83,19 @@ function bucketOf(p: DashboardPickupRow): Bucket | null {
   if (
     p.sup_status === "ready_confirm_sent" ||
     p.sup_status === "ready_for_pickup" ||
-    p.sup_status === "pickup_assigned"
+    p.sup_status === "pickup_assigned" ||
+    // Task 14 (2026-05-15) — `partially_shipped` (migration 0107) means at
+    // least one thread is still ready + not picked. Mirror the
+    // PartnerFactoryPickupsPage `awaiting` bucket so the Dashboard headline
+    // numbers stay in sync with the kanban screen.
+    p.sup_status === "partially_shipped"
   )
     return "awaiting";
   if (p.sup_status === "pickup_accepted") return "scheduled";
-  if (p.sup_status === "picked_up") return "in_transit";
+  // Task 14 (2026-05-15) — `shipped` is the post-thread-pickup terminal state
+  // (all linked threads have pickup_event_id; PO not yet received at WH).
+  // Mirrors the kanban's in_transit bucket in PartnerFactoryPickupsPage.
+  if (p.sup_status === "picked_up" || p.sup_status === "shipped") return "in_transit";
   if (p.sup_status === "delivered") return "delivered";
   return null;
 }

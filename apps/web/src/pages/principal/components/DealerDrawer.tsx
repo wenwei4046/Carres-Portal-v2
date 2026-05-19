@@ -178,7 +178,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
                 >
                   <div>
                     <div className="font-mono text-[11px] font-semibold">
-                      DL-{o.dl}
+                      SO-{o.so}
                     </div>
                     <div className="text-[11px] text-base-500">
                       {o.customerName ?? "—"}

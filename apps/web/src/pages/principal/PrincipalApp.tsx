@@ -4,7 +4,12 @@ import PrincipalDashboard from "./PrincipalDashboard";
 import PrincipalApprovals from "./PrincipalApprovals";
 import PrincipalDealers from "./PrincipalDealers";
 import PrincipalPartners from "./PrincipalPartners";
-import LogisticsCatalog from "@/pages/catalog/LogisticsCatalog";
+import PrincipalAccounts from "./PrincipalAccounts";
+import PrincipalAudit from "./PrincipalAudit";
+import PrincipalSuppliers from "./PrincipalSuppliers";
+import PrincipalOrders from "./PrincipalOrders";
+import PrincipalStock from "./PrincipalStock";
+import OperationCatalog from "@/pages/catalog/OperationCatalog";
 import { usePrincipalDashboard } from "@/lib/queries";
 
 /**
@@ -41,7 +46,12 @@ export default function PrincipalApp() {
         {tab === "approvals" && <PrincipalApprovals />}
         {tab === "dealers" && <PrincipalDealers />}
         {tab === "partners" && <PrincipalPartners />}
-        {tab === "catalog" && <LogisticsCatalog />}
+        {tab === "catalog" && <OperationCatalog />}
+        {tab === "accounts" && <PrincipalAccounts />}
+        {tab === "audit" && <PrincipalAudit />}
+        {tab === "suppliers" && <PrincipalSuppliers />}
+        {tab === "orders" && <PrincipalOrders />}
+        {tab === "stock" && <PrincipalStock />}
       </main>
     </div>
   );

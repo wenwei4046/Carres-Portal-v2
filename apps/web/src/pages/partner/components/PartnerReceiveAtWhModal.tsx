@@ -3,27 +3,27 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { useReceivePoAsPartnerMutation } from "@/lib/queries";
 import DOFileUploadField from "../../../components/DOFileUploadField";
-import { INPUT_CLS, Modal, ModalActions } from "../../logistics/components/Modal";
+import { INPUT_CLS, Modal, ModalActions } from "../../operation/components/Modal";
 
 /**
  * PartnerReceiveAtWhModal — Loo 2026-05-11.
  *
  * Replaces the simple "Arrived at WH" button on the Partner factory pickup
  * kanban with a full receive-with-DO flow. Submitting flips the PO atomically
- * to status='received' (sup_status='delivered') — Logistics no longer needs
+ * to status='received' (sup_status='delivered') — operation no longer needs
  * a separate Receive step.
  *
  * Forked from `ReceivePOModal` because:
- *   - The partner's row shape (`PickupRow`) differs from `LogisticsPoListRow`
+ *   - The partner's row shape (`PickupRow`) differs from `operationPoListRow`
  *     (no top-level `purchase_order_lines`; lines come back aliased as `lines`)
  *   - The mutation hook + API endpoint differ (/api/partner/pickups/:id/receive
- *     vs /api/logistics/pos/:id/receive — different auth gate, different cache
+ *     vs /api/operation/pos/:id/receive — different auth gate, different cache
  *     invalidation)
  *   - Title + intro reflect the partner-driver POV ("you're delivering goods
  *     to the warehouse") instead of warehouse-staff POV ("you're booking goods
  *     into the warehouse")
  *
- * Same per-line / DO upload / signed-checkbox UX as the logistics modal so
+ * Same per-line / DO upload / signed-checkbox UX as the operation modal so
  * a partner who's used the warehouse-side flow has zero re-learning.
  */
 type PickupLine = {
@@ -131,7 +131,7 @@ export default function PartnerReceiveAtWhModal({ po, onClose }: Props) {
         <strong>{po.suppliers?.name ?? "supplier"}</strong>&rsquo;s goods to{" "}
         <strong>{po.warehouses?.name ?? "warehouse"}</strong>. Upload the signed
         DO and tick received qty per SKU. The PO flips straight to{" "}
-        <strong>received</strong> when you submit — Logistics doesn&rsquo;t
+        <strong>received</strong> when you submit — operation doesn&rsquo;t
         need to re-confirm.
       </div>
 

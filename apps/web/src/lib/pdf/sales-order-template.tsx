@@ -21,6 +21,7 @@
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
+import { DocHeader } from "./letterhead";
 import type { SalesOrderTemplateData } from "./types";
 
 const ACCENT = "#D64F20";
@@ -37,20 +38,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     color: "#1A1714",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    borderBottomWidth: 2,
-    borderBottomColor: ACCENT,
-    paddingBottom: 12,
-    marginBottom: 16,
-  },
-  brand: { fontSize: 22, fontWeight: 700, color: ACCENT, letterSpacing: 1 },
-  brandSub: { fontSize: 9, color: MUTED, marginTop: 2 },
-  docMeta: { textAlign: "right" },
-  docTitle: { fontSize: 14, fontWeight: 700, marginBottom: 4 },
-  docMetaRow: { fontSize: 9, color: MUTED },
+  // 2026-05-16 — header rendering moved to shared DocHeader.
 
   metaBand: {
     flexDirection: "row",
@@ -203,7 +191,6 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     issue_date,
     order_code,
     status_label,
-    channel,
     customer,
     dealer,
     delivery,
@@ -217,23 +204,28 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     signed,
   } = data;
 
-  const isShowroom = channel === "showroom";
+  // Loo 2026-05-16 — Sales Orders override the default Carres HQ address
+  // in the shared DocHeader with the showroom/outlet address so the
+  // customer sees where the sale actually happened. Legal name + reg no
+  // stay Carres per the brand-consistency rule.
+  const outletName =
+    dealer.outlet_name && dealer.outlet_name.trim().length > 0
+      ? dealer.outlet_name.trim()
+      : null;
+  const outletAddress =
+    dealer.outlet_address && dealer.outlet_address.trim().length > 0
+      ? dealer.outlet_address.trim()
+      : null;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.brand}>CARRES</Text>
-            <Text style={styles.brandSub}>HOUZS Venture Sdn Bhd</Text>
-          </View>
-          <View style={styles.docMeta}>
-            <Text style={styles.docTitle}>SALES ORDER</Text>
-            <Text style={styles.docMetaRow}>{so_number}</Text>
-            <Text style={styles.docMetaRow}>Date: {issue_date}</Text>
-            <Text style={styles.docMetaRow}>Order: {order_code}</Text>
-          </View>
-        </View>
+        <DocHeader
+          docTitle="SALES ORDER"
+          docMetaRows={[so_number, `Date: ${issue_date}`, `Order: ${order_code}`]}
+          subTitle={outletName}
+          addressLines={outletAddress ? [outletAddress] : undefined}
+        />
 
         <View style={styles.metaBand}>
           <View style={styles.metaCol}>
@@ -266,15 +258,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             <Text style={styles.partyLabel}>Sold By</Text>
             <Text style={styles.partyName}>{dealer.name}</Text>
             {dealer.contact ? <Text style={styles.partyLine}>{dealer.contact}</Text> : null}
-            {isShowroom && dealer.outlet_name ? (
-              <View style={styles.partyDivider}>
-                <Text style={styles.partyLabel}>Showroom</Text>
-                <Text style={styles.partyLine}>{dealer.outlet_name}</Text>
-                {dealer.outlet_address ? (
-                  <Text style={styles.partyLine}>{dealer.outlet_address}</Text>
-                ) : null}
-              </View>
-            ) : null}
+            {/* Showroom block lives in the letterhead now (Loo 2026-05-16) — no
+                duplication here. Salesperson stays since it's people-info, not
+                location-info. */}
             {dealer.salesperson_name ? (
               <View style={styles.partyDivider}>
                 <Text style={styles.partyLabel}>Salesperson</Text>
@@ -376,7 +362,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             2. Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow QR, and cheque accepted.
           </Text>
           <Text style={styles.termsLine}>
-            3. Delivery date is best-effort and may shift ±3 working days subject to logistics confirmation.
+            3. Delivery date is best-effort and may shift ±3 working days subject to operation confirmation.
           </Text>
           <Text style={styles.termsLine}>
             4. Stair-carry surcharges (if any) are billed on this sales order and are not invoiced separately on the DO.

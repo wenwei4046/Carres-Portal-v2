@@ -140,7 +140,7 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
           </div>
           {c.addressUnknown ? (
             <div className="rounded bg-base-50 border border-dashed border-base-200 px-3 py-2.5 text-xs font-body text-base-500">
-              Address will be required before this order can move to logistics.
+              Address will be required before this order can move to operation.
             </div>
           ) : (
             <MYAddressFields

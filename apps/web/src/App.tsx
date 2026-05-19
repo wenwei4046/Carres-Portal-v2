@@ -7,12 +7,13 @@ import Login from "@/pages/Login";
 import Me from "@/pages/Me";
 import DealerApp from "@/pages/dealer/DealerApp";
 import PrincipalApp from "@/pages/principal/PrincipalApp";
-import LogisticsApp from "@/pages/logistics/LogisticsApp";
+import OperationApp from "@/pages/operation/OperationApp";
 import PartnerApp from "@/pages/partner/PartnerApp";
 import FinanceApp from "@/pages/finance/FinanceApp";
 import SupplierApp from "@/pages/supplier/SupplierApp";
 import BDApp from "@/pages/bd/BDApp";
 import OpsApp from "@/pages/ops/OpsApp";
+import PickupEventPrintPage from "@/pages/print/PickupEventPrintPage";
 
 function HomeRedirect() {
   const session = useAuth((s) => s.session);
@@ -27,7 +28,7 @@ function HomeRedirect() {
   }
   if (!session) return <Navigate to="/login" replace />;
   if (role === "principal") return <Navigate to="/principal" replace />;
-  if (role === "logistics") return <Navigate to="/logistics" replace />;
+  if (role === "operation") return <Navigate to="/operation" replace />;
   if (role === "partner") return <Navigate to="/delivery-partner" replace />;
   if (role === "finance") return <Navigate to="/finance" replace />;
   if (role === "supplier") return <Navigate to="/supplier" replace />;
@@ -86,11 +87,11 @@ export default function App() {
           }
         />
         <Route
-          path="/logistics/*"
+          path="/operation/*"
           element={
             <RequireAuth>
-              <RequireRole roles={["logistics"]}>
-                <LogisticsApp />
+              <RequireRole roles={["operation"]}>
+                <OperationApp />
               </RequireRole>
             </RequireAuth>
           }
@@ -135,18 +136,27 @@ export default function App() {
             </RequireAuth>
           }
         />
-        {/* Ops Panel (Jess COO). wenwei renamed logistics→operation in
-            migration 0121, so the canonical role is now `operation`.
-            `logistics` kept transitionally in case the rename hasn't
-            propagated to every session yet; `principal` is the admin
+        {/* Ops Panel (Jess COO). wenwei renamed logistics→operation, so the
+            canonical role is now `operation`; `principal` is the admin
             fallback. */}
         <Route
           path="/ops/*"
           element={
             <RequireAuth>
-              <RequireRole roles={["principal", "operation", "logistics"]}>
+              <RequireRole roles={["principal", "operation"]}>
                 <OpsApp />
               </RequireRole>
+            </RequireAuth>
+          }
+        />
+        {/* Task 13 (2026-05-15) — pickup-event DO reprint landing.
+         *  Role-agnostic URL pattern; the server endpoint
+         *  (`/api/pickup-events/:id/print`) gates per-role via RLS. */}
+        <Route
+          path="/print/pickup-event/:eventId"
+          element={
+            <RequireAuth>
+              <PickupEventPrintPage />
             </RequireAuth>
           }
         />

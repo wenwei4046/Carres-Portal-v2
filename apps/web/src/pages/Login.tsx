@@ -57,8 +57,8 @@ export default function Login() {
       const defaultHome =
         role === "principal"
           ? "/principal"
-          : role === "logistics"
-            ? "/logistics"
+          : role === "operation"
+            ? "/operation"
             : role === "partner"
               ? "/delivery-partner/dashboard"
               : role === "finance"
@@ -198,7 +198,7 @@ export default function Login() {
             </h1>
 
             <p className="deck">
-              <strong>One workspace</strong> for dealers, suppliers, logistics &amp; finance — every order, every approval, every signal in one place.
+              <strong>One workspace</strong> for dealers, suppliers, operation &amp; finance — every order, every approval, every signal in one place.
             </p>
           </div>
 

@@ -52,7 +52,9 @@ describe("SupplierIncoming", () => {
 
     expect(screen.getByText("Committed (POs)")).toBeInTheDocument();
     expect(screen.getByText("Pending (orders)")).toBeInTheDocument();
-    expect(screen.getByText("Pending ack")).toBeInTheDocument();
+    // 2026-05-15 (Loo) — "Pending ack" KPI removed from this view; supplier
+    // reads ack state on the POs page now.
+    expect(screen.queryByText("Pending ack")).not.toBeInTheDocument();
   });
 
   it("groups SKUs by category prefix", async () => {

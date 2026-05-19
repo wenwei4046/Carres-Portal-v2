@@ -45,6 +45,9 @@ export const productSkuSchema = z.object({
   // still serialize cleanly; the Create-PO submit gate refuses lines whose
   // SKU has cost=null.
   cost: z.number().nullable(),
+  // 2026-05-17 — SKU-level supplier_id (NOT NULL on DB since 0074). Required
+  // for CreatePOModal to route lines to the right supplier group.
+  supplierId: z.string().uuid().nullable(),
   discontinuedAt: z.string().nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
@@ -114,7 +117,7 @@ export type SalespersonsListResponse = z.infer<typeof salespersonsListResponseSc
 
 // ---------------------------------------------------------------------------
 // 0074 — Catalog admin CRUD (Loo 2026-05-09 Q2=c, Q3=b, Q4=c).
-// Both principal + logistics can create/patch/soft-delete catalog entities.
+// Both principal + operation can create/patch/soft-delete catalog entities.
 // is_internal() RLS write covers both roles natively, so the API just forwards
 // the user JWT — no extra guard needed beyond the standard auth middleware.
 // ---------------------------------------------------------------------------

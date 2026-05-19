@@ -19,7 +19,7 @@ import type { AppEnv } from "../../types";
  *                                + thread.delivery_partner_id ownership.
  *   POST /:threadId/attach    — calls partner_attach_pod RPC (migration 0070)
  *                                which sets pod_url + transitions thread
- *                                logistics_stage='delivered'.
+ *                                operation_stage='delivered'.
  *
  * Path generation for sign-upload:
  *   {thread_id}/{uuid}-pod.{ext}

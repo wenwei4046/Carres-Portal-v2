@@ -6,7 +6,7 @@ import type { AppEnv } from "../../types";
 /**
  * GET /api/partner/dashboard — Phase 4.5 Chunk 1 (Task 24).
  *
- * Returns KPI counts for the authenticated Logistics Partner (LP):
+ * Returns KPI counts for the authenticated operation Partner (LP):
  *   - assigned   : sup_status = 'pickup_assigned'
  *   - accepted   : sup_status = 'pickup_accepted'
  *   - in_transit : sup_status = 'picked_up'
@@ -61,11 +61,24 @@ partnerDashboardRouter.get("/", async (c) => {
     ready: rows.filter(
       (r) =>
         r.sup_status === "ready_confirm_sent" ||
-        r.sup_status === "ready_for_pickup",
+        r.sup_status === "ready_for_pickup" ||
+        // 2026-05-15 (Task 14) — migration 0107 introduces partial pickup:
+        // PO sits at `partially_shipped` while >=1 thread is still ready and
+        // not picked. Counts toward the "ready" KPI so the partner sees
+        // remaining work even after the first DO has been issued. Mirrors
+        // the UI bucket in PartnerFactoryPickupsPage.stageOf which already
+        // routes `partially_shipped` to "awaiting".
+        r.sup_status === "partially_shipped",
     ).length,
     assigned: rows.filter((r) => r.sup_status === "pickup_assigned").length,
     accepted: rows.filter((r) => r.sup_status === "pickup_accepted").length,
-    in_transit: rows.filter((r) => r.sup_status === "picked_up").length,
+    // 2026-05-15 (Task 14) — `shipped` is the post-thread-pickup terminal
+    // state from 0107 (all threads have pickup_event_id). Treat as in-transit
+    // so KPI parity holds across the kanban view (FactoryPickupsPage already
+    // maps `shipped` to the in_transit column).
+    in_transit: rows.filter(
+      (r) => r.sup_status === "picked_up" || r.sup_status === "shipped",
+    ).length,
     delivered: rows.filter((r) => r.sup_status === "delivered").length,
     total: rows.length,
   };

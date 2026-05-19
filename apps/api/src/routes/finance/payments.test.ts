@@ -319,12 +319,12 @@ describe("POST /api/finance/payments/order-receipt", () => {
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 
-  it("rejects logistics role with 403", async () => {
+  it("rejects operation role with 403", async () => {
     const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/finance/payments/order-receipt", {
         method: "POST",
@@ -534,12 +534,12 @@ describe("POST /api/finance/payments/po-schedule", () => {
     expect(res.status).toBe(422);
   });
 
-  it("rejects logistics role with 403", async () => {
+  it("rejects operation role with 403", async () => {
     const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
-    const jwt = await makeJwt("logistics");
+    const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/finance/payments/po-schedule", {
         method: "POST",

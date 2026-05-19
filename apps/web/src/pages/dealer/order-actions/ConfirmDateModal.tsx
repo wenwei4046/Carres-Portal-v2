@@ -42,7 +42,7 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
 
   const setDateMut = useSetOrderDate(order.id, {
     onSuccess: () => {
-      toast.success(`Delivery date set for #${order.dl}`);
+      toast.success(`Delivery date set for #${order.so}`);
       onClose();
     },
     onError: (err) => {
@@ -116,7 +116,7 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
     <ModalShell onClose={onClose}>
       {/* Header */}
       <header className="px-7 pt-5 pb-3.5 border-b border-base-100">
-        <p className="kicker">Delivery date · #{order.dl}</p>
+        <p className="kicker">Delivery date · #{order.so}</p>
         <h2 className="font-display text-[22px] mt-0.5 tracking-[-0.02em] leading-[1.2] font-semibold">
           Confirm delivery date
         </h2>

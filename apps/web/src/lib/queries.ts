@@ -39,7 +39,7 @@ import {
   type FinanceTopupApproveInput,
   type ReconciliationCreateInput,
   type RefundApplyInput,
-  type ListLogisticsOrdersQuery,
+  type ListOperationOrdersQuery,
   type ListMovementsQuery,
   type ListPurchaseOrdersQuery,
   type Order,
@@ -83,8 +83,20 @@ export const qk = {
       ["principal", "dealers", filters ?? {}] as const,
     dealer:    (id: string) => ["principal", "dealers", id] as const,
     partners:  () => ["principal", "partners"] as const,
+    /** Phase 10 — principal accounts admin (PrincipalAccounts page). */
+    accounts:  () => ["principal", "accounts"] as const,
+    /** Phase 10 — read-only orders list across all dealers (PrincipalOrders). */
+    orders:    (filters?: Record<string, unknown>) =>
+      ["principal", "orders", filters ?? {}] as const,
+    /** Phase 10 — supplier roster + per-supplier stats (PrincipalSuppliers). */
+    suppliers: () => ["principal", "suppliers"] as const,
+    /** Phase 10 — stock balances across all warehouses (PrincipalStock). */
+    stock:     () => ["principal", "stock"] as const,
+    /** Phase 10 — audit log (PrincipalAudit). */
+    audit:     (filters?: Record<string, unknown>) =>
+      ["principal", "audit", filters ?? {}] as const,
   },
-  // Phase 4.5 Chunk 1 — Logistics Partner (LP) namespace. Nested keys mirror
+  // Phase 4.5 Chunk 1 — operation Partner (LP) namespace. Nested keys mirror
   // `principal` so we can blast `["partner"]` to invalidate the whole sub-tree
   // (e.g. after accept/reject RFD ripples to dashboard counts + pickups list).
   partner: {
@@ -94,63 +106,69 @@ export const qk = {
     toDeliver:  () => ["partner", "to-deliver"] as const,
     fleet:      () => ["partner", "fleet"] as const,
   },
-  // Phase 4 — HQ Logistics namespace. Same nested-key strategy as `principal`
-  // so M5 mutation hooks can blast `["logistics"]` (or a sub-tree) on each
+  // Phase 4 — HQ operation namespace. Same nested-key strategy as `principal`
+  // so M5 mutation hooks can blast `["operation"]` (or a sub-tree) on each
   // ripple — e.g. assign-partner invalidates orders + dashboard; PO receive
   // invalidates pos + warehouse + dashboard. Filter keys are typed via the
   // `List*Query` zod-derived shapes from `@carres/shared` so a wrong key fails
   // typecheck at the call site rather than silently breaking cache reads.
-  logistics: {
-    dashboard: () => ["logistics", "dashboard"] as const,
+  operation: {
+    dashboard: () => ["operation", "dashboard"] as const,
     /** Loo 2026-05-10 — sidebar badge counts (orders awaiting + pickup-action
-     *  POs). 30s refetch, kept under `logistics` so a future blunt invalidate
-     *  on `["logistics"]` after a relevant mutation fans out here too. */
-    badges:    () => ["logistics", "badges"] as const,
-    orders:    (filters?: LogisticsOrderFilters) =>
-      ["logistics", "orders", filters ?? {}] as const,
-    order:     (id: string) => ["logistics", "orders", id] as const,
-    partners:  () => ["logistics", "partners"] as const,
-    suppliers: () => ["logistics", "suppliers"] as const,
-    pos:       (filters?: LogisticsPoFilters) =>
-      ["logistics", "pos", filters ?? {}] as const,
-    po:        (id: string) => ["logistics", "pos", id] as const,
+     *  POs). 30s refetch, kept under `operation` so a future blunt invalidate
+     *  on `["operation"]` after a relevant mutation fans out here too. */
+    badges:    () => ["operation", "badges"] as const,
+    orders:    (filters?: operationOrderFilters) =>
+      ["operation", "orders", filters ?? {}] as const,
+    order:     (id: string) => ["operation", "orders", id] as const,
+    partners:  () => ["operation", "partners"] as const,
+    suppliers: () => ["operation", "suppliers"] as const,
+    pos:       (filters?: operationPoFilters) =>
+      ["operation", "pos", filters ?? {}] as const,
+    po:        (id: string) => ["operation", "pos", id] as const,
+    /** Loo 2026-05-16 — per-source-order ETA list for the PO detail modal.
+     *  Nested under "pos" so a blunt `["operation","pos"]` invalidation after
+     *  a PO mutation also clears these. Cheap (1-row-per-SO select), and the
+     *  fetch only fires when the modal opens. */
+    poSourceOrders: (id: string) =>
+      ["operation", "pos", id, "source-orders"] as const,
     /** Phase 4.5 Chunk 2 (T34) — per-supplier procurement tab list. Keyed by
      *  `slug` so each tab's cache stays distinct (otherwise switching tabs
      *  would thrash the same key). Nested under `pos` so a future blunt
-     *  invalidation on `["logistics","pos"]` (e.g. after a CreatePO) reaches
+     *  invalidation on `["operation","pos"]` (e.g. after a CreatePO) reaches
      *  every tab too. */
     procurementTab: (slug: ProcurementTabSlug) =>
-      ["logistics", "pos", "tab", slug] as const,
+      ["operation", "pos", "tab", slug] as const,
     /** Pipeline v2 (C5.3) — SKU-level shortage feed for the "Auto-fill from
      *  awaiting stock" button on CreatePOModal. Lazy: fired only on click via
      *  the hook's `refetch()`. Nested under `pos` so future blunt
-     *  invalidations on `["logistics","pos"]` reach this cache too (e.g. when
-     *  a PO is issued, the awaiting_logistics_action pool changes).
+     *  invalidations on `["operation","pos"]` reach this cache too (e.g. when
+     *  a PO is issued, the awaiting_operation_action pool changes).
      *
-     *  `dls` (optional, sorted) scopes shortage to a specific dl set, used by
+     *  `dls` (optional, sorted) scopes shortage to a specific so set, used by
      *  the cross-order bundle prefill flow. Sorting keeps the cache key stable
      *  across permutations of the same selection. */
     awaitingStockShortage: (dls?: number[]) =>
       dls && dls.length > 0
-        ? (["logistics", "pos", "awaiting-stock-shortage", [...dls].sort((a, b) => a - b)] as const)
-        : (["logistics", "pos", "awaiting-stock-shortage"] as const),
+        ? (["operation", "pos", "awaiting-stock-shortage", [...dls].sort((a, b) => a - b)] as const)
+        : (["operation", "pos", "awaiting-stock-shortage"] as const),
     /** Phase 4.5 Chunk 2 (T18/T21) — stock alerts derived from
      *  `(qty - reserved) < low_threshold`. Read by `StockAlertsTile` on the
      *  dashboard and (later) the warehouse red-dot indicator. The
      *  `SetThresholdDialog` invalidates this key on save so the tile
      *  re-derives. */
-    stockAlerts: () => ["logistics", "stock-alerts"] as const,
-    warehouse: () => ["logistics", "warehouse"] as const,
+    stockAlerts: () => ["operation", "stock-alerts"] as const,
+    warehouse: () => ["operation", "warehouse"] as const,
     /** Pipeline v2 (C4) — reserve drill-down per (warehouse, sku). Nested under
-     *  warehouse so future blunt invalidations on `["logistics","warehouse"]`
+     *  warehouse so future blunt invalidations on `["operation","warehouse"]`
      *  fan out to drill-down caches too. */
     reservedDrilldown: (warehouseId: string | null, sku: string | null) =>
-      ["logistics", "warehouse", "reserved", warehouseId ?? "null", sku ?? "null"] as const,
+      ["operation", "warehouse", "reserved", warehouseId ?? "null", sku ?? "null"] as const,
     movements: (filters?: MovementsFilters) =>
-      ["logistics", "movements", filters ?? {}] as const,
+      ["operation", "movements", filters ?? {}] as const,
   },
   // Phase 5 — HQ Finance namespace. Same nested-key strategy as `principal`
-  // and `logistics` so mutations can blast `["finance"]` (e.g. topup-approve
+  // and `operation` so mutations can blast `["finance"]` (e.g. topup-approve
   // ripples to dashboard summary + payments list + AR aging) or a tighter
   // sub-tree.
   finance: {
@@ -188,6 +206,19 @@ export const qk = {
     po:       (id: string) => ["supplier", "pos", id] as const,
     products: () => ["supplier", "products"] as const,
     demand:   () => ["supplier", "products", "demand"] as const,
+  },
+  // 2026-05-15 (Loo) — Supplier per-thread readiness + pickup event keys.
+  // Top-level (not nested under `supplier`) because thread + pickup-event
+  // reads are role-agnostic (supplier reads threads; partner+operation +
+  // anyone with link reads pickup-event print payload). Mutations invalidate
+  // these by their top-level prefix (`["supplierThreads"]` /
+  // `["pickupEvents"]`) so the namespacing matches the invalidate calls.
+  supplierThreads: {
+    byPo: (poId: string) => ["supplierThreads", poId] as const,
+  },
+  pickupEvent: {
+    print: (eventId: string) => ["pickupEvent", eventId] as const,
+    byPo:  (poId: string)  => ["pickupEvents", poId] as const,
   },
 };
 
@@ -246,7 +277,7 @@ export interface FinanceRefundsFilters {
 // ---------------------------------------------------------------------------
 export interface FinanceArAgingRow {
   order_id:      string;
-  dl:            number;
+  so:            number;
   customer_name: string;
   dealer_id:     string | null;
   dealer_name:   string | null;
@@ -293,7 +324,7 @@ export interface FinanceApAgingHistoryEntry {
 }
 export interface FinanceApAgingRow {
   po_id:               string;
-  dl:                  number | null;
+  so:                  number | null;
   supplier_id:         string | null;
   supplier_name:       string | null;
   warehouse_id:        string | null;
@@ -391,7 +422,7 @@ export interface FinanceRefundRow {
 
 // finance_recon_suggest_matches RPC payload.
 export interface FinanceReconCandidate {
-  dl:            number;
+  so:            number;
   customer_name: string;
   dealer_name:   string | null;
   total:         number;
@@ -432,15 +463,15 @@ export interface FinancePaymentRow {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 4 — Logistics filter shapes
+// Phase 4 — operation filter shapes
 // ---------------------------------------------------------------------------
 // Re-exported as plain type aliases of the zod-inferred query shapes from
-// @carres/shared/schemas/logistics. The web side only needs these as cache-key
+// @carres/shared/schemas/operation. The web side only needs these as cache-key
 // values + URLSearchParams sources — no runtime parse here, the server already
 // owns that boundary. Keeping the alias means a schema change in one file
 // updates both the API and the React Query keys without drift.
-export type LogisticsOrderFilters = Partial<ListLogisticsOrdersQuery>;
-export type LogisticsPoFilters = Partial<ListPurchaseOrdersQuery>;
+export type operationOrderFilters = Partial<ListOperationOrdersQuery>;
+export type operationPoFilters = Partial<ListPurchaseOrdersQuery>;
 export type MovementsFilters = Partial<ListMovementsQuery>;
 
 function toSearch(f?: OrderFilters): string {
@@ -511,7 +542,7 @@ export function useCreateOrder(
 
 /**
  * useProceedOrder — POST /api/orders/:id/proceed. Atomically transitions a
- * Place order to Proceed (sent to logistics). On success, primes both the
+ * Place order to Proceed (sent to operation). On success, primes both the
  * detail cache and invalidates the list cache so kanban + tabs reflect the
  * new bucket on next mount.
  *
@@ -927,7 +958,7 @@ export interface PrincipalDealerDetailDealer {
 }
 export interface PrincipalDealerRecentOrder {
   id: string;
-  dl: number;
+  so: number;
   status: string;
   customerName: string;
   paid: number;
@@ -1145,7 +1176,155 @@ export function useDealerSetStatus(
 }
 
 // ===========================================================================
-// Phase 4 — HQ Logistics hooks
+// Phase 10 — Principal Accounts admin
+// ===========================================================================
+// Closes phase-10-rotate-alpha-test-passwords HIGH carry-forward by giving
+// the principal a UI surface for create / disable / re-enable / reset-password
+// instead of needing direct SQL + auth.admin.updateUserById on the server.
+
+export type AppRole =
+  | "principal"
+  | "dealer"
+  | "salesperson"
+  | "showroom"
+  | "operation"
+  | "supplier"
+  | "partner"
+  | "finance"
+  | "bd";
+
+export interface AccountRow {
+  id: string;
+  email: string;
+  name: string;
+  role: AppRole;
+  title: string | null;
+  status: "active" | "invited" | "disabled";
+  dealerId: string | null;
+  supplierId: string | null;
+  partnerId: string | null;
+  outletId: string | null;
+  orgName: string | null;
+  createdBy: string | null;
+  lastSeenAt: string | null;
+  createdAt: string;
+}
+
+export function usePrincipalAccounts() {
+  return useQuery<{ users: AccountRow[] }, ApiError>({
+    queryKey: qk.principal.accounts(),
+    queryFn: () => apiFetch("/api/principal/accounts"),
+  });
+}
+
+export function useCreateAccount(
+  opts?: Partial<
+    UseMutationOptions<
+      {
+        id: string;
+        email: string;
+        name: string;
+        role: AppRole;
+        dealerId: string | null;
+        supplierId: string | null;
+        partnerId: string | null;
+      },
+      ApiError,
+      {
+        name: string;
+        email: string;
+        role: AppRole;
+        title?: string | null;
+        companyName?: string;
+        region?: string;
+        tempPassword: string;
+      }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) =>
+      apiFetch<{
+        id: string;
+        email: string;
+        name: string;
+        role: AppRole;
+        dealerId: string | null;
+        supplierId: string | null;
+        partnerId: string | null;
+      }>("/api/principal/accounts", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.principal.accounts() });
+      await qc.invalidateQueries({ queryKey: qk.principal.audit() });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+  });
+}
+
+export function useSetAccountStatus(
+  userId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; status: "active" | "disabled" },
+      ApiError,
+      { status: "active" | "disabled"; reason?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; status: "active" | "disabled" }>(
+        `/api/principal/accounts/${userId}/status`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.principal.accounts() });
+      await qc.invalidateQueries({ queryKey: qk.principal.audit() });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+  });
+}
+
+export function useResetAccountPassword(
+  userId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; ok: true },
+      ApiError,
+      { tempPassword: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; ok: true }>(
+        `/api/principal/accounts/${userId}/reset-password`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.principal.audit() });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+  });
+}
+
+// ===========================================================================
+// Phase 4 — HQ operation hooks
 // ===========================================================================
 // API contract is snake_case across the board (matching how Phase 3 principal
 // dashboard / approvals payloads are forwarded verbatim from the RPCs). The
@@ -1162,29 +1341,29 @@ export function useDealerSetStatus(
 
 // --- Shared response shapes (snake_case, forwarded from RPC / route) -------
 
-/** GET /api/logistics/dashboard — `logistics_dashboard_summary()` payload.
+/** GET /api/operation/dashboard — `operation_dashboard_summary()` payload.
  *  Field names mirror the RPC verbatim (migration 0019, lines 380-414):
  *  `today_deliveries`, `open_pos`, `overdue_orders`, `active_orders`,
  *  `active_gmv`. The proto KPI tiles read these as Today / Open POs / Overdue. */
-export interface LogisticsDashboardKpis {
+export interface operationDashboardKpis {
   today_deliveries: number;
   open_pos: number;
   overdue_orders: number;
   active_orders: number;
   active_gmv: number;
 }
-export interface LogisticsPipelineCounts {
+export interface operationPipelineCounts {
   /** Pipeline v2 (C3): orders with `status='place'` — dealer-side, not yet
    *  proceeded. Counted via the dashboard route since the RPC is frozen. */
   placed: number;
-  /** Pipeline v2 (C3): orders with `logistics_stage='proceed_request'` —
-   *  awaiting HQ logistics triage decision. */
+  /** Pipeline v2 (C3): orders with `operation_stage='proceed_request'` —
+   *  awaiting HQ operation triage decision. */
   proceed_request: number;
-  awaiting_logistics_action: number;
+  awaiting_operation_action: number;
   ready_to_dispatch: number;
   dispatched: number;
 }
-export interface LogisticsOpenPoRow {
+export interface operationOpenPoRow {
   id: string;
   supplier_id: string;
   warehouse_id: string;
@@ -1192,17 +1371,17 @@ export interface LogisticsOpenPoRow {
   sup_status: string;
   eta_date: string | null;
   placed_at: string;
-  dl: number | null;
-  dl_refs: number[] | null;
+  so: number | null;
+  so_refs: number[] | null;
 }
-export interface LogisticsLowStockRow {
+export interface operationLowStockRow {
   sku: string;
   warehouse_id: string;
   qty: number;
   reserved: number;
   available: number;
 }
-export interface LogisticsAuditRow {
+export interface operationAuditRow {
   id: string;
   role: string;
   actor_text: string | null;
@@ -1211,19 +1390,19 @@ export interface LogisticsAuditRow {
   ref: string | null;
   occurred_at: string;
 }
-export interface LogisticsAlerts {
+export interface operationAlerts {
   out_of_stock_skus: number;
 }
-export interface LogisticsDashboardResponse {
-  kpis: LogisticsDashboardKpis;
-  pipeline: LogisticsPipelineCounts;
-  open_pos: LogisticsOpenPoRow[];
-  low_stock: LogisticsLowStockRow[];
-  audit_recent: LogisticsAuditRow[];
-  alerts: LogisticsAlerts;
+export interface operationDashboardResponse {
+  kpis: operationDashboardKpis;
+  pipeline: operationPipelineCounts;
+  open_pos: operationOpenPoRow[];
+  low_stock: operationLowStockRow[];
+  audit_recent: operationAuditRow[];
+  alerts: operationAlerts;
 }
 
-/** Row in GET /api/logistics/partners. Bare `delivery_partners` row trimmed to
+/** Row in GET /api/operation/partners. Bare `delivery_partners` row trimmed to
  *  what `DispatchModal` needs (name + zones in the option label, contact in the
  *  preview). */
 export interface DeliveryPartnerRow {
@@ -1236,10 +1415,10 @@ export interface DeliveryPartnersListResponse {
   partners: DeliveryPartnerRow[];
 }
 
-/** Row in GET /api/logistics/suppliers. Used by `CreatePOModal` for the
+/** Row in GET /api/operation/suppliers. Used by `CreatePOModal` for the
  *  supplier dropdown + auto-detect via `cat_covered`. `kind` is the supplier's
  *  fulfilment mode (own_logistics ships goods themselves; factory_pickup
- *  expects logistics to dispatch a partner to the factory). */
+ *  expects operation to dispatch a partner to the factory). */
 export interface SupplierRow {
   id: string;
   name: string;
@@ -1253,18 +1432,18 @@ export interface SuppliersListResponse {
 }
 
 /** Phase 4.5 Chunk 2 (T9) — embedded `order_supplier_threads` row shape on
- *  logistics order list/detail responses. Carries the per-leg customer-side LP
+ *  operation order list/detail responses. Carries the per-leg customer-side LP
  *  fields that migrated off `purchase_orders` per design spec §CQ1 option (b).
  *  One row per (order, supplier, category); a multi-supplier order spawns N
  *  threads, each with its own customer-leg LP assignment. */
-export interface LogisticsOrderThreadRow {
+export interface operationOrderThreadRow {
   id: string;
   supplier_id: string;
   category: string;
-  logistics_stage:
+  operation_stage:
     | "placed"
     | "proceed_request"
-    | "awaiting_logistics_action"
+    | "awaiting_operation_action"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered";
@@ -1273,18 +1452,22 @@ export interface LogisticsOrderThreadRow {
    *  reads this to render the LP pill; an order may have heterogeneous LPs
    *  across threads (different supplier legs picked different partners). */
   delivery_partner_id: string | null;
+  /** 2026-05-18 (Loo) — partner name embed so OrderCard pill renders
+   *  "via Nets Sdn Bhd" instead of "LP-{8-char UUID}". Closes the
+   *  phase-4-detail-partner-name-join carry-forward. */
+  delivery_partners: { id: string; name: string } | null;
   confirm_delivery_date: string | null;
   request_for_delivery_at: string | null;
   partner_accepted_at: string | null;
   partner_rejected_at: string | null;
 }
 
-/** Row in GET /api/logistics/orders. Embedded `dealers(name)` is a PostgREST
+/** Row in GET /api/operation/orders. Embedded `dealers(name)` is a PostgREST
  *  nested fetch shape — the route forwards it verbatim.
  *
- *  Pipeline v2 (C1/C2): adds `'placed'` + `'proceed_request'` to logistics_stage
+ *  Pipeline v2 (C1/C2): adds `'placed'` + `'proceed_request'` to operation_stage
  *  and widens status to include the dealer-side `'place'` value (orders that
- *  haven't been pushed to logistics yet still surface in the kanban so HQ can
+ *  haven't been pushed to operation yet still surface in the kanban so HQ can
  *  see what's coming).
  *
  *  Phase 4.5 Chunk 2 (T9): adds embedded `order_supplier_threads` array
@@ -1292,14 +1475,14 @@ export interface LogisticsOrderThreadRow {
  *  OrderCard pill. The order-level `delivery_partner_id` is kept for backward
  *  compat (print-DO and other legacy callers) — but the kanban now reads from
  *  threads to honor multi-supplier scenarios. */
-export interface LogisticsOrderListRow {
+export interface operationOrderListRow {
   id: string;
-  dl: number;
+  so: number;
   status: "place" | "proceed_order" | "delivered";
-  logistics_stage:
+  operation_stage:
     | "placed"
     | "proceed_request"
-    | "awaiting_logistics_action"
+    | "awaiting_operation_action"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered"
@@ -1320,21 +1503,21 @@ export interface LogisticsOrderListRow {
    *  field is non-nullable. An empty array means no threads have been spawned
    *  yet (pre-confirm-proceed orders); the FE treats `[]` as "no thread state
    *  available" and omits the LP pill. */
-  order_supplier_threads: LogisticsOrderThreadRow[];
+  order_supplier_threads: operationOrderThreadRow[];
 }
-export interface LogisticsOrdersListResponse {
-  orders: LogisticsOrderListRow[];
+export interface operationOrdersListResponse {
+  orders: operationOrderListRow[];
 }
 
-/** GET /api/logistics/orders/:id — composed drawer payload (orders.ts §97). */
-export interface LogisticsOrderDetailOrder {
+/** GET /api/operation/orders/:id — composed drawer payload (orders.ts §97). */
+export interface operationOrderDetailOrder {
   id: string;
-  dl: number;
+  so: number;
   status: string;
-  logistics_stage:
+  operation_stage:
     | "placed"
     | "proceed_request"
-    | "awaiting_logistics_action"
+    | "awaiting_operation_action"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered"
@@ -1355,18 +1538,18 @@ export interface LogisticsOrderDetailOrder {
   dealer_id: string;
   outlet_id: string | null;
   /** 0098: auto-set by orders_auto_issue_on_dispatched_trg when
-   *  logistics_stage transitions to 'dispatched'. Surfaces in the drawer
+   *  operation_stage transitions to 'dispatched'. Surfaces in the drawer
    *  as the Print Invoice button gate. */
   invoice_no: string | null;
   invoiced_at: string | null;
   /** 0105 — surfaced so the drawer can render the Record-top-up modal at
-   *  ready_to_dispatch / dispatched stages (logistics records the customer's
+   *  ready_to_dispatch / dispatched stages (operation records the customer's
    *  final balance payment at delivery). */
   paid: number;
   dealers: { name: string } | null;
   outlets: { name: string } | null;
 }
-export interface LogisticsOrderDetailLine {
+export interface operationOrderDetailLine {
   sku: string;
   qty: number;
   unit_price: number;
@@ -1376,77 +1559,77 @@ export interface LogisticsOrderDetailLine {
   // pre-cascade legacy data.
   attrs?: Record<string, unknown> | null;
 }
-export interface LogisticsOrderDetailAddon {
+export interface operationOrderDetailAddon {
   addon_key: string;
   qty: number;
   unit_price: number;
 }
-export interface LogisticsOrderDetailHistoryRow {
+export interface operationOrderDetailHistoryRow {
   text: string;
   by_role: string | null;
   occurred_at: string;
 }
-export interface LogisticsOrderDetailWarehouse {
+export interface operationOrderDetailWarehouse {
   id: string;
   name: string;
   address: string | null;
 }
-export interface LogisticsOrderDetailStockBalance {
+export interface operationOrderDetailStockBalance {
   sku: string;
   warehouse_id: string;
   qty: number;
   reserved: number;
 }
-export interface LogisticsOrderDetailPoLine {
+export interface operationOrderDetailPoLine {
   po_id: string;
   sku: string;
   qty: number;
   received_qty: number;
 }
-export interface LogisticsOrderDetailPo {
+export interface operationOrderDetailPo {
   id: string;
   supplier_id: string;
   warehouse_id: string;
   status: string;
   sup_status: string;
-  dl: number | null;
-  dl_refs: number[] | null;
+  so: number | null;
+  so_refs: number[] | null;
   eta_date: string | null;
-  lines: LogisticsOrderDetailPoLine[];
+  lines: operationOrderDetailPoLine[];
 }
-export interface LogisticsOrderDetailResponse {
-  order: LogisticsOrderDetailOrder;
-  lines: LogisticsOrderDetailLine[];
-  addons: LogisticsOrderDetailAddon[];
+export interface operationOrderDetailResponse {
+  order: operationOrderDetailOrder;
+  lines: operationOrderDetailLine[];
+  addons: operationOrderDetailAddon[];
   total: number;
-  warehouse: LogisticsOrderDetailWarehouse | null;
-  stockBalances: LogisticsOrderDetailStockBalance[];
-  pos: LogisticsOrderDetailPo[];
-  history: LogisticsOrderDetailHistoryRow[];
+  warehouse: operationOrderDetailWarehouse | null;
+  stockBalances: operationOrderDetailStockBalance[];
+  pos: operationOrderDetailPo[];
+  history: operationOrderDetailHistoryRow[];
   /** Phase 4.5 Chunk 2 (T9) — per-supplier thread rows carrying customer-leg
    *  LP state. Drawer reads `threads[].delivery_partner_id` to compute partner
    *  assignment instead of order-level `delivery_partner_id`, since per design
    *  spec §CQ1 option (b) the customer-leg LP lives on the thread now. */
-  threads: LogisticsOrderThreadRow[];
+  threads: operationOrderThreadRow[];
 }
 
-/** Row in GET /api/logistics/pos. `purchase_order_lines(...)` is the embedded
+/** Row in GET /api/operation/pos. `purchase_order_lines(...)` is the embedded
  *  PostgREST nested resource. */
-export interface LogisticsPoListRow {
+export interface operationPoListRow {
   id: string;
   supplier_id: string;
   warehouse_id: string;
   status: "open" | "received" | "cancelled";
   sup_status: string;
-  dl: number | null;
-  dl_refs: number[] | null;
+  so: number | null;
+  so_refs: number[] | null;
   eta_date: string | null;
   placed_at: string;
   purchase_order_lines: {
     // 0076 (Loo 2026-05-10): line UUID — primary key after migration. Used
     // by ReceivePOModal as the recv-state key (replacing sku) so multi-
     // variant lines (same SKU different colors/fabrics) don't collide. Also
-    // the lookup key for logistics_receive_po_with_do.
+    // the lookup key for operation_receive_po_with_do.
     id: string;
     sku: string;
     qty: number;
@@ -1456,20 +1639,33 @@ export interface LogisticsPoListRow {
     // {fabric_id, fabric_name, fabric_surcharge}.
     attrs?: Record<string, unknown> | null;
   }[];
+  /** 2026-05-18 (Loo C+D) — per-source-SO enrichment from
+   *  /api/operation/procurement/:slug. One entry per SO this PO serves
+   *  (po.so for single, po.so_refs[] for bundle). Empty for stockpile POs
+   *  or non-procurement-tabs endpoints (the global /api/operation/pos still
+   *  returns the bare row without this field — treat as []). */
+  orders?: {
+    so: number;
+    customer_name: string;
+    delivery_date: string | null;
+  }[];
+  /** 2026-05-18 (Loo C+D) — worst-case urgency across source SOs. NULL when
+   *  the PO has no source SOs (stockpile) or all delivery_date are NULL. */
+  urgency?: "critical" | "urgent" | "normal" | null;
 }
-export interface LogisticsPosListResponse {
-  pos: LogisticsPoListRow[];
+export interface operationPosListResponse {
+  pos: operationPoListRow[];
 }
 
 /** Pipeline v2 (C4) — re-export the zod-derived drill-down shape so consumers
  *  don't have to import from @carres/shared directly. */
-export type LogisticsReservedDrilldownResponse = ReservedDrilldownResponse;
+export type operationReservedDrilldownResponse = ReservedDrilldownResponse;
 
 /** Pipeline v2 (C5.3) — re-export the awaiting-stock shortage shape for the
  *  CreatePOModal auto-fill button, same convention as the drill-down above. */
-export type LogisticsAwaitingStockShortageResponse = AwaitingStockShortageResponse;
+export type operationAwaitingStockShortageResponse = AwaitingStockShortageResponse;
 
-/** GET /api/logistics/warehouse — composed table-style payload (warehouse.ts). */
+/** GET /api/operation/warehouse — composed table-style payload (warehouse.ts). */
 export type LowStockStatus = "out" | "low" | "ok";
 export interface WarehouseStockEntry {
   sku: string;
@@ -1477,7 +1673,7 @@ export interface WarehouseStockEntry {
   reserved: number;
   low_stock_status: LowStockStatus;
   /** T42-pass3-C1 — current `stock_balances.low_threshold`. NULL = no alert
-   *  configured. Used by `SetThresholdDialog` prefill from LogisticsWarehouse. */
+   *  configured. Used by `SetThresholdDialog` prefill from OperationWarehouse. */
   low_threshold: number | null;
   /** T42-pass3-C1 — current `stock_balances.high_threshold`. NULL = use low * 2
    *  fallback. Same prefill purpose as low_threshold. */
@@ -1494,7 +1690,7 @@ export interface WarehouseListResponse {
   totalsBySku: Record<string, WarehouseSkuTotals>;
 }
 
-/** GET /api/logistics/movements — `stock_movements` table rows + cap. */
+/** GET /api/operation/movements — `stock_movements` table rows + cap. */
 export interface MovementRow {
   id: string;
   sku: string;
@@ -1512,31 +1708,31 @@ export interface MovementsListResponse {
 }
 
 /** Mutation responses — RPCs return the mutated row; routes wrap in `{ x: data }`. */
-export interface LogisticsOrderMutationResponse {
+export interface operationOrderMutationResponse {
   order: unknown;
 }
-export interface LogisticsPoMutationResponse {
+export interface operationPoMutationResponse {
   po: unknown;
 }
-export interface LogisticsRecheckStockResponse {
+export interface operationRecheckStockResponse {
   warehouseId: string | null;
   shortages: { sku: string; short: number }[];
 }
-export interface LogisticsIssuePosResponse {
+export interface operationIssuePosResponse {
   pos_created: { po_id: string; supplier_id: string; lines: number }[];
 }
-export interface LogisticsAdjustStockResponse {
+export interface operationAdjustStockResponse {
   sku: string;
   warehouse_id: string;
   qty: number;
   reserved: number;
 }
-/** Phase 4.5 Chunk 2 (T18/T21) — `GET /api/logistics/stock-alerts` row shape.
- *  RPC `logistics_stock_alerts()` returns rows where `(qty - reserved) <
+/** Phase 4.5 Chunk 2 (T18/T21) — `GET /api/operation/stock-alerts` row shape.
+ *  RPC `operation_stock_alerts()` returns rows where `(qty - reserved) <
  *  low_threshold`. The dashboard tile slices the top-3 by shortage; the
  *  warehouse page (Sprint D follow-up) drives a red-dot indicator off the
  *  count. `effective = qty - reserved`; `shortage = low_threshold - effective`. */
-export interface LogisticsStockAlertRow {
+export interface operationStockAlertRow {
   sku: string;
   warehouse_id: string;
   qty: number;
@@ -1545,10 +1741,10 @@ export interface LogisticsStockAlertRow {
   low_threshold: number;
   shortage: number;
 }
-export interface LogisticsStockAlertsResponse {
-  alerts: LogisticsStockAlertRow[];
+export interface operationStockAlertsResponse {
+  alerts: operationStockAlertRow[];
 }
-export interface LogisticsReceivePoWithDoResponse {
+export interface operationReceivePoWithDoResponse {
   po_id: string;
   do_file_path: string;
   do_number: string;
@@ -1561,7 +1757,7 @@ export interface LogisticsReceivePoWithDoResponse {
 
 // --- Filter → query string helpers -----------------------------------------
 
-function logisticsOrdersSearch(f?: LogisticsOrderFilters): string {
+function operationOrdersSearch(f?: operationOrderFilters): string {
   if (!f) return "";
   const params = new URLSearchParams();
   if (f.stage && f.stage !== "all") params.set("stage", f.stage);
@@ -1571,7 +1767,7 @@ function logisticsOrdersSearch(f?: LogisticsOrderFilters): string {
   return qs ? `?${qs}` : "";
 }
 
-function logisticsPosSearch(f?: LogisticsPoFilters): string {
+function operationPosSearch(f?: operationPoFilters): string {
   if (!f) return "";
   const params = new URLSearchParams();
   if (f.status && f.status !== "all") params.set("status", f.status);
@@ -1597,14 +1793,14 @@ function movementsSearch(f?: MovementsFilters): string {
 
 // --- Query hooks (7) -------------------------------------------------------
 
-/** Logistics dashboard — KPIs + pipeline + open POs + low stock + audit. */
-export function useLogisticsDashboard(
-  opts?: Partial<UseQueryOptions<LogisticsDashboardResponse>>,
+/** operation dashboard — KPIs + pipeline + open POs + low stock + audit. */
+export function useOperationDashboard(
+  opts?: Partial<UseQueryOptions<operationDashboardResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.dashboard(),
+    queryKey: qk.operation.dashboard(),
     queryFn: () =>
-      apiFetch<LogisticsDashboardResponse>("/api/logistics/dashboard"),
+      apiFetch<operationDashboardResponse>("/api/operation/dashboard"),
     staleTime: 30_000,
     ...opts,
   });
@@ -1612,16 +1808,16 @@ export function useLogisticsDashboard(
 
 /** Loo 2026-05-10 — sidebar badge counts. Polled every 30s so the operator
  *  sees the chip update without leaving the page. Mounted from
- *  LogisticsSidebar; staleTime matches refetchInterval so the cache stays
+ *  OperationSidebar; staleTime matches refetchInterval so the cache stays
  *  warm across nav transitions. */
-export function useLogisticsBadges(
-  opts?: Partial<UseQueryOptions<import("@carres/shared").LogisticsBadgesResponse>>,
+export function useOperationBadges(
+  opts?: Partial<UseQueryOptions<import("@carres/shared").OperationBadgesResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.badges(),
+    queryKey: qk.operation.badges(),
     queryFn: () =>
-      apiFetch<import("@carres/shared").LogisticsBadgesResponse>(
-        "/api/logistics/badges",
+      apiFetch<import("@carres/shared").OperationBadgesResponse>(
+        "/api/operation/badges",
       ),
     staleTime: 30_000,
     refetchInterval: 30_000,
@@ -1630,7 +1826,7 @@ export function useLogisticsBadges(
 }
 
 /**
- * Mark a logistics nav badge as seen — Loo 2026-05-11 unread semantics.
+ * Mark a operation nav badge as seen — Loo 2026-05-11 unread semantics.
  *
  * Optimistically zeros the count for the given key in the badges cache so
  * the UI reacts instantly (~16 ms instead of waiting for the next 30s
@@ -1638,43 +1834,43 @@ export function useLogisticsBadges(
  * count (could be >0 if new items advanced between click and ack)
  * reconciles.
  *
- * Pairs with POST /api/logistics/badges/seen which calls the
+ * Pairs with POST /api/operation/badges/seen which calls the
  * mark_badge_seen RPC (migration 0083).
  */
-type LogisticsBadgeKey = "logistics:orders" | "logistics:procurement";
-type LogisticsBadgeKeyShort = "orders" | "procurement";
+type operationBadgeKey = "operation:orders" | "operation:procurement";
+type operationBadgeKeyShort = "orders" | "procurement";
 
-export function useMarkLogisticsBadgeSeen() {
+export function useMarkOperationBadgeSeen() {
   const qc = useQueryClient();
   return useMutation<
-    { badgeKey: LogisticsBadgeKey; lastSeenAt: string },
+    { badgeKey: operationBadgeKey; lastSeenAt: string },
     ApiError,
-    LogisticsBadgeKeyShort,
-    { prev: import("@carres/shared").LogisticsBadgesResponse | undefined }
+    operationBadgeKeyShort,
+    { prev: import("@carres/shared").OperationBadgesResponse | undefined }
   >({
     mutationFn: (short) =>
-      apiFetch("/api/logistics/badges/seen", {
+      apiFetch("/api/operation/badges/seen", {
         method: "POST",
-        body: JSON.stringify({ badgeKey: `logistics:${short}` }),
+        body: JSON.stringify({ badgeKey: `operation:${short}` }),
       }),
     onMutate: async (short) => {
-      await qc.cancelQueries({ queryKey: qk.logistics.badges() });
-      const prev = qc.getQueryData<import("@carres/shared").LogisticsBadgesResponse>(
-        qk.logistics.badges(),
+      await qc.cancelQueries({ queryKey: qk.operation.badges() });
+      const prev = qc.getQueryData<import("@carres/shared").OperationBadgesResponse>(
+        qk.operation.badges(),
       );
       if (prev) {
-        qc.setQueryData<import("@carres/shared").LogisticsBadgesResponse>(
-          qk.logistics.badges(),
+        qc.setQueryData<import("@carres/shared").OperationBadgesResponse>(
+          qk.operation.badges(),
           { ...prev, [short]: 0 },
         );
       }
       return { prev };
     },
     onError: (_err, _short, ctx) => {
-      if (ctx?.prev) qc.setQueryData(qk.logistics.badges(), ctx.prev);
+      if (ctx?.prev) qc.setQueryData(qk.operation.badges(), ctx.prev);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: qk.logistics.badges() });
+      qc.invalidateQueries({ queryKey: qk.operation.badges() });
     },
   });
 }
@@ -1685,39 +1881,39 @@ export function useDeliveryPartners(
   opts?: Partial<UseQueryOptions<DeliveryPartnersListResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.partners(),
+    queryKey: qk.operation.partners(),
     queryFn: () =>
-      apiFetch<DeliveryPartnersListResponse>("/api/logistics/partners"),
+      apiFetch<DeliveryPartnersListResponse>("/api/operation/partners"),
     staleTime: 5 * 60_000,
     ...opts,
   });
 }
 
 /** Suppliers — populates the CreatePOModal supplier dropdown (M5 task 3
- *  §18.4). Stable list (suppliers are managed in Logistics Settings + don't
+ *  §18.4). Stable list (suppliers are managed in operation Settings + don't
  *  change between sessions); cache for 5 minutes. */
-export function useLogisticsSuppliers(
+export function useOperationSuppliers(
   opts?: Partial<UseQueryOptions<SuppliersListResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.suppliers(),
+    queryKey: qk.operation.suppliers(),
     queryFn: () =>
-      apiFetch<SuppliersListResponse>("/api/logistics/suppliers"),
+      apiFetch<SuppliersListResponse>("/api/operation/suppliers"),
     staleTime: 5 * 60_000,
     ...opts,
   });
 }
 
-/** Logistics orders kanban list. Server defaults stage='all', channel='all'. */
-export function useLogisticsOrders(
-  filters: LogisticsOrderFilters = {},
-  opts?: Partial<UseQueryOptions<LogisticsOrdersListResponse>>,
+/** operation orders kanban list. Server defaults stage='all', channel='all'. */
+export function useOperationOrders(
+  filters: operationOrderFilters = {},
+  opts?: Partial<UseQueryOptions<operationOrdersListResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.orders(filters),
+    queryKey: qk.operation.orders(filters),
     queryFn: () =>
-      apiFetch<LogisticsOrdersListResponse>(
-        "/api/logistics/orders" + logisticsOrdersSearch(filters),
+      apiFetch<operationOrdersListResponse>(
+        "/api/operation/orders" + operationOrdersSearch(filters),
       ),
     staleTime: 30_000,
     // Keep showing the previous filtered/searched list while fetching the
@@ -1731,14 +1927,14 @@ export function useLogisticsOrders(
 }
 
 /** Drawer detail. `null` id disables the query (mirror of usePrincipalDealer). */
-export function useLogisticsOrder(
+export function useOperationOrder(
   id: string | null,
-  opts?: Partial<UseQueryOptions<LogisticsOrderDetailResponse>>,
+  opts?: Partial<UseQueryOptions<operationOrderDetailResponse>>,
 ) {
   return useQuery({
-    queryKey: id ? qk.logistics.order(id) : (["logistics", "orders", "null"] as const),
+    queryKey: id ? qk.operation.order(id) : (["operation", "orders", "null"] as const),
     queryFn: () =>
-      apiFetch<LogisticsOrderDetailResponse>(`/api/logistics/orders/${id}`),
+      apiFetch<operationOrderDetailResponse>(`/api/operation/orders/${id}`),
     enabled: !!id,
     staleTime: 10_000,
     ...opts,
@@ -1746,15 +1942,15 @@ export function useLogisticsOrder(
 }
 
 /** Procurement (PO) list. Server defaults status='all'. */
-export function useLogisticsPos(
-  filters: LogisticsPoFilters = {},
-  opts?: Partial<UseQueryOptions<LogisticsPosListResponse>>,
+export function useOperationPos(
+  filters: operationPoFilters = {},
+  opts?: Partial<UseQueryOptions<operationPosListResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.pos(filters),
+    queryKey: qk.operation.pos(filters),
     queryFn: () =>
-      apiFetch<LogisticsPosListResponse>(
-        "/api/logistics/pos" + logisticsPosSearch(filters),
+      apiFetch<operationPosListResponse>(
+        "/api/operation/pos" + operationPosSearch(filters),
       ),
     staleTime: 30_000,
     ...opts,
@@ -1763,18 +1959,18 @@ export function useLogisticsPos(
 
 /** PO drawer detail. There is no GET /:id route — the list embeds lines via
  *  PostgREST nested fetch. Kept here as a future hook; for now M5 pages should
- *  pluck the row from `useLogisticsPos`. The unused-id query is disabled when
+ *  pluck the row from `useOperationPos`. The unused-id query is disabled when
  *  id is null. (Endpoint may land in M5 task 4 when the drawer needs richer
  *  history; this hook is a placeholder for that.) */
-export function useLogisticsPo(
+export function useOperationPo(
   _id: string | null,
-  opts?: Partial<UseQueryOptions<LogisticsPoListRow>>,
+  opts?: Partial<UseQueryOptions<operationPoListRow>>,
 ) {
   return useQuery({
-    queryKey: _id ? qk.logistics.po(_id) : (["logistics", "pos", "null"] as const),
+    queryKey: _id ? qk.operation.po(_id) : (["operation", "pos", "null"] as const),
     queryFn: () => {
       throw new Error(
-        "useLogisticsPo: GET /api/logistics/pos/:id not implemented yet — read from useLogisticsPos list cache via select() instead.",
+        "useOperationPo: GET /api/operation/pos/:id not implemented yet — read from useOperationPos list cache via select() instead.",
       );
     },
     enabled: false,
@@ -1783,21 +1979,50 @@ export function useLogisticsPo(
   });
 }
 
+/** Loo 2026-05-16 — per-source-order delivery date list for PoDetailModal.
+ *  Returns `[{so, deliveryDate}]` for every so in the PO's `so + so_refs`.
+ *  The PO list itself doesn't carry delivery_date because that lives on
+ *  `orders`, not on the PO row. */
+export interface operationPoSourceOrder {
+  so: number;
+  deliveryDate: string | null;
+}
+export interface operationPoSourceOrdersResponse {
+  orders: operationPoSourceOrder[];
+}
+export function useOperationPoSourceOrders(
+  poId: string | null,
+  opts?: Partial<UseQueryOptions<operationPoSourceOrdersResponse>>,
+) {
+  return useQuery({
+    queryKey: poId
+      ? qk.operation.poSourceOrders(poId)
+      : (["operation", "pos", "null", "source-orders"] as const),
+    queryFn: () =>
+      apiFetch<operationPoSourceOrdersResponse>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/source-orders`,
+      ),
+    enabled: !!poId,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 /** Phase 4.5 Chunk 2 (T34) — per-tab procurement listing.
- *  Wraps `GET /api/logistics/procurement/:slug` (T33). Each tab on the
+ *  Wraps `GET /api/operation/procurement/:slug` (T33). Each tab on the
  *  TabbedProcurementShell mounts a child component that calls this hook with
  *  its own slug, so the active tab's data fetches lazily on mount. The
- *  response shape mirrors `LogisticsPosListResponse` (`{ pos: [...] }`) so
+ *  response shape mirrors `operationPosListResponse` (`{ pos: [...] }`) so
  *  child tabs can reuse the existing PO row rendering verbatim. */
 export function useProcurementTab(
   slug: ProcurementTabSlug,
-  opts?: Partial<UseQueryOptions<LogisticsPosListResponse>>,
+  opts?: Partial<UseQueryOptions<operationPosListResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.procurementTab(slug),
+    queryKey: qk.operation.procurementTab(slug),
     queryFn: () =>
-      apiFetch<LogisticsPosListResponse>(
-        `/api/logistics/procurement/${encodeURIComponent(slug)}`,
+      apiFetch<operationPosListResponse>(
+        `/api/operation/procurement/${encodeURIComponent(slug)}`,
       ),
     staleTime: 30_000,
     ...opts,
@@ -1805,12 +2030,12 @@ export function useProcurementTab(
 }
 
 /** Warehouse stock matrix. */
-export function useLogisticsWarehouse(
+export function useOperationWarehouse(
   opts?: Partial<UseQueryOptions<WarehouseListResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.warehouse(),
-    queryFn: () => apiFetch<WarehouseListResponse>("/api/logistics/warehouse"),
+    queryKey: qk.operation.warehouse(),
+    queryFn: () => apiFetch<WarehouseListResponse>("/api/operation/warehouse"),
     staleTime: 30_000,
     ...opts,
   });
@@ -1818,23 +2043,23 @@ export function useLogisticsWarehouse(
 
 /** Pipeline v2 (C4) — drill-down on a single (warehouse, sku) pair to list
  *  the orders currently holding `stock_balances.reserved`. `null` for either
- *  param disables the query (mirror of `useLogisticsOrder`). staleTime is
+ *  param disables the query (mirror of `useOperationOrder`). staleTime is
  *  short (5s) — reserve counts shift on every assign-partner / attach-do /
  *  abandon, so we want fresh data when the dialog reopens. */
 export function useReservedDrilldown(
   warehouseId: string | null,
   sku: string | null,
-  opts?: Partial<UseQueryOptions<LogisticsReservedDrilldownResponse>>,
+  opts?: Partial<UseQueryOptions<operationReservedDrilldownResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.reservedDrilldown(warehouseId, sku),
+    queryKey: qk.operation.reservedDrilldown(warehouseId, sku),
     queryFn: () => {
       const params = new URLSearchParams({
         warehouseId: warehouseId ?? "",
         sku: sku ?? "",
       });
-      return apiFetch<LogisticsReservedDrilldownResponse>(
-        `/api/logistics/warehouse/reserved-drilldown?${params.toString()}`,
+      return apiFetch<operationReservedDrilldownResponse>(
+        `/api/operation/warehouse/reserved-drilldown?${params.toString()}`,
       );
     },
     enabled: !!warehouseId && !!sku,
@@ -1847,7 +2072,7 @@ export function useReservedDrilldown(
  *  "Auto-fill from awaiting stock" button. Lazy: `enabled: false` so the
  *  query only fires when the user clicks the button (via `refetch()`). The
  *  result replaces the modal's `lines` state. staleTime is 0 so a fresh
- *  refetch is always triggered — the awaiting_logistics_action pool can change between
+ *  refetch is always triggered — the awaiting_operation_action pool can change between
  *  clicks (e.g. user dispatches an order, abandons one).
  *
  *  Bundle scoping: when `dls` is non-empty the query appends `?dls=1,2,3` so
@@ -1856,15 +2081,15 @@ export function useReservedDrilldown(
  *  for the operator's exact selection instead of the global awaiting pool. */
 export function useAwaitingStockShortage(
   dls?: number[],
-  opts?: Partial<UseQueryOptions<LogisticsAwaitingStockShortageResponse>>,
+  opts?: Partial<UseQueryOptions<operationAwaitingStockShortageResponse>>,
 ) {
   const hasDls = dls != null && dls.length > 0;
   const url = hasDls
-    ? `/api/logistics/pos/awaiting-stock-shortage?dls=${[...dls!].sort((a, b) => a - b).join(",")}`
-    : "/api/logistics/pos/awaiting-stock-shortage";
+    ? `/api/operation/pos/awaiting-stock-shortage?dls=${[...dls!].sort((a, b) => a - b).join(",")}`
+    : "/api/operation/pos/awaiting-stock-shortage";
   return useQuery({
-    queryKey: qk.logistics.awaitingStockShortage(dls),
-    queryFn: () => apiFetch<LogisticsAwaitingStockShortageResponse>(url),
+    queryKey: qk.operation.awaitingStockShortage(dls),
+    queryFn: () => apiFetch<operationAwaitingStockShortageResponse>(url),
     enabled: false,
     staleTime: 0,
     ...opts,
@@ -1873,33 +2098,33 @@ export function useAwaitingStockShortage(
 
 /** Phase 4.5 Chunk 2 (T18/T21) — Stock alerts feed. Used by the dashboard
  *  `StockAlertsTile` (count + top-3) and the warehouse page red-dot indicator.
- *  Cache key `["logistics","stock-alerts"]` is invalidated by
+ *  Cache key `["operation","stock-alerts"]` is invalidated by
  *  `SetThresholdDialog` on save so a freshly-cleared low threshold removes the
  *  tile entry without a manual refetch. staleTime mirrors the dashboard
  *  surface (30s) — alerts only shift when stock or thresholds change, both of
  *  which already trigger broader invalidations on their own mutation paths. */
 export function useStockAlerts(
-  opts?: Partial<UseQueryOptions<LogisticsStockAlertsResponse>>,
+  opts?: Partial<UseQueryOptions<operationStockAlertsResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.stockAlerts(),
+    queryKey: qk.operation.stockAlerts(),
     queryFn: () =>
-      apiFetch<LogisticsStockAlertsResponse>("/api/logistics/stock-alerts"),
+      apiFetch<operationStockAlertsResponse>("/api/operation/stock-alerts"),
     staleTime: 30_000,
     ...opts,
   });
 }
 
 /** Movements log. Default period='30d'; cap at 200 rows server-side. */
-export function useLogisticsMovements(
+export function useOperationMovements(
   filters: MovementsFilters = {},
   opts?: Partial<UseQueryOptions<MovementsListResponse>>,
 ) {
   return useQuery({
-    queryKey: qk.logistics.movements(filters),
+    queryKey: qk.operation.movements(filters),
     queryFn: () =>
       apiFetch<MovementsListResponse>(
-        "/api/logistics/movements" + movementsSearch(filters),
+        "/api/operation/movements" + movementsSearch(filters),
       ),
     staleTime: 30_000,
     ...opts,
@@ -1909,12 +2134,12 @@ export function useLogisticsMovements(
 // --- Mutation hooks (12) ---------------------------------------------------
 //
 // Invalidation strategy: every mutation invalidates a minimum of
-//   • the affected detail key (`qk.logistics.order(id)` / .po(id))
-//   • the affected list key tree (`["logistics", "orders"]` / .pos)
-//   • the dashboard (`qk.logistics.dashboard()`) — KPIs depend on order /
+//   • the affected detail key (`qk.operation.order(id)` / .po(id))
+//   • the affected list key tree (`["operation", "orders"]` / .pos)
+//   • the dashboard (`qk.operation.dashboard()`) — KPIs depend on order /
 //     PO state changes universally.
-// Stock-touching mutations also invalidate `["logistics", "warehouse"]` and
-// `["logistics", "movements"]` because stock_balances + stock_movements rows
+// Stock-touching mutations also invalidate `["operation", "warehouse"]` and
+// `["operation", "movements"]` because stock_balances + stock_movements rows
 // shift on every receive / adjust / dispatch.
 
 /** D1 step 1 — assign a delivery partner. Stage flips to dispatched; KPIs +
@@ -1922,21 +2147,21 @@ export function useLogisticsMovements(
 export function useAssignPartnerMutation(
   orderId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsOrderMutationResponse, ApiError, AssignPartnerInput>
+    UseMutationOptions<operationOrderMutationResponse, ApiError, AssignPartnerInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsOrderMutationResponse, ApiError, AssignPartnerInput>({
+  return useMutation<operationOrderMutationResponse, ApiError, AssignPartnerInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsOrderMutationResponse>(
-        `/api/logistics/orders/${orderId}/assign-partner`,
+      apiFetch<operationOrderMutationResponse>(
+        `/api/operation/orders/${orderId}/assign-partner`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -1947,27 +2172,27 @@ export function useAssignPartnerMutation(
 export function useAttachDoMutation(
   orderId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsOrderMutationResponse, ApiError, AttachDoInput>
+    UseMutationOptions<operationOrderMutationResponse, ApiError, AttachDoInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsOrderMutationResponse, ApiError, AttachDoInput>({
+  return useMutation<operationOrderMutationResponse, ApiError, AttachDoInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsOrderMutationResponse>(
-        `/api/logistics/orders/${orderId}/attach-do`,
+      apiFetch<operationOrderMutationResponse>(
+        `/api/operation/orders/${orderId}/attach-do`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
       // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
       // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
       // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -1977,50 +2202,50 @@ export function useAttachDoMutation(
 export function useAbandonOrderMutation(
   orderId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsOrderMutationResponse, ApiError, AbandonOrderInput>
+    UseMutationOptions<operationOrderMutationResponse, ApiError, AbandonOrderInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsOrderMutationResponse, ApiError, AbandonOrderInput>({
+  return useMutation<operationOrderMutationResponse, ApiError, AbandonOrderInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsOrderMutationResponse>(
-        `/api/logistics/orders/${orderId}/abandon`,
+      apiFetch<operationOrderMutationResponse>(
+        `/api/operation/orders/${orderId}/abandon`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
       // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
       // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
       // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
 }
 
 /** 2026-05-12 (Loo) — back-arrow from Proceed Request column → Placed.
- *  No body. Server enforces logistics or principal role + RPC 0095 enforces
+ *  No body. Server enforces operation or principal role + RPC 0095 enforces
  *  current stage. */
 export function useRevertOrderProceedMutation(
   orderId: string,
-  opts?: Partial<UseMutationOptions<{ order_id: string; dl: number }, ApiError, void>>,
+  opts?: Partial<UseMutationOptions<{ order_id: string; so: number }, ApiError, void>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ order_id: string; dl: number }, ApiError, void>({
+  return useMutation<{ order_id: string; so: number }, ApiError, void>({
     mutationFn: () =>
-      apiFetch<{ order_id: string; dl: number }>(
-        `/api/logistics/orders/${orderId}/revert-proceed`,
+      apiFetch<{ order_id: string; so: number }>(
+        `/api/operation/orders/${orderId}/revert-proceed`,
         { method: "POST" },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2031,56 +2256,56 @@ export function useRevertOrderProceedMutation(
 export function useRevertOrderDispatchMutation(
   orderId: string,
   opts?: Partial<
-    UseMutationOptions<{ order_id: string; dl: number; threads_reverted: number }, ApiError, void>
+    UseMutationOptions<{ order_id: string; so: number; threads_reverted: number }, ApiError, void>
   >,
 ) {
   const qc = useQueryClient();
   return useMutation<
-    { order_id: string; dl: number; threads_reverted: number },
+    { order_id: string; so: number; threads_reverted: number },
     ApiError,
     void
   >({
     mutationFn: () =>
-      apiFetch<{ order_id: string; dl: number; threads_reverted: number }>(
-        `/api/logistics/orders/${orderId}/revert-dispatch`,
+      apiFetch<{ order_id: string; so: number; threads_reverted: number }>(
+        `/api/operation/orders/${orderId}/revert-dispatch`,
         { method: "POST" },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
 }
 
-/** Manual override of the auto-picked source warehouse (E1 awaiting_logistics_action). */
+/** Manual override of the auto-picked source warehouse (E1 awaiting_operation_action). */
 export function useWarehousePickMutation(
   orderId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsOrderMutationResponse, ApiError, WarehousePickInput>
+    UseMutationOptions<operationOrderMutationResponse, ApiError, WarehousePickInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsOrderMutationResponse, ApiError, WarehousePickInput>({
+  return useMutation<operationOrderMutationResponse, ApiError, WarehousePickInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsOrderMutationResponse>(
-        `/api/logistics/orders/${orderId}/warehouse`,
+      apiFetch<operationOrderMutationResponse>(
+        `/api/operation/orders/${orderId}/warehouse`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
 }
 
 /** Pipeline v2 (C2 / migration 0024) — confirm a `proceed_request` order.
- *  RPC `logistics_confirm_proceed_request` decides awaiting_logistics_action vs
+ *  RPC `operation_confirm_proceed_request` decides awaiting_operation_action vs
  *  ready_to_dispatch based on shortage at the chosen warehouse. `warehouseId`
  *  is optional — RPC accepts NULL when the order already has a warehouse_id.
  *
@@ -2099,7 +2324,7 @@ export function useConfirmProceedRequest(
   orderId: string,
   opts?: Partial<
     UseMutationOptions<
-      LogisticsOrderMutationResponse,
+      operationOrderMutationResponse,
       ApiError,
       ConfirmProceedRequestInput
     >
@@ -2107,34 +2332,34 @@ export function useConfirmProceedRequest(
 ) {
   const qc = useQueryClient();
   return useMutation<
-    LogisticsOrderMutationResponse,
+    operationOrderMutationResponse,
     ApiError,
     ConfirmProceedRequestInput
   >({
     mutationFn: (input) =>
-      apiFetch<LogisticsOrderMutationResponse>(
-        `/api/logistics/orders/${orderId}/confirm-proceed`,
+      apiFetch<operationOrderMutationResponse>(
+        `/api/operation/orders/${orderId}/confirm-proceed`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
       // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
       // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
       // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
 }
 
 /** Pipeline v2 (C2 / migration 0024) — flip a `proceed_request` or
- *  `awaiting_logistics_action` order directly to `ready_to_dispatch`. Wraps
- *  `logistics_warehouse_pick` whose source-stage guard widens to permit both
+ *  `awaiting_operation_action` order directly to `ready_to_dispatch`. Wraps
+ *  `operation_warehouse_pick` whose source-stage guard widens to permit both
  *  stages. `warehouseId` is REQUIRED here (the RPC raises 22023
  *  `warehouse_required` on NULL — confirm-proceed accepts NULL via a different
  *  RPC, do not conflate). Reserves stock; busts warehouse cache. */
@@ -2142,7 +2367,7 @@ export function useTransferReady(
   orderId: string,
   opts?: Partial<
     UseMutationOptions<
-      LogisticsOrderMutationResponse,
+      operationOrderMutationResponse,
       ApiError,
       TransferReadyInput
     >
@@ -2150,26 +2375,26 @@ export function useTransferReady(
 ) {
   const qc = useQueryClient();
   return useMutation<
-    LogisticsOrderMutationResponse,
+    operationOrderMutationResponse,
     ApiError,
     TransferReadyInput
   >({
     mutationFn: (input) =>
-      apiFetch<LogisticsOrderMutationResponse>(
-        `/api/logistics/orders/${orderId}/transfer-ready`,
+      apiFetch<operationOrderMutationResponse>(
+        `/api/operation/orders/${orderId}/transfer-ready`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
       // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
       // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
       // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2179,45 +2404,45 @@ export function useTransferReady(
 export function useRecheckStockMutation(
   orderId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsRecheckStockResponse, ApiError, void>
+    UseMutationOptions<operationRecheckStockResponse, ApiError, void>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsRecheckStockResponse, ApiError, void>({
+  return useMutation<operationRecheckStockResponse, ApiError, void>({
     mutationFn: () =>
-      apiFetch<LogisticsRecheckStockResponse>(
-        `/api/logistics/orders/${orderId}/recheck-stock`,
+      apiFetch<operationRecheckStockResponse>(
+        `/api/operation/orders/${orderId}/recheck-stock`,
         { method: "POST", body: JSON.stringify({}) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
 }
 
-/** Auto-issue POs for an awaiting_logistics_action order's shortages. Body empty. */
+/** Auto-issue POs for an awaiting_operation_action order's shortages. Body empty. */
 export function useIssuePosForOrderMutation(
   orderId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsIssuePosResponse, ApiError, void>
+    UseMutationOptions<operationIssuePosResponse, ApiError, void>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsIssuePosResponse, ApiError, void>({
+  return useMutation<operationIssuePosResponse, ApiError, void>({
     mutationFn: () =>
-      apiFetch<LogisticsIssuePosResponse>(
-        `/api/logistics/orders/${orderId}/issue-pos`,
+      apiFetch<operationIssuePosResponse>(
+        `/api/operation/orders/${orderId}/issue-pos`,
         { method: "POST", body: JSON.stringify({}) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2226,23 +2451,23 @@ export function useIssuePosForOrderMutation(
 /** Manual create-PO from procurement page. */
 export function useCreatePoMutation(
   opts?: Partial<
-    UseMutationOptions<LogisticsPoMutationResponse, ApiError, CreatePoInput>
+    UseMutationOptions<operationPoMutationResponse, ApiError, CreatePoInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsPoMutationResponse, ApiError, CreatePoInput>({
+  return useMutation<operationPoMutationResponse, ApiError, CreatePoInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsPoMutationResponse>("/api/logistics/pos", {
+      apiFetch<operationPoMutationResponse>("/api/operation/pos", {
         method: "POST",
         body: JSON.stringify(input),
       }),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
-      // If the PO is tied to a DL (single or via dl_refs), the awaiting_logistics_action
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      // If the PO is tied to a SO (single or via so_refs), the awaiting_operation_action
       // drawer for those orders should refresh. Bust the orders sub-tree too.
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2258,7 +2483,7 @@ export function useCreatePoMutation(
  * (say) the 3rd supplier validation fails.
  *
  * Cache invalidation matches useCreatePoMutation (pos / dashboard / warehouse
- * / orders sub-trees) so the procurement list, KPI strip, awaiting_logistics_action
+ * / orders sub-trees) so the procurement list, KPI strip, awaiting_operation_action
  * drawers, and the warehouse stock view all refresh after the batch lands.
  *
  * de8bf4e pattern: spread `...opts` BEFORE `onSuccess` so caller-supplied
@@ -2273,20 +2498,20 @@ export function useCreatePosBatch(
   const qc = useQueryClient();
   return useMutation<CreatePosBatchResponse, ApiError, CreatePosBatchInput>({
     mutationFn: (input) =>
-      apiFetch<CreatePosBatchResponse>("/api/logistics/pos/batch", {
+      apiFetch<CreatePosBatchResponse>("/api/operation/pos/batch", {
         method: "POST",
         body: JSON.stringify(input),
       }),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
       // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
       // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
       // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2295,35 +2520,35 @@ export function useCreatePosBatch(
 /**
  * Receive a PO with DO upload — single batched call carrying all ticked lines
  * plus the uploaded DO file path and supplier DO number. Maps to v3 RPC
- * `logistics_receive_po_with_do` (migration 0045) per Phase 4.5 Chunk 1
+ * `operation_receive_po_with_do` (migration 0045) per Phase 4.5 Chunk 1
  * carry-forward `phase-4.5-chunk-1-receive-rpc-v3-swap`.
  */
 export function useReceivePoWithDoMutation(
   poId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>
+    UseMutationOptions<operationReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>({
+  return useMutation<operationReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsReceivePoWithDoResponse>(
-        `/api/logistics/pos/${poId}/receive`,
+      apiFetch<operationReceivePoWithDoResponse>(
+        `/api/operation/pos/${poId}/receive`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
       // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
       // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
       // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
-      // Receiving stock can unblock awaiting_logistics_action orders → invalidate orders.
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
+      // Receiving stock can unblock awaiting_operation_action orders → invalidate orders.
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2333,26 +2558,26 @@ export function useReceivePoWithDoMutation(
  * Partner-side variant of useReceivePoWithDoMutation — Loo 2026-05-11.
  *
  * Posts to /api/partner/pickups/:id/receive, which calls the SAME
- * `logistics_receive_po_with_do` RPC under the hood (the RPC's role gate
+ * `operation_receive_po_with_do` RPC under the hood (the RPC's role gate
  * already admits partners + checks procurement_partner_id matches caller).
- * Replaces the "Arrived at WH → wait for Logistics Receive" two-step with
+ * Replaces the "Arrived at WH → wait for operation Receive" two-step with
  * one atomic move: partner uploads DO + ticks qty → PO flips straight to
  * status='received'.
  *
- * Cache invalidation differs from the logistics version: blast the partner
- * sub-tree (so dashboard + pickups kanban refresh) AND the logistics tree
+ * Cache invalidation differs from the operation version: blast the partner
+ * sub-tree (so dashboard + pickups kanban refresh) AND the operation tree
  * (so the procurement view sees the PO arrive in the Received tab).
  */
 export function useReceivePoAsPartnerMutation(
   poId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>
+    UseMutationOptions<operationReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>({
+  return useMutation<operationReceivePoWithDoResponse, ApiError, ReceivePoWithDoInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsReceivePoWithDoResponse>(
+      apiFetch<operationReceivePoWithDoResponse>(
         `/api/partner/pickups/${poId}/receive`,
         { method: "POST", body: JSON.stringify(input) },
       ),
@@ -2360,15 +2585,15 @@ export function useReceivePoAsPartnerMutation(
     onSuccess: async (...args) => {
       // Partner-side caches.
       await qc.invalidateQueries({ queryKey: ["partner"] });
-      // Logistics-side caches (PO appears in Received tab; warehouse stock
-      // bumped; orders may unblock awaiting_logistics_action).
-      await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
-      await qc.invalidateQueries({ queryKey: ["logistics", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      // operation-side caches (PO appears in Received tab; warehouse stock
+      // bumped; orders may unblock awaiting_operation_action).
+      await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2378,21 +2603,21 @@ export function useReceivePoAsPartnerMutation(
 export function useCancelPoMutation(
   poId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsPoMutationResponse, ApiError, { reason: string }>
+    UseMutationOptions<operationPoMutationResponse, ApiError, { reason: string }>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsPoMutationResponse, ApiError, { reason: string }>({
+  return useMutation<operationPoMutationResponse, ApiError, { reason: string }>({
     mutationFn: (input) =>
-      apiFetch<LogisticsPoMutationResponse>(
-        `/api/logistics/pos/${poId}/cancel`,
+      apiFetch<operationPoMutationResponse>(
+        `/api/operation/pos/${poId}/cancel`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2402,21 +2627,21 @@ export function useCancelPoMutation(
 export function useAssignPickupPartnerMutation(
   poId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsPoMutationResponse, ApiError, AssignPickupPartnerInput>
+    UseMutationOptions<operationPoMutationResponse, ApiError, AssignPickupPartnerInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsPoMutationResponse, ApiError, AssignPickupPartnerInput>({
+  return useMutation<operationPoMutationResponse, ApiError, AssignPickupPartnerInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsPoMutationResponse>(
-        `/api/logistics/pos/${poId}/assign-pickup-partner`,
+      apiFetch<operationPoMutationResponse>(
+        `/api/operation/pos/${poId}/assign-pickup-partner`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2426,26 +2651,26 @@ export function useAssignPickupPartnerMutation(
 export function useReassignPoWarehouseMutation(
   poId: string,
   opts?: Partial<
-    UseMutationOptions<LogisticsPoMutationResponse, ApiError, ReassignPoWarehouseInput>
+    UseMutationOptions<operationPoMutationResponse, ApiError, ReassignPoWarehouseInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsPoMutationResponse, ApiError, ReassignPoWarehouseInput>({
+  return useMutation<operationPoMutationResponse, ApiError, ReassignPoWarehouseInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsPoMutationResponse>(
-        `/api/logistics/pos/${poId}/reassign-warehouse`,
+      apiFetch<operationPoMutationResponse>(
+        `/api/operation/pos/${poId}/reassign-warehouse`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.po(poId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["logistics", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
       // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
       // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
       // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2455,25 +2680,25 @@ export function useReassignPoWarehouseMutation(
  *  stock_movements row + audit_log entry. */
 export function useAdjustStockMutation(
   opts?: Partial<
-    UseMutationOptions<LogisticsAdjustStockResponse, ApiError, AdjustStockInput>
+    UseMutationOptions<operationAdjustStockResponse, ApiError, AdjustStockInput>
   >,
 ) {
   const qc = useQueryClient();
-  return useMutation<LogisticsAdjustStockResponse, ApiError, AdjustStockInput>({
+  return useMutation<operationAdjustStockResponse, ApiError, AdjustStockInput>({
     mutationFn: (input) =>
-      apiFetch<LogisticsAdjustStockResponse>("/api/logistics/warehouse/adjust", {
+      apiFetch<operationAdjustStockResponse>("/api/operation/warehouse/adjust", {
         method: "POST",
         body: JSON.stringify(input),
       }),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.logistics.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
       // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
       // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
       // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.logistics.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["logistics", "movements"] });
-      await qc.invalidateQueries({ queryKey: qk.logistics.dashboard(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -2960,6 +3185,12 @@ export type SupplierSupStatus =
   | "partner_confirmed"
   | "pickup_assigned"
   | "pickup_accepted"
+  // 2026-05-15 (Task 14): migration 0107 per-thread pickup introduces this
+  // intermediate state — some but not all linked threads picked up. PO
+  // remains "open" from forecast / pipeline / badge perspectives. Filter
+  // audit landed `partially_shipped` in the `ready` bucket of
+  // PIPELINE_BUCKETS (apps/api/src/routes/supplier/pos.ts).
+  | "partially_shipped"
   | "shipped"
   | "picked_up"
   | "delivered"
@@ -2981,7 +3212,7 @@ export interface SupplierPoLine {
 
 export interface SupplierPoRow {
   id: string;
-  dl: number | null;
+  so: number | null;
   supplier_id: string;
   warehouse_id: string;
   // 2026-05-10 (Loo) — was scalar `sku`/`qty` (read from dropped columns
@@ -2995,7 +3226,7 @@ export interface SupplierPoRow {
     id: string;
     name: string;
     address: string | null;
-    kind: "own" | "logistics_partner" | null;
+    kind: "own" | "operation_partner" | null;
     owning_partner_id: string | null;
     owner: { id: string; name: string; contact: string | null } | null;
   } | null;
@@ -3011,6 +3242,40 @@ export interface SupplierPoRow {
   placed_at: string;
   created_at: string;
   updated_at: string;
+  // Task 6 server enrichment (apps/api/src/routes/supplier/pos.ts:120-150).
+  // All optional so older callers / tests that mock without these still typecheck.
+  //   customer_eta_min — min(orders.delivery_date) across linked threads
+  //   urgency          — <7d critical · 7-13d urgent · >=14d normal · null if no threads
+  //   behind_schedule  — true when PO.eta_date is at/after customer_eta_min
+  //   sku_summary      — deduped [{sku, qty}] from lines for compact card render
+  customer_eta_min?: string | null;
+  urgency?: "critical" | "urgent" | "normal" | null;
+  behind_schedule?: boolean;
+  sku_summary?: Array<{ sku: string; qty: number }>;
+  // 2026-05-16 (migration 0114) — per-thread state counts that drive the
+  // supplier kanban bucket placement + the "X of Y" card subtitle. Same PO
+  // can land in `po` (producing > 0) AND `ready` (ready > 0) when partial.
+  thread_state_counts?: {
+    producing: number;
+    ready: number;
+    picked: number;
+    total: number;
+  };
+  // 2026-05-17 (Loo screenshot) — per-thread enrichment server-side spliced
+  // into the list response so the card body can list every linked SO with
+  // its own customer ETA. `orders` is populated via supplier_orders_for_threads
+  // RPC (0116) and is null for threads whose order RLS lookup misses.
+  threads?: Array<{
+    id: string;
+    order_id: string;
+    supplier_ready_at: string | null;
+    pickup_event_id: string | null;
+    orders: {
+      so: number;
+      customer_name: string;
+      delivery_date: string | null;
+    } | null;
+  }>;
 }
 
 export interface SupplierProductRow {
@@ -3064,7 +3329,7 @@ export interface SupplierDemandRow {
  *  2026-05-13 (Loo): added `do_number` (migration 0099) so the POD upload
  *  dialog can auto-fill. 2026-05-13 (Loo, later): migration 0101 widens
  *  the RPC to also return delivered threads (last 30 days) + exposes
- *  `logistics_stage` + `delivered_at` so the Deliveries kanban can show
+ *  `operation_stage` + `delivered_at` so the Deliveries kanban can show
  *  a Delivered column without a second query. */
 export interface PartnerToDeliverRow {
   thread_id:             string;
@@ -3077,7 +3342,7 @@ export interface PartnerToDeliverRow {
   confirm_delivery_date: string | null;
   do_number:             string | null;
   /** 'dispatched' or 'delivered' — caller uses this to bucket into kanban columns */
-  logistics_stage:       "dispatched" | "delivered";
+  operation_stage:       "dispatched" | "delivered";
   /** populated for delivered rows only */
   delivered_at:          string | null;
 }
@@ -3099,7 +3364,7 @@ export function usePartnerToDeliver(
  *  disappears, dashboard counts update).
  *
  *  Migration 0088 (Loo 2026-05-11): partner POD upload now matches the
- *  logistics DOAttachModal field set so role-switching operators don't
+ *  operation DOAttachModal field set so role-switching operators don't
  *  re-learn anything. RPC validates signed=true + doNumber ≥3 chars +
  *  podPath non-empty. */
 export type AttachPodInput = {
@@ -3371,6 +3636,252 @@ export function useMarkDelivered(
       await qc.invalidateQueries({ queryKey: ["supplier"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 2026-05-15 (Loo) — Supplier per-thread readiness + pickup batch hooks
+// (Task 8 of supplier-thread-pickup-plan). The supplier marks individual
+// threads ready (POST/DELETE /api/supplier/threads/:id/ready); partners or
+// operation batch-pickup a set of ready threads on a PO (POST
+// /api/partner/pickups/batch or POST /api/operation/pos/:poId/receive-threads).
+// The reprint queries hit /api/pickup-events/:id/print for the bundled DO
+// payload.
+//
+// NOTE: `/api/supplier/pos/:poId/threads` and
+// `/api/supplier/pos/:poId/pickup-events` endpoints DO NOT EXIST yet — Task 10
+// (per-thread checklist) adds `/threads`; Task 13 (DO reprint history) adds
+// `/pickup-events`. The hooks below type-check now but will 404 at runtime
+// until those tasks land. This is intentional scaffolding so feature work in
+// Tasks 9/11/12 can call them.
+// ---------------------------------------------------------------------------
+
+/** Supplier marks a single thread ready for pickup. RPC returns the updated
+ *  thread row + new `po_sup_status` so callers can show optimistic UI; the
+ *  `noop` flag fires when the thread was already marked ready (idempotent). */
+export function useMarkThreadReady() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (threadId: string) => {
+      return apiFetch<{
+        thread_id: string;
+        supplier_ready_at: string | null;
+        po_sup_status: string;
+        noop?: boolean;
+      }>(`/api/supplier/threads/${threadId}/ready`, { method: "POST" });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["supplier", "pos"] });
+      qc.invalidateQueries({ queryKey: ["supplierThreads"] });
+    },
+  });
+}
+
+/** Supplier un-marks a thread ready (only allowed pre-pickup). RPC nulls
+ *  `supplier_ready_at` and recomputes PO sup_status downward (last ready
+ *  removed → drops back to `ready_for_pickup`/`in_production`). `noop` fires
+ *  when the thread was already not-ready. */
+export function useUnmarkThreadReady() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (threadId: string) => {
+      return apiFetch<{
+        thread_id: string;
+        po_sup_status?: string;
+        noop?: boolean;
+      }>(`/api/supplier/threads/${threadId}/ready`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["supplier", "pos"] });
+      qc.invalidateQueries({ queryKey: ["supplierThreads"] });
+    },
+  });
+}
+
+/** Partner batch pickup — picks N ready threads on a PO in one DO. Server
+ *  creates one `pickup_events` row + stamps every selected thread's
+ *  `pickup_event_id`.
+ *
+ *  2026-05-16 (migration 0117) — `doNumber` + `doFilePath` are optional.
+ *  Server auto-generates `DO-{poId}-{seq}` when omitted; the partner doesn't
+ *  type a number for a doc they didn't issue. Response includes the final
+ *  do_number so the UI can echo it back in a toast.
+ */
+export function usePartnerPickupBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      poId: string;
+      threadIds: string[];
+      doNumber?: string;
+      doFilePath?: string;
+      doNote?: string;
+    }) => {
+      return apiFetch<{
+        pickup_event_id: string;
+        thread_count: number;
+        do_number: string;
+        po_sup_status: string;
+      }>("/api/partner/pickups/batch", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["partner"] });
+      qc.invalidateQueries({ queryKey: ["pickupEvents"] });
+      qc.invalidateQueries({ queryKey: ["supplierThreads"] });
+    },
+  });
+}
+
+/**
+ * Partner marks a pickup event as "physically collected · departing factory".
+ * Stamps po_pickup_events.departed_at = NOW() server-side. Drives the kanban
+ * PO from SCHEDULED → IN TRANSIT (the middle of the proto-faithful 3-step
+ * partner flow restored 2026-05-17 by migration 0119).
+ */
+export function usePartnerMarkPickupCollected() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (eventId: string) => {
+      return apiFetch<{ event_id: string; departed_at: string }>(
+        `/api/partner/pickups/events/${eventId}/collect`,
+        { method: "POST" },
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["partner"] });
+      qc.invalidateQueries({ queryKey: ["pickupEvents"] });
+    },
+  });
+}
+
+/** operation counterpart — same shape, different role-gated route.
+ *  `poId` lives in the URL (matches the existing
+ *  `/api/operation/pos/:poId/...` family); body carries the rest. */
+export function useOperationReceiveThreads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      poId: string;
+      threadIds: string[];
+      doNumber: string;
+      doFilePath: string;
+      doNote?: string;
+    }) => {
+      const { poId, ...body } = input;
+      return apiFetch<{
+        pickup_event_id: string;
+        thread_count: number;
+        po_sup_status: string;
+      }>(`/api/operation/pos/${poId}/receive-threads`, {
+        method: "POST",
+        body: JSON.stringify({ ...body, signed: true }),
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      qc.invalidateQueries({ queryKey: ["pickupEvents"] });
+      qc.invalidateQueries({ queryKey: ["supplierThreads"] });
+    },
+  });
+}
+
+/** Thread list for a single PO. Used by the supplier PODrawer's per-thread
+ *  checklist (Task 10). Each row is one `order_supplier_threads` row scoped
+ *  to that PO, plus the SKU lines this thread is responsible for (derived
+ *  from the `order_supplier_thread_lines` join). `pickup_event_id` is
+ *  non-null when the thread has already been picked up.
+ *
+ *  Endpoint added by Task 10; this hook currently 404s until then. */
+export type ThreadRow = {
+  id: string;
+  order_id: string;
+  order_dl: number;
+  customer_name: string;
+  customer_delivery_date: string | null;
+  supplier_ready_at: string | null;
+  pickup_event_id: string | null;
+  sku_lines: Array<{ sku: string; qty: number }>;
+};
+
+export function useSupplierThreadsForPo(poId: string | null) {
+  return useQuery({
+    queryKey: poId ? qk.supplierThreads.byPo(poId) : ["supplierThreads", "none"],
+    queryFn: () => apiFetch<ThreadRow[]>(`/api/supplier/pos/${poId}/threads`),
+    enabled: !!poId,
+  });
+}
+
+/** operation counterpart to {@link useSupplierThreadsForPo} — same payload
+ *  shape, different role-gated endpoint (operation-only). Used by the
+ *  operation ReceivePOModal (Task 12) to render the per-thread receive list
+ *  for own_logistics suppliers (where operation receives goods directly at
+ *  the HQ warehouse with no LP involved). Share the `supplierThreads` cache
+ *  key family with the supplier endpoint — both refer to the same DB rows. */
+export function useOperationThreadsForPo(
+  poId: string | null,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: poId ? qk.supplierThreads.byPo(poId) : ["supplierThreads", "none"],
+    queryFn: () => apiFetch<ThreadRow[]>(`/api/operation/pos/${poId}/threads`),
+    enabled: !!poId && (options?.enabled ?? true),
+  });
+}
+
+/** Pickup events list for a single PO (history view). Used by the supplier
+ *  PODrawer's "Past pickups" section + the reprint button.
+ *  `ack_role` lets the UI label "Picked by partner" vs "Received by HQ".
+ *
+ *  Endpoint added by Task 13; this hook currently 404s until then. */
+export type PickupEventRow = {
+  id: string;
+  do_number: string;
+  picked_up_at: string;
+  ack_role: "partner" | "operation";
+  thread_count: number;
+};
+
+export function usePickupEventsForPo(poId: string | null) {
+  return useQuery({
+    queryKey: poId ? qk.pickupEvent.byPo(poId) : ["pickupEvents", "none"],
+    queryFn: () => apiFetch<PickupEventRow[]>(`/api/supplier/pos/${poId}/pickup-events`),
+    enabled: !!poId,
+  });
+}
+
+/** Full pickup event payload for the print/reprint flow. Returns enough
+ *  context to render the DO without a second round-trip: PO ID + ETA,
+ *  supplier name, every thread in the event with customer + SKU lines.
+ *
+ *  Endpoint added by Task 13 (`/api/pickup-events/:id/print`). */
+export type PickupEventPrintPayload = {
+  event_id: string;
+  do_number: string;
+  do_file_path: string | null;
+  do_note: string | null;
+  picked_up_at: string;
+  ack_role: "partner" | "operation";
+  po_id: string;
+  po_eta_date: string | null;
+  supplier_name: string;
+  threads: Array<{
+    thread_id: string;
+    order_id: string;
+    order_dl: number;
+    customer_name: string;
+    customer_delivery_date: string | null;
+    sku_lines: Array<{ sku: string; qty: number }>;
+  }>;
+};
+
+export function usePickupEventPrint(eventId: string | null) {
+  return useQuery({
+    queryKey: eventId ? qk.pickupEvent.print(eventId) : ["pickupEvent", "none"],
+    queryFn: () => apiFetch<PickupEventPrintPayload>(`/api/pickup-events/${eventId}/print`),
+    enabled: !!eventId,
   });
 }
 

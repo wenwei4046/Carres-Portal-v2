@@ -14,10 +14,10 @@ export const orderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
-export const logisticsStageSchema = z.enum([
+export const operationStageSchema = z.enum([
   "placed",
   "proceed_request",
-  "awaiting_logistics_action",
+  "awaiting_operation_action",
   "ready_to_dispatch",
   "dispatched",
   "delivered",
@@ -57,7 +57,7 @@ const orderHistorySchema = z.object({
 
 export const orderSchema = z.object({
   id: z.string().uuid(),
-  dl: z.number().int(),
+  so: z.number().int(),
   status: orderStatusSchema,
   channel: z.string(),
   dealerId: z.string().uuid(),
@@ -86,7 +86,7 @@ export const orderSchema = z.object({
   paymentMethod: z.enum(["online", "credit", "installment"]).nullable(),
   approvalCode: z.string().nullable(),
   installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
-  logisticsStage: logisticsStageSchema.nullable(),
+  operationStage: operationStageSchema.nullable(),
   warehouseId: z.string().uuid().nullable(),
   deliveryPartnerId: z.string().uuid().nullable(),
   partnerStage: partnerStageSchema.nullable(),

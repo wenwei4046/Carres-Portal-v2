@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabase";
 /**
  * DOFileUploadField — Phase 4.5 Chunk 1 (Task 37).
  *
- * Lets a Logistics caller pick a Delivery Order file (PDF/JPG/PNG ≤ 10 MiB),
+ * Lets a operation caller pick a Delivery Order file (PDF/JPG/PNG ≤ 10 MiB),
  * obtain a short-lived signed upload URL from
  * POST /api/storage/dos/sign-upload, and stream the bytes directly to the
  * `delivery-orders` Supabase Storage bucket via `uploadToSignedUrl`.

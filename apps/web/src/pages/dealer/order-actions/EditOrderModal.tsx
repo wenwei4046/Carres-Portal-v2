@@ -39,7 +39,7 @@ export default function EditOrderModal({ order, onClose }: Props) {
 
   const updateMut = useUpdateOrder(order.id, {
     onSuccess: () => {
-      toast.success(`Order #${order.dl} updated`);
+      toast.success(`Order #${order.so} updated`);
       onClose();
     },
     onError: (err) => {
@@ -100,13 +100,13 @@ export default function EditOrderModal({ order, onClose }: Props) {
   return (
     <ModalShell onClose={onClose}>
       <header className="px-7 pt-5 pb-3.5 border-b border-base-100">
-        <p className="kicker">Edit · #{order.dl}</p>
+        <p className="kicker">Edit · #{order.so}</p>
         <h2 className="font-display text-[22px] mt-0.5 tracking-[-0.02em] leading-[1.2] font-semibold">
           Order details
         </h2>
         <p className="text-xs text-base-600 mt-1">
           Editable while order is in <strong>Place</strong>. Once proceeded,
-          changes go through logistics.
+          changes go through operation.
         </p>
       </header>
 
@@ -164,7 +164,7 @@ export default function EditOrderModal({ order, onClose }: Props) {
             </div>
             {addressUnknown ? (
               <div className="rounded bg-base-50 border border-dashed border-base-200 px-3 py-2.5 text-xs text-base-500">
-                Address will be required before this order can move to logistics.
+                Address will be required before this order can move to operation.
               </div>
             ) : (
               <textarea

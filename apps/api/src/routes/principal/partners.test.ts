@@ -75,7 +75,7 @@ describe("POST /api/principal/partners", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dpInsert = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: { id: newPartnerId, name: "LP-A Logistics" }, error: null }),
+        single: vi.fn().mockResolvedValue({ data: { id: newPartnerId, name: "LP-A operation" }, error: null }),
       }),
     });
     const auInsert = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -106,7 +106,7 @@ describe("POST /api/principal/partners", () => {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          companyName: "LP-A Logistics",
+          companyName: "LP-A operation",
           contactNumber: "0123456789",
           address: "1 Demo St",
           password: "abcd1234",
@@ -125,7 +125,7 @@ describe("POST /api/principal/partners", () => {
     expect(dpInsert).toHaveBeenCalledOnce();
     const dpArg = dpInsert.mock.calls[0]?.[0];
     expect(dpArg).toMatchObject({
-      name: "LP-A Logistics",
+      name: "LP-A operation",
       contact: "0123456789",
       address: "1 Demo St",
     });
@@ -136,7 +136,7 @@ describe("POST /api/principal/partners", () => {
       id: newAuthUserId,
       partner_id: newPartnerId,
       role: "partner",
-      name: "LP-A Logistics",
+      name: "LP-A operation",
     });
   });
 

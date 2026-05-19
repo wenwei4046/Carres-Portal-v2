@@ -143,7 +143,7 @@ export type InvoicesListQuery = z.infer<typeof invoicesListQuery>;
  * Behavior (matches proto finance-refunds.jsx:13-46):
  *   - Always inserts a refunds row with reason + amount.
  *   - For `kind=refund` AND amount > RM 1000, ALSO inserts an approvals
- *     row with kind='refund', refers_to=`DL-{dl}`, dealer_id, amount.
+ *     row with kind='refund', refers_to=`SO-{so}`, dealer_id, amount.
  *     Refunds row stays at status='pending' until approval_decide
  *     (existing 0016 RPC) flips it via the kind=refund side-effect.
  *   - For `kind=refund` AND amount <= RM 1000, refunds row is created
@@ -253,7 +253,7 @@ export type BankStatementsListQuery = z.infer<typeof bankStatementsListQuery>;
  * manual_ref. Server enforces the same check constraint as the table
  * (at least one target). manual_ref is the escape hatch for lines that
  * don't have a clean record match (proto: customer transferred without
- * quoting DL).
+ * quoting SO).
  */
 export const reconciliationCreateInput = z.object({
   bankStatementId: z.string().uuid(),

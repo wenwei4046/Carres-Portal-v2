@@ -72,7 +72,7 @@ function mockAll() {
 }
 
 describe("SupplierDashboard", () => {
-  it("renders 4 KPIs from the supplier PO list", async () => {
+  it("renders demand + pipeline KPI rows", async () => {
     mockAll();
 
     render(wrap(<SupplierDashboard />));
@@ -81,9 +81,17 @@ describe("SupplierDashboard", () => {
       expect(screen.getByText("Pending acknowledgement")).toBeInTheDocument();
     });
 
+    // Pipeline row (existing)
     expect(screen.getByText("In production")).toBeInTheDocument();
     expect(screen.getByText("Ready · awaiting pickup")).toBeInTheDocument();
-    expect(screen.getByText("Total open units")).toBeInTheDocument();
+
+    // Demand hero row (added 2026-05-15)
+    expect(screen.getByText("Total demand")).toBeInTheDocument();
+    expect(screen.getByText("Committed (POs)")).toBeInTheDocument();
+    expect(screen.getByText("Pending (orders)")).toBeInTheDocument();
+
+    // "Total open units" dropped — duplicated Committed (POs)
+    expect(screen.queryByText("Total open units")).not.toBeInTheDocument();
   });
 
   it("derives pipeline stage counts from sup_status", async () => {
@@ -126,7 +134,7 @@ describe("SupplierDashboard", () => {
     expect(screen.getByText("mattress")).toBeInTheDocument();
     expect(screen.getByText("10–14 days")).toBeInTheDocument();
     expect(screen.getByText("ops@cloudmattress.my")).toBeInTheDocument();
-    expect(screen.getByText("Own logistics")).toBeInTheDocument();
+    expect(screen.getByText("Own operation")).toBeInTheDocument();
   });
 
   it("renders factory_pickup workflow badge when kind=factory_pickup", async () => {

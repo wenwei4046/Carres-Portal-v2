@@ -129,7 +129,7 @@ describe("GET /api/supplier/me", () => {
   });
 
   it("rejects non-supplier roles with 403", async () => {
-    const jwt = await makeJwt("logistics", { supplierId: SUPPLIER_ID });
+    const jwt = await makeJwt("operation", { supplierId: SUPPLIER_ID });
     const res = await app.fetch(
       new Request("http://t/api/supplier/me", {
         headers: { Authorization: `Bearer ${jwt}` },

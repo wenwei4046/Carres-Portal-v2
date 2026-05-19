@@ -10,9 +10,9 @@
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
+import { DocHeader } from "./letterhead";
 import type { DoTemplateData } from "./types";
 
-const ACCENT = "#D64F20";
 const BORDER = "#D9D2C7";
 const MUTED = "#7A7268";
 
@@ -25,38 +25,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     color: "#1A1714",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    borderBottomWidth: 2,
-    borderBottomColor: ACCENT,
-    paddingBottom: 12,
-    marginBottom: 16,
-  },
-  brand: {
-    fontSize: 22,
-    fontWeight: 700,
-    color: ACCENT,
-    letterSpacing: 1,
-  },
-  brandSub: {
-    fontSize: 9,
-    color: MUTED,
-    marginTop: 2,
-  },
-  docMeta: {
-    textAlign: "right",
-  },
-  docTitle: {
-    fontSize: 14,
-    fontWeight: 700,
-    marginBottom: 4,
-  },
-  docMetaRow: {
-    fontSize: 9,
-    color: MUTED,
-  },
+  // 2026-05-16 — header rendering moved to shared DocHeader.
   partyRow: {
     flexDirection: "row",
     marginBottom: 16,
@@ -119,22 +88,6 @@ const styles = StyleSheet.create({
   colQty: { width: "10%", textAlign: "right" },
   colUnit: { width: "10%", textAlign: "left" },
   colTotal: { width: "18%", textAlign: "right" },
-  footer: {
-    marginTop: "auto",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingTop: 24,
-  },
-  signBlock: {
-    width: "45%",
-    borderTopWidth: 1,
-    borderTopColor: "#1A1714",
-    paddingTop: 4,
-  },
-  signLabel: {
-    fontSize: 8,
-    color: MUTED,
-  },
   disclaimer: {
     fontSize: 8,
     color: MUTED,
@@ -152,18 +105,10 @@ export function DoTemplate(data: DoTemplateData) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.brand}>CARRES</Text>
-            <Text style={styles.brandSub}>HOUZS Venture Sdn Bhd</Text>
-          </View>
-          <View style={styles.docMeta}>
-            <Text style={styles.docTitle}>DELIVERY ORDER</Text>
-            <Text style={styles.docMetaRow}>{do_number}</Text>
-            <Text style={styles.docMetaRow}>Date: {issue_date}</Text>
-            <Text style={styles.docMetaRow}>Order: {order_code}</Text>
-          </View>
-        </View>
+        <DocHeader
+          docTitle="DELIVERY ORDER"
+          docMetaRows={[do_number, `Date: ${issue_date}`, `Order: ${order_code}`]}
+        />
 
         <View style={styles.partyRow}>
           <View style={styles.party}>
@@ -207,17 +152,8 @@ export function DoTemplate(data: DoTemplateData) {
           })}
         </View>
 
-        <View style={styles.footer}>
-          <View style={styles.signBlock}>
-            <Text style={styles.signLabel}>Issued by (Carres)</Text>
-          </View>
-          <View style={styles.signBlock}>
-            <Text style={styles.signLabel}>Received by (Customer)</Text>
-          </View>
-        </View>
-
         <Text style={styles.disclaimer}>
-          Goods received in good condition. Please verify quantity and description above before signing.
+          Goods received in good condition. Please verify quantity and description above on delivery.
         </Text>
       </Page>
     </Document>

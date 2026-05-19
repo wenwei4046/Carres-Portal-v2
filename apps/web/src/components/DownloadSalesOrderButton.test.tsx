@@ -35,26 +35,26 @@ describe("DownloadSalesOrderButton", () => {
 
   it("renders for allowed roles", () => {
     render(
-      <DownloadSalesOrderButton orderId="ord-1" dl={1001} role="dealer" />,
+      <DownloadSalesOrderButton orderId="ord-1" so={1001} role="dealer" />,
     );
     expect(screen.getByTestId("download-sales-order-1001")).toBeInTheDocument();
   });
 
-  it("renders for logistics (allowed after Loo's 2026-05-12 revision)", () => {
+  it("renders for operation (allowed after Loo's 2026-05-12 revision)", () => {
     render(
-      <DownloadSalesOrderButton orderId="ord-1" dl={1001} role="logistics" />,
+      <DownloadSalesOrderButton orderId="ord-1" so={1001} role="operation" />,
     );
     expect(screen.getByTestId("download-sales-order-1001")).toBeInTheDocument();
   });
 
   it("renders nothing for partner + supplier (denied)", () => {
     const partner = render(
-      <DownloadSalesOrderButton orderId="ord-2" dl={1002} role="partner" />,
+      <DownloadSalesOrderButton orderId="ord-2" so={1002} role="partner" />,
     );
     expect(partner.container.firstChild).toBeNull();
 
     const supplier = render(
-      <DownloadSalesOrderButton orderId="ord-3" dl={1003} role="supplier" />,
+      <DownloadSalesOrderButton orderId="ord-3" so={1003} role="supplier" />,
     );
     expect(supplier.container.firstChild).toBeNull();
   });
@@ -67,7 +67,7 @@ describe("DownloadSalesOrderButton", () => {
 
     render(
       <>
-        <DownloadSalesOrderButton orderId="ord-1" dl={1001} role="dealer" />
+        <DownloadSalesOrderButton orderId="ord-1" so={1001} role="dealer" />
         <Toaster />
       </>,
     );

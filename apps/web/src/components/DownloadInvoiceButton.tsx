@@ -5,20 +5,20 @@ import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
 
 /**
- * 2026-05-13 (Loo) — Sales Invoice PDF reprint button for the Logistics
+ * 2026-05-13 (Loo) — Sales Invoice PDF reprint button for the operation
  * drawer at dispatched / delivered status.
  *
- * Hits GET /api/orders/:id/invoice-pdf-data which gates to logistics /
+ * Hits GET /api/orders/:id/invoice-pdf-data which gates to operation /
  * finance / principal / bd. The invoice row + invoice_no are auto-issued
  * by the orders_auto_issue_on_dispatched_trg trigger (migration 0098) when
- * an order's logistics_stage transitions to 'dispatched', so this button
+ * an order's operation_stage transitions to 'dispatched', so this button
  * is safe to surface alongside Print DO at and after that stage.
  *
  * Returns null on denied roles to avoid a click that always 403s.
  *
  * Props:
  *   - orderId: UUID
- *   - dl:      integer (filename + toast text)
+ *   - so:      integer (filename + toast text)
  *   - role:    current user role; hides on partner / supplier / dealer /
  *              showroom / salesperson (no invoice access for them)
  *   - variant: "primary" / "secondary" — matches Submit / outline styling
@@ -28,7 +28,7 @@ type Role =
   | "dealer"
   | "showroom"
   | "salesperson"
-  | "logistics"
+  | "operation"
   | "finance"
   | "partner"
   | "supplier"
@@ -36,7 +36,7 @@ type Role =
   | "bd";
 
 const ALLOWED: ReadonlySet<Role> = new Set([
-  "logistics",
+  "operation",
   "finance",
   "principal",
   "bd",
@@ -44,7 +44,7 @@ const ALLOWED: ReadonlySet<Role> = new Set([
 
 interface Props {
   orderId: string;
-  dl: number;
+  so: number;
   role: Role;
   variant?: "primary" | "secondary";
   className?: string;
@@ -52,7 +52,7 @@ interface Props {
 
 export default function DownloadInvoiceButton({
   orderId,
-  dl,
+  so,
   role,
   variant = "secondary",
   className,
@@ -71,7 +71,7 @@ export default function DownloadInvoiceButton({
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      toast.success(`Invoice INV-${String(dl).padStart(6, "0")} opened`);
+      toast.success(`Invoice INV-${String(so).padStart(6, "0")} opened`);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : String(e);
       toast.error(`Invoice PDF failed: ${msg}`);
@@ -91,7 +91,7 @@ export default function DownloadInvoiceButton({
       onClick={onClick}
       disabled={busy}
       className={`px-3.5 py-2 rounded-md text-[12.5px] disabled:opacity-50 transition-colors ${baseCls} ${className ?? ""}`}
-      data-testid={`download-invoice-${dl}`}
+      data-testid={`download-invoice-${so}`}
     >
       {busy ? "Opening…" : "Print Invoice"}
     </button>

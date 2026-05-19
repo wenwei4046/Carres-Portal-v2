@@ -14,7 +14,7 @@ const CFG: FloorConfigDto = { id: 1, freeUpToFloor: 2, perFloorPerItem: 50 };
 function baseOrder(over: Partial<Order> = {}): Order {
   return {
     id: "11111111-1111-1111-1111-111111111111",
-    dl: 1,
+    so: 1,
     status: "place",
     channel: "dealer",
     dealerId: "00000000-0000-0000-0000-000000000d01",
@@ -29,7 +29,7 @@ function baseOrder(over: Partial<Order> = {}): Order {
     paymentMethod: null,
     approvalCode: null,
     installmentMonths: null,
-    logisticsStage: null,
+    operationStage: null,
     warehouseId: null,
     deliveryPartnerId: null,
     partnerStage: null,

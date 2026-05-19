@@ -10,6 +10,7 @@
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
+import { DocHeader } from "./letterhead";
 import type { PoTemplateData } from "./types";
 
 const ACCENT = "#D64F20";
@@ -25,38 +26,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     color: "#1A1714",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    borderBottomWidth: 2,
-    borderBottomColor: ACCENT,
-    paddingBottom: 12,
-    marginBottom: 16,
-  },
-  brand: {
-    fontSize: 22,
-    fontWeight: 700,
-    color: ACCENT,
-    letterSpacing: 1,
-  },
-  brandSub: {
-    fontSize: 9,
-    color: MUTED,
-    marginTop: 2,
-  },
-  docMeta: {
-    textAlign: "right",
-  },
-  docTitle: {
-    fontSize: 14,
-    fontWeight: 700,
-    marginBottom: 4,
-  },
-  docMetaRow: {
-    fontSize: 9,
-    color: MUTED,
-  },
+  // 2026-05-16 — header rendering moved to shared DocHeader.
   partyRow: {
     flexDirection: "row",
     marginBottom: 16,
@@ -201,17 +171,10 @@ export function PoTemplate(data: PoTemplateData) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.brand}>CARRES</Text>
-            <Text style={styles.brandSub}>HOUZS Venture Sdn Bhd</Text>
-          </View>
-          <View style={styles.docMeta}>
-            <Text style={styles.docTitle}>PURCHASE ORDER</Text>
-            <Text style={styles.docMetaRow}>{po_number}</Text>
-            <Text style={styles.docMetaRow}>Date: {issue_date}</Text>
-          </View>
-        </View>
+        <DocHeader
+          docTitle="PURCHASE ORDER"
+          docMetaRows={[po_number, `Date: ${issue_date}`]}
+        />
 
         <View style={styles.partyRow}>
           <View style={styles.party}>
