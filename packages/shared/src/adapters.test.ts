@@ -126,7 +126,7 @@ describe("orderInputToRpcPayload", () => {
     ]);
   });
 
-  it("maps addons with snake_case addon_key + unit_price", () => {
+  it("maps addons with snake_case addon_key + unit_price, attrs null when omitted", () => {
     const out = orderInputToRpcPayload(
       baseInput({
         addons: [
@@ -137,8 +137,46 @@ describe("orderInputToRpcPayload", () => {
       DEALER_ID,
     );
     expect(out.addons).toEqual([
-      { addon_key: "warranty5", qty: 1, unit_price: 200 },
-      { addon_key: "dispose-mattress", qty: 1, unit_price: 50 },
+      { addon_key: "warranty5", qty: 1, unit_price: 200, attrs: null },
+      { addon_key: "dispose-mattress", qty: 1, unit_price: 50, attrs: null },
+    ]);
+  });
+
+  // Migration 0133 — disposal size tag rides through unchanged so the RPC
+  // can persist it into order_addons.attrs.
+  it("maps addon attrs through (migration 0133 disposal size tag)", () => {
+    const out = orderInputToRpcPayload(
+      baseInput({
+        addons: [
+          {
+            addonKey: "dispose-mattress",
+            qty: 1,
+            unitPrice: 50,
+            attrs: { size: "King" },
+          },
+          {
+            addonKey: "dispose-sofa",
+            qty: 1,
+            unitPrice: 120,
+            attrs: { size: "2-seater" },
+          },
+        ],
+      }),
+      DEALER_ID,
+    );
+    expect(out.addons).toEqual([
+      {
+        addon_key: "dispose-mattress",
+        qty: 1,
+        unit_price: 50,
+        attrs: { size: "King" },
+      },
+      {
+        addon_key: "dispose-sofa",
+        qty: 1,
+        unit_price: 120,
+        attrs: { size: "2-seater" },
+      },
     ]);
   });
 

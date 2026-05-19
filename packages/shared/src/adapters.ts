@@ -159,6 +159,7 @@ export const orderAddonFromRow = (r: DB.OrderAddonRow): D.OrderAddon => ({
   addonKey: r.addon_key,
   qty: r.qty,
   unitPrice: Number(r.unit_price),
+  attrs: r.attrs ?? null,
 });
 
 export const orderHistoryFromRow = (r: DB.OrderHistoryRow): D.OrderHistory => ({
@@ -406,6 +407,7 @@ export const orderInputToRpcPayload = (
     addon_key: a.addonKey,
     qty: a.qty,
     unit_price: a.unitPrice,
+    attrs: a.attrs ?? null,
   })),
   deposit_pct: input.depositPct,
 });

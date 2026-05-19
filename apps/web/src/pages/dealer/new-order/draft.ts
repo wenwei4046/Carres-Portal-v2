@@ -29,13 +29,32 @@ export interface DraftLine {
   label: string;
 }
 
-/** Addon staged on the order. Persisted as order_addons rows on submit. */
+/** Addon staged on the order. Persisted as order_addons rows on submit.
+ *
+ * 2026-05-19 — disposal addons carry a size tag in `attrs`. The frontend
+ * (Step2Products) enforces "size required" for any key starting with
+ * `dispose-`; the create_order RPC just persists whatever is sent. */
 export interface DraftAddon {
   key: string;       // matches addons.key
   qty: number;
   unitPrice: number; // snapshot at staging time
   name: string;      // for LineList rendering
+  /** Free-form attrs jsonb. For disposal addons: { size: "King" } etc. */
+  attrs?: { size?: string } | null;
 }
+
+/** Returns true if the addon is a disposal service (size tag required). */
+export function isDisposalAddon(key: string): boolean {
+  return key.startsWith("dispose-");
+}
+
+/** Size options keyed by disposal sub-kind. Mattress + Bedframe share one set
+ *  per Loo 2026-05-19; Sofa uses its own seating-config sizes. */
+export const DISPOSAL_SIZE_OPTIONS: Readonly<Record<string, readonly string[]>> = {
+  "dispose-mattress": ["King", "Queen", "Super Single", "Single"] as const,
+  "dispose-bedframe": ["King", "Queen", "Super Single", "Single"] as const,
+  "dispose-sofa":     ["2-seater", "3-seater", "L-shape"] as const,
+};
 
 /**
  * Slip / signature attachment cached in the wizard before upload. We keep the
@@ -284,11 +303,29 @@ export function step1FirstIssue(d: WizardDraft): string | null {
 }
 
 /**
- * Step 2 gate — at least one line must be staged. Addons alone don't count
- * (mirrors proto: lines.length > 0 check). The Continue button calls this.
+ * Step 2 gate — at least one line must be staged AND every selected disposal
+ * addon must have a size picked. Lines.length > 0 mirrors the proto; the
+ * disposal-size check was added 2026-05-19 so partners pick up the right
+ * size of old furniture.
  */
 export function step2Valid(d: WizardDraft): boolean {
-  return d.lines.length > 0;
+  if (d.lines.length === 0) return false;
+  for (const a of d.addons) {
+    if (isDisposalAddon(a.key) && !a.attrs?.size) return false;
+  }
+  return true;
+}
+
+/** Returns the first failing disposal addon's display label, or null when
+ *  every disposal has a size. Used by the wizard footer to surface a
+ *  specific reason rather than a generic "Continue" disabled state. */
+export function step2FirstDisposalIssue(d: WizardDraft): string | null {
+  for (const a of d.addons) {
+    if (isDisposalAddon(a.key) && !a.attrs?.size) {
+      return `${a.name} — pick a size`;
+    }
+  }
+  return null;
 }
 
 /**

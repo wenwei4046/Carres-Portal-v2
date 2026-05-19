@@ -229,6 +229,10 @@ export default function DealerNewOrder({ open, onClose }: Props) {
           addonKey: a.key,
           qty: a.qty,
           unitPrice: a.unitPrice,
+          // 2026-05-19 (migration 0133) — disposal size tag rides through to
+          // order_addons.attrs. Non-disposal addons have undefined attrs which
+          // the zod schema/RPC handle as NULL.
+          attrs: a.attrs ?? null,
         })),
         paid: draft.paid,
         signaturePath,

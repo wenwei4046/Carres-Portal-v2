@@ -191,12 +191,27 @@ function OrderBody({
             <span className="font-mono">RM {(l.unitPrice * l.qty).toLocaleString()}</span>
           </div>
         ))}
-        {(order.addons ?? []).map((a, i) => (
-          <div key={a.id} className={`flex justify-between px-3.5 py-2.5 text-sm text-base-600 ${(order.lines?.length ?? 0) + i > 0 ? "border-t border-base-100" : ""}`}>
-            <span className="font-mono">+ {a.addonKey} × {a.qty}</span>
-            <span className="font-mono">RM {(a.unitPrice * a.qty).toLocaleString()}</span>
-          </div>
-        ))}
+        {(order.addons ?? []).map((a, i) => {
+          // 2026-05-19 (migration 0133) — disposal addons carry an attrs.size
+          // tag set by the wizard. Render it next to the addon key so the
+          // partner picking up the old furniture knows what size to handle.
+          const size =
+            typeof a.attrs === "object" &&
+            a.attrs !== null &&
+            typeof (a.attrs as { size?: unknown }).size === "string"
+              ? ((a.attrs as { size: string }).size)
+              : null;
+          return (
+            <div key={a.id} className={`flex justify-between px-3.5 py-2.5 text-sm text-base-600 ${(order.lines?.length ?? 0) + i > 0 ? "border-t border-base-100" : ""}`}>
+              <span className="font-mono">
+                + {a.addonKey}
+                {size && <span className="text-base-700"> · {size}</span>}
+                {" "}× {a.qty}
+              </span>
+              <span className="font-mono">RM {(a.unitPrice * a.qty).toLocaleString()}</span>
+            </div>
+          );
+        })}
         {(order.lines ?? []).length === 0 && (order.addons ?? []).length === 0 && (
           <div className="px-3.5 py-3 text-sm text-base-500">No items recorded.</div>
         )}

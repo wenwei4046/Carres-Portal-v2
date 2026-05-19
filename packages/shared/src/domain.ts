@@ -167,12 +167,19 @@ export interface OrderLine {
   unitPrice: number;
 }
 
+/**
+ * Order addon (e.g. disposal services). `attrs` is a free-form jsonb added
+ * by migration 0133 — currently used for disposal size tag, e.g.
+ * `{ size: "King" }` / `{ size: "2-seater" }`. Optional so old fixtures
+ * still compile.
+ */
 export interface OrderAddon {
   id: string;
   orderId: string;
   addonKey: string;
   qty: number;
   unitPrice: number;
+  attrs?: Record<string, unknown> | null;
 }
 
 export interface OrderHistory {

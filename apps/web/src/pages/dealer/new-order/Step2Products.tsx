@@ -1,6 +1,12 @@
 import type { CatalogResponse } from "@carres/shared";
 import { floorSurchargeRaw } from "@/lib/order-totals";
-import type { DraftAddon, DraftLine, WizardDraft } from "./draft";
+import {
+  DISPOSAL_SIZE_OPTIONS,
+  isDisposalAddon,
+  type DraftAddon,
+  type DraftLine,
+  type WizardDraft,
+} from "./draft";
 import ProductPicker from "./ProductPicker";
 
 interface Props {
@@ -54,6 +60,12 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
     const meta = catalog.addons.find((a) => a.key === addonKey);
     if (!meta) return;
     const next: DraftAddon = { key: meta.key, qty: 1, unitPrice: meta.price, name: meta.name };
+    // 2026-05-19 — disposal addons need a size pick before Step 2 will
+    // advance. We init `attrs: {}` so the size dropdown renders empty (the
+    // step2Valid gate keeps Continue disabled until a size is picked).
+    if (isDisposalAddon(meta.key)) {
+      next.attrs = {};
+    }
     onChange({ ...draft, addons: [...draft.addons, next] });
   }
 
@@ -62,6 +74,17 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
       ...draft,
       addons: draft.addons.map((a) =>
         a.key === addonKey ? { ...a, qty: Math.max(1, a.qty + delta) } : a,
+      ),
+    });
+  }
+
+  function setAddonSize(addonKey: string, size: string) {
+    onChange({
+      ...draft,
+      addons: draft.addons.map((a) =>
+        a.key === addonKey
+          ? { ...a, attrs: { ...(a.attrs ?? {}), size: size || undefined } }
+          : a,
       ),
     });
   }
@@ -179,6 +202,33 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
                       {RM(selected.unitPrice * selected.qty)}
                     </span>
                   </div>
+                  {/* 2026-05-19 — disposal size picker. Required to advance
+                      Step 2 (see draft.ts step2Valid). Border turns red when
+                      unset so the missing pick stands out at a glance. */}
+                  {isDisposalAddon(a.key) && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[10.5px] uppercase tracking-[0.06em] font-semibold text-base-500">
+                        Size
+                      </span>
+                      <select
+                        value={selected.attrs?.size ?? ""}
+                        onChange={(e) => setAddonSize(a.key, e.target.value)}
+                        aria-label={`${a.name} size`}
+                        className={`flex-1 h-7 px-2 border rounded text-[11.5px] bg-white outline-none focus:border-primary ${
+                          selected.attrs?.size
+                            ? "border-base-300"
+                            : "border-destructive/60"
+                        }`}
+                      >
+                        <option value="">Select size…</option>
+                        {(DISPOSAL_SIZE_OPTIONS[a.key] ?? []).map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -379,6 +429,9 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
                 <div className="min-w-0 flex-1">
                   <div className="text-[13px]">
                     + {a.name}
+                    {a.attrs?.size && (
+                      <span className="text-base-700"> · {a.attrs.size}</span>
+                    )}
                     {a.qty > 1 && <span className="text-base-500"> ×{a.qty}</span>}
                   </div>
                   <div className="font-mono text-[10px] text-base-500 mt-0.5">

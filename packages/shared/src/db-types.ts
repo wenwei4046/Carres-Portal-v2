@@ -314,6 +314,9 @@ export interface OrderAddonRow {
   addon_key: string;
   qty: number;
   unit_price: number;
+  // Migration 0133 — free-form addon attrs (e.g. disposal size tag).
+  // Optional + nullable: existing rows pre-0133 have NULL, fixtures don't break.
+  attrs?: Record<string, unknown> | null;
 }
 
 export interface OrderHistoryRow {

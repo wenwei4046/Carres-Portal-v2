@@ -45,6 +45,9 @@ const orderAddonSchema = z.object({
   addonKey: z.string(),
   qty: z.number().int(),
   unitPrice: z.number(),
+  // Migration 0133 — disposal size tag etc. Optional + nullable; absence
+  // means "no extra attributes" (the legacy shape).
+  attrs: z.record(z.unknown()).nullable().optional(),
 });
 
 const orderHistorySchema = z.object({
@@ -149,6 +152,9 @@ const orderAddonInputSchema = z.object({
   addonKey: z.string().min(1),
   qty: z.number().int().positive(),
   unitPrice: z.number().nonnegative(),
+  // Migration 0133 — disposal size tag etc. The frontend enforces "size
+  // required for any disposal addon"; the RPC just persists whatever is sent.
+  attrs: z.record(z.unknown()).nullable().optional(),
 });
 
 export const createOrderInputSchema = z.object({
