@@ -1,11 +1,62 @@
 # AutoCount Import Contract — single source of truth
 
-> **Status:** locked 2026-05-19. This document is the ONE contract both dev streams
-> (wenwei's `apps/api` + Jess's operation panel) build against. If the import door
-> changes, this doc changes first, then code.
+> **Status:** locked 2026-05-19, **revised 2026-05-19 post-sync** (operation-role
+> rename + dl→so rename + schema-gap finding). This document is the ONE contract
+> both dev streams (wenwei's `apps/api` + Jess's operation panel) build against.
+> If the import door changes, this doc changes first, then code.
 >
 > **Owner of this door:** wenwei (this repo). The import endpoint lives in
 > `apps/api`. Jess does NOT build a parallel importer.
+>
+> **⚠️ One open DECISION blocks the build — see §1.5. Everything else is locked.**
+
+---
+
+## 1.5 Schema reality gap — DECISION NEEDED before build
+
+The survey of the current code (post the ~80-commit sync: `logistics`→`operation`
+role rename migration 0121, `dl`→`so` rename migration 0123) found that the
+existing order-creation path **cannot ingest AutoCount orders as-is**:
+
+1. **No external-reference column.** `orders.so` is a server-generated
+   auto-increment int (seq `orders_so_seq`, starts 1251). There is **no column**
+   for AutoCount's `Ref.` (`CR0418`, `TCF0282/CR1009`) and **no column on
+   `order_lines`** for AutoCount's `PO Doc No.` (`PO/2604-046`). The locked
+   idempotency rule ("re-import same Ref + PO# = upsert not duplicate") is
+   **impossible** without somewhere to store those keys.
+
+2. **`create_order(payload)` RPC** (migration 0006) is built for the dealer
+   wizard. It **requires** fields AutoCount listing does NOT have:
+   `outletId`, `salespersonId`, `signaturePath` (required!), `paymentSlipPath`,
+   `depositPct`, `paymentMethod`, `termsAccepted`. It also force-generates a new
+   `so` number and writes `order_history` "Order created" text. Reusing it
+   verbatim for import is wrong: imported orders have no salesperson/signature,
+   and we'd be double-keying (AutoCount is the source of truth, not the portal).
+
+**Recommended approach (needs Loo's explicit §7 approval — schema change):**
+
+- New migration `00NN_autocount_import.sql` adding:
+  - `orders.source_ref text[]` (the AutoCount Ref set; combined refs kept as array)
+  - `orders.source_system text` (e.g. `'autocount'`) + `channel='dealer'` derive
+  - `order_lines.source_po text` (AutoCount PO Doc No. for that line)
+  - a UNIQUE/conflict key over `(source_system, source_ref)` for idempotent upsert
+- New dedicated RPC `import_autocount_order(payload jsonb)` — a sibling of
+  `create_order`, NOT a modification of it. Relaxes the wizard-only required
+  fields (no signature/salesperson), preserves AutoCount Ref + PO# verbatim,
+  still creates `orders`+`order_lines`(+threads) so downstream pipeline behaves
+  identically. `so` is still server-generated as the internal id; `source_ref`
+  is the external/business key operation reads by.
+
+**Why not just extend `create_order`:** it is load-bearing for the live dealer
+flow (6+ call sites, strict zod). A sibling RPC isolates import risk and keeps
+the dealer path untouched. This mirrors the project's "frontend/reality wins,
+schema follows" methodology.
+
+**DECISION for Loo:** approve (a) the new columns + (b) a dedicated
+`import_autocount_order` RPC as one new migration in the single chain? Until
+approved, the endpoint cannot be built correctly — building on `create_order`
+as-is would silently drop the AutoCount keys and break idempotency + the
+GAI→NETS / Master-sheet replacement.
 
 ---
 
@@ -185,19 +236,27 @@ both source refs on the order (array) and not collapse them.
 
 ## 7. `POST /api/orders/import` — behaviour
 
-- **Auth:** Bearer JWT, role-gated (operation/principal-class — final role per the
-  separate role decision; until then `principal`).
+- **Auth:** Bearer JWT, role-gated **`operation`** (guard `requireOperation` in
+  `apps/api/src/lib/auth-guards.ts`; `operation` OR `principal` acceptable —
+  `requireOperationOrPrincipal`). Role decision is RESOLVED: `logistics` was
+  renamed to `operation` (migration 0121); Jess's panel uses `operation`. No new
+  role needed.
 - **Input:** parsed rows (client parses xlsx → JSON array; the endpoint validates
   with a zod schema in `packages/shared` so both sides share one validator).
 - **Grouping:** rows → orders keyed by `Ref.` set; lines preserve order.
 - **Idempotency:** re-importing the same AutoCount `Ref.` + `PO Doc No.` set must
-  upsert, not duplicate. AutoCount PO# + Ref are the natural keys. Define the
-  conflict key explicitly in the migration/RPC.
-- **Preserve verbatim:** AutoCount PO numbers and Refs are stored as-is. The
-  portal does NOT regenerate its own PO/DL numbers for imported orders.
+  upsert, not duplicate. Natural key = `(source_system, source_ref)` (see §1.5 —
+  needs the new columns). Define the conflict key explicitly in the migration/RPC.
+- **Preserve verbatim:** AutoCount Ref + PO numbers stored as-is in
+  `orders.source_ref[]` / `order_lines.source_po`. `orders.so` remains the
+  server-generated internal id (auto-increment int, NOT the AutoCount number);
+  operation reads/searches by `source_ref`.
+- **RPC:** dedicated `import_autocount_order(payload jsonb)` — sibling of
+  `create_order`, NOT a modification (see §1.5). Relaxes wizard-only required
+  fields; still writes `orders`+`order_lines`(+threads) so downstream is identical.
 - **Report:** return a per-row result (created / upserted / unmatched-sku /
   error) so operation can fix-and-reimport. No silent drops.
-- **Schema changes** needed for any of the above go through this repo's **single
+- **Schema changes** (the §1.5 columns + RPC) go through this repo's **single
   migration chain** (next free `00NN_*.sql`), reviewed per CLAUDE.md §7. Jess
   does not write migrations on the shared DB.
 
@@ -217,12 +276,15 @@ both source refs on the order (array) and not collapse them.
 
 ---
 
-## 9. Open items (not blocking the contract)
+## 9. Open items
 
-1. Final **role** for the operation panel (new role vs reuse `principal`) — deferred
-   decision; `principal` until resolved. New role = one coordinated migration.
-2. SKU master → `product_skus`/`suppliers` seed script (separate task; uses the
-   committed xlsx).
-3. GAI → NETS warehouse cutover (master-data + stock-location migration) — separate
+1. **BLOCKING — §1.5 decision:** approve new columns (`orders.source_ref[]`,
+   `orders.source_system`, `order_lines.source_po`) + dedicated
+   `import_autocount_order` RPC as one migration. Build cannot start correctly
+   without this.
+2. ~~Role decision~~ — RESOLVED: `operation` role (migration 0121). Not deferred.
+3. SKU master → `product_skus`/`suppliers` seed script (separate task; uses the
+   committed `scripts/ops-seed/carres-sku-master.xlsx`).
+4. GAI → NETS warehouse cutover (master-data + stock-location migration) — separate
    urgent track, this repo, not part of the import door.
-4. `phase-5-cogs-real-source` switch once SKU `Cost` is seeded (§4.4).
+5. `phase-5-cogs-real-source` switch once SKU `Cost` is seeded (§4.4).
