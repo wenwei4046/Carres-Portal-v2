@@ -7,6 +7,11 @@ import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
 import OperationCatalog from "@/pages/catalog/OperationCatalog";
+import OrderInbox from "@/pages/ops/OrderInbox";
+import ReadyStock from "@/pages/ops/ReadyStock";
+import ReservedStock from "@/pages/ops/ReservedStock";
+import RepairQueue from "@/pages/ops/RepairQueue";
+import StockInventory from "@/pages/ops/StockInventory";
 import type { MovementsFilters } from "@/lib/queries";
 
 /**
@@ -168,6 +173,31 @@ export default function OperationApp() {
               />
             )}
             {tab === "catalog" && <OperationCatalog />}
+            {/* Ops Panel tabs (Jess COO) — greenfield pages/ops/*. Each is a
+                self-contained page with its own data fetching, dropped into
+                the operation shell's main slot. */}
+            {tab === "ops-inbox" && <OrderInbox />}
+            {tab === "ops-ready" && <ReadyStock />}
+            {tab === "ops-reserved" && <ReservedStock />}
+            {tab === "ops-repair" && <RepairQueue />}
+            {tab === "ops-inventory" && <StockInventory />}
+            {tab === "ops-transfer" && (
+              <div className="px-9 py-7">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-primary font-semibold mb-1.5">
+                  Ops Panel
+                </div>
+                <h1 className="text-[28px] font-display font-bold text-base-900 mb-2">
+                  Stock Transfer
+                </h1>
+                <p className="text-[13px] text-base-600 mb-6 max-w-2xl">
+                  Inter-warehouse transfer module — scaffolded, functional UI
+                  ships next iteration.
+                </p>
+                <div className="card p-9 text-center text-[12px] text-base-500 italic">
+                  Module under construction
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>

@@ -45,6 +45,20 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { k: "catalog", t: "SKU Catalog", icon: "▭" },
     ],
   },
+  {
+    // Ops Panel (Jess COO). AutoCount-staged orders + per-unit stock register.
+    // Pages live in pages/ops/* (greenfield, ops_* tables); rendered here so
+    // the operation role gets them as native tabs alongside wenwei's screens.
+    label: "Ops",
+    items: [
+      { k: "ops-inbox", t: "Inbox", icon: "▤" },
+      { k: "ops-ready", t: "Ready Stock", icon: "★" },
+      { k: "ops-reserved", t: "Reserved", icon: "◐" },
+      { k: "ops-repair", t: "Repair / Return", icon: "⚠" },
+      { k: "ops-inventory", t: "Inventory", icon: "▥" },
+      { k: "ops-transfer", t: "Transfer", icon: "⇄" },
+    ],
+  },
 ];
 
 interface Props {
