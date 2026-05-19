@@ -7,6 +7,7 @@ import ActivityLog from "./ActivityLog";
 import StockInventory from "./StockInventory";
 import ReadyStock from "./ReadyStock";
 import ReservedStock from "./ReservedStock";
+import RepairQueue from "./RepairQueue";
 
 /**
  * Ops Panel root — sidebar + content shell mirroring LogisticsApp pattern.
@@ -31,6 +32,7 @@ export default function OpsApp() {
         {tab === "stock-inventory" && <StockInventory />}
         {tab === "ready-stock" && <ReadyStock />}
         {tab === "stock-reserved" && <ReservedStock />}
+        {tab === "stock-repair" && <RepairQueue />}
         {tab === "stock-transfer" && <ComingSoon name="Stock Transfer" />}
         {tab === "activity" && <ActivityLog />}
       </main>

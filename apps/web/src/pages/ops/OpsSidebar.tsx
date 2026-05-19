@@ -28,6 +28,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { k: "ready-stock", t: "Ready Stock", icon: "★" },
       { k: "stock-reserved", t: "Reserved", icon: "◐" },
+      { k: "stock-repair", t: "Repair / Return", icon: "⚠" },
       { k: "stock-inventory", t: "Inventory", icon: "□" },
       { k: "stock-transfer", t: "Transfer", icon: "⇄" },
       { k: "stock-adjust", t: "Adjust (Excel)", icon: "✎", disabled: true },
