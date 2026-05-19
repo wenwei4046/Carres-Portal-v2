@@ -4,8 +4,12 @@ import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * /api/principal/orders — Phase 10 read-only feed of every order across
- * every dealer. Mirrors `reference/proto/principal-views.jsx` L4-76.
+ * /api/operation/orders-feed — Phase 10 read-only cross-dealer feed of every
+ * order. Mirrors `reference/proto/principal-views.jsx` L4-76.
+ *
+ * Distinct from /api/operation/orders (the kanban-driver for the Orders tab):
+ * this is a flat filterable list, no kanban semantics, no actions. Suffix
+ * `-feed` keeps the two endpoints disambiguated.
  *
  * GET /?dealer=&status=&q=&limit=
  *   - dealer: dealer_id filter (UUID) — narrow to one dealer
@@ -13,20 +17,22 @@ import type { AppEnv } from "../../types";
  *   - q: free-text match on SO# (sub-string) OR customer_name
  *   - limit: 1..500, defaults 200
  *
- * RLS on orders already allows principal to see everything; the inline
- * guard is a fast 403 short-circuit before the Supabase round-trip.
+ * RLS on orders already allows operation + principal to see everything; the
+ * inline guard is a fast 403 short-circuit before the Supabase round-trip.
+ *
+ * 2026-05-19 — moved from /api/principal/orders.
  */
-const principalOrdersRouter = new Hono<AppEnv>();
+const operationOrdersFeedRouter = new Hono<AppEnv>();
 
-principalOrdersRouter.use("*", async (c, next) => {
+operationOrdersFeedRouter.use("*", async (c, next) => {
   const role = c.var.auth?.role;
-  if (role !== "principal") {
-    throw new HTTPException(403, { message: "Principal only" });
+  if (role !== "operation" && role !== "principal") {
+    throw new HTTPException(403, { message: "Operation/Principal only" });
   }
   await next();
 });
 
-principalOrdersRouter.get("/", async (c) => {
+operationOrdersFeedRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   const dealer = c.req.query("dealer");
@@ -102,4 +108,4 @@ principalOrdersRouter.get("/", async (c) => {
   return c.json({ orders });
 });
 
-export default principalOrdersRouter;
+export default operationOrdersFeedRouter;

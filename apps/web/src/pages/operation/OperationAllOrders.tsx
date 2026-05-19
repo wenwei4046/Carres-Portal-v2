@@ -4,9 +4,13 @@ import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 
 /**
- * Phase 10 · Principal · All orders — `reference/proto/principal-views.jsx`
- * L4-76 pixel parity. Cross-dealer feed with 3 filters (search + dealer
- * dropdown + status tab strip). Read-only.
+ * Phase 10 · Operation · All orders — `reference/proto/principal-views.jsx`
+ * L4-76 pixel parity. Cross-dealer flat feed with 3 filters (search +
+ * dealer dropdown + status tab strip). Read-only — the per-stage kanban
+ * (Orders tab) is where operation actually works orders; this view is the
+ * data-table reference.
+ *
+ * 2026-05-19 — moved from PrincipalOrders.
  */
 
 type OrderRow = {
@@ -26,7 +30,7 @@ type DealerOpt = { id: string; name: string };
 
 const STATUS_TABS = ["all", "place", "proceed_order", "delivered", "cancelled"] as const;
 
-export default function PrincipalOrders() {
+export default function OperationAllOrders() {
   const [dealerFilter, setDealerFilter] = useState("all");
   const [statusFilter, setStatusFilter] =
     useState<(typeof STATUS_TABS)[number]>("all");
@@ -42,13 +46,12 @@ export default function PrincipalOrders() {
   }, [dealerFilter, statusFilter, search]);
 
   const { data, isLoading } = useQuery<{ orders: OrderRow[] }>({
-    queryKey: qk.principal.orders({ dealer: dealerFilter, status: statusFilter, q: search }),
-    queryFn: () => apiFetch(`/api/principal/orders${queryStr}`),
+    queryKey: qk.operation.ordersFeed({ dealer: dealerFilter, status: statusFilter, q: search }),
+    queryFn: () => apiFetch(`/api/operation/orders-feed${queryStr}`),
   });
   const orders = data?.orders ?? [];
 
-  // Cheap dealer list — derive from the dashboard query the principal app
-  // already runs, OR fall back to deriving from rows we just fetched.
+  // Cheap dealer list — derive from rows we just fetched.
   const dealersFromRows = useMemo<DealerOpt[]>(() => {
     const map = new Map<string, string>();
     orders.forEach((o) => {

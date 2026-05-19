@@ -7,6 +7,10 @@ import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
 import OperationCatalog from "@/pages/catalog/OperationCatalog";
+// 2026-05-19 — Stock / All orders / Suppliers moved from Principal sidebar.
+import OperationStock from "./OperationStock";
+import OperationAllOrders from "./OperationAllOrders";
+import OperationSuppliers from "./OperationSuppliers";
 import type { MovementsFilters } from "@/lib/queries";
 
 /**
@@ -168,6 +172,9 @@ export default function OperationApp() {
               />
             )}
             {tab === "catalog" && <OperationCatalog />}
+            {tab === "stock" && <OperationStock />}
+            {tab === "all-orders" && <OperationAllOrders />}
+            {tab === "suppliers" && <OperationSuppliers />}
           </>
         )}
       </main>

@@ -6,9 +6,7 @@ import PrincipalDealers from "./PrincipalDealers";
 import PrincipalPartners from "./PrincipalPartners";
 import PrincipalAccounts from "./PrincipalAccounts";
 import PrincipalAudit from "./PrincipalAudit";
-import PrincipalSuppliers from "./PrincipalSuppliers";
-import PrincipalOrders from "./PrincipalOrders";
-import PrincipalStock from "./PrincipalStock";
+// 2026-05-19 — Suppliers / Orders / Stock moved to Operation sidebar.
 import OperationCatalog from "@/pages/catalog/OperationCatalog";
 import { usePrincipalDashboard } from "@/lib/queries";
 
@@ -49,9 +47,6 @@ export default function PrincipalApp() {
         {tab === "catalog" && <OperationCatalog />}
         {tab === "accounts" && <PrincipalAccounts />}
         {tab === "audit" && <PrincipalAudit />}
-        {tab === "suppliers" && <PrincipalSuppliers />}
-        {tab === "orders" && <PrincipalOrders />}
-        {tab === "stock" && <PrincipalStock />}
       </main>
     </div>
   );

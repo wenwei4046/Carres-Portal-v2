@@ -27,6 +27,8 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Pipeline",
     items: [
       { k: "orders", t: "Orders", icon: "▣" },
+      // 2026-05-19 — read-only flat list view of every order (was PrincipalOrders).
+      { k: "all-orders", t: "All orders", icon: "▤" },
       { k: "procurement", t: "Procurement", icon: "▦" },
     ],
   },
@@ -35,6 +37,18 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { k: "warehouse", t: "Warehouse", icon: "□" },
       { k: "movements", t: "Movements", icon: "≡" },
+    ],
+  },
+  {
+    // 2026-05-19 — Network group bundles cross-warehouse stock + supplier
+    // oversight. Both are observation surfaces ("across the network") rather
+    // than the daily work surfaces in Stock/Pipeline. Routes:
+    //   • all-warehouses → /operation/stock      (was PrincipalStock)
+    //   • suppliers      → /operation/suppliers-overview (was PrincipalSuppliers)
+    label: "Network",
+    items: [
+      { k: "stock", t: "All warehouses", icon: "▥" },
+      { k: "suppliers", t: "Suppliers", icon: "▦" },
     ],
   },
   {

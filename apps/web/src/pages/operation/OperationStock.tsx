@@ -4,12 +4,14 @@ import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 
 /**
- * Phase 10 · Principal · Stock — `reference/proto/principal-views.jsx`
- * L80-138 pixel parity. Read-only stock across the network with per-warehouse
+ * Phase 10 · Operation · Stock — `reference/proto/principal-views.jsx`
+ * L80-138 pixel parity. Cross-warehouse stock table with per-warehouse
  * columns + Available + Incoming + Price. 2 view tabs (Low stock / All SKUs).
  *
- * Operation owns the mutation surface (adjust stock, set thresholds); this
- * page is observation-only for the principal.
+ * 2026-05-19 — moved from PrincipalStock. The proto's kicker reads
+ * "HQ · Operations" because this is a warehouse-staff daily view, not a
+ * boardroom report. Principal can still hit /api/operation/stock directly
+ * for oversight deep links (role gate admits both).
  */
 
 type WarehouseLite = { id: string; name: string };
@@ -29,11 +31,11 @@ type StockPayload = {
   summary: { totalSkus: number; lowStockCount: number; openPos: number };
 };
 
-export default function PrincipalStock() {
+export default function OperationStock() {
   const [view, setView] = useState<"low" | "all">("low");
   const { data, isLoading } = useQuery<StockPayload>({
-    queryKey: qk.principal.stock(),
-    queryFn: () => apiFetch("/api/principal/stock"),
+    queryKey: qk.operation.stock(),
+    queryFn: () => apiFetch("/api/operation/stock"),
   });
   const payload = data;
   const warehouses = payload?.warehouses ?? [];

@@ -85,16 +85,12 @@ export const qk = {
     partners:  () => ["principal", "partners"] as const,
     /** Phase 10 — principal accounts admin (PrincipalAccounts page). */
     accounts:  () => ["principal", "accounts"] as const,
-    /** Phase 10 — read-only orders list across all dealers (PrincipalOrders). */
-    orders:    (filters?: Record<string, unknown>) =>
-      ["principal", "orders", filters ?? {}] as const,
-    /** Phase 10 — supplier roster + per-supplier stats (PrincipalSuppliers). */
-    suppliers: () => ["principal", "suppliers"] as const,
-    /** Phase 10 — stock balances across all warehouses (PrincipalStock). */
-    stock:     () => ["principal", "stock"] as const,
     /** Phase 10 — audit log (PrincipalAudit). */
     audit:     (filters?: Record<string, unknown>) =>
       ["principal", "audit", filters ?? {}] as const,
+    // 2026-05-19 — stock / orders / suppliers tabs moved to Operation
+    // (qk.operation.stock / ordersFeed / suppliersOverview). Principal admit
+    // is still allowed on those endpoints for oversight deep links.
   },
   // Phase 4.5 Chunk 1 — operation Partner (LP) namespace. Nested keys mirror
   // `principal` so we can blast `["partner"]` to invalidate the whole sub-tree
@@ -166,6 +162,19 @@ export const qk = {
       ["operation", "warehouse", "reserved", warehouseId ?? "null", sku ?? "null"] as const,
     movements: (filters?: MovementsFilters) =>
       ["operation", "movements", filters ?? {}] as const,
+    /** 2026-05-19 — cross-warehouse stock table (OperationStock page). */
+    stock: () => ["operation", "stock"] as const,
+    /** 2026-05-19 — read-only cross-dealer orders feed (OperationAllOrders
+     *  page). Distinct from qk.operation.orders (the kanban-driver). */
+    ordersFeed: (filters?: Record<string, unknown>) =>
+      ["operation", "orders-feed", filters ?? {}] as const,
+    /** 2026-05-19 — supplier oversight roster (OperationSuppliers page).
+     *  Distinct from qk.operation.suppliers (the CRUD list). */
+    suppliersOverview: () => ["operation", "suppliers-overview"] as const,
+    /** 2026-05-19 — per-supplier recent-12-PO drawer query. Nested under
+     *  the parent so a blunt invalidate fans out. */
+    suppliersOverviewPos: (id: string) =>
+      ["operation", "suppliers-overview", id, "pos"] as const,
   },
   // Phase 5 — HQ Finance namespace. Same nested-key strategy as `principal`
   // and `operation` so mutations can blast `["finance"]` (e.g. topup-approve

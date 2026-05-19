@@ -4,9 +4,14 @@ import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 
 /**
- * Phase 10 · Principal · Suppliers — `reference/proto/principal-suppliers.jsx`
+ * Phase 10 · Operation · Suppliers — `reference/proto/principal-suppliers.jsx`
  * pixel parity. 2-col grid of clickable supplier cards; click opens a 480-wide
  * right-side drawer with recent 12 POs.
+ *
+ * Distinct from operation's CRUD suppliers admin (procurement-side): this is
+ * the read-only roster/oversight view. Endpoint /api/operation/suppliers-overview.
+ *
+ * 2026-05-19 — moved from PrincipalSuppliers.
  */
 
 type SupplierRow = {
@@ -32,10 +37,10 @@ type PoRow = {
   placedAt: string | null;
 };
 
-export default function PrincipalSuppliers() {
+export default function OperationSuppliers() {
   const { data, isLoading } = useQuery<{ suppliers: SupplierRow[] }>({
-    queryKey: qk.principal.suppliers(),
-    queryFn: () => apiFetch("/api/principal/suppliers"),
+    queryKey: qk.operation.suppliersOverview(),
+    queryFn: () => apiFetch("/api/operation/suppliers-overview"),
   });
   const suppliers = data?.suppliers ?? [];
   const [open, setOpen] = useState<SupplierRow | null>(null);
@@ -118,8 +123,8 @@ function Stat({ label, v }: { label: string; v: number | string }) {
 
 function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose: () => void }) {
   const { data, isLoading } = useQuery<{ pos: PoRow[] }>({
-    queryKey: ["principal", "suppliers", supplier.id, "pos"],
-    queryFn: () => apiFetch(`/api/principal/suppliers/${supplier.id}/pos`),
+    queryKey: qk.operation.suppliersOverviewPos(supplier.id),
+    queryFn: () => apiFetch(`/api/operation/suppliers-overview/${supplier.id}/pos`),
   });
   const pos = data?.pos ?? [];
 

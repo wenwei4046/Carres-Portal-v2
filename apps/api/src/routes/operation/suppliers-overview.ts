@@ -4,9 +4,14 @@ import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * /api/principal/suppliers — Phase 10 read-only oversight of the supplier
- * roster + per-supplier PO performance. Mirrors `reference/proto/
+ * /api/operation/suppliers-overview — Phase 10 read-only oversight of the
+ * supplier roster + per-supplier PO performance. Mirrors `reference/proto/
  * principal-suppliers.jsx` data contract.
+ *
+ * Distinct from /api/operation/suppliers (the editable CRUD endpoint used by
+ * the procurement admin flow): this is an observation surface — supplier
+ * cards + recent-12-PO drawer for the dealer/finance/operation reads.
+ * Suffix `-overview` keeps the two endpoints disambiguated.
  *
  * GET / — list with rolled-up PO stats per supplier (open / received /
  *         total). The PO scan is a single SELECT grouped client-side; the
@@ -14,18 +19,20 @@ import type { AppEnv } from "../../types";
  *         no RPC needed.
  *
  * GET /:id/pos — recent 12 POs for the drawer view.
+ *
+ * 2026-05-19 — moved from /api/principal/suppliers.
  */
-const principalSuppliersRouter = new Hono<AppEnv>();
+const operationSuppliersOverviewRouter = new Hono<AppEnv>();
 
-principalSuppliersRouter.use("*", async (c, next) => {
+operationSuppliersOverviewRouter.use("*", async (c, next) => {
   const role = c.var.auth?.role;
-  if (role !== "principal") {
-    throw new HTTPException(403, { message: "Principal only" });
+  if (role !== "operation" && role !== "principal") {
+    throw new HTTPException(403, { message: "Operation/Principal only" });
   }
   await next();
 });
 
-principalSuppliersRouter.get("/", async (c) => {
+operationSuppliersOverviewRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   const [suppliersRes, posRes] = await Promise.all([
@@ -72,7 +79,7 @@ principalSuppliersRouter.get("/", async (c) => {
   return c.json({ suppliers });
 });
 
-principalSuppliersRouter.get("/:id/pos", async (c) => {
+operationSuppliersOverviewRouter.get("/:id/pos", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
@@ -93,4 +100,4 @@ principalSuppliersRouter.get("/:id/pos", async (c) => {
   });
 });
 
-export default principalSuppliersRouter;
+export default operationSuppliersOverviewRouter;

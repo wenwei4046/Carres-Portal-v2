@@ -4,27 +4,30 @@ import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * /api/principal/stock — Phase 10 read-only view of stock balances across
- * every warehouse + per-SKU price + threshold + incoming PO counts. Mirrors
+ * /api/operation/stock — Phase 10 cross-warehouse stock observation. Mirrors
  * `reference/proto/principal-views.jsx` L80-138.
  *
  * GET /
  *   - returns warehouses[], skus[] (with per-warehouse qty/reserved/available),
  *     and a tally of POs in-flight per SKU as `incoming`.
  *
- * Read-only — operation role owns the mutation surface.
+ * 2026-05-19 — moved from /api/principal/stock. The kicker on the proto's own
+ * stock view reads "HQ · Operations"; this page primarily serves operation
+ * (daily picking/dispatch). Principal kept as admit-list for oversight deep
+ * links (e.g. drill-from-dashboard) but the tab lives in the Operation
+ * sidebar now.
  */
-const principalStockRouter = new Hono<AppEnv>();
+const operationStockRouter = new Hono<AppEnv>();
 
-principalStockRouter.use("*", async (c, next) => {
+operationStockRouter.use("*", async (c, next) => {
   const role = c.var.auth?.role;
-  if (role !== "principal") {
-    throw new HTTPException(403, { message: "Principal only" });
+  if (role !== "operation" && role !== "principal") {
+    throw new HTTPException(403, { message: "Operation/Principal only" });
   }
   await next();
 });
 
-principalStockRouter.get("/", async (c) => {
+operationStockRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   const [warehousesRes, balancesRes, skusRes, poLinesRes] = await Promise.all([
@@ -117,4 +120,4 @@ principalStockRouter.get("/", async (c) => {
   });
 });
 
-export default principalStockRouter;
+export default operationStockRouter;

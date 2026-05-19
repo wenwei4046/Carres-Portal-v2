@@ -3,13 +3,15 @@ import { useAuth } from "@/lib/auth";
 import CarresLockup from "@/components/CarresLockup";
 
 /**
- * Principal sidebar — 5 nav groups, 10 active tabs as of Phase 10
- * (Dashboard / Approvals / Dealers / operation Partners / Suppliers /
- * Catalog & Pricing / All orders / Stock / Audit log / Accounts). Pixel
- * sizes mirror `reference/proto/principal.jsx` exactly. Active items show a
- * 3px terracotta accent bar on the left + base-100 fill + base-900 text.
- * Disabled items (none at present) dim to base-400 with a hover tooltip
- * pointing at the planned phase.
+ * Principal sidebar — 5 nav groups, 7 active tabs as of 2026-05-19
+ * (Dashboard / Approvals / Dealers / operation Partners / Catalog & Pricing /
+ * Audit log / Accounts). The Stock / All orders / Suppliers tabs moved to
+ * Operation 2026-05-19 — Principal still has API admit for oversight deep
+ * links, but the sidebar entries live in OperationSidebar now.
+ * Pixel sizes mirror `reference/proto/principal.jsx` exactly. Active items
+ * show a 3px terracotta accent bar on the left + base-100 fill + base-900
+ * text. Disabled items (none at present) dim to base-400 with a hover
+ * tooltip pointing at the planned phase.
  *
  * The Approvals item gets a pending-count pill (mono, terracotta fill) when
  * the dashboard summary reports any pending approvals.
@@ -35,7 +37,6 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { k: "dealers", t: "Dealers", icon: "▤", enabled: true },
       { k: "partners", t: "operation Partners", icon: "▦", enabled: true },
-      { k: "suppliers", t: "Suppliers", icon: "▥", enabled: true },
     ],
   },
   {
@@ -51,8 +52,6 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Records",
     items: [
-      { k: "orders", t: "All orders", icon: "▣", enabled: true },
-      { k: "stock", t: "Stock", icon: "□", enabled: true },
       { k: "audit", t: "Audit log", icon: "≡", enabled: true },
     ],
   },
