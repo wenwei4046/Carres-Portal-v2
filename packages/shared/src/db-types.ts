@@ -287,6 +287,10 @@ export interface OrderRow {
   delivered_at: string | null;
   invoice_no: string | null;
   invoiced_at: string | null;
+  // AutoCount import (migration 0132). Optional + NULL for portal-native
+  // orders; optional so existing OrderRow constructors/fixtures don't break.
+  source_system?: string | null;
+  source_ref?: string[] | null;
   placed_at: string;
   created_at: string;
   updated_at: string;
@@ -299,6 +303,9 @@ export interface OrderLineRow {
   qty: number;
   attrs: Record<string, unknown> | null;
   unit_price: number;
+  // AutoCount "PO Doc No." (migration 0132). Optional so existing
+  // OrderLineRow constructors/fixtures don't break.
+  source_po?: string | null;
 }
 
 export interface OrderAddonRow {

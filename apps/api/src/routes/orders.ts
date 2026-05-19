@@ -4,6 +4,8 @@ import { z } from "zod";
 import {
   Adapters,
   DB,
+  autocountImportInput,
+  autocountImportResponseSchema,
   cancelOrderInputSchema,
   createOrderInputSchema,
   isProceedBlockerCode,
@@ -14,6 +16,7 @@ import {
   setOrderDateInputSchema,
   topUpOrderInputSchema,
   updateOrderInputSchema,
+  type AutocountImportResult,
 } from "@carres/shared";
 import { userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
@@ -247,6 +250,174 @@ ordersRouter.post("/", async (c) => {
     history: row.order_history ?? [],
   });
   return c.json(orderSchema.parse(order), 201);
+});
+
+// ---------------------------------------------------------------------------
+// AutoCount import door — POST /api/orders/import
+// Contract: docs/autocount-import-contract.md. Mirrors create_order's table
+// writes via the sibling RPC import_autocount_order (migration 0132).
+// create_order is NOT reused (requires wizard-only fields; can't store the
+// AutoCount Ref/PO# the idempotency key needs).
+// ---------------------------------------------------------------------------
+
+/** Split a combined Ref ("TCF0282/CR1009", "TCF0282 + CR1009") → sorted uniq. */
+function normalizeRefs(ref: string): string[] {
+  return Array.from(
+    new Set(
+      ref
+        .split(/[/+,]/)
+        .map((r) => r.trim().toUpperCase())
+        .filter((r) => r.length > 0),
+    ),
+  ).sort();
+}
+
+const CORE_ITEM_RE = /mattress|bed ?fram|sofa/i;
+function isCoreItem(itemGroup: string): boolean {
+  return CORE_ITEM_RE.test(itemGroup);
+}
+
+/** §5: CR = Carres PJ Showroom → showroom channel; everything else dealer. */
+function deriveChannel(refs: string[]): string {
+  return refs.some((r) => r.startsWith("CR")) ? "showroom" : "dealer";
+}
+
+function buildAddress(row: {
+  addr1?: string | null;
+  addr2?: string | null;
+  addr3?: string | null;
+  addr4?: string | null;
+  deliveryLocation?: string | null;
+}): string | null {
+  const parts = [row.addr1, row.addr2, row.addr3, row.addr4, row.deliveryLocation]
+    .map((p) => (p ?? "").trim())
+    .filter((p) => p.length > 0);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+/** "RM3322 Paid" → 3322; "RM874" / "" → 0 (treated as outstanding). */
+function parsePaid(balance?: string | null | undefined): number {
+  if (!balance || !/paid/i.test(balance)) return 0;
+  const m = balance.replace(/,/g, "").match(/RM\s*(\d+(?:\.\d+)?)/i);
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * SKU resolution seam. The SKU master (scripts/ops-seed/carres-sku-master.xlsx)
+ * is not yet seeded into product_skus (contract §9 open item #3 — separate
+ * task). Until then this returns null: the line stores the raw AutoCount
+ * Description as `sku` (nothing lost), and core items are flagged in the
+ * import report so operation can reconcile. Wiring real Description→Item Code
+ * resolution later is a one-function change here.
+ */
+function resolveSku(_detailDescription: string): string | null {
+  return null;
+}
+
+ordersRouter.post("/import", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "operation" && auth.role !== "principal") {
+    throw new HTTPException(403, { message: "Import is operation/principal only" });
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+
+  const parsed = autocountImportInput.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid import input: " + parsed.error.issues[0]?.message,
+    });
+  }
+  const { dealerId, sourceSystem, rows } = parsed.data;
+
+  // Group rows into orders by normalized Ref set.
+  const groups = new Map<string, { sourceRef: string[]; rows: typeof rows }>();
+  for (const row of rows) {
+    const refs = normalizeRefs(row.ref);
+    if (refs.length === 0) continue;
+    const key = refs.join("|");
+    let g = groups.get(key);
+    if (!g) {
+      g = { sourceRef: refs, rows: [] };
+      groups.set(key, g);
+    }
+    g.rows.push(row);
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const results: AutocountImportResult[] = [];
+
+  for (const g of groups.values()) {
+    const first = g.rows[0];
+    const unmatched: string[] = [];
+    const lines = g.rows.map((r) => {
+      const resolved = resolveSku(r.detailDescription);
+      if (!resolved && isCoreItem(r.itemGroup)) unmatched.push(r.detailDescription);
+      return {
+        sku: resolved ?? r.detailDescription,
+        qty: r.qty,
+        attrs: null,
+        unit_price: 0, // listing carries no price; financials stay in AutoCount
+        source_po: r.poDocNo ?? null,
+      };
+    });
+
+    const payload = {
+      dealer_id: dealerId,
+      source_system: sourceSystem,
+      source_ref: g.sourceRef,
+      channel: deriveChannel(g.sourceRef),
+      customer_name: first.debtorName,
+      customer_phone: first.phone ?? null,
+      customer_address: buildAddress(first),
+      customer_address_unknown: false,
+      delivery_date: first.deliveryDate ?? null,
+      delivery_date_tbd: !first.deliveryDate,
+      paid: parsePaid(first.balance),
+      lines,
+    };
+
+    const { data, error } = await sb.rpc("import_autocount_order", { payload });
+    if (error) {
+      results.push({
+        sourceRef: g.sourceRef,
+        result: "error",
+        orderId: null,
+        so: null,
+        unmatchedDescriptions: unmatched,
+        error: error.message,
+      });
+      continue;
+    }
+    const d = data as {
+      id: string;
+      so: number;
+      result: "created" | "updated" | "skipped_locked";
+    };
+    results.push({
+      sourceRef: g.sourceRef,
+      result: d.result,
+      orderId: d.id,
+      so: d.so,
+      unmatchedDescriptions: unmatched,
+      error: null,
+    });
+  }
+
+  const resp = {
+    ordersTotal: results.length,
+    created: results.filter((r) => r.result === "created").length,
+    updated: results.filter((r) => r.result === "updated").length,
+    skippedLocked: results.filter((r) => r.result === "skipped_locked").length,
+    errored: results.filter((r) => r.result === "error").length,
+    results,
+  };
+  return c.json(autocountImportResponseSchema.parse(resp));
 });
 
 /**

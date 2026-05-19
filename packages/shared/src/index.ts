@@ -268,3 +268,16 @@ export {
   partnerPickupBatchInput,
   type PartnerPickupBatchInput,
 } from "./schemas/partner";
+
+// Migration 0132 — AutoCount order-import door. See
+// docs/autocount-import-contract.md.
+export {
+  autocountImportRowSchema,
+  autocountImportInput,
+  autocountImportResultSchema,
+  autocountImportResponseSchema,
+  type AutocountImportRow,
+  type AutocountImportInput,
+  type AutocountImportResult,
+  type AutocountImportResponse,
+} from "./schemas/autocount-import";
