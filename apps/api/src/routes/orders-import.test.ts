@@ -9,6 +9,7 @@ import {
 } from "jose";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
+import type { AutocountImportResponse } from "@carres/shared";
 
 vi.mock("../lib/supabase", () => ({
   userClient: vi.fn(),
@@ -141,7 +142,7 @@ describe("POST /api/orders/import", () => {
       ],
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as AutocountImportResponse;
     expect(body.ordersTotal).toBe(1);
     expect(body.created).toBe(1);
     expect(sb._calls).toHaveLength(1);
@@ -173,7 +174,7 @@ describe("POST /api/orders/import", () => {
         row({ itemGroup: "Service", detailDescription: "Sofa Disposal" }),
       ],
     });
-    const body = await res.json();
+    const body = (await res.json()) as AutocountImportResponse;
     expect(body.results[0].unmatchedDescriptions).toContain("Glano TH5090/30(2 Seater)");
     // Service rows are not core → not flagged
     expect(body.results[0].unmatchedDescriptions).not.toContain("Sofa Disposal");
@@ -183,7 +184,7 @@ describe("POST /api/orders/import", () => {
     vi.mocked(userClient).mockReturnValue(buildSb(okReply("skipped_locked")));
     const jwt = await makeJwt("principal");
     const res = await post(jwt, { dealerId: DEALER_HOUSE, rows: [row()] });
-    const body = await res.json();
+    const body = (await res.json()) as AutocountImportResponse;
     expect(body.skippedLocked).toBe(1);
     expect(body.results[0].result).toBe("skipped_locked");
   });
@@ -194,7 +195,7 @@ describe("POST /api/orders/import", () => {
     const jwt = await makeJwt("operation");
     const res = await post(jwt, { dealerId: DEALER_HOUSE, rows: [row()] });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as AutocountImportResponse;
     expect(body.errored).toBe(1);
     expect(body.results[0].result).toBe("error");
     expect(body.results[0].error).toBe("boom");
