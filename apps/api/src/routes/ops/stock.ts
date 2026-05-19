@@ -39,15 +39,25 @@ async function loadCtx(sb: ReturnType<typeof userClient>) {
   return { skuMap, modelMap, whMap };
 }
 
+const SIZE_SUFFIX: Record<string, string> = {
+  K: "King", Q: "Queen", SS: "Super Single", S: "Single", SK: "King Set",
+};
+
+function sizeFromSku(sku: string, fallbackVariant: string): string {
+  const sfx = (sku.split("-").pop() ?? "").toUpperCase();
+  return SIZE_SUFFIX[sfx] ?? fallbackVariant;
+}
+
 function enrich(row: any, ctx: any) {
   const sku = ctx.skuMap.get(row.sku);
   const model = sku ? ctx.modelMap.get(sku.model_id) : null;
   const wh = ctx.whMap.get(row.warehouse_id);
+  const variant = sku?.variant ?? "—";
   return {
     sku: row.sku,
     category: model?.category ?? "—",
     model: model?.name ?? row.sku,
-    variant: sku?.variant ?? "—",
+    size: sizeFromSku(row.sku, variant),
     warehouse: wh?.name ?? "—",
   };
 }

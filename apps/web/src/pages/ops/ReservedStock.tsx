@@ -7,7 +7,7 @@ type Row = {
   sku: string;
   category: string;
   model: string;
-  variant: string;
+  size: string;
   warehouse: string;
   condition: string;
   status: string;
@@ -143,7 +143,7 @@ export default function ReservedStock() {
                   <div className="text-[10px] font-mono text-base-400 truncate">{r.sku}</div>
                 </div>
                 <div className="text-[10px] uppercase tracking-wide text-base-600">{r.category}</div>
-                <div className="text-base-700">{r.variant}</div>
+                <div className="text-base-700 truncate">{r.size}</div>
                 <div className="text-right font-mono font-bold text-[#9a6700]">{r.qty}</div>
                 <div className="min-w-0">
                   <div className="font-mono text-[11.5px] text-base-800 truncate">
@@ -189,7 +189,7 @@ export default function ReservedStock() {
                   : "Take out (committed stock-out)"}
             </div>
             <div className="text-[12px] text-base-600 mb-4">
-              {act.row.model} · {act.row.variant} · {act.row.qty} reserved
+              {act.row.model} · {act.row.size} · {act.row.qty} reserved
             </div>
 
             <label className="block text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-1">

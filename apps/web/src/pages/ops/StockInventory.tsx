@@ -6,7 +6,7 @@ type Row = {
   sku: string;
   category: string;
   model: string;
-  variant: string;
+  size: string;
   warehouse: string;
   condition: string;
   status: string;
@@ -153,7 +153,7 @@ export default function StockInventory() {
                   <div className="text-[10px] text-base-500 truncate">{r.model}</div>
                 </div>
                 <div className="text-[10px] uppercase tracking-wide text-base-600">{r.category}</div>
-                <div className="text-base-700">{r.variant}</div>
+                <div className="text-base-700 truncate">{r.size}</div>
                 <div className="font-semibold" style={{ color: COND_C[r.condition] ?? "#555" }}>
                   {r.condition}
                 </div>

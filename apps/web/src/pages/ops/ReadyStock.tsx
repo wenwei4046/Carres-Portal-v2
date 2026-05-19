@@ -7,7 +7,7 @@ type Row = {
   sku: string;
   category: string;
   model: string;
-  variant: string;
+  size: string;
   warehouse: string;
   condition: "new" | "exhibition" | "old" | "damaged";
   status: string;
@@ -130,7 +130,7 @@ export default function ReadyStock() {
                     <div className="text-[10px] font-mono text-base-400 truncate">{r.sku}</div>
                   </div>
                   <div className="text-[10.5px] uppercase tracking-wider text-base-600">{r.category}</div>
-                  <div className="text-base-700">{r.variant}</div>
+                  <div className="text-base-700 truncate">{r.size}</div>
                   <div>
                     <span
                       className="text-[9px] font-bold uppercase rounded-sm px-1.5 py-0.5"
@@ -165,7 +165,7 @@ export default function ReadyStock() {
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl z-50 p-5 w-[420px]">
             <div className="text-[15px] font-semibold text-base-900 mb-1">Reserve a unit</div>
             <div className="text-[12px] text-base-600 mb-4">
-              {booking.model} · {booking.variant} · {booking.condition} · {booking.qty} free
+              {booking.model} · {booking.size} · {booking.condition} · {booking.qty} free
             </div>
             <label className="block text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-1">
               Customer order ref

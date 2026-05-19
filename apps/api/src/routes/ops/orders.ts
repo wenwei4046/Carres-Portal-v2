@@ -177,7 +177,7 @@ opsOrdersRouter.post("/import", async (c) => {
   const refs = [...grouped.keys()];
   const existingRes = await sb
     .from("ops_imported_orders")
-    .select("ref, ops_assigned_logistic, ops_assigned_at, ops_assigned_by, ops_status, ops_remark, first_imported_at")
+    .select("ref, ops_assigned_logistic, ops_assigned_at, ops_assigned_by, ops_status, ops_remark, first_imported_at, items_edited, items, total_qty")
     .in("ref", refs);
   if (existingRes.error) {
     const m = mapPgError(existingRes.error);
@@ -189,6 +189,8 @@ opsOrdersRouter.post("/import", async (c) => {
   // Build the upsert rows, preserving ops-set fields when present.
   const upserts = [...grouped.values()].map((g) => {
     const ex = existingMap.get(g.ref);
+    // Portal wins: if ops staff has manually edited items, keep their version.
+    const itemsEdited = ex?.items_edited ?? false;
     return {
       ref: g.ref,
       customer_name: g.customer_name,
@@ -202,8 +204,9 @@ opsOrdersRouter.post("/import", async (c) => {
       balance_raw: g.balance_raw,
       balance_amount: g.balance_amount,
       balance_status: g.balance_status,
-      items: g.items,
-      total_qty: g.total_qty,
+      items: itemsEdited ? ex!.items : g.items,
+      total_qty: itemsEdited ? ex!.total_qty : g.total_qty,
+      items_edited: itemsEdited,
       order_date: g.order_date,
       import_source_logistic: g.import_source_logistic,
       // PRESERVE ops decisions across re-imports.
@@ -414,12 +417,22 @@ opsOrdersRouter.post("/:ref/status", async (c) => {
 // passing `null` clears it, omitting it leaves it unchanged.
 // -----------------------------------------------------------------------------
 const annotationInput = z.object({
+  // Ops notes
   customerRequest: z.string().nullable().optional(),
   carresRemark: z.string().nullable().optional(),
   actionForLogistic: z.string().nullable().optional(),
+  warehouseNote: z.string().nullable().optional(),
   logisticRemark: z.string().nullable().optional(),
-  logisticEta: z.string().nullable().optional(), // ISO date string or null
+  logisticEta: z.string().nullable().optional(),
   deliveryTimeSlot: z.string().nullable().optional(),
+  // Customer & delivery corrections (typo fixes — re-import will overwrite unless items_edited set)
+  customerPhone: z.string().max(30).nullable().optional(),
+  deliveryLocation: z.string().max(120).nullable().optional(),
+  deliveryDateRequested: z.string().nullable().optional(),
+  deliveryAddress1: z.string().max(200).nullable().optional(),
+  deliveryAddress2: z.string().max(200).nullable().optional(),
+  deliveryAddress3: z.string().max(200).nullable().optional(),
+  deliveryAddress4: z.string().max(200).nullable().optional(),
 });
 
 opsOrdersRouter.patch("/:ref/annotation", async (c) => {
@@ -445,11 +458,21 @@ opsOrdersRouter.patch("/:ref/annotation", async (c) => {
     updateFields.ops_carres_remark = parsed.data.carresRemark;
   if (parsed.data.actionForLogistic !== undefined)
     updateFields.ops_action_for_logistic = parsed.data.actionForLogistic;
+  if (parsed.data.warehouseNote !== undefined)
+    updateFields.ops_warehouse_note = parsed.data.warehouseNote;
   if (parsed.data.logisticRemark !== undefined)
     updateFields.ops_logistic_remark = parsed.data.logisticRemark;
   if (parsed.data.logisticEta !== undefined) updateFields.ops_logistic_eta = parsed.data.logisticEta;
   if (parsed.data.deliveryTimeSlot !== undefined)
     updateFields.ops_delivery_time_slot = parsed.data.deliveryTimeSlot;
+  if (parsed.data.customerPhone !== undefined) updateFields.customer_phone = parsed.data.customerPhone;
+  if (parsed.data.deliveryLocation !== undefined) updateFields.delivery_location = parsed.data.deliveryLocation;
+  if (parsed.data.deliveryDateRequested !== undefined)
+    updateFields.delivery_date_requested = parsed.data.deliveryDateRequested;
+  if (parsed.data.deliveryAddress1 !== undefined) updateFields.delivery_address_1 = parsed.data.deliveryAddress1;
+  if (parsed.data.deliveryAddress2 !== undefined) updateFields.delivery_address_2 = parsed.data.deliveryAddress2;
+  if (parsed.data.deliveryAddress3 !== undefined) updateFields.delivery_address_3 = parsed.data.deliveryAddress3;
+  if (parsed.data.deliveryAddress4 !== undefined) updateFields.delivery_address_4 = parsed.data.deliveryAddress4;
 
   if (Object.keys(updateFields).length === 0) {
     return c.json({ error: "no_fields_to_update" }, 422);
@@ -476,6 +499,67 @@ opsOrdersRouter.patch("/:ref/annotation", async (c) => {
     entity_ref: ref,
     summary: `Updated annotations on ${ref}`,
     details: { fields: Object.keys(updateFields) },
+  });
+
+  return c.json({ order: data });
+});
+
+// -----------------------------------------------------------------------------
+// PUT /:ref/items — ops staff manually replaces the items array.
+// Sets items_edited=true so re-import won't overwrite (portal wins AutoCount).
+// -----------------------------------------------------------------------------
+const itemLineSchema = z.object({
+  itemGroup: z.string().nullable().optional(),
+  qty: z.number().int().nonnegative(),
+  description: z.string().nullable().optional(),
+  poDocNo: z.string().nullable().optional(),
+  remark: z.string().max(500).nullable().optional(),
+});
+
+const itemsInput = z.object({
+  items: z.array(itemLineSchema).min(1).max(200),
+});
+
+opsOrdersRouter.put("/:ref/items", async (c) => {
+  const auth = c.var.auth;
+  const ref = c.req.param("ref");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = itemsInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: parsed.error.issues[0]?.message ?? "invalid input",
+      },
+      422,
+    );
+  }
+
+  const items = parsed.data.items;
+  const total_qty = items.reduce((s, i) => s + i.qty, 0);
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("ops_imported_orders")
+    .update({ items, total_qty, items_edited: true })
+    .eq("ref", ref)
+    .select()
+    .single();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  await sb.from("ops_activity_log").insert({
+    actor_id: auth.id,
+    actor_name: auth.email,
+    module: "orders",
+    action: "items_edited",
+    entity_type: "order",
+    entity_ref: ref,
+    summary: `Items manually edited on ${ref} (${items.length} lines, ${total_qty} pcs)`,
+    details: { items },
   });
 
   return c.json({ order: data });
