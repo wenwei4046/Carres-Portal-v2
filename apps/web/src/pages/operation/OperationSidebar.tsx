@@ -44,6 +44,17 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    // 2026-05-20 — Phase A step 5 · per-unit stock register (Carres Klang only).
+    // 4 mental modes per Loo M3: Ready / Reserved / Repair / Inventory.
+    label: "Klang Stock",
+    items: [
+      { k: "ops-ready",     t: "Ready",     icon: "★" },
+      { k: "ops-reserved",  t: "Reserved",  icon: "◐" },
+      { k: "ops-repair",    t: "Repair",    icon: "⚠" },
+      { k: "ops-inventory", t: "Inventory", icon: "▥" },
+    ],
+  },
+  {
     label: "Stock",
     items: [
       { k: "warehouse", t: "Warehouse", icon: "□" },

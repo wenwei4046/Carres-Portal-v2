@@ -283,3 +283,25 @@ export {
   type AutocountImportResult,
   type AutocountImportResponse,
 } from "./schemas/autocount-import";
+
+// Migration 0137 — per-unit stock register (Carres Klang).
+export {
+  opsStockConditionSchema,
+  opsStockStatusSchema,
+  opsStockReserveInputSchema,
+  opsStockReleaseInputSchema,
+  opsStockReassignInputSchema,
+  opsStockTakeoutInputSchema,
+  opsStockFlagRepairInputSchema,
+  opsStockItemSchema,
+  opsStockListResponseSchema,
+  type OpsStockCondition,
+  type OpsStockStatus,
+  type OpsStockReserveInput,
+  type OpsStockReleaseInput,
+  type OpsStockReassignInput,
+  type OpsStockTakeoutInput,
+  type OpsStockFlagRepairInput,
+  type OpsStockItem,
+  type OpsStockListResponse,
+} from "./schemas/ops-stock";

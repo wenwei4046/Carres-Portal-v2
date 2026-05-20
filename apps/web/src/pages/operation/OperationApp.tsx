@@ -14,6 +14,11 @@ import OperationSuppliers from "./OperationSuppliers";
 // 2026-05-20 — Phase A · AutoCount integration tabs.
 import OperationImport from "./OperationImport";
 import OperationInbox from "./OperationInbox";
+// 2026-05-20 — Phase A step 5 · per-unit stock register tabs (Carres Klang).
+import OperationOpsReady from "./OperationOpsReady";
+import OperationOpsReserved from "./OperationOpsReserved";
+import OperationOpsRepair from "./OperationOpsRepair";
+import OperationOpsInventory from "./OperationOpsInventory";
 import type { MovementsFilters } from "@/lib/queries";
 
 /**
@@ -181,6 +186,11 @@ export default function OperationApp() {
             {/* 2026-05-20 — Phase A · AutoCount integration */}
             {tab === "ops-import" && <OperationImport />}
             {tab === "ops-inbox" && <OperationInbox />}
+            {/* 2026-05-20 — Phase A step 5 · per-unit stock (Carres Klang) */}
+            {tab === "ops-ready" && <OperationOpsReady />}
+            {tab === "ops-reserved" && <OperationOpsReserved />}
+            {tab === "ops-repair" && <OperationOpsRepair />}
+            {tab === "ops-inventory" && <OperationOpsInventory />}
           </>
         )}
       </main>

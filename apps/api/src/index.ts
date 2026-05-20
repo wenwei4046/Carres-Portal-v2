@@ -52,6 +52,8 @@ import supplierProductsRouter from "./routes/supplier/products";
 import supplierThreadsRouter from "./routes/supplier/threads";
 import salespersonsRouter from "./routes/salespersons";
 import dosRouter from "./routes/storage/dos";
+// Phase A step 5 (migration 0137) — per-unit stock register.
+import opsStockRouter from "./routes/ops/stock";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -117,6 +119,7 @@ api.route("/supplier/pos", supplierPosRouter);
 api.route("/supplier/products", supplierProductsRouter);
 api.route("/supplier/threads", supplierThreadsRouter);
 api.route("/storage/dos", dosRouter);
+api.route("/ops/stock", opsStockRouter);
 
 app.route("/api", api);
 
