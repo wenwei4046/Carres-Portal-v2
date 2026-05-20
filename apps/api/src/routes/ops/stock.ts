@@ -6,6 +6,7 @@ import {
   opsStockReassignInputSchema,
   opsStockTakeoutInputSchema,
   opsStockFlagRepairInputSchema,
+  opsStockUpdateConditionInputSchema,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
@@ -148,6 +149,18 @@ opsStockRouter.post("/takeout", requireOperationOrPrincipal, async (c) => {
     });
   }
   return c.json({ itemId: data });
+});
+
+opsStockRouter.patch("/:itemId/condition", requireOperationOrPrincipal, async (c) => {
+  const itemId = c.req.param("itemId");
+  const parsed = await parseBody(c, opsStockUpdateConditionInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb
+    .from("ops_stock_items")
+    .update({ condition: parsed.condition, updated_at: new Date().toISOString() })
+    .eq("id", itemId);
+  if (error) throw mapErr(error);
+  return c.json({ itemId });
 });
 
 opsStockRouter.post("/flag-repair", requireOperationOrPrincipal, async (c) => {

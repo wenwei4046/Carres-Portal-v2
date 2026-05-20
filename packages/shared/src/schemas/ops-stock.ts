@@ -57,6 +57,12 @@ export const opsStockFlagRepairInputSchema = z.object({
 });
 export type OpsStockFlagRepairInput = z.infer<typeof opsStockFlagRepairInputSchema>;
 
+/** PATCH /api/ops/stock/:itemId/condition */
+export const opsStockUpdateConditionInputSchema = z.object({
+  condition: opsStockConditionSchema,
+});
+export type OpsStockUpdateConditionInput = z.infer<typeof opsStockUpdateConditionInputSchema>;
+
 /** Row returned by /api/ops/stock GET endpoints (filtered subsets). */
 export const opsStockItemSchema = z.object({
   id: z.string().uuid(),

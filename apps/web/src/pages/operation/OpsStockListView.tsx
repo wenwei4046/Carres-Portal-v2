@@ -62,6 +62,15 @@ export default function OpsStockListView(props: Props) {
       }),
     onSuccess: invalidateAll,
   });
+  const conditionMut = useMutation({
+    mutationFn: (args: { itemId: string; condition: string }) =>
+      apiFetch(`/api/ops/stock/${args.itemId}/condition`, {
+        method: "PATCH",
+        body: JSON.stringify({ condition: args.condition }),
+      }),
+    onSuccess: invalidateAll,
+  });
+
   const releaseMut = useMutation({
     mutationFn: (itemId: string) =>
       apiFetch(`/api/ops/stock/release`, {
@@ -184,8 +193,9 @@ export default function OpsStockListView(props: Props) {
                 <th className="text-left px-3 py-2 font-medium">Condition</th>
                 <th className="text-left px-3 py-2 font-medium">Status</th>
                 <th className="text-left px-3 py-2 font-medium">Reserved for</th>
-                <th className="text-left px-3 py-2 font-medium">Prior refs</th>
-                <th className="text-left px-3 py-2 font-medium">PO / Source</th>
+                <th className="text-left px-3 py-2 font-medium">History</th>
+                <th className="text-left px-3 py-2 font-medium">PO No.</th>
+                <th className="text-left px-3 py-2 font-medium">Supplier Ref</th>
                 <th className="text-left px-3 py-2 font-medium">Date in</th>
                 <th className="text-right px-3 py-2 font-medium">Actions</th>
               </tr>
@@ -196,6 +206,9 @@ export default function OpsStockListView(props: Props) {
                   key={r.id}
                   row={r}
                   actions={props.actions}
+                  onConditionChange={(condition) =>
+                    conditionMut.mutate({ itemId: r.id, condition })
+                  }
                   onRelease={() => releaseMut.mutate(r.id)}
                   onReassign={(newRef) =>
                     reassignMut.mutate({ itemId: r.id, newRef })
@@ -216,7 +229,8 @@ export default function OpsStockListView(props: Props) {
                     releaseMut.isPending ||
                     reassignMut.isPending ||
                     takeoutMut.isPending ||
-                    flagRepairMut.isPending
+                    flagRepairMut.isPending ||
+                    conditionMut.isPending
                   }
                 />
               ))}
@@ -228,9 +242,17 @@ export default function OpsStockListView(props: Props) {
   );
 }
 
+const CONDITION_LABEL: Record<string, string> = {
+  new: "New",
+  exhibition: "Exhibition",
+  old: "Old",
+  damaged: "Damaged",
+};
+
 function RowItem({
   row,
   actions,
+  onConditionChange,
   onRelease,
   onReassign,
   onTakeout,
@@ -239,6 +261,7 @@ function RowItem({
 }: {
   row: OpsStockItem;
   actions: Action[];
+  onConditionChange: (c: string) => void;
   onRelease: () => void;
   onReassign: (newRef: string) => void;
   onTakeout: () => void;
@@ -250,20 +273,29 @@ function RowItem({
   return (
     <tr className="border-t border-base-200 hover:bg-base-50">
       <td className="px-3 py-2 font-mono text-base-900">{row.sku}</td>
-      <td className="px-3 py-2 text-base-700">
-        {row.condition}
+      <td className="px-3 py-2">
+        <select
+          value={row.condition}
+          onChange={(e) => onConditionChange(e.target.value)}
+          disabled={busy}
+          className="rounded border border-base-200 bg-white px-1.5 py-0.5 text-xs text-base-700 focus:border-primary focus:outline-none disabled:opacity-50"
+        >
+          {Object.entries(CONDITION_LABEL).map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
         {row.needsRepair ? (
-          <span className="ml-1 text-warning-700">⚠</span>
+          <span className="ml-1 text-warning-700 text-xs">⚠</span>
         ) : null}
       </td>
       <td className="px-3 py-2">
         <span
           className={
             row.status === "free"
-              ? "text-success-700"
+              ? "text-success-700 text-xs font-medium"
               : row.status === "reserved"
-                ? "text-base-700"
-                : "text-base-400"
+                ? "text-base-700 text-xs font-medium"
+                : "text-base-400 text-xs"
           }
         >
           {row.status}
@@ -273,10 +305,8 @@ function RowItem({
       <td className="px-3 py-2 text-xs text-base-500">
         {row.refHistory.length > 0 ? row.refHistory.join(", ") : "—"}
       </td>
-      <td className="px-3 py-2 text-xs text-base-600">
-        {row.poNo ?? "—"}
-        {row.sourceRef ? <span className="ml-1 text-base-400">/ {row.sourceRef}</span> : null}
-      </td>
+      <td className="px-3 py-2 text-xs text-base-600 font-mono">{row.poNo ?? "—"}</td>
+      <td className="px-3 py-2 text-xs text-base-500 font-mono">{row.sourceRef ?? "—"}</td>
       <td className="px-3 py-2 text-xs text-base-500">{fmtDate(row.dateIn)}</td>
       <td className="px-3 py-2 text-right">
         <div className="flex flex-wrap gap-1 justify-end items-center">

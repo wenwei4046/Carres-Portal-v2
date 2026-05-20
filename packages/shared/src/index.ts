@@ -293,6 +293,7 @@ export {
   opsStockReassignInputSchema,
   opsStockTakeoutInputSchema,
   opsStockFlagRepairInputSchema,
+  opsStockUpdateConditionInputSchema,
   opsStockItemSchema,
   opsStockListResponseSchema,
   type OpsStockCondition,
@@ -302,6 +303,7 @@ export {
   type OpsStockReassignInput,
   type OpsStockTakeoutInput,
   type OpsStockFlagRepairInput,
+  type OpsStockUpdateConditionInput,
   type OpsStockItem,
   type OpsStockListResponse,
 } from "./schemas/ops-stock";

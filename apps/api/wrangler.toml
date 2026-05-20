@@ -3,6 +3,7 @@
 # Production: `wrangler deploy --env production` (Phase 9 cutover 2026-05-10)
 
 name = "carres-portal-v2-api"
+account_id = "e2494242a0fd563cacee5a301cf95dd3"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
