@@ -56,8 +56,19 @@ export type AutocountImportInput = z.infer<typeof autocountImportInput>;
 /** Per-order result in the import report. No silent drops. */
 export const autocountImportResultSchema = z.object({
   sourceRef: z.array(z.string()),
-  /** RPC outcome, or 'error' when the order failed entirely. */
-  result: z.enum(["created", "updated", "skipped_locked", "error"]),
+  /**
+   * RPC outcome, or 'error' when the order failed entirely.
+   * - 'updated_items_locked' (added with migration 0135): the order exists at
+   *   status='place' but its items array was edited in portal — non-item
+   *   fields re-imported, items preserved.
+   */
+  result: z.enum([
+    "created",
+    "updated",
+    "updated_items_locked",
+    "skipped_locked",
+    "error",
+  ]),
   orderId: z.string().uuid().nullable(),
   so: z.number().int().nullable(),
   /** Lines whose core item (mattress/bedframe/sofa) failed SKU resolution. */

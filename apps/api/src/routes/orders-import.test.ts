@@ -44,22 +44,47 @@ type RpcReply = { data: unknown; error: unknown };
 function buildSb(
   reply: (payload: any) => RpcReply,
   catalog?: Array<{ sku: string; variant: string }>,
+  // 0135: for /accept-autocount-items endpoint — row returned by
+  // .from('orders').update(...).select().maybeSingle(). null = not found.
+  updateOrderRow?: { id: string; items_edited: boolean } | null,
+  updateOrderError?: unknown,
 ) {
   const calls: Array<{ name: string; payload: any }> = [];
+  const updateCalls: Array<{ table: string; patch: any; eqs: Array<[string, unknown]> }> = [];
   const sb = {
     rpc: async (name: string, args: { payload: any }) => {
       calls.push({ name, payload: args.payload });
       return reply(args.payload);
     },
-    from: (_table: string) => ({
+    from: (table: string) => ({
       select: (_cols: string) => ({
         in: async (_col: string, _vals: string[]) => ({
           data: catalog ?? [],
           error: null,
         }),
       }),
+      update: (patch: any) => {
+        const eqs: Array<[string, unknown]> = [];
+        const chain: any = {
+          eq: (col: string, val: unknown) => {
+            eqs.push([col, val]);
+            return chain;
+          },
+          select: (_cols: string) => ({
+            maybeSingle: async () => {
+              updateCalls.push({ table, patch, eqs });
+              return {
+                data: updateOrderRow ?? null,
+                error: updateOrderError ?? null,
+              };
+            },
+          }),
+        };
+        return chain;
+      },
     }),
     _calls: calls,
+    _updateCalls: updateCalls,
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return sb as any;
@@ -228,5 +253,82 @@ describe("POST /api/orders/import", () => {
     expect(body.results[0].unmatchedDescriptions).toEqual([]);
     // RPC payload's first line uses canonical Item Code, NOT raw description
     expect(sb._calls[0].payload.lines[0].sku).toBe("MS01-B1201F-K");
+  });
+
+  // 0135 — portal-wins-AutoCount guard.
+  it("buckets 'updated_items_locked' under updated count + keeps per-row distinction", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb(okReply("updated_items_locked")));
+    const jwt = await makeJwt("operation");
+    const res = await post(jwt, { dealerId: DEALER_HOUSE, rows: [row()] });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AutocountImportResponse;
+    // Counts: bucketed under "updated"
+    expect(body.updated).toBe(1);
+    expect(body.created).toBe(0);
+    expect(body.skippedLocked).toBe(0);
+    // Per-row detail preserves the locked label
+    expect(body.results[0].result).toBe("updated_items_locked");
+  });
+});
+
+// 0135 — one-shot unlock endpoint.
+describe("POST /api/orders/:id/accept-autocount-items", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a1";
+
+  async function postAccept(jwt: string | null, id: string) {
+    return app.fetch(
+      new Request(`http://t/api/orders/${id}/accept-autocount-items`, {
+        method: "POST",
+        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+      }),
+      env,
+    );
+  }
+
+  it("401 without Authorization", async () => {
+    const res = await postAccept(null, ORDER_ID);
+    expect(res.status).toBe(401);
+  });
+
+  it("403 for non-operation/principal role", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb(okReply()));
+    const jwt = await makeJwt("dealer");
+    const res = await postAccept(jwt, ORDER_ID);
+    expect(res.status).toBe(403);
+  });
+
+  it("clears items_edited and returns the row (operation role)", async () => {
+    const sb = buildSb(okReply(), undefined, { id: ORDER_ID, items_edited: false });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await postAccept(jwt, ORDER_ID);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string; items_edited: boolean };
+    expect(body.id).toBe(ORDER_ID);
+    expect(body.items_edited).toBe(false);
+    // Confirm the UPDATE patched the right column + was scoped to id + status='place'
+    expect(sb._updateCalls).toHaveLength(1);
+    expect(sb._updateCalls[0].patch.items_edited).toBe(false);
+    const eqMap = new Map(sb._updateCalls[0].eqs);
+    expect(eqMap.get("id")).toBe(ORDER_ID);
+    expect(eqMap.get("status")).toBe("place");
+  });
+
+  it("404 when no matching row (already past 'place' or RLS-hidden)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb(okReply(), undefined, null /* no row returned */),
+    );
+    const jwt = await makeJwt("operation");
+    const res = await postAccept(jwt, ORDER_ID);
+    expect(res.status).toBe(404);
+  });
+
+  it("admits principal role too (mirrors /import gate)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb(okReply(), undefined, { id: ORDER_ID, items_edited: false }),
+    );
+    const jwt = await makeJwt("principal");
+    const res = await postAccept(jwt, ORDER_ID);
+    expect(res.status).toBe(200);
   });
 });

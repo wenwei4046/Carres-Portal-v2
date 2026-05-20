@@ -108,4 +108,27 @@ describe("autocountImportResponseSchema", () => {
       }).success,
     ).toBe(false);
   });
+
+  // 0135 — portal-wins-AutoCount guard.
+  it("accepts 'updated_items_locked' as a valid result", () => {
+    expect(
+      autocountImportResponseSchema.safeParse({
+        ordersTotal: 1,
+        created: 0,
+        updated: 1,
+        skippedLocked: 0,
+        errored: 0,
+        results: [
+          {
+            sourceRef: ["CR0418"],
+            result: "updated_items_locked",
+            orderId: "00000000-0000-0000-0000-0000000000a1",
+            so: 1252,
+            unmatchedDescriptions: [],
+            error: null,
+          },
+        ],
+      }).success,
+    ).toBe(true);
+  });
 });

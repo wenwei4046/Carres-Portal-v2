@@ -291,6 +291,11 @@ export interface OrderRow {
   // orders; optional so existing OrderRow constructors/fixtures don't break.
   source_system?: string | null;
   source_ref?: string[] | null;
+  // Portal-wins-AutoCount guard (migration 0135). true once order_lines was
+  // edited in portal; subsequent imports preserve the portal version.
+  // Optional + NOT NULL DEFAULT false on the DB; optional in TS so legacy
+  // fixtures/constructors don't break.
+  items_edited?: boolean;
   placed_at: string;
   created_at: string;
   updated_at: string;

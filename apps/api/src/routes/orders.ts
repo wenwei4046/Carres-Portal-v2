@@ -423,7 +423,8 @@ ordersRouter.post("/import", async (c) => {
     const d = data as {
       id: string;
       so: number;
-      result: "created" | "updated" | "skipped_locked";
+      // 0135 adds 'updated_items_locked' — the portal-wins-AutoCount path.
+      result: "created" | "updated" | "updated_items_locked" | "skipped_locked";
     };
     results.push({
       sourceRef: g.sourceRef,
@@ -438,12 +439,52 @@ ordersRouter.post("/import", async (c) => {
   const resp = {
     ordersTotal: results.length,
     created: results.filter((r) => r.result === "created").length,
-    updated: results.filter((r) => r.result === "updated").length,
+    // Counts bucket 'updated' + 'updated_items_locked' together — per-row
+    // detail in `results[].result` preserves the distinction for the UI.
+    updated: results.filter(
+      (r) => r.result === "updated" || r.result === "updated_items_locked",
+    ).length,
     skippedLocked: results.filter((r) => r.result === "skipped_locked").length,
     errored: results.filter((r) => r.result === "error").length,
     results,
   };
   return c.json(autocountImportResponseSchema.parse(resp));
+});
+
+/**
+ * POST /api/orders/:id/accept-autocount-items — one-shot unlock for the
+ * portal-wins-AutoCount guard. Clears `orders.items_edited`, so the next
+ * AutoCount re-import REPLACES the order's items array with AutoCount's
+ * version (instead of preserving the portal-edited one).
+ *
+ * Use when AutoCount has the truer items list (e.g. customer changed
+ * configuration after order, ops's earlier edit is now stale).
+ *
+ * Allowed: operation, principal (mirrors /import gate). Only valid while
+ * the order is at status='place' — past that, items are frozen anyway by
+ * the proceed flow.
+ */
+ordersRouter.post("/:id/accept-autocount-items", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "operation" && auth.role !== "principal") {
+    throw new HTTPException(403, { message: "Operation or principal only" });
+  }
+  const id = c.req.param("id");
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("orders")
+    .update({ items_edited: false, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "place")
+    .select("id, items_edited")
+    .maybeSingle();
+  if (error) throw new HTTPException(500, { message: error.message });
+  if (!data) {
+    throw new HTTPException(404, {
+      message: "Order not found, not at status='place', or RLS-hidden",
+    });
+  }
+  return c.json({ id: data.id, items_edited: data.items_edited });
 });
 
 /**
