@@ -179,6 +179,13 @@ export const qk = {
      *  the parent so a blunt invalidate fans out. */
     suppliersOverviewPos: (id: string) =>
       ["operation", "suppliers-overview", id, "pos"] as const,
+    /** Phase B (migration 0138) — merged annotation + activity timeline for
+     *  a single order. Nested under "orders" so a blunt invalidate on
+     *  `["operation","orders"]` fans out here too. */
+    orderTimeline: (id: string) =>
+      ["operation", "orders", id, "timeline"] as const,
+    /** Phase B — recent 'escalate'-tagged annotations for Jess's exception inbox. */
+    escalations: () => ["operation", "escalations"] as const,
   },
   // Phase 5 — HQ Finance namespace. Same nested-key strategy as `principal`
   // and `operation` so mutations can blast `["finance"]` (e.g. topup-approve
@@ -1517,6 +1524,9 @@ export interface operationOrderListRow {
    *  yet (pre-confirm-proceed orders); the FE treats `[]` as "no thread state
    *  available" and omits the LP pill. */
   order_supplier_threads: operationOrderThreadRow[];
+  /** Phase B (migration 0138) — latest annotation snippet for kanban card.
+   *  PostgREST returns all annotations; card picks newest by created_at. */
+  order_annotations: { content: string; tag: string | null; created_at: string }[];
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];
@@ -3990,5 +4000,78 @@ export function useDeleteSofaFabric() {
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/sofa-fabrics/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ─── Phase B — Order annotations + activity timeline ─────────────────────────
+
+export type AnnotationTag = "follow_up" | "escalate" | "resolved";
+
+/** A single entry in the merged order timeline.
+ *  kind='annotation' → human note (content + tag populated)
+ *  kind='activity'   → system event (action + detail populated) */
+export interface TimelineEntry {
+  id: string;
+  kind: "annotation" | "activity";
+  content?: string | null;
+  tag?: AnnotationTag | null;
+  action?: string | null;
+  detail?: Record<string, unknown> | null;
+  actor_name?: string | null;
+  occurred_at: string;
+}
+
+export interface AddAnnotationInput {
+  orderId: string;
+  content: string;
+  tag?: AnnotationTag | null;
+}
+
+/** Merged annotation + activity timeline for one order. */
+export function useOrderTimeline(orderId: string | null) {
+  return useQuery({
+    queryKey: orderId
+      ? qk.operation.orderTimeline(orderId)
+      : (["operation", "orders", "null", "timeline"] as const),
+    queryFn: () =>
+      apiFetch<TimelineEntry[]>(`/api/operation/orders/${orderId}/timeline`),
+    enabled: !!orderId,
+    staleTime: 10_000,
+  });
+}
+
+export interface EscalationRow {
+  id: string;
+  content: string;
+  created_at: string;
+  orders: { id: string; so: number; customer_name: string } | null;
+  app_users: { name: string } | null;
+}
+
+/** Recent 🚨 escalate-tagged annotations for Jess's dashboard inbox. */
+export function useEscalations(limit = 10) {
+  return useQuery({
+    queryKey: qk.operation.escalations(),
+    queryFn: () =>
+      apiFetch<EscalationRow[]>(`/api/operation/escalations?limit=${limit}`),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+/** Append a human note to an order.
+ *  Invalidates the timeline cache on success. */
+export function useAddAnnotation() {
+  const qc = useQueryClient();
+  return useMutation<TimelineEntry, ApiError, AddAnnotationInput>({
+    mutationFn: ({ orderId, content, tag }) =>
+      apiFetch<TimelineEntry>(`/api/operation/orders/${orderId}/annotations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, tag: tag ?? null }),
+      }),
+    onSuccess: (_data, { orderId }) => {
+      void qc.invalidateQueries({ queryKey: qk.operation.orderTimeline(orderId) });
+    },
   });
 }

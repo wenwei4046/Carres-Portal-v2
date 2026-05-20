@@ -13,6 +13,7 @@ import {
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 import { useAuth } from "@/lib/auth";
+import AnnotationTimeline from "./AnnotationTimeline";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
 import StageChip, { type OperationStage } from "./StageChip";
@@ -351,7 +352,7 @@ function DrawerBody({
   onTransferReadyClick,
   onTopUpClick,
 }: DrawerBodyProps) {
-  const { order, lines, addons, total, warehouse, stockBalances, pos, history, threads } = data;
+  const { order, lines, addons, total, warehouse, stockBalances, pos, threads } = data;
   // Loo 2026-05-12 — surface the SO PDF reprint button in the header. Hook
   // lives in DrawerBody (not the parent OrderDetailDrawer) because the
   // button JSX renders here; pulling `role` from the parent scope would
@@ -535,28 +536,9 @@ function DrawerBody({
           {order.do_number && <KV label="DO number" value={order.do_number} />}
         </div>
 
-        {/* History */}
-        <SectionHead>History</SectionHead>
-        <div className="bg-white border border-base-200 rounded-[4px] px-4 py-3">
-          {history.length === 0 ? (
-            <div className="text-[12px] text-base-500">No history yet.</div>
-          ) : (
-            history.map((h, i) => (
-              <div
-                key={i}
-                className={`grid grid-cols-[auto_1fr] gap-3 py-1.5 ${i ? "border-t border-dashed border-base-100" : ""}`}
-              >
-                <span className="font-mono text-[10px] text-base-500 whitespace-nowrap">
-                  {h.occurred_at?.slice(0, 16)?.replace("T", " ")}
-                </span>
-                <span className="text-[12px] font-body">
-                  {h.text}{" "}
-                  <span className="text-base-500">· {h.by_role ?? "system"}</span>
-                </span>
-              </div>
-            ))
-          )}
-        </div>
+        {/* Annotations + activity timeline (Phase B) */}
+        <SectionHead>备注 &amp; 活动记录</SectionHead>
+        <AnnotationTimeline orderId={order.id} />
 
         {/* Total */}
         <div className="flex justify-between mt-4 py-3.5 border-t border-base-200">

@@ -137,7 +137,7 @@ function makeOrder(
     // Phase 4.5 Chunk 2 (T9) — embedded threads default to empty array. The
     // dashboard kanban surface shows the LP pill only when threads carry an
     // assigned `delivery_partner_id`; default fixtures stay unassigned.
-    order_supplier_threads: [],
+    order_supplier_threads: [], order_annotations: [],
     ...overrides,
   };
 }

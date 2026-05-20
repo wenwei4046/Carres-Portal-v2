@@ -133,6 +133,10 @@ export default function OrderCard({
   // twice on the same order.
   const threads = order.order_supplier_threads ?? [];
   const posTotal = threads.length;
+
+  // Phase B — latest annotation snippet (newest by created_at)
+  const latestAnnotation = [...(order.order_annotations ?? [])]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
   const posIssued = threads.filter((t) => t.po_id !== null).length;
   const poChipState: "none" | "partial" | "all" =
     posIssued === 0 ? "none" : posIssued < posTotal ? "partial" : "all";
@@ -227,6 +231,27 @@ export default function OrderCard({
               </span>
             </div>
             <div className="text-[11px] text-base-500 mt-0.5">{dateLabel}</div>
+            {/* Phase B — latest annotation snippet */}
+            {latestAnnotation && (
+              <div
+                className="mt-1 flex items-start gap-1"
+                data-testid={`order-card-annotation-${order.so}`}
+              >
+                {latestAnnotation.tag === "escalate" && (
+                  <span className="text-[9px] flex-shrink-0 mt-0.5">🚨</span>
+                )}
+                {latestAnnotation.tag === "follow_up" && (
+                  <span className="text-[9px] flex-shrink-0 mt-0.5">🔔</span>
+                )}
+                {latestAnnotation.tag === "resolved" && (
+                  <span className="text-[9px] flex-shrink-0 mt-0.5">✅</span>
+                )}
+                <span className="text-[10px] text-base-500 line-clamp-1 italic">
+                  {latestAnnotation.content.slice(0, 50)}
+                  {latestAnnotation.content.length > 50 ? "…" : ""}
+                </span>
+              </div>
+            )}
             {/* Phase 4.5 Chunk 2 (T9) — LP pill from thread.delivery_partner_id.
                 The list endpoint returns the partner uuid only (no name join);
                 we surface a short id slug + open the drawer for full detail.

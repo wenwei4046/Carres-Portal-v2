@@ -109,7 +109,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   let q = sb
     .from("orders")
     .select(
-      "id, so, status, operation_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as

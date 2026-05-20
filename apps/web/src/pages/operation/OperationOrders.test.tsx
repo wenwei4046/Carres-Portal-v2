@@ -121,7 +121,7 @@ function makeOrder(overrides: Partial<operationOrderListRow> = {}): operationOrd
     dealers: { name: "ComfortBeds" },
     // Phase 4.5 Chunk 2 (T9) — embedded threads default to empty array. Tests
     // that exercise the LP pill path override with realistic thread fixtures.
-    order_supplier_threads: [],
+    order_supplier_threads: [], order_annotations: [],
     ...overrides,
   };
 }
@@ -774,7 +774,7 @@ describe("OperationOrders — kanban", () => {
         // Order-level delivery_partner_id deliberately set; Chunk 2 ignores it
         // and reads from threads. With empty threads, no pill should render.
         delivery_partner_id: "00000000-0000-0000-0000-000000000fff",
-        order_supplier_threads: [],
+        order_supplier_threads: [], order_annotations: [],
       }),
     ]);
     render(wrap(<OperationOrders />));

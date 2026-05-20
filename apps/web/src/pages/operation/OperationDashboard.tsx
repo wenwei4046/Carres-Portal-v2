@@ -9,6 +9,7 @@ import PipelineColumn from "./components/PipelineColumn";
 import OpenPOsCard from "./components/OpenPOsCard";
 import LowStockCard from "./components/LowStockCard";
 import StockAlertsTile from "./components/StockAlertsTile";
+import EscalationInboxCard from "./components/EscalationInboxCard";
 
 /**
  * operation landing page — hero summary + 3 KPI tiles + 3-column pipeline +
@@ -206,6 +207,12 @@ export default function OperationDashboard({ setTab }: Props) {
         <OpenPOsCard pos={open_pos} onViewAll={() => setTab("procurement")} />
         <LowStockCard lowStock={low_stock} onViewAll={() => setTab("warehouse")} />
         <StockAlertsTile onJumpToWarehouse={() => setTab("warehouse")} />
+      </div>
+
+      {/* Phase B — Jess's escalation inbox. Navigates to orders tab so she
+          can open the drawer and resolve the issue. */}
+      <div className="mt-4">
+        <EscalationInboxCard onViewOrder={() => setTab("orders")} />
       </div>
     </div>
   );
