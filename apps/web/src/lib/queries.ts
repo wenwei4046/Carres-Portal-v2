@@ -109,6 +109,10 @@ export const qk = {
   // `List*Query` zod-derived shapes from `@carres/shared` so a wrong key fails
   // typecheck at the call site rather than silently breaking cache reads.
   operation: {
+    /** 0136 — AutoCount-imported orders still in Inbox triage (no logistic
+     *  assigned). Polled 15s while the page is open so newly-imported orders
+     *  appear without manual refresh. */
+    inbox: () => ["operation", "inbox"] as const,
     dashboard: () => ["operation", "dashboard"] as const,
     /** Loo 2026-05-10 — sidebar badge counts (orders awaiting + pickup-action
      *  POs). 30s refetch, kept under `operation` so a future blunt invalidate

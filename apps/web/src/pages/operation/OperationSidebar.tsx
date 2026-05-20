@@ -33,6 +33,17 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    // 2026-05-20 — Phase A · AutoCount integration. Replaces the operation
+    // team's Google Sheet workflow. Import = paste in the AutoCount listing
+    // CSV; Inbox = the triage queue of AutoCount-imported orders awaiting
+    // logistic assignment (NETS / TSDD / AL / HOUZS).
+    label: "AutoCount",
+    items: [
+      { k: "ops-import", t: "Import", icon: "↥" },
+      { k: "ops-inbox",  t: "Inbox",  icon: "▤" },
+    ],
+  },
+  {
     label: "Stock",
     items: [
       { k: "warehouse", t: "Warehouse", icon: "□" },

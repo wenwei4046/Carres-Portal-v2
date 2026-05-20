@@ -11,6 +11,9 @@ import OperationCatalog from "@/pages/catalog/OperationCatalog";
 import OperationStock from "./OperationStock";
 import OperationAllOrders from "./OperationAllOrders";
 import OperationSuppliers from "./OperationSuppliers";
+// 2026-05-20 — Phase A · AutoCount integration tabs.
+import OperationImport from "./OperationImport";
+import OperationInbox from "./OperationInbox";
 import type { MovementsFilters } from "@/lib/queries";
 
 /**
@@ -175,6 +178,9 @@ export default function OperationApp() {
             {tab === "stock" && <OperationStock />}
             {tab === "all-orders" && <OperationAllOrders />}
             {tab === "suppliers" && <OperationSuppliers />}
+            {/* 2026-05-20 — Phase A · AutoCount integration */}
+            {tab === "ops-import" && <OperationImport />}
+            {tab === "ops-inbox" && <OperationInbox />}
           </>
         )}
       </main>
