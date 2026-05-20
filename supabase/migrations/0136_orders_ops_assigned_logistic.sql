@@ -74,12 +74,15 @@ BEGIN
     RAISE EXCEPTION '0136 sanity: orders_inbox_idx missing';
   END IF;
 
+  -- The existing NETS row is named "Nets Sdn Bhd" (formal company name from
+  -- Phase 9 master data) — match it case-insensitively by prefix so we
+  -- don't depend on exact display casing.
   SELECT count(*) INTO partner_count
     FROM delivery_partners
-   WHERE name IN ('NETS','TSDD','AL','HOUZS');
+   WHERE name ILIKE 'nets%' OR name IN ('TSDD','AL','HOUZS');
   IF partner_count < 4 THEN
-    RAISE EXCEPTION '0136 sanity: expected 4 logistic partners (NETS/TSDD/AL/HOUZS) seeded, got %', partner_count;
+    RAISE EXCEPTION '0136 sanity: expected 4 logistic partners (Nets*/TSDD/AL/HOUZS) seeded, got %', partner_count;
   END IF;
 
-  RAISE NOTICE '0136 OK: ops_assigned_logistic column + indexes added; % core logistic partners present (NETS/TSDD/AL/HOUZS)', partner_count;
+  RAISE NOTICE '0136 OK: ops_assigned_logistic column + indexes added; % core logistic partners present (Nets*/TSDD/AL/HOUZS)', partner_count;
 END $sanity$;
