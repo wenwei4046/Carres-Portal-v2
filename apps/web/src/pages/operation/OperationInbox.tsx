@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
+import { fmtDate } from "@/lib/fmt-date";
 
 /**
  * Operation · Inbox — Phase A step 3 (migration 0136).
@@ -132,7 +133,7 @@ export default function OperationInbox() {
                     {(r.source_ref ?? []).join(" + ") || "—"}
                   </td>
                   <td className="px-4 py-3 text-base-700">
-                    {r.delivery_date ?? <span className="text-base-400">TBD</span>}
+                    {r.delivery_date ? fmtDate(r.delivery_date) : <span className="text-base-400">TBD</span>}
                   </td>
                   <td className="px-4 py-3">
                     <select

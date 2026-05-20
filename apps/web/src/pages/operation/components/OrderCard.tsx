@@ -3,6 +3,7 @@ import type {
   operationOrderThreadRow,
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
+import { fmtDate } from "@/lib/fmt-date";
 import type { OperationStage } from "./StageChip";
 
 /**
@@ -118,10 +119,10 @@ export default function OrderCard({
     : dealerName;
 
   const dateLabel = order.delivery_date
-    ? `→ ${order.delivery_date}`
+    ? `→ ${fmtDate(order.delivery_date)}`
     : "Date TBD";
 
-  const placedShort = order.placed_at?.slice(0, 10) ?? "";
+  const placedShort = fmtDate(order.placed_at);
 
   // Phase 4.5 Chunk 2 (T9) — LP pill driven by thread.delivery_partner_id.
   const lpSummary = summariseThreadLps(order.order_supplier_threads);

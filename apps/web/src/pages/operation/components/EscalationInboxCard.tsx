@@ -1,4 +1,5 @@
 import { useEscalations } from "@/lib/queries";
+import { fmtDate } from "@/lib/fmt-date";
 
 interface Props {
   onViewOrder: (orderId: string) => void;
@@ -43,7 +44,7 @@ export default function EscalationInboxCard({ onViewOrder }: Props) {
                     #{item.orders?.so ?? "—"} {item.orders?.customer_name ?? ""}
                   </span>
                   <span className="font-mono text-[9px] text-base-400 whitespace-nowrap">
-                    {item.created_at?.slice(0, 10) ?? ""}
+                    {fmtDate(item.created_at)}
                   </span>
                 </div>
                 <p className="text-[11px] text-base-600 mt-0.5 line-clamp-2">

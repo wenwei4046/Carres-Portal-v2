@@ -12,6 +12,7 @@ import {
   type operationOrderDetailStockBalance,
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
+import { fmtDate } from "@/lib/fmt-date";
 import { useAuth } from "@/lib/auth";
 import AnnotationTimeline from "./AnnotationTimeline";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
@@ -519,7 +520,7 @@ function DrawerBody({
               order.delivery_date_tbd ? (
                 <em className="text-warning">TBD</em>
               ) : (
-                order.delivery_date ?? "—"
+                fmtDate(order.delivery_date)
               )
             }
           />

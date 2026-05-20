@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
+import { fmtDate } from "@/lib/fmt-date";
 
 /**
  * Phase 10 · Operation · Suppliers — `reference/proto/principal-suppliers.jsx`
@@ -167,7 +168,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
               <div>
                 <div className="font-mono font-semibold">{p.id}</div>
                 <div className="text-[11px] text-base-500 mt-0.5">
-                  {p.placedAt?.slice(0, 10) ?? "—"}
+                  {fmtDate(p.placedAt)}
                 </div>
               </div>
               <div className="text-right">

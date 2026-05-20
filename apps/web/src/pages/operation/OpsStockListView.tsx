@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queries";
+import { fmtDate } from "@/lib/fmt-date";
 import type { OpsStockItem, OpsStockListResponse } from "@carres/shared";
 
 /**
@@ -276,7 +277,7 @@ function RowItem({
         {row.poNo ?? "—"}
         {row.sourceRef ? <span className="ml-1 text-base-400">/ {row.sourceRef}</span> : null}
       </td>
-      <td className="px-3 py-2 text-xs text-base-500">{row.dateIn ?? "—"}</td>
+      <td className="px-3 py-2 text-xs text-base-500">{fmtDate(row.dateIn)}</td>
       <td className="px-3 py-2 text-right">
         <div className="flex flex-wrap gap-1 justify-end items-center">
           {actions.includes("release") && row.status === "reserved" ? (

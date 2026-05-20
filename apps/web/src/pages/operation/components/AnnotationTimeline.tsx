@@ -6,6 +6,7 @@ import {
   type TimelineEntry,
   type AnnotationTag,
 } from "@/lib/queries";
+import { fmtDate } from "@/lib/fmt-date";
 
 // ─── Tag helpers ─────────────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ function TimelineRow({
   entry: TimelineEntry;
   first: boolean;
 }) {
-  const time = entry.occurred_at?.slice(0, 16)?.replace("T", " ") ?? "";
+  const time = fmtDate(entry.occurred_at, { time: true });
 
   if (entry.kind === "annotation") {
     return (

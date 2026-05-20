@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
+import { fmtDate } from "@/lib/fmt-date";
 
 /**
  * Phase 10 · Operation · All orders — `reference/proto/principal-views.jsx`
@@ -152,7 +153,7 @@ export default function OperationAllOrders() {
                   <StatusChip status={o.status} />
                 </td>
                 <td className="px-4 py-2.5 text-base-500 text-[11.5px]">
-                  {o.placedAt ? o.placedAt.slice(0, 10) : "—"}
+                  {fmtDate(o.placedAt)}
                 </td>
               </tr>
             ))}
