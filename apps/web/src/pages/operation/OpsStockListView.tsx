@@ -134,7 +134,7 @@ export default function OpsStockListView(props: Props) {
                 className="rounded border border-base-300 px-2 py-1.5 text-sm w-40"
                 value={reserveRef}
                 onChange={(e) => setReserveRef(e.target.value)}
-                placeholder="CR0418"
+                placeholder="SO-1001"
               />
             </label>
             <button
