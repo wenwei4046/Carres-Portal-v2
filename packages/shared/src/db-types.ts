@@ -296,6 +296,10 @@ export interface OrderRow {
   // Optional + NOT NULL DEFAULT false on the DB; optional in TS so legacy
   // fixtures/constructors don't break.
   items_edited?: boolean;
+  // Inbox triage pre-assignment (migration 0136). FK to delivery_partners.id.
+  // NULL = still in Inbox. Separate from delivery_partner_id (formal LP
+  // set later by the proceed/assign flow).
+  ops_assigned_logistic?: string | null;
   placed_at: string;
   created_at: string;
   updated_at: string;

@@ -12,6 +12,7 @@ import {
   orderSchema,
   ordersListResponseSchema,
   orderStatusSchema,
+  setOpsAssignedLogisticInputSchema,
   setOrderAddressInputSchema,
   setOrderDateInputSchema,
   topUpOrderInputSchema,
@@ -124,6 +125,38 @@ ordersRouter.get("/", async (c) => {
 
   const body = ordersListResponseSchema.parse({ orders, total: orders.length });
   return c.json(body);
+});
+
+/**
+ * GET /api/orders/inbox — operation triage queue (migration 0136).
+ *
+ * Returns AutoCount-imported orders still in Inbox = status='place' AND
+ * source_system='autocount' AND ops_assigned_logistic IS NULL.
+ *
+ * Operation OR principal only. RLS sees all orders for internal roles, so
+ * the filter is the only narrowing. Sorted oldest first (FIFO triage).
+ *
+ * Static path — must register BEFORE the GET /:id route so "inbox" doesn't
+ * match the :id param. (Hono Trie router resolves static > dynamic anyway,
+ * but ordering is explicit insurance.)
+ */
+ordersRouter.get("/inbox", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "operation" && auth.role !== "principal") {
+    throw new HTTPException(403, { message: "Operation or principal only" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("orders")
+    .select(
+      "id, so, customer_name, customer_phone, customer_address, delivery_date, paid, source_ref, source_system, ops_assigned_logistic, placed_at",
+    )
+    .eq("status", "place")
+    .eq("source_system", "autocount")
+    .is("ops_assigned_logistic", null)
+    .order("placed_at", { ascending: true });
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ orders: data ?? [], total: (data ?? []).length });
 });
 
 /**
@@ -485,6 +518,59 @@ ordersRouter.post("/:id/accept-autocount-items", async (c) => {
     });
   }
   return c.json({ id: data.id, items_edited: data.items_edited });
+});
+
+/**
+ * POST /api/orders/:id/ops-assign — set/clear orders.ops_assigned_logistic
+ * (migration 0136). The Inbox triage step: operation picks which logistic
+ * partner (NETS / TSDD / AL / HOUZS) will handle this AutoCount-imported
+ * order. Pass deliveryPartnerId=null to clear (returns the order to Inbox).
+ *
+ * Operation OR principal only. Scoped to status='place' — past that, the
+ * formal proceed/assign flow owns delivery_partner_id and this triage
+ * column becomes purely historical.
+ */
+ordersRouter.post("/:id/ops-assign", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "operation" && auth.role !== "principal") {
+    throw new HTTPException(403, { message: "Operation or principal only" });
+  }
+  const id = c.req.param("id");
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = setOpsAssignedLogisticInputSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid ops-assign input: " + parsed.error.issues[0]?.message,
+    });
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("orders")
+    .update({
+      ops_assigned_logistic: parsed.data.deliveryPartnerId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "place")
+    .select("id, ops_assigned_logistic")
+    .maybeSingle();
+  if (error) throw new HTTPException(500, { message: error.message });
+  if (!data) {
+    throw new HTTPException(404, {
+      message: "Order not found, not at status='place', or RLS-hidden",
+    });
+  }
+  return c.json({
+    id: data.id,
+    ops_assigned_logistic: data.ops_assigned_logistic,
+  });
 });
 
 /**

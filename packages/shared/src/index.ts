@@ -39,6 +39,7 @@ export {
   setOrderDateInputSchema,
   updateOrderInputSchema,
   cancelOrderInputSchema,
+  setOpsAssignedLogisticInputSchema,
   type Order,
   type OrderLine,
   type OrderAddon,
@@ -54,6 +55,7 @@ export {
   type SetOrderDateInput,
   type UpdateOrderInput,
   type CancelOrderInput,
+  type SetOpsAssignedLogisticInput,
 } from "./schemas/orders";
 
 export {

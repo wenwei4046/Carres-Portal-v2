@@ -41,48 +41,64 @@ async function makeJwt(role: string) {
 }
 
 type RpcReply = { data: unknown; error: unknown };
-function buildSb(
-  reply: (payload: any) => RpcReply,
-  catalog?: Array<{ sku: string; variant: string }>,
-  // 0135: for /accept-autocount-items endpoint — row returned by
-  // .from('orders').update(...).select().maybeSingle(). null = not found.
-  updateOrderRow?: { id: string; items_edited: boolean } | null,
-  updateOrderError?: unknown,
-) {
+type SbOpts = {
+  rpcReply?: (payload: any) => RpcReply;
+  // 0133: for /import → product_skus catalog resolution via .from('product_skus').select(...).in(...)
+  catalog?: Array<{ sku: string; variant: string }>;
+  // 0135/0136: for /accept-autocount-items + /ops-assign — row returned by
+  // .from('orders').update(...).eq().eq().select(...).maybeSingle()
+  orderUpdateRow?: Record<string, unknown> | null;
+  orderUpdateError?: unknown;
+  // 0136: for /inbox → row list from .from('orders').select(...).eq().eq().is().order()
+  inboxRows?: Array<Record<string, unknown>>;
+};
+function buildSb(opts: SbOpts = {}) {
   const calls: Array<{ name: string; payload: any }> = [];
   const updateCalls: Array<{ table: string; patch: any; eqs: Array<[string, unknown]> }> = [];
   const sb = {
     rpc: async (name: string, args: { payload: any }) => {
       calls.push({ name, payload: args.payload });
-      return reply(args.payload);
+      return (opts.rpcReply ?? (() => ({ data: null, error: { message: "no rpcReply configured" } })))(args.payload);
     },
-    from: (table: string) => ({
-      select: (_cols: string) => ({
-        in: async (_col: string, _vals: string[]) => ({
-          data: catalog ?? [],
-          error: null,
-        }),
-      }),
-      update: (patch: any) => {
+    from: (table: string) => {
+      const selectChain = (_cols?: string): any => {
+        const chain: any = {
+          // .in() is terminal: returns the catalog (product_skus path)
+          in: async (_col: string, _vals: string[]) => ({
+            data: opts.catalog ?? [],
+            error: null,
+          }),
+          // .eq().is().order() chain for the /inbox read; resolves to inboxRows
+          eq: () => chain,
+          is: () => chain,
+          order: async () => ({ data: opts.inboxRows ?? [], error: null }),
+        };
+        return chain;
+      };
+      const updateChain = (patch: any): any => {
         const eqs: Array<[string, unknown]> = [];
         const chain: any = {
           eq: (col: string, val: unknown) => {
             eqs.push([col, val]);
             return chain;
           },
-          select: (_cols: string) => ({
+          select: (_cols?: string) => ({
             maybeSingle: async () => {
               updateCalls.push({ table, patch, eqs });
               return {
-                data: updateOrderRow ?? null,
-                error: updateOrderError ?? null,
+                data: opts.orderUpdateRow ?? null,
+                error: opts.orderUpdateError ?? null,
               };
             },
           }),
         };
         return chain;
-      },
-    }),
+      };
+      return {
+        select: selectChain,
+        update: updateChain,
+      };
+    },
     _calls: calls,
     _updateCalls: updateCalls,
   };
@@ -153,21 +169,21 @@ describe("POST /api/orders/import", () => {
   });
 
   it("403 for a non-operation/principal role", async () => {
-    vi.mocked(userClient).mockReturnValue(buildSb(okReply()));
+    vi.mocked(userClient).mockReturnValue(buildSb({ rpcReply: okReply() }));
     const jwt = await makeJwt("dealer");
     const res = await post(jwt, { dealerId: DEALER_HOUSE, rows: [row()] });
     expect(res.status).toBe(403);
   });
 
   it("400 on invalid body", async () => {
-    vi.mocked(userClient).mockReturnValue(buildSb(okReply()));
+    vi.mocked(userClient).mockReturnValue(buildSb({ rpcReply: okReply() }));
     const jwt = await makeJwt("operation");
     const res = await post(jwt, { dealerId: "not-a-uuid", rows: [] });
     expect(res.status).toBe(400);
   });
 
   it("groups rows sharing a Ref into one order; calls RPC once", async () => {
-    const sb = buildSb(okReply("created"));
+    const sb = buildSb({ rpcReply: okReply("created") });
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("operation");
     const res = await post(jwt, {
@@ -189,7 +205,7 @@ describe("POST /api/orders/import", () => {
   });
 
   it("splits a combined Ref into a sorted unique source_ref array", async () => {
-    const sb = buildSb(okReply());
+    const sb = buildSb({ rpcReply: okReply() });
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("operation");
     const res = await post(jwt, {
@@ -201,7 +217,7 @@ describe("POST /api/orders/import", () => {
   });
 
   it("flags unmatched core items in the report (SKU resolver is a pending seam)", async () => {
-    vi.mocked(userClient).mockReturnValue(buildSb(okReply()));
+    vi.mocked(userClient).mockReturnValue(buildSb({ rpcReply: okReply() }));
     const jwt = await makeJwt("operation");
     const res = await post(jwt, {
       dealerId: DEALER_HOUSE,
@@ -217,7 +233,7 @@ describe("POST /api/orders/import", () => {
   });
 
   it("passes through skipped_locked from the RPC", async () => {
-    vi.mocked(userClient).mockReturnValue(buildSb(okReply("skipped_locked")));
+    vi.mocked(userClient).mockReturnValue(buildSb({ rpcReply: okReply("skipped_locked") }));
     const jwt = await makeJwt("principal");
     const res = await post(jwt, { dealerId: DEALER_HOUSE, rows: [row()] });
     const body = (await res.json()) as AutocountImportResponse;
@@ -226,7 +242,7 @@ describe("POST /api/orders/import", () => {
   });
 
   it("records a per-order error instead of failing the whole batch", async () => {
-    const sb = buildSb(() => ({ data: null, error: { message: "boom" } }));
+    const sb = buildSb({ rpcReply: () => ({ data: null, error: { message: "boom" } }) });
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("operation");
     const res = await post(jwt, { dealerId: DEALER_HOUSE, rows: [row()] });
@@ -238,9 +254,10 @@ describe("POST /api/orders/import", () => {
   });
 
   it("resolves Description → Item Code via product_skus.variant (0133 seam)", async () => {
-    const sb = buildSb(okReply(), [
-      { sku: "MS01-B1201F-K", variant: "Breeze FirmCare-B1201F-K" },
-    ]);
+    const sb = buildSb({
+      rpcReply: okReply(),
+      catalog: [{ sku: "MS01-B1201F-K", variant: "Breeze FirmCare-B1201F-K" }],
+    });
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("operation");
     const res = await post(jwt, {
@@ -257,7 +274,7 @@ describe("POST /api/orders/import", () => {
 
   // 0135 — portal-wins-AutoCount guard.
   it("buckets 'updated_items_locked' under updated count + keeps per-row distinction", async () => {
-    vi.mocked(userClient).mockReturnValue(buildSb(okReply("updated_items_locked")));
+    vi.mocked(userClient).mockReturnValue(buildSb({ rpcReply: okReply("updated_items_locked") }));
     const jwt = await makeJwt("operation");
     const res = await post(jwt, { dealerId: DEALER_HOUSE, rows: [row()] });
     expect(res.status).toBe(200);
@@ -291,14 +308,17 @@ describe("POST /api/orders/:id/accept-autocount-items", () => {
   });
 
   it("403 for non-operation/principal role", async () => {
-    vi.mocked(userClient).mockReturnValue(buildSb(okReply()));
+    vi.mocked(userClient).mockReturnValue(buildSb({ rpcReply: okReply() }));
     const jwt = await makeJwt("dealer");
     const res = await postAccept(jwt, ORDER_ID);
     expect(res.status).toBe(403);
   });
 
   it("clears items_edited and returns the row (operation role)", async () => {
-    const sb = buildSb(okReply(), undefined, { id: ORDER_ID, items_edited: false });
+    const sb = buildSb({
+      rpcReply: okReply(),
+      orderUpdateRow: { id: ORDER_ID, items_edited: false },
+    });
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("operation");
     const res = await postAccept(jwt, ORDER_ID);
@@ -316,7 +336,7 @@ describe("POST /api/orders/:id/accept-autocount-items", () => {
 
   it("404 when no matching row (already past 'place' or RLS-hidden)", async () => {
     vi.mocked(userClient).mockReturnValue(
-      buildSb(okReply(), undefined, null /* no row returned */),
+      buildSb({ rpcReply: okReply(), orderUpdateRow: null /* no row returned */ }),
     );
     const jwt = await makeJwt("operation");
     const res = await postAccept(jwt, ORDER_ID);
@@ -325,10 +345,152 @@ describe("POST /api/orders/:id/accept-autocount-items", () => {
 
   it("admits principal role too (mirrors /import gate)", async () => {
     vi.mocked(userClient).mockReturnValue(
-      buildSb(okReply(), undefined, { id: ORDER_ID, items_edited: false }),
+      buildSb({ rpcReply: okReply(), orderUpdateRow: { id: ORDER_ID, items_edited: false } }),
     );
     const jwt = await makeJwt("principal");
     const res = await postAccept(jwt, ORDER_ID);
     expect(res.status).toBe(200);
+  });
+});
+
+// 0136 — Inbox triage assignment.
+describe("POST /api/orders/:id/ops-assign", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a1";
+  const PARTNER_ID = "00000000-0000-0000-0000-0000000000e1";
+
+  async function postAssign(jwt: string | null, id: string, body: unknown) {
+    return app.fetch(
+      new Request(`http://t/api/orders/${id}/ops-assign`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+        },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("401 without Authorization", async () => {
+    const res = await postAssign(null, ORDER_ID, { deliveryPartnerId: PARTNER_ID });
+    expect(res.status).toBe(401);
+  });
+
+  it("403 for non-operation/principal role", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb({ rpcReply: okReply() }));
+    const jwt = await makeJwt("dealer");
+    const res = await postAssign(jwt, ORDER_ID, { deliveryPartnerId: PARTNER_ID });
+    expect(res.status).toBe(403);
+  });
+
+  it("400 on invalid input (non-uuid)", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb({ rpcReply: okReply() }));
+    const jwt = await makeJwt("operation");
+    const res = await postAssign(jwt, ORDER_ID, { deliveryPartnerId: "not-a-uuid" });
+    expect(res.status).toBe(400);
+  });
+
+  it("sets ops_assigned_logistic to a partner uuid (operation)", async () => {
+    const sb = buildSb({
+      rpcReply: okReply(),
+      orderUpdateRow: { id: ORDER_ID, ops_assigned_logistic: PARTNER_ID },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await postAssign(jwt, ORDER_ID, { deliveryPartnerId: PARTNER_ID });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string; ops_assigned_logistic: string | null };
+    expect(body.ops_assigned_logistic).toBe(PARTNER_ID);
+    // Update patched the right column scoped to id + status='place'
+    expect(sb._updateCalls).toHaveLength(1);
+    expect(sb._updateCalls[0].patch.ops_assigned_logistic).toBe(PARTNER_ID);
+    const eqMap = new Map(sb._updateCalls[0].eqs);
+    expect(eqMap.get("id")).toBe(ORDER_ID);
+    expect(eqMap.get("status")).toBe("place");
+  });
+
+  it("clears ops_assigned_logistic when deliveryPartnerId=null (returns order to Inbox)", async () => {
+    const sb = buildSb({
+      rpcReply: okReply(),
+      orderUpdateRow: { id: ORDER_ID, ops_assigned_logistic: null },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await postAssign(jwt, ORDER_ID, { deliveryPartnerId: null });
+    expect(res.status).toBe(200);
+    expect(sb._updateCalls[0].patch.ops_assigned_logistic).toBeNull();
+  });
+
+  it("404 when no row matches (not at status='place' or RLS-hidden)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({ rpcReply: okReply(), orderUpdateRow: null }),
+    );
+    const jwt = await makeJwt("operation");
+    const res = await postAssign(jwt, ORDER_ID, { deliveryPartnerId: PARTNER_ID });
+    expect(res.status).toBe(404);
+  });
+});
+
+// 0136 — Inbox triage queue.
+describe("GET /api/orders/inbox", () => {
+  async function getInbox(jwt: string | null) {
+    return app.fetch(
+      new Request("http://t/api/orders/inbox", {
+        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+      }),
+      env,
+    );
+  }
+
+  it("401 without Authorization", async () => {
+    const res = await getInbox(null);
+    expect(res.status).toBe(401);
+  });
+
+  it("403 for non-operation/principal role", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb({ rpcReply: okReply() }));
+    const jwt = await makeJwt("dealer");
+    const res = await getInbox(jwt);
+    expect(res.status).toBe(403);
+  });
+
+  it("returns the filtered Inbox rows (operation)", async () => {
+    const rows = [
+      {
+        id: "11111111-1111-1111-1111-000000000001",
+        so: 1252,
+        customer_name: "Felix Koh",
+        ops_assigned_logistic: null,
+      },
+      {
+        id: "11111111-1111-1111-1111-000000000002",
+        so: 1253,
+        customer_name: "Tan Win Shen",
+        ops_assigned_logistic: null,
+      },
+    ];
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({ rpcReply: okReply(), inboxRows: rows }),
+    );
+    const jwt = await makeJwt("operation");
+    const res = await getInbox(jwt);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { orders: typeof rows; total: number };
+    expect(body.total).toBe(2);
+    expect(body.orders[0].so).toBe(1252);
+    expect(body.orders[1].so).toBe(1253);
+  });
+
+  it("returns empty list when nothing in Inbox", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({ rpcReply: okReply(), inboxRows: [] }),
+    );
+    const jwt = await makeJwt("principal");
+    const res = await getInbox(jwt);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { orders: unknown[]; total: number };
+    expect(body.total).toBe(0);
+    expect(body.orders).toEqual([]);
   });
 });

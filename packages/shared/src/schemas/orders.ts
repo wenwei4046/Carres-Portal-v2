@@ -296,6 +296,14 @@ export const updateOrderInputSchema = z
   });
 export type UpdateOrderInput = z.infer<typeof updateOrderInputSchema>;
 
+// 0136 — Inbox triage assignment. Pass null to clear (return to Inbox).
+export const setOpsAssignedLogisticInputSchema = z.object({
+  deliveryPartnerId: z.string().uuid().nullable(),
+});
+export type SetOpsAssignedLogisticInput = z.infer<
+  typeof setOpsAssignedLogisticInputSchema
+>;
+
 export const dealerSelfSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
