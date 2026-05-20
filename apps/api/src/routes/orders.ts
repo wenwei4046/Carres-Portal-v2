@@ -303,15 +303,33 @@ function parsePaid(balance?: string | null | undefined): number {
 }
 
 /**
- * SKU resolution seam. The SKU master (scripts/ops-seed/carres-sku-master.xlsx)
- * is not yet seeded into product_skus (contract §9 open item #3 — separate
- * task). Until then this returns null: the line stores the raw AutoCount
- * Description as `sku` (nothing lost), and core items are flagged in the
- * import report so operation can reconcile. Wiring real Description→Item Code
- * resolution later is a one-function change here.
+ * SKU resolution: AutoCount Description → portal Item Code, via
+ * product_skus.variant (which migration 0133 seeded with the AutoCount
+ * Description text). The lookup is a single batched SELECT before the
+ * per-order loop, so the per-row resolve becomes a Map.get.
+ *
+ * Lines whose description is not in product_skus.variant fall back to
+ * storing the raw description as sku, and core items (mattress/bedframe/
+ * sofa) are flagged in the import report so operation can reconcile.
  */
-function resolveSku(_detailDescription: string): string | null {
-  return null;
+async function buildSkuResolver(
+  sb: ReturnType<typeof userClient>,
+  descriptions: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (descriptions.length === 0) return map;
+  const { data, error } = await sb
+    .from("product_skus")
+    .select("sku, variant")
+    .in("variant", descriptions);
+  if (error) {
+    // Don't fail the import on a catalog read error — degrade to fallback.
+    return map;
+  }
+  for (const row of (data ?? []) as Array<{ sku: string; variant: string }>) {
+    map.set(row.variant, row.sku);
+  }
+  return map;
 }
 
 ordersRouter.post("/import", async (c) => {
@@ -350,16 +368,24 @@ ordersRouter.post("/import", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
+
+  // One batched catalog read: resolve every distinct description in the batch.
+  const distinctDescriptions = Array.from(
+    new Set(rows.map((r) => r.detailDescription.trim())),
+  );
+  const skuByDesc = await buildSkuResolver(sb, distinctDescriptions);
+
   const results: AutocountImportResult[] = [];
 
   for (const g of groups.values()) {
     const first = g.rows[0];
     const unmatched: string[] = [];
     const lines = g.rows.map((r) => {
-      const resolved = resolveSku(r.detailDescription);
-      if (!resolved && isCoreItem(r.itemGroup)) unmatched.push(r.detailDescription);
+      const desc = r.detailDescription.trim();
+      const resolved = skuByDesc.get(desc) ?? null;
+      if (!resolved && isCoreItem(r.itemGroup)) unmatched.push(desc);
       return {
-        sku: resolved ?? r.detailDescription,
+        sku: resolved ?? desc,
         qty: r.qty,
         attrs: null,
         unit_price: 0, // listing carries no price; financials stay in AutoCount

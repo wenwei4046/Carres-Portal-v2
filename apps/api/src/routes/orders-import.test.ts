@@ -41,13 +41,24 @@ async function makeJwt(role: string) {
 }
 
 type RpcReply = { data: unknown; error: unknown };
-function buildSb(reply: (payload: any) => RpcReply) {
+function buildSb(
+  reply: (payload: any) => RpcReply,
+  catalog?: Array<{ sku: string; variant: string }>,
+) {
   const calls: Array<{ name: string; payload: any }> = [];
   const sb = {
     rpc: async (name: string, args: { payload: any }) => {
       calls.push({ name, payload: args.payload });
       return reply(args.payload);
     },
+    from: (_table: string) => ({
+      select: (_cols: string) => ({
+        in: async (_col: string, _vals: string[]) => ({
+          data: catalog ?? [],
+          error: null,
+        }),
+      }),
+    }),
     _calls: calls,
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -199,5 +210,23 @@ describe("POST /api/orders/import", () => {
     expect(body.errored).toBe(1);
     expect(body.results[0].result).toBe("error");
     expect(body.results[0].error).toBe("boom");
+  });
+
+  it("resolves Description → Item Code via product_skus.variant (0133 seam)", async () => {
+    const sb = buildSb(okReply(), [
+      { sku: "MS01-B1201F-K", variant: "Breeze FirmCare-B1201F-K" },
+    ]);
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await post(jwt, {
+      dealerId: DEALER_HOUSE,
+      rows: [row({ detailDescription: "Breeze FirmCare-B1201F-K" })],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AutocountImportResponse;
+    // Resolved → no unmatched flag, even for core item
+    expect(body.results[0].unmatchedDescriptions).toEqual([]);
+    // RPC payload's first line uses canonical Item Code, NOT raw description
+    expect(sb._calls[0].payload.lines[0].sku).toBe("MS01-B1201F-K");
   });
 });
