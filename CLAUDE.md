@@ -302,19 +302,21 @@ Don't burn an hour spinning. Surface and ask.
 
 ## 17. Project status
 
-### 17.1 Current state (as of 2026-05-18)
+### 17.1 Current state (as of 2026-05-20)
 
 | | |
 |---|---|
-| Active phase | **Phase 10** — post-launch fixes + per-thread architecture |
+| Active phase | **Phase 10** — post-launch fixes + Phase A (AutoCount import + per-unit stock) |
 | Project started | 2026-05-02 |
 | Web URL | https://carres-portal.pages.dev |
 | API URL | https://carres-portal-v2-api.wwch.workers.dev |
 | DB | staging Supabase = prod, project_id `kfprgpjpaffedghytstl` |
-| Latest migration | **0131** `supplier_mark_ready_po_rollup` |
-| Test count | api 629/632 · web 439/443 · shared 154/154 (4 web + 3 api pre-existing failures, see §17.7) |
-| Web bundle | 2620 KiB raw / 781 KiB gzipped (regression flagged, see CFs §17.5) |
-| API bundle | 4744 KiB raw / 993 KiB gzipped (31 KiB under Workers Free 1024 KiB limit) |
+| Latest migration | **0137** `ops_stock_items` (per-unit stock register · Carres Klang 67 units seeded) |
+| Catalog state | 11 suppliers · 170 product_models · 1013 product_skus (target 1091, 78 source dupes in carres-sku-master.xlsx — see CFs) |
+| Orders state | 0 transactional orders; orders_so_seq reset to 1000; next nextval = SO-1001 (4 alpha test orders SO-1001..1004 wiped 2026-05-20) |
+| Test count | api 629/632 · web 439/443 · shared 154/154 (4 web + 3 api pre-existing failures, see §17.7) — STALE, not run against new tables/columns from 0132-0137 |
+| Web bundle | 2620 KiB raw / 781 KiB gzipped (regression flagged, see CFs §17.5) — STALE, not rebuilt since 0123 |
+| API bundle | 4744 KiB raw / 993 KiB gzipped (31 KiB under Workers Free 1024 KiB limit) — STALE, not rebuilt since 0123 |
 
 ### 17.2 Phase timeline
 
@@ -457,6 +459,19 @@ Sidebar comment updated; `PrincipalSidebar` no longer has any `enabled:false` en
 - `phase-10-principal-orders-detail-drawer` — proto + v2 row is non-clickable; add OrderDetailDrawer if drilldown wanted
 - `phase-10-audit-cursor-pagination` — `audit_log` capped at 500 rows; cursor paginate once table grows past ~10k
 - `phase-10-resend-invite-email-template` — Accounts only does temp-password mode (no email invite — needs Supabase email-template config)
+
+**2026-05-20 ~16:00..18:00 GMT+8 · Phase A migrations 0132-0137 caught up on remote · MCP-driven** — Session opened with Loo asking "supabase linked?". Discovered CLAUDE.md §17.1 was stale (latest=0131) and local was at 0137; remote DB only had 0131 + `order_addons_attrs` (= local 0133). Migrations 0132 (autocount_import), 0134 (seed_sku_master), 0135 (orders_items_edited), 0136 (ops_assigned_logistic), 0137 (ops_stock_items) all needed apply.
+- Re-OAuth'd the project-specific Supabase MCP at `mcp.supabase.com/mcp?project_ref=kfprgpjpaffedghytstl` via `mcp__supabase__authenticate` (different org from the generic Supabase MCP visible at session start).
+- 0134's catalog wipe safety guard tripped on 4 alpha test orders (SO-1001 "tam anw weing" / SO-1002 "fewfwe" / SO-1003 "dsadsad" / SO-1004 "123123") created 2026-05-19 — 21 history rows, 12 audit_log rows, 3 threads, 2 POs, 2 invoices. Loo authorised wipe per §14 #1; SQL deleted cascades + `setval('orders_so_seq', 1000, true)` so next alpha order = SO-1001.
+- 0134 is 1351 lines / 382KB — exceeds Read tool's 25K-token cap (~170 dense SKU lines). Split via PowerShell into 5 chunks then 12 sub-thirds; applied each as own migration with `ON CONFLICT DO NOTHING` for idempotency. Sanity-check inside 5t3 tripped (1013 ≠ 1091) — re-applied 5t3 without sanity.
+- 78-SKU shortfall traced to **source xlsx dupes**: same SKU code maps to different variant names in `scripts/ops-seed/carres-sku-master.xlsx` (e.g. `SF03-HK5535/24"(2 Seater)` mapping to variant `'SF03-HK5535/24"(3 Seater)'`). ON CONFLICT DO NOTHING drops the second one. Non-blocking — 67-unit ops_stock seed found all required SKUs (mattress + bedframe non-Discovery-833 SKUs were 100% seeded).
+- Final state per `mcp__supabase__execute_sql`: suppliers=11, models=170, skus=1013, klang_units=67, ops_rpcs=6, new_order_cols=4 (source_system + source_ref + items_edited + ops_assigned_logistic).
+- 5 memories saved to `~/.claude/projects/.../memory/` documenting: MCP linkage, chunk-size limits, "grinder over CLI" feedback, Phase A applied state, local env not configured.
+
+3 NEW carry-forwards (all low):
+- `phase-A-sku-seed-78-missing` — 78 SKUs in 0134 source are dupes; ON CONFLICT DO NOTHING dropped them. If AutoCount import sees unresolved SKU codes, fix the xlsx and re-insert.
+- `phase-A-stale-test-bundle-metrics` — §17.1 test count / bundle size were last measured at 0123/0130; not re-run for 0132-0137. Likely safe (most changes are additive) but flag if anything breaks.
+- `phase-A-local-dev-env-not-configured` — `apps/api/.dev.vars` + `apps/web/.env.local` still don't exist (only `.example` templates). `pnpm dev` blocked until populated from Supabase Dashboard → Settings → API.
 
 ### 17.4 Business model (locked 2026-05-03)
 
