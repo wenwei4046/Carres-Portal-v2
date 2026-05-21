@@ -5,8 +5,9 @@ import { z } from "zod";
  *
  * The web/operation client parses the AutoCount Excel "listing" into JSON
  * rows (one row = one line item) and POSTs them here. The API groups rows by
- * `ref`, resolves each `detailDescription` against the SKU master, and calls
- * the `import_autocount_order` RPC once per order.
+ * `ref`, resolves each `detailDescription` against the SKU master, and sends
+ * the whole batch to the `import_autocount_orders` RPC in one call (migration
+ * 0143 — one Worker subrequest regardless of order count).
  *
  * One schema, two consumers — the operation panel and apps/api both validate
  * against this so the contract cannot drift.

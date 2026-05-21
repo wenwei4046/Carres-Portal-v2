@@ -53,12 +53,34 @@ type SbOpts = {
   inboxRows?: Array<Record<string, unknown>>;
 };
 function buildSb(opts: SbOpts = {}) {
-  const calls: Array<{ name: string; payload: any }> = [];
+  const calls: Array<{ name: string; payload: any; payloads?: any[] }> = [];
   const updateCalls: Array<{ table: string; patch: any; eqs: Array<[string, unknown]> }> = [];
   const sb = {
-    rpc: async (name: string, args: { payload: any }) => {
-      calls.push({ name, payload: args.payload });
-      return (opts.rpcReply ?? (() => ({ data: null, error: { message: "no rpcReply configured" } })))(args.payload);
+    rpc: async (name: string, args: { payload?: any; payloads?: any[] }) => {
+      calls.push({ name, payload: args.payload, payloads: args.payloads });
+      const reply =
+        opts.rpcReply ?? (() => ({ data: null, error: { message: "no rpcReply configured" } }));
+      // 0143: /import batches via import_autocount_orders({ payloads }), which
+      // returns a per-order result ARRAY. Fan the per-order reply across each
+      // payload; a per-order { error } becomes a { result:'error' } element,
+      // mirroring the RPC's in-loop BEGIN/EXCEPTION isolation.
+      if (name === "import_autocount_orders") {
+        const out = (args.payloads ?? []).map((p) => {
+          const r = reply(p);
+          if (r.error) {
+            return {
+              id: null,
+              so: null,
+              source_ref: p.source_ref,
+              result: "error",
+              error: (r.error as { message?: string }).message ?? "error",
+            };
+          }
+          return r.data;
+        });
+        return { data: out, error: null };
+      }
+      return reply(args.payload);
     },
     from: (table: string) => {
       const selectChain = (_cols?: string): any => {
@@ -198,10 +220,67 @@ describe("POST /api/orders/import", () => {
     expect(body.ordersTotal).toBe(1);
     expect(body.created).toBe(1);
     expect(sb._calls).toHaveLength(1);
-    expect(sb._calls[0].name).toBe("import_autocount_order");
-    expect(sb._calls[0].payload.source_ref).toEqual(["CR0418"]);
-    expect(sb._calls[0].payload.lines).toHaveLength(2);
-    expect(sb._calls[0].payload.channel).toBe("showroom"); // CR prefix
+    expect(sb._calls[0].name).toBe("import_autocount_orders");
+    expect(sb._calls[0].payloads).toHaveLength(1);
+    expect(sb._calls[0].payloads[0].source_ref).toEqual(["CR0418"]);
+    expect(sb._calls[0].payloads[0].lines).toHaveLength(2);
+    expect(sb._calls[0].payloads[0].channel).toBe("showroom"); // CR prefix
+  });
+
+  // 0143 — the whole batch is ONE Supabase subrequest, no matter the order
+  // count. Regression guard for the Cloudflare Workers Free-plan 50-subrequest
+  // cap that truncated large imports (115 orders → 67 failed mid-batch).
+  it("sends every grouped order in a single batch RPC call", async () => {
+    const sb = buildSb({ rpcReply: okReply("created") });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await post(jwt, {
+      dealerId: DEALER_HOUSE,
+      rows: [
+        row({ ref: "CR0001", detailDescription: "A" }),
+        row({ ref: "CR0002", detailDescription: "B" }),
+        row({ ref: "CR0003", detailDescription: "C" }),
+      ],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AutocountImportResponse;
+    expect(body.ordersTotal).toBe(3);
+    expect(body.created).toBe(3);
+    // The critical assertion: exactly one subrequest carrying all three orders.
+    expect(sb._calls).toHaveLength(1);
+    expect(sb._calls[0].name).toBe("import_autocount_orders");
+    expect(sb._calls[0].payloads).toHaveLength(3);
+  });
+
+  it("isolates a per-order failure inside the batch; good orders still recorded", async () => {
+    const sb = buildSb({
+      rpcReply: (payload: any) =>
+        payload.lines[0].sku === "POISON"
+          ? { data: null, error: { message: "bad sku" } }
+          : okReply("created")(payload),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await post(jwt, {
+      dealerId: DEALER_HOUSE,
+      rows: [
+        row({ ref: "CR1000", detailDescription: "Good A" }),
+        row({ ref: "CR1001", detailDescription: "POISON" }),
+        row({ ref: "CR1002", detailDescription: "Good B" }),
+      ],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AutocountImportResponse;
+    expect(sb._calls).toHaveLength(1); // still a single subrequest
+    expect(body.ordersTotal).toBe(3);
+    expect(body.created).toBe(2);
+    expect(body.errored).toBe(1);
+    // Error is zipped back to the RIGHT order by index.
+    const poison = body.results.find((r) => r.sourceRef[0] === "CR1001");
+    expect(poison?.result).toBe("error");
+    expect(poison?.error).toBe("bad sku");
+    const good = body.results.find((r) => r.sourceRef[0] === "CR1000");
+    expect(good?.result).toBe("created");
   });
 
   it("splits a combined Ref into a sorted unique source_ref array", async () => {
@@ -213,7 +292,7 @@ describe("POST /api/orders/import", () => {
       rows: [row({ ref: "TCF0282/CR1009" })],
     });
     expect(res.status).toBe(200);
-    expect(sb._calls[0].payload.source_ref).toEqual(["CR1009", "TCF0282"]);
+    expect(sb._calls[0].payloads[0].source_ref).toEqual(["CR1009", "TCF0282"]);
   });
 
   it("flags unmatched core items in the report (SKU resolver is a pending seam)", async () => {
@@ -269,7 +348,7 @@ describe("POST /api/orders/import", () => {
     // Resolved → no unmatched flag, even for core item
     expect(body.results[0].unmatchedDescriptions).toEqual([]);
     // RPC payload's first line uses canonical Item Code, NOT raw description
-    expect(sb._calls[0].payload.lines[0].sku).toBe("MS01-B1201F-K");
+    expect(sb._calls[0].payloads[0].lines[0].sku).toBe("MS01-B1201F-K");
   });
 
   // 0135 — portal-wins-AutoCount guard.
