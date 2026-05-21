@@ -42,12 +42,12 @@ export const autocountImportRowSchema = z.object({
 export type AutocountImportRow = z.infer<typeof autocountImportRowSchema>;
 
 /**
- * Batch payload. `dealerId` is the designated "house" dealer every imported
- * order attaches to (orders.dealer_id is NOT NULL). Operation supplies it;
- * it is config/master-data, not derived from the listing.
+ * Batch payload. `dealerId` is optional — when omitted the server auto-picks
+ * the first dealer (the Carres house entity). orders.dealer_id is NOT NULL so
+ * the server resolves it before insert.
  */
 export const autocountImportInput = z.object({
-  dealerId: z.string().uuid(),
+  dealerId: z.string().uuid().optional(),
   sourceSystem: z.string().trim().min(1).default("autocount"),
   rows: z.array(autocountImportRowSchema).min(1).max(5000),
 });

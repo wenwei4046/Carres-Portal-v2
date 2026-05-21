@@ -19,7 +19,7 @@ import {
   updateOrderInputSchema,
   type AutocountImportResult,
 } from "@carres/shared";
-import { userClient } from "../lib/supabase";
+import { userClient, adminClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
 
 /**
@@ -384,7 +384,21 @@ ordersRouter.post("/import", async (c) => {
       message: "Invalid import input: " + parsed.error.issues[0]?.message,
     });
   }
-  const { dealerId, sourceSystem, rows } = parsed.data;
+  let { dealerId, sourceSystem, rows } = parsed.data;
+
+  // Auto-resolve dealer when caller omits it (operation role doesn't pick one).
+  if (!dealerId) {
+    const { data: dealerRow, error: dealerErr } = await adminClient(c.env)
+      .from("dealers")
+      .select("id")
+      .order("name")
+      .limit(1)
+      .single();
+    if (dealerErr || !dealerRow) {
+      throw new HTTPException(500, { message: "No dealer account found — create one first." });
+    }
+    dealerId = dealerRow.id as string;
+  }
 
   // Group rows into orders by normalized Ref set.
   const groups = new Map<string, { sourceRef: string[]; rows: typeof rows }>();

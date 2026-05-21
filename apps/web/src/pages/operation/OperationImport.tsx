@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { parseCsv, listingRowToImportRow } from "@/lib/csv";
 import { apiFetch } from "@/lib/api";
@@ -24,11 +24,6 @@ import type {
  * list (the Carres house entity) silently — no user-facing picker needed.
  */
 
-interface DealerOpt {
-  id: string;
-  name: string;
-}
-
 export default function OperationImport() {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -42,12 +37,6 @@ export default function OperationImport() {
   >([]);
   const [fileName, setFileName] = useState<string>("");
 
-  // Auto-pick the first dealer (Carres house entity). No user-facing picker.
-  const dealersQ = useQuery<{ dealers: DealerOpt[] }>({
-    queryKey: ["principal", "dealers", { all: true }] as const,
-    queryFn: () => apiFetch("/api/principal/dealers"),
-  });
-  const houseDealerId = dealersQ.data?.dealers[0]?.id ?? "";
 
   const usableRows = parsedRows.filter((r): r is NonNullable<typeof r> => r !== null);
 
@@ -92,10 +81,8 @@ export default function OperationImport() {
   });
 
   function submit() {
-    if (!houseDealerId) return;
     if (usableRows.length === 0) return;
     submitMut.mutate({
-      dealerId: houseDealerId,
       sourceSystem: "autocount",
       rows: usableRows,
     });
@@ -226,18 +213,11 @@ export default function OperationImport() {
           <button
             type="button"
             className="rounded bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={
-              !houseDealerId ||
-              usableRows.length === 0 ||
-              submitMut.isPending
-            }
+            disabled={usableRows.length === 0 || submitMut.isPending}
             onClick={submit}
           >
             {submitMut.isPending ? "Importing…" : `Import ${usableRows.length} rows`}
           </button>
-          {!houseDealerId && !dealersQ.isLoading ? (
-            <p className="mt-2 text-xs text-error-600">No dealer account found — contact admin.</p>
-          ) : null}
         </section>
       ) : null}
 
