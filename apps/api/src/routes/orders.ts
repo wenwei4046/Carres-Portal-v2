@@ -422,7 +422,11 @@ ordersRouter.post("/import", async (c) => {
   );
   const skuByDesc = await buildSkuResolver(sb, distinctDescriptions);
 
-  const results: AutocountImportResult[] = [];
+  // Phase 1 (in-memory, no subrequests): build one payload per grouped order
+  // and keep the per-group unmatched-SKU metadata so we can zip it back by
+  // index after the batch RPC returns.
+  const payloads: unknown[] = [];
+  const groupMeta: Array<{ sourceRef: string[]; unmatched: string[] }> = [];
 
   for (const g of groups.values()) {
     const first = g.rows[0];
@@ -440,7 +444,7 @@ ordersRouter.post("/import", async (c) => {
       };
     });
 
-    const payload = {
+    payloads.push({
       dealer_id: dealerId,
       source_system: sourceSystem,
       source_ref: g.sourceRef,
@@ -453,34 +457,69 @@ ordersRouter.post("/import", async (c) => {
       delivery_date_tbd: !first.deliveryDate,
       paid: parsePaid(first.balance),
       lines,
-    };
-
-    const { data, error } = await sb.rpc("import_autocount_order", { payload });
-    if (error) {
-      results.push({
-        sourceRef: g.sourceRef,
-        result: "error",
-        orderId: null,
-        so: null,
-        unmatchedDescriptions: unmatched,
-        error: error.message,
-      });
-      continue;
-    }
-    const d = data as {
-      id: string;
-      so: number;
-      // 0135 adds 'updated_items_locked' — the portal-wins-AutoCount path.
-      result: "created" | "updated" | "updated_items_locked" | "skipped_locked";
-    };
-    results.push({
-      sourceRef: g.sourceRef,
-      result: d.result,
-      orderId: d.id,
-      so: d.so,
-      unmatchedDescriptions: unmatched,
-      error: null,
     });
+    groupMeta.push({ sourceRef: g.sourceRef, unmatched });
+  }
+
+  // Phase 2 (ONE subrequest): the whole batch goes to Postgres in a single
+  // import_autocount_orders RPC. It loops server-side — each order in its own
+  // subtransaction — and returns a per-order result array IN INPUT ORDER. This
+  // keeps the Worker at a CONSTANT 2 subrequests (catalog read + this call)
+  // regardless of how many orders the listing has, so the Cloudflare Free-plan
+  // 50-subrequest cap can no longer truncate a large import. (migration 0143)
+  const results: AutocountImportResult[] = [];
+
+  if (payloads.length > 0) {
+    const { data, error } = await sb.rpc("import_autocount_orders", { payloads });
+    if (error) {
+      // The batch call itself failed (e.g. role gate / transport). Report every
+      // grouped order as errored rather than 500-ing the whole import.
+      for (const m of groupMeta) {
+        results.push({
+          sourceRef: m.sourceRef,
+          result: "error",
+          orderId: null,
+          so: null,
+          unmatchedDescriptions: m.unmatched,
+          error: error.message,
+        });
+      }
+    } else {
+      const rows = (data ?? []) as Array<{
+        id: string | null;
+        so: number | null;
+        // 0135 adds 'updated_items_locked'; 0143 batch adds per-order 'error'.
+        result:
+          | "created"
+          | "updated"
+          | "updated_items_locked"
+          | "skipped_locked"
+          | "error";
+        error?: string | null;
+      }>;
+      groupMeta.forEach((m, i) => {
+        const d = rows[i];
+        if (!d) {
+          results.push({
+            sourceRef: m.sourceRef,
+            result: "error",
+            orderId: null,
+            so: null,
+            unmatchedDescriptions: m.unmatched,
+            error: "no result returned for this order",
+          });
+          return;
+        }
+        results.push({
+          sourceRef: m.sourceRef,
+          result: d.result,
+          orderId: d.id,
+          so: d.so,
+          unmatchedDescriptions: m.unmatched,
+          error: d.error ?? null,
+        });
+      });
+    }
   }
 
   const resp = {
