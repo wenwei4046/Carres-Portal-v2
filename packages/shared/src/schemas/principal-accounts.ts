@@ -40,14 +40,68 @@ export const createAccountInput = z
     title: z.string().trim().max(120).optional().nullable(),
     companyName: z.string().trim().max(200).optional(),
     region: z.string().trim().max(80).optional(),
+    // 2026-05-22 (Loo) — explicit outlet name for the default outlet seeded
+    // alongside the dealer/showroom org. Optional: server falls back to
+    // companyName when blank so the simple case ("Outlet = company") keeps
+    // working without an extra input.
+    outletName: z.string().trim().max(120).optional(),
+    // 2026-05-22 (Loo) — dealer address is mandatory on the create-account flow
+    // because it surfaces on Sales Order PDFs (the "Sold By" block falls back
+    // to dealers.address when no outlet is tied). Supplier/Partner roles don't
+    // print to customer-facing docs, so address stays optional for them.
+    address: z.string().trim().max(500).optional(),
+    // 2026-05-22 (Loo) — Malaysia SSM (Suruhanjaya Syarikat Malaysia)
+    // registration number per dealer company. Required for dealer accounts;
+    // optional shape here, superRefine below gates on role=dealer.
+    ssmCode: z.string().trim().max(40).optional(),
+    // 2026-05-22 (Loo) — dealer PIC (Person In Charge) split into name +
+    // phone. Both required for dealer accounts; API backfills the legacy
+    // `dealers.contact` text column with "name · phone" for read-side
+    // backwards compatibility.
+    contactName: z.string().trim().max(120).optional(),
+    contactPhone: z.string().trim().max(40).optional(),
     tempPassword: z.string().min(8).max(72),
   })
   .superRefine((v, ctx) => {
-    if ((v.role === "dealer" || v.role === "supplier" || v.role === "partner") && !v.companyName) {
+    if ((v.role === "dealer" || v.role === "showroom" || v.role === "supplier" || v.role === "partner") && !v.companyName) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["companyName"],
         message: `companyName is required for role=${v.role}`,
+      });
+    }
+    // 2026-05-22 (Loo) — showroom is a dealer-with-channel='showroom' under
+    // the hood, so it carries the same legal/contact/address requirements as
+    // a plain dealer. Same SSM, same PIC contact, same printable address on
+    // SO PDFs. Group the checks under one role-list so it stays trivial to
+    // extend (e.g. a 'showroom' sub-flag later).
+    const orgLikeDealer = v.role === "dealer" || v.role === "showroom";
+    if (orgLikeDealer && (!v.address || v.address.length < 5)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["address"],
+        message: `address is required for role=${v.role}`,
+      });
+    }
+    if (orgLikeDealer && (!v.ssmCode || v.ssmCode.length < 6)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ssmCode"],
+        message: `ssmCode is required for role=${v.role}`,
+      });
+    }
+    if (orgLikeDealer && (!v.contactName || v.contactName.length < 2)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["contactName"],
+        message: `contactName is required for role=${v.role}`,
+      });
+    }
+    if (orgLikeDealer && (!v.contactPhone || v.contactPhone.length < 7)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["contactPhone"],
+        message: `contactPhone is required for role=${v.role}`,
       });
     }
   });

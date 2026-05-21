@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import type { Order, UpdateOrderInput } from "@carres/shared";
+import { MAX_DELIVERY_FLOOR, type Order, type UpdateOrderInput } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useUpdateOrder } from "@/lib/queries";
 import { ModalShell } from "./TopUpDepositModal";
@@ -237,12 +237,20 @@ export default function EditOrderModal({ order, onClose }: Props) {
 
           <div className="grid grid-cols-2 gap-3 mt-3">
             <label className="block">
-              <span className="label block mb-1.5">Floor</span>
+              <span className="label block mb-1.5">Floor (max {MAX_DELIVERY_FLOOR}F)</span>
               <input
                 type="number"
                 min={1}
+                max={MAX_DELIVERY_FLOOR}
                 value={floor}
-                onChange={(e) => setFloor(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                onChange={(e) =>
+                  setFloor(
+                    Math.max(
+                      1,
+                      Math.min(MAX_DELIVERY_FLOOR, parseInt(e.target.value, 10) || 1),
+                    ),
+                  )
+                }
                 className="w-full px-3 py-2.5 border border-base-300 rounded text-sm font-mono bg-white outline-none focus:border-primary"
               />
             </label>

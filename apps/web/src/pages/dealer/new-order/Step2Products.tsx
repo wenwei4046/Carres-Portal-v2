@@ -1,4 +1,4 @@
-import type { CatalogResponse } from "@carres/shared";
+import { MAX_DELIVERY_FLOOR, type CatalogResponse } from "@carres/shared";
 import { floorSurchargeRaw } from "@/lib/order-totals";
 import {
   DISPOSAL_SIZE_OPTIONS,
@@ -90,7 +90,7 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
   }
 
   function setFloor(next: number) {
-    setDelivery({ floor: Math.max(1, next) });
+    setDelivery({ floor: Math.max(1, Math.min(MAX_DELIVERY_FLOOR, next)) });
   }
 
   function bumpStairItems(delta: number, maxItems: number) {
@@ -239,7 +239,7 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
       {/* ---------- Stair carry (3-col grid: floor / lift / fee panel) ---------- */}
       <Section
         title="Stair carry"
-        hint={`1F–${cfg.freeUpToFloor}F free · ${RM(cfg.perFloorPerItem)} per floor per item from ${cfg.freeUpToFloor + 1}F`}
+        hint={`1F–${cfg.freeUpToFloor}F free · ${RM(cfg.perFloorPerItem)} per floor per item from ${cfg.freeUpToFloor + 1}F · max ${MAX_DELIVERY_FLOOR}F (no delivery above)`}
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 items-end">
           <FieldLabel label="Floor">
@@ -262,7 +262,8 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
               <button
                 type="button"
                 onClick={() => setFloor(draft.delivery.floor + 1)}
-                className="px-2.5 py-1.5 rounded text-sm hover:bg-base-100"
+                disabled={draft.delivery.floor >= MAX_DELIVERY_FLOOR}
+                className="px-2.5 py-1.5 rounded text-sm hover:bg-base-100 disabled:opacity-30 disabled:cursor-not-allowed"
                 aria-label="Increase floor"
               >
                 +
@@ -271,7 +272,7 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
           </FieldLabel>
 
           <FieldLabel
-            label={`Items needing stair carry (max ${itemsTotal})`}
+            label={itemsTotal > 0 ? `Quantity (max ${itemsTotal})` : "Quantity"}
           >
             <div className="flex items-center gap-1.5 border border-base-300 bg-white rounded px-1.5 py-1">
               <button
@@ -279,7 +280,7 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
                 onClick={() => bumpStairItems(-1, itemsTotal)}
                 disabled={itemsTotal === 0 || stairItemsEffective === 0}
                 className="px-2.5 py-1.5 rounded text-sm hover:bg-base-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                aria-label="Decrease stair-carry item count"
+                aria-label="Decrease stair-carry quantity"
               >
                 −
               </button>
@@ -295,6 +296,7 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
                   setDelivery({ stairItems: safe });
                 }}
                 disabled={itemsTotal === 0}
+                placeholder={itemsTotal === 0 ? "—" : ""}
                 className="flex-1 min-w-0 text-center text-sm font-mono bg-transparent outline-none border-none py-1 disabled:opacity-50"
               />
               <button
@@ -302,11 +304,16 @@ export default function Step2Products({ draft, onChange, catalog }: Props) {
                 onClick={() => bumpStairItems(1, itemsTotal)}
                 disabled={itemsTotal === 0 || stairItemsEffective >= itemsTotal}
                 className="px-2.5 py-1.5 rounded text-sm hover:bg-base-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                aria-label="Increase stair-carry item count"
+                aria-label="Increase stair-carry quantity"
               >
                 +
               </button>
             </div>
+            {itemsTotal === 0 && (
+              <p className="text-[10.5px] text-base-500 mt-1 italic">
+                Add products above to enable
+              </p>
+            )}
           </FieldLabel>
 
           <FieldLabel label="Lift available?">

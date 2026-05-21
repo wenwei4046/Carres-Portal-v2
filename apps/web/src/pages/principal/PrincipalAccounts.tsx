@@ -7,6 +7,8 @@ import {
   type AccountRow,
   type AppRole,
 } from "@/lib/queries";
+import MYAddressFields from "@/components/MYAddressFields";
+import { composeAddress } from "@/data/malaysia-postcodes";
 
 /**
  * Phase 10 · Principal · Accounts — `reference/proto/principal-accounts.jsx`
@@ -412,12 +414,43 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
     role: "dealer" as AppRole,
     title: "",
     companyName: "",
-    region: "",
+    // 2026-05-22 (Loo) — region dropped from the form (structured address
+    // below carries state/city; region was a free-text duplicate). The DB
+    // column stays — existing dealers retain their value; new creations get
+    // "—" as the API-side default.
+    // 2026-05-22 (Loo) — dealer address uses the same cascading MY picker as
+    // the Sales Order customer address (Line 1 + optional Line 2 + state → city
+    // → postcode). composeAddress() flattens these into the single string
+    // dealers.address stores.
+    addressLine1: "",
+    addressLine2: "",
+    addressState: "",
+    addressCity: "",
+    addressPostcode: "",
+    // 2026-05-22 (Loo) — Malaysia SSM registration number, required for
+    // dealer role. Old format "123456-A" or new 12-digit "201801234567".
+    ssmCode: "",
+    // 2026-05-22 (Loo) — dealer PIC name + phone (separate from the portal
+    // user's name/email above — this is the dealer company's contact person
+    // for ops/finance comms).
+    contactName: "",
+    contactPhone: "",
+    // 2026-05-22 (Loo) — explicit name for the default outlet seeded at
+    // create-account time. Server falls back to companyName when blank; the
+    // UI pre-fills with companyName so the "common case = outlet name same
+    // as company" path takes zero clicks.
+    outletName: "",
     tempPassword: generateTempPassword(),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const needsOrg = draft.role === "dealer" || draft.role === "supplier" || draft.role === "partner";
+  // 2026-05-22 (Loo) — showroom shares the dealer schema (channel='showroom'
+  // under the hood) so it carries the same SSM + contact + address + outlet
+  // requirements. The wider `needsOrg` covers all roles that need a company
+  // row at all (incl. supplier/partner); `dealerLike` is the stricter set
+  // that needs the full Malaysia-business profile.
+  const needsOrg = draft.role === "dealer" || draft.role === "showroom" || draft.role === "supplier" || draft.role === "partner";
+  const dealerLike = draft.role === "dealer" || draft.role === "showroom";
   const create = useCreateAccount({
     onSuccess: () => onClose(),
   });
@@ -427,12 +460,39 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
     if (errors[k as string]) setErrors((e) => ({ ...e, [k as string]: "" }));
   }
 
+  // MYAddressFields fires partial patches like `{ addressState: next,
+  // addressCity: "", addressPostcode: "" }` when state changes (city/postcode
+  // reset cascade). One merge, one error-clear pass per touched key.
+  function setAddress(patch: Partial<typeof draft>) {
+    setDraft((d) => ({ ...d, ...patch }));
+    setErrors((e) => {
+      const next = { ...e };
+      for (const k of Object.keys(patch)) {
+        if (next[k]) next[k] = "";
+      }
+      return next;
+    });
+  }
+
   function validate() {
     const e: Record<string, string> = {};
     if (!draft.name.trim()) e.name = "Required";
     if (!draft.email.trim()) e.email = "Required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) e.email = "Invalid email";
     if (needsOrg && !draft.companyName.trim()) e.companyName = "Required";
+    // 2026-05-22 (Loo) — mirror Sales Order Step 1 address validation
+    // (apps/web/src/pages/dealer/new-order/draft.ts step1FirstIssue): Line 1
+    // ≥ 5 chars, state + city + postcode all picked. Line 2 stays optional.
+    // SSM code: ≥ 6 chars (covers both old "123456-A" + new 12-digit format).
+    if (dealerLike) {
+      if (draft.addressLine1.trim().length < 5) e.addressLine1 = "Required (≥5 chars)";
+      else if (!draft.addressState) e.addressState = "Required";
+      else if (!draft.addressCity) e.addressCity = "Required";
+      else if (!draft.addressPostcode) e.addressPostcode = "Required";
+      if (draft.ssmCode.trim().length < 6) e.ssmCode = "Required (≥6 chars)";
+      if (draft.contactName.trim().length < 2) e.contactName = "Required";
+      if (draft.contactPhone.trim().length < 7) e.contactPhone = "Required (≥7 digits)";
+    }
     if (draft.tempPassword.length < 8) e.tempPassword = "Min 8 chars";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -440,13 +500,37 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
 
   function submit() {
     if (!validate()) return;
+    // Dealer address: flatten the 5 structured fields into the single string
+    // dealers.address stores (mirrors how composeAddress is used for the SO
+    // customer_address path).
+    const composedAddress = dealerLike
+      ? composeAddress({
+          line1: draft.addressLine1,
+          line2: draft.addressLine2,
+          state: draft.addressState,
+          city: draft.addressCity,
+          postcode: draft.addressPostcode,
+        })
+      : undefined;
     create.mutate({
       name: draft.name.trim(),
       email: draft.email.trim().toLowerCase(),
       role: draft.role,
       title: draft.title.trim() || null,
       companyName: needsOrg ? draft.companyName.trim() : undefined,
-      region: draft.role === "dealer" ? draft.region.trim() : undefined,
+      // Region dropped from the form — API still accepts it (optional zod),
+      // server-side defaults to "—" when absent (see accounts.ts dealer
+      // insert). Existing dealers retain their region values.
+      // outletName: send only if dealer/showroom AND non-blank; the server
+      // falls back to companyName when this is omitted.
+      outletName:
+        dealerLike && draft.outletName.trim().length > 0
+          ? draft.outletName.trim()
+          : undefined,
+      address: composedAddress,
+      ssmCode: dealerLike ? draft.ssmCode.trim() : undefined,
+      contactName: dealerLike ? draft.contactName.trim() : undefined,
+      contactPhone: dealerLike ? draft.contactPhone.trim() : undefined,
       tempPassword: draft.tempPassword,
     });
   }
@@ -527,19 +611,93 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
           {needsOrg && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-700">
-                New {draft.role === "dealer" ? "dealer" : draft.role === "supplier" ? "supplier" : "delivery partner"} organisation
+                New{" "}
+                {draft.role === "dealer"
+                  ? "dealer"
+                  : draft.role === "showroom"
+                    ? "showroom"
+                    : draft.role === "supplier"
+                      ? "supplier"
+                      : "delivery partner"}{" "}
+                organisation
               </div>
               <Field label="Company name" error={errors.companyName}>
                 <Input
                   value={draft.companyName}
                   onChange={(v) => set("companyName", v)}
-                  placeholder={draft.role === "dealer" ? "e.g. BedHouse KL Sdn Bhd" : draft.role === "supplier" ? "e.g. Hookka Industries" : "e.g. JT Express"}
+                  placeholder={
+                    draft.role === "dealer"
+                      ? "e.g. BedHouse KL Sdn Bhd"
+                      : draft.role === "showroom"
+                        ? "e.g. Carres KL Showroom"
+                        : draft.role === "supplier"
+                          ? "e.g. Hookka Industries"
+                          : "e.g. JT Express"
+                  }
                 />
               </Field>
-              {draft.role === "dealer" && (
-                <Field label="Region" hint="Optional">
-                  <Input value={draft.region} onChange={(v) => set("region", v)} placeholder="e.g. Klang Valley, Penang, Sabah" />
-                </Field>
+              {dealerLike && (
+                <>
+                  <Field label="Outlet name" hint="Default outlet · falls back to company name when blank">
+                    <Input
+                      value={draft.outletName}
+                      onChange={(v) => set("outletName", v)}
+                      placeholder={draft.companyName || "Same as company name"}
+                    />
+                  </Field>
+                  <Field label="SSM code" hint="Required · company registration number (e.g. 201801234567 or 123456-A)" error={errors.ssmCode}>
+                    <Input
+                      value={draft.ssmCode}
+                      onChange={(v) => set("ssmCode", v)}
+                      placeholder="201801234567"
+                    />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Contact person" hint="Required · dealer PIC name" error={errors.contactName}>
+                      <Input
+                        value={draft.contactName}
+                        onChange={(v) => set("contactName", v)}
+                        placeholder="e.g. Aisha Rahman"
+                      />
+                    </Field>
+                    <Field label="Contact phone" hint="Required" error={errors.contactPhone}>
+                      <Input
+                        value={draft.contactPhone}
+                        onChange={(v) => set("contactPhone", v)}
+                        placeholder="e.g. 012-3344556"
+                      />
+                    </Field>
+                  </div>
+                  <div>
+                    <div className="text-[9.5px] uppercase tracking-wider text-base-500 font-semibold mb-1">
+                      Business address
+                    </div>
+                    <div className="text-[10px] text-base-500 mb-2 leading-snug">
+                      Required · prints on Sales Order PDFs when no outlet is attached
+                    </div>
+                    <MYAddressFields
+                      data={{
+                        addressLine1: draft.addressLine1,
+                        addressLine2: draft.addressLine2,
+                        addressState: draft.addressState,
+                        addressCity: draft.addressCity,
+                        addressPostcode: draft.addressPostcode,
+                      }}
+                      onChange={setAddress}
+                    />
+                    {(errors.addressLine1 ||
+                      errors.addressState ||
+                      errors.addressCity ||
+                      errors.addressPostcode) && (
+                      <div className="text-[11px] text-destructive mt-1.5">
+                        {errors.addressLine1 ||
+                          errors.addressState ||
+                          errors.addressCity ||
+                          errors.addressPostcode}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
               <div className="text-[11px] text-base-500 leading-relaxed">
                 A new {draft.role} record will be created and this user will be the owner.

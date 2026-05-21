@@ -23,13 +23,9 @@ interface Props {
 
 export default function Step1Customer({ draft, onChange, outlets, salespersons }: Props) {
   const c = draft.customer;
-  const d = draft.delivery;
 
   function setC(patch: Partial<WizardDraft["customer"]>) {
     onChange({ ...draft, customer: { ...c, ...patch } });
-  }
-  function setD(patch: Partial<WizardDraft["delivery"]>) {
-    onChange({ ...draft, delivery: { ...d, ...patch } });
   }
 
   function setOutlet(outletId: string) {
@@ -245,71 +241,10 @@ export default function Step1Customer({ draft, onChange, outlets, salespersons }
         )}
       </Section>
 
-      {/* Delivery date */}
-      <Section title="Delivery date">
-        <div className="grid grid-cols-[1fr_auto] gap-3.5 items-end">
-          <Field label={d.dateTbd ? "Delivery date (TBD)" : "Delivery date *"}>
-            <input
-              type="date"
-              value={d.date}
-              disabled={d.dateTbd}
-              onChange={(e) =>
-                // User edited the date manually — drop the ASAP flag so we
-                // don't auto-proceed against a date the dealer overrode.
-                setD({ date: e.target.value, asap: false })
-              }
-              className={inputClass({ disabled: d.dateTbd })}
-            />
-          </Field>
-          <div className="pb-2.5">
-            <InlineCheckbox
-              label="Confirm later"
-              checked={d.dateTbd}
-              onChange={(v) =>
-                setD({ dateTbd: v, date: v ? "" : d.date, asap: v ? false : d.asap })
-              }
-            />
-          </div>
-        </div>
-
-        {/* 2026-05-10 (Loo) — "As Fast As Possible" pill. Sets date = today
-            + 20 days and flips the asap flag so DealerNewOrder auto-fires
-            the Proceed mutation after submit. Disabled when "Confirm later"
-            is on (those two semantics conflict). */}
-        <div className="flex items-center gap-2.5 mt-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              const t = new Date();
-              t.setDate(t.getDate() + 20);
-              const iso = t.toISOString().slice(0, 10);
-              setD({ date: iso, dateTbd: false, asap: true });
-            }}
-            disabled={d.dateTbd}
-            className={`px-3 py-1.5 rounded text-[12px] font-semibold transition-colors ${
-              d.asap
-                ? "bg-primary text-white"
-                : "border border-primary text-primary hover:bg-primary/5"
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-            data-testid="delivery-asap-pill"
-          >
-            ⚡ As Fast As Possible (~20 days)
-          </button>
-          {d.asap && (
-            <span className="text-[11px] text-base-600 font-body">
-              Order will auto-proceed once submitted (skips the manual
-              Place → Proceed click).
-            </span>
-          )}
-        </div>
-
-        {d.dateTbd && (
-          <div className="rounded bg-warning-soft text-warning px-3 py-2.5 text-xs font-body mt-2.5">
-            ⓘ Order will sit in <strong>Place</strong> until you confirm a date — it can't move
-            to <em>Proceed</em> without one.
-          </div>
-        )}
-      </Section>
+      {/* 2026-05-22 (Loo) — Delivery date section moved to the new Step 3
+          (Step3Delivery.tsx) because the min-date constraint depends on
+          what's in the cart (mattress/bedframe 14 days, sofa 21 days). Step
+          1 stays focused on customer + outlet + address info. */}
     </div>
   );
 }

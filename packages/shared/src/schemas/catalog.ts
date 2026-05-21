@@ -100,6 +100,18 @@ export const outletsListResponseSchema = z.object({
 });
 export type OutletsListResponse = z.infer<typeof outletsListResponseSchema>;
 
+/**
+ * 2026-05-22 (Loo) — Dealer-side Settings → Outlets create input. Name +
+ * address are both required (mirrors the dealer.address ≥ 5 char floor used
+ * everywhere else in v2). dealer_id is derived server-side from the JWT so
+ * dealers can't spoof other dealers' outlets.
+ */
+export const createOutletInput = z.object({
+  name:    z.string().trim().min(1).max(120),
+  address: z.string().trim().min(5).max(500),
+});
+export type CreateOutletInput = z.infer<typeof createOutletInput>;
+
 export const salespersonSchema = z.object({
   id: z.string().uuid(),
   dealerId: z.string().uuid(),

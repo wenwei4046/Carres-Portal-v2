@@ -21,10 +21,14 @@ import {
   step1FirstIssue,
   step1Valid,
   step2Valid,
-  step3Valid,
+  step3DateValid,
+  step3DateFirstIssue,
+  step4Valid,
 } from "./draft";
+import { maxLeadDaysFor } from "@carres/shared";
 import Step1Customer from "./Step1Customer";
 import Step2Products from "./Step2Products";
+import Step3Delivery from "./Step3Delivery";
 import Step3SignaturePayment from "./Step3SignaturePayment";
 import ThankYou from "./ThankYou";
 
@@ -36,10 +40,14 @@ interface Props {
   onClose: () => void;
 }
 
+// 2026-05-22 (Loo) — 3-step wizard expanded to 4: delivery date split out
+// of Step 1 into its own step because the min-date constraint depends on
+// what's in the cart (mattress/bedframe = 14 days, sofa = 21).
 const STEP_LABELS: Record<number, string> = {
-  1: "Customer & delivery",
+  1: "Customer info",
   2: "Products & add-ons",
-  3: "Confirm and sign",
+  3: "Delivery date",
+  4: "Confirm and sign",
 };
 
 /**
@@ -117,6 +125,23 @@ export default function DealerNewOrder({ open, onClose }: Props) {
 
   const canStep1 = useMemo(() => step1Valid(draft), [draft]);
   const canStep2 = useMemo(() => step2Valid(draft), [draft]);
+  // 2026-05-22 (Loo) — Step 3 (delivery date) min-date constraint is
+  // category-aware: mattress + bedframe = 14 days, sofa = 21. The catalog
+  // is needed to map line.sku → model.category. Categories come out of the
+  // catalog only when the user reaches Step 3, so we don't recompute it on
+  // every keystroke during Step 1/2.
+  const minLeadDays = useMemo(() => {
+    if (!catalogQ.data) return 0;
+    const cats = new Set<string>();
+    for (const line of draft.lines) {
+      const sku = catalogQ.data.skus.find((s) => s.sku === line.sku);
+      if (!sku) continue;
+      const model = catalogQ.data.models.find((m) => m.id === sku.modelId);
+      if (model) cats.add(model.category);
+    }
+    return maxLeadDaysFor([...cats]);
+  }, [draft.lines, catalogQ.data]);
+  const canStep3 = useMemo(() => step3DateValid(draft, minLeadDays), [draft, minLeadDays]);
   // 2026-05-10 (Loo) — when ASAP is on, the 50% deposit threshold is a HARD
   // submit gate (the wizard auto-fires Proceed after create — Proceed
   // requires ≥50% so we reject the order at submit time rather than create
@@ -131,13 +156,17 @@ export default function DealerNewOrder({ open, onClose }: Props) {
     if (totalForPct <= 0) return false;
     return (draft.paid / totalForPct) * 100 >= 50;
   }, [draft]);
-  const canStep3 = useMemo(
-    () => step3Valid(draft) && asapDepositOk,
+  const canStep4 = useMemo(
+    () => step4Valid(draft) && asapDepositOk,
     [draft, asapDepositOk],
   );
-  const canAdvance = step === 1 ? canStep1 : step === 2 ? canStep2 : canStep3;
+  const canAdvance =
+    step === 1 ? canStep1 :
+    step === 2 ? canStep2 :
+    step === 3 ? canStep3 :
+    canStep4;
   const submitDisabled =
-    !canStep3 || uploading || createOrder.isPending || !dealerId;
+    !canStep4 || uploading || createOrder.isPending || !dealerId;
 
   // Footer total — shown from Step 2 onward to mirror proto. We exclude
   // stair carry from the visible Total to match proto's `monthValue` definition
@@ -310,7 +339,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
             ) : (
               <>
                 <p className="kicker">
-                  New order · step {step} of 3
+                  New order · step {step} of 4
                 </p>
                 <h2 className="font-display text-[22px] mt-0.5 tracking-[-0.02em] leading-[1.2] font-semibold">
                   {STEP_LABELS[step]}
@@ -331,7 +360,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
         {/* Stepper — hidden on the ThankYou screen */}
         {!submitted && (
           <div className="flex px-7 pt-3.5 pb-1 gap-1.5">
-            {[1, 2, 3].map((n) => (
+            {[1, 2, 3, 4].map((n) => (
               <div
                 key={n}
                 className={`flex-1 h-[3px] rounded-sm ${n <= step ? "bg-primary" : "bg-base-200"}`}
@@ -388,6 +417,21 @@ export default function DealerNewOrder({ open, onClose }: Props) {
           {!submitted && step === 3 && (
             <>
               {catalogQ.data && (
+                <Step3Delivery
+                  draft={draft}
+                  onChange={setDraft}
+                  catalog={catalogQ.data}
+                  minLeadDays={minLeadDays}
+                />
+              )}
+              {!catalogQ.data && (
+                <p className="text-sm text-muted-foreground">Loading catalog…</p>
+              )}
+            </>
+          )}
+          {!submitted && step === 4 && (
+            <>
+              {catalogQ.data && (
                 <Step3SignaturePayment
                   draft={draft}
                   onChange={setDraft}
@@ -431,7 +475,7 @@ export default function DealerNewOrder({ open, onClose }: Props) {
                     </span>
                   </span>
                 )}
-                {step < 3 ? (
+                {step < 4 ? (
                   <div className="flex flex-col items-end gap-1">
                     <button
                       onClick={() => canAdvance && setStep(step + 1)}
@@ -443,6 +487,11 @@ export default function DealerNewOrder({ open, onClose }: Props) {
                     {!canAdvance && step === 1 && (
                       <span className="text-[11px] text-base-500 italic">
                         Missing: {step1FirstIssue(draft)}
+                      </span>
+                    )}
+                    {!canAdvance && step === 3 && (
+                      <span className="text-[11px] text-base-500 italic">
+                        {step3DateFirstIssue(draft, minLeadDays)}
                       </span>
                     )}
                   </div>

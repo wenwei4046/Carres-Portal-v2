@@ -88,6 +88,10 @@ export type SalesOrderTemplateData = {
   dealer: {
     name: string;
     contact: string | null;
+    // 2026-05-22 (Loo, migration 0144) — dealer-side fallback address used
+    // by the PDF "Sold By" block when no outlet is attached. outlet_address
+    // takes precedence when present.
+    address: string | null;
     outlet_name: string | null;
     outlet_address: string | null;
     salesperson_name: string | null;

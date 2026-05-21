@@ -1,5 +1,13 @@
 export const SHARED_VERSION = "0.0.0" as const;
 
+export {
+  MAX_DELIVERY_FLOOR,
+  DELIVERY_LEAD_DAYS,
+  maxLeadDaysFor,
+  minDeliveryDateISO,
+  type DeliveryLeadCategory,
+} from "./constants";
+
 // Sub-path imports also work, e.g.:
 //   import type { DealerRow } from "@carres/shared/db-types";
 //   import { dealerFromRow }   from "@carres/shared/adapters";
@@ -88,6 +96,7 @@ export {
   floorConfigSchema,
   outletSchema,
   outletsListResponseSchema,
+  createOutletInput,
   salespersonSchema,
   salespersonsListResponseSchema,
   salespersonCreateInputSchema,
@@ -107,6 +116,7 @@ export {
   type FloorConfigDto,
   type OutletDto,
   type OutletsListResponse,
+  type CreateOutletInput,
   type SalespersonDto,
   type SalespersonsListResponse,
   type SalespersonCreateInput,
@@ -130,8 +140,10 @@ export {
 export {
   inviteDealerInput,
   setDealerStatusInput,
+  updateDealerInput,
   type InviteDealerInput,
   type SetDealerStatusInput,
+  type UpdateDealerInput,
 } from "./schemas/principal-dealers";
 
 export {

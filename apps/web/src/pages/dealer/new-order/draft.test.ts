@@ -10,6 +10,8 @@ import {
   saveDraft,
   step1Valid,
   step2Valid,
+  step3DateFirstIssue,
+  step3DateValid,
   step3Valid,
 } from "./draft";
 
@@ -226,16 +228,14 @@ describe("step1Valid — Continue gate", () => {
     expect(step1Valid(d)).toBe(false);
   });
 
-  it("rejects when delivery.date empty and not dateTbd", () => {
+  // 2026-05-22 (Loo) — delivery date validation moved from step 1 to step 3
+  // (new dedicated step) because the min-date constraint depends on cart
+  // contents. Those gating tests now live under the `step3DateValid` block
+  // below. Step 1 no longer cares about delivery.date.
+  it("ignores delivery.date — step 1 no longer gates on it", () => {
     const d = validDraft();
     d.delivery.date = "";
-    expect(step1Valid(d)).toBe(false);
-  });
-
-  it("dateTbd = true bypasses date-required rule", () => {
-    const d = validDraft();
-    d.delivery.date = "";
-    d.delivery.dateTbd = true;
+    d.delivery.dateTbd = false;
     expect(step1Valid(d)).toBe(true);
   });
 
@@ -312,6 +312,64 @@ describe("loadDraft backfills lines/addons for pre-2B.3 drafts", () => {
     expect(restored!.signature).toBeNull();
     expect(restored!.termsAccepted).toBe(false);
     expect(restored!.wizardSessionId).toBeNull();
+  });
+});
+
+describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
+  // Frozen "today" to make lead-time math deterministic. Picked an arbitrary
+  // weekday in early 2026; tests below compute (today + minLeadDays) and
+  // compare ISO strings.
+  const TODAY = new Date("2026-06-01T00:00:00Z");
+
+  function isoToday(plus: number): string {
+    const d = new Date(TODAY);
+    d.setUTCDate(d.getUTCDate() + plus);
+    return d.toISOString().slice(0, 10);
+  }
+
+  it("accepts dateTbd regardless of lead time", () => {
+    const d = validDraft();
+    d.delivery.date = "";
+    d.delivery.dateTbd = true;
+    expect(step3DateValid(d, 21, TODAY)).toBe(true);
+  });
+
+  it("rejects when date empty and not TBD", () => {
+    const d = validDraft();
+    d.delivery.date = "";
+    d.delivery.dateTbd = false;
+    expect(step3DateValid(d, 14, TODAY)).toBe(false);
+    expect(step3DateFirstIssue(d, 14, TODAY)).toContain("pick a date");
+  });
+
+  it("rejects mattress date < today + 14", () => {
+    const d = validDraft();
+    d.delivery.date = isoToday(10); // 10 days out — below 14-day floor
+    expect(step3DateValid(d, 14, TODAY)).toBe(false);
+  });
+
+  it("accepts mattress date == today + 14", () => {
+    const d = validDraft();
+    d.delivery.date = isoToday(14);
+    expect(step3DateValid(d, 14, TODAY)).toBe(true);
+  });
+
+  it("rejects sofa date < today + 21", () => {
+    const d = validDraft();
+    d.delivery.date = isoToday(20);
+    expect(step3DateValid(d, 21, TODAY)).toBe(false);
+  });
+
+  it("accepts sofa date == today + 21", () => {
+    const d = validDraft();
+    d.delivery.date = isoToday(21);
+    expect(step3DateValid(d, 21, TODAY)).toBe(true);
+  });
+
+  it("accepts any future date when minLeadDays = 0 (non-gated cart)", () => {
+    const d = validDraft();
+    d.delivery.date = isoToday(1);
+    expect(step3DateValid(d, 0, TODAY)).toBe(true);
   });
 });
 

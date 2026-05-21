@@ -39,6 +39,10 @@ type SalesOrderData = {
   dealer: {
     name: string;
     contact: string | null;
+    // 2026-05-22 (Loo, migration 0144) — dealer-side fallback address used
+    // by the PDF "Sold By" block when no outlet is attached (pure dealer
+    // channel). outlet_address takes precedence when present.
+    address: string | null;
     outlet_name: string | null;
     outlet_address: string | null;
     salesperson_name: string | null;
@@ -1118,7 +1122,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
         "paid, signature_url, placed_at, " +
         "order_lines(sku, qty, unit_price, attrs), " +
         "order_addons(addon_key, qty, unit_price), " +
-        "dealers(name, contact), " +
+        "dealers(name, contact, address), " +
         "outlets(name, address), " +
         "salespersons(name, phone)",
     )
@@ -1202,6 +1206,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     dealer: {
       name: String(o.dealers?.name ?? "Carres"),
       contact: o.dealers?.contact ?? null,
+      address: o.dealers?.address ?? null,
       outlet_name: o.outlets?.name ?? null,
       outlet_address: o.outlets?.address ?? null,
       salesperson_name: o.salespersons?.name ?? null,

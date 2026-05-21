@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import {
   inviteDealerInput,
   setDealerStatusInput,
+  updateDealerInput,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -68,7 +69,7 @@ principalDealersRouter.get("/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  // 1. Fetch dealer (basic record).
+  // 1. Fetch dealer (basic record + stats) via the legacy RPC.
   const { data: dealerRows, error: e1 } = await sb.rpc("dealer_with_stats", { p_id: id });
   if (e1) {
     const m = mapPgError(e1);
@@ -81,6 +82,25 @@ principalDealersRouter.get("/:id", async (c) => {
     );
   }
   const dealer = Array.isArray(dealerRows) ? dealerRows[0] : dealerRows;
+
+  // 1b. dealer_with_stats RPC returns only the legacy columns. Pull the four
+  // newer fields (address, ssm_code, contact_name, contact_phone — migrations
+  // 0144/0145/0146) directly so the DealerDrawer editor can pre-fill them.
+  const { data: extra } = await sb
+    .from("dealers")
+    .select("address, ssm_code, contact_name, contact_phone")
+    .eq("id", id)
+    .maybeSingle();
+  if (extra) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).address       = extra.address ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).ssm_code      = extra.ssm_code ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).contact_name  = extra.contact_name ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).contact_phone = extra.contact_phone ?? null;
+  }
 
   // 2. Fetch last 8 orders with line/addon for total computation.
   const { data: ordRows, error: e2 } = await sb
@@ -136,6 +156,61 @@ principalDealersRouter.post("/invite", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json(data); // { dealer, approval, idempotent }
+});
+
+// ----- PATCH /:id ----- (2026-05-22, Loo)
+// Principal-side dealer profile edit. Accepts a partial body — every field
+// optional — and forwards only present keys to the UPDATE so partial saves
+// don't clobber unrelated columns. `contactName` + `contactPhone` also
+// rewrite the legacy `dealers.contact` text column ("name · phone") to keep
+// the older readers (DealerRow tooltip etc.) consistent.
+principalDealersRouter.patch("/:id", async (c) => {
+  const parsed = await parseJsonBody(c, updateDealerInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const id = c.req.param("id");
+  const body = parsed.data;
+
+  // Build a snake_case patch with only the keys the caller actually sent.
+  const patch: Record<string, string> = {};
+  if (body.name        !== undefined) patch.name = body.name;
+  if (body.region      !== undefined) patch.region = body.region;
+  if (body.address     !== undefined) patch.address = body.address;
+  if (body.ssmCode     !== undefined) patch.ssm_code = body.ssmCode;
+  if (body.contactName !== undefined) patch.contact_name = body.contactName;
+  if (body.contactPhone !== undefined) patch.contact_phone = body.contactPhone;
+
+  // Legacy `contact` text column mirrors contact_name + contact_phone for
+  // back-compat reads. Recompute only when one of the two changed (otherwise
+  // leave whatever was there — partial saves shouldn't blow away the cached
+  // string).
+  if (body.contactName !== undefined || body.contactPhone !== undefined) {
+    const sbRead = userClient(c.env, c.var.auth.jwt);
+    const { data: existing } = await sbRead
+      .from("dealers")
+      .select("contact_name, contact_phone")
+      .eq("id", id)
+      .maybeSingle();
+    const finalName  = body.contactName  ?? existing?.contact_name  ?? "";
+    const finalPhone = body.contactPhone ?? existing?.contact_phone ?? "";
+    patch.contact = `${finalName} · ${finalPhone}`.trim();
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return c.json({ ok: true, dealer: null });
+  }
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("dealers")
+    .update(patch)
+    .eq("id", id)
+    .select("id, name, region, contact, address, ssm_code, contact_name, contact_phone")
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, dealer: data });
 });
 
 // ----- POST /:id/status -----

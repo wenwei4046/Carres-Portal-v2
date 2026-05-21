@@ -762,14 +762,21 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   const dup = variantSet.size !== lines.length;
   const totalUnits = lines.reduce((s, l) => s + (l.qty || 0), 0);
 
-  // 0076 (Loo 2026-05-10) — `issuanceGroups` is the post-split normalized list
-  // of POs to be created. OFF (default): one entry per supplier (existing
-  // bedframe behavior). ON: one entry per (supplier, sku, attrs) tuple — the
-  // sofa workflow where HoOKkA needs separate POs per fabric.
+  // Per-variant split (per (SO, sku, attrs)) is sofa-only: HoOKkA's production
+  // is per-fabric so each fabric variant + SO needs its own PO. Non-sofa
+  // suppliers (Nice Future mattress, bedframe vendors) consolidate everything
+  // into one PO per supplier — multi-SKU + multi-SO is fine because production
+  // is batch-fungible, and the RPC tolerates `so_refs int[]` carrying many SOs
+  // (see _v3_claim_threads_for_po). Reverts Phase 3's universal-split for
+  // non-sofa cases (Loo 2026-05-22).
   const issuanceGroups = useMemo(() => {
-    // Phase 3 (2026-05-18 — Loo): no early-return; always split.
     const out: typeof groups.groups = [];
     for (const g of groups.groups) {
+      const isSofaSupplier = (g.supplier.cat_covered ?? []).includes("sofa");
+      if (!isSofaSupplier) {
+        out.push({ supplier: g.supplier, lines: g.lines });
+        continue;
+      }
       const byKey = new Map<string, typeof g.lines>();
       for (const l of g.lines) {
         const key = `${l.sourceSo ?? "null"}|${l.sku}|${canonAttrs(l.attrs)}`;
@@ -811,13 +818,27 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           g.supplier.kind === "factory_pickup"
             ? partnerFor(g.supplier) || undefined
             : undefined;
-        // Phase 3 (2026-05-18 — Loo) — single-PO branch carries the source
-        // SO of its lines (constant within an issuance group). Single-SO
-        // prefill: sourceSo === prefill.so → uses single `so` field. Bundle
-        // prefill that auto-fans to exactly 1 PO: sourceSo is that one SO →
-        // wire as `so` (RPC accepts either). Stockpile + global: sourceSo
-        // null → omit both.
-        const lineSo = g.lines[0]?.sourceSo ?? null;
+        // 2026-05-22 (Loo) — non-sofa consolidation means one PO may now span
+        // many SOs. Collect distinct sourceSos and route to `so` (single) vs
+        // `soRefs` (multi); the createPoInput zod schema + operation_create_po
+        // RPC both accept either shape. Sofa per-variant groups still have one
+        // SO each (key includes sourceSo) so they fall into the `.length === 1`
+        // branch unchanged. Stockpile = both omitted.
+        const distinctSos = stockpile
+          ? []
+          : Array.from(
+              new Set(
+                g.lines
+                  .map((l) => l.sourceSo)
+                  .filter((s): s is number => s != null),
+              ),
+            );
+        const soPayload =
+          distinctSos.length === 0
+            ? {}
+            : distinctSos.length === 1
+              ? { so: distinctSos[0] }
+              : { soRefs: distinctSos };
         await create.mutateAsync({
           supplierId: g.supplier.id,
           warehouseId: warehouseFor(g.supplier),
@@ -829,7 +850,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             costSource: l.costSource!,
             attrs: l.attrs ?? null,
           })),
-          ...(!stockpile && lineSo != null ? { so: lineSo } : {}),
+          ...soPayload,
           etaDate: eta,
         });
         toast.success(
@@ -850,7 +871,25 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
               g.supplier.kind === "factory_pickup"
                 ? partnerFor(g.supplier) || undefined
                 : undefined;
-            const lineSo = g.lines[0]?.sourceSo ?? null;
+            // 2026-05-22 (Loo) — same distinct-sourceSos rollup as the
+            // single-PO branch above. A non-sofa group may consolidate many
+            // SOs; sofa-split groups always have exactly one SO so they fall
+            // through with soRefs: [singleSo].
+            const distinctSos = stockpile
+              ? []
+              : Array.from(
+                  new Set(
+                    g.lines
+                      .map((l) => l.sourceSo)
+                      .filter((s): s is number => s != null),
+                  ),
+                );
+            const soPayload =
+              distinctSos.length === 0
+                ? {}
+                : distinctSos.length === 1
+                  ? { so: distinctSos[0] }
+                  : { soRefs: distinctSos };
             return {
               supplierId: g.supplier.id,
               warehouseId: warehouseFor(g.supplier),
@@ -864,9 +903,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                 costSource: l.costSource!,
                 attrs: l.attrs ?? null,
               })),
-              ...(!stockpile && lineSo != null
-                ? { soRefs: [lineSo] }
-                : {}),
+              ...soPayload,
               etaDate: eta,
             };
           }),

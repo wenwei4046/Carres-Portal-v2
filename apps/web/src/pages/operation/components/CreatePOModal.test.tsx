@@ -869,6 +869,22 @@ describe("CreatePOModal — base modal flows (migrated from operationProcurement
       "Sofa Factory Co",
     );
   });
+
+  it("non-sofa supplier with 2 different SKUs consolidates into 1 PO (no split)", () => {
+    // 2026-05-22 (Loo) — SUPPLIER_A covers mattress + bedframe (no sofa) so
+    // King + Queen should land in the SAME PO. The old Phase 3 universal
+    // per-(sku,attrs) split would have shown the Auto-split notice; with the
+    // sofa-only carve-out it should not.
+    render(wrap(<CreatePOModal prefill={{}} onClose={() => {}} />));
+    fireEvent.click(screen.getByRole("button", { name: /\+ Add SKU/ }));
+    const skuSelects = screen.getAllByLabelText(/Line \d+ variant/);
+    expect(skuSelects.length).toBe(2);
+    // Line 0 default = King (SUPPLIER_A). Switch line 1 → Queen (also A).
+    fireEvent.change(skuSelects[1], {
+      target: { value: "mattress:carres-cloud:Queen" },
+    });
+    expect(screen.queryByText(/Auto-split:/)).not.toBeInTheDocument();
+  });
 });
 
 /**

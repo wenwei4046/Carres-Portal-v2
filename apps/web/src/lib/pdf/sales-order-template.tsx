@@ -134,12 +134,23 @@ const styles = StyleSheet.create({
   totalsValue: { fontSize: 10, fontWeight: 700 },
   totalsValueGrand: { fontSize: 12, fontWeight: 700, color: ACCENT },
 
+  // 2026-05-22 (Loo) — 2-column signature footer mirroring the Invoice
+  // template style: left = Carres-side authorised signatory, right =
+  // customer signature. Each block has a top border line so the signer
+  // signs above it.
+  signRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 24,
+    marginBottom: 18,
+    marginTop: 12,
+  },
   signBlock: {
-    width: "50%",
+    flex: 1,
     borderTopWidth: 1,
     borderTopColor: "#1A1714",
     paddingTop: 4,
-    marginBottom: 18,
+    minHeight: 56,
   },
   signLabel: { fontSize: 8, color: MUTED },
   signMark: { fontSize: 9, color: ACCENT, fontWeight: 700, marginBottom: 4 },
@@ -190,7 +201,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     so_number,
     issue_date,
     order_code,
-    status_label,
+    // status_label intentionally dropped from the render (Loo 2026-05-22)
+    // — still present on the payload contract so callers/tests need not
+    // change shape, but the customer-facing PDF no longer surfaces it.
     customer,
     dealer,
     delivery,
@@ -216,6 +229,12 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     dealer.outlet_address && dealer.outlet_address.trim().length > 0
       ? dealer.outlet_address.trim()
       : null;
+  // 2026-05-22 (Loo, migration 0144) — when an order isn't tied to an outlet
+  // (pure dealer channel), fall back to the dealer's own address. The "Sold
+  // By" block below renders whichever resolves first.
+  const sellerAddress =
+    outletAddress ??
+    (dealer.address && dealer.address.trim().length > 0 ? dealer.address.trim() : null);
 
   return (
     <Document>
@@ -227,23 +246,21 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           addressLines={outletAddress ? [outletAddress] : undefined}
         />
 
+        {/* 2026-05-22 (Loo) — Status column removed; meta band collapsed to
+            Order reference + Delivery. status_label still flows in via the
+            payload but customer-facing PDF no longer shows it. */}
         <View style={styles.metaBand}>
           <View style={styles.metaCol}>
             <Text style={styles.metaLbl}>Order reference</Text>
             <Text style={styles.metaVal}>{order_code}</Text>
             <Text style={styles.metaSub}>{so_number}</Text>
           </View>
-          <View style={styles.metaCol}>
+          <View style={styles.metaColLast}>
             <Text style={styles.metaLbl}>Delivery</Text>
             <Text style={styles.metaVal}>{delivery.date}</Text>
             <Text style={styles.metaSub}>
               Floor {delivery.floor} · {delivery.has_lift ? "lift available" : "no lift"}
             </Text>
-          </View>
-          <View style={styles.metaColLast}>
-            <Text style={styles.metaLbl}>Status</Text>
-            <Text style={styles.metaVal}>{status_label}</Text>
-            <Text style={styles.metaSub}>Sales order — pending fulfilment</Text>
           </View>
         </View>
 
@@ -257,10 +274,13 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           <View style={styles.party}>
             <Text style={styles.partyLabel}>Sold By</Text>
             <Text style={styles.partyName}>{dealer.name}</Text>
+            {/* 2026-05-22 (Loo) — seller address resolves to outlet_address
+                first (showroom orders), falling back to dealers.address
+                (pure dealer channel). Rendered here in the Sold By block as
+                Loo requested; the letterhead still also carries the outlet
+                line (no duplication for dealer-channel which has no outlet). */}
+            {sellerAddress ? <Text style={styles.partyLine}>{sellerAddress}</Text> : null}
             {dealer.contact ? <Text style={styles.partyLine}>{dealer.contact}</Text> : null}
-            {/* Showroom block lives in the letterhead now (Loo 2026-05-16) — no
-                duplication here. Salesperson stays since it's people-info, not
-                location-info. */}
             {dealer.salesperson_name ? (
               <View style={styles.partyDivider}>
                 <Text style={styles.partyLabel}>Salesperson</Text>
@@ -343,15 +363,28 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           </View>
         </View>
 
-        <View style={styles.signBlock}>
-          {signed ? (
-            <Text style={styles.signMark}>✓ Signed electronically by customer</Text>
-          ) : null}
-          <Text style={styles.signLabel}>Customer signature</Text>
-          <Text style={styles.signLabel}>
-            {customer.name}
-            {customer.phone ? ` · ${customer.phone}` : ""}
-          </Text>
+        {/* 2026-05-22 (Loo) — 2-column signature footer. Left = Authorised
+            signatory (dealer/showroom seller side), right = Customer. Both
+            blocks have a top border so the recipient signs above it on the
+            printed copy. The ✓ signed mark continues to flag the electronic
+            signature captured during checkout. */}
+        <View style={styles.signRow}>
+          <View style={styles.signBlock}>
+            <Text style={styles.signLabel}>Authorised by</Text>
+            <Text style={styles.signLabel}>
+              {dealer.salesperson_name ?? dealer.name}
+            </Text>
+          </View>
+          <View style={styles.signBlock}>
+            {signed ? (
+              <Text style={styles.signMark}>✓ Signed electronically by customer</Text>
+            ) : null}
+            <Text style={styles.signLabel}>Customer signature</Text>
+            <Text style={styles.signLabel}>
+              {customer.name}
+              {customer.phone ? ` · ${customer.phone}` : ""}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.terms}>
@@ -368,7 +401,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             4. Stair-carry surcharges (if any) are billed on this sales order and are not invoiced separately on the DO.
           </Text>
           <Text style={styles.termsLine}>
-            5. SST 8% is included in unit prices per LHDN inclusive convention.
+            5. Once the delivery date has been confirmed, any subsequent request to change or extend the date will incur a rescheduling surcharge.
           </Text>
         </View>
 

@@ -808,6 +808,37 @@ export function useOutlets(opts?: Partial<UseQueryOptions<OutletsListResponse>>)
   });
 }
 
+/**
+ * 2026-05-22 (Loo) — Dealer-side create outlet. Used in DealerSettings →
+ * Outlets section to add a second / third physical location after the
+ * principal-seeded default outlet.
+ */
+export function useCreateOutlet(
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; dealerId: string; name: string; address: string },
+      ApiError,
+      { name: string; address: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; dealerId: string; name: string; address: string }>(
+        "/api/outlets",
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.outlets() });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+  });
+}
+
 export function useSalespersons(
   outletId?: string,
   opts?: Partial<UseQueryOptions<SalespersonsListResponse>>,
@@ -975,6 +1006,14 @@ export interface PrincipalDealerDetailDealer {
   order_count: number;
   gmv: number;
   outstanding: number;
+  // 2026-05-22 (Loo) — populated by GET /api/principal/dealers/:id via a
+  // second SELECT, since dealer_with_stats RPC returns only legacy columns.
+  // All null-able because pre-migration-0144/0145/0146 rows may not have
+  // had the editor touch them yet.
+  address: string | null;
+  ssm_code: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
 }
 export interface PrincipalDealerRecentOrder {
   id: string;
@@ -1195,6 +1234,50 @@ export function useDealerSetStatus(
   });
 }
 
+/**
+ * 2026-05-22 (Loo) — PATCH dealer profile (name, region, address, ssm_code,
+ * contact name/phone). Every field optional; the server applies a partial
+ * UPDATE and recomputes the legacy `dealers.contact` text column when
+ * contact_name or contact_phone changes.
+ */
+export function useUpdateDealer(
+  dealerId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { ok: boolean; dealer: unknown },
+      ApiError,
+      {
+        name?: string;
+        region?: string;
+        address?: string;
+        ssmCode?: string;
+        contactName?: string;
+        contactPhone?: string;
+      }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) =>
+      apiFetch<{ ok: boolean; dealer: unknown }>(
+        `/api/principal/dealers/${dealerId}`,
+        { method: "PATCH", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({
+        queryKey: qk.principal.dealer(dealerId),
+        exact: true,
+      });
+      await qc.invalidateQueries({ queryKey: ["principal", "dealers"] });
+      opts?.onSuccess?.(
+        ...(args as Parameters<NonNullable<typeof opts.onSuccess>>),
+      );
+    },
+  });
+}
+
 // ===========================================================================
 // Phase 10 — Principal Accounts admin
 // ===========================================================================
@@ -1257,6 +1340,11 @@ export function useCreateAccount(
         title?: string | null;
         companyName?: string;
         region?: string;
+        outletName?: string;
+        address?: string;
+        ssmCode?: string;
+        contactName?: string;
+        contactPhone?: string;
         tempPassword: string;
       }
     >

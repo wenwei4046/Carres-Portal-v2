@@ -150,13 +150,27 @@ principalAccountsRouter.post("/", async (c) => {
   let createdOrgTable: "dealers" | "suppliers" | "delivery_partners" | null = null;
   let createdOrgId: string | null = null;
 
-  if (body.role === "dealer") {
+  if (body.role === "dealer" || body.role === "showroom") {
+    // 2026-05-22 (Loo) — showroom is a dealer-with-channel='showroom' under
+    // the hood, so the org-creation path is identical to plain dealer. The
+    // only difference is the `channel` column value, which drives the
+    // dealer-channel vs showroom-channel branching in downstream UI/PDF
+    // (e.g. Sales Order "Sold By" letterhead).
+    const channel = body.role === "showroom" ? "showroom" : "dealer";
     const dpInsert = await sb
       .from("dealers")
       .insert({
         name: body.companyName!,
+        channel,
         region: body.region?.trim() || "—",
-        contact: `${body.name} · ${body.email}`,
+        // Legacy single-text `contact` column auto-built from the new
+        // structured contact_name + contact_phone fields so existing reads
+        // (DealerRow tooltip, DealerDrawer header) keep working.
+        contact: `${body.contactName!} · ${body.contactPhone!}`,
+        address: body.address!,
+        ssm_code: body.ssmCode!,
+        contact_name: body.contactName!,
+        contact_phone: body.contactPhone!,
       })
       .select("id")
       .single();
@@ -173,6 +187,29 @@ principalAccountsRouter.post("/", async (c) => {
     dealerId = dpInsert.data.id;
     createdOrgTable = "dealers";
     createdOrgId = dealerId;
+
+    // 2026-05-22 (Loo) — auto-create the default outlet so the dealer/
+    // showroom can start creating sales orders immediately. Without this
+    // the Step 1 picker stalls with "No outlets yet — add one in Settings".
+    // outletName defaults to companyName when blank (handles the common
+    // case "outlet = company"); explicit override supported via the form.
+    const outletInsert = await sb
+      .from("outlets")
+      .insert({
+        dealer_id: dealerId,
+        name: (body.outletName?.trim() || body.companyName)!,
+        address: body.address!,
+      });
+    if (outletInsert.error) {
+      return c.json(
+        {
+          error: "rpc_failed",
+          code: "outlets_insert_failed",
+          message: outletInsert.error.message ?? "default outlet insert failed",
+        },
+        500,
+      );
+    }
   } else if (body.role === "supplier") {
     const dpInsert = await sb
       .from("suppliers")

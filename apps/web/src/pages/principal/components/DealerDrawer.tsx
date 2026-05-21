@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import {
   usePrincipalDealer,
   useDealerSetStatus,
+  useUpdateDealer,
   type PrincipalDealerRecentOrder,
 } from "@/lib/queries";
 import { TOAST } from "@/lib/toast-copy";
@@ -48,6 +50,30 @@ interface Props {
 export default function DealerDrawer({ dealerId, onClose }: Props) {
   const { data, isLoading } = usePrincipalDealer(dealerId);
   const setStatus = useDealerSetStatus(dealerId);
+  const update = useUpdateDealer(dealerId);
+
+  // 2026-05-22 (Loo) — local editor state for the four newer fields. Synced
+  // from server data via the effect below; touching any input flips dirty so
+  // the Save button enables. Address stays as a plain textarea for the v1
+  // editor (cascade-pre-fill would need a parser; deferred).
+  const [draft, setDraft] = useState({
+    address: "",
+    ssmCode: "",
+    contactName: "",
+    contactPhone: "",
+  });
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    if (data?.dealer) {
+      setDraft({
+        address: data.dealer.address ?? "",
+        ssmCode: data.dealer.ssm_code ?? "",
+        contactName: data.dealer.contact_name ?? "",
+        contactPhone: data.dealer.contact_phone ?? "",
+      });
+      setDirty(false);
+    }
+  }, [data?.dealer]);
 
   if (isLoading || !data) {
     return (
@@ -71,6 +97,51 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
   const dealer = data.dealer;
   const recentOrders = data.recentOrders ?? [];
   const outstandingNum = Number(dealer.outstanding ?? 0);
+
+  function setField<K extends keyof typeof draft>(k: K, v: string) {
+    setDraft((d) => ({ ...d, [k]: v }));
+    setDirty(true);
+  }
+
+  async function saveProfile() {
+    // Send only fields that changed AND meet min-length (server zod has
+    // floors at address ≥ 5 / ssm ≥ 6 / name ≥ 2 / phone ≥ 7); pushing
+    // shorter values would 422.
+    const payload: Record<string, string> = {};
+    if (draft.address.trim().length >= 5 && draft.address !== (dealer.address ?? "")) {
+      payload.address = draft.address.trim();
+    }
+    if (draft.ssmCode.trim().length >= 6 && draft.ssmCode !== (dealer.ssm_code ?? "")) {
+      payload.ssmCode = draft.ssmCode.trim();
+    }
+    if (
+      draft.contactName.trim().length >= 2 &&
+      draft.contactName !== (dealer.contact_name ?? "")
+    ) {
+      payload.contactName = draft.contactName.trim();
+    }
+    if (
+      draft.contactPhone.trim().length >= 7 &&
+      draft.contactPhone !== (dealer.contact_phone ?? "")
+    ) {
+      payload.contactPhone = draft.contactPhone.trim();
+    }
+    if (Object.keys(payload).length === 0) {
+      toast.info("No changes to save");
+      return;
+    }
+    try {
+      await update.mutateAsync(payload);
+      toast.success(`${dealer.name} profile updated`);
+      setDirty(false);
+    } catch (e: unknown) {
+      if (e instanceof ApiError) {
+        toast.error(e.message || "Failed to update dealer");
+      } else {
+        toast.error(e instanceof Error ? e.message : "Failed to update dealer");
+      }
+    }
+  }
 
   async function suspend() {
     if (
@@ -202,6 +273,63 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
           )}
         </div>
 
+        {/* 2026-05-22 (Loo) — profile editor. Backfills the four fields
+            added in migrations 0144/0145/0146 (address, ssm_code, contact_name,
+            contact_phone) for existing dealers, and lets the principal correct
+            them later. Save button disabled until something changes. */}
+        <div className="mb-[18px] pt-[18px] border-t border-base-100">
+          <div className="text-[10px] uppercase tracking-wider text-base-500 font-semibold mb-2">
+            Dealer profile
+          </div>
+          <div className="grid gap-3">
+            <ProfileField label="SSM code">
+              <input
+                value={draft.ssmCode}
+                onChange={(e) => setField("ssmCode", e.target.value)}
+                placeholder="e.g. 201801234567"
+                className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
+              />
+            </ProfileField>
+            <div className="grid grid-cols-2 gap-3">
+              <ProfileField label="Contact person">
+                <input
+                  value={draft.contactName}
+                  onChange={(e) => setField("contactName", e.target.value)}
+                  placeholder="e.g. Aisha Rahman"
+                  className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
+                />
+              </ProfileField>
+              <ProfileField label="Contact phone">
+                <input
+                  value={draft.contactPhone}
+                  onChange={(e) => setField("contactPhone", e.target.value)}
+                  placeholder="e.g. 012-3344556"
+                  className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary"
+                />
+              </ProfileField>
+            </div>
+            <ProfileField label="Business address" hint="Single text field — full address line">
+              <textarea
+                value={draft.address}
+                onChange={(e) => setField("address", e.target.value)}
+                placeholder="109, Jalan SS 25/2, Taman Mayang, 47301 Petaling Jaya, Selangor"
+                rows={3}
+                className="w-full px-3 py-2 border border-base-200 rounded text-[13px] outline-none focus:border-primary resize-none"
+              />
+            </ProfileField>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={saveProfile}
+                disabled={!dirty || update.isPending}
+                className="btn-primary disabled:opacity-50"
+              >
+                {update.isPending ? "Saving…" : "Save profile"}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="pt-[18px] border-t border-base-100 flex gap-2">
           {dealer.status === "active" && (
             <button
@@ -236,6 +364,29 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Editor-row label + optional hint, used by the dealer profile editor. */
+function ProfileField({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="text-[9.5px] uppercase tracking-wider text-base-500 font-semibold mb-1">
+        {label}
+      </div>
+      {hint ? (
+        <div className="text-[10px] text-base-500 mb-1.5 leading-snug">{hint}</div>
+      ) : null}
+      {children}
     </div>
   );
 }

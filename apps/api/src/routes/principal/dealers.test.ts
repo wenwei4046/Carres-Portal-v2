@@ -75,6 +75,12 @@ function buildSb(opts: {
   };
   chain.then = (resolve: (v: { data: unknown; error: unknown }) => unknown) =>
     resolve({ data: opts.ordersRows ?? [], error: opts.ordersError ?? null });
+  // 2026-05-22 (Loo) — GET /:id now does a second `.from("dealers").select(...)
+  // .eq("id", id).maybeSingle()` pull for address/ssm_code/contact_name/
+  // contact_phone (migrations 0144/0145/0146). The mock returns null so the
+  // route's null-coalescing path runs; tests asserting only the legacy fields
+  // are unaffected.
+  chain.maybeSingle = async () => ({ data: null, error: null });
 
   const sb = {
     rpc: async (name: string, args: unknown) => {

@@ -1267,7 +1267,11 @@ describe("PATCH /api/orders/:id", () => {
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           customer: { name: "Updated Name", phone: "012-9988776" },
-          delivery: { floor: 5, hasLift: true },
+          // 2026-05-22 (Loo) — floor capped at MAX_DELIVERY_FLOOR (3) since
+          // Carres doesn't stair-carry above floor 3. The original test used
+          // floor: 5 to assert the flattening path; floor: 3 exercises the
+          // same path and now also satisfies the new max constraint.
+          delivery: { floor: 3, hasLift: true },
         }),
       }),
       env,
@@ -1277,7 +1281,7 @@ describe("PATCH /api/orders/:id", () => {
     const args = sb._rpcCalls[0].args as { p_payload: Record<string, unknown> };
     expect(args.p_payload.customer_name).toBe("Updated Name");
     expect(args.p_payload.customer_phone).toBe("012-9988776");
-    expect(args.p_payload.delivery_floor).toBe(5);
+    expect(args.p_payload.delivery_floor).toBe(3);
     expect(args.p_payload.delivery_has_lift).toBe(true);
   });
 

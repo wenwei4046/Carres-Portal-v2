@@ -409,28 +409,31 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
       </Section>
 
       {/* ---------- T&C ---------- */}
+      {/* 2026-05-22 (Loo) — wording mirrors `sales-order-template.tsx` so the
+          customer reads the same 5 clauses on-screen (here) and on the printed
+          PDF they sign. Any future edit must touch both files together. */}
       <Section title="Terms & conditions">
         <div className="rounded border border-base-200 bg-white p-3.5 text-[11px] leading-relaxed text-base-700 max-h-[140px] overflow-auto">
           <p className="text-base-900 font-semibold mb-1.5">Carres Group Sdn Bhd · Order Terms</p>
           <p>
-            1. All orders are subject to stock availability. 50% deposit confirms reservation.
+            1. This sales order becomes a binding tax invoice once goods are delivered and full
+            payment is reconciled.
           </p>
           <p>
-            2. Final payment is due before delivery. Goods remain property of Carres until full
-            payment is received.
+            2. Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow
+            QR, and cheque accepted.
           </p>
           <p>
-            3. Delivery dates are estimates. Stair carry surcharges apply from{" "}
-            {cfg.freeUpToFloor + 1}F onward at RM {cfg.perFloorPerItem} per item per floor (no
-            charge if lift available).
+            3. Delivery date is best-effort and may shift ±3 working days subject to operation
+            confirmation.
           </p>
           <p>
-            4. Returns accepted within 7 days, original packaging only. Custom orders are
-            non-refundable.
+            4. Stair-carry surcharges (if any) are billed on this sales order and are not invoiced
+            separately on the DO.
           </p>
           <p>
-            5. Customer warrants all information provided is accurate and consents to delivery
-            contact via the emergency contact above.
+            5. Once the delivery date has been confirmed, any subsequent request to change or
+            extend the date will incur a rescheduling surcharge.
           </p>
         </div>
         <label

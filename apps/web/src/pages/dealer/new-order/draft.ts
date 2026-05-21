@@ -278,6 +278,11 @@ export function step1Valid(d: WizardDraft): boolean {
  * is fully valid. Used by the wizard footer to surface "Continue 灰着" reasons
  * inline so dealers don't have to scroll the form hunting for the missing
  * field. Order matches the form's visual top-to-bottom layout.
+ *
+ * 2026-05-22 (Loo) — delivery date moved out of Step 1 into the new Step 3
+ * because the date constraint depends on what's in the cart (mattress +
+ * bedframe = today + 14 days, sofa = today + 21 days). See
+ * `step3DateFirstIssue` for the new gate.
  */
 export function step1FirstIssue(d: WizardDraft): string | null {
   const c = d.customer;
@@ -298,7 +303,6 @@ export function step1FirstIssue(d: WizardDraft): string | null {
     if (!c.addressPostcode)                 return "Address — Postcode, or tick 'Unknown'";
   }
   if (!c.billingSame && c.billing.trim().length < 5) return "Billing — fill billing address, or tick 'Same as delivery'";
-  if (!d.delivery.dateTbd && !d.delivery.date)       return "Delivery — pick a date, or tick 'TBD'";
   return null;
 }
 
@@ -329,7 +333,38 @@ export function step2FirstDisposalIssue(d: WizardDraft): string | null {
 }
 
 /**
- * Step 3 / Submit gate — every business-required field is set.
+ * Step 3 gate — 2026-05-22 (Loo). Dedicated to the delivery date now that
+ * it's been split out of Step 1. The caller passes `minLeadDays` (computed
+ * from the cart's categories — see shared `maxLeadDaysFor`) so this module
+ * stays catalog-agnostic.
+ *
+ *   - TBD is accepted (order parks in Place until a real date is entered)
+ *   - Otherwise the picked date must be on/after today + minLeadDays
+ */
+export function step3DateValid(d: WizardDraft, minLeadDays: number, today: Date = new Date()): boolean {
+  return step3DateFirstIssue(d, minLeadDays, today) === null;
+}
+
+export function step3DateFirstIssue(
+  d: WizardDraft,
+  minLeadDays: number,
+  today: Date = new Date(),
+): string | null {
+  if (d.delivery.dateTbd) return null;
+  if (!d.delivery.date) return "Delivery — pick a date, or tick 'Confirm later'";
+  if (minLeadDays > 0) {
+    const min = new Date(today);
+    min.setDate(min.getDate() + minLeadDays);
+    const picked = new Date(d.delivery.date);
+    if (picked < new Date(min.toISOString().slice(0, 10))) {
+      return `Delivery — earliest date is ${min.toISOString().slice(0, 10)} (${minLeadDays}-day lead time)`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Step 4 / Submit gate — every business-required field is set.
  *
  * Rules (mirror proto/new-order-step3 paymentMethodOk + signature/T&C check):
  *   - signature is a non-empty PNG dataURL
@@ -340,8 +375,11 @@ export function step2FirstDisposalIssue(d: WizardDraft): string | null {
  *   - if method === "installment": installmentMonths is 6 or 12 (default 6 is fine)
  *   - paid is a finite number ≥ 0 (50% threshold is a preview banner, not a
  *     hard gate per Phase 2B → Place→Proceed transition lives in Phase 2C)
+ *
+ * 2026-05-22 (Loo) — renamed from step3Valid when the wizard added a new
+ * step 3 for delivery date. Body unchanged.
  */
-export function step3Valid(d: WizardDraft): boolean {
+export function step4Valid(d: WizardDraft): boolean {
   if (!d.signature || !d.signature.startsWith("data:image/")) return false;
   if (!d.termsAccepted) return false;
   if (!d.payment.slip) return false;
@@ -357,6 +395,12 @@ export function step3Valid(d: WizardDraft): boolean {
   if (!Number.isFinite(d.paid) || d.paid < 0) return false;
   return true;
 }
+
+/** @deprecated 2026-05-22 (Loo) — renamed to `step4Valid` after the wizard
+ *  added a dedicated step 3 for delivery date. Alias kept until the test
+ *  files and DealerNewOrder.tsx are updated. Remove once no consumer
+ *  references it. */
+export const step3Valid = step4Valid;
 
 /** Convert a base64 dataURL into a Blob for upload. Throws on malformed input. */
 export function dataUrlToBlob(dataUrl: string): Blob {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_DELIVERY_FLOOR } from "../constants";
 
 /**
  * Single Order schema with optional rels. Lists return arrays of orders without
@@ -172,7 +173,7 @@ export const createOrderInputSchema = z.object({
   delivery: z.object({
     date: z.string().nullable(),
     dateTbd: z.boolean(),
-    floor: z.number().int().min(1),
+    floor: z.number().int().min(1).max(MAX_DELIVERY_FLOOR),
     hasLift: z.boolean(),
     stairItems: z.number().int().nonnegative().nullable().optional(),
   }),
@@ -286,7 +287,7 @@ export const updateOrderInputSchema = z
       .object({
         date: z.string().nullable().optional(),
         dateTbd: z.boolean().optional(),
-        floor: z.number().int().min(1).optional(),
+        floor: z.number().int().min(1).max(MAX_DELIVERY_FLOOR).optional(),
         hasLift: z.boolean().optional(),
       })
       .optional(),

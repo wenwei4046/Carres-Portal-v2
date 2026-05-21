@@ -1,6 +1,12 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { Adapters, DB, outletsListResponseSchema } from "@carres/shared";
+import {
+  Adapters,
+  DB,
+  createOutletInput,
+  outletSchema,
+  outletsListResponseSchema,
+} from "@carres/shared";
 import { userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
 
@@ -24,6 +30,53 @@ outletsRouter.get("/", async (c) => {
     Adapters.outletFromRow(row as DB.OutletRow),
   );
   return c.json(outletsListResponseSchema.parse({ outlets }));
+});
+
+/**
+ * POST /api/outlets — 2026-05-22 (Loo). Dealer/showroom self-service create.
+ *
+ * dealer_id is derived from JWT — caller cannot spoof another dealer.
+ * Mirrors the pattern in salespersons.ts POST: same role gate, same JWT-
+ * derived dealer scoping. The principal does NOT use this endpoint — they
+ * seed the default outlet via Principal Accounts at dealer-create time
+ * (apps/api/src/routes/principal/accounts.ts).
+ */
+outletsRouter.post("/", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "dealer" && auth.role !== "salesperson" && auth.role !== "showroom") {
+    throw new HTTPException(403, { message: "Dealer/showroom only" });
+  }
+  if (!auth.dealerId) {
+    throw new HTTPException(422, { message: "Caller has no dealer_id in JWT" });
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = createOutletInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error:   "invalid_body",
+        code:    "invalid_param",
+        message: parsed.error.issues[0]?.message ?? "invalid body",
+      },
+      422,
+    );
+  }
+  const { name, address } = parsed.data;
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("outlets")
+    .insert({
+      dealer_id: auth.dealerId,
+      name,
+      address,
+    })
+    .select("*")
+    .single();
+  if (error) throw new HTTPException(500, { message: error.message });
+
+  return c.json(outletSchema.parse(Adapters.outletFromRow(data as DB.OutletRow)));
 });
 
 export default outletsRouter;
