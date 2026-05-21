@@ -20,13 +20,9 @@ import type {
  *   5. shows the per-order report (created / updated / skipped_locked /
  *      updated_items_locked / error) + unmatched-SKU list per order
  *
- * "House dealer" is the Carres-internal entity all AutoCount-imported
- * orders attach to (orders.dealer_id is NOT NULL). Operation picks it once;
- * the value is remembered in localStorage so subsequent imports skip the
- * step.
+ * dealer_id is required by the schema; we auto-pick the first dealer in the
+ * list (the Carres house entity) silently — no user-facing picker needed.
  */
-
-const HOUSE_DEALER_LS_KEY = "carres.ops.import.houseDealerId";
 
 interface DealerOpt {
   id: string;
@@ -46,15 +42,12 @@ export default function OperationImport() {
   >([]);
   const [fileName, setFileName] = useState<string>("");
 
-  const [houseDealerId, setHouseDealerId] = useState<string>(
-    () => localStorage.getItem(HOUSE_DEALER_LS_KEY) ?? "",
-  );
-
-  // Pull the list of dealers so ops can pick the house dealer.
+  // Auto-pick the first dealer (Carres house entity). No user-facing picker.
   const dealersQ = useQuery<{ dealers: DealerOpt[] }>({
     queryKey: ["principal", "dealers", { all: true }] as const,
     queryFn: () => apiFetch("/api/principal/dealers"),
   });
+  const houseDealerId = dealersQ.data?.dealers[0]?.id ?? "";
 
   const usableRows = parsedRows.filter((r): r is NonNullable<typeof r> => r !== null);
 
@@ -101,7 +94,6 @@ export default function OperationImport() {
   function submit() {
     if (!houseDealerId) return;
     if (usableRows.length === 0) return;
-    localStorage.setItem(HOUSE_DEALER_LS_KEY, houseDealerId);
     submitMut.mutate({
       dealerId: houseDealerId,
       sourceSystem: "autocount",
@@ -128,33 +120,10 @@ export default function OperationImport() {
         </p>
       </div>
 
-      {/* Step 1: house dealer */}
-      <section className="rounded border border-base-200 bg-white p-6 mb-4">
-        <h2 className="text-sm font-semibold text-base-900 mb-1">
-          1. House dealer (the Carres entity these orders attach to)
-        </h2>
-        <p className="text-xs text-base-500 mb-3">
-          Picked once, remembered in this browser for next time.
-        </p>
-        <select
-          className="w-full max-w-md rounded border border-base-300 bg-white px-3 py-2 text-sm"
-          value={houseDealerId}
-          onChange={(e) => setHouseDealerId(e.target.value)}
-          disabled={dealersQ.isLoading}
-        >
-          <option value="">— select dealer —</option>
-          {(dealersQ.data?.dealers ?? []).map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
-      </section>
-
-      {/* Step 2: file pick */}
+      {/* Step 1: file pick */}
       <section className="rounded border border-base-200 bg-white p-6 mb-4">
         <h2 className="text-sm font-semibold text-base-900 mb-3">
-          2. Pick the CSV file
+          1. Pick the CSV file
         </h2>
         <div className="flex items-center gap-3">
           <input
@@ -183,7 +152,7 @@ export default function OperationImport() {
       {csvText ? (
         <section className="rounded border border-base-200 bg-white p-6 mb-4">
           <h2 className="text-sm font-semibold text-base-900 mb-3">
-            3. Preview
+            2. Preview
           </h2>
           <div className="grid grid-cols-3 gap-4 mb-4">
             <Stat label="Rows in file" value={parsedRows.length} />
@@ -252,7 +221,7 @@ export default function OperationImport() {
       {csvText ? (
         <section className="rounded border border-base-200 bg-white p-6 mb-4">
           <h2 className="text-sm font-semibold text-base-900 mb-3">
-            4. Submit
+            3. Submit
           </h2>
           <button
             type="button"
@@ -266,8 +235,8 @@ export default function OperationImport() {
           >
             {submitMut.isPending ? "Importing…" : `Import ${usableRows.length} rows`}
           </button>
-          {!houseDealerId ? (
-            <p className="mt-2 text-xs text-error-600">Pick a house dealer first.</p>
+          {!houseDealerId && !dealersQ.isLoading ? (
+            <p className="mt-2 text-xs text-error-600">No dealer account found — contact admin.</p>
           ) : null}
         </section>
       ) : null}
