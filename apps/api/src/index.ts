@@ -69,6 +69,14 @@ app.use("*", cors({
   maxAge: 600,
 }));
 
+// Global error handler — ensures unhandled throws return JSON (not a
+// connection reset that causes "Failed to fetch" in the browser).
+app.onError((err, c) => {
+  const status = (err as { status?: number }).status ?? 500;
+  const message = err instanceof Error ? err.message : "Internal server error";
+  return c.json({ error: "server_error", message }, status as 400 | 401 | 403 | 404 | 422 | 500);
+});
+
 app.get("/health", (c) => c.json({ ok: true }));
 
 const api = new Hono<AppEnv>();

@@ -108,7 +108,7 @@ snRouter.post("/", requireOperationOrPrincipal, async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 snRouter.get("/lookup", requireOperationOrPrincipal, async (c) => {
   const soParam = c.req.query("so") ?? "";
-  const soNum = parseInt(soParam.replace(/^SO-/i, ""), 10);
+  const soNum = parseInt(soParam.replace(/^S[O0]-?/i, ""), 10);
   if (isNaN(soNum)) return c.json({ order: null });
 
   const sb = userClient(c.env, c.var.auth.jwt);

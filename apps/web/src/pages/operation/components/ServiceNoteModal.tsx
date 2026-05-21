@@ -73,7 +73,7 @@ export default function ServiceNoteModal({ mode, id, onClose, onSaved }: Props) 
     setRefNo(val);
     if (lookupTimer.current) clearTimeout(lookupTimer.current);
 
-    const soMatch = val.trim().match(/^SO-?(\d+)$/i);
+    const soMatch = val.trim().match(/^S[O0]-?(\d+)$/i);
     if (!soMatch) {
       setLookupStatus("idle");
       return;
