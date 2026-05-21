@@ -149,7 +149,7 @@ ordersRouter.get("/inbox", async (c) => {
   const { data, error } = await sb
     .from("orders")
     .select(
-      "id, so, customer_name, customer_phone, customer_address, delivery_date, paid, source_ref, source_system, ops_assigned_logistic, placed_at",
+      "id, so, customer_name, customer_phone, customer_address, delivery_date, paid, source_ref, source_system, ops_assigned_logistic, placed_at, order_lines(sku, qty, attrs)",
     )
     .eq("status", "place")
     .eq("source_system", "autocount")

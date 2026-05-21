@@ -16,6 +16,12 @@ import { fmtDate } from "@/lib/fmt-date";
  * orders table — single source of truth (per Loo Q1=a 2026-05-20).
  */
 
+interface InboxLine {
+  sku: string;
+  qty: number;
+  attrs: Record<string, unknown> | null;
+}
+
 interface InboxRow {
   id: string;
   so: number;
@@ -28,6 +34,7 @@ interface InboxRow {
   source_system: string | null;
   ops_assigned_logistic: string | null;
   placed_at: string;
+  order_lines: InboxLine[];
 }
 
 interface InboxResponse {
@@ -55,16 +62,23 @@ export default function OperationInbox() {
     queryFn: () => apiFetch("/api/operation/partners"),
   });
 
-  // Filter the partner list to the 4 ops cares about — keeps the dropdown
-  // focused and stable as the master data grows.
+  // Filter to the 4 logistic partners, rename for display, NETS first.
   const logisticPartners: PartnerOpt[] = useMemo(() => {
+    const DISPLAY: Record<string, string> = {
+      nets: "NETS",
+      tsdd: "TSDD",
+      al: "AL",
+      houzs: "HOUZS",
+    };
+    const ORDER: Record<string, number> = { nets: 0, tsdd: 1, al: 2, houzs: 3 };
     const all = partnersQ.data?.partners ?? [];
-    const allowed = ["nets", "tsdd", "al", "houzs"];
     return all
-      .filter((p) =>
-        allowed.some((slug) => p.name.toLowerCase().startsWith(slug)),
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .filter((p) => Object.keys(DISPLAY).some((slug) => p.name.toLowerCase().startsWith(slug)))
+      .map((p) => {
+        const slug = Object.keys(DISPLAY).find((s) => p.name.toLowerCase().startsWith(s)) ?? "";
+        return { id: p.id, name: DISPLAY[slug] ?? p.name, _order: ORDER[slug] ?? 99 };
+      })
+      .sort((a, b) => (a as { _order: number })._order - (b as { _order: number })._order);
   }, [partnersQ.data]);
 
   const assignMut = useMutation({
@@ -112,15 +126,16 @@ export default function OperationInbox() {
               <tr>
                 <th className="text-left px-4 py-3 font-medium">SO #</th>
                 <th className="text-left px-4 py-3 font-medium">Customer</th>
-                <th className="text-left px-4 py-3 font-medium">AutoCount Ref</th>
+                <th className="text-left px-4 py-3 font-medium">Ref</th>
+                <th className="text-left px-4 py-3 font-medium">Items</th>
                 <th className="text-left px-4 py-3 font-medium">Delivery</th>
-                <th className="text-left px-4 py-3 font-medium">Assign Logistic</th>
+                <th className="text-left px-4 py-3 font-medium w-36">Assign Logistic</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-t border-base-200 hover:bg-base-50">
-                  <td className="px-4 py-3 font-mono text-base-900">SO-{r.so}</td>
+                <tr key={r.id} className="border-t border-base-200 hover:bg-base-50 align-top">
+                  <td className="px-4 py-3 font-mono text-base-900 whitespace-nowrap">SO-{r.so}</td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-base-900">
                       {r.customer_name ?? "—"}
@@ -129,10 +144,25 @@ export default function OperationInbox() {
                       {r.customer_phone ?? ""}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-base-700">
+                  <td className="px-4 py-3 text-xs text-base-600 font-mono whitespace-nowrap">
                     {(r.source_ref ?? []).join(" + ") || "—"}
                   </td>
-                  <td className="px-4 py-3 text-base-700">
+                  <td className="px-4 py-3 max-w-xs">
+                    <ul className="space-y-0.5">
+                      {(r.order_lines ?? []).map((l, i) => (
+                        <li key={i} className="text-xs text-base-700">
+                          <span className="font-mono">{l.sku}</span>
+                          {l.attrs && Object.keys(l.attrs).length > 0 && (
+                            <span className="text-base-500 ml-1">
+                              {Object.entries(l.attrs).map(([k, v]) => `${k}:${v}`).join(" ")}
+                            </span>
+                          )}
+                          <span className="text-base-400 ml-1">×{l.qty}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
+                  <td className="px-4 py-3 text-base-700 whitespace-nowrap">
                     {r.delivery_date ? fmtDate(r.delivery_date) : <span className="text-base-400">TBD</span>}
                   </td>
                   <td className="px-4 py-3">
@@ -148,7 +178,7 @@ export default function OperationInbox() {
                         });
                       }}
                     >
-                      <option value="">— pick partner —</option>
+                      <option value="">— pick —</option>
                       {logisticPartners.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name}
