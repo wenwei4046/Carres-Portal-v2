@@ -19,6 +19,8 @@ import OperationOpsReady from "./OperationOpsReady";
 import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
+// Migration 0140 — Service Notes / Issue Tracker.
+import OperationServiceNotes from "./OperationServiceNotes";
 import type { MovementsFilters } from "@/lib/queries";
 
 /**
@@ -191,6 +193,8 @@ export default function OperationApp() {
             {tab === "ops-reserved" && <OperationOpsReserved />}
             {tab === "ops-repair" && <OperationOpsRepair />}
             {tab === "ops-inventory" && <OperationOpsInventory />}
+            {/* Migration 0140 — Service Notes / Issue Tracker */}
+            {tab === "service-notes" && <OperationServiceNotes />}
           </>
         )}
       </main>

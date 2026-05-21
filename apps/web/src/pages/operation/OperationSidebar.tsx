@@ -74,6 +74,13 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    // Migration 0140 — Service Notes / Issue Tracker.
+    label: "Cases",
+    items: [
+      { k: "service-notes", t: "Service Notes", icon: "✎" },
+    ],
+  },
+  {
     // 0074 catalog admin (Loo 2026-05-09 Q1=b, Q2=c). Same page mounts under
     // /principal/catalog too — RLS write covers both roles via is_internal().
     label: "Catalog",
@@ -99,6 +106,7 @@ export default function OperationSidebar({ active, onChange }: Props) {
   const badgeCount: Record<string, number> = {
     orders: badgesQ.data?.orders ?? 0,
     procurement: badgesQ.data?.procurement ?? 0,
+    "service-notes": badgesQ.data?.serviceNotes ?? 0,
   };
   // Mark-seen mutation (Loo 2026-05-11). Fires on click for keys that have
   // a badge counter — optimistically zeros the count so the orange dot

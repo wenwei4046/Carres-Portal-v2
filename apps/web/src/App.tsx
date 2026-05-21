@@ -13,6 +13,7 @@ import FinanceApp from "@/pages/finance/FinanceApp";
 import SupplierApp from "@/pages/supplier/SupplierApp";
 import BDApp from "@/pages/bd/BDApp";
 import PickupEventPrintPage from "@/pages/print/PickupEventPrintPage";
+import ServiceNotePrintPage from "@/pages/print/ServiceNotePrintPage";
 
 function HomeRedirect() {
   const session = useAuth((s) => s.session);
@@ -143,6 +144,14 @@ export default function App() {
           element={
             <RequireAuth>
               <PickupEventPrintPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/print/service-note/:id"
+          element={
+            <RequireAuth>
+              <ServiceNotePrintPage />
             </RequireAuth>
           }
         />

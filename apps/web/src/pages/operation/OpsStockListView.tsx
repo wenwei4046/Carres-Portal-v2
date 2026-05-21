@@ -195,7 +195,7 @@ export default function OpsStockListView(props: Props) {
                 <th className="text-left px-3 py-2 font-medium">Reserved for</th>
                 <th className="text-left px-3 py-2 font-medium">History</th>
                 <th className="text-left px-3 py-2 font-medium">PO No.</th>
-                <th className="text-left px-3 py-2 font-medium">Supplier Ref</th>
+                <th className="text-left px-3 py-2 font-medium">Source Ref</th>
                 <th className="text-left px-3 py-2 font-medium">Date in</th>
                 <th className="text-right px-3 py-2 font-medium">Actions</th>
               </tr>

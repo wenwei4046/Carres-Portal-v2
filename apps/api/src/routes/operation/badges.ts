@@ -64,7 +64,9 @@ operationBadgesRouter.get("/", async (c) => {
   const ordersSince = seenMap.get(ORDERS_KEY) ?? EPOCH;
   const procurementSince = seenMap.get(PROCUREMENT_KEY) ?? EPOCH;
 
-  const [ordersRes, procurementRes] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [ordersRes, procurementRes, snRes] = await Promise.all([
     sb
       .from("orders")
       .select("id", { count: "exact", head: true })
@@ -85,6 +87,13 @@ operationBadgesRouter.get("/", async (c) => {
         "reassign_needed",
       ])
       .gt("updated_at", procurementSince),
+    // Service notes badge: ongoing cases whose deadline has passed.
+    // Uses a live count (not last-seen semantics) — overdue = real alert.
+    sb
+      .from("service_notes")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "ongoing")
+      .lt("deadline", today),
   ]);
   if (ordersRes.error) {
     const m = mapPgError(ordersRes.error);
@@ -98,6 +107,7 @@ operationBadgesRouter.get("/", async (c) => {
   return c.json({
     orders: ordersRes.count ?? 0,
     procurement: procurementRes.count ?? 0,
+    serviceNotes: snRes.count ?? 0,
   });
 });
 

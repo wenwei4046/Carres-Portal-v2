@@ -307,3 +307,32 @@ export {
   type OpsStockItem,
   type OpsStockListResponse,
 } from "./schemas/ops-stock";
+
+// Migration 0140 — Service Notes (SN module / Issue Tracker).
+export {
+  snSectionASchema,
+  snSectionBSchema,
+  snSectionCSchema,
+  snItemSchema,
+  serviceNoteSchema,
+  serviceNoteListItemSchema,
+  serviceNoteListResponseSchema,
+  createServiceNoteInputSchema,
+  updateServiceNoteInputSchema,
+  SN_CATEGORIES,
+  SN_TYPES,
+  SN_LOGISTICS,
+  SN_STAGES,
+  SN_STAGE_LABELS,
+  SN_STAGE_NEXT,
+  type SnStage,
+  type SnSectionA,
+  type SnSectionB,
+  type SnSectionC,
+  type SnItem,
+  type ServiceNote,
+  type ServiceNoteListItem,
+  type ServiceNoteListResponse,
+  type CreateServiceNoteInput,
+  type UpdateServiceNoteInput,
+} from "./schemas/service-notes";

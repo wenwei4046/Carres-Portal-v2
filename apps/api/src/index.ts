@@ -54,6 +54,8 @@ import salespersonsRouter from "./routes/salespersons";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.
 import opsStockRouter from "./routes/ops/stock";
+// Migration 0140 — Service Notes (SN / Issue Tracker).
+import snRouter from "./routes/ops/service-notes";
 // Phase B (migration 0138) — order annotations + activity timeline.
 import annotationsRouter, { escalationsRouter } from "./routes/operation/annotations";
 import type { AppEnv } from "./types";
@@ -122,6 +124,7 @@ api.route("/supplier/products", supplierProductsRouter);
 api.route("/supplier/threads", supplierThreadsRouter);
 api.route("/storage/dos", dosRouter);
 api.route("/ops/stock", opsStockRouter);
+api.route("/ops/service-notes", snRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
 

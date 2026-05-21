@@ -616,6 +616,7 @@ export type ListMovementsQuery = z.infer<typeof listMovementsQuery>;
 export const OperationBadgesResponse = z.object({
   orders: z.number().int().nonnegative(),
   procurement: z.number().int().nonnegative(),
+  serviceNotes: z.number().int().nonnegative().default(0),
 });
 export type OperationBadgesResponse = z.infer<typeof OperationBadgesResponse>;
 
