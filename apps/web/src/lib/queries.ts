@@ -25,6 +25,8 @@ import {
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
   type ConfirmProceedRequestInput,
+  type LpRejectOrderInput,
+  type ReselectPartnerInput,
   type CreateOrderInput,
   type CreatePoInput,
   type CreatePosBatchInput,
@@ -101,6 +103,10 @@ export const qk = {
     rfdPending: () => ["partner", "rfd-pending"] as const,
     toDeliver:  () => ["partner", "to-deliver"] as const,
     fleet:      () => ["partner", "fleet"] as const,
+    /** Migration 0147 (item h, 2026-05-23) — LP "Incoming" queue: orders
+     *  picked by Operation at Accept Proceed that the LP hasn't yet accepted
+     *  or rejected. Polled every 15s while the page is open. */
+    incoming:   () => ["partner", "incoming"] as const,
   },
   // Phase 4 — HQ operation namespace. Same nested-key strategy as `principal`
   // so M5 mutation hooks can blast `["operation"]` (or a sub-tree) on each
@@ -1600,6 +1606,17 @@ export interface operationOrderListRow {
   placed_at: string;
   delivery_date: string | null;
   delivery_partner_id: string | null;
+  /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
+   *  state. Set by `operation_confirm_proceed_request_v3` when Operation
+   *  picks an LP at Accept Proceed; the LP then accepts (partner_accepted_at)
+   *  or rejects (partner_rejected_at + partner_rejected_reason). On reselect
+   *  Operation clears the reject and writes a fresh request_for_delivery_at. */
+  request_for_delivery_at: string | null;
+  partner_accepted_at: string | null;
+  partner_rejected_at: string | null;
+  partner_rejected_reason: string | null;
+  /** Joined name for the order-level LP (when delivery_partner_id is set). */
+  delivery_partners: { id: string; name: string } | null;
   do_number: string | null;
   dispatched_at: string | null;
   delivered_at: string | null;
@@ -2465,6 +2482,114 @@ export function useConfirmProceedRequest(
       await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
+  });
+}
+
+/** Migration 0147 (item h, 2026-05-23) — Operation reselects a different LP
+ *  after the previously assigned LP rejected via lp_reject_order. Clears the
+ *  reject timestamps + reason on the order and writes a fresh
+ *  request_for_delivery_at, putting the order back into the new LP's queue.
+ *
+ *  Errors (422 with body.code):
+ *    - `not_rejected` — order has no active reject (FE should not have surfaced
+ *      the reselect entry, but covered for defense-in-depth)
+ *    - `same_partner` — operator picked the LP that just rejected (no-op)
+ *    - `partner_not_found` — the new partner uuid is unknown */
+export function useReselectPartner(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<unknown, ApiError, ReselectPartnerInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, ReselectPartnerInput>({
+    mutationFn: (input) =>
+      apiFetch(
+        `/api/operation/orders/${orderId}/reselect-partner`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Migration 0147 (item h, 2026-05-23) — LP accepts an incoming delivery
+ *  assignment. Body is empty (orderId is in the path). Mutation source is
+ *  the Partner "Incoming" page. */
+export function useLpAcceptOrder(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, void>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, void>({
+    mutationFn: () =>
+      apiFetch(
+        `/api/partner/orders/${orderId}/accept`,
+        { method: "POST", body: JSON.stringify({}) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.partner.incoming() });
+      await qc.invalidateQueries({ queryKey: qk.partner.toDeliver() });
+      await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Migration 0147 (item h, 2026-05-23) — LP rejects an incoming delivery
+ *  assignment with a required free-text reason. The reason surfaces back to
+ *  Operation in the red-badge tooltip + reselect dialog. */
+export function useLpRejectOrder(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, LpRejectOrderInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, LpRejectOrderInput>({
+    mutationFn: (input) =>
+      apiFetch(
+        `/api/partner/orders/${orderId}/reject`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.partner.incoming() });
+      await qc.invalidateQueries({ queryKey: qk.partner.dashboard() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Migration 0147 (item h, 2026-05-23) — LP "Incoming" queue. Orders picked
+ *  by Operation at Accept Proceed that this LP hasn't yet accepted or
+ *  rejected. Polled 15s while the page is open. */
+export interface PartnerIncomingOrder {
+  id: string;
+  so: number;
+  customer_name: string;
+  customer_phone: string | null;
+  customer_address: string | null;
+  delivery_date: string | null;
+  request_for_delivery_at: string;
+  placed_at: string;
+  operation_stage: string | null;
+  warehouse_id: string | null;
+  dealers: { name: string } | null;
+  warehouses: { name: string; address: string | null } | null;
+}
+export interface PartnerIncomingResponse {
+  orders: PartnerIncomingOrder[];
+}
+export function usePartnerIncomingOrders() {
+  return useQuery<PartnerIncomingResponse>({
+    queryKey: qk.partner.incoming(),
+    queryFn: () => apiFetch<PartnerIncomingResponse>("/api/partner/orders/incoming"),
+    refetchInterval: 15_000,
   });
 }
 

@@ -196,19 +196,58 @@ export const warehousePickInput = z.object({
 export type WarehousePickInput = z.infer<typeof warehousePickInput>;
 
 /**
- * `confirmProceedRequestInputSchema` — POST /api/operation/orders/:id/confirm-proceed
- * (Pipeline v2, C2 / migration 0024). Maps to RPC
- * `operation_confirm_proceed_request(p_order_id, p_warehouse_id)`. operation'
- * manual triage entry point: confirms a `proceed_request` order and decides
- * `awaiting_operation_action` vs `ready_to_dispatch` based on shortage at the
- * chosen warehouse. `warehouseId` is optional — RPC accepts NULL when the
- * order already has `warehouse_id`. `nullable()` is included so callers can be
- * explicit with `{ warehouseId: null }`.
+ * `confirmProceedRequestInputSchema` — POST /api/operation/orders/:id/confirm-proceed.
+ * Maps to RPC `operation_confirm_proceed_request_v3(p_order_id, p_delivery_partner_id)`
+ * (migration 0147 — item h: LP picked at Accept Proceed).
+ *
+ * `deliveryPartnerId` REQUIRED — the operator commits to a customer-leg LP at
+ * this moment. The RPC writes it to `orders.delivery_partner_id` +
+ * `orders.request_for_delivery_at`, putting the order into the LP's "Incoming"
+ * queue. The LP then accepts (lp_accept_order) or rejects (lp_reject_order)
+ * with a reason.
+ *
+ * `warehouseId` is intentionally NOT on this schema. v3 RPC picks the source
+ * warehouse internally (auto-skip from `own` buffer based on stock coverage).
+ * Operation overrides via the separate `transferReadyInputSchema` route once
+ * the order is in awaiting_operation_action.
  */
 export const confirmProceedRequestInputSchema = z.object({
-  warehouseId: z.string().uuid().nullable().optional(),
+  deliveryPartnerId: z.string().uuid(),
 }).strict();
 export type ConfirmProceedRequestInput = z.infer<typeof confirmProceedRequestInputSchema>;
+
+/**
+ * `reselectPartnerInput` — POST /api/operation/orders/:id/reselect-partner.
+ * Maps to RPC `operation_reselect_partner(p_order_id, p_partner_id)`
+ * (migration 0147). Used when the previously picked LP rejected via
+ * `lp_reject_order` — the order surfaces back to operation with a red badge
+ * and the operator picks a different LP. Same-partner reselect is rejected
+ * (RPC errcode 22023 detail 'same_partner').
+ */
+export const reselectPartnerInput = z.object({
+  partnerId: z.string().uuid(),
+}).strict();
+export type ReselectPartnerInput = z.infer<typeof reselectPartnerInput>;
+
+/**
+ * `lpAcceptOrderInput` — POST /api/partner/orders/:id/accept (item h).
+ * Maps to RPC `lp_accept_order(p_order_id)`. Body is empty; the order id is
+ * the path param. Strict so callers can't sneak extra keys.
+ */
+export const lpAcceptOrderInput = z.object({}).strict();
+export type LpAcceptOrderInput = z.infer<typeof lpAcceptOrderInput>;
+
+/**
+ * `lpRejectOrderInput` — POST /api/partner/orders/:id/reject (item h).
+ * Maps to RPC `lp_reject_order(p_order_id, p_reason)`. Reason is REQUIRED
+ * and free-text (max 500 chars). RPC rejects empty/whitespace reasons with
+ * 22023 detail 'reason_required'. The reason is shown to Operation in the
+ * reselect dialog so they know why this LP couldn't take the job.
+ */
+export const lpRejectOrderInput = z.object({
+  reason: z.string().trim().min(1).max(500),
+}).strict();
+export type LpRejectOrderInput = z.infer<typeof lpRejectOrderInput>;
 
 /**
  * `transferReadyInputSchema` — POST /api/operation/orders/:id/transfer-ready

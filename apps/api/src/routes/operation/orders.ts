@@ -7,6 +7,7 @@ import {
   issuePosForOrderInput,
   ListOperationOrdersQuery,
   recheckStockInput,
+  reselectPartnerInput,
   transferReadyInputSchema,
   warehousePickInput,
 } from "@carres/shared";
@@ -109,7 +110,12 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   let q = sb
     .from("orders")
     .select(
-      "id, so, status, operation_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at)",
+      // Migration 0147 (item h, 2026-05-23) — surface the order-level LP
+      // request/accept/reject state so the kanban can show a red "LP
+      // rejected" badge + the FE can open a reselect dialog. These mirror
+      // the per-thread fields on order_supplier_threads but at the order
+      // level (customer-leg LP is one per order).
+      "id, so, status, operation_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), delivery_partners(id, name), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -459,45 +465,59 @@ operationOrdersRouter.post("/:id/warehouse", requireOperation, async (c) => {
 });
 
 // ----- POST /:id/confirm-proceed -----
-// Phase 4.5a T4 (v3 swap): now calls `operation_confirm_proceed_request_v3`
-// (migrations 0034 + 0039). v3 takes ONLY `p_order_id` — the warehouse
-// decision moved into the RPC body (auto-skip-from-stock picks an `own`
-// warehouse, else threads stay at awaiting_operation_action).
+// Migration 0147 (item h, 2026-05-23) — v3 RPC now requires the LP at the
+// Accept-Proceed moment. The body shape changed: `warehouseId` was dropped
+// (legacy v2 vestige; v3 picks the own-warehouse internally), and
+// `deliveryPartnerId` is now REQUIRED.
 //
-// `warehouseId` stays in the request schema for backward-compat with FE
-// callers built against the v2 contract; the field is intentionally ignored
-// at the RPC layer (Option A in the T4 plan). T5 (FE rename) may remove it
-// from the schema once no caller forwards it.
+// RPC call: operation_confirm_proceed_request_v3(p_order_id, p_delivery_partner_id).
+// The RPC writes orders.delivery_partner_id + orders.request_for_delivery_at,
+// putting the order into the LP's "Incoming" queue. The LP then accepts via
+// lp_accept_order or rejects via lp_reject_order; on reject Operation reselects
+// via the /reselect-partner sibling route below.
 //
-// Error mapping (overrides the generic mapPgError for the 22023 cases that
-// carry a meaningful detail code, since spec §5 / 0024:354-414 promises
-// specific UI codes):
+// Error mapping (mapPipelineV2Error):
 //   • 42501                → 403 forbidden
+//   • 22023 partner_required → 422 (defence in depth — FE zod already gates)
 //   • 22023 wrong_stage    → 422 with code='wrong_stage'
-//   • P0001 insufficient_stock_for_reserve → 422 with code +
-//                            hint passthrough (sku=... warehouse_id=...) so
-//                            the UI can name the offending pair.
-//   • 40001                → 409 with code='concurrent_reserve' (v3 auto-skip
-//                            FOR UPDATE race; mapPgError covers this)
-//
-// Phase 4.5a T5 (2026-05-05): the legacy 22023 `warehouse_required` mapping
-// was dropped here. v3 RPC `operation_confirm_proceed_request_v3` takes only
-// `p_order_id` (auto-skip-from-stock picks an `own` warehouse internally), so
-// the no-warehouse-supplied error path is no longer reachable from this
-// endpoint. The orders.test.ts test that asserted the mapping has also been
-// removed.
+//   • P0001 partner_not_found → 422 code='partner_not_found'
+//   • P0001 insufficient_stock_for_reserve → 422 with code + hint passthrough
+//   • 40001                → 409 with code='concurrent_reserve'
 operationOrdersRouter.post("/:id/confirm-proceed", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, confirmProceedRequestInputSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("operation_confirm_proceed_request_v3", {
     p_order_id: c.req.param("id"),
+    p_delivery_partner_id: parsed.data.deliveryPartnerId,
   });
   if (error) {
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
   }
   return c.json({ order: data });
+});
+
+// ----- POST /:id/reselect-partner -----
+// Migration 0147 (item h, 2026-05-23). Operation reselects a different LP
+// after the previous one rejected via lp_reject_order. Clears the reject
+// timestamps + reason on the order, writes the new partner + a fresh
+// request_for_delivery_at, putting the order back into the new LP's queue.
+// RPC raises 22023 detail 'same_partner' if the operator picks the same LP
+// that just rejected (no-op user error guard).
+operationOrdersRouter.post("/:id/reselect-partner", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, reselectPartnerInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("operation_reselect_partner", {
+    p_order_id: c.req.param("id"),
+    p_partner_id: parsed.data.partnerId,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
 });
 
 // ----- POST /:id/transfer-ready -----

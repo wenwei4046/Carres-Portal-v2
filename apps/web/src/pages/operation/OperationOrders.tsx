@@ -13,6 +13,7 @@ import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import CrossOrderBundleSheet from "./components/CrossOrderBundleSheet";
 import ResumeFromWaitingDialog from "./components/ResumeFromWaitingDialog";
 import RevertConfirmDialog from "./components/RevertConfirmDialog";
+import ReselectPartnerDialog from "./components/ReselectPartnerDialog";
 import PipelineHeader, {
   PIPELINE_STAGE_LABELS,
   type PipelineSubFilter,
@@ -103,6 +104,10 @@ export default function OperationOrders() {
   const [revertFor, setRevertFor] = useState<
     { orderId: string; so: number; kind: "proceed" | "dispatch" } | null
   >(null);
+  // Migration 0147 (item h, 2026-05-23) — "Reselect →" link on the LP-rejected
+  // badge of an order card. The dialog reads partner_rejected_reason etc from
+  // the same row already in `allOrders` so we only need the id here.
+  const [reselectOrderId, setReselectOrderId] = useState<string | null>(null);
 
   // Server applies search; we always fetch the full list and bucket
   // client-side so chip badges show every stage's count even when the active
@@ -313,6 +318,7 @@ export default function OperationOrders() {
               onRevert={(orderId, so, kind) =>
                 setRevertFor({ orderId, so, kind })
               }
+              onReselectPartner={(orderId) => setReselectOrderId(orderId)}
             />
           ))}
         </div>
@@ -362,6 +368,7 @@ export default function OperationOrders() {
                     onRevert={(kind) =>
                       setRevertFor({ orderId: o.id, so: o.so, kind })
                     }
+                    onReselectPartner={() => setReselectOrderId(o.id)}
                   />
                 );
               })}
@@ -399,6 +406,16 @@ export default function OperationOrders() {
           onClose={() => setRevertFor(null)}
         />
       )}
+      {reselectOrderId && (() => {
+        const rOrder = allOrders.find((o) => o.id === reselectOrderId);
+        if (!rOrder) return null;
+        return (
+          <ReselectPartnerDialog
+            order={rOrder}
+            onClose={() => setReselectOrderId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

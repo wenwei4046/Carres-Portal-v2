@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import PartnerSidebar from "./PartnerSidebar";
 import PartnerDashboard from "./PartnerDashboard";
 import PartnerFactoryPickupsPage from "./PartnerFactoryPickupsPage";
+import PartnerIncoming from "./PartnerIncoming";
 import PartnerPickupsPage from "./PartnerPickupsPage";
 import PartnerFleet from "./PartnerFleet";
 import PartnerProfile from "./PartnerProfile";
@@ -24,6 +25,7 @@ export default function PartnerApp() {
       <main className="ml-[220px] flex-1 min-w-0">
         <Routes>
           <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="incoming" element={<PartnerIncoming />} />
           <Route path="dashboard" element={<PartnerDashboard />} />
           {/* 2026-05-10 (Loo) — split into two pages by leg:
               factory-pickups = supplier → warehouse (procurement leg)

@@ -5,30 +5,30 @@ import { ApiError } from "@/lib/api";
 import {
   useCatalog,
   useConfirmProceedRequest,
-  useOperationWarehouse,
+  useDeliveryPartners,
   type operationOrderDetailLine,
   type operationOrderDetailOrder,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "./Modal";
 
 /**
- * ConfirmProceedDialog — Pipeline v2 (Phase 4 C2/C3) triage entry point.
+ * ConfirmProceedDialog — Operation Accept-Proceed entry point.
  *
- * Surfaces when the order is in stage `proceed_request` (dealer pushed it,
- * operation needs to commit). The picker chooses the source warehouse. The
- * RPC (`operation_confirm_proceed_request`) decides:
- *   - If all lines covered at the chosen warehouse → reserve stock + flip to
- *     `ready_to_dispatch` (atomic).
- *   - If any line short → flip to `awaiting_operation_action`, no reserve. The user
- *     must `Issue POs` next.
+ * Migration 0147 (item h, 2026-05-23) rewrote the dialog. Old role: pick a
+ * source warehouse. New role: pick the customer-leg LP at this moment.
  *
- * The dialog computes a client-side pre-flight hint from the order's lines
- * vs. available stock so the user knows which path the RPC is going to take
- * BEFORE submitting. Treat this as advisory: stock can shift between the
- * pre-flight read and the submit (race), in which case the RPC returns a
- * 422 with code `insufficient_stock_for_reserve`.
+ * v3 RPC `operation_confirm_proceed_request_v3` now requires
+ * `p_delivery_partner_id`. It writes orders.delivery_partner_id +
+ * orders.request_for_delivery_at, putting the order into the LP's "Incoming"
+ * queue. The RPC ALSO auto-picks an `own` warehouse internally — covered
+ * SKUs become reserved + the order flips to `ready_to_dispatch`; otherwise
+ * the order goes to `awaiting_operation_action` and Operation issues POs
+ * next. No warehouse choice from the dialog any more.
  *
- * Wires to `POST /api/operation/orders/:id/confirm-proceed`.
+ * Operation-side soft-lock (2026-05-22 Loo, commit 2d608c4) preserved: if
+ * delivery date is more than category lead-time (mattress/bedframe 14, sofa
+ * 21) out, the operator must explicitly ack to procure now. Procuring too
+ * early ties up warehouse stock until the late delivery date.
  */
 interface Props {
   order: operationOrderDetailOrder;
@@ -46,37 +46,56 @@ function readErrorBody(err: ApiError): ApiErrorBody {
   return (err.body ?? {}) as ApiErrorBody;
 }
 
+// Logistic-partner display + ordering (same set/order as OperationInbox).
+const LP_DISPLAY: Record<string, string> = {
+  nets:  "NETS",
+  tsdd:  "TSDD",
+  al:    "AL",
+  houzs: "HOUZS",
+};
+const LP_ORDER: Record<string, number> = { nets: 0, tsdd: 1, al: 2, houzs: 3 };
+
 export default function ConfirmProceedDialog({
   order,
   lines,
   onClose,
 }: Props) {
-  const warehousesQ = useOperationWarehouse();
-  const allWarehouses = warehousesQ.data?.warehouses ?? [];
-  const byWarehouse = warehousesQ.data?.byWarehouse ?? {};
+  const partnersQ = useDeliveryPartners();
+  const allPartners = partnersQ.data?.partners ?? [];
 
-  // Default to the order's pre-assigned warehouse if it has one (C2 RPC will
-  // accept NULL in that case but we prefer to be explicit), otherwise the
-  // first available warehouse.
-  const initialWh = order.warehouse_id ?? "";
-  const [warehouseId, setWarehouseId] = useState<string>(initialWh);
+  // Filter to the 4 logistic partners + canonicalise display labels. Mirrors
+  // OperationInbox so the LP set is consistent across the two operator-facing
+  // pickers.
+  const logisticPartners = useMemo(() => {
+    return allPartners
+      .filter((p) =>
+        Object.keys(LP_DISPLAY).some((slug) => p.name.toLowerCase().startsWith(slug)),
+      )
+      .map((p) => {
+        const slug = Object.keys(LP_DISPLAY).find((s) => p.name.toLowerCase().startsWith(s)) ?? "";
+        return {
+          id: p.id,
+          name: LP_DISPLAY[slug] ?? p.name,
+          _order: LP_ORDER[slug] ?? 99,
+        };
+      })
+      .sort((a, b) => a._order - b._order);
+  }, [allPartners]);
+
+  const [partnerId, setPartnerId] = useState<string>("");
   useEffect(() => {
-    if (!warehouseId && allWarehouses.length > 0) {
-      setWarehouseId(allWarehouses[0].id);
+    if (!partnerId && logisticPartners.length > 0) {
+      setPartnerId(logisticPartners[0].id);
     }
-  }, [warehouseId, allWarehouses]);
+  }, [partnerId, logisticPartners]);
 
   const confirm = useConfirmProceedRequest(order.id);
 
-  // 2026-05-22 (Loo) — Operation-side soft-lock against procuring too early.
-  // Mattress/bedframe production = 14 days, sofa = 21 (see DELIVERY_LEAD_DAYS).
-  // If the customer's delivery date is more than that many days out, kicking
-  // off procurement now means stock arrives at the warehouse and sits
-  // idle until delivery — tied-up capital + storage cost. The dialog warns
-  // the operator and forces an explicit acknowledgement before proceeding.
-  //
-  // Within window (days <= leadDays): no warning, normal flow.
-  // Beyond window (days >  leadDays): red banner + ack checkbox required.
+  // Lead-time soft-lock (2026-05-22 Loo). Mattress/bedframe production = 14
+  // days, sofa = 21 (DELIVERY_LEAD_DAYS in shared). If the customer's
+  // delivery date is more than that many days out, accepting now means
+  // stock arrives at the warehouse and sits idle until delivery — tied-up
+  // capital + storage cost. Force explicit ack.
   const catalogQ = useCatalog();
   const leadDays = useMemo(() => {
     if (!catalogQ.data || lines.length === 0) return 0;
@@ -101,50 +120,27 @@ export default function ConfirmProceedDialog({
     return { days, leadDays, excess: days - leadDays };
   }, [leadDays, order.delivery_date, order.delivery_date_tbd]);
   const [leadAcknowledged, setLeadAcknowledged] = useState(false);
-  // Reset acknowledgement when the order or lead gap changes (e.g. operator
-  // switches between drawers without closing this one).
   useEffect(() => {
     setLeadAcknowledged(false);
   }, [order.id, leadGap?.days, leadGap?.leadDays]);
 
-  // Pre-flight: at the selected warehouse, are all order lines covered by
-  // available (qty - reserved) stock? Returns the array of short lines so we
-  // can show a richer hint than just "yes/no".
-  const preflight = useMemo(() => {
-    if (!warehouseId) return null;
-    const stockAtWh = byWarehouse[warehouseId] ?? [];
-    const availableBySku: Record<string, number> = {};
-    for (const e of stockAtWh) {
-      availableBySku[e.sku] = Math.max(0, Number(e.qty) - Number(e.reserved));
-    }
-    const shortages: { sku: string; need: number; have: number }[] = [];
-    for (const l of lines) {
-      const have = availableBySku[l.sku] ?? 0;
-      if (have < l.qty) {
-        shortages.push({ sku: l.sku, need: l.qty, have });
-      }
-    }
-    return { shortages, sufficient: shortages.length === 0 };
-  }, [warehouseId, byWarehouse, lines]);
-
   const valid =
-    !!warehouseId && !confirm.isPending && (leadGap === null || leadAcknowledged);
+    !!partnerId && !confirm.isPending && (leadGap === null || leadAcknowledged);
 
   async function submit() {
     if (!valid) return;
     try {
-      await confirm.mutateAsync({ warehouseId });
-      toast.success(
-        preflight?.sufficient
-          ? `#${order.so} stock reserved · ready to dispatch`
-          : `#${order.so} triaged · awaiting stock`,
-      );
+      await confirm.mutateAsync({ deliveryPartnerId: partnerId });
+      const lpName = logisticPartners.find((p) => p.id === partnerId)?.name ?? "LP";
+      toast.success(`#${order.so} accepted · ${lpName} notified`);
       onClose();
     } catch (e: unknown) {
       if (e instanceof ApiError) {
         const body = readErrorBody(e);
-        if (body.code === "warehouse_required") {
-          toast.error("Pick a warehouse first");
+        if (body.code === "partner_required") {
+          toast.error("Pick a delivery partner first");
+        } else if (body.code === "partner_not_found") {
+          toast.error("That delivery partner no longer exists — pick another");
         } else if (body.code === "wrong_stage") {
           toast.error("Order has already been triaged — refresh and retry");
         } else if (body.code === "insufficient_stock_for_reserve") {
@@ -158,14 +154,14 @@ export default function ConfirmProceedDialog({
     }
   }
 
-  const selectedWh = allWarehouses.find((w) => w.id === warehouseId);
-
   return (
     <Modal title={`Confirm proceed · #${order.so}`} onClose={onClose}>
       <div className="text-[12px] text-base-600 mb-3.5 font-body">
-        Pick a source warehouse. The system will reserve stock if all lines are
-        covered, otherwise the order moves to <strong>Awaiting operation Action</strong>{" "}
-        and you&rsquo;ll need to issue POs next.
+        Pick the customer-leg delivery partner. They&rsquo;ll receive this
+        order in their <strong>Incoming</strong> queue to accept or reject.
+        The system auto-picks the source warehouse based on stock coverage —
+        order goes to <strong>Ready to dispatch</strong> if covered, otherwise
+        to <strong>Awaiting operation action</strong> for PO issuance.
       </div>
 
       <div
@@ -178,48 +174,32 @@ export default function ConfirmProceedDialog({
         </div>
       </div>
 
-      <div className="label mb-1.5">Source warehouse *</div>
-      {warehousesQ.isLoading ? (
+      <div className="label mb-1.5">Delivery partner *</div>
+      {partnersQ.isLoading ? (
         <div className="text-[12px] text-base-500 mb-3.5">
-          Loading warehouses…
+          Loading partners…
         </div>
-      ) : warehousesQ.isError ? (
+      ) : partnersQ.isError ? (
         <div className="text-[12px] text-destructive mb-3.5">
-          Couldn&rsquo;t load warehouses — try again later.
+          Couldn&rsquo;t load partners — try again later.
         </div>
-      ) : allWarehouses.length === 0 ? (
+      ) : logisticPartners.length === 0 ? (
         <div className="text-[12px] text-warning mb-3.5">
-          No warehouses on file.
+          No logistic partners configured (NETS / TSDD / AL / HOUZS).
         </div>
       ) : (
         <select
-          value={warehouseId}
-          onChange={(e) => setWarehouseId(e.target.value)}
-          aria-label="Source warehouse"
+          value={partnerId}
+          onChange={(e) => setPartnerId(e.target.value)}
+          aria-label="Delivery partner"
           className={`${INPUT_CLS} mb-3.5`}
         >
-          {allWarehouses.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name}
+          {logisticPartners.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
             </option>
           ))}
         </select>
-      )}
-
-      {selectedWh && (
-        <div
-          className="text-[12px] text-base-600 px-3 py-2.5 rounded-[4px] mb-3.5 font-body"
-          style={{ background: "var(--base-50)" }}
-        >
-          <div>
-            <strong>{selectedWh.name}</strong>
-          </div>
-          {selectedWh.address && (
-            <div className="font-mono text-[11px] mt-1">
-              {selectedWh.address}
-            </div>
-          )}
-        </div>
       )}
 
       {leadGap && (
@@ -242,37 +222,8 @@ export default function ConfirmProceedDialog({
               onChange={(e) => setLeadAcknowledged(e.target.checked)}
               className="w-4 h-4"
             />
-            I'm sure I want to procure now anyway
+            I&apos;m sure I want to procure now anyway
           </label>
-        </div>
-      )}
-
-      {preflight && (
-        <div
-          data-testid="confirm-proceed-preflight"
-          className={`text-[12px] px-3 py-2.5 rounded-[4px] mb-3.5 font-body ${
-            preflight.sufficient
-              ? "text-success border border-success/30 bg-success/5"
-              : "text-warning border border-warning/30 bg-warning/5"
-          }`}
-        >
-          {preflight.sufficient ? (
-            <>
-              <strong>Stock sufficient</strong> — order will move directly to{" "}
-              <strong>Ready to dispatch</strong> and reserve stock.
-            </>
-          ) : (
-            <>
-              <strong>Some lines short</strong> — order will move to{" "}
-              <strong>Awaiting operation action</strong>; you&rsquo;ll need to issue POs
-              next.
-              <div className="font-mono text-[11px] mt-1">
-                {preflight.shortages
-                  .map((s) => `${s.sku}: need ${s.need}, have ${s.have}`)
-                  .join(" · ")}
-              </div>
-            </>
-          )}
         </div>
       )}
 
@@ -280,7 +231,7 @@ export default function ConfirmProceedDialog({
         onCancel={onClose}
         onPrimary={submit}
         primary="Confirm proceed"
-        primaryDisabled={!valid || allWarehouses.length === 0}
+        primaryDisabled={!valid || logisticPartners.length === 0}
         primaryPending={confirm.isPending}
       />
     </Modal>

@@ -91,6 +91,11 @@ interface Props {
    *  link that fires `onRevert(kind)` instead of opening the drawer. */
   stage?: OperationStage;
   onRevert?: (kind: "proceed" | "dispatch") => void;
+  /** Migration 0147 (item h, 2026-05-23) — when the assigned LP rejected the
+   *  delivery via lp_reject_order, the card surfaces a red "LP rejected"
+   *  badge + a "Reselect LP" link. Click → fires `onReselectPartner(order)`
+   *  so the parent can open ReselectPartnerDialog. */
+  onReselectPartner?: () => void;
 }
 
 export default function OrderCard({
@@ -103,7 +108,11 @@ export default function OrderCard({
   compact = false,
   stage,
   onRevert,
+  onReselectPartner,
 }: Props) {
+  // Migration 0147 (item h, 2026-05-23) — surface LP-rejected state.
+  const lpRejected =
+    order.partner_rejected_at !== null && order.partner_accepted_at === null;
   const revertKind: "proceed" | "dispatch" | null =
     stage === "proceed_request"
       ? "proceed"
@@ -338,6 +347,31 @@ export default function OrderCard({
               >
                 &#x21B6; Revert
               </button>
+            )}
+            {lpRejected && (
+              <div
+                data-testid={`order-card-lp-rejected-${order.so}`}
+                className="mt-1.5 flex items-center gap-2 px-2 py-1 rounded-[3px] border border-destructive/30 bg-destructive/5"
+                title={order.partner_rejected_reason ?? "LP rejected"}
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-destructive">
+                  LP rejected
+                </span>
+                {onReselectPartner && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onReselectPartner();
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    className="ml-auto text-[10px] font-semibold text-primary hover:underline"
+                    aria-label={`Reselect LP for order ${order.so}`}
+                  >
+                    Reselect &rarr;
+                  </button>
+                )}
+              </div>
             )}
           </>
         )}

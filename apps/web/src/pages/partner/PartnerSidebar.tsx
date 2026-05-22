@@ -14,7 +14,11 @@ import CarresLockup from "@/components/CarresLockup";
 //   Deliveries      = warehouse → customer (the partner's POD work)
 // Different state machines, different RPCs, different mental models — no
 // reason to entangle them on one page.
+// 2026-05-23 (item h) — "Incoming" tab at the top: orders Operation has just
+// picked this LP for at Accept Proceed. Reading them here lets the LP accept
+// or reject the assignment before the goods are even ready to dispatch.
 const NAV_ITEMS = [
+  { to: "/delivery-partner/incoming",        label: "Incoming",        icon: "✦", end: false },
   { to: "/delivery-partner/dashboard",       label: "Today",           icon: "◆", end: false },
   { to: "/delivery-partner/factory-pickups", label: "Factory pickups", icon: "▦", end: false },
   { to: "/delivery-partner/deliveries",      label: "Deliveries",      icon: "▣", end: false },

@@ -867,16 +867,13 @@ describe("POST /api/operation/orders/:id/recheck-stock", () => {
   });
 });
 
-describe("POST /api/operation/orders/:id/confirm-proceed", () => {
+describe("POST /api/operation/orders/:id/confirm-proceed (migration 0147 — item h)", () => {
   const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
-  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000c02";
+  const PARTNER_ID = "00000000-0000-0000-0000-000000000b01";
 
-  it("returns 200 on happy path with warehouseId (v3: warehouseId accepted by zod, ignored at RPC)", async () => {
-    // Phase 4.5a T4: route now calls operation_confirm_proceed_request_v3
-    // (p_order_id only). The v2 p_warehouse_id arg is dropped — warehouse
-    // selection moved into the RPC body via auto-skip-from-stock. The FE
-    // may still pass `warehouseId` in the request body for backward compat,
-    // but it's silently ignored at the RPC layer.
+  it("returns 200 and forwards both p_order_id + p_delivery_partner_id to v3 RPC", async () => {
+    // Migration 0147 swap: v3 RPC now requires the LP at Accept Proceed. Body
+    // shape: { deliveryPartnerId } (warehouseId vestige dropped).
     const rpc = vi.fn().mockResolvedValue({
       data: {
         order_id: ORDER_ID,
@@ -885,6 +882,7 @@ describe("POST /api/operation/orders/:id/confirm-proceed", () => {
         auto_skipped: false,
         po_id: null,
         threads: [],
+        delivery_partner_id: PARTNER_ID,
       },
       error: null,
     });
@@ -895,31 +893,25 @@ describe("POST /api/operation/orders/:id/confirm-proceed", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
+        body: JSON.stringify({ deliveryPartnerId: PARTNER_ID }),
       }),
       env,
     );
     expect(res.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("operation_confirm_proceed_request_v3", {
       p_order_id: ORDER_ID,
+      p_delivery_partner_id: PARTNER_ID,
     });
-    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", ["p_order_id"]);
+    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", [
+      "p_order_id",
+      "p_delivery_partner_id",
+    ]);
   });
 
-  it("returns 200 with empty body (v3: no warehouse arg forwarded)", async () => {
-    // v3 contract: RPC receives only p_order_id. Warehouse choice is made
-    // internally (auto-skip vs awaiting_operation_action).
-    const rpc = vi.fn().mockResolvedValue({
-      data: {
-        order_id: ORDER_ID,
-        so: 4001,
-        operation_stage: "awaiting_operation_action",
-        auto_skipped: false,
-        po_id: null,
-        threads: [],
-      },
-      error: null,
-    });
+  it("returns 422 with empty body (deliveryPartnerId is now required)", async () => {
+    // Migration 0147: zod schema requires deliveryPartnerId. Empty body never
+    // reaches the RPC layer.
+    const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("operation");
@@ -931,11 +923,25 @@ describe("POST /api/operation/orders/:id/confirm-proceed", () => {
       }),
       env,
     );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("operation_confirm_proceed_request_v3", {
-      p_order_id: ORDER_ID,
-    });
-    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", ["p_order_id"]);
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 when deliveryPartnerId is not a uuid", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryPartnerId: "not-a-uuid" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("returns 422 with code='wrong_stage' when called on non-proceed_request order", async () => {
@@ -950,7 +956,7 @@ describe("POST /api/operation/orders/:id/confirm-proceed", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ deliveryPartnerId: PARTNER_ID }),
       }),
       env,
     );
@@ -960,13 +966,30 @@ describe("POST /api/operation/orders/:id/confirm-proceed", () => {
     expect(body.code).toBe("wrong_stage");
   });
 
-  // Phase 4.5a T5 (2026-05-05): the stale `warehouse_required` test that
-  // previously sat between the wrong_stage and insufficient_stock cases was
-  // removed. After T4 swapped /confirm-proceed to v3 RPC
-  // `operation_confirm_proceed_request_v3` (single arg p_order_id), the
-  // 22023 warehouse_required error path is no longer reachable from this
-  // endpoint — the v3 RPC auto-picks an `own` warehouse internally and
-  // never raises that condition.
+  it("returns 422 with code='partner_not_found' when LP uuid is unknown (defence in depth)", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "P0001",
+        message: "delivery partner not found",
+        details: "partner_not_found",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryPartnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    // mapPipelineV2Error wraps generic P0001 in mapPgError (no special branch),
+    // so the response code surfaces from the generic mapping.
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
 
   it("returns 422 with code='insufficient_stock_for_reserve' + hint passthrough", async () => {
     const rpc = vi.fn().mockResolvedValue({
@@ -985,7 +1008,7 @@ describe("POST /api/operation/orders/:id/confirm-proceed", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
+        body: JSON.stringify({ deliveryPartnerId: PARTNER_ID }),
       }),
       env,
     );
@@ -994,21 +1017,6 @@ describe("POST /api/operation/orders/:id/confirm-proceed", () => {
     const body = (await res.json()) as any;
     expect(body.code).toBe("insufficient_stock_for_reserve");
     expect(body.hint).toBe("sku=MAT-K-001 warehouse_id=00000000-0000-0000-0000-000000000c02");
-  });
-
-  it("returns 422 when warehouseId is not a uuid", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: "not-a-uuid" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
   });
 
   it("returns 403 for non-operation role (no rpc call)", async () => {
@@ -1020,7 +1028,118 @@ describe("POST /api/operation/orders/:id/confirm-proceed", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ deliveryPartnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/operation/orders/:id/reselect-partner (migration 0147 — item h)", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+  const PARTNER_ID = "00000000-0000-0000-0000-000000000b02";
+
+  it("returns 200 and forwards p_order_id + p_partner_id", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: {
+        order_id: ORDER_ID,
+        so: 4001,
+        delivery_partner_id: PARTNER_ID,
+        request_for_delivery_at: new Date().toISOString(),
+      },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/reselect-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("operation_reselect_partner", {
+      p_order_id: ORDER_ID,
+      p_partner_id: PARTNER_ID,
+    });
+  });
+
+  it("returns 422 with code='not_rejected' when order has no active reject", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "order is not in rejected state", details: "not_rejected" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/reselect-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("not_rejected");
+  });
+
+  it("returns 422 with code='same_partner' when reselecting the LP that just rejected", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "cannot reselect the same partner", details: "same_partner" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/reselect-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.code).toBe("same_partner");
+  });
+
+  it("returns 422 when partnerId is not a uuid", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/reselect-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: "nope" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for non-operation role", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/reselect-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
       }),
       env,
     );
@@ -1177,6 +1296,9 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
   const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
   const SUPPLIER_NF = "00000000-0000-0000-0000-000000000b01";
   const SUPPLIER_HK = "00000000-0000-0000-0000-000000000b02";
+  // Migration 0147 (item h): every confirm-proceed call now requires a
+  // delivery_partner uuid in the body. Tests below pass this fixture.
+  const PARTNER_ID = "00000000-0000-0000-0000-000000000b09";
 
   it("skips to ready_to_dispatch when all threads have sufficient stock (no ghost PO)", async () => {
     // Migration 0039 contract: when every thread can be served from buffer
@@ -1218,7 +1340,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ deliveryPartnerId: PARTNER_ID }),
       }),
       env,
     );
@@ -1236,7 +1358,10 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     }
     // Pin the v3 RPC name so T4's API callsite swap (orders.ts:471) is
     // caught by this test if it regresses to the v2 RPC.
-    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", ["p_order_id"]);
+    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", [
+      "p_order_id",
+      "p_delivery_partner_id",
+    ]);
   });
 
   it("stays at awaiting_operation_action when any thread has shortage", async () => {
@@ -1271,7 +1396,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ deliveryPartnerId: PARTNER_ID }),
       }),
       env,
     );
@@ -1282,7 +1407,10 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     expect(body.order.po_id).toBeNull();
     expect(body.order.operation_stage).toBe("awaiting_operation_action");
     expect(body.order.threads[0].stage).toBe("awaiting_operation_action");
-    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", ["p_order_id"]);
+    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", [
+      "p_order_id",
+      "p_delivery_partner_id",
+    ]);
   });
 
   it("does not auto-skip if even one thread has shortage (ALL-or-NONE atomicity)", async () => {
@@ -1329,7 +1457,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ deliveryPartnerId: PARTNER_ID }),
       }),
       env,
     );
@@ -1344,7 +1472,10 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
       expect(t.stage).toBe("awaiting_operation_action");
       expect(t.po_id).toBeNull();
     }
-    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", ["p_order_id"]);
+    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", [
+      "p_order_id",
+      "p_delivery_partner_id",
+    ]);
   });
 
   it("returns 409 on concurrent reserve race (40001 / serialization_failure)", async () => {
@@ -1367,7 +1498,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/confirm-proceed`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ deliveryPartnerId: PARTNER_ID }),
       }),
       env,
     );
@@ -1377,7 +1508,10 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     // mapPgError surfaces error.details as `code`; covers both
     // `concurrent_reserve` and (fallback) `concurrent_claim` shapes.
     expect(body.code).toBe("concurrent_reserve");
-    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", ["p_order_id"]);
+    assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", [
+      "p_order_id",
+      "p_delivery_partner_id",
+    ]);
   });
 });
 

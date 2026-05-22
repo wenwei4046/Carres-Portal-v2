@@ -17,6 +17,9 @@ import {
   cancelPoInput,
   listMovementsQuery,
   confirmProceedRequestInputSchema,
+  reselectPartnerInput,
+  lpAcceptOrderInput,
+  lpRejectOrderInput,
   transferReadyInputSchema,
   partnerAcceptRfdInput,
   partnerRejectRfdInput,
@@ -555,21 +558,69 @@ describe('listMovementsQuery', () => {
   });
 });
 
-describe('confirmProceedRequestInputSchema', () => {
-  it('accepts an empty body (warehouseId optional)', () => {
-    expect(confirmProceedRequestInputSchema.safeParse({}).success).toBe(true);
+describe('confirmProceedRequestInputSchema (migration 0147 — item h)', () => {
+  it('rejects an empty body (deliveryPartnerId required)', () => {
+    expect(confirmProceedRequestInputSchema.safeParse({}).success).toBe(false);
   });
-  it('accepts warehouseId as a uuid', () => {
-    expect(confirmProceedRequestInputSchema.safeParse({ warehouseId: UUID }).success).toBe(true);
+  it('accepts deliveryPartnerId as a uuid', () => {
+    expect(confirmProceedRequestInputSchema.safeParse({ deliveryPartnerId: UUID }).success).toBe(true);
   });
-  it('accepts warehouseId=null (explicit null)', () => {
-    expect(confirmProceedRequestInputSchema.safeParse({ warehouseId: null }).success).toBe(true);
+  it('rejects deliveryPartnerId that is not a uuid', () => {
+    expect(confirmProceedRequestInputSchema.safeParse({ deliveryPartnerId: 'not-a-uuid' }).success).toBe(false);
   });
-  it('rejects warehouseId that is not a uuid', () => {
-    expect(confirmProceedRequestInputSchema.safeParse({ warehouseId: 'not-a-uuid' }).success).toBe(false);
+  it('rejects deliveryPartnerId=null (required, non-nullable)', () => {
+    expect(confirmProceedRequestInputSchema.safeParse({ deliveryPartnerId: null }).success).toBe(false);
   });
   it('rejects extra keys (strict mode)', () => {
-    expect(confirmProceedRequestInputSchema.safeParse({ warehouseId: UUID, extraField: 'x' }).success).toBe(false);
+    expect(confirmProceedRequestInputSchema.safeParse({ deliveryPartnerId: UUID, extraField: 'x' }).success).toBe(false);
+  });
+  it('rejects legacy warehouseId field (dropped post-0147)', () => {
+    expect(confirmProceedRequestInputSchema.safeParse({ deliveryPartnerId: UUID, warehouseId: UUID }).success).toBe(false);
+  });
+});
+
+describe('reselectPartnerInput (migration 0147 — item h)', () => {
+  it('accepts a uuid partnerId', () => {
+    expect(reselectPartnerInput.safeParse({ partnerId: UUID }).success).toBe(true);
+  });
+  it('rejects empty body', () => {
+    expect(reselectPartnerInput.safeParse({}).success).toBe(false);
+  });
+  it('rejects non-uuid partnerId', () => {
+    expect(reselectPartnerInput.safeParse({ partnerId: 'x' }).success).toBe(false);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(reselectPartnerInput.safeParse({ partnerId: UUID, extra: 1 }).success).toBe(false);
+  });
+});
+
+describe('lpAcceptOrderInput (migration 0147 — item h)', () => {
+  it('accepts empty body', () => {
+    expect(lpAcceptOrderInput.safeParse({}).success).toBe(true);
+  });
+  it('rejects extra keys (strict mode)', () => {
+    expect(lpAcceptOrderInput.safeParse({ extra: 1 }).success).toBe(false);
+  });
+});
+
+describe('lpRejectOrderInput (migration 0147 — item h)', () => {
+  it('accepts a non-empty reason', () => {
+    expect(lpRejectOrderInput.safeParse({ reason: 'out of capacity' }).success).toBe(true);
+  });
+  it('rejects empty reason', () => {
+    expect(lpRejectOrderInput.safeParse({ reason: '' }).success).toBe(false);
+  });
+  it('rejects whitespace-only reason (trim+min(1))', () => {
+    expect(lpRejectOrderInput.safeParse({ reason: '   ' }).success).toBe(false);
+  });
+  it('rejects reason >500 chars', () => {
+    expect(lpRejectOrderInput.safeParse({ reason: 'a'.repeat(501) }).success).toBe(false);
+  });
+  it('rejects missing reason', () => {
+    expect(lpRejectOrderInput.safeParse({}).success).toBe(false);
+  });
+  it('rejects extra keys', () => {
+    expect(lpRejectOrderInput.safeParse({ reason: 'ok', extra: 1 }).success).toBe(false);
   });
 });
 

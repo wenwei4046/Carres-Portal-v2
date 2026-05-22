@@ -128,6 +128,12 @@ function makeOrder(
     placed_at: "2026-04-28T08:00:00Z",
     delivery_date: "2026-05-05",
     delivery_partner_id: null,
+    // Migration 0147 (item h, 2026-05-23) — order-level LP request state.
+    request_for_delivery_at: null,
+    partner_accepted_at: null,
+    partner_rejected_at: null,
+    partner_rejected_reason: null,
+    delivery_partners: null,
     do_number: null,
     dispatched_at: null,
     delivered_at: null,

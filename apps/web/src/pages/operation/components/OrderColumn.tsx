@@ -63,6 +63,9 @@ interface Props {
   /** 2026-05-12 (Loo) — fires when a card's `↶ Revert` link is clicked.
    *  Parent owns the confirm dialog + mutation. */
   onRevert?: (orderId: string, so: number, kind: "proceed" | "dispatch") => void;
+  /** Migration 0147 (item h, 2026-05-23) — fires when a card's "Reselect →"
+   *  link in the LP-rejected badge is clicked. Parent owns the dialog state. */
+  onReselectPartner?: (orderId: string) => void;
 }
 
 export default function OrderColumn({
@@ -79,6 +82,7 @@ export default function OrderColumn({
   anyExpanded,
   onToggleExpand,
   onRevert,
+  onReselectPartner,
 }: Props) {
   const accentText = STAGE_ACCENT_TEXT[stage];
   const accentBorder = STAGE_ACCENT_BORDER[stage];
@@ -168,6 +172,9 @@ export default function OrderColumn({
                 onRevert
                   ? (kind) => onRevert(o.id, o.so, kind)
                   : undefined
+              }
+              onReselectPartner={
+                onReselectPartner ? () => onReselectPartner(o.id) : undefined
               }
             />
           ))
