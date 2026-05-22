@@ -127,4 +127,8 @@ export type SalesOrderTemplateData = {
   currency: string;
 
   signed: boolean;
+  /** 2026-05-22 (Loo) — signed URL to the customer's eSign PNG captured at
+   *  checkout. The template renders this inline as the customer signature.
+   *  Null when the order has no signature on file. */
+  signature_url?: string | null;
 };

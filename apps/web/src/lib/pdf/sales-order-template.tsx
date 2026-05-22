@@ -19,7 +19,7 @@
  * warm-linen palette) so SO + Invoice look like a matched pair.
  */
 
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { DocHeader } from "./letterhead";
 import type { SalesOrderTemplateData } from "./types";
@@ -134,23 +134,41 @@ const styles = StyleSheet.create({
   totalsValue: { fontSize: 10, fontWeight: 700 },
   totalsValueGrand: { fontSize: 12, fontWeight: 700, color: ACCENT },
 
-  // 2026-05-22 (Loo) — 2-column signature footer mirroring the Invoice
-  // template style: left = Carres-side authorised signatory, right =
-  // customer signature. Each block has a top border line so the signer
-  // signs above it.
+  // 2026-05-22 (Loo) — single-column customer signature block on the left.
+  // The earlier 2-column version had a Carres-side "Authorised by" line on
+  // the left which Loo removed (customer is the only required signatory on
+  // the SO — Carres-side authorisation lives in the audit trail, not on
+  // the customer-facing doc). The captured eSign PNG renders inline above
+  // the signer's printed name + phone for in-store verification.
   signRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 24,
     marginBottom: 18,
     marginTop: 12,
   },
   signBlock: {
-    flex: 1,
+    width: "50%",
+    paddingTop: 4,
+    minHeight: 80,
+  },
+  signImage: {
+    width: 140,
+    height: 56,
+    objectFit: "contain",
+    marginBottom: 4,
+  },
+  signImagePlaceholder: {
+    width: 140,
+    height: 56,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderStyle: "dashed",
+    marginBottom: 4,
+  },
+  signRule: {
     borderTopWidth: 1,
     borderTopColor: "#1A1714",
-    paddingTop: 4,
-    minHeight: 56,
+    marginBottom: 4,
+    width: 140,
   },
   signLabel: { fontSize: 8, color: MUTED },
   signMark: { fontSize: 9, color: ACCENT, fontWeight: 700, marginBottom: 4 },
@@ -215,6 +233,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     balance_due,
     currency,
     signed,
+    signature_url,
   } = data;
 
   // Loo 2026-05-16 — Sales Orders override the default Carres HQ address
@@ -363,19 +382,20 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           </View>
         </View>
 
-        {/* 2026-05-22 (Loo) — 2-column signature footer. Left = Authorised
-            signatory (dealer/showroom seller side), right = Customer. Both
-            blocks have a top border so the recipient signs above it on the
-            printed copy. The ✓ signed mark continues to flag the electronic
-            signature captured during checkout. */}
+        {/* 2026-05-22 (Loo) — single-column customer signature on the left.
+            "Authorised by James" block dropped per Loo's request — Carres-
+            side authorisation lives in the audit trail, customer is the
+            only required signatory on the SO. The captured eSign PNG
+            renders inline above the signer's printed name + phone so
+            in-store staff can eyeball-verify it matches the customer. */}
         <View style={styles.signRow}>
           <View style={styles.signBlock}>
-            <Text style={styles.signLabel}>Authorised by</Text>
-            <Text style={styles.signLabel}>
-              {dealer.salesperson_name ?? dealer.name}
-            </Text>
-          </View>
-          <View style={styles.signBlock}>
+            {signed && signature_url ? (
+              <Image src={signature_url} style={styles.signImage} />
+            ) : (
+              <View style={styles.signImagePlaceholder} />
+            )}
+            <View style={styles.signRule} />
             {signed ? (
               <Text style={styles.signMark}>✓ Signed electronically by customer</Text>
             ) : null}

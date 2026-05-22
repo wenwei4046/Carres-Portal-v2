@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { maxLeadDaysFor } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
+  useCatalog,
   useConfirmProceedRequest,
   useOperationWarehouse,
   type operationOrderDetailLine,
@@ -66,6 +68,45 @@ export default function ConfirmProceedDialog({
 
   const confirm = useConfirmProceedRequest(order.id);
 
+  // 2026-05-22 (Loo) — Operation-side soft-lock against procuring too early.
+  // Mattress/bedframe production = 14 days, sofa = 21 (see DELIVERY_LEAD_DAYS).
+  // If the customer's delivery date is more than that many days out, kicking
+  // off procurement now means stock arrives at the warehouse and sits
+  // idle until delivery — tied-up capital + storage cost. The dialog warns
+  // the operator and forces an explicit acknowledgement before proceeding.
+  //
+  // Within window (days <= leadDays): no warning, normal flow.
+  // Beyond window (days >  leadDays): red banner + ack checkbox required.
+  const catalogQ = useCatalog();
+  const leadDays = useMemo(() => {
+    if (!catalogQ.data || lines.length === 0) return 0;
+    const cats = new Set<string>();
+    for (const line of lines) {
+      const sku = catalogQ.data.skus.find((s) => s.sku === line.sku);
+      if (!sku) continue;
+      const model = catalogQ.data.models.find((m) => m.id === sku.modelId);
+      if (model) cats.add(model.category);
+    }
+    return maxLeadDaysFor([...cats]);
+  }, [catalogQ.data, lines]);
+  const leadGap = useMemo(() => {
+    if (leadDays === 0 || !order.delivery_date || order.delivery_date_tbd) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(order.delivery_date);
+    if (Number.isNaN(target.getTime())) return null;
+    const msPerDay = 86_400_000;
+    const days = Math.ceil((target.getTime() - today.getTime()) / msPerDay);
+    if (days <= leadDays) return null;
+    return { days, leadDays, excess: days - leadDays };
+  }, [leadDays, order.delivery_date, order.delivery_date_tbd]);
+  const [leadAcknowledged, setLeadAcknowledged] = useState(false);
+  // Reset acknowledgement when the order or lead gap changes (e.g. operator
+  // switches between drawers without closing this one).
+  useEffect(() => {
+    setLeadAcknowledged(false);
+  }, [order.id, leadGap?.days, leadGap?.leadDays]);
+
   // Pre-flight: at the selected warehouse, are all order lines covered by
   // available (qty - reserved) stock? Returns the array of short lines so we
   // can show a richer hint than just "yes/no".
@@ -86,7 +127,8 @@ export default function ConfirmProceedDialog({
     return { shortages, sufficient: shortages.length === 0 };
   }, [warehouseId, byWarehouse, lines]);
 
-  const valid = !!warehouseId && !confirm.isPending;
+  const valid =
+    !!warehouseId && !confirm.isPending && (leadGap === null || leadAcknowledged);
 
   async function submit() {
     if (!valid) return;
@@ -177,6 +219,31 @@ export default function ConfirmProceedDialog({
               {selectedWh.address}
             </div>
           )}
+        </div>
+      )}
+
+      {leadGap && (
+        <div
+          data-testid="confirm-proceed-lead-warning"
+          className="text-[12px] px-3 py-2.5 rounded-[4px] mb-3.5 font-body text-destructive border border-destructive/30 bg-destructive/5"
+        >
+          <div>
+            <strong>Procuring too early?</strong> — delivery is{" "}
+            <strong>{leadGap.days} days</strong> from today, but production
+            lead-time for this category is only{" "}
+            <strong>{leadGap.leadDays} days</strong>. Proceeding now means
+            stock arrives ~{leadGap.excess} day{leadGap.excess === 1 ? "" : "s"}{" "}
+            early and sits idle in the warehouse.
+          </div>
+          <label className="inline-flex items-center gap-2 mt-2 cursor-pointer text-[12px]">
+            <input
+              type="checkbox"
+              checked={leadAcknowledged}
+              onChange={(e) => setLeadAcknowledged(e.target.checked)}
+              className="w-4 h-4"
+            />
+            I'm sure I want to procure now anyway
+          </label>
         </div>
       )}
 

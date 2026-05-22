@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { MAX_DELIVERY_FLOOR, type Order, type UpdateOrderInput } from "@carres/shared";
+import {
+  MAX_DELIVERY_FLOOR,
+  maxLeadDaysFor,
+  minDeliveryDateISO,
+  type Order,
+  type UpdateOrderInput,
+} from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { useUpdateOrder } from "@/lib/queries";
+import { useCatalog, useUpdateOrder } from "@/lib/queries";
 import { ModalShell } from "./TopUpDepositModal";
 
 interface Props {
@@ -36,6 +42,24 @@ export default function EditOrderModal({ order, onClose }: Props) {
   const [dateTbd, setDateTbd] = useState(order.delivery.dateTbd);
   const [floor, setFloor] = useState(order.delivery.floor);
   const [hasLift, setHasLift] = useState(order.delivery.hasLift);
+
+  // 2026-05-22 (Loo) — same lead-time floor as the wizard's Step 3 (mattress
+  // + bedframe 14d, sofa 21d, see shared DELIVERY_LEAD_DAYS). Without this
+  // gate the dealer could create with a compliant date, then open Edit and
+  // shift to tomorrow — bypassing the production lead-time entirely.
+  const catalogQ = useCatalog();
+  const minLeadDays = useMemo(() => {
+    if (!catalogQ.data || !order.lines) return 0;
+    const cats = new Set<string>();
+    for (const line of order.lines) {
+      const sku = catalogQ.data.skus.find((s) => s.sku === line.sku);
+      if (!sku) continue;
+      const model = catalogQ.data.models.find((m) => m.id === sku.modelId);
+      if (model) cats.add(model.category);
+    }
+    return maxLeadDaysFor([...cats]);
+  }, [catalogQ.data, order.lines]);
+  const minDate = useMemo(() => minDeliveryDateISO(minLeadDays), [minLeadDays]);
 
   const updateMut = useUpdateOrder(order.id, {
     onSuccess: () => {
@@ -88,7 +112,11 @@ export default function EditOrderModal({ order, onClose }: Props) {
   const nameValid = name.trim().length >= 2;
   const phoneValid = !phone || /^[0-9-+\s]{8,}/.test(phone);
   const billingValid = billingSame || billing.trim().length >= 5;
-  const dateValid = dateTbd || !!deliveryDate;
+  // Lead-time floor: when not TBD and a date is picked, the date must be
+  // on/after today + minLeadDays. The wizard enforced this on create; this
+  // closes the Edit-modal bypass.
+  const dateLeadOk = dateTbd || !deliveryDate || (minLeadDays === 0 || deliveryDate >= minDate);
+  const dateValid = (dateTbd || !!deliveryDate) && dateLeadOk;
   const canSubmit =
     nameValid && phoneValid && billingValid && dateValid && hasChanges && !updateMut.isPending;
 
@@ -213,11 +241,17 @@ export default function EditOrderModal({ order, onClose }: Props) {
                 type="date"
                 value={deliveryDate}
                 disabled={dateTbd}
+                min={minLeadDays > 0 ? minDate : undefined}
                 onChange={(e) => setDeliveryDate(e.target.value)}
                 className={`w-full px-3 py-2.5 border border-base-300 rounded text-sm outline-none focus:border-primary ${
                   dateTbd ? "bg-base-50 text-base-500 cursor-not-allowed" : "bg-white"
                 }`}
               />
+              {minLeadDays > 0 && !dateTbd && (
+                <span className="text-[11px] text-base-500 block mt-1">
+                  Earliest available: {minDate} ({minLeadDays}-day production lead time)
+                </span>
+              )}
             </label>
             <div className="pb-2.5">
               <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-base-700">
@@ -296,9 +330,14 @@ export default function EditOrderModal({ order, onClose }: Props) {
             Billing address needs at least 5 characters when different from delivery.
           </p>
         )}
-        {!dateValid && (
+        {!dateValid && (dateTbd || !deliveryDate) && (
           <p className="text-[11px] text-destructive">
             Delivery date is required (or check &ldquo;Confirm later&rdquo;).
+          </p>
+        )}
+        {!dateLeadOk && (
+          <p className="text-[11px] text-destructive">
+            Earliest delivery date is {minDate} ({minLeadDays}-day production lead time for this category).
           </p>
         )}
       </div>

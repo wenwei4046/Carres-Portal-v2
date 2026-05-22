@@ -20,6 +20,11 @@ import {
   type AutocountImportResult,
 } from "@carres/shared";
 import { userClient, adminClient } from "../lib/supabase";
+import {
+  getOrderSkus,
+  validateDeliveryLeadTime,
+  type LeadTimeViolation,
+} from "../lib/lead-time";
 import type { AppEnv } from "../types";
 
 /**
@@ -64,6 +69,10 @@ type SalesOrderData = {
   balance_due: number;
   currency: string;
   signed: boolean;
+  /** 2026-05-22 (Loo) — signed URL to the customer's eSign PNG. The PDF
+   *  template renders this as an <Image> inside the signature block. Null
+   *  when the order pre-dates signature capture or the file is missing. */
+  signature_url: string | null;
 };
 
 const ordersRouter = new Hono<AppEnv>();
@@ -233,9 +242,22 @@ ordersRouter.post("/", async (c) => {
     });
   }
 
-  const payload = Adapters.orderInputToRpcPayload(parsed.data, auth.dealerId);
-
   const sb = userClient(c.env, auth.jwt);
+
+  // Server-side lead-time floor (mattress + bedframe = 14d, sofa = 21d). The
+  // wizard's Step 3 picker already enforces this client-side, but a curl or
+  // a third-party integration could still POST a sub-lead-time date. We
+  // resolve the SKUs against product_models.category to find the longest
+  // gating lead-time, then reject the request if the picked date is earlier
+  // than today + that floor. TBD orders (delivery.date === null) skip — they
+  // get gated again at POST /:id/date when the dealer confirms.
+  if (parsed.data.delivery.date) {
+    const skus = parsed.data.lines.map((l) => l.sku);
+    const violation = await validateDeliveryLeadTime(sb, skus, parsed.data.delivery.date);
+    if (violation) return c.json(leadTimeBody(violation), 422);
+  }
+
+  const payload = Adapters.orderInputToRpcPayload(parsed.data, auth.dealerId);
   const { data: created, error } = await sb.rpc("create_order", { payload });
   if (error) {
     // 42501 = manual cross-dealer check inside the RPC. We map to 403 so the
@@ -801,6 +823,27 @@ ordersRouter.post("/:id/proceed", async (c) => {
  * mutations (top-up / address / date). Keeps the route handlers small and
  * uniform: parse → validate → call RPC → map errors → re-fetch + return.
  */
+/** Standard 422 body shape for lead-time violations. Mirrors `mapPgError`'s
+ *  P0001 (rule_violation) so the FE can branch on `error === "rule_violation"`
+ *  + `code === "lead_time_violation"` to surface a date-picker friendly
+ *  message. `minDate` + `leadDays` are extras the wizard's inline reason can
+ *  display without re-fetching catalog. */
+function leadTimeBody(v: LeadTimeViolation): {
+  error: "rule_violation";
+  code: "lead_time_violation";
+  message: string;
+  minDate: string;
+  leadDays: number;
+} {
+  return {
+    error: "rule_violation",
+    code: "lead_time_violation",
+    message: v.message,
+    minDate: v.minDate,
+    leadDays: v.leadDays,
+  };
+}
+
 async function dispatchOrderMutation<TBody>(
   c: Context<AppEnv>,
   opts: {
@@ -811,6 +854,15 @@ async function dispatchOrderMutation<TBody>(
     rpcArgs: (body: TBody, dealerId: string) => Record<string, unknown>;
     /** Optional pre-flight checks (storage paths inside dealer folder, etc.). */
     preFlight?: (body: TBody, dealerId: string) => void;
+    /** Optional async pre-flight, runs after the sync `preFlight` with access
+     *  to the supabase client + order id. Return a Response to short-circuit
+     *  with that response; return null to continue to the RPC dispatch. Used
+     *  by POST /:id/date to enforce lead-time floor (which needs to query
+     *  product_models for the order's lines). */
+    asyncPreFlight?: (
+      body: TBody,
+      ctx: { sb: ReturnType<typeof userClient>; id: string; dealerId: string | null },
+    ) => Promise<Response | null>;
     /** Tag used in 422 response bodies so the frontend can branch on the route. */
     errorTag: string;
   },
@@ -850,6 +902,14 @@ async function dispatchOrderMutation<TBody>(
   }
 
   const sb = userClient(c.env, auth.jwt);
+  if (opts.asyncPreFlight) {
+    const short = await opts.asyncPreFlight(parsed.data, {
+      sb,
+      id,
+      dealerId: auth.dealerId ?? null,
+    });
+    if (short) return short;
+  }
   const args = opts.rpcArgs(parsed.data, auth.dealerId ?? "");
   // `args` is the named-arg object Postgres expects; pass through verbatim.
   const { error: rpcError } = await sb.rpc(opts.rpcName, args as never);
@@ -917,12 +977,21 @@ ordersRouter.post("/:id/address", (c) =>
 );
 
 /** POST /api/orders/:id/date — confirm a TBD delivery date. Mirrors
- *  ConfirmDateModal in proto. */
+ *  ConfirmDateModal in proto. The lead-time floor (mattress/bedframe 14d,
+ *  sofa 21d — see shared `DELIVERY_LEAD_DAYS`) is enforced via async
+ *  pre-flight because the wizard's client-side gate doesn't apply once
+ *  the order is already in Place with `dateTbd: true`. */
 ordersRouter.post("/:id/date", (c) =>
   dispatchOrderMutation(c, {
     schema: setOrderDateInputSchema,
     rpcName: "set_order_date",
     errorTag: "set_date_blocked",
+    asyncPreFlight: async (body, ctx) => {
+      const skus = await getOrderSkus(ctx.sb, ctx.id);
+      const violation = await validateDeliveryLeadTime(ctx.sb, skus, body.date);
+      if (violation) return c.json(leadTimeBody(violation), 422);
+      return null;
+    },
     rpcArgs: (body) => ({
       p_order_id: c.req.param("id"),
       p_date: body.date,
@@ -1014,6 +1083,17 @@ ordersRouter.patch("/:id", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
+
+  // Lead-time floor on delivery.date edits. The wizard's Step 3 picker gates
+  // create, but the dealer can hit PATCH to mutate a Place order's date —
+  // without this check the wizard's 14/21-day floor is trivially bypassable.
+  // TBD-flip (dateTbd: true with empty date) skips; non-TBD edits validate.
+  if (del?.date && !del.dateTbd) {
+    const skus = await getOrderSkus(sb, id);
+    const violation = await validateDeliveryLeadTime(sb, skus, del.date);
+    if (violation) return c.json(leadTimeBody(violation), 422);
+  }
+
   const { error: rpcError } = await sb.rpc("update_order", {
     p_order_id: id,
     p_payload: flat,
@@ -1191,6 +1271,11 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   const channel: "dealer" | "showroom" =
     o.channel === "showroom" || o.outlets ? "showroom" : "dealer";
 
+  // Sign the customer's eSign PNG so the PDF template can render it inline.
+  // 1h TTL is enough — the browser downloads the PDF or saves the image
+  // immediately when render fires.
+  const signatureSignedUrl = await signAttachment(sb, o.signature_url ?? null);
+
   const payload: SalesOrderData = {
     so_number,
     issue_date,
@@ -1225,6 +1310,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     balance_due,
     currency: "MYR",
     signed: !!o.signature_url,
+    signature_url: signatureSignedUrl,
   };
 
   return c.json(payload);

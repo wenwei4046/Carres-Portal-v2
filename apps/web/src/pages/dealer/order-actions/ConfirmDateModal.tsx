@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { Order } from "@carres/shared";
+import { maxLeadDaysFor, type Order } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { useSetOrderDate } from "@/lib/queries";
+import { useCatalog, useSetOrderDate } from "@/lib/queries";
 import { ModalShell } from "./TopUpDepositModal";
 
 interface Props {
@@ -24,16 +24,40 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
     return d;
   }, []);
 
+  // 2026-05-22 (Loo) — production lead-time floor (mattress + bedframe 14d,
+  // sofa 21d, see shared DELIVERY_LEAD_DAYS). When this modal pops up the
+  // order is in Place with `dateTbd: true`; the wizard's Step 3 floor never
+  // ran for it, so we enforce the same gate here.
+  const catalogQ = useCatalog();
+  const minLeadDays = useMemo(() => {
+    if (!catalogQ.data || !order.lines) return 0;
+    const cats = new Set<string>();
+    for (const line of order.lines) {
+      const sku = catalogQ.data.skus.find((s) => s.sku === line.sku);
+      if (!sku) continue;
+      const model = catalogQ.data.models.find((m) => m.id === sku.modelId);
+      if (model) cats.add(model.category);
+    }
+    return maxLeadDaysFor([...cats]);
+  }, [catalogQ.data, order.lines]);
+  const minPickable = useMemo(() => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + minLeadDays);
+    return d;
+  }, [today, minLeadDays]);
+
   const initialDate = useMemo(() => {
     if (order.delivery.date && !order.delivery.dateTbd) {
       const d = new Date(order.delivery.date);
       if (!Number.isNaN(d.getTime())) {
         d.setHours(0, 0, 0, 0);
+        // Snap forward if a stale TBD edge somehow stored a sub-lead date.
+        if (d < minPickable) return minPickable;
         return d;
       }
     }
-    return today;
-  }, [order.delivery.date, order.delivery.dateTbd, today]);
+    return minPickable;
+  }, [order.delivery.date, order.delivery.dateTbd, minPickable]);
 
   const [viewMonth, setViewMonth] = useState(
     new Date(initialDate.getFullYear(), initialDate.getMonth(), 1),
@@ -76,11 +100,18 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
     setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
   }
 
-  function pickQuick(kind: "today" | "1w" | "2w" | "1m") {
-    const d = new Date(today);
-    if (kind === "1w") d.setDate(d.getDate() + 7);
-    if (kind === "2w") d.setDate(d.getDate() + 14);
-    if (kind === "1m") d.setMonth(d.getMonth() + 1);
+  function pickQuick(kind: "earliest" | "1w" | "2w" | "1m") {
+    let d: Date;
+    if (kind === "earliest") {
+      d = new Date(minPickable);
+    } else {
+      d = new Date(today);
+      if (kind === "1w") d.setDate(d.getDate() + 7);
+      if (kind === "2w") d.setDate(d.getDate() + 14);
+      if (kind === "1m") d.setMonth(d.getMonth() + 1);
+      // Floor to minPickable so a chip never lands on a sub-lead-time date.
+      if (d < minPickable) d = new Date(minPickable);
+    }
     setSelected(d);
     setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
   }
@@ -94,17 +125,19 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
     a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate();
-  const isPast = (d: Date) => d < today;
+  /** Any date earlier than `minPickable` is unselectable — that covers
+   *  both past dates AND the production lead-time floor when one applies. */
+  const isBlocked = (d: Date) => d < minPickable;
 
   function handleSubmit() {
-    if (isPast(selected) || setDateMut.isPending) return;
+    if (isBlocked(selected) || setDateMut.isPending) return;
     const yyyy = selected.getFullYear();
     const mm = String(selected.getMonth() + 1).padStart(2, "0");
     const dd = String(selected.getDate()).padStart(2, "0");
     setDateMut.mutate({ date: `${yyyy}-${mm}-${dd}` });
   }
 
-  const canSubmit = !isPast(selected) && !setDateMut.isPending;
+  const canSubmit = !isBlocked(selected) && !setDateMut.isPending;
   const selectedLabel = selected.toLocaleDateString("en-MY", {
     weekday: "short",
     day: "numeric",
@@ -121,7 +154,13 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
           Confirm delivery date
         </h2>
         <p className="text-xs text-base-600 mt-1">
-          Earliest is today. Past dates are blocked.
+          {minLeadDays > 0
+            ? `Earliest is ${minPickable.toLocaleDateString("en-MY", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })} (${minLeadDays}-day production lead time).`
+            : "Earliest is today. Past dates are blocked."}
         </p>
       </header>
 
@@ -131,7 +170,10 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
         <div className="flex gap-1.5 flex-wrap">
           {(
             [
-              { key: "today" as const, label: "Today" },
+              {
+                key: "earliest" as const,
+                label: minLeadDays > 0 ? `Earliest (+${minLeadDays}d)` : "Today",
+              },
               { key: "1w" as const, label: "+1 week" },
               { key: "2w" as const, label: "+2 weeks" },
               { key: "1m" as const, label: "+1 month" },
@@ -179,19 +221,19 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
           <div className="grid grid-cols-7 gap-0.5 p-1.5 pt-1">
             {grid.map((d, i) => {
               const inMonth = d.getMonth() === viewMonth.getMonth();
-              const past = isPast(d);
+              const blocked = isBlocked(d);
               const isSelected = sameDay(d, selected);
               const isToday = sameDay(d, today);
               return (
                 <button
                   key={i}
                   type="button"
-                  disabled={past}
-                  onClick={() => !past && setSelected(d)}
+                  disabled={blocked}
+                  onClick={() => !blocked && setSelected(d)}
                   className={`aspect-square text-[12px] rounded grid place-items-center transition-colors ${
                     isSelected
                       ? "bg-primary text-primary-foreground font-semibold"
-                      : past
+                      : blocked
                         ? "text-base-300 cursor-not-allowed"
                         : isToday
                           ? "bg-signature-50 text-primary font-semibold border border-primary"

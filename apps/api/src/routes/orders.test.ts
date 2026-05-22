@@ -144,6 +144,11 @@ function buildSbForCreate(opts: {
   rpcResult?: { id: string; so: number; placed_at: string };
   rpcError?: { code?: string; message?: string; details?: string };
   fetchedRow?: unknown;
+  /** Category rows returned by the product_skus.in() lookup used by the
+   *  server-side lead-time validator. Defaults to empty (fail-open). Pass
+   *  e.g. `[{ product_models: { category: "mattress" } }]` to make the
+   *  validator reject any date < today + 14d. */
+  productSkuCategoryRows?: Array<{ product_models: { category: string } | null }>;
 }) {
   const rpcCalls: Array<{ name: string; payload: unknown }> = [];
   const eqs: Array<[string, unknown]> = [];
@@ -152,6 +157,7 @@ function buildSbForCreate(opts: {
       eqs.push([col, val]);
       return chain;
     },
+    in: async () => ({ data: opts.productSkuCategoryRows ?? [], error: null }),
     order: async () => ({ data: [], error: null }),
     maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
   };
@@ -821,6 +827,130 @@ describe("POST /api/orders", () => {
     );
     expect(res.status).toBe(400);
   });
+
+  // 2026-05-22 (Loo) — server-side lead-time floor for delivery.date.
+  // Mattress + bedframe = 14 days, sofa = 21 days (see shared
+  // DELIVERY_LEAD_DAYS). The wizard gates this client-side; these tests
+  // verify the curl/devtools bypass is shut.
+  describe("lead-time validation", () => {
+    it("rejects 422 lead_time_violation when mattress order has delivery.date < today + 14d", async () => {
+      const today = new Date();
+      const tooSoon = new Date(today);
+      tooSoon.setDate(tooSoon.getDate() + 5);
+      const tooSoonIso = tooSoon.toISOString().slice(0, 10);
+
+      const sb = buildSbForCreate({
+        productSkuCategoryRows: [{ product_models: { category: "mattress" } }],
+      });
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request("http://t/api/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(
+            validCreateBody({ delivery: { date: tooSoonIso, dateTbd: false, floor: 1, hasLift: false } }),
+          ),
+        }),
+        env,
+      );
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { code?: string; leadDays?: number };
+      expect(body.code).toBe("lead_time_violation");
+      expect(body.leadDays).toBe(14);
+      // Critically: RPC was NOT called — server bailed before DB write
+      expect(sb._rpcCalls).toHaveLength(0);
+    });
+
+    it("rejects 422 with leadDays=21 when sofa order has delivery.date < today + 21d", async () => {
+      const today = new Date();
+      const tooSoon = new Date(today);
+      tooSoon.setDate(tooSoon.getDate() + 15);
+      const tooSoonIso = tooSoon.toISOString().slice(0, 10);
+
+      const sb = buildSbForCreate({
+        productSkuCategoryRows: [{ product_models: { category: "sofa" } }],
+      });
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request("http://t/api/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(
+            validCreateBody({ delivery: { date: tooSoonIso, dateTbd: false, floor: 1, hasLift: false } }),
+          ),
+        }),
+        env,
+      );
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { code?: string; leadDays?: number };
+      expect(body.code).toBe("lead_time_violation");
+      expect(body.leadDays).toBe(21);
+    });
+
+    it("accepts 201 when mattress order's delivery.date >= today + 14d", async () => {
+      const today = new Date();
+      const okDate = new Date(today);
+      okDate.setDate(okDate.getDate() + 30);
+      const okIso = okDate.toISOString().slice(0, 10);
+
+      const sb = buildSbForCreate({
+        rpcResult: { id: NEW_ORDER_ID, so: 1042, placed_at: "2026-05-22T00:00:00Z" },
+        fetchedRow: makeOrderRow({
+          id: NEW_ORDER_ID,
+          delivery_date: okIso,
+          signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+          terms_accepted: true,
+        }),
+        productSkuCategoryRows: [{ product_models: { category: "mattress" } }],
+      });
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request("http://t/api/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(
+            validCreateBody({ delivery: { date: okIso, dateTbd: false, floor: 1, hasLift: false } }),
+          ),
+        }),
+        env,
+      );
+      expect(res.status).toBe(201);
+      // RPC fired exactly once (lead-time gate passed)
+      expect(sb._rpcCalls.filter((c: { name: string }) => c.name === "create_order")).toHaveLength(1);
+    });
+
+    it("skips lead-time check when delivery.date is null (TBD path)", async () => {
+      const sb = buildSbForCreate({
+        rpcResult: { id: NEW_ORDER_ID, so: 1043, placed_at: "2026-05-22T00:00:00Z" },
+        fetchedRow: makeOrderRow({
+          id: NEW_ORDER_ID,
+          delivery_date: null,
+          delivery_date_tbd: true,
+          signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+          terms_accepted: true,
+        }),
+        // Even if catalog says mattress, TBD bypasses — gate runs again at
+        // POST /:id/date when dealer confirms a real date.
+        productSkuCategoryRows: [{ product_models: { category: "mattress" } }],
+      });
+      vi.mocked(userClient).mockReturnValue(sb);
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(
+        new Request("http://t/api/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(
+            validCreateBody({ delivery: { date: null, dateTbd: true, floor: 1, hasLift: false } }),
+          ),
+        }),
+        env,
+      );
+      expect(res.status).toBe(201);
+    });
+  });
 });
 
 // =============================================================================
@@ -834,21 +964,45 @@ describe("POST /api/orders", () => {
 function buildSbForProceed(opts: {
   rpcError?: { code?: string; message?: string; details?: string };
   fetchedRow?: unknown;
+  /** Used by the server-side lead-time validator (POST /:id/date and
+   *  PATCH /:id with delivery.date). The validator first fetches the
+   *  order's lines, then joins product_skus → product_models.category. */
+  productSkuCategoryRows?: Array<{ product_models: { category: string } | null }>;
+  /** Optional SKU list returned by the order_lines fetch in
+   *  `getOrderSkus`. Empty array (default) means the lead-time validator
+   *  short-circuits at the "no SKUs" branch (fail-open). */
+  orderLineSkus?: string[];
 }) {
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
   const eqs: Array<[string, unknown]> = [];
+  let currentTable: string | null = null;
   const chain = {
     eq(col: string, val: unknown) {
       eqs.push([col, val]);
+      // `.eq()` is the terminal builder call for `getOrderSkus`
+      // (sb.from("order_lines").select("sku").eq("order_id", id)). Awaiting
+      // the resulting builder is awaiting this object — return a thenable
+      // result for the order_lines path; for every other table the test
+      // still composes via .order/.maybeSingle so we keep returning chain.
+      if (currentTable === "order_lines") {
+        return Promise.resolve({
+          data: (opts.orderLineSkus ?? []).map((sku) => ({ sku })),
+          error: null,
+        });
+      }
       return chain;
     },
+    in: async () => ({ data: opts.productSkuCategoryRows ?? [], error: null }),
     order: async () => ({ data: [], error: null }),
     maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
   };
   const storage = buildStorageMock();
   return Object.assign(
     {
-      from: () => ({ select: () => chain }),
+      from: (table: string) => {
+        currentTable = table;
+        return { select: () => chain };
+      },
       rpc: async (name: string, args: unknown) => {
         rpcCalls.push({ name, args });
         if (opts.rpcError) {
@@ -1242,6 +1396,34 @@ describe("POST /api/orders/:id/date", () => {
     );
     expect(res.status).toBe(400);
   });
+
+  it("422 lead_time_violation when confirmed date is < today + 14d for a mattress order", async () => {
+    const today = new Date();
+    const tooSoon = new Date(today);
+    tooSoon.setDate(tooSoon.getDate() + 5);
+    const tooSoonIso = tooSoon.toISOString().slice(0, 10);
+
+    const sb = buildSbForProceed({
+      orderLineSkus: ["mattress-1"],
+      productSkuCategoryRows: [{ product_models: { category: "mattress" } }],
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(dateUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ date: tooSoonIso }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; leadDays?: number };
+    expect(body.code).toBe("lead_time_violation");
+    expect(body.leadDays).toBe(14);
+    // Critically: set_order_date RPC was NOT called — server bailed first
+    expect(sb._rpcCalls.some((c: { name: string }) => c.name === "set_order_date")).toBe(false);
+  });
 });
 
 // =============================================================================
@@ -1340,6 +1522,65 @@ describe("PATCH /api/orders/:id", () => {
       env,
     );
     expect(res.status).toBe(403);
+  });
+
+  // 2026-05-22 (Loo) — lead-time floor also enforced on edit. The wizard
+  // bakes the gate into Step 3, but a curl PATCH would otherwise bypass it
+  // because dealers can edit Place orders freely.
+  it("422 lead_time_violation when patching delivery.date to < today + 14d on a mattress order", async () => {
+    const today = new Date();
+    const tooSoon = new Date(today);
+    tooSoon.setDate(tooSoon.getDate() + 3);
+    const tooSoonIso = tooSoon.toISOString().slice(0, 10);
+
+    const sb = buildSbForProceed({
+      orderLineSkus: ["mattress-1"],
+      productSkuCategoryRows: [{ product_models: { category: "mattress" } }],
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editUrl, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ delivery: { date: tooSoonIso } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; leadDays?: number };
+    expect(body.code).toBe("lead_time_violation");
+    expect(body.leadDays).toBe(14);
+    expect(sb._rpcCalls.some((c: { name: string }) => c.name === "update_order")).toBe(false);
+  });
+
+  it("200 when patching delivery.date to a date >= today + 14d on a mattress order", async () => {
+    const today = new Date();
+    const okDate = new Date(today);
+    okDate.setDate(okDate.getDate() + 30);
+    const okIso = okDate.toISOString().slice(0, 10);
+
+    const sb = buildSbForProceed({
+      fetchedRow: makeOrderRow({
+        delivery_date: okIso,
+        signature_url: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+        terms_accepted: true,
+      }),
+      orderLineSkus: ["mattress-1"],
+      productSkuCategoryRows: [{ product_models: { category: "mattress" } }],
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editUrl, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ delivery: { date: okIso } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb._rpcCalls.some((c: { name: string }) => c.name === "update_order")).toBe(true);
   });
 });
 
