@@ -24,9 +24,9 @@ function wrap(ui: React.ReactNode) {
 }
 
 const DEMAND = [
-  { sku: "mattress:cloud:Queen", openQty: 12, poCount: 2 },
-  { sku: "mattress:premier:King", openQty: 4, poCount: 1 },
-  { sku: "bedframe:l1202:King", openQty: 6, poCount: 1 },
+  { sku: "MS01-cloud-Q", category: "mattress", openQty: 12, poCount: 2, pendingQty: 0, pendingOrderCount: 0 },
+  { sku: "MS01-premier-K", category: "mattress", openQty: 4, poCount: 1, pendingQty: 2, pendingOrderCount: 1 },
+  { sku: "BF04-l1202-K", category: "bedframe", openQty: 6, poCount: 1, pendingQty: 0, pendingOrderCount: 0 },
 ];
 const PENDING_POS = [
   { id: "PO-2050", sup_status: "pending", supplier_id: "e1", qty: 4 },
@@ -57,7 +57,7 @@ describe("SupplierIncoming", () => {
     expect(screen.queryByText("Pending ack")).not.toBeInTheDocument();
   });
 
-  it("groups SKUs by category prefix", async () => {
+  it("groups rows by server-returned category", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.includes("/products/demand")) return DEMAND;
       if (url.includes("/api/supplier/pos")) return PENDING_POS;

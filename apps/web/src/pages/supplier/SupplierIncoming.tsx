@@ -25,14 +25,19 @@ export default function SupplierIncoming() {
   // 2026-05-15 (Loo) — "Pending ack" KPI removed. It was a sub-status of
   // committed POs (sup_status='pending') and didn't belong in a demand
   // forecast view; supplier reads PO ack state on the POs page anyway.
-  const totalOpenUnits = rows.reduce((s, r) => s + r.openQty, 0);
-  const totalPendingUnits = rows.reduce((s, r) => s + (r.pendingQty ?? 0), 0);
+  // Only the 3 furniture categories belong in a supplier forecast; the server
+  // already excludes accessories/services (category null), but guard anyway.
+  const relevant = rows.filter((r) => r.category);
+  const totalOpenUnits = relevant.reduce((s, r) => s + r.openQty, 0);
+  const totalPendingUnits = relevant.reduce((s, r) => s + (r.pendingQty ?? 0), 0);
   const totalUnits = totalOpenUnits + totalPendingUnits;
 
-  // Group by category prefix (proto:715-720). SKU format: cat:model:variant.
+  // Group by server-derived category (migration 0148 resolve_demand_category).
+  // The legacy `sku.split(":")` is gone — AutoCount + canonical SKUs have no
+  // category prefix.
   const byCat: Record<string, typeof rows> = {};
-  for (const r of rows) {
-    const cat = r.sku.split(":")[0];
+  for (const r of relevant) {
+    const cat = r.category as string;
     if (!byCat[cat]) byCat[cat] = [];
     byCat[cat].push(r);
   }
@@ -83,7 +88,7 @@ export default function SupplierIncoming() {
             )}
           </div>
           <div className="text-[11px] text-muted-foreground mt-2">
-            Across {rows.length} SKU{rows.length === 1 ? "" : "s"}
+            Across {relevant.length} SKU{relevant.length === 1 ? "" : "s"}
           </div>
         </div>
         <Kpi
@@ -99,7 +104,7 @@ export default function SupplierIncoming() {
         />
       </div>
 
-      {rows.length === 0 ? (
+      {relevant.length === 0 ? (
         <div className="border border-border rounded-md p-10 text-center bg-card">
           <div className="text-[14px] text-muted-foreground">
             No incoming demand right now.

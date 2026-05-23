@@ -3551,12 +3551,15 @@ export interface SupplierMe {
 
 export interface SupplierDemandRow {
   sku: string;
-  /** Formal commitment (already-issued PO lines). */
+  /** mattress | bedframe | sofa, or null for accessories/services (hidden).
+   *  Server-derived via resolve_demand_category (migration 0148). */
+  category: "mattress" | "bedframe" | "sofa" | null;
+  /** Formal commitment (already-issued PO lines) — the Commit bucket. */
   openQty: number;
   poCount: number;
-  // 2026-05-10 (Loo) — pre-commit demand from sales orders matching the
-  // supplier's cat_covered. Fed by `supplier_pending_demand()` RPC; null/0
-  // means "nothing in the pipeline beyond what's already POed".
+  // 2026-05-10 (Loo) — pre-commit demand from active orders not yet POed —
+  // the Forecast bucket. Fed by `supplier_pending_demand()` RPC; 0 means
+  // nothing in the pipeline beyond what's already POed.
   pendingQty: number;
   pendingOrderCount: number;
 }
