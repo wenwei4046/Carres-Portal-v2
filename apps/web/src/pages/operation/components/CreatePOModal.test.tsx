@@ -963,6 +963,74 @@ describe("CreatePOModal — Auto-fill from awaiting stock (C5.3)", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("bundle scope merges same (sku, attrs) across SOs into ONE line, qty summed, so_refs preserved (Loo 2026-05-23)", async () => {
+    // A non-sofa SKU needed by two source orders must collapse to a single
+    // line (qty 2+3=5). Per-SO allocation is preserved by the PO's so_refs
+    // (= union of the source SOs) + thread claiming, NOT by separate lines.
+    const refetch = vi.fn().mockResolvedValue({
+      data: {
+        shortage: [
+          {
+            sku: SKU_KING,
+            need: 5,
+            available: 0,
+            shortage: 5,
+            attrs: null,
+            bySo: [
+              { so: 1117, need: 2, available: 0, shortage: 2 },
+              { so: 1118, need: 3, available: 0, shortage: 3 },
+            ],
+          },
+        ],
+      },
+    });
+    shortageHookState = {
+      data: undefined,
+      isFetching: false,
+      isFetched: false,
+      refetch,
+    };
+    vi.mocked(apiFetch).mockResolvedValue({
+      cost: null,
+      lastPoId: null,
+      lastReceivedAt: null,
+    });
+
+    render(
+      wrap(<CreatePOModal prefill={{ soRefs: [1117, 1118] }} onClose={() => {}} />),
+    );
+
+    // The bundle mount-effect runs autoFillFromShortage exactly once.
+    await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
+
+    // Merged: exactly ONE line row (the two SOs' King need is summed), not two.
+    await waitFor(() => {
+      expect(screen.getByTestId("po-line-row-0")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("po-line-row-1")).toBeNull();
+
+    // Submit → single-PO RPC: one line at qty 5, so_refs carrying BOTH source
+    // SOs so per-SO thread allocation stays intact downstream.
+    fireEvent.change(screen.getByTestId(`po-warehouse-${SUPPLIER_A.id}`), {
+      target: { value: WAREHOUSE_KL.id },
+    });
+    fillEta();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /create combined po|issue po|create po/i,
+      }),
+    );
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalledTimes(1));
+    const arg = createMutateAsync.mock.calls[0][0] as {
+      lines: { sku: string; qty: number }[];
+      so?: number;
+      soRefs?: number[];
+    };
+    expect(arg.lines).toHaveLength(1);
+    expect(arg.lines[0]).toMatchObject({ sku: SKU_KING, qty: 5 });
+    expect(arg.soRefs).toEqual([1117, 1118]);
+  });
+
   it("empty shortage result disables the button + shows the empty label", () => {
     const refetch = vi.fn().mockResolvedValue({ data: { shortage: [] } });
     // Simulate the post-fetch state: isFetched=true, data is empty.

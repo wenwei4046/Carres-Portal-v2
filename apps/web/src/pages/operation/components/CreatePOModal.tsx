@@ -106,13 +106,13 @@ interface DraftLine {
   // fabric_name, fabric_surcharge}, Mattress=null. Submit gate refuses when
   // bedframe lacks color/gap or sofa lacks fabric_id.
   attrs: Record<string, unknown> | null;
-  // 2026-05-18 (Phase 3 — Loo) — when this line came from a bundle auto-fill
-  // (data.shortage[].bySo), `sourceSo` is the SO it serves. Drives per-SO
-  // PO splitting in `issuanceGroups`: each (supplier, sourceSo, sku, attrs)
-  // tuple becomes its own PO so 1 SO = at most 1 PO per (sku, attrs). For
-  // manually-added lines and single-SO scope (prefill.so), sourceSo is null
-  // and the existing per-supplier+per-variant grouping applies unchanged.
-  sourceSo: number | null;
+  // 2026-05-23 (Loo) — the source SOs this line serves (from bundle auto-fill,
+  // data.shortage[].bySo). Non-sofa lines merge all SOs of one (sku, attrs)
+  // into a single line (qty summed) so the supplier sees one line per product;
+  // the SO list flows to the PO's so_refs so per-SO thread allocation stays
+  // intact. Sofa lines stay per-SO (each becomes its own PO in issuanceGroups).
+  // Manually-added / global / stockpile lines = [].
+  sourceSos: number[];
 }
 
 // 2026-05-17 (Loo A→Z test bug A) — real DB SKUs (e.g. `B1201F-K`) don't carry
@@ -323,7 +323,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           // Phase 3 (2026-05-18) — single-SO prefill attributes every line to
           // that SO. Bundle prefill (`soRefs`) skips initialLines entirely
           // (autoFillFromShortage fans out per-SO from the shortage response).
-          sourceSo: prefill.so ?? null,
+          sourceSos: prefill.so != null ? [prefill.so] : [],
         };
       });
     }
@@ -392,7 +392,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             cost: cs.cost,
             costSource: cs.costSource,
             attrs: null,
-            sourceSo: null,
+            sourceSos: [],
           },
         ]);
       }
@@ -537,25 +537,40 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       const fanned: DraftLine[] = [];
       for (const s of data.shortage) {
         const cs = lineCostFromSku(s.sku);
-        const base: Omit<DraftLine, "qty" | "sourceSo"> = {
+        const base: Omit<DraftLine, "qty" | "sourceSos"> = {
           modelId: modelIdForSku(s.sku, skuByCode),
           sku: s.sku,
           cost: cs.cost,
           costSource: cs.costSource,
           attrs: s.attrs,
         };
-        const bySo = s.bySo ?? [];
+        const bySo = (s.bySo ?? []).filter((b) => b.shortage > 0);
         if (isBundleScope && bySo.length > 0) {
-          for (const b of bySo) {
-            if (b.shortage <= 0) continue;
-            fanned.push({ ...base, qty: b.shortage, sourceSo: b.so });
+          // 2026-05-23 (Loo) — merge per (sku, attrs): a non-sofa SKU needed by
+          // several source SOs becomes ONE line with qty summed, recording every
+          // SO in `sourceSos`. The PO's so_refs (= union of sourceSos) + thread
+          // claiming (matched by sku/attrs within so_refs, qty-INdependent — see
+          // _v3_claim_threads_for_po) keep per-SO allocation intact while the
+          // supplier sees a single line. Sofa stays per-SO: each (so, sku, attrs)
+          // keeps its own line and, in issuanceGroups, its own PO (factory
+          // production is per-fabric per-order).
+          if (categoryForSku(s.sku, skuByCode, models) === "sofa") {
+            for (const b of bySo) {
+              fanned.push({ ...base, qty: b.shortage, sourceSos: [b.so] });
+            }
+          } else {
+            fanned.push({
+              ...base,
+              qty: bySo.reduce((acc, b) => acc + b.shortage, 0),
+              sourceSos: bySo.map((b) => b.so),
+            });
           }
         } else {
           // Single-SO scope (prefill.so) or global awaiting (no scope).
           fanned.push({
             ...base,
             qty: s.shortage,
-            sourceSo: prefill.so ?? null,
+            sourceSos: prefill.so != null ? [prefill.so] : [],
           });
         }
       }
@@ -637,7 +652,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
           costSource: cs.costSource,
           attrs: null,
           // Stock-alert path is global / stockpile-shaped — no source SO.
-          sourceSo: null,
+          sourceSos: [],
         };
       });
       setLines(nextLines);
@@ -689,7 +704,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         // Manually-added line inherits the prefill's single-SO scope when
         // applicable, otherwise null (stockpile / global). Bundle scope
         // never adds lines manually — auto-fill produces fanned lines.
-        sourceSo: prefill.so ?? null,
+        sourceSos: prefill.so != null ? [prefill.so] : [],
       },
     ]);
   }
@@ -758,8 +773,6 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     for (const k of keys) ordered[k] = a[k];
     return JSON.stringify(ordered);
   };
-  const variantSet = new Set(lines.map((l) => `${l.sku} ${canonAttrs(l.attrs)}`));
-  const dup = variantSet.size !== lines.length;
   const totalUnits = lines.reduce((s, l) => s + (l.qty || 0), 0);
 
   // Per-variant split (per (SO, sku, attrs)) is sofa-only: HoOKkA's production
@@ -779,7 +792,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       }
       const byKey = new Map<string, typeof g.lines>();
       for (const l of g.lines) {
-        const key = `${l.sourceSo ?? "null"}|${l.sku}|${canonAttrs(l.attrs)}`;
+        const key = `${l.sourceSos.join(",") || "null"}|${l.sku}|${canonAttrs(l.attrs)}`;
         if (!byKey.has(key)) byKey.set(key, []);
         byKey.get(key)!.push(l);
       }
@@ -790,6 +803,21 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups.groups]);
+
+  // Duplicate (sku, attrs) WITHIN one PO would violate the (po_id, sku,
+  // coalesce(attrs,'')) unique index (0076). After the per-(sku, attrs) merge
+  // in autoFill, non-sofa groups can't dup and sofa groups split per SO into
+  // separate POs — so this only fires on a genuine same-PO collision (e.g. a
+  // manual add of an already-present variant).
+  const dup = issuanceGroups.some((g) => {
+    const seen = new Set<string>();
+    for (const l of g.lines) {
+      const k = `${l.sku} ${canonAttrs(l.attrs)}`;
+      if (seen.has(k)) return true;
+      seen.add(k);
+    }
+    return false;
+  });
 
   const willSplit = issuanceGroups.length > 1;
 
@@ -826,13 +854,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
         // branch unchanged. Stockpile = both omitted.
         const distinctSos = stockpile
           ? []
-          : Array.from(
-              new Set(
-                g.lines
-                  .map((l) => l.sourceSo)
-                  .filter((s): s is number => s != null),
-              ),
-            );
+          : Array.from(new Set(g.lines.flatMap((l) => l.sourceSos)));
         const soPayload =
           distinctSos.length === 0
             ? {}
@@ -877,13 +899,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
             // through with soRefs: [singleSo].
             const distinctSos = stockpile
               ? []
-              : Array.from(
-                  new Set(
-                    g.lines
-                      .map((l) => l.sourceSo)
-                      .filter((s): s is number => s != null),
-                  ),
-                );
+              : Array.from(new Set(g.lines.flatMap((l) => l.sourceSos)));
             const soPayload =
               distinctSos.length === 0
                 ? {}
