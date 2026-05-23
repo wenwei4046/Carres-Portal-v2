@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the supplier *Incoming* forecast show pending demand (and the Commit bucket) grouped by a correctly-derived category, for any order at `status='place'` — fixing the `split_part(sku,':')` bug that left it empty — and rename the mis-seeded supplier `Ohana` → `HoOKkA`.
+**Goal:** Make the supplier *Incoming* forecast show pending demand (and the Commit bucket) grouped by a correctly-derived category, for any order at `status='place'` — fixing the `split_part(sku,':')` bug that left it empty — and standardize the supplier name to canonical **Ohana**.
+
+> **2026-05-24 correction:** Task 2 below was first written as "Ohana → HoOKkA"; the correct direction is **HoOKkA → Ohana** (Ohana is canonical). Migration 0149 went the wrong way and was corrected by **0150**; the code rename `HoOKkA → Ohana` (component files → `Ohana*Tab`, labels, tests, e2e) **kept the internal routing slug `hookka`** (wired into `_v3_resolve_sop_name` + `sops.ts`) and the login email. Read Task 2's direction inverted.
 
 **Architecture:** A new `STABLE` SQL function `resolve_demand_category(sku)` derives category two ways — exact catalog join (`product_skus → product_models.category`) for native Portal orders, model-keyword regex for legacy AutoCount free-text SKUs. Both the Forecast RPC (`supplier_pending_demand`, rewritten) and a new Commit RPC (`supplier_committed_demand`) use it. The Hono `/demand` route merges the two RPCs by SKU; the React page groups by the returned `category`. The three-state lifecycle (Forecast → Commit → 0) is unchanged — the Forecast/Commit boundary is `order_supplier_threads.po_id IS NULL`.
 

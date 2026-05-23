@@ -1,8 +1,10 @@
 # Supplier "Incoming" forecast — fix category derivation for Place-status orders
 
 > Spec date: 2026-05-24 · Phase 10 · author: Claude + Loo
-> Status: **draft for review**
-> Migrations: **0148** (forecast category fix) + **0149** (Ohana → HoOKkA rename)
+> Status: **implemented** (branch `phase/10-supplier-place-forecast`)
+> Migrations: **0148** (forecast category fix) + **0149 → 0150** (supplier name rename — see correction)
+>
+> **2026-05-24 correction (authoritative):** the rename direction is **HoOKkA → Ohana** (Ohana is the canonical name), NOT "Ohana → HoOKkA" as the §0/§4.6 prose below was first written. Migration **0149** renamed the wrong way; **0150** corrected it (suppliers + app_user + ops_stock → `Ohana`). The full code rename `HoOKkA → Ohana` (incl. component files `OhanaSofaTab`/`OhanaBedFrameTab`) **kept the internal routing slug `hookka`** (opaque key wired into `_v3_resolve_sop_name` + `sops.ts` + tab URLs) and the login email. Where §4.6 says "Ohana → HoOKkA", read it inverted.
 
 ---
 
