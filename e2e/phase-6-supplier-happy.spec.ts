@@ -15,13 +15,13 @@ async function login(page: Page, email: string, password: string) {
 //   2. Supplier 能 acknowledge PO，状态 pending → acknowledged
 //   3. Supplier 能更新 sup_status (in_production → ready_for_pickup → delivered)
 //
-// Walks the own_logistics flow (HoOKkA — supplier@carres.com) since it
+// Walks the own_logistics flow (Ohana — supplier@carres.com) since it
 // exercises every supplier-callable RPC. factory_pickup variant for
 // Nice Future is covered by API tests; an E2E variant could be added
 // post-V1 if the path diverges materially.
 // Pre-condition: run `pnpm seed:test-users && pnpm reset:e2e-state` before
 // running this spec — the first ensures the @carres.com seed users have
-// role/entity ids in app_metadata; the second resets HoOKkA POs back to
+// role/entity ids in app_metadata; the second resets Ohana POs back to
 // pending sup_status so the spec finds work to do. Both are idempotent.
 test("phase-6 happy: supplier acknowledges PO → production → ready → DO upload → delivered", async ({ page }) => {
   // ----- 1. Supplier login + sees PO list -----------------------------------

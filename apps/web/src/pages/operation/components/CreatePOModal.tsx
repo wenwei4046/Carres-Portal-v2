@@ -775,7 +775,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   };
   const totalUnits = lines.reduce((s, l) => s + (l.qty || 0), 0);
 
-  // Per-variant split (per (SO, sku, attrs)) is sofa-only: HoOKkA's production
+  // Per-variant split (per (SO, sku, attrs)) is sofa-only: Ohana's production
   // is per-fabric so each fabric variant + SO needs its own PO. Non-sofa
   // suppliers (Nice Future mattress, bedframe vendors) consolidate everything
   // into one PO per supplier — multi-SKU + multi-SO is fine because production

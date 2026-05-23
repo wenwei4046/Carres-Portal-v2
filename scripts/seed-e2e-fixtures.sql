@@ -269,7 +269,7 @@ INSERT INTO order_supplier_threads (
 VALUES (
   '99999999-7777-7777-7777-000000007777'::uuid,
   '99999999-7000-7000-7000-000000007000'::uuid,
-  '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
+  '00000000-0000-0000-0000-0000000000e1',  -- Ohana
   'mattress', 'STANDARD', 'ready_to_dispatch',
   '[]'::jsonb
 );
@@ -337,13 +337,13 @@ INSERT INTO order_supplier_threads (
    '00000000-0000-0000-0000-0000000000e2',  -- Nice Future
    'mattress', 'STANDARD', 'dispatched', '[]'::jsonb),
   ('99999999-aa22-aa22-aa22-000000000aa2'::uuid, '99999999-a000-a000-a000-000000000aa2'::uuid,
-   '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
+   '00000000-0000-0000-0000-0000000000e1',  -- Ohana
    'bedframe', 'STANDARD', 'dispatched', '[]'::jsonb),
   ('99999999-aa33-aa33-aa33-000000000aa3'::uuid, '99999999-a000-a000-a000-000000000aa3'::uuid,
-   '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
+   '00000000-0000-0000-0000-0000000000e1',  -- Ohana
    'sofa', 'SOFA_SPECIAL', 'dispatched', '[]'::jsonb),
   ('99999999-aa44-aa44-aa44-000000000aa4'::uuid, '99999999-a000-a000-a000-000000000aa4'::uuid,
-   '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
+   '00000000-0000-0000-0000-0000000000e1',  -- Ohana
    'sofa', 'SOFA_SPECIAL', 'waiting', '[]'::jsonb);
 
 -- ----- Phase 7 POD upload fixture --------------------
@@ -376,7 +376,7 @@ INSERT INTO order_supplier_threads (
 VALUES (
   '99999999-aabb-aabb-aabb-000000007077'::uuid,
   '99999999-7077-7077-7077-000000007077'::uuid,
-  '00000000-0000-0000-0000-0000000000e1',  -- HoOKkA
+  '00000000-0000-0000-0000-0000000000e1',  -- Ohana
   'mattress', 'STANDARD', 'dispatched',
   '00000000-0000-0000-0000-0000000000f1',  -- JT Express (lp-test partner)
   '[]'::jsonb

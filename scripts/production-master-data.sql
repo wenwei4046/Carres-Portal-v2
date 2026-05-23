@@ -38,13 +38,13 @@ insert into salespersons (dealer_id, outlet_id, name, phone) values
    null);
 
 -- -----------------------------------------------------------------------------
--- SUPPLIERS — 2 (HoOKkA + Nice Future), kept in place during cleanup because
+-- SUPPLIERS — 2 (Ohana + Nice Future), kept in place during cleanup because
 -- product_skus.supplier_id references these rows. Names + kinds + cat_covered
 -- already match Loo's prod spec from seed.sql; only lead_time + contact need
 -- updating. Login users (hookka@gmail.com + nicefuture@carres.com) get
 -- created via PrincipalAccounts UI on Day 1 with supplier_id pointing here.
 -- -----------------------------------------------------------------------------
-update suppliers set lead_time = '7-21 days', contact = null where name = 'HoOKkA';
+update suppliers set lead_time = '7-21 days', contact = null where name = 'Ohana';
 update suppliers set lead_time = '7-10 days', contact = null where name = 'Nice Future';
 
 -- -----------------------------------------------------------------------------
@@ -82,7 +82,7 @@ commit;
 --  | bd            | BD@carres.com                | none                       |
 --  | dealer        | mattress@carres.com          | Mattress King              |
 --  | salesperson   | sales-mk@carres.com          | Mattress King + Main outlet|
---  | supplier      | hookka@gmail.com             | HoOKkA                     |
+--  | supplier      | hookka@gmail.com             | Ohana                     |
 --  | supplier      | nicefuture@carres.com        | Nice Future                |
 --  | partner       | nets@carres.com              | Nets Sdn Bhd               |
 --  | showroom      | sales@carres.com             | Carres KL Showroom         |

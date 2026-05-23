@@ -3,7 +3,7 @@ import { apiFetch } from "../../../lib/api";
 import { qk } from "../../../lib/queries";
 
 /**
- * LpInboundConfirmDialog — operation-side 代按 (proxy) for HoOKkA Sofa
+ * LpInboundConfirmDialog — operation-side 代按 (proxy) for Ohana Sofa
  * pre-flight inbound confirmation. Mirrors the Sofa SOP v2 (sops.ts):
  * supplier marks PO `ready_confirm_sent`, and operation-Procurement (LP)
  * stands in for the customer to either Accept the inbound delivery or
@@ -65,7 +65,7 @@ export default function LpInboundConfirmDialog({
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
         <h2 className="text-lg font-semibold mb-4">LP Pre-flight — {poId}</h2>
         <p className="text-sm text-base-600 mb-4">
-          代按 LP confirm/reject for HoOKkA Sofa inbound delivery. Reason not stored (per C1.9).
+          代按 LP confirm/reject for Ohana Sofa inbound delivery. Reason not stored (per C1.9).
         </p>
         <div className="flex gap-2 justify-end">
           <button

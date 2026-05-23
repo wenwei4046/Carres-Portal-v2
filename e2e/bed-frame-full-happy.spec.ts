@@ -10,14 +10,14 @@ async function login(page: Page, email: string, password: string) {
 
 // Pre-condition: pnpm seed:test-users && pnpm seed:e2e-fixtures
 //   - SO-9202: bedframe order at operation_stage='dispatched' with thread
-//     supplier=HoOKkA, category='bedframe', sop_name='STANDARD'.
+//     supplier=Ohana, category='bedframe', sop_name='STANDARD'.
 //
 // 2026-05-09 rewrite: original spec was a half-stubbed multi-context flow
-// (HoOKkA self-delivery → receive → RFD path → POD upload). Pivoted to
+// (Ohana self-delivery → receive → RFD path → POD upload). Pivoted to
 // SOP routing smoke. Bedframe uses SOP_STANDARD same as mattress, but
-// differs in supplier (HoOKkA, not Nice Future) — this spec confirms the
+// differs in supplier (Ohana, not Nice Future) — this spec confirms the
 // SOP routing works regardless of supplier.
-test("Bed Frame (SOP_STANDARD, HoOKkA) — order surfaces on operation kanban", async ({ page }) => {
+test("Bed Frame (SOP_STANDARD, Ohana) — order surfaces on operation kanban", async ({ page }) => {
   await login(page, "operation-test@x.com", "operation-test-password");
   await page.goto("/operation/orders");
   await expect(page.getByRole("button", { name: /#9202/ })).toBeAttached({ timeout: 10_000 });

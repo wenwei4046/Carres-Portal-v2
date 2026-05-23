@@ -312,7 +312,7 @@ export interface PurchaseOrder {
   warehouseId: string;
   // Single-sku/qty columns dropped in 0017 — lines live in purchase_order_lines.
   status: "open" | "received" | "cancelled";
-  // v3-S3 (migration 0030) added 6 values for the HoOKkA Sofa flow.
+  // v3-S3 (migration 0030) added 6 values for the Ohana Sofa flow.
   // Phase 4.5 Chunk 1 (migration 0043) appended `at_warehouse_waiting` for the
   // Sofa Reject + Relocate + Receive flow; mirrors DB.POSupStatus.
   supStatus:

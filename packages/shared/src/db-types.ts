@@ -21,7 +21,7 @@ export type OperationStage    =
   | "waiting" | "delivered";
 export type PartnerStage      = "assigned" | "picked_from_wh" | "en_route" | "delivered";
 export type POStatus          = "open" | "received" | "cancelled";
-// 6 new values appended in migration 0030 (v3-S3) for the HoOKkA Sofa flow:
+// 6 new values appended in migration 0030 (v3-S3) for the Ohana Sofa flow:
 // ready_confirm -> partner confirm -> (customer_rejected -> relocated)? ->
 // at_partner_wh | at_own_wh_waiting.
 // Phase 4.5 Chunk 1 (migration 0043): `at_warehouse_waiting` appended for the
@@ -189,7 +189,7 @@ export interface SupplierRow {
   kind: "own_logistics" | "factory_pickup";
   cat_covered: string[];
   // Stable slug for cross-env supplier identification (migration 0032, v3-S4).
-  // NOT NULL UNIQUE in DB. Seeded values: 'hookka' (HoOKkA), 'nice-future'
+  // NOT NULL UNIQUE in DB. Seeded values: 'hookka' (Ohana), 'nice-future'
   // (Nice Future). Used by SUPPLIER_SOP keying in `sops.ts` so SOP routing
   // survives env reseeds where supplier UUIDs differ.
   slug: string;

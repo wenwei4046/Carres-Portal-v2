@@ -4,8 +4,8 @@ import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
 import CreatePOModal, {
   type CreatePoPrefill,
 } from "../components/CreatePOModal";
-import HoOKkABedFrameTab from "./HoOKkABedFrameTab";
-import HoOKkASofaTab from "./HoOKkASofaTab";
+import OhanaBedFrameTab from "./OhanaBedFrameTab";
+import OhanaSofaTab from "./OhanaSofaTab";
 import NiceFutureMattressTab from "./NiceFutureMattressTab";
 
 /**
@@ -13,8 +13,8 @@ import NiceFutureMattressTab from "./NiceFutureMattressTab";
  *
  * Per-supplier kanban shell wrapping the three procurement channel tabs:
  *   • Nice Future Mattress (`nice-future`)
- *   • HoOKkA Sofa          (`hookka-sofa`)
- *   • HoOKkA Bed Frame     (`hookka-bedframe`)
+ *   • Ohana Sofa          (`hookka-sofa`)
+ *   • Ohana Bed Frame     (`hookka-bedframe`)
  *
  * The active tab is decided by the URL `:slug` param. Invalid slugs redirect
  * to the first tab so the user never sees a 404 from a typo or stale link.
@@ -36,14 +36,14 @@ import NiceFutureMattressTab from "./NiceFutureMattressTab";
  */
 const TAB_LABELS: Record<ProcurementTabSlug, string> = {
   "nice-future": "Nice Future Mattress",
-  "hookka-sofa": "HoOKkA Sofa",
-  "hookka-bedframe": "HoOKkA Bed Frame",
+  "hookka-sofa": "Ohana Sofa",
+  "hookka-bedframe": "Ohana Bed Frame",
 };
 
 const TAB_COMPONENTS: Record<ProcurementTabSlug, () => JSX.Element> = {
   "nice-future": NiceFutureMattressTab,
-  "hookka-sofa": HoOKkASofaTab,
-  "hookka-bedframe": HoOKkABedFrameTab,
+  "hookka-sofa": OhanaSofaTab,
+  "hookka-bedframe": OhanaBedFrameTab,
 };
 
 const DEFAULT_SLUG: ProcurementTabSlug = "nice-future";

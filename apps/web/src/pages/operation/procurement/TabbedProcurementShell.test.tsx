@@ -9,7 +9,7 @@ import TabbedProcurementShell from "./TabbedProcurementShell";
  *
  * The shell renders tab nav + the active child component + the page-level
  * "+ New PO" button (T42-C2 restore). The child tabs (NiceFutureMattressTab
- * / HoOKkASofaTab / HoOKkABedFrameTab) all wrap `ProcurementTabContent`,
+ * / OhanaSofaTab / OhanaBedFrameTab) all wrap `ProcurementTabContent`,
  * which calls `useProcurementTab(slug)` plus the three reference hooks
  * (suppliers / warehouse / catalog). The modal is `CreatePOModal`, which
  * additionally calls useDeliveryPartners + the create mutations + the
@@ -121,10 +121,10 @@ describe("TabbedProcurementShell", () => {
     ).toHaveTextContent("Nice Future Mattress");
     expect(
       screen.getByTestId("procurement-tab-link-hookka-sofa"),
-    ).toHaveTextContent("HoOKkA Sofa");
+    ).toHaveTextContent("Ohana Sofa");
     expect(
       screen.getByTestId("procurement-tab-link-hookka-bedframe"),
-    ).toHaveTextContent("HoOKkA Bed Frame");
+    ).toHaveTextContent("Ohana Bed Frame");
   });
 
   it("active tab matches the URL slug", () => {

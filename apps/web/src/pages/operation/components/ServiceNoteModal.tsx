@@ -458,7 +458,7 @@ export default function ServiceNoteModal({ mode, id, onClose, onSaved }: Props) 
                   </Field>
                 </div>
                 <Field label="Supplier Name">
-                  <input className={inp} value={sectionB.supplierName ?? ""} onChange={e => setSectionB({ ...sectionB, supplierName: e.target.value || null })} placeholder="HoOKkA" />
+                  <input className={inp} value={sectionB.supplierName ?? ""} onChange={e => setSectionB({ ...sectionB, supplierName: e.target.value || null })} placeholder="Ohana" />
                 </Field>
                 <Field label="Deliver Date">
                   <input type="date" className={inp} value={sectionB.deliverDate ?? ""} onChange={e => setSectionB({ ...sectionB, deliverDate: e.target.value || null })} />

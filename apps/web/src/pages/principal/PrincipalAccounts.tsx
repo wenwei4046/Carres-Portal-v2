@@ -631,7 +631,7 @@ function CreateAccountModal({ onClose }: { onClose: () => void }) {
                       : draft.role === "showroom"
                         ? "e.g. Carres KL Showroom"
                         : draft.role === "supplier"
-                          ? "e.g. Hookka Industries"
+                          ? "e.g. Ohana Industries"
                           : "e.g. JT Express"
                   }
                 />

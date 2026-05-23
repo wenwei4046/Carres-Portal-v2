@@ -165,10 +165,10 @@ describe("GET /api/operation/procurement/:slug", () => {
     purchase_order_lines: [{ sku: "mattress:carres-cloud:King", qty: 2, received_qty: 0 }],
   };
 
-  // T42-pass3-C4 — Hookka PO with BOTH sofa AND bedframe lines. The
+  // T42-pass3-C4 — Ohana PO with BOTH sofa AND bedframe lines. The
   // hookka-sofa tab must surface this PO with BOTH lines visible (not just
   // the sofa one), otherwise Receive/Detail modals operate on partial data.
-  const HOOKKA_MIXED_PO = {
+  const OHANA_MIXED_PO = {
     id: "PO-3010",
     supplier_id: "00000000-0000-0000-0000-000000000a02",
     warehouse_id: "00000000-0000-0000-0000-000000000b01",
@@ -178,7 +178,7 @@ describe("GET /api/operation/procurement/:slug", () => {
     so_refs: null,
     eta_date: "2026-05-22",
     placed_at: "2026-05-06T09:30:00Z",
-    suppliers: { slug: "hookka", name: "HoOKkA" },
+    suppliers: { slug: "hookka", name: "Ohana" },
     purchase_order_lines: [
       { sku: "sofa:harbour:preset:3-seater", qty: 1, received_qty: 0 },
       { sku: "bedframe:savana:Queen", qty: 2, received_qty: 0 },
@@ -221,7 +221,7 @@ describe("GET /api/operation/procurement/:slug", () => {
     const { from, passASelect, passALike, passAEq, passBSelect, passBIn, passBOrder, passBLimit } =
       mockTwoPass({
         matchedLines: [{ po_id: "PO-3010" }],
-        parentRows: [HOOKKA_MIXED_PO],
+        parentRows: [OHANA_MIXED_PO],
       });
 
     const jwt = await makeJwt("operation");
@@ -233,7 +233,7 @@ describe("GET /api/operation/procurement/:slug", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      pos: Array<typeof HOOKKA_MIXED_PO>;
+      pos: Array<typeof OHANA_MIXED_PO>;
     };
     expect(body.pos).toHaveLength(1);
     expect(body.pos[0]?.id).toBe("PO-3010");
@@ -295,7 +295,7 @@ describe("GET /api/operation/procurement/:slug", () => {
     // 2 sofa lines on the same PO must collapse to a single id in Pass B.
     const m = mockTwoPass({
       matchedLines: [{ po_id: "PO-3010" }, { po_id: "PO-3010" }],
-      parentRows: [HOOKKA_MIXED_PO],
+      parentRows: [OHANA_MIXED_PO],
     });
     const jwt = await makeJwt("operation");
     const res = await app.fetch(

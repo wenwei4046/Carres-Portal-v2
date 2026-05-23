@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import HoOKkASofaTab from "./HoOKkASofaTab";
+import OhanaSofaTab from "./OhanaSofaTab";
 import type { CatalogResponse } from "@carres/shared";
 import type {
   DeliveryPartnersListResponse,
@@ -13,7 +13,7 @@ import type {
 } from "@/lib/queries";
 
 /**
- * HoOKkASofaTab — Phase 4.5 Chunk 2 Sprint F Task 34/36.
+ * OhanaSofaTab — Phase 4.5 Chunk 2 Sprint F Task 34/36.
  *
  * The Sofa tab is the home for sofa-channel behavior:
  *   - factory_pickup pickup-flight states (`ready_for_pickup`,
@@ -32,9 +32,9 @@ const useProcurementTabSpy = vi.fn();
 
 let posListState: operationPoListRow[] = [];
 
-const SUPPLIER_HOOKKA = {
+const SUPPLIER_OHANA = {
   id: "11111111-1111-1111-1111-000000000002",
-  name: "HoOKkA Furniture",
+  name: "Ohana Furniture",
   kind: "factory_pickup" as const,
   cat_covered: ["sofa", "bedframe"],
   lead_time: "10–14 days",
@@ -73,7 +73,7 @@ vi.mock("@/lib/queries", async () => {
       };
     },
     useOperationSuppliers: (): { data: SuppliersListResponse } => ({
-      data: { suppliers: [SUPPLIER_HOOKKA] },
+      data: { suppliers: [SUPPLIER_OHANA] },
     }),
     useOperationWarehouse: (): { data: WarehouseListResponse } => ({
       data: {
@@ -117,7 +117,7 @@ function makeSofaPo(
 ): operationPoListRow {
   return {
     id: "PO-SOFA-001",
-    supplier_id: SUPPLIER_HOOKKA.id,
+    supplier_id: SUPPLIER_OHANA.id,
     warehouse_id: WAREHOUSE_KL.id,
     status: "open",
     sup_status: "in_production",
@@ -151,12 +151,12 @@ beforeEach(() => {
   assignPickupMutateAsync.mockClear();
 });
 
-describe("HoOKkASofaTab — slug + read view", () => {
+describe("OhanaSofaTab — slug + read view", () => {
   it("calls useProcurementTab with slug='hookka-sofa' and renders fetched sofa POs", () => {
     posListState = [
       makeSofaPo({ id: "PO-SOFA-001", sup_status: "ready_confirm_sent" }),
     ];
-    render(wrap(<HoOKkASofaTab />));
+    render(wrap(<OhanaSofaTab />));
     expect(useProcurementTabSpy).toHaveBeenCalledWith("hookka-sofa");
     expect(screen.getByTestId("po-row-PO-SOFA-001")).toBeInTheDocument();
     expect(screen.getByText("Nordic Sofa · 3 seater")).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe("HoOKkASofaTab — slug + read view", () => {
   });
 });
 
-describe("HoOKkASofaTab — AssignPickupDialog (factory_pickup ready_for_pickup)", () => {
+describe("OhanaSofaTab — AssignPickupDialog (factory_pickup ready_for_pickup)", () => {
   it("clicking 'Assign partner' on a ready_for_pickup PO opens AssignPickupDialog", () => {
     posListState = [
       makeSofaPo({
@@ -177,7 +177,7 @@ describe("HoOKkASofaTab — AssignPickupDialog (factory_pickup ready_for_pickup)
         sup_status: "ready_for_pickup",
       }),
     ];
-    render(wrap(<HoOKkASofaTab />));
+    render(wrap(<OhanaSofaTab />));
     fireEvent.click(screen.getByTestId("assign-pickup-PO-2060"));
     expect(
       screen.getByText(/Assign pickup partner · PO-2060/),
@@ -191,7 +191,7 @@ describe("HoOKkASofaTab — AssignPickupDialog (factory_pickup ready_for_pickup)
         sup_status: "ready_for_pickup",
       }),
     ];
-    render(wrap(<HoOKkASofaTab />));
+    render(wrap(<OhanaSofaTab />));
     fireEvent.click(screen.getByTestId("assign-pickup-PO-2061"));
     // Two buttons named "Assign partner": the row CTA and the modal's primary.
     // The modal-rendered one is inside [role=dialog]; pick that one.
@@ -213,16 +213,16 @@ describe("HoOKkASofaTab — AssignPickupDialog (factory_pickup ready_for_pickup)
   });
 });
 
-describe("HoOKkASofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
+describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
   // The factory_pickup branch carve-outs that exist BECAUSE Sofa is the only
-  // channel with factory_pickup supplier kind. NiceFutureMattress + HoOKkA
+  // channel with factory_pickup supplier kind. NiceFutureMattress + Ohana
   // BedFrame both fall through to the catch-all "Receive →" branch (covered
   // in ProcurementTabContent.test.tsx).
   it("shows Assign partner button (NOT Receive) when sup_status is ready_for_pickup", () => {
     posListState = [
       makeSofaPo({ id: "PO-3005", sup_status: "ready_for_pickup" }),
     ];
-    render(wrap(<HoOKkASofaTab />));
+    render(wrap(<OhanaSofaTab />));
     expect(screen.getByTestId("assign-pickup-PO-3005")).toBeInTheDocument();
     expect(screen.queryByTestId("receive-po-PO-3005")).not.toBeInTheDocument();
   });
@@ -231,7 +231,7 @@ describe("HoOKkASofaTab — pickup-flight sup_status branches (v3-S2.2)", () => 
     posListState = [
       makeSofaPo({ id: "PO-3006", sup_status: "pickup_assigned" }),
     ];
-    render(wrap(<HoOKkASofaTab />));
+    render(wrap(<OhanaSofaTab />));
     expect(screen.queryByTestId("receive-po-PO-3006")).not.toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3006");
     expect(row.textContent).toContain("awaiting accept");
@@ -241,7 +241,7 @@ describe("HoOKkASofaTab — pickup-flight sup_status branches (v3-S2.2)", () => 
     posListState = [
       makeSofaPo({ id: "PO-3007", sup_status: "pickup_accepted" }),
     ];
-    render(wrap(<HoOKkASofaTab />));
+    render(wrap(<OhanaSofaTab />));
     expect(screen.queryByTestId("receive-po-PO-3007")).not.toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3007");
     expect(row.textContent).toContain("pickup scheduled");
@@ -251,7 +251,7 @@ describe("HoOKkASofaTab — pickup-flight sup_status branches (v3-S2.2)", () => 
     posListState = [
       makeSofaPo({ id: "PO-3008", sup_status: "picked_up" }),
     ];
-    render(wrap(<HoOKkASofaTab />));
+    render(wrap(<OhanaSofaTab />));
     expect(screen.queryByTestId("receive-po-PO-3008")).not.toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3008");
     expect(row.textContent).toContain("in transit");

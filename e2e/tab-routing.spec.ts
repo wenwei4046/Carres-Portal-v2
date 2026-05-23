@@ -38,8 +38,8 @@ test("phase-4.5-chunk-2: tab routing — direct URL + back/forward + slug fallba
   // Nice Future POs visible (mattress channel via deriveProcurementSlug).
   await expect(page.getByTestId("procurement-tab-content-nice-future")).toBeVisible();
 
-  // 3. Click "HoOKkA Sofa" tab → URL becomes /operation/procurement/hookka-sofa.
-  await page.getByRole("tab", { name: /hookka sofa|HoOKkA Sofa/i }).click();
+  // 3. Click "Ohana Sofa" tab → URL becomes /operation/procurement/hookka-sofa.
+  await page.getByRole("tab", { name: /hookka sofa|Ohana Sofa/i }).click();
   await expect(page).toHaveURL(/\/operation\/procurement\/hookka-sofa$/);
   await expect(page.getByTestId("procurement-tab-content-hookka-sofa")).toBeVisible();
   // Nice Future list should no longer be in the DOM (route swap, not hidden).
@@ -55,7 +55,7 @@ test("phase-4.5-chunk-2: tab routing — direct URL + back/forward + slug fallba
   );
   await expect(page.getByTestId("procurement-tab-content-nice-future")).toBeVisible();
 
-  // 5. Browser forward → returns to HoOKkA Sofa.
+  // 5. Browser forward → returns to Ohana Sofa.
   await page.goForward();
   await expect(page).toHaveURL(/\/operation\/procurement\/hookka-sofa$/);
   await expect(page.getByTestId("procurement-tab-content-hookka-sofa")).toBeVisible();

@@ -12,8 +12,8 @@ import ReceivePOModal from "../components/ReceivePOModal";
 /**
  * ProcurementTabContent — Phase 4.5 Chunk 2 Sprint F Task 34.
  *
- * Per-tab body shared by NiceFutureMattressTab, HoOKkASofaTab, and
- * HoOKkABedFrameTab. Each tab is a thin wrapper that picks a slug; this
+ * Per-tab body shared by NiceFutureMattressTab, OhanaSofaTab, and
+ * OhanaBedFrameTab. Each tab is a thin wrapper that picks a slug; this
  * component does the actual fetch + table render. It mirrors the row layout
  * of `operationProcurement.tsx` (the original single-page list) so tab
  * navigation feels seamless to the user.

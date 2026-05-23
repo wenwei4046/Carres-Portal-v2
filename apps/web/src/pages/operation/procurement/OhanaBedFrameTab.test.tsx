@@ -2,14 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import HoOKkABedFrameTab from "./HoOKkABedFrameTab";
+import OhanaBedFrameTab from "./OhanaBedFrameTab";
 import type {
   operationPosListResponse,
   operationPoListRow,
 } from "@/lib/queries";
 
 /**
- * HoOKkABedFrameTab — Phase 4.5 Chunk 2 Sprint F Task 34.
+ * OhanaBedFrameTab — Phase 4.5 Chunk 2 Sprint F Task 34.
  *
  * Verifies the wrapper passes slug='hookka-bedframe' through to the hook +
  * renders the seeded bedframe PO. Bedframe is the 'STANDARD' SOP (not sofa-
@@ -55,7 +55,7 @@ vi.mock("@/lib/queries", async () => {
         suppliers: [
           {
             id: "11111111-1111-1111-1111-000000000002",
-            name: "HoOKkA Furniture",
+            name: "Ohana Furniture",
             kind: "factory_pickup",
             cat_covered: ["sofa", "bedframe"],
             lead_time: "10–14 days",
@@ -113,9 +113,9 @@ function wrap(node: React.ReactNode) {
   );
 }
 
-describe("HoOKkABedFrameTab", () => {
+describe("OhanaBedFrameTab", () => {
   it("calls useProcurementTab with slug='hookka-bedframe' and renders fetched bedframe POs", () => {
-    render(wrap(<HoOKkABedFrameTab />));
+    render(wrap(<OhanaBedFrameTab />));
     expect(useProcurementTabSpy).toHaveBeenCalledWith("hookka-bedframe");
     expect(screen.getByTestId("po-row-PO-BF-001")).toBeInTheDocument();
     expect(screen.getByText("Oak Bedframe · Queen")).toBeInTheDocument();

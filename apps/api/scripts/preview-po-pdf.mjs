@@ -30,7 +30,7 @@ const data = {
   issue_date: "2026-05-10",
   po_id: "PO-2031",
   supplier: {
-    name: "HoOKkA",
+    name: "Ohana",
     address: null,
     contact: null,
   },

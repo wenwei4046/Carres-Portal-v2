@@ -28,13 +28,13 @@ import { test, expect, type Page } from "@playwright/test";
  * is the un-fixme blocker):
  *
  *   • 10 dealer orders for the Carres KL Showroom dealer:
- *       - 3 sofa orders → HoOKkA sofa threads
+ *       - 3 sofa orders → Ohana sofa threads
  *       - 3 mattress+bedframe orders → NiceFuture mattress threads +
- *                                       HoOKkA bedframe threads
+ *                                       Ohana bedframe threads
  *       - 4 mattress-only orders → NiceFuture mattress threads
  *   • `operation_create_pos_batch` bundles them into 2 POs:
  *       - PO-FIX-NF-PARTIAL (NiceFuture mattress, 10 threads total = 3+3+4)
- *       - PO-FIX-HK-COMBINED (HoOKkA sofa + bedframe, mixed-category)
+ *       - PO-FIX-HK-COMBINED (Ohana sofa + bedframe, mixed-category)
  *   • Both POs advanced to `sup_status='in_production'` so the supplier-side
  *     `supplier_ready_thread` RPC is the first state-mutating call this spec
  *     drives. Per-thread state machine starts clean: supplier_ready_at NULL,
@@ -43,7 +43,7 @@ import { test, expect, type Page } from "@playwright/test";
  * Required app users (already in seed-test-users.ts):
  *   • supplier-nicefuture@x.com (own_logistics, supplier_id=NiceFuture)
  *   • partner-nets@x.com (procurement partner for both POs)
- *   • supplier@carres.com (HoOKkA — touched lightly to verify cross-supplier
+ *   • supplier@carres.com (Ohana — touched lightly to verify cross-supplier
  *     RLS holds throughout)
  */
 

@@ -11,7 +11,7 @@ async function login(page: Page, email: string, password: string) {
 // Pre-condition: pnpm seed:test-users && pnpm seed:e2e-fixtures
 //   - SO-9204: sofa-reject order at thread.operation_stage='waiting' (per
 //     0047 rollup, orders.operation_stage rolls up to 'ready_to_dispatch'
-//     when any thread is at 'waiting'). Thread supplier=HoOKkA, sop_name=
+//     when any thread is at 'waiting'). Thread supplier=Ohana, sop_name=
 //     'SOFA_SPECIAL'.
 //
 // 2026-05-09 rewrite: original spec walked the Sofa Reject Relocate flow

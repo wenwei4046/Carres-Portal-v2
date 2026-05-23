@@ -10,10 +10,10 @@ async function login(page: Page, email: string, password: string) {
 
 // Pre-condition: pnpm seed:test-users && pnpm seed:e2e-fixtures
 //   - SO-9203: sofa order at operation_stage='dispatched' with thread
-//     supplier=HoOKkA, category='sofa', sop_name='SOFA_SPECIAL'.
+//     supplier=Ohana, category='sofa', sop_name='SOFA_SPECIAL'.
 //
 // 2026-05-09 rewrite: original spec walked the LP-pre-flight 代按 flow
-// (HoOKkA Ready Confirm → operation LP Pre-flight → LP Accept Receive →
+// (Ohana Ready Confirm → operation LP Pre-flight → LP Accept Receive →
 // proceeds to deliver). Pivoted to SOP_SOFA_SPECIAL routing smoke —
 // confirms an SOFA_SPECIAL thread reaches 'dispatched' end-state and
 // surfaces correctly on the operation kanban.

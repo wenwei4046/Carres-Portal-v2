@@ -3,10 +3,10 @@
  *
  * Per spec §4.3, two state machines govern post-`awaiting_operation_action` flow:
  *
- *   SOP_STANDARD     — Nice Future Mattress + HoOKkA Bedframe
+ *   SOP_STANDARD     — Nice Future Mattress + Ohana Bedframe
  *                      awaiting_operation_action → ready_to_dispatch → dispatched → delivered
  *
- *   SOP_SOFA_SPECIAL — HoOKkA Sofa (partner-driven happy path)
+ *   SOP_SOFA_SPECIAL — Ohana Sofa (partner-driven happy path)
  *                      awaiting_operation_action → dispatched → delivered
  *                                              ↘ waiting → delivered
  *

@@ -196,7 +196,7 @@ procurementTabsRouter.get("/:slug", async (c) => {
   //
   // T42-pass3-C4 — DO NOT use `purchase_order_lines!inner(...)` with an
   // embedded `.like()` filter to narrow by category. PostgREST applies the
-  // embedded filter to the EMBEDDED ARRAY too, so a mixed-category Hookka PO
+  // embedded filter to the EMBEDDED ARRAY too, so a mixed-category Ohana PO
   // (sofa + bedframe lines) would show in `hookka-sofa` but its embedded
   // lines array would be truncated to only sofa rows. Receive/Detail modals
   // would then operate on an incomplete PO.
