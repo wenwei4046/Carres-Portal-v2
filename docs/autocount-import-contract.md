@@ -158,7 +158,7 @@ Sheet → prefix (informational):
 |---|---|---|
 | Red Sofa | 594 | `SF01-` |
 | NB Furniture | 235 | `BF03-` |
-| Ohana | 78 | `BF04-` |
+| HoOKkA | 78 | `BF04-` |
 | Nice Future | 69 | `MS01-` |
 | Armani | 65 | `SF02-` |
 | Without Supplier Code | 62 | `EO11-/RD01-/BL01-/SERV-` |
