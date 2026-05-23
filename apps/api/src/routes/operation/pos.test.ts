@@ -326,8 +326,8 @@ describe("POST /api/operation/pos", () => {
       // 0073 cascade picker: each line carries an `attrs` jsonb (NULL for
       // mattress + legacy callers; bedframe/sofa get filled by the FE).
       p_lines: [{ sku: "MAT-K-001", qty: 2, cost: 1500, cost_source: "hand_entered", attrs: null }],
-      p_dl: 4001,
-      p_dl_refs: null,
+      p_so: 4001,
+      p_so_refs: null,
       // 0079 (Loo 2026-05-10) — procurement-leg LP pre-assigned at PO
       // creation. Null when caller omits (own_logistics suppliers).
       p_procurement_partner_id: null,
@@ -336,8 +336,8 @@ describe("POST /api/operation/pos", () => {
       "p_supplier_id",
       "p_warehouse_id",
       "p_lines",
-      "p_dl",
-      "p_dl_refs",
+      "p_so",
+      "p_so_refs",
       "p_procurement_partner_id",
     ]);
     // 0083 (Loo 2026-05-10) — post-RPC UPDATE persists eta_date on the
@@ -374,8 +374,8 @@ describe("POST /api/operation/pos", () => {
       // T29: per-line `costSource` reshaped to snake_case `cost_source` at API edge.
       // 0073 cascade picker: attrs jsonb (NULL for mattress + legacy lines).
       p_lines: [{ sku: "MAT-K-001", qty: 5, cost: 1500, cost_source: "hand_entered", attrs: null }],
-      p_dl: null,
-      p_dl_refs: [4001, 4002, 4003],
+      p_so: null,
+      p_so_refs: [4001, 4002, 4003],
       // 0079 (Loo 2026-05-10) — see prior test for rationale.
       p_procurement_partner_id: null,
     });
@@ -383,8 +383,8 @@ describe("POST /api/operation/pos", () => {
       "p_supplier_id",
       "p_warehouse_id",
       "p_lines",
-      "p_dl",
-      "p_dl_refs",
+      "p_so",
+      "p_so_refs",
       "p_procurement_partner_id",
     ]);
   });

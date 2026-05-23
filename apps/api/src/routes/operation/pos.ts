@@ -697,8 +697,12 @@ operationPosRouter.post("/", requireOperation, async (c) => {
     p_supplier_id: parsed.data.supplierId,
     p_warehouse_id: parsed.data.warehouseId,
     p_lines: linesForRpc,
-    p_dl: parsed.data.so ?? null,
-    p_dl_refs: parsed.data.soRefs ?? null,
+    // p_so / p_so_refs MUST match the DB function param names (renamed from
+    // p_dl / p_dl_refs by migration 0123). The 0123 code sweep's \bdl\b regex
+    // missed `p_dl` (no word boundary after `_`), so this call site shipped
+    // stale → PostgREST 500 "Could not find the function ... in the schema cache".
+    p_so: parsed.data.so ?? null,
+    p_so_refs: parsed.data.soRefs ?? null,
     // 0079 (Loo 2026-05-10) — pre-assign the procurement-leg LP at PO
     // creation. Modal already validates that factory_pickup suppliers have
     // a partner picked; own_logistics suppliers omit the field and the RPC
