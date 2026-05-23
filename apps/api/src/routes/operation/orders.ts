@@ -115,7 +115,15 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // rejected" badge + the FE can open a reselect dialog. These mirror
       // the per-thread fields on order_supplier_threads but at the order
       // level (customer-leg LP is one per order).
-      "id, so, status, operation_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), delivery_partners(id, name), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at)",
+      //
+      // The `!orders_delivery_partner_id_fkey` hint on the order-level
+      // delivery_partners embed is REQUIRED, not optional: `orders` has TWO
+      // FKs to delivery_partners (delivery_partner_id + ops_assigned_logistic,
+      // the latter added by migration 0136). A bare `delivery_partners(...)`
+      // embed is ambiguous → PostgREST PGRST201 → mapPgError default → 500.
+      // Do NOT remove the hint. Same rule for every order-level embed of
+      // delivery_partners (print-do-data below + partner/pickups.ts).
+      "id, so, status, operation_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -275,13 +283,15 @@ operationOrdersRouter.get("/:id/print-do-data", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   // Fetch order + dealer/warehouse/partner in one round-trip via embedded resources.
-  // dealers / warehouses / delivery_partners are FK'd from orders, so PostgREST
-  // auto-detects the embedding. order_lines.sku is NOT FK'd to product_skus —
+  // dealers / warehouses are FK'd from orders, so PostgREST auto-detects those.
+  // delivery_partners needs the explicit `!orders_delivery_partner_id_fkey` hint:
+  // orders has 2 FKs to it (delivery_partner_id + ops_assigned_logistic, 0136),
+  // so a bare embed is ambiguous → PGRST201 → 500. order_lines.sku is NOT FK'd to product_skus —
   // SKU descriptions come from a separate query below.
   const { data: order, error: e1 } = await sb
     .from("orders")
     .select(
-      "id, so, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners(name)",
+      "id, so, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners!orders_delivery_partner_id_fkey(name)",
     )
     .eq("id", id)
     .maybeSingle();

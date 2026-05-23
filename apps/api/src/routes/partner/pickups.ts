@@ -551,9 +551,12 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
   }
 
   const { data: order, error: e1 } = await sb
+    // !orders_delivery_partner_id_fkey: orders has 2 FKs to delivery_partners
+    // (delivery_partner_id + ops_assigned_logistic, migration 0136); a bare
+    // embed is ambiguous → PostgREST PGRST201 → 500. Keep the hint.
     .from("orders")
     .select(
-      "id, so, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners(name)",
+      "id, so, status, do_number, do_note, customer_name, customer_phone, customer_address, dealer_id, warehouse_id, delivery_partner_id, placed_at, delivered_at, dealers(name, contact), warehouses(name, address), delivery_partners!orders_delivery_partner_id_fkey(name)",
     )
     .eq("id", id)
     .maybeSingle();
