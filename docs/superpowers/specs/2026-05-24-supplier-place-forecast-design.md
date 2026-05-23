@@ -12,7 +12,7 @@
 
 `supplier_pending_demand` RPC 靠 `split_part(sku, ':', 1)` 取 category，这假设 SKU 是 `category:model:variant` 格式。但现在 DB 里 115 张 `status='place'` 的单全是 AutoCount 导入的自由文字 SKU（`Breeze FirmCare-B1201F-K`、`1013Jager/Fab3-King/COL:PC151-02`），切出来全是垃圾，配不上任何供应商的 `cat_covered` → forecast 永远空。
 
-**修法（外科手术式）**：把 category 的来源换成一个分层 resolver——原生 Portal 单走 catalog join（精准），AutoCount 历史单走 Item Group / 关键字兜底。Forecast 与 Commit 两个 bucket 都用它。生命周期逻辑（Forecast → Commit → 0）本来就对，不动。外加把误植的供应商名 `Ohana` 改回 `HoOKkA`。
+**修法（外科手术式）**：把 category 的来源换成一个分层 resolver——原生 Portal 单走 catalog join（精准），历史 AutoCount 单走 model 关键字兜底。Forecast 与 Commit 两个 bucket 都用它。生命周期逻辑（Forecast → Commit → 0）本来就对，不动。外加把误植的供应商名 `Ohana` 改回 `HoOKkA`。
 
 **不动 schema、不碰冻结 migration。**
 
@@ -96,23 +96,23 @@ Every "unclassified" line is a genuine **accessory/service** (8 distinct: Memory
 
 ### 4.1 `resolve_demand_category(p_sku text) → text` (new, shared)
 
-`language sql stable security definer`, `search_path = public, pg_temp`. Returns `'mattress' | 'bedframe' | 'sofa' | NULL`. Layered, best-signal-first:
+`language sql stable security definer`, `search_path = public, pg_temp`. Returns `'mattress' | 'bedframe' | 'sofa' | NULL`. Two layers, best-signal-first:
 
 1. **Native / canonical catalog (exact):**
    `SELECT pm.category::text FROM product_skus ps JOIN product_models pm ON pm.id = ps.model_id WHERE ps.sku = p_sku LIMIT 1`.
-   This is the going-forward path; native order lines always hit it.
-2. **AutoCount `Item Group` (legacy authoritative):** look up `p_sku` against `ops_imported_orders.items[].description` (normalized `lower(trim())`); map `Mattress→mattress`, `Bed Fram→bedframe`, `Sofa→sofa`; ignore `Pillow/M.P/Service`.
-3. **Keyword classifier (legacy fallback):** regex on `lower(p_sku)`:
+   This is the going-forward path; native order lines always hit it (indexed PK lookup).
+2. **Keyword classifier (legacy + safety net):** regex on `lower(p_sku)`, evaluated top-down:
    - accessory/service guard first → `NULL`: `disposal | transport fee | no lift | per floor | memory pillow | protector | microfiber`
    - bedframe: `jager | cody | trion | hilton | fenrir | ricardo | regal | divan | /fab[0-9]`
    - sofa: `hk55 | dsl90 | dsl80 | am90 | th50 | th51 | glano | muro | nuvio | lunor | modulo | seater | incliner | eleganz` (`hk55` covers HK5531/HK5535)
    - mattress: `firmcare | softcloud | breeze | lumi | forte | sonic | haven | solace | meridian | b120 | l120 | h140 | m140 | s160`
    - canonical prefix safety net: `^ms\d → mattress`, `^bf\d → bedframe`, `^sf\d → sofa`
-4. Else → `NULL` (not shown in any supplier forecast; matches proto's "3 categories only").
+   - else → `NULL`
+3. (coalesce of the two) → `NULL` means accessory/service (not shown in any supplier forecast; matches proto's "3 categories only").
 
-> The keyword list is a **legacy-only** fallback; native catalog SKUs resolve at layer 1 and never reach it. Comment in the migration to flag it as maintained-for-AutoCount.
+> **Why no staging/Item-Group layer:** the AutoCount `Item Group` (in `ops_imported_orders.items[]`) is an authoritative legacy signal, but the keyword classifier **reproduces it 100%** on the fixed 115-order legacy set (verified 2026-05-24: identical mattress 80 / sofa 63 / bedframe 34 lines, accessories→null). AutoCount is a one-time pre-Portal backfill — no future imports — so the keyword layer is sufficient and avoids a per-row `jsonb_array_elements` scan. Keyword list is **legacy-only**; native catalog SKUs resolve at layer 1 and never reach it.
 
-> Perf: called per order-line/PO-line during aggregation. At forecast scale (hundreds of lines, low QPS) with `STABLE` planner caching this is well within CLAUDE.md §8 budgets. If data grows, inline as set-based `LEFT JOIN`s.
+> Perf: layer 1 is an indexed PK lookup; layer 2 is pure regex. Cheap per row, `STABLE` for planner caching — well within CLAUDE.md §8 budgets.
 
 ### 4.2 Forecast bucket — rewrite `supplier_pending_demand()`
 
@@ -194,7 +194,7 @@ The fix is **mechanism-level, not data-level**. `supplier_pending_demand` keys o
 
 ## 6. Testing
 
-- **Unit (vitest):** `resolve_demand_category` truth table — canonical mattress/bedframe/sofa Item Codes (layer 1), AutoCount raw furniture strings (layer 3), accessory/service → null. (Tested via the api route mock + a dedicated SQL-logic test, mirroring the classifier SQL.)
+- **SQL verification (MCP `execute_sql` against remote):** `resolve_demand_category` truth table — canonical mattress/bedframe/sofa Item Codes (layer 1), AutoCount raw furniture strings (layer 2 keyword), accessory/service → null. (No local PG; verified by querying the deployed function.)
 - **Integration (api):** `/products/demand` returns category-grouped rows; pending excludes POed lines; committed reflects open POs.
 - **Frontend:** `SupplierIncoming` groups by returned `category`; null-category rows hidden; two-bucket KPIs intact.
 - **Live SQL verification (post-deploy):** as Nice Future and HoOKkA — confirm non-empty forecast with correct per-category totals; confirm the 1 existing `pending` PO surfaces in Commit, not Forecast.
