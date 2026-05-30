@@ -1,5 +1,16 @@
 # Plan — per-unit SKU ID + customer e-sign + LP rule fixes
 
+> **STATUS 2026-05-31: F + E + B + C + D all DONE & committed.** Migrations
+> 0151 (e-sign) · 0152 (auto-dispatch + reject) · 0153 + 0154 (per-unit ID)
+> applied to live DB. Branch `phase/10-per-unit-id-esign-lp-rules`:
+> 93106ad (F) · 4d968a8 (E) · dd4432f (B+C) · 1087f08 (D).
+> typechecks shared+api+web clean. Full suite: shared 186/186, api 687/690,
+> web 464/469 — all 8 fails pre-existing per §17.7 (OhanaSofaTab kanban ×5,
+> supplier/pos ×2, pickups ×1); git diff proves my commits never touched
+> those files. **ONLY ITEM A (Cloudflare deploy) REMAINS** — deliberately
+> last so all 5 ship in one deploy. NOT yet deployed → Nice Future fix is in
+> code but not yet live until deploy.
+
 > Date: 2026-05-31 · Phase 10 · Author: Claude (Opus 4.8)
 > Source investigation: workflow `wf_937a4e2c-d47` (4-track, 2026-05-31)
 
