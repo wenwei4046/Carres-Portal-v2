@@ -80,3 +80,22 @@
 
 ## Test gates per item
 - Unit (vitest) for adapters/schemas; integration (msw) for new/changed routes; live MCP smoke against staging=prod for each migration; regression guards for B/C/D.
+
+## Execution state (2026-05-31)
+
+Branch: `phase/10-per-unit-id-esign-lp-rules` (off main HEAD 52f7b9a).
+
+- ✅ **F DONE** — commit `2da7d3c`. `CreatePOModal.tsx` issuanceGroups now splits per-LINE sofa category (was supplier-level). typecheck clean, CreatePOModal 19/19.
+- ⏳ **A** — defer the actual Cloudflare Pages redeploy to the very end so all fixes ship in one deploy. Web deploy = manual `wrangler pages deploy dist --project-name carres-portal` (no git-triggered CI). Live bundle is likely pre-`2514362` (the Nice Future symptom); current HEAD already has the fix.
+- 🔜 **E — refined design (ready to build):**
+  - DB facts (verified live via MCP): `order_supplier_threads` ALREADY has `pod_signature_path text`, `pod_signed_by text`, `pod_signed_at timestamptz` (plus pod_url/pod_do_number/pod_note/pod_uploaded_at/pod_uploaded_by/delivered_at). `orders` has `pod_signed bool`, `pod_signed_at`, `pod_signed_by`, `do_file_path`, BUT **no `pod_signature_path`** → only orders needs that column added.
+  - Two RPCs to widen (no SQL dependents — `[]`): `partner_attach_pod(p_thread_id uuid,p_po_id text,p_do_number text,p_do_note text,p_signed boolean,p_do_file_path text)` and `operation_attach_do_and_deliver(p_order_id uuid,p_do_number text,p_do_note text,p_signed boolean,p_do_file_path text)`.
+  - **Zero-downtime rollout**: drop old sig, recreate with 2 NEW trailing params `p_signature_path text default null, p_signed_by text default null` (defaults keep the stale live bundle's 6/5-arg calls working). Store pod_signature_path + pod_signed_by + pod_signed_at when provided. Required-ness enforced at UI + API (zod), not the RPC (RPC hard-guard deferred to a cleanup migration after old bundle is gone).
+  - partner_attach_pod body: SECURITY DEFINER, verifies `v_thread.delivery_partner_id = auth.app_partner_id()`, idempotent on `operation_stage='delivered'`, UPDATE then `perform _recompute_order_logistics_stage(order_id)`.
+  - operation_attach_do_and_deliver body: SECURITY DEFINER, UPDATE orders set operation_stage/status='delivered' + do_* + pod_signed + pod_signed_at.
+  - Files: web `apps/web/src/pages/partner/components/PODUploadDialog.tsx` (replace `signed` checkbox with SignaturePad + signer-name input; gate `canSubmit` on both), `apps/web/src/lib/storage.ts` (`uploadDeliveryFile` → add a `kind:'pod'|'signature'` variant; sign-upload path `{thread}/{uuid}-signature.png`), `apps/web/src/lib/api.ts` (thin fetch wrapper — `api.partner.pod.signUpload`/`.attach`; PROXY/dynamic — needs the construction read to confirm whether call-site fields auto-forward), `apps/web/src/pages/operation/components/AttachDoDeliverModal.tsx` + `apps/api/src/routes/operation/orders.ts` (HQ path, ~line 612), `apps/api/src/routes/partner/pod.ts` (attachSchema + sign-upload kind).
+  - SignaturePad reuse: `apps/web/src/pages/dealer/new-order/SignaturePad.tsx` (canvas → PNG dataURL via `toDataURL`). Lift to a shared dir + add an optional `caption`/disclaimer prop (current hardcoded "agrees to the terms below" is wrong for delivery). Convert dataURL→Blob→File for upload.
+  - Tests: `apps/api/.../partner/pod.test.ts`, operation orders test, PODUploadDialog test if present.
+- 🔜 **B/C/D** — as specified above; all via Supabase MCP `apply_migration` (reliable) + chunked Reads for code (Grep is unreliable this session — use PowerShell Select-String→file→Read or chunked Read instead).
+
+**Tooling note (this session):** Grep returns blank/garbled; terminal stdout garbles (route to file + chunked-read); large/offset Reads intermittently garble (use small `limit`). MCP + Edit + small Reads are reliable. A fresh session typically resets this.
