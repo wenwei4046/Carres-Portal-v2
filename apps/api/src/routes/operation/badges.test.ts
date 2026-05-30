@@ -61,9 +61,19 @@ afterAll(() => _setJwksForTesting(null));
 function mockBadges(opts: {
   ordersCount: number;
   procurementCount: number;
+  // 0152 — service_notes (live overdue count) + lp_rejected query were missing
+  // from this mock (pre-existing phase-10-badges-test-stale). Default both so
+  // existing call-sites stay terse.
+  serviceNotesCount?: number;
+  lpRejectedCount?: number;
   seen?: { badge_key: string; last_seen_at: string }[];
 }) {
   const seenRows = opts.seen ?? [];
+  const serviceNotesCount = opts.serviceNotesCount ?? 0;
+  const lpRejectedCount = opts.lpRejectedCount ?? 0;
+  // The route issues TWO `.from("orders")` count queries (orders awaiting, then
+  // lp_rejected); disambiguate by call order.
+  let ordersCalls = 0;
   const from = vi.fn((table: string) => {
     if (table === "user_nav_seen") {
       return {
@@ -75,11 +85,25 @@ function mockBadges(opts: {
       };
     }
     if (table === "orders") {
+      ordersCalls += 1;
+      // 1st orders query: .eq(operation_stage).gt(updated_at) → awaiting count
+      // 2nd orders query: .not(partner_rejected_at).gt(partner_rejected_at) → lp_rejected
+      if (ordersCalls === 1) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              gt: vi.fn(() =>
+                Promise.resolve({ data: null, error: null, count: opts.ordersCount }),
+              ),
+            })),
+          })),
+        };
+      }
       return {
         select: vi.fn(() => ({
-          eq: vi.fn(() => ({
+          not: vi.fn(() => ({
             gt: vi.fn(() =>
-              Promise.resolve({ data: null, error: null, count: opts.ordersCount }),
+              Promise.resolve({ data: null, error: null, count: lpRejectedCount }),
             ),
           })),
         })),
@@ -102,6 +126,17 @@ function mockBadges(opts: {
         })),
       };
     }
+    if (table === "service_notes") {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            lt: vi.fn(() =>
+              Promise.resolve({ data: null, error: null, count: serviceNotesCount }),
+            ),
+          })),
+        })),
+      };
+    }
     throw new Error(`Unexpected from() table: ${table}`);
   });
   vi.mocked(userClient).mockReturnValue({
@@ -113,7 +148,7 @@ function mockBadges(opts: {
 
 describe("GET /api/operation/badges", () => {
   it("returns 200 + count JSON for operation (no prior seen rows)", async () => {
-    mockBadges({ ordersCount: 3, procurementCount: 2 });
+    mockBadges({ ordersCount: 3, procurementCount: 2, serviceNotesCount: 1, lpRejectedCount: 4 });
 
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -123,8 +158,13 @@ describe("GET /api/operation/badges", () => {
       env,
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { orders: number; procurement: number };
-    expect(body).toEqual({ orders: 3, procurement: 2 });
+    const body = (await res.json()) as {
+      orders: number;
+      procurement: number;
+      serviceNotes: number;
+      lpRejected: number;
+    };
+    expect(body).toEqual({ orders: 3, procurement: 2, serviceNotes: 1, lpRejected: 4 });
   });
 
   it("threads each key's last_seen_at into the .gt(updated_at, …) filter", async () => {
@@ -140,6 +180,7 @@ describe("GET /api/operation/badges", () => {
       { badge_key: "operation:orders", last_seen_at: "2026-05-11T10:00:00Z" },
       { badge_key: "operation:procurement", last_seen_at: "2026-05-11T11:00:00Z" },
     ];
+    let ordersCalls = 0;
     const from = vi.fn((table: string) => {
       if (table === "user_nav_seen") {
         return {
@@ -151,9 +192,25 @@ describe("GET /api/operation/badges", () => {
         };
       }
       if (table === "orders") {
+        ordersCalls += 1;
+        // 1st orders query = awaiting (.eq.gt); 2nd = lp_rejected (.not.gt).
+        if (ordersCalls === 1) {
+          return { select: vi.fn(() => ({ eq: vi.fn(() => ({ gt: ordersGt })) })) };
+        }
         return {
           select: vi.fn(() => ({
-            eq: vi.fn(() => ({ gt: ordersGt })),
+            not: vi.fn(() => ({
+              gt: vi.fn(() => Promise.resolve({ data: null, error: null, count: 0 })),
+            })),
+          })),
+        };
+      }
+      if (table === "service_notes") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              lt: vi.fn(() => Promise.resolve({ data: null, error: null, count: 0 })),
+            })),
           })),
         };
       }
@@ -185,6 +242,10 @@ describe("GET /api/operation/badges", () => {
     const procGt = vi.fn(() =>
       Promise.resolve({ data: null, error: null, count: 7 }),
     );
+    const lpRejGt = vi.fn(() =>
+      Promise.resolve({ data: null, error: null, count: 2 }),
+    );
+    let ordersCalls = 0;
     const from = vi.fn((table: string) => {
       if (table === "user_nav_seen") {
         return {
@@ -194,7 +255,20 @@ describe("GET /api/operation/badges", () => {
         };
       }
       if (table === "orders") {
-        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ gt: ordersGt })) })) };
+        ordersCalls += 1;
+        if (ordersCalls === 1) {
+          return { select: vi.fn(() => ({ eq: vi.fn(() => ({ gt: ordersGt })) })) };
+        }
+        return { select: vi.fn(() => ({ not: vi.fn(() => ({ gt: lpRejGt })) })) };
+      }
+      if (table === "service_notes") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              lt: vi.fn(() => Promise.resolve({ data: null, error: null, count: 1 })),
+            })),
+          })),
+        };
       }
       return {
         select: vi.fn(() => ({
@@ -215,8 +289,15 @@ describe("GET /api/operation/badges", () => {
     expect(res.status).toBe(200);
     expect(ordersGt).toHaveBeenCalledWith("updated_at", "1970-01-01T00:00:00Z");
     expect(procGt).toHaveBeenCalledWith("updated_at", "1970-01-01T00:00:00Z");
-    const body = (await res.json()) as { orders: number; procurement: number };
-    expect(body).toEqual({ orders: 5, procurement: 7 });
+    // 0152 — lp_rejected falls back to epoch on its own partner_rejected_at filter.
+    expect(lpRejGt).toHaveBeenCalledWith("partner_rejected_at", "1970-01-01T00:00:00Z");
+    const body = (await res.json()) as {
+      orders: number;
+      procurement: number;
+      serviceNotes: number;
+      lpRejected: number;
+    };
+    expect(body).toEqual({ orders: 5, procurement: 7, serviceNotes: 1, lpRejected: 2 });
   });
 
   it("zeroes default when supabase returns null counts", async () => {
@@ -229,8 +310,13 @@ describe("GET /api/operation/badges", () => {
       env,
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { orders: number; procurement: number };
-    expect(body).toEqual({ orders: 0, procurement: 0 });
+    const body = (await res.json()) as {
+      orders: number;
+      procurement: number;
+      serviceNotes: number;
+      lpRejected: number;
+    };
+    expect(body).toEqual({ orders: 0, procurement: 0, serviceNotes: 0, lpRejected: 0 });
   });
 
   it("returns 403 for non-operation roles", async () => {

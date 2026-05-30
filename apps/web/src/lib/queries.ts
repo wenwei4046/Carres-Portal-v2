@@ -1965,8 +1965,19 @@ export function useOperationBadges(
  * Pairs with POST /api/operation/badges/seen which calls the
  * mark_badge_seen RPC (migration 0083).
  */
-type operationBadgeKey = "operation:orders" | "operation:procurement";
-type operationBadgeKeyShort = "orders" | "procurement";
+// 0152 (Loo 2026-05-31) — `lp_rejected` added. Its response field is camelCase
+// `lpRejected` (the others match their short key), so the optimistic-zero needs
+// a short→field map below.
+type operationBadgeKey =
+  | "operation:orders"
+  | "operation:procurement"
+  | "operation:lp_rejected";
+type operationBadgeKeyShort = "orders" | "procurement" | "lp_rejected";
+const BADGE_FIELD: Record<operationBadgeKeyShort, keyof import("@carres/shared").OperationBadgesResponse> = {
+  orders: "orders",
+  procurement: "procurement",
+  lp_rejected: "lpRejected",
+};
 
 export function useMarkOperationBadgeSeen() {
   const qc = useQueryClient();
@@ -1989,7 +2000,7 @@ export function useMarkOperationBadgeSeen() {
       if (prev) {
         qc.setQueryData<import("@carres/shared").OperationBadgesResponse>(
           qk.operation.badges(),
-          { ...prev, [short]: 0 },
+          { ...prev, [BADGE_FIELD[short]]: 0 },
         );
       }
       return { prev };

@@ -37,6 +37,10 @@ const operationBadgesRouter = new Hono<AppEnv>();
 
 const ORDERS_KEY = "operation:orders";
 const PROCUREMENT_KEY = "operation:procurement";
+// 0152 (Loo 2026-05-31) — active "LP rejected" notification. Counts orders an
+// LP rejected (orders.partner_rejected_at) that are newer than the operator's
+// last view, so the sidebar rings when a delivery bounces back for reselect.
+const LP_REJECTED_KEY = "operation:lp_rejected";
 const EPOCH = "1970-01-01T00:00:00Z";
 
 operationBadgesRouter.get("/", async (c) => {
@@ -52,7 +56,7 @@ operationBadgesRouter.get("/", async (c) => {
   const seenRes = await sb
     .from("user_nav_seen")
     .select("badge_key, last_seen_at")
-    .in("badge_key", [ORDERS_KEY, PROCUREMENT_KEY]);
+    .in("badge_key", [ORDERS_KEY, PROCUREMENT_KEY, LP_REJECTED_KEY]);
   if (seenRes.error) {
     const m = mapPgError(seenRes.error);
     return c.json(m.body, m.status);
@@ -63,10 +67,11 @@ operationBadgesRouter.get("/", async (c) => {
   }
   const ordersSince = seenMap.get(ORDERS_KEY) ?? EPOCH;
   const procurementSince = seenMap.get(PROCUREMENT_KEY) ?? EPOCH;
+  const lpRejectedSince = seenMap.get(LP_REJECTED_KEY) ?? EPOCH;
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const [ordersRes, procurementRes, snRes] = await Promise.all([
+  const [ordersRes, procurementRes, snRes, lpRejectedRes] = await Promise.all([
     sb
       .from("orders")
       .select("id", { count: "exact", head: true })
@@ -94,6 +99,14 @@ operationBadgesRouter.get("/", async (c) => {
       .select("id", { count: "exact", head: true })
       .eq("status", "ongoing")
       .lt("deadline", today),
+    // 0152 — orders an LP rejected since the operator last looked. Reject
+    // bumps orders.partner_rejected_at; reselect clears it → the badge zeroes
+    // once Operation picks a new LP.
+    sb
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .not("partner_rejected_at", "is", null)
+      .gt("partner_rejected_at", lpRejectedSince),
   ]);
   if (ordersRes.error) {
     const m = mapPgError(ordersRes.error);
@@ -103,11 +116,16 @@ operationBadgesRouter.get("/", async (c) => {
     const m = mapPgError(procurementRes.error);
     return c.json(m.body, m.status);
   }
+  if (lpRejectedRes.error) {
+    const m = mapPgError(lpRejectedRes.error);
+    return c.json(m.body, m.status);
+  }
 
   return c.json({
     orders: ordersRes.count ?? 0,
     procurement: procurementRes.count ?? 0,
     serviceNotes: snRes.count ?? 0,
+    lpRejected: lpRejectedRes.count ?? 0,
   });
 });
 
@@ -124,7 +142,11 @@ operationBadgesRouter.get("/", async (c) => {
  * badges land.
  */
 const seenInput = z.object({
-  badgeKey: z.enum(["operation:orders", "operation:procurement"]),
+  badgeKey: z.enum([
+    "operation:orders",
+    "operation:procurement",
+    "operation:lp_rejected",
+  ]),
 });
 
 operationBadgesRouter.post("/seen", async (c) => {

@@ -98,8 +98,12 @@ export default function OperationSidebar({ active, onChange }: Props) {
   // silently to 0 (no badge render) so a transient API hiccup doesn't break
   // the nav.
   const badgesQ = useOperationBadges();
+  // 0152 (Loo 2026-05-31) — LP-rejected orders surface in the Orders view
+  // (OrderCard "Reselect →"), so their unread count rides on the Orders tab
+  // badge; clicking Orders marks BOTH keys seen.
+  const lpRejected = badgesQ.data?.lpRejected ?? 0;
   const badgeCount: Record<string, number> = {
-    orders: badgesQ.data?.orders ?? 0,
+    orders: (badgesQ.data?.orders ?? 0) + lpRejected,
     procurement: badgesQ.data?.procurement ?? 0,
     "service-notes": badgesQ.data?.serviceNotes ?? 0,
   };
@@ -147,6 +151,11 @@ export default function OperationSidebar({ active, onChange }: Props) {
                       onChange(n.k);
                       if (BADGE_KEYS.has(n.k) && (badgeCount[n.k] ?? 0) > 0) {
                         markSeen.mutate(n.k as "orders" | "procurement");
+                      }
+                      // 0152 — Orders click also clears the LP-rejected unread
+                      // count (the reselect action lives in the Orders view).
+                      if (n.k === "orders" && lpRejected > 0) {
+                        markSeen.mutate("lp_rejected");
                       }
                     }}
                     className={cls}

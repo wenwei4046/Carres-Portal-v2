@@ -662,6 +662,10 @@ export const OperationBadgesResponse = z.object({
   orders: z.number().int().nonnegative(),
   procurement: z.number().int().nonnegative(),
   serviceNotes: z.number().int().nonnegative().default(0),
+  // 0152 (Loo 2026-05-31) — orders an LP rejected, unseen since last view.
+  // Folded into the Orders sidebar tab badge (the reselect surface lives in
+  // the Orders view).
+  lpRejected: z.number().int().nonnegative().default(0),
 });
 export type OperationBadgesResponse = z.infer<typeof OperationBadgesResponse>;
 
