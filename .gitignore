@@ -136,3 +136,6 @@ tmp/
 # Local-only working state (retro snapshots, drafts that don't belong in git)
 # -----------------------------------------------------------------------------
 .context/
+
+# editor/tool backup files
+*.bak
