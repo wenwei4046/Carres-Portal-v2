@@ -5,6 +5,9 @@ interface Props {
   value: string | null;
   /** Fires with a fresh PNG dataURL after each stroke. Null on Clear. */
   onChange: (dataUrl: string | null) => void;
+  /** Disclaimer line under the pad. Defaults to the sales-order wording;
+   *  the delivery e-sign flow (0151) passes a receipt-acknowledgement copy. */
+  caption?: string;
 }
 
 /**
@@ -16,7 +19,7 @@ interface Props {
  * Coordinates are scaled from CSS pixels to canvas pixels so signatures stay
  * crisp on devicePixelRatio > 1 displays.
  */
-export default function SignaturePad({ value, onChange }: Props) {
+export default function SignaturePad({ value, onChange, caption }: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
   const last = useRef({ x: 0, y: 0 });
@@ -126,7 +129,7 @@ export default function SignaturePad({ value, onChange }: Props) {
       </div>
       <div className="mt-1.5 flex items-center justify-between">
         <span className="text-[11px] text-base-500">
-          By signing, customer agrees to the terms below.
+          {caption ?? "By signing, customer agrees to the terms below."}
         </span>
         <button type="button" onClick={clear} className="btn-ghost text-[11px] px-2.5 py-1">
           ↻ Clear

@@ -47,6 +47,9 @@ describe('attachDoInput', () => {
     doNumber: 'DO-9801',
     signed: true as const,
     doFilePath: 'order-00000000-0000-0000-0000-000000000a01/abc-DO-9801.pdf',
+    // 0151 — REQUIRED customer e-signature on delivery.
+    signaturePath: 'order-00000000-0000-0000-0000-000000000a01/abc-signature.png',
+    signerName: 'Mr Tan',
   };
   it('accepts DO# + signed=true + doFilePath (note optional)', () => {
     expect(attachDoInput.safeParse(VALID).success).toBe(true);
@@ -65,6 +68,16 @@ describe('attachDoInput', () => {
     expect(
       attachDoInput.safeParse({ ...VALID, doFilePath: 'ab' }).success,
     ).toBe(false);
+  });
+  it('rejects when signaturePath is missing (0151 e-sign required)', () => {
+    const { signaturePath: _omit, ...noSig } = VALID;
+    void _omit;
+    expect(attachDoInput.safeParse(noSig).success).toBe(false);
+  });
+  it('rejects when signerName is missing (0151 e-sign required)', () => {
+    const { signerName: _omit, ...noName } = VALID;
+    void _omit;
+    expect(attachDoInput.safeParse(noName).success).toBe(false);
   });
   it('rejects extra keys (strict mode)', () => {
     expect(

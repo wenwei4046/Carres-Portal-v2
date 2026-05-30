@@ -9,6 +9,8 @@ import {
   type operationOrderDetailLine,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "./Modal";
+import SignaturePad from "../../dealer/new-order/SignaturePad";
+import { dataUrlToBlob } from "../../dealer/new-order/draft";
 
 /**
  * DOAttachModal — attaches a Delivery Order (number + signed file) and flips
@@ -54,7 +56,12 @@ function suggestDoNumber(): string {
 export default function DOAttachModal({ order, warehouse, lines, onClose }: Props) {
   const [doNumber, setDoNumber] = useState(suggestDoNumber);
   const [doNote, setDoNote] = useState("");
-  const [signed, setSigned] = useState(false);
+  // 0151 (Loo 2026-05-31) — REQUIRED customer e-signature replaces the old
+  // operator-ticked "customer signed" checkbox. The customer types their name
+  // + signs on the canvas; the PNG uploads to delivery-orders at submit time.
+  const [signerName, setSignerName] = useState("");
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [signatureUploading, setSignatureUploading] = useState(false);
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
   const [uploadName, setUploadName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -64,9 +71,11 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
   const itemCount = totalItems(lines);
   const valid =
     doNumber.trim().length >= 3 &&
-    signed &&
+    !!signatureDataUrl &&
+    signerName.trim().length >= 2 &&
     !!doFilePath &&
     !uploading &&
+    !signatureUploading &&
     !attach.isPending;
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -127,19 +136,44 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
   }
 
   async function submit() {
-    if (!valid || !doFilePath) return;
+    if (!valid || !doFilePath || !signatureDataUrl) return;
+    setSignatureUploading(true);
     try {
+      // Upload the captured signature PNG to the delivery-orders bucket
+      // (kind=signature → order-<id>/<uuid>-signature.png), then mark delivered.
+      const blob = dataUrlToBlob(signatureDataUrl);
+      const sign = await apiFetch<{ token: string; path: string }>(
+        "/api/storage/dos/sign-order-upload",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            order_id:   order.id,
+            do_number:  doNumber.trim() || "DO-PENDING",
+            mime_type:  "image/png",
+            size_bytes: blob.size,
+            kind:       "signature",
+          }),
+        },
+      );
+      const { error: upErr } = await supabase.storage
+        .from("delivery-orders")
+        .uploadToSignedUrl(sign.path, sign.token, blob);
+      if (upErr) throw upErr;
       await attach.mutateAsync({
         doNumber: doNumber.trim(),
         doNote: doNote.trim() || undefined,
         signed: true,
         doFilePath,
+        signaturePath: sign.path,
+        signerName: signerName.trim(),
       });
       toast.success(`#${order.so} delivered · stock deducted`);
       onClose();
     } catch (e: unknown) {
       if (e instanceof ApiError) toast.error(e.message || "Mark delivered failed");
       else toast.error(e instanceof Error ? e.message : "Mark delivered failed");
+    } finally {
+      setSignatureUploading(false);
     }
   }
 
@@ -211,17 +245,27 @@ export default function DOAttachModal({ order, warehouse, lines, onClose }: Prop
             </p>
           )}
         </div>
-        <label className="flex gap-2 items-center px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] cursor-pointer">
+        <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
+          <label className="label mb-1.5 block" htmlFor="do-signer-name">
+            Received &amp; signed by *
+          </label>
           <input
-            type="checkbox"
-            checked={signed}
-            onChange={(e) => setSigned(e.target.checked)}
-            className="accent-primary"
+            id="do-signer-name"
+            value={signerName}
+            onChange={(e) => setSignerName(e.target.value)}
+            placeholder="Customer name"
+            className={INPUT_CLS}
+            data-testid="do-signer-name"
           />
-          <span className="text-[12px] font-body">
-            Customer signed the DO on receipt
-          </span>
-        </label>
+          <div className="text-[11px] text-base-600 mt-2.5 mb-1.5 font-body">
+            Customer signature *
+          </div>
+          <SignaturePad
+            value={signatureDataUrl}
+            onChange={setSignatureDataUrl}
+            caption="By signing, the customer confirms receipt of this delivery."
+          />
+        </div>
       </div>
 
       <ModalActions

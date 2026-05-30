@@ -41,6 +41,12 @@ export const attachDoInput = z.object({
   doNote: z.string().optional(),
   signed: z.literal(true),
   doFilePath: z.string().min(3).max(300),
+  // 0151 (Loo 2026-05-31) — REQUIRED customer e-signature on delivery.
+  // `signaturePath` is the Storage path of the captured signature PNG
+  // (uploaded to delivery-orders/order-<id>/<uuid>-signature.png);
+  // `signerName` is the receiving customer's typed name.
+  signaturePath: z.string().min(3).max(300),
+  signerName: z.string().min(1).max(120),
 }).strict();
 export type AttachDoInput = z.infer<typeof attachDoInput>;
 

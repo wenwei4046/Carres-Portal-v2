@@ -481,11 +481,14 @@ describe("POST /api/operation/orders/:id/assign-partner", () => {
 describe("POST /api/operation/orders/:id/attach-do", () => {
   const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
   const DO_PATH = `order-${ORDER_ID}/abc-DO-9801.pdf`;
+  const SIG_PATH = `order-${ORDER_ID}/abc-signature.png`;
   const VALID = {
     doNumber: "DO-9801",
     doNote: "Delivered to lobby",
     signed: true,
     doFilePath: DO_PATH,
+    signaturePath: SIG_PATH,
+    signerName: "Mr Tan",
   };
 
   it("returns 200 on success and calls RPC with snake_case args", async () => {
@@ -510,6 +513,8 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
       p_do_note: "Delivered to lobby",
       p_signed: true,
       p_do_file_path: DO_PATH,
+      p_signature_url: SIG_PATH,
+      p_signed_by: "Mr Tan",
     });
     assertRpcCallShape(rpc, "operation_attach_do_and_deliver", [
       "p_order_id",
@@ -517,6 +522,8 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
       "p_do_note",
       "p_signed",
       "p_do_file_path",
+      "p_signature_url",
+      "p_signed_by",
     ]);
   });
 
@@ -576,7 +583,13 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
       new Request(`http://t/api/operation/orders/${ORDER_ID}/attach-do`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ doNumber: "DO-9802", signed: true, doFilePath: DO_PATH }),
+        body: JSON.stringify({
+          doNumber: "DO-9802",
+          signed: true,
+          doFilePath: DO_PATH,
+          signaturePath: SIG_PATH,
+          signerName: "Mr Tan",
+        }),
       }),
       env,
     );
@@ -586,6 +599,8 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
       p_do_note: null,
       p_signed: true,
       p_do_file_path: DO_PATH,
+      p_signature_url: SIG_PATH,
+      p_signed_by: "Mr Tan",
     });
     assertRpcCallShape(rpc, "operation_attach_do_and_deliver", [
       "p_order_id",
@@ -593,6 +608,8 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
       "p_do_note",
       "p_signed",
       "p_do_file_path",
+      "p_signature_url",
+      "p_signed_by",
     ]);
   });
 

@@ -4,6 +4,8 @@ import { apiFetch } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useAttachPod, type PartnerToDeliverRow } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "../../operation/components/Modal";
+import SignaturePad from "../../dealer/new-order/SignaturePad";
+import { dataUrlToBlob } from "../../dealer/new-order/draft";
 
 /**
  * PODUploadDialog — Phase 7 Sprint 2, redesigned 2026-05-11 (Loo).
@@ -45,7 +47,13 @@ export default function PODUploadDialog({
   // override case.
   const [doNumber, setDoNumber] = useState(row.do_number ?? "");
   const [doNote, setDoNote] = useState("");
-  const [signed, setSigned] = useState(false);
+  // 0151 (Loo 2026-05-31) — REQUIRED customer e-signature replaces the old
+  // driver-ticked "customer signed" checkbox (which stored nothing). The
+  // customer types their name + signs on the canvas; the PNG is uploaded to
+  // the proof-of-delivery bucket at submit time.
+  const [signerName, setSignerName] = useState("");
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [signatureUploading, setSignatureUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [pickedName, setPickedName] = useState<string | null>(null);
@@ -132,16 +140,46 @@ export default function PODUploadDialog({
     }
   }
 
-  function handleSubmit() {
-    if (attach.isPending) return;
-    if (!uploadedPath || !signed || doNumber.trim().length < 3) return;
-    attach.mutate({
-      threadId: row.thread_id,
-      podPath:  uploadedPath,
-      doNumber: doNumber.trim(),
-      doNote:   doNote.trim() || undefined,
-      signed:   true,
-    });
+  async function handleSubmit() {
+    if (attach.isPending || signatureUploading) return;
+    if (!uploadedPath || doNumber.trim().length < 3) return;
+    if (!signatureDataUrl || signerName.trim().length < 2) return;
+    setError(null);
+    setSignatureUploading(true);
+    try {
+      // Upload the captured signature PNG to the proof-of-delivery bucket
+      // (kind=signature → {thread}/{uuid}-signature.png), then mark delivered.
+      const blob = dataUrlToBlob(signatureDataUrl);
+      const sign = await apiFetch<{ token: string; path: string }>(
+        "/api/partner/pod/sign-upload",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            threadId:  row.thread_id,
+            mimeType:  "image/png",
+            sizeBytes: blob.size,
+            kind:      "signature",
+          }),
+        },
+      );
+      const { error: upErr } = await supabase.storage
+        .from("proof-of-delivery")
+        .uploadToSignedUrl(sign.path, sign.token, blob);
+      if (upErr) throw upErr;
+      attach.mutate({
+        threadId:      row.thread_id,
+        podPath:       uploadedPath,
+        doNumber:      doNumber.trim(),
+        doNote:        doNote.trim() || undefined,
+        signed:        true,
+        signaturePath: sign.path,
+        signerName:    signerName.trim(),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Signature upload failed");
+    } finally {
+      setSignatureUploading(false);
+    }
   }
 
   function handleRepick() {
@@ -152,8 +190,10 @@ export default function PODUploadDialog({
   const canSubmit =
     !!uploadedPath &&
     !uploading &&
+    !signatureUploading &&
     !attach.isPending &&
-    signed &&
+    !!signatureDataUrl &&
+    signerName.trim().length >= 2 &&
     doNumber.trim().length >= 3;
   const isImage = pickedType === "image/jpeg" || pickedType === "image/png";
   const sizeMb = pickedSize ? (pickedSize / 1024 / 1024).toFixed(2) : null;
@@ -176,8 +216,8 @@ export default function PODUploadDialog({
             <span>{row.customer_address}</span>
           </>
         )}
-        . Record the DO + tick the signed box — the thread flips straight to{" "}
-        <strong>delivered</strong> when you submit.
+        . Record the DO + capture the customer&rsquo;s signature — the thread
+        flips straight to <strong>delivered</strong> when you submit.
       </div>
 
       <div className="grid gap-3 mb-4">
@@ -290,18 +330,27 @@ export default function PODUploadDialog({
           )}
         </div>
 
-        <label className="flex gap-2 items-center px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] cursor-pointer">
+        <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
+          <label className="label mb-1.5 block" htmlFor="pod-signer-name">
+            Received &amp; signed by *
+          </label>
           <input
-            type="checkbox"
-            checked={signed}
-            onChange={(e) => setSigned(e.target.checked)}
-            className="accent-primary"
-            data-testid="pod-signed"
+            id="pod-signer-name"
+            value={signerName}
+            onChange={(e) => setSignerName(e.target.value)}
+            placeholder="Customer name"
+            className={INPUT_CLS}
+            data-testid="pod-signer-name"
           />
-          <span className="text-[12px] font-body">
-            Customer signed the DO on receipt
-          </span>
-        </label>
+          <div className="text-[11px] text-base-600 mt-2.5 mb-1.5 font-body">
+            Customer signature *
+          </div>
+          <SignaturePad
+            value={signatureDataUrl}
+            onChange={setSignatureDataUrl}
+            caption="By signing, the customer confirms receipt of this delivery."
+          />
+        </div>
       </div>
 
       <ModalActions

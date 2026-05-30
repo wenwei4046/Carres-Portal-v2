@@ -37,6 +37,10 @@ const signUploadSchema = z.object({
   threadId:  z.string().uuid(),
   mimeType:  z.enum(ALLOWED_MIMES),
   sizeBytes: z.number().int().positive().max(MAX_SIZE),
+  // 0151 — the POD photo and the customer signature both live in the
+  // proof-of-delivery bucket; `kind` only changes the filename suffix
+  // (-pod vs -signature) so the two artefacts don't collide.
+  kind:      z.enum(["pod", "signature"]).default("pod"),
 });
 
 const attachSchema = z.object({
@@ -44,6 +48,9 @@ const attachSchema = z.object({
   doNumber: z.string().min(3).max(50),
   doNote:   z.string().max(500).optional(),
   signed:   z.literal(true),
+  // 0151 (Loo 2026-05-31) — REQUIRED customer e-signature on delivery.
+  signaturePath: z.string().min(1).max(500),
+  signerName:    z.string().min(1).max(120),
 }).strict();
 
 function extForMime(mime: (typeof ALLOWED_MIMES)[number]): string {
@@ -73,9 +80,9 @@ partnerPodRouter.post("/sign-upload", async (c) => {
     );
   }
 
-  const { threadId, mimeType } = parsed.data;
+  const { threadId, mimeType, kind } = parsed.data;
   const ext = extForMime(mimeType);
-  const path = `${threadId}/${crypto.randomUUID()}-pod.${ext}`;
+  const path = `${threadId}/${crypto.randomUUID()}-${kind}.${ext}`;
 
   // 2026-05-13 (Loo) — Storage backend's RLS path 503s with "schema invalid
   // or incompatible" for the sofa direct-ship customer-leg flow even after
@@ -152,6 +159,8 @@ partnerPodRouter.post("/:threadId/attach", async (c) => {
     p_do_number: parsed.data.doNumber,
     p_do_note:   parsed.data.doNote ?? null,
     p_signed:    parsed.data.signed,
+    p_signature_url: parsed.data.signaturePath,
+    p_signed_by:     parsed.data.signerName,
   });
   if (error) {
     const m = mapPgError(error);

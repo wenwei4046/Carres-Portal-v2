@@ -3612,16 +3612,20 @@ export type AttachPodInput = {
   doNumber:  string;
   doNote?:   string;
   signed:    true;
+  /** 0151 — REQUIRED customer e-signature: Storage path of the captured
+   *  signature PNG + the receiving customer's typed name. */
+  signaturePath: string;
+  signerName:    string;
 };
 export function useAttachPod(
   opts?: Partial<UseMutationOptions<unknown, ApiError, AttachPodInput>>,
 ) {
   const qc = useQueryClient();
   return useMutation<unknown, ApiError, AttachPodInput>({
-    mutationFn: ({ threadId, podPath, doNumber, doNote, signed }) =>
+    mutationFn: ({ threadId, podPath, doNumber, doNote, signed, signaturePath, signerName }) =>
       apiFetch(`/api/partner/pod/${threadId}/attach`, {
         method: "POST",
-        body: JSON.stringify({ podPath, doNumber, doNote, signed }),
+        body: JSON.stringify({ podPath, doNumber, doNote, signed, signaturePath, signerName }),
       }),
     ...opts,
     onSuccess: async (...args) => {

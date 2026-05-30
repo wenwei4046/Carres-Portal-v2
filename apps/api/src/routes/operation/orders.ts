@@ -434,6 +434,8 @@ operationOrdersRouter.post("/:id/attach-do", requireOperation, async (c) => {
     p_do_note: parsed.data.doNote ?? null,
     p_signed: parsed.data.signed,
     p_do_file_path: parsed.data.doFilePath,
+    p_signature_url: parsed.data.signaturePath,
+    p_signed_by: parsed.data.signerName,
   });
   if (error) {
     const m = mapPgError(error);

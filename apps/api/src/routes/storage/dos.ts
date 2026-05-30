@@ -53,6 +53,9 @@ const signOrderUploadSchema = z.object({
   do_number:  z.string().min(3).max(50),
   mime_type:  z.enum(ALLOWED_MIMES),
   size_bytes: z.number().int().positive().max(MAX_SIZE),
+  // 0151 — `kind: "signature"` names the file order-<id>/<uuid>-signature.<ext>
+  // (the captured customer e-signature PNG) instead of the DO-number scheme.
+  kind:       z.enum(["do", "signature"]).default("do"),
 });
 
 function extForMime(mime: (typeof ALLOWED_MIMES)[number]): string {
@@ -152,10 +155,11 @@ dosRouter.post("/sign-order-upload", async (c) => {
     );
   }
 
-  const { order_id, do_number, mime_type } = parsed.data;
+  const { order_id, do_number, mime_type, kind } = parsed.data;
   const safeDo = do_number.replace(/[^a-zA-Z0-9._-]/g, "_");
   const ext = extForMime(mime_type);
-  const path = `order-${order_id}/${crypto.randomUUID()}-${safeDo}.${ext}`;
+  const slug = kind === "signature" ? "signature" : safeDo;
+  const path = `order-${order_id}/${crypto.randomUUID()}-${slug}.${ext}`;
 
   // USER JWT — Storage RLS (0042 + 0084 operation/principal short-circuit)
   // gates writes; this endpoint only enforces caller role + path shape.

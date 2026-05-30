@@ -161,14 +161,17 @@ describe("POST /api/partner/pod/sign-upload", () => {
 
 describe("POST /api/partner/pod/:threadId/attach", () => {
   const POD_PATH = `${THREAD_ID}/abc-pod.jpg`;
+  const SIG_PATH = `${THREAD_ID}/abc-signature.png`;
   const VALID = {
     podPath:  POD_PATH,
     doNumber: "DO-5301",
     doNote:   "Delivered at lobby",
     signed:   true,
+    signaturePath: SIG_PATH,
+    signerName:    "Mr Tan",
   };
 
-  it("calls partner_attach_pod RPC with 5 args and returns 200", async () => {
+  it("calls partner_attach_pod RPC with 7 args and returns 200", async () => {
     const sb = {
       rpc: vi.fn().mockResolvedValue({
         data: { thread_id: THREAD_ID, operation_stage: "delivered", pod_url: POD_PATH },
@@ -194,6 +197,8 @@ describe("POST /api/partner/pod/:threadId/attach", () => {
       p_do_number: "DO-5301",
       p_do_note:   "Delivered at lobby",
       p_signed:    true,
+      p_signature_url: SIG_PATH,
+      p_signed_by:     "Mr Tan",
     });
   });
 
@@ -206,7 +211,13 @@ describe("POST /api/partner/pod/:threadId/attach", () => {
       new Request(`http://t/api/partner/pod/${THREAD_ID}/attach`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ podPath: POD_PATH, doNumber: "DO-5302", signed: true }),
+        body: JSON.stringify({
+          podPath: POD_PATH,
+          doNumber: "DO-5302",
+          signed: true,
+          signaturePath: SIG_PATH,
+          signerName: "Mr Tan",
+        }),
       }),
       env,
     );
@@ -216,6 +227,8 @@ describe("POST /api/partner/pod/:threadId/attach", () => {
       p_do_number: "DO-5302",
       p_do_note:   null,
       p_signed:    true,
+      p_signature_url: SIG_PATH,
+      p_signed_by:     "Mr Tan",
     });
   });
 
