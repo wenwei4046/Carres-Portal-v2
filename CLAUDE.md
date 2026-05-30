@@ -311,7 +311,7 @@ Don't burn an hour spinning. Surface and ask.
 | Web URL | https://carres-portal.pages.dev |
 | API URL | https://carres-portal-v2-api.wwch.workers.dev |
 | DB | staging Supabase = prod, project_id `kfprgpjpaffedghytstl` |
-| Latest migration | **0150** `rename_hookka_ohana` (supplier name → Ohana). 0148 = supplier forecast category resolver. 0138-0147 applied per [[project_db_applied_state]] memory. |
+| Latest migration | **0154** `fix_per_unit_id_hooks` (corrects 0153 signature errors). 0151 = delivery e-sign · 0152 = STANDARD auto-dispatch + LP-reject branch · 0153+0154 = per-unit `id-abc123456` tracking. 0150 = `rename_hookka_ohana`. 0138-0147 per [[project_db_applied_state]] memory. |
 | Catalog state | 11 suppliers · 170 product_models · 1013 product_skus (target 1091, 78 source dupes in carres-sku-master.xlsx — see CFs) |
 | Orders state | 0 transactional orders; orders_so_seq reset to 1000; next nextval = SO-1001 (4 alpha test orders SO-1001..1004 wiped 2026-05-20) |
 | Test count | api 629/632 · web 439/443 · shared 154/154 (4 web + 3 api pre-existing failures, see §17.7) — STALE, not run against new tables/columns from 0132-0137 |
