@@ -183,10 +183,13 @@ opsStockRouter.post("/flag-repair", requireOperationOrPrincipal, async (c) => {
 
 interface RawRow {
   id: string;
+  // 0153 — forced per-unit serial (id-abc123456), minted at PO-open.
+  unit_code: string | null;
   sku: string;
   warehouse_id: string;
   condition: "new" | "exhibition" | "old" | "damaged";
-  status: "free" | "reserved" | "sold" | "transferred";
+  // 0153 added 'incoming' (PO opened, not yet at WH) + 'voided' (PO cancelled).
+  status: "incoming" | "free" | "reserved" | "sold" | "transferred" | "voided";
   reserved_ref: string | null;
   ref_history: string[];
   needs_repair: boolean;
@@ -194,6 +197,9 @@ interface RawRow {
   po_no: string | null;
   source_ref: string | null;
   date_in: string | null;
+  // 0153 — sale linkage set on delivery.
+  sold_at: string | null;
+  sold_order_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -201,6 +207,7 @@ interface RawRow {
 function shape(rows: RawRow[]) {
   return rows.map((r) => ({
     id: r.id,
+    unitCode: r.unit_code,
     sku: r.sku,
     warehouseId: r.warehouse_id,
     condition: r.condition,
@@ -212,6 +219,8 @@ function shape(rows: RawRow[]) {
     poNo: r.po_no,
     sourceRef: r.source_ref,
     dateIn: r.date_in,
+    soldAt: r.sold_at,
+    soldOrderId: r.sold_order_id,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }));

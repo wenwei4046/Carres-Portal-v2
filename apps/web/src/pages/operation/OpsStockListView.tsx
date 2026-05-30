@@ -189,6 +189,7 @@ export default function OpsStockListView(props: Props) {
           <table className="w-full text-sm">
             <thead className="bg-base-50 text-xs uppercase tracking-wider text-base-500">
               <tr>
+                <th className="text-left px-3 py-2 font-medium">Unit ID</th>
                 <th className="text-left px-3 py-2 font-medium">SKU</th>
                 <th className="text-left px-3 py-2 font-medium">Condition</th>
                 <th className="text-left px-3 py-2 font-medium">Status</th>
