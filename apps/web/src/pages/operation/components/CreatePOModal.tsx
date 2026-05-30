@@ -785,13 +785,27 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
   const issuanceGroups = useMemo(() => {
     const out: typeof groups.groups = [];
     for (const g of groups.groups) {
-      const isSofaSupplier = (g.supplier.cat_covered ?? []).includes("sofa");
-      if (!isSofaSupplier) {
-        out.push({ supplier: g.supplier, lines: g.lines });
-        continue;
+      // 2026-05-31 (Loo) — split is per-LINE sofa category, NOT per-supplier.
+      // Ohana covers bedframe + sofa; its bedframe lines must consolidate into
+      // ONE PO (batch-fungible) while only its sofa lines split per (SO, sku,
+      // attrs) because factory production is per-fabric per-order. The previous
+      // supplier-level `cat_covered.includes('sofa')` test wrongly fanned
+      // Ohana's bedframe lines too.
+      const sofaLines = g.lines.filter(
+        (l) => categoryForSku(l.sku, skuByCode, models) === "sofa",
+      );
+      const nonSofaLines = g.lines.filter(
+        (l) => categoryForSku(l.sku, skuByCode, models) !== "sofa",
+      );
+      // Non-sofa lines (mattress, bedframe) consolidate into a single PO per
+      // supplier — multi-SKU + multi-SO is fine; so_refs carries every SO and
+      // _v3_claim_threads_for_po matches by sku/attrs within so_refs.
+      if (nonSofaLines.length > 0) {
+        out.push({ supplier: g.supplier, lines: nonSofaLines });
       }
+      // Sofa lines split per (sourceSos, sku, attrs) — one PO per fabric per SO.
       const byKey = new Map<string, typeof g.lines>();
-      for (const l of g.lines) {
+      for (const l of sofaLines) {
         const key = `${l.sourceSos.join(",") || "null"}|${l.sku}|${canonAttrs(l.attrs)}`;
         if (!byKey.has(key)) byKey.set(key, []);
         byKey.get(key)!.push(l);
@@ -802,7 +816,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups.groups]);
+  }, [groups.groups, skuByCode, models]);
 
   // Duplicate (sku, attrs) WITHIN one PO would violate the (po_id, sku,
   // coalesce(attrs,'')) unique index (0076). After the per-(sku, attrs) merge
