@@ -125,11 +125,52 @@ export function parseCsv(text: string): CsvParseResult {
 
 // --- AutoCount listing-specific column mapping ----------------------------
 
+/** The four required-non-empty fields in the AutoCount import schema. */
+export type ListingSkipReason =
+  | "noRef"
+  | "noItemGroup"
+  | "noDescription"
+  | "noDebtorName";
+
+/** The validated shape that survives client-side checks; matches the
+ *  AutocountImportRow zod schema's required fields. */
+export interface ListingImportRow {
+  ref: string;
+  deliveryLocation: string | null;
+  deliveryDate: string | null;
+  itemGroup: string;
+  qty: number;
+  detailDescription: string;
+  poDocNo: string | null;
+  debtorName: string;
+  phone: string | null;
+  addr1: string | null;
+  addr2: string | null;
+  addr3: string | null;
+  addr4: string | null;
+  balance: string | null;
+}
+
+/** Discriminated mapper result: callers branch on `ok` to read row or reason. */
+export type ListingRowResult =
+  | { ok: true; row: ListingImportRow }
+  | { ok: false; reason: ListingSkipReason };
+
 /**
  * Map an AutoCount-listing CSV row (whose column names mirror the xlsx
  * listing) to the `AutocountImportRow` shape the /api/orders/import
- * endpoint accepts. Returns null when the row has no usable Ref. (silent
- * skip — AutoCount sometimes exports blank trailing rows).
+ * endpoint accepts.
+ *
+ * Returns a discriminated `{ ok, … }` so the operation panel can report
+ * WHY a row was skipped instead of bundling silent drops with a backend
+ * zod 400. The four reasons mirror the four `.min(1)` fields in
+ * `autocountImportRowSchema`; checking them client-side prevents the
+ * "one bad row → whole 192-row batch rejected" trap (e.g. an AutoCount
+ * discount line whose Item Group cell exports blank).
+ *
+ * Check order: ref → itemGroup → detailDescription → debtorName.
+ * Ref. comes first so trailing blank rows still report `noRef` (the
+ * historical silent-skip case).
  *
  * Column names accepted (case-insensitive trim-tolerant):
  *   Ref.                      → ref
@@ -147,22 +188,7 @@ export function parseCsv(text: string): CsvParseResult {
  */
 export function listingRowToImportRow(
   rawRow: Record<string, string>,
-): {
-  ref: string;
-  deliveryLocation: string | null;
-  deliveryDate: string | null;
-  itemGroup: string;
-  qty: number;
-  detailDescription: string;
-  poDocNo: string | null;
-  debtorName: string;
-  phone: string | null;
-  addr1: string | null;
-  addr2: string | null;
-  addr3: string | null;
-  addr4: string | null;
-  balance: string | null;
-} | null {
+): ListingRowResult {
   // Build a case-insensitive lookup (forgive minor header casing variance).
   const lc: Record<string, string> = {};
   for (const [k, v] of Object.entries(rawRow)) {
@@ -175,31 +201,43 @@ export function listingRowToImportRow(
   };
 
   const ref = get("ref.") || get("ref");
-  if (!ref) return null;
+  if (!ref) return { ok: false, reason: "noRef" };
+
+  const itemGroup = get("item group") || get("itemgroup");
+  if (!itemGroup) return { ok: false, reason: "noItemGroup" };
+
+  const detailDescription =
+    get("detail description") || get("detaildescription") || get("description");
+  if (!detailDescription) return { ok: false, reason: "noDescription" };
+
+  const debtorName = get("debtor name") || get("debtorname");
+  if (!debtorName) return { ok: false, reason: "noDebtorName" };
 
   const qtyRaw = get("qty");
   const qtyNum = qtyRaw ? Number(qtyRaw) : 1;
   const qty = Number.isFinite(qtyNum) && qtyNum > 0 ? Math.floor(qtyNum) : 1;
 
-  const debtorName = get("debtor name") || get("debtorname");
-  const itemGroup = get("item group") || get("itemgroup");
-  const detailDescription = get("detail description") || get("detaildescription") || get("description");
-
   return {
-    ref,
-    deliveryLocation: nullable("delivery location"),
-    deliveryDate: parseDeliveryDate(get("new- delivery date") || get("delivery date") || get("new-delivery date")),
-    itemGroup,
-    qty,
-    detailDescription,
-    poDocNo: nullable("po doc no.") || nullable("po doc no") || nullable("podocno"),
-    debtorName,
-    phone: nullable("phone"),
-    addr1: nullable("delivery address 1") || nullable("addr1"),
-    addr2: nullable("delivery address 2") || nullable("addr2"),
-    addr3: nullable("delivery address 3") || nullable("addr3"),
-    addr4: nullable("delivery address 4") || nullable("addr4"),
-    balance: nullable("balance"),
+    ok: true,
+    row: {
+      ref,
+      deliveryLocation: nullable("delivery location"),
+      deliveryDate: parseDeliveryDate(
+        get("new- delivery date") || get("delivery date") || get("new-delivery date"),
+      ),
+      itemGroup,
+      qty,
+      detailDescription,
+      poDocNo:
+        nullable("po doc no.") || nullable("po doc no") || nullable("podocno"),
+      debtorName,
+      phone: nullable("phone"),
+      addr1: nullable("delivery address 1") || nullable("addr1"),
+      addr2: nullable("delivery address 2") || nullable("addr2"),
+      addr3: nullable("delivery address 3") || nullable("addr3"),
+      addr4: nullable("delivery address 4") || nullable("addr4"),
+      balance: nullable("balance"),
+    },
   };
 }
 
