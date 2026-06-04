@@ -90,6 +90,14 @@ function buildSb(opts: SbOpts = {}) {
             data: opts.catalog ?? [],
             error: null,
           }),
+          // 2026-06-04: /import switched to .filter("variant","in",...) so
+          // descriptions containing `"` (sofa codes) survive the URL escape
+          // bug in supabase-js .in(). Same catalog payload as .in() since the
+          // intent is identical (resolve description → sku).
+          filter: async (_col: string, _op: string, _val: string) => ({
+            data: opts.catalog ?? [],
+            error: null,
+          }),
           // .eq().is().order() chain for the /inbox read; resolves to inboxRows
           eq: () => chain,
           is: () => chain,
@@ -311,6 +319,33 @@ describe("POST /api/orders/import", () => {
     });
     expect(res.status).toBe(200);
     expect(sb._calls[0].payloads[0].source_ref).toEqual(["CR1009", "TCF0282"]);
+  });
+
+  // 2026-06-04 — Loo's 192-row CSV: 24 catalog hits silently lost because
+  // supabase-js .in() doesn't backslash-escape `"` inside its IN-list values.
+  // Sofa codes ("HK5531/28\"(2 Seater)/...") tripped it; PostgREST returned
+  // 200 + 0 rows; ALL 109 distinct descriptions fell back to raw. Test guards
+  // that resolution now goes through .filter("variant","in",...) and that a
+  // catalog entry whose variant contains `"` is correctly matched + sent as
+  // the canonical sku on the RPC payload (not the raw description).
+  it("resolves descriptions containing double-quote characters via .filter() (not .in())", async () => {
+    const sb = buildSb({
+      rpcReply: okReply("created"),
+      // catalog row whose variant contains an embedded `"`
+      catalog: [{ sku: "SF03-HK5535-2L", variant: 'HK5531/28"(2+L Seater)' }],
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await post(jwt, {
+      dealerId: DEALER_HOUSE,
+      rows: [row({ itemGroup: "Sofa", detailDescription: 'HK5531/28"(2+L Seater)' })],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AutocountImportResponse;
+    expect(body.results[0].unmatchedDescriptions).toEqual([]);
+    // RPC payload should carry the canonical sku, NOT the raw description.
+    const lines = sb._calls[0].payloads![0].lines;
+    expect(lines[0].sku).toBe("SF03-HK5535-2L");
   });
 
   it("flags unmatched core items in the report (SKU resolver is a pending seam)", async () => {
