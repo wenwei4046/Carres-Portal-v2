@@ -98,6 +98,14 @@ function buildSb(opts: SbOpts = {}) {
             data: opts.catalog ?? [],
             error: null,
           }),
+          // 2026-06-04 (later): resolver now reads the WHOLE catalog via
+          // paginated .range() so the model-family fallback (Layer 3) can run
+          // in-memory. Return the same catalog payload — the resolver does
+          // the matching itself.
+          range: async (_from: number, _to: number) => ({
+            data: opts.catalog ?? [],
+            error: null,
+          }),
           // .eq().is().order() chain for the /inbox read; resolves to inboxRows
           eq: () => chain,
           is: () => chain,
@@ -328,6 +336,91 @@ describe("POST /api/orders/import", () => {
   // that resolution now goes through .filter("variant","in",...) and that a
   // catalog entry whose variant contains `"` is correctly matched + sent as
   // the canonical sku on the RPC payload (not the raw description).
+  // 2026-06-04 — Loo: sofa specs explode (model × seater × colorway) so the
+  // catalog can't enumerate every permutation. When an AutoCount description
+  // can't exact-match OR color-strip-match anything, the resolver falls back
+  // to a model-family lookup (same model identifier, best-fit seater) so
+  // procurement still routes to the correct supplier. Approximate seater is
+  // acceptable: the supplier-prefix on the resulting sku is what drives PO
+  // routing; operation can adjust the exact line spec at PO creation if
+  // needed. Test guards the fallback for a seater config (`(2+L Seater)`)
+  // that doesn't exist in the catalog — we still map to the supplier's
+  // closest (2 Seater) sku rather than dropping into raw-description mode.
+  it("falls back to model-family match when seater config isn't in catalog (Layer 3)", async () => {
+    const sb = buildSb({
+      rpcReply: okReply("created"),
+      catalog: [
+        // 3 catalog rows under the HK5531/28" model family — none of them
+        // exactly matches `(2+L Seater)`. Layer 3 should still pick the
+        // closest by seater number (2).
+        { sku: 'SF03-HK5531/28"(1+L)', variant: 'HK5531/28"(1+L)' },
+        { sku: 'SF03-HK5531/28"(2 Seater)', variant: 'HK5531/28"(2 Seater)' },
+        { sku: 'SF03-HK5531/28"(3 Seater)', variant: 'HK5531/28"(3 Seater)' },
+      ],
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await post(jwt, {
+      dealerId: DEALER_HOUSE,
+      rows: [
+        row({
+          ref: "TCF0448",
+          itemGroup: "Sofa",
+          detailDescription: 'HK5531/28"(2+L Seater)/COLOUR NINJA 08',
+        }),
+      ],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AutocountImportResponse;
+    // Should resolve via family fallback → no unmatched flagged for this row
+    expect(body.results[0].unmatchedDescriptions).toEqual([]);
+    // Best seater match within the family = `(2 Seater)`
+    expect(sb._calls[0].payloads![0].lines[0].sku).toBe(
+      'SF03-HK5531/28"(2 Seater)',
+    );
+  });
+
+  // 2026-06-04 — AutoCount appends colorway suffix to Detail Description
+  // ("/COL:NINJA-02", "/M2402-4 Sand", "/PC151-01" etc.) that the catalog
+  // (product_skus.variant) doesn't store — the colorway lives in the sibling
+  // sku (Item Code). Resolver now color-strips before catalog lookup so 38
+  // more lines find their canonical sku (Loo: 24/109 → 62/109 recovered).
+  it("resolves descriptions whose colorway suffix isn't in the catalog (Col:/COLOUR/fabric codes)", async () => {
+    const sb = buildSb({
+      rpcReply: okReply("created"),
+      catalog: [
+        // catalog stores stripped model+seater; sku carries the colorway
+        { sku: "SF02-DSL8019-3S", variant: 'Muro DSL8019/30"(3 Seater)' },
+        { sku: "BF04-1013Jager/Fab3-Q", variant: "1013Jager/Fab3-Queen" },
+      ],
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await post(jwt, {
+      dealerId: DEALER_HOUSE,
+      rows: [
+        row({
+          ref: "TCF0383",
+          itemGroup: "Sofa",
+          detailDescription: 'Muro DSL8019/30"(3 Seater)/Col:NINJA-02',
+        }),
+        row({
+          ref: "CR1124",
+          itemGroup: "Bed Fram",
+          detailDescription: "1013Jager/Fab3-Queen/PC151-01",
+        }),
+      ],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AutocountImportResponse;
+    // Both core items should now be unflagged (resolved via color-strip)
+    expect(body.results.flatMap((r) => r.unmatchedDescriptions)).toEqual([]);
+    // RPC payload carries the catalog sku, NOT the raw description with colorway
+    const payloads = sb._calls[0].payloads!;
+    const lineSkus = payloads.flatMap((p: any) => p.lines.map((l: any) => l.sku)).sort();
+    expect(lineSkus).toEqual(["BF04-1013Jager/Fab3-Q", "SF02-DSL8019-3S"]);
+  });
+
   it("resolves descriptions containing double-quote characters via .filter() (not .in())", async () => {
     const sb = buildSb({
       rpcReply: okReply("created"),

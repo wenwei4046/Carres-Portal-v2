@@ -371,36 +371,166 @@ function parsePaid(balance?: string | null | undefined): number {
  * storing the raw description as sku, and core items (mattress/bedframe/
  * sofa) are flagged in the import report so operation can reconcile.
  */
+/**
+ * AutoCount appends a colorway suffix to the Detail Description that the
+ * product catalog (product_skus.variant) does NOT store — e.g. AutoCount
+ * sends `Muro DSL8019/30"(3 Seater)/Col:NINJA-02` but the catalog row is
+ * just `Muro DSL8019/30"(3 Seater)` and the color is encoded in the
+ * sibling `sku` (Item Code). Stripping the trailing color clause restores
+ * an exact match on the model+seater portion.
+ *
+ * Heuristic only — we look for the FIRST `/` followed by a known color
+ * marker (`COLOUR` / `Col:` / fabric codes like `M2402-`, `PC151-`,
+ * `KN390-`, `HR805-`, named colors). False positives are harmless: if the
+ * stripped string also fails to match we proceed to model-family
+ * fallback (Layer 3 in `buildSkuResolver`).
+ */
+const COLOR_SUFFIX_RE =
+  /\s*\/(?:\s*)(?:COLOUR|COLOR|Col:|COL:|col:|M\d{3,}|PC\s?\d{3,}|KN\d{3,}|HR\d{3,}|BL\d{2,}|RD\d{2,}|EO\d{2,}|Ninja|NINJA|Eleganz|Garfield|GARFIELD|Fossil|FOSSIL|Pearl|PEARL|Sand|SAND|Forest|FOREST|Light\s|Lighty\s|Metal|METAL|Tundora|TUNDORA|Cheron)/;
+function stripColorSuffix(s: string): string {
+  const m = s.match(COLOR_SUFFIX_RE);
+  return m && m.index !== undefined ? s.slice(0, m.index).trim() : s;
+}
+
+/**
+ * Extract a model identifier from an AutoCount description for Layer 3
+ * model-family lookup. The identifier is the *model + width/size* prefix
+ * shared across every seater + colorway variant of that supplier model.
+ *
+ * Examples:
+ *   `HK5531/28"(2+L Seater)/COLOUR NINJA 08`  → `HK5531/28"`
+ *   `Muro DSL8019/30"(3 Seater)`               → `Muro DSL8019/30"`
+ *   `1013Jager/Fab3-Queen/PC151-01`            → `1013Jager/Fab3-Queen`
+ *   `FORTE-L1202F-Q`                           → `FORTE-L1202F-Q` (whole string)
+ *
+ * Rule: cut at the first `(` if present (sofa seater paren); else cut at
+ * the second `/` if there are 3+ slashes (bedframe `Model/Fab/Color`);
+ * else return as-is (mattress / single-token sku).
+ */
+function extractModelIdentifier(desc: string): string {
+  const noColor = stripColorSuffix(desc);
+  const parenIdx = noColor.indexOf("(");
+  if (parenIdx > 0) return noColor.slice(0, parenIdx).trim();
+  const parts = noColor.split("/");
+  if (parts.length > 2) return parts.slice(0, 2).join("/").trim();
+  return noColor.trim();
+}
+
+/**
+ * Pick the catalog variant that best represents the AutoCount description
+ * within its model family. Prefer matching seater config (e.g. `(2 Seater)`
+ * — by exact paren content first, then by seater number). Falls back to
+ * the alphabetically first candidate so the result is deterministic.
+ */
+function pickBestModelCandidate(
+  desc: string,
+  candidates: string[],
+): string | null {
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  const seaterMatch = desc.match(/\(([^)]+)\)/);
+  if (seaterMatch) {
+    const desiredSeater = seaterMatch[1].toLowerCase().trim();
+    const exact = candidates.find((c) => {
+      const m = c.match(/\(([^)]+)\)/);
+      return m && m[1].toLowerCase().trim() === desiredSeater;
+    });
+    if (exact) return exact;
+
+    const numMatch = desiredSeater.match(/^(\d+)/);
+    if (numMatch) {
+      const numSeater = candidates.find((c) =>
+        c.toLowerCase().includes(`(${numMatch[1]} seater)`),
+      );
+      if (numSeater) return numSeater;
+    }
+  }
+  return [...candidates].sort()[0];
+}
+
+/**
+ * Paginate `product_skus` (PostgREST defaults to a 1000-row cap so we
+ * walk through `.range()` until a short page comes back). Returns the
+ * full catalog snapshot used for in-memory matching.
+ */
+async function loadAllCatalogRows(
+  sb: ReturnType<typeof userClient>,
+): Promise<Array<{ sku: string; variant: string }>> {
+  const PAGE = 1000;
+  const all: Array<{ sku: string; variant: string }> = [];
+  let offset = 0;
+  // Hard ceiling to prevent an unbounded loop if the catalog explodes.
+  for (let i = 0; i < 20; i++) {
+    const { data, error } = await sb
+      .from("product_skus")
+      .select("sku, variant")
+      .range(offset, offset + PAGE - 1);
+    if (error || !data) break;
+    all.push(...(data as Array<{ sku: string; variant: string }>));
+    if (data.length < PAGE) break;
+    offset += PAGE;
+  }
+  return all;
+}
+
 async function buildSkuResolver(
   sb: ReturnType<typeof userClient>,
   descriptions: string[],
 ): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (descriptions.length === 0) return map;
-  // 2026-06-04 — supabase-js `.in()` builds the PostgREST IN list by
-  // wrapping values that contain `,`, `(`, `)` in `"..."` but does NOT
-  // escape internal `"`. AutoCount sofa codes (e.g. `HK5531/28"(...)`)
-  // contain a double-quote, so the URL becomes malformed and PostgREST
-  // SILENTLY returns 0 rows (200 OK, no error). The catalog map ends up
-  // empty and EVERY line falls back to the raw description — Loo's
-  // 109-distinct-description import lost all 24 real SKU matches.
-  //
-  // Workaround: build the IN clause ourselves with proper backslash
-  // escaping (PostgREST IN syntax allows `\"` inside quoted values) and
-  // pass it through `.filter()`. One subrequest, no extra round trips.
-  const escapedList = descriptions
-    .map((d) => `"${d.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)
-    .join(",");
-  const { data, error } = await sb
-    .from("product_skus")
-    .select("sku, variant")
-    .filter("variant", "in", `(${escapedList})`);
-  if (error) {
-    // Don't fail the import on a catalog read error — degrade to fallback.
-    return map;
-  }
-  for (const row of (data ?? []) as Array<{ sku: string; variant: string }>) {
-    map.set(row.variant, row.sku);
+
+  // 2026-06-04 — Loo's listing exposed that AutoCount sofa specs explode
+  // into per-colorway descriptions (`HK5531/28"(2+L Seater)/COLOUR NINJA 08`)
+  // while the catalog only stores model+seater (`HK5531/28"(2 Seater)`).
+  // Enumerating every colorway in the catalog is impractical, so the
+  // resolver is now a 3-layer cascade keyed on the original description:
+  //   1. exact match
+  //   2. color-stripped match (drops `/COLOUR..`, `/Col:..`, `/M2402-..` …)
+  //   3. model-family match — same model identifier + best seater fit
+  //      (preserves supplier routing even when the exact seater isn't
+  //      in the catalog).
+  // One subrequest reads the whole catalog (~1k rows) so all three
+  // layers run in memory.
+  const catalog = await loadAllCatalogRows(sb);
+  if (catalog.length === 0) return map;
+
+  const byVariant = new Map<string, string>();
+  for (const row of catalog) byVariant.set(row.variant, row.sku);
+
+  for (const d of descriptions) {
+    // Layer 1: exact match on the raw AutoCount description.
+    const exact = byVariant.get(d);
+    if (exact) {
+      map.set(d, exact);
+      continue;
+    }
+    // Layer 2: drop the AutoCount colorway suffix and try again.
+    const stripped = stripColorSuffix(d);
+    if (stripped !== d) {
+      const sFromStripped = byVariant.get(stripped);
+      if (sFromStripped) {
+        map.set(d, sFromStripped);
+        continue;
+      }
+    }
+    // Layer 3: model-family — pick a catalog row inside the same model
+    // identifier (and best-matching seater) so procurement still routes
+    // to the correct supplier even when the seater/colorway combo isn't
+    // in the catalog. Skip super-short identifiers to avoid bad matches
+    // on generic words (e.g. accessory descriptions like `Pillow`).
+    const modelId = extractModelIdentifier(stripped);
+    if (modelId.length < 4) continue;
+    const candidates = catalog
+      .filter((c) => c.variant.startsWith(modelId))
+      .map((c) => c.variant);
+    if (candidates.length === 0) continue;
+    const best = pickBestModelCandidate(stripped, candidates);
+    if (best) {
+      const sku = byVariant.get(best);
+      if (sku) map.set(d, sku);
+    }
   }
   return map;
 }
