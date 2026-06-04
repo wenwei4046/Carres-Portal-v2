@@ -125,7 +125,11 @@ export default function SupplierIncoming() {
                 {cat.charAt(0).toUpperCase() + cat.slice(1)}
               </div>
               <div className="font-mono text-[11px] text-muted-foreground">
-                {items.reduce((s, i) => s + i.openQty, 0)} units · {items.length} SKU
+                {/* Total = committed + pending, matching the hero KPI math —
+                    committed-only here understated categories whose demand is
+                    mostly un-POed sales orders (Loo 2026-06-04). */}
+                {items.reduce((s, i) => s + i.openQty + (i.pendingQty ?? 0), 0)}{" "}
+                units · {items.length} SKU
                 {items.length === 1 ? "" : "s"}
               </div>
             </div>
