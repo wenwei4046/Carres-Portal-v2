@@ -377,10 +377,24 @@ async function buildSkuResolver(
 ): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (descriptions.length === 0) return map;
+  // 2026-06-04 — supabase-js `.in()` builds the PostgREST IN list by
+  // wrapping values that contain `,`, `(`, `)` in `"..."` but does NOT
+  // escape internal `"`. AutoCount sofa codes (e.g. `HK5531/28"(...)`)
+  // contain a double-quote, so the URL becomes malformed and PostgREST
+  // SILENTLY returns 0 rows (200 OK, no error). The catalog map ends up
+  // empty and EVERY line falls back to the raw description — Loo's
+  // 109-distinct-description import lost all 24 real SKU matches.
+  //
+  // Workaround: build the IN clause ourselves with proper backslash
+  // escaping (PostgREST IN syntax allows `\"` inside quoted values) and
+  // pass it through `.filter()`. One subrequest, no extra round trips.
+  const escapedList = descriptions
+    .map((d) => `"${d.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)
+    .join(",");
   const { data, error } = await sb
     .from("product_skus")
     .select("sku, variant")
-    .in("variant", descriptions);
+    .filter("variant", "in", `(${escapedList})`);
   if (error) {
     // Don't fail the import on a catalog read error — degrade to fallback.
     return map;
