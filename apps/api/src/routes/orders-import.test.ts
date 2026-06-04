@@ -328,6 +328,47 @@ describe("POST /api/orders/import", () => {
   // that resolution now goes through .filter("variant","in",...) and that a
   // catalog entry whose variant contains `"` is correctly matched + sent as
   // the canonical sku on the RPC payload (not the raw description).
+  // 2026-06-04 — AutoCount appends colorway suffix to Detail Description
+  // ("/COL:NINJA-02", "/M2402-4 Sand", "/PC151-01" etc.) that the catalog
+  // (product_skus.variant) doesn't store — the colorway lives in the sibling
+  // sku (Item Code). Resolver now color-strips before catalog lookup so 38
+  // more lines find their canonical sku (Loo: 24/109 → 62/109 recovered).
+  it("resolves descriptions whose colorway suffix isn't in the catalog (Col:/COLOUR/fabric codes)", async () => {
+    const sb = buildSb({
+      rpcReply: okReply("created"),
+      catalog: [
+        // catalog stores stripped model+seater; sku carries the colorway
+        { sku: "SF02-DSL8019-3S", variant: 'Muro DSL8019/30"(3 Seater)' },
+        { sku: "BF04-1013Jager/Fab3-Q", variant: "1013Jager/Fab3-Queen" },
+      ],
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await post(jwt, {
+      dealerId: DEALER_HOUSE,
+      rows: [
+        row({
+          ref: "TCF0383",
+          itemGroup: "Sofa",
+          detailDescription: 'Muro DSL8019/30"(3 Seater)/Col:NINJA-02',
+        }),
+        row({
+          ref: "CR1124",
+          itemGroup: "Bed Fram",
+          detailDescription: "1013Jager/Fab3-Queen/PC151-01",
+        }),
+      ],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AutocountImportResponse;
+    // Both core items should now be unflagged (resolved via color-strip)
+    expect(body.results.flatMap((r) => r.unmatchedDescriptions)).toEqual([]);
+    // RPC payload carries the catalog sku, NOT the raw description with colorway
+    const payloads = sb._calls[0].payloads!;
+    const lineSkus = payloads.flatMap((p: any) => p.lines.map((l: any) => l.sku)).sort();
+    expect(lineSkus).toEqual(["BF04-1013Jager/Fab3-Q", "SF02-DSL8019-3S"]);
+  });
+
   it("resolves descriptions containing double-quote characters via .filter() (not .in())", async () => {
     const sb = buildSb({
       rpcReply: okReply("created"),

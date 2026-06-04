@@ -371,24 +371,57 @@ function parsePaid(balance?: string | null | undefined): number {
  * storing the raw description as sku, and core items (mattress/bedframe/
  * sofa) are flagged in the import report so operation can reconcile.
  */
+/**
+ * AutoCount appends a colorway suffix to the Detail Description that the
+ * product catalog (product_skus.variant) does NOT store — e.g. AutoCount
+ * sends `Muro DSL8019/30"(3 Seater)/Col:NINJA-02` but the catalog row is
+ * just `Muro DSL8019/30"(3 Seater)` and the color is encoded in the
+ * sibling `sku` (Item Code). Stripping the trailing color clause restores
+ * an exact match on the model+seater portion; with this Loo's 192-row
+ * listing recovers 38 more SKU matches (24→62 of 109 distinct descs).
+ *
+ * Heuristic only — we look for the FIRST `/` followed by a known color
+ * marker (`COLOUR` / `Col:` / fabric codes like `M2402-`, `PC151-`,
+ * `KN390-`, `HR805-`, named colors). False positives are harmless: if the
+ * stripped string also fails to match, we keep the original behaviour
+ * (raw description in line). The catalog read still returns a single
+ * UNION of original + stripped descriptions in ONE subrequest.
+ */
+const COLOR_SUFFIX_RE =
+  /\s*\/(?:\s*)(?:COLOUR|COLOR|Col:|COL:|col:|M\d{3,}|PC\s?\d{3,}|KN\d{3,}|HR\d{3,}|BL\d{2,}|RD\d{2,}|EO\d{2,}|Ninja|NINJA|Eleganz|Garfield|GARFIELD|Fossil|FOSSIL|Pearl|PEARL|Sand|SAND|Forest|FOREST|Light\s|Lighty\s|Metal|METAL|Tundora|TUNDORA|Cheron)/;
+function stripColorSuffix(s: string): string {
+  const m = s.match(COLOR_SUFFIX_RE);
+  return m && m.index !== undefined ? s.slice(0, m.index).trim() : s;
+}
+
 async function buildSkuResolver(
   sb: ReturnType<typeof userClient>,
   descriptions: string[],
 ): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (descriptions.length === 0) return map;
+
+  // Build the catalog query set: original descriptions PLUS the
+  // color-stripped variants (deduped). Two-stage fallback below: prefer
+  // exact match on the original, else exact match on the stripped form.
+  const queryTargets = new Set<string>();
+  for (const d of descriptions) {
+    queryTargets.add(d);
+    const stripped = stripColorSuffix(d);
+    if (stripped !== d) queryTargets.add(stripped);
+  }
+
   // 2026-06-04 — supabase-js `.in()` builds the PostgREST IN list by
   // wrapping values that contain `,`, `(`, `)` in `"..."` but does NOT
   // escape internal `"`. AutoCount sofa codes (e.g. `HK5531/28"(...)`)
   // contain a double-quote, so the URL becomes malformed and PostgREST
   // SILENTLY returns 0 rows (200 OK, no error). The catalog map ends up
-  // empty and EVERY line falls back to the raw description — Loo's
-  // 109-distinct-description import lost all 24 real SKU matches.
+  // empty and EVERY line falls back to the raw description.
   //
   // Workaround: build the IN clause ourselves with proper backslash
   // escaping (PostgREST IN syntax allows `\"` inside quoted values) and
   // pass it through `.filter()`. One subrequest, no extra round trips.
-  const escapedList = descriptions
+  const escapedList = Array.from(queryTargets)
     .map((d) => `"${d.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)
     .join(",");
   const { data, error } = await sb
@@ -399,8 +432,25 @@ async function buildSkuResolver(
     // Don't fail the import on a catalog read error — degrade to fallback.
     return map;
   }
+  const catalogByVariant = new Map<string, string>();
   for (const row of (data ?? []) as Array<{ sku: string; variant: string }>) {
-    map.set(row.variant, row.sku);
+    catalogByVariant.set(row.variant, row.sku);
+  }
+
+  // Per AutoCount description, prefer exact match, fall back to stripped
+  // color match. Keep the map keyed on the ORIGINAL description so per-row
+  // lookups downstream stay byte-identical (no rewriting needed).
+  for (const d of descriptions) {
+    const exact = catalogByVariant.get(d);
+    if (exact) {
+      map.set(d, exact);
+      continue;
+    }
+    const stripped = stripColorSuffix(d);
+    if (stripped !== d) {
+      const fallback = catalogByVariant.get(stripped);
+      if (fallback) map.set(d, fallback);
+    }
   }
   return map;
 }
