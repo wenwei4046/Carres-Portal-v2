@@ -417,6 +417,28 @@ function extractModelIdentifier(desc: string): string {
 }
 
 /**
+ * Layer-4 model token — looser than `extractModelIdentifier`. We drop the
+ * width/size segment as well, keeping only the FIRST `/`-separated token.
+ * Catches AutoCount sending a width the catalog doesn't carry (e.g.
+ * `SF03-HK5535/32"` when catalog has only `/24"` and `/30"`) or a slightly
+ * malformed model+seater spec (`SF02-DSL9038/30"/ "(2 Seater)`).
+ *
+ *   `SF03-HK5535/32"(3 Seater)`          → `SF03-HK5535`
+ *   `SF02-DSL9038/30"/ "(2 Seater)`      → `SF02-DSL9038`
+ *   `Muro DSL8019/30"(2 Seater)`         → `Muro DSL8019`
+ *   `1013Jager/Fab3-Queen`               → `1013Jager`
+ *   `FORTE-L1202F-Q`                     → `FORTE-L1202F-Q` (no slash to cut)
+ */
+function extractModelToken(desc: string): string {
+  const noColor = stripColorSuffix(desc);
+  const parenIdx = noColor.indexOf("(");
+  const modelId =
+    parenIdx > 0 ? noColor.slice(0, parenIdx).trim() : noColor.trim();
+  const firstSlash = modelId.indexOf("/");
+  return firstSlash > 0 ? modelId.slice(0, firstSlash).trim() : modelId.trim();
+}
+
+/**
  * Pick the catalog variant that best represents the AutoCount description
  * within its model family. Prefer matching seater config (e.g. `(2 Seater)`
  * — by exact paren content first, then by seater number). Falls back to
@@ -485,14 +507,18 @@ async function buildSkuResolver(
   // into per-colorway descriptions (`HK5531/28"(2+L Seater)/COLOUR NINJA 08`)
   // while the catalog only stores model+seater (`HK5531/28"(2 Seater)`).
   // Enumerating every colorway in the catalog is impractical, so the
-  // resolver is now a 3-layer cascade keyed on the original description:
+  // resolver is now a 4-layer cascade keyed on the original description:
   //   1. exact match
   //   2. color-stripped match (drops `/COLOUR..`, `/Col:..`, `/M2402-..` …)
-  //   3. model-family match — same model identifier + best seater fit
-  //      (preserves supplier routing even when the exact seater isn't
-  //      in the catalog).
-  // One subrequest reads the whole catalog (~1k rows) so all three
-  // layers run in memory.
+  //   3. model-family match — same model identifier (model + width) +
+  //      best-fit seater (preserves supplier routing when the colorway
+  //      isn't in the catalog).
+  //   4. model-token match — same model TOKEN (drops width too) + best-fit
+  //      seater. Catches AutoCount sending a width the catalog doesn't
+  //      carry (`SF03-HK5535/32"` when catalog has only `/24"` + `/30"`)
+  //      or a malformed spec (`SF02-DSL9038/30"/ "(2 Seater)`).
+  // One subrequest reads the whole catalog (~1k rows) so all four layers
+  // run in memory.
   const catalog = await loadAllCatalogRows(sb);
   if (catalog.length === 0) return map;
 
@@ -515,20 +541,37 @@ async function buildSkuResolver(
         continue;
       }
     }
-    // Layer 3: model-family — pick a catalog row inside the same model
-    // identifier (and best-matching seater) so procurement still routes
-    // to the correct supplier even when the seater/colorway combo isn't
-    // in the catalog. Skip super-short identifiers to avoid bad matches
-    // on generic words (e.g. accessory descriptions like `Pillow`).
+    // Layer 3: model-family — pick a catalog row whose variant starts with
+    // the full model identifier (model + width). Skip super-short
+    // identifiers to avoid generic-word collisions.
     const modelId = extractModelIdentifier(stripped);
-    if (modelId.length < 4) continue;
-    const candidates = catalog
-      .filter((c) => c.variant.startsWith(modelId))
+    if (modelId.length >= 4) {
+      const layer3Candidates = catalog
+        .filter((c) => c.variant.startsWith(modelId))
+        .map((c) => c.variant);
+      if (layer3Candidates.length > 0) {
+        const best = pickBestModelCandidate(stripped, layer3Candidates);
+        if (best) {
+          const sku = byVariant.get(best);
+          if (sku) {
+            map.set(d, sku);
+            continue;
+          }
+        }
+      }
+    }
+    // Layer 4: model-token — drop the width segment too. Only run when the
+    // token is shorter than the identifier (i.e. there's actually a slash
+    // to cut on); same min-length guard.
+    const modelToken = extractModelToken(stripped);
+    if (modelToken.length < 4 || modelToken === modelId) continue;
+    const layer4Candidates = catalog
+      .filter((c) => c.variant.startsWith(modelToken))
       .map((c) => c.variant);
-    if (candidates.length === 0) continue;
-    const best = pickBestModelCandidate(stripped, candidates);
-    if (best) {
-      const sku = byVariant.get(best);
+    if (layer4Candidates.length === 0) continue;
+    const best4 = pickBestModelCandidate(stripped, layer4Candidates);
+    if (best4) {
+      const sku = byVariant.get(best4);
       if (sku) map.set(d, sku);
     }
   }

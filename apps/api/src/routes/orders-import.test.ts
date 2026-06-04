@@ -336,6 +336,44 @@ describe("POST /api/orders/import", () => {
   // that resolution now goes through .filter("variant","in",...) and that a
   // catalog entry whose variant contains `"` is correctly matched + sent as
   // the canonical sku on the RPC payload (not the raw description).
+  // 2026-06-04 — Loo's screenshot still showed 3 unmatched after Layers 1-3
+  // (`SF03-HK5535/32"(3 Seater)` — catalog has HK5535 in /24" + /30" widths
+  // only; `SF02-DSL9038/24"…` and `/30"/ "(2 Seater)…` — DSL9038 only in
+  // /30" width with malformed format). Layer 4 drops the width segment too,
+  // matching by model token alone, so the supplier prefix on the resulting
+  // sku still drives correct procurement routing.
+  it("falls back to model-token match when catalog lacks the AutoCount width (Layer 4)", async () => {
+    const sb = buildSb({
+      rpcReply: okReply("created"),
+      catalog: [
+        // Catalog HK5535 in /24" + /30" only — AutoCount sent /32".
+        { sku: 'SF03-HK5535/24"(3 Seater)', variant: 'SF03-HK5535/24"(3 Seater)' },
+        { sku: 'SF03-HK5535/30"(1 Seater)', variant: 'SF03-HK5535/30"(1 Seater)' },
+        { sku: 'SF03-HK5535/30"(3 Seater)', variant: 'SF03-HK5535/30"(3 Seater)' },
+      ],
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await post(jwt, {
+      dealerId: DEALER_HOUSE,
+      rows: [
+        row({
+          ref: "TCF0505",
+          itemGroup: "Sofa",
+          detailDescription: 'SF03-HK5535/32"(3 Seater)',
+        }),
+      ],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AutocountImportResponse;
+    expect(body.results[0].unmatchedDescriptions).toEqual([]);
+    // Best seater (3 Seater) match within the SF03-HK5535 family; alpha
+    // tiebreak between /24"(3 Seater) and /30"(3 Seater) → /24" wins.
+    expect(sb._calls[0].payloads![0].lines[0].sku).toBe(
+      'SF03-HK5535/24"(3 Seater)',
+    );
+  });
+
   // 2026-06-04 — Loo: sofa specs explode (model × seater × colorway) so the
   // catalog can't enumerate every permutation. When an AutoCount description
   // can't exact-match OR color-strip-match anything, the resolver falls back
