@@ -380,8 +380,16 @@ ordersRouter.post("/import", async (c) => {
 
   const parsed = autocountImportInput.safeParse(body);
   if (!parsed.success) {
+    // Surface zod's path alongside the message — without it ops sees the
+    // useless "String must contain at least 1 character(s)" with no hint as to
+    // which row or field. Real-world trigger: AutoCount exports a discount
+    // line with a blank `Item Group` cell; the path now reads
+    // "Invalid import input at rows.148.itemGroup: ..." so the bad CSV cell is
+    // immediately findable. (2026-06-04 — Loo 192-row listing 4 jun 26.csv)
+    const issue = parsed.error.issues[0];
+    const path = issue && issue.path.length > 0 ? issue.path.join(".") : "<root>";
     throw new HTTPException(400, {
-      message: "Invalid import input: " + parsed.error.issues[0]?.message,
+      message: `Invalid import input at ${path}: ${issue?.message ?? "validation failed"}`,
     });
   }
   let { dealerId, sourceSystem, rows } = parsed.data;

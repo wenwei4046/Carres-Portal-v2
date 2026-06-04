@@ -73,61 +73,115 @@ describe("listingRowToImportRow", () => {
     "Balance": "RM3322 Paid",
   };
 
-  it("maps a full AutoCount listing row", () => {
+  // Return-shape contract — 2026-06-04: was `T | null`, now a discriminated
+  // union `{ ok:true, row } | { ok:false, reason }` so the operation panel can
+  // explain WHY each row was skipped (the "all 192 rows rejected because one
+  // discount line had no Item Group" UX trap). `noRef` keeps the original
+  // silent-skip semantics; the three other reasons used to slip past the
+  // mapper and trigger a useless zod error.
+
+  it("returns ok:true with row when every required field is present", () => {
     const r = listingRowToImportRow(validRow);
-    expect(r).not.toBeNull();
-    expect(r!.ref).toBe("CR0418");
-    expect(r!.itemGroup).toBe("Mattress");
-    expect(r!.qty).toBe(1);
-    expect(r!.detailDescription).toBe("Breeze FirmCare-B1201F-K");
-    expect(r!.poDocNo).toBe("PO/2604-006");
-    expect(r!.debtorName).toBe("Felix Koh");
-    expect(r!.balance).toBe("RM3322 Paid");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.row.ref).toBe("CR0418");
+      expect(r.row.itemGroup).toBe("Mattress");
+      expect(r.row.qty).toBe(1);
+      expect(r.row.detailDescription).toBe("Breeze FirmCare-B1201F-K");
+      expect(r.row.poDocNo).toBe("PO/2604-006");
+      expect(r.row.debtorName).toBe("Felix Koh");
+      expect(r.row.balance).toBe("RM3322 Paid");
+    }
+  });
+
+  it("returns ok:false reason='noRef' when Ref. is blank (preserves old silent skip)", () => {
+    expect(listingRowToImportRow({ ...validRow, "Ref.": "" })).toEqual({
+      ok: false,
+      reason: "noRef",
+    });
+  });
+
+  it("returns ok:false reason='noItemGroup' when Item Group is blank (AutoCount discount line)", () => {
+    expect(listingRowToImportRow({ ...validRow, "Item Group": "" })).toEqual({
+      ok: false,
+      reason: "noItemGroup",
+    });
+  });
+
+  it("returns ok:false reason='noDescription' when Detail Description is blank", () => {
+    expect(listingRowToImportRow({ ...validRow, "Detail Description": "" })).toEqual({
+      ok: false,
+      reason: "noDescription",
+    });
+  });
+
+  it("returns ok:false reason='noDebtorName' when Debtor Name is blank", () => {
+    expect(listingRowToImportRow({ ...validRow, "Debtor Name": "" })).toEqual({
+      ok: false,
+      reason: "noDebtorName",
+    });
+  });
+
+  it("reports noRef first when both Ref. and Item Group are blank (ref drives the silent-skip path)", () => {
+    expect(
+      listingRowToImportRow({ ...validRow, "Ref.": "", "Item Group": "" }),
+    ).toEqual({ ok: false, reason: "noRef" });
   });
 
   it("parses Excel serial 46143 to ISO date (May 1 2026, Lotus epoch)", () => {
     const r = listingRowToImportRow(validRow);
     // 1899-12-30 + 46143 days = 2026-05-01
-    expect(r!.deliveryDate).toBe("2026-05-01");
+    if (r.ok) expect(r.row.deliveryDate).toBe("2026-05-01");
+    else throw new Error("expected ok row");
   });
 
   it("parses DD/MM/YYYY date format", () => {
     const r = listingRowToImportRow({ ...validRow, "New- Delivery Date": "19/05/2026" });
-    expect(r!.deliveryDate).toBe("2026-05-19");
+    if (r.ok) expect(r.row.deliveryDate).toBe("2026-05-19");
+    else throw new Error("expected ok row");
   });
 
   it("accepts ISO date format passthrough", () => {
     const r = listingRowToImportRow({ ...validRow, "New- Delivery Date": "2026-05-19" });
-    expect(r!.deliveryDate).toBe("2026-05-19");
+    if (r.ok) expect(r.row.deliveryDate).toBe("2026-05-19");
+    else throw new Error("expected ok row");
   });
 
   it("returns null deliveryDate for blank / unparseable", () => {
-    expect(listingRowToImportRow({ ...validRow, "New- Delivery Date": "" })!.deliveryDate).toBeNull();
-    expect(listingRowToImportRow({ ...validRow, "New- Delivery Date": "garbage" })!.deliveryDate).toBeNull();
-  });
-
-  it("returns null on missing Ref. (silent skip)", () => {
-    expect(listingRowToImportRow({ ...validRow, "Ref.": "" })).toBeNull();
+    const blank = listingRowToImportRow({ ...validRow, "New- Delivery Date": "" });
+    const garbage = listingRowToImportRow({ ...validRow, "New- Delivery Date": "garbage" });
+    if (blank.ok) expect(blank.row.deliveryDate).toBeNull();
+    else throw new Error("expected ok row for blank date");
+    if (garbage.ok) expect(garbage.row.deliveryDate).toBeNull();
+    else throw new Error("expected ok row for garbage date");
   });
 
   it("defaults qty to 1 when blank or non-numeric", () => {
-    expect(listingRowToImportRow({ ...validRow, Qty: "" })!.qty).toBe(1);
-    expect(listingRowToImportRow({ ...validRow, Qty: "abc" })!.qty).toBe(1);
+    const blank = listingRowToImportRow({ ...validRow, Qty: "" });
+    const abc = listingRowToImportRow({ ...validRow, Qty: "abc" });
+    if (blank.ok) expect(blank.row.qty).toBe(1);
+    else throw new Error("expected ok row for blank qty");
+    if (abc.ok) expect(abc.row.qty).toBe(1);
+    else throw new Error("expected ok row for abc qty");
   });
 
   it("case-insensitive header tolerance", () => {
     const upper: Record<string, string> = {};
     for (const [k, v] of Object.entries(validRow)) upper[k.toUpperCase()] = v;
     const r = listingRowToImportRow(upper);
-    expect(r).not.toBeNull();
-    expect(r!.ref).toBe("CR0418");
-    expect(r!.itemGroup).toBe("Mattress");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.row.ref).toBe("CR0418");
+      expect(r.row.itemGroup).toBe("Mattress");
+    }
   });
 
   it("nullifies blank Address fields", () => {
     const r = listingRowToImportRow(validRow);
-    expect(r!.addr2).toBeNull();
-    expect(r!.addr3).toBeNull();
-    expect(r!.addr4).toBeNull();
+    if (r.ok) {
+      expect(r.row.addr2).toBeNull();
+      expect(r.row.addr3).toBeNull();
+      expect(r.row.addr4).toBeNull();
+    } else throw new Error("expected ok row");
   });
 });

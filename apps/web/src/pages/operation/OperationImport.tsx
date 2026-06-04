@@ -1,12 +1,25 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { parseCsv, listingRowToImportRow } from "@/lib/csv";
+import {
+  parseCsv,
+  listingRowToImportRow,
+  type ListingRowResult,
+  type ListingSkipReason,
+} from "@/lib/csv";
 import { apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queries";
 import type {
   AutocountImportInput,
   AutocountImportResponse,
 } from "@carres/shared";
+
+/** Human-friendly labels for the skip-reason breakdown beneath the preview. */
+const SKIP_REASON_LABEL: Record<ListingSkipReason, string> = {
+  noRef: "No Ref.",
+  noItemGroup: "No Item Group",
+  noDescription: "No Detail Description",
+  noDebtorName: "No Debtor Name",
+};
 
 /**
  * Operation · AutoCount Import — Phase A step 4.
@@ -29,16 +42,27 @@ export default function OperationImport() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [csvText, setCsvText] = useState<string>("");
-  const [parsedRows, setParsedRows] = useState<
-    ReturnType<typeof listingRowToImportRow>[]
-  >([]);
+  const [parsedRows, setParsedRows] = useState<ListingRowResult[]>([]);
   const [parseErrors, setParseErrors] = useState<
     { row: number; col: number; message: string }[]
   >([]);
   const [fileName, setFileName] = useState<string>("");
 
 
-  const usableRows = parsedRows.filter((r): r is NonNullable<typeof r> => r !== null);
+  const usableRows = parsedRows.flatMap((r) => (r.ok ? [r.row] : []));
+  const skippedRows = parsedRows.filter(
+    (r): r is Extract<ListingRowResult, { ok: false }> => !r.ok,
+  );
+  // Breakdown like { noRef: 1, noItemGroup: 1 } — drives the small reason
+  // legend underneath the preview tiles so ops can find the bad CSV row by
+  // field instead of staring at a generic backend 400.
+  const skipBreakdown = skippedRows.reduce<Partial<Record<ListingSkipReason, number>>>(
+    (acc, r) => {
+      acc[r.reason] = (acc[r.reason] ?? 0) + 1;
+      return acc;
+    },
+    {},
+  );
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -89,7 +113,7 @@ export default function OperationImport() {
   }
 
   const previewRows = usableRows.slice(0, 5);
-  const skippedRowCount = parsedRows.length - usableRows.length;
+  const skippedRowCount = skippedRows.length;
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -149,11 +173,31 @@ export default function OperationImport() {
               accent={usableRows.length > 0 ? "ok" : undefined}
             />
             <Stat
-              label="Skipped (no Ref.)"
+              label="Skipped"
               value={skippedRowCount}
               accent={skippedRowCount > 0 ? "warn" : undefined}
             />
           </div>
+          {skippedRowCount > 0 ? (
+            <div className="mb-4 rounded border border-warning-200 bg-warning-50 p-3 text-xs text-warning-800">
+              <div className="font-semibold mb-1">
+                Skipped rows ({skippedRowCount})
+              </div>
+              <ul className="space-y-0.5">
+                {(Object.entries(skipBreakdown) as [ListingSkipReason, number][]).map(
+                  ([reason, count]) => (
+                    <li key={reason}>
+                      {SKIP_REASON_LABEL[reason]}: <span className="font-mono">{count}</span>
+                    </li>
+                  ),
+                )}
+              </ul>
+              <p className="mt-2 text-[11px] text-warning-700">
+                These rows are silently dropped — the import will only create / update the {usableRows.length} usable row(s).
+                Fix the cell in AutoCount and re-export if you want them included.
+              </p>
+            </div>
+          ) : null}
           {parseErrors.length > 0 ? (
             <div className="mb-4 rounded border border-warning-200 bg-warning-50 p-3 text-xs text-warning-800">
               <div className="font-semibold mb-1">

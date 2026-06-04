@@ -204,6 +204,24 @@ describe("POST /api/orders/import", () => {
     expect(res.status).toBe(400);
   });
 
+  // 2026-06-04 — surface the failing zod path. Before this, ops saw
+  // "Invalid import input: String must contain at least 1 character(s)" with
+  // no hint as to WHICH of 192 rows or WHICH field; tracing it took a node
+  // diagnostic. The path lets the message read like
+  // "Invalid import input at rows.1.itemGroup: …" so the bad CSV row is
+  // immediately obvious.
+  it("400 message includes the failing zod path (rows.<i>.<field>)", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb({ rpcReply: okReply() }));
+    const jwt = await makeJwt("operation");
+    const res = await post(jwt, {
+      dealerId: DEALER_HOUSE,
+      rows: [row(), { ...row(), itemGroup: "" }], // row[1] mirrors the AutoCount discount-line case
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message ?? "").toContain("rows.1.itemGroup");
+  });
+
   it("groups rows sharing a Ref into one order; calls RPC once", async () => {
     const sb = buildSb({ rpcReply: okReply("created") });
     vi.mocked(userClient).mockReturnValue(sb);
