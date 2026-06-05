@@ -1567,7 +1567,7 @@ export interface operationOrderThreadRow {
    *  across threads (different supplier legs picked different partners). */
   delivery_partner_id: string | null;
   /** 2026-05-18 (Loo) — partner name embed so OrderCard pill renders
-   *  "via Nets Sdn Bhd" instead of "LP-{8-char UUID}". Closes the
+   *  "via NETS" instead of "LP-{8-char UUID}". Closes the
    *  phase-4-detail-partner-name-join carry-forward. */
   delivery_partners: { id: string; name: string } | null;
   confirm_delivery_date: string | null;

@@ -794,7 +794,7 @@ describe("OperationOrders — kanban", () => {
 
   it("26. (Chunk 2 T9 + 2026-05-18 name join) renders LP pill with partner NAME when threads share the same delivery_partner_id + joined name", () => {
     const PARTNER_ID = "00000000-0000-0000-0000-0000000abcde";
-    const PARTNER_NAME = "Nets Sdn Bhd";
+    const PARTNER_NAME = "NETS";
     setLoaded([
       makeOrder({
         id: "ord-single-lp",
