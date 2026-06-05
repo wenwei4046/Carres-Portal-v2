@@ -48,12 +48,13 @@ update suppliers set lead_time = '7-21 days', contact = null where name = 'Ohana
 update suppliers set lead_time = '7-10 days', contact = null where name = 'Nice Future';
 
 -- -----------------------------------------------------------------------------
--- DELIVERY PARTNERS — Nets Sdn Bhd
+-- DELIVERY PARTNERS — NETS (renamed from "Nets Sdn Bhd" to short form via
+-- migration 0157 for consistency with AL/HOUZS/TSDD/Teow/TT/EU/SSY).
 -- -----------------------------------------------------------------------------
 -- partner_fleet stays empty Day 1 — partner can add vehicles via Partner →
 -- Fleet UI (Phase 7 Sprint 3 shipped this).
 insert into delivery_partners (name, contact, zones, onboarded_date, rate_card) values
-  ('Nets Sdn Bhd', null, 'Klang Valley', '2025-01-01', null);
+  ('NETS', null, 'Klang Valley', '2025-01-01', null);
 
 -- -----------------------------------------------------------------------------
 -- WAREHOUSES — 1 (Carres Klang)
@@ -84,7 +85,7 @@ commit;
 --  | salesperson   | sales-mk@carres.com          | Mattress King + Main outlet|
 --  | supplier      | hookka@gmail.com             | Ohana                     |
 --  | supplier      | nicefuture@carres.com        | Nice Future                |
---  | partner       | nets@carres.com              | Nets Sdn Bhd               |
+--  | partner       | nets@carres.com              | NETS                       |
 --  | showroom      | sales@carres.com             | Carres KL Showroom         |
 --
 -- Items Loo can refine later via UI (no Day 1 blocker):

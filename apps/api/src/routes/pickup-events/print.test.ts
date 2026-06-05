@@ -99,7 +99,7 @@ describe("GET /api/pickup-events/:id/print", () => {
           pickup_at: "2026-05-15T03:00:00Z",
         },
         supplier: { name: "Acme Furniture Sdn Bhd", contact: "+60 3-1234 5678" },
-        partner: { name: "Nets Sdn Bhd" },
+        partner: { name: "NETS" },
         warehouse: { name: "Carres Klang", address: "1 Persiaran Test, Klang" },
         lines: [
           { sku: "MAT-K-001", variant: "King Mattress 200x200", qty: 2 },
