@@ -89,12 +89,10 @@ Each branch = one PR. No direct commits to main.
 
 | PR | Branch | Owner | What |
 |----|--------|-------|------|
-| #7 | `fix/normalize-nets-name` | Feature | NETS + TEOW name normalization (0157 + 0158) |
-| (this) | `docs/parallel-dev-checkpoint` | Feature | this doc |
-| (next) | TBD | Feature | multi-leg delivery API endpoints |
+| (this) | `feat/multi-leg-delivery-api` | Feature | API endpoints + shared types contract |
 
-After PR #7 merges, all 8 partners read consistently: `AL · EU · HOUZS · NETS
-· SSY · TEOW · TSDD · TT`.
+All 8 partners now read consistently: `AL · EU · HOUZS · NETS · SSY · TEOW
+· TSDD · TT` (PR #7 merged 2026-06-05).
 
 ---
 
@@ -103,18 +101,32 @@ After PR #7 merges, all 8 partners read consistently: `AL · EU · HOUZS · NETS
 The schema landed already (migration 0156 — merged in PR #6): `orders.delivery_stops
 jsonb` + 2 RPCs (`set_delivery_chain`, `patch_delivery_stop`).
 
-### Feature session (me) — next
+### Feature session — DONE in this PR
 
-1. **API endpoints** in `apps/api/src/routes/operation/delivery-chain.ts`:
+1. ✅ **API endpoints** in `apps/api/src/routes/operation/delivery-chain.ts`:
    - `PUT /api/operation/orders/:id/delivery-chain` → calls `set_delivery_chain` RPC
    - `PATCH /api/operation/orders/:id/delivery-stops/:leg` → calls `patch_delivery_stop` RPC
-   - `POST /api/operation/orders/:id/delivery-stops/:leg/pod` → upload POD photo to Storage
-2. **TypeScript contract** in `packages/shared/src/schemas/delivery-chain.ts`:
-   - `deliveryStopSchema` (zod)
-   - `setDeliveryChainInput`, `patchDeliveryStopInput`
-3. **Tests** in `apps/api/src/routes/operation/delivery-chain.test.ts`
-4. Watch this section — will be marked **"Multi-leg contract ready"** when types are
-   merged so UI session can pull and start the timeline component.
+2. ✅ **TypeScript contract** in `packages/shared/src/schemas/delivery-chain.ts`:
+   - `deliveryStopSchema`, `setDeliveryChainInputSchema`, `patchDeliveryStopInputSchema`,
+     `deliveryChainResponseSchema` + matching types
+   - Re-exported from `@carres/shared` root
+3. ✅ **Tests** in `apps/api/src/routes/operation/delivery-chain.test.ts` (16/16 pass)
+4. ⚠️ **POD upload**: deferred — frontend uploads directly to Storage via
+   supabase-js (bucket `delivery-orders`, path `orders/<id>/legs/<n>/<ts>.<ext>`)
+   then PATCHes the leg with `pod_url`. No backend endpoint needed.
+
+🟢 **Multi-leg contract is READY** — UI session can pull main + start the
+timeline component (task #4 below). Imports: `import { deliveryStopSchema,
+setDeliveryChainInputSchema, type DeliveryStop } from "@carres/shared"`.
+
+### Feature session — next
+
+- React Query hooks in `apps/web/src/lib/queries.ts`:
+  `useSetDeliveryChain(orderId)`, `usePatchDeliveryStop(orderId)`
+  + matching query keys + cache invalidation
+- Surface `delivery_stops` on `useOperationOrder` (already returns row;
+  jsonb column just needs to be included in the SELECT)
+- Tests for the new hooks
 
 ### UI session — start NOW (independent of multi-leg backend)
 
@@ -129,11 +141,20 @@ Pick one and ship a PR. All three are scoped + don't need new backend.
 3. **Inbox dropdown polish** — show partner zone next to name in the picker,
    e.g. `TEOW · KL → Johor Bahru`. File: `apps/web/src/pages/operation/OperationInbox.tsx`.
 
-### UI session — wait for "Multi-leg contract ready" signal
+### UI session — Multi-leg timeline (UNBLOCKED 🟢)
 
-4. **Multi-leg timeline UI** in Order detail drawer — depends on Feature session
-   shipping `packages/shared/src/schemas/delivery-chain.ts`. Updates to this doc
-   will signal when it's ready to pull.
+4. **Multi-leg timeline UI** in Order detail drawer
+   - Component: `apps/web/src/pages/operation/components/DeliveryChain.tsx`
+   - Renders the stops array from `useOperationOrder().order.delivery_stops`
+   - "Add leg" form (partner picker + from/to)
+   - Per-leg actions: `[Mark Picked Up]` `[Mark Handed Off]` `[Mark Delivered]`
+     `[Upload POD]` `[Edit notes]`
+   - On submit, calls the hooks Feature session will publish next
+     (`useSetDeliveryChain`, `usePatchDeliveryStop`) — names final, types
+     already in `@carres/shared`
+   - Empty `delivery_stops` (null or `[]`) → render single-leg compact view
+     (just shows `delivery_partner_id`'s name as today)
+   - Multi-leg (1+ stops) → vertical timeline with status pills per leg
 
 ---
 

@@ -25,6 +25,7 @@ import operationPosRouter from "./routes/operation/pos";
 import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
+import deliveryChainRouter from "./routes/operation/delivery-chain";
 import lpInboundRouter from "./routes/operation/lp-inbound";
 import resumeDispatchRouter from "./routes/operation/resume-dispatch";
 import recentCostRouter from "./routes/operation/recent-cost";
@@ -99,6 +100,8 @@ api.route("/operation/dashboard", operationDashboardRouter);
 api.route("/operation/movements", operationMovementsRouter);
 api.route("/operation/orders", operationOrdersRouter);
 api.route("/operation/orders", resumeDispatchRouter);
+// 0156 γ multi-leg — PUT /:id/delivery-chain + PATCH /:id/delivery-stops/:leg
+api.route("/operation/orders", deliveryChainRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);

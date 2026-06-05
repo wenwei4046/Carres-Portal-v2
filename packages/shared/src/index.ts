@@ -354,3 +354,17 @@ export {
   type CreateServiceNoteInput,
   type UpdateServiceNoteInput,
 } from "./schemas/service-notes";
+
+// Migration 0156 — multi-leg delivery chain (γ architecture).
+export {
+  deliveryStopStatusSchema,
+  deliveryStopSchema,
+  setDeliveryChainInputSchema,
+  patchDeliveryStopInputSchema,
+  deliveryChainResponseSchema,
+  type DeliveryStopStatus,
+  type DeliveryStop,
+  type SetDeliveryChainInput,
+  type PatchDeliveryStopInput,
+  type DeliveryChainResponse,
+} from "./schemas/delivery-chain";
