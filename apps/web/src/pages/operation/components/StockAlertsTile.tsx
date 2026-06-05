@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 import { useStockAlerts } from "@/lib/queries";
 
 /**
@@ -16,15 +15,20 @@ import { useStockAlerts } from "@/lib/queries";
  *
  * Per the master plan §Sprint D Task 21:
  *   - tile shows the alert count + the top-3 alert SKUs
- *   - clicking the tile navigates to `/operation/warehouse?alert=true`
+ *   - clicking "View alerts" jumps to the warehouse tab with the low-stock
+ *     alert filter pre-applied
  *
- * T42-C3 (codex review fix): `OperationApp` is tab-state-driven, so a bare
- * `navigate(...)` only changes the URL but leaves the dashboard tab selected.
- * The `onJumpToWarehouse` prop lets the parent flip its `useState` tab in
- * lockstep so the warehouse view actually mounts. Kept optional for
- * backward compatibility — when omitted (e.g. tests rendering the tile in
- * isolation, or future callers outside `OperationApp`), only the URL
- * navigation runs and the test assertions still hold.
+ * Routing (2026-06-05 fix — closes `phase-4.5-chunk-2-alerts-tab-routing`):
+ * `OperationApp` is tab-state-driven (only `/operation/procurement` + `/orders`
+ * are URL-driven), so this tile must NOT write a URL. The earlier
+ * `navigate("/operation/warehouse?alert=true")` was a no-op nothing read back —
+ * `OperationWarehouse` never consumed `?alert=true`, and the bare
+ * `/operation/warehouse` path didn't survive a refresh (the shell boots to the
+ * dashboard tab). Instead the parent threads `onJumpToWarehouse`, wired to
+ * `goWarehouse({ alert: true })`, which flips the tab AND seeds the warehouse
+ * page's "Alerts" view via the same prefill idiom the shell already uses for
+ * movements. Kept optional — when omitted (tests in isolation, or future
+ * callers outside `OperationApp`) clicking is a safe no-op.
  *
  * Empty / loading / error states all render in-place rather than hiding the
  * tile — the dashboard grid expects a fixed slot, and a "No alerts" badge
@@ -38,16 +42,14 @@ interface Props {
 }
 
 export default function StockAlertsTile({ onJumpToWarehouse }: Props = {}) {
-  const navigate = useNavigate();
   const { data, isLoading, isError } = useStockAlerts();
 
   const handleOpen = () => {
-    // Flip the parent's tab state FIRST (synchronous setState) so the
-    // warehouse slot mounts on the same React commit that consumes the new
-    // URL. Reversing the order would race the conditional render in
-    // `OperationApp` against the next event-loop tick.
+    // Tab-state only — see the routing note above. The parent's
+    // `onJumpToWarehouse` lands the user on the warehouse "Alerts" view; we
+    // deliberately do NOT write a URL (the operation shell is tab-state-driven,
+    // so a URL write would only desync from the rendered tab).
     onJumpToWarehouse?.();
-    navigate("/operation/warehouse?alert=true");
   };
 
   const alerts = data?.alerts ?? [];

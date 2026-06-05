@@ -64,6 +64,11 @@ export default function OperationApp() {
   const [movementsPrefill, setMovementsPrefill] = useState<
     Partial<MovementsFilters> | undefined
   >(undefined);
+  // Cross-tab prefill for the warehouse slot — currently just the alert filter
+  // intent seeded by the dashboard StockAlertsTile. Mirrors `movementsPrefill`.
+  const [warehousePrefill, setWarehousePrefill] = useState<
+    { alert?: boolean } | undefined
+  >(undefined);
 
   // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/operation`), make sure the local tab state has a sensible value so
@@ -88,6 +93,18 @@ export default function OperationApp() {
     }
   }
 
+  // Cross-tab jump used by the dashboard StockAlertsTile → lands on the
+  // warehouse tab with the alert filter pre-applied. Mirrors goMovements: seed
+  // the prefill, flip the tab, leave any URL-driven section. No URL write —
+  // warehouse is tab-state-driven (closes `phase-4.5-chunk-2-alerts-tab-routing`).
+  function goWarehouse(prefill?: { alert?: boolean }) {
+    setWarehousePrefill(prefill);
+    setTab("warehouse");
+    if (isUrlDriven) {
+      navigate("/operation");
+    }
+  }
+
   /**
    * Single tab-change entry point used by both the sidebar and child pages
    * (OperationDashboard's KPI tiles + side cards still call
@@ -102,17 +119,21 @@ export default function OperationApp() {
     if (next === "procurement") {
       navigate("/operation/procurement");
       setMovementsPrefill(undefined);
+      setWarehousePrefill(undefined);
       return;
     }
     if (next === "orders") {
       navigate("/operation/orders");
       setMovementsPrefill(undefined);
+      setWarehousePrefill(undefined);
       return;
     }
 
-    // Switching away from the movements tab via the sidebar discards any
-    // pending prefill so re-entering the tab starts fresh.
+    // Switching away from the movements / warehouse tabs via the sidebar
+    // discards any pending prefill so re-entering the tab starts fresh — a
+    // plain warehouse entry must NOT inherit a stale alert filter.
     if (next !== "movements") setMovementsPrefill(undefined);
+    if (next !== "warehouse") setWarehousePrefill(undefined);
     setTab(next);
     // Leave any URL-driven section behind so the nested <Routes> stops
     // matching.
@@ -170,9 +191,15 @@ export default function OperationApp() {
           </Routes>
         ) : (
           <>
-            {tab === "dashboard" && <OperationDashboard setTab={changeTab} />}
+            {tab === "dashboard" && (
+              <OperationDashboard setTab={changeTab} goWarehouse={goWarehouse} />
+            )}
             {tab === "warehouse" && (
-              <OperationWarehouse setTab={changeTab} goMovements={goMovements} />
+              <OperationWarehouse
+                setTab={changeTab}
+                goMovements={goMovements}
+                initialAlert={warehousePrefill?.alert ?? false}
+              />
             )}
             {tab === "movements" && (
               <OperationMovements

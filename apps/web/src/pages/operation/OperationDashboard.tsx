@@ -39,17 +39,21 @@ import EscalationInboxCard from "./components/EscalationInboxCard";
  */
 interface Props {
   setTab: (t: string) => void;
+  /** Cross-tab jump to the warehouse tab WITH a prefill (the alert filter).
+   *  Wired by OperationApp; the StockAlertsTile "View alerts" button uses it.
+   *  Falls back to a plain `setTab("warehouse")` when absent (isolated tests). */
+  goWarehouse?: (prefill?: { alert?: boolean }) => void;
 }
 
-// T42-C3: thread the parent's tab-switch hook into StockAlertsTile so its
-// "View alerts" button flips both the URL AND the tab-state. The dashboard
-// itself doesn't read from the URL — `OperationApp` does — so we just hand
-// the tile a small "go to warehouse" callback and let it call both that and
-// `navigate("/operation/warehouse?alert=true")` when clicked.
+// StockAlertsTile "View alerts" → jump to the warehouse "Alerts" view. We pass
+// a handler that prefers `goWarehouse({ alert: true })` (seeds the alert filter
+// via OperationApp's tab-state prefill) and falls back to a plain
+// `setTab("warehouse")` when the shell didn't wire goWarehouse (isolated tests).
+// No URL write — closes `phase-4.5-chunk-2-alerts-tab-routing`.
 
 const RM = (n: number) => `RM ${Math.round(Number(n) || 0).toLocaleString()}`;
 
-export default function OperationDashboard({ setTab }: Props) {
+export default function OperationDashboard({ setTab, goWarehouse }: Props) {
   const { data, isLoading, isError, error, refetch } = useOperationDashboard();
   // Active pipeline items — all proceed_order rows + recently delivered (the
   // proto's `incoming` filter). The kanban / orders page reuses the same
@@ -206,7 +210,11 @@ export default function OperationDashboard({ setTab }: Props) {
       <div className="grid grid-cols-3 gap-3.5">
         <OpenPOsCard pos={open_pos} onViewAll={() => setTab("procurement")} />
         <LowStockCard lowStock={low_stock} onViewAll={() => setTab("warehouse")} />
-        <StockAlertsTile onJumpToWarehouse={() => setTab("warehouse")} />
+        <StockAlertsTile
+          onJumpToWarehouse={() =>
+            goWarehouse ? goWarehouse({ alert: true }) : setTab("warehouse")
+          }
+        />
       </div>
 
       {/* Phase B — Jess's escalation inbox. Navigates to orders tab so she
