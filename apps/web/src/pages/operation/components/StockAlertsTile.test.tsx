@@ -52,13 +52,15 @@ function wrap(ui: React.ReactNode, initialEntries: string[] = ["/operation"]) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  // The LocationProbe rides alongside the `/operation` element so the
+  // navigation tests can assert the URL stays put (the tile must NOT write a
+  // URL anymore — see `phase-4.5-chunk-2-alerts-tab-routing`).
   return (
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={initialEntries}>
         <Routes>
-          <Route path="/operation" element={ui} />
           <Route
-            path="/operation/warehouse"
+            path="/operation"
             element={
               <>
                 {ui}
@@ -122,12 +124,12 @@ describe("StockAlertsTile", () => {
     expect(screen.queryByTestId("stock-alerts-count")).not.toBeInTheDocument();
   });
 
-  it("clicking the open button navigates to /operation/warehouse?alert=true AND calls onJumpToWarehouse", async () => {
-    // T42-C3: the parent (`OperationApp`) keeps the active tab in `useState`,
-    // so URL change alone leaves the dashboard tab selected. The tile has to
-    // tell the parent to flip its state via `onJumpToWarehouse` while ALSO
-    // changing the URL (so refresh / share / back / forward all keep the
-    // alert filter applied via `?alert=true`).
+  it("clicking the open button calls onJumpToWarehouse and does NOT write a URL", async () => {
+    // 2026-06-05 fix (`phase-4.5-chunk-2-alerts-tab-routing`): the operation
+    // shell is tab-state-driven, so the tile must NOT navigate. The earlier
+    // `navigate("/operation/warehouse?alert=true")` was a no-op nothing read
+    // back. Clicking now flips the parent tab via `onJumpToWarehouse` ONLY; the
+    // URL stays put so it can never desync from the rendered tab.
     vi.mocked(apiFetch).mockResolvedValue({ alerts: [] });
     const onJumpToWarehouse = vi.fn();
     render(wrap(<StockAlertsTile onJumpToWarehouse={onJumpToWarehouse} />));
@@ -140,21 +142,15 @@ describe("StockAlertsTile", () => {
 
     fireEvent.click(screen.getByTestId("stock-alerts-open"));
 
-    // Both effects must fire on a single click: the tab-state flip AND the
-    // URL navigation. Order is enforced inside `handleOpen` (state first,
-    // navigate second), but at the assertion level we only require both
-    // happened by the time React has flushed.
     expect(onJumpToWarehouse).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
-      const probe = screen.getByTestId("location");
-      expect(probe.textContent).toBe("/operation/warehouse?alert=true");
-    });
+    // URL is unchanged — no fake `/operation/warehouse?alert=true` write.
+    expect(screen.getByTestId("location").textContent).toBe("/operation");
   });
 
-  it("clicking the open button still navigates when onJumpToWarehouse is omitted (backward compat)", async () => {
-    // The prop is optional — the tile can still be mounted standalone (e.g.
-    // future placement outside `OperationApp`'s tab shell) and the URL-only
-    // path must keep working without crashing.
+  it("clicking the open button is a safe no-op when onJumpToWarehouse is omitted", async () => {
+    // The prop is optional — mounted standalone (e.g. a future placement
+    // outside `OperationApp`'s tab shell) clicking must not crash and must not
+    // navigate anywhere.
     vi.mocked(apiFetch).mockResolvedValue({ alerts: [] });
     render(wrap(<StockAlertsTile />));
 
@@ -164,10 +160,9 @@ describe("StockAlertsTile", () => {
 
     fireEvent.click(screen.getByTestId("stock-alerts-open"));
 
-    await waitFor(() => {
-      const probe = screen.getByTestId("location");
-      expect(probe.textContent).toBe("/operation/warehouse?alert=true");
-    });
+    // Still mounted, and no navigation occurred.
+    expect(screen.getByTestId("stock-alerts-open")).toBeInTheDocument();
+    expect(screen.getByTestId("location").textContent).toBe("/operation");
   });
 
   it("renders the loading state while the query is pending", () => {

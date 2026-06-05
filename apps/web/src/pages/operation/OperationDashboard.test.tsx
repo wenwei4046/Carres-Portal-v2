@@ -58,8 +58,10 @@ vi.mock("@/lib/queries", async () => {
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  // T21 — `StockAlertsTile` calls `useNavigate`, which requires a Router
-  // ancestor. MemoryRouter keeps the tests hermetic (no real history stack).
+  // Kept hermetic with MemoryRouter so any descendant that touches router
+  // hooks resolves (the dashboard tree mounts several child cards). The
+  // StockAlertsTile itself no longer navigates (see
+  // `phase-4.5-chunk-2-alerts-tab-routing`).
   return (
     <QueryClientProvider client={qc}>
       <MemoryRouter>{node}</MemoryRouter>
@@ -385,6 +387,29 @@ describe("OperationDashboard", () => {
     expect(setTab).toHaveBeenLastCalledWith("procurement");
 
     fireEvent.click(screen.getByRole("button", { name: /Open warehouse/ }));
+    expect(setTab).toHaveBeenLastCalledWith("warehouse");
+  });
+
+  it("StockAlertsTile 'View alerts' calls goWarehouse({ alert: true })", () => {
+    // The alert deep-link routes through goWarehouse (which seeds the warehouse
+    // Alerts view), NOT a bare setTab — closes
+    // `phase-4.5-chunk-2-alerts-tab-routing`.
+    setLoaded();
+    const setTab = vi.fn();
+    const goWarehouse = vi.fn();
+    render(
+      wrap(<OperationDashboard setTab={setTab} goWarehouse={goWarehouse} />),
+    );
+    fireEvent.click(screen.getByTestId("stock-alerts-open"));
+    expect(goWarehouse).toHaveBeenCalledWith({ alert: true });
+    expect(setTab).not.toHaveBeenCalledWith("warehouse");
+  });
+
+  it("StockAlertsTile falls back to setTab('warehouse') when goWarehouse is absent", () => {
+    setLoaded();
+    const setTab = vi.fn();
+    render(wrap(<OperationDashboard setTab={setTab} />));
+    fireEvent.click(screen.getByTestId("stock-alerts-open"));
     expect(setTab).toHaveBeenLastCalledWith("warehouse");
   });
 });

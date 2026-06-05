@@ -774,4 +774,69 @@ describe("OperationWarehouse page", () => {
       (screen.getByTestId("set-threshold-high-input") as HTMLInputElement).value,
     ).toBe("12");
   });
+
+  // -------------------------------------------------------------------------
+  // Phase 10 (2026-06-05) — Alerts pseudo-tab + initialAlert deep-link
+  // (`phase-4.5-chunk-2-alerts-tab-routing`)
+  // -------------------------------------------------------------------------
+
+  it("24. initialAlert opens the Alerts view showing only low/out SKUs across categories", () => {
+    // The dashboard StockAlertsTile seeds `initialAlert`, landing the page on
+    // the cross-category Alerts pseudo-tab. Default KL fixtures: King=ok,
+    // Queen=low, Bedframe=out, Sofa=ok → only Queen + Bedframe show, regardless
+    // of their (mattress / bedframe) categories.
+    setLoaded();
+    render(wrap(<OperationWarehouse initialAlert />));
+    expect(
+      screen.getByTestId("warehouse-cat-alerts").getAttribute("aria-selected"),
+    ).toBe("true");
+    // Low + Out rows present regardless of SKU category…
+    expect(
+      screen.getByTestId(`warehouse-row-${SKU_MATTRESS_QUEEN}`),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId(`warehouse-row-${SKU_BEDFRAME}`),
+    ).toBeInTheDocument();
+    // …OK rows filtered out.
+    expect(
+      screen.queryByTestId(`warehouse-row-${SKU_MATTRESS_KING}`),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(`warehouse-row-${SKU_SOFA}`),
+    ).not.toBeInTheDocument();
+  });
+
+  it("25. Alerts view shows the healthy empty-state when nothing is low/out", () => {
+    setLoaded({
+      byWarehouse: {
+        [WAREHOUSE_KL.id]: [
+          { sku: SKU_MATTRESS_KING, qty: 8, reserved: 0, low_stock_status: "ok", low_threshold: null, high_threshold: null },
+          { sku: SKU_SOFA, qty: 4, reserved: 0, low_stock_status: "ok", low_threshold: null, high_threshold: null },
+        ],
+        [WAREHOUSE_PG.id]: [],
+      },
+      totalsBySku: {
+        [SKU_MATTRESS_KING]: { total_qty: 8, total_reserved: 0, low_stock_status_aggregate: "ok" },
+        [SKU_SOFA]: { total_qty: 4, total_reserved: 0, low_stock_status_aggregate: "ok" },
+      },
+    });
+    render(wrap(<OperationWarehouse initialAlert />));
+    const empty = screen.getByTestId("warehouse-empty");
+    expect(empty.textContent).toMatch(/everything.s healthy/i);
+  });
+
+  it("26. default mount (no initialAlert) stays on the mattress tab — no stale alert filter", () => {
+    setLoaded();
+    render(wrap(<OperationWarehouse />));
+    expect(
+      screen.getByTestId("warehouse-cat-alerts").getAttribute("aria-selected"),
+    ).toBe("false");
+    // Mattress rows visible, bedframe (Out) hidden by the category filter.
+    expect(
+      screen.getByTestId(`warehouse-row-${SKU_MATTRESS_KING}`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId(`warehouse-row-${SKU_BEDFRAME}`),
+    ).not.toBeInTheDocument();
+  });
 });

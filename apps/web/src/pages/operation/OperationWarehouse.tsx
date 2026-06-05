@@ -52,7 +52,7 @@ import SetThresholdDialog from "./components/SetThresholdDialog";
  *  the active warehouse where `reserved > 0`, with a drill-down trigger that
  *  lists the orders holding the reserve. The other 3 tabs are 1-1 with
  *  ProductCategory and behave as before. */
-type ActiveCat = ProductCategory | "reserved";
+type ActiveCat = ProductCategory | "reserved" | "alerts";
 
 const CATEGORIES: { key: ProductCategory; label: string; icon: string }[] = [
   { key: "mattress", label: "Mattress", icon: "▭" },
@@ -68,6 +68,14 @@ interface Props {
    *  via the "Movement log →" button when we want to scope to this warehouse.
    *  M5.5 wiring per `reference/proto/operation.jsx` line 15+33. */
   goMovements?: (prefill?: Partial<MovementsFilters>) => void;
+  /** Phase 10 (2026-06-05) — when true, the page opens on the "Alerts"
+   *  pseudo-view (every low/out SKU at the active warehouse, across all
+   *  categories), seeded by the dashboard StockAlertsTile via
+   *  `OperationApp.goWarehouse({ alert: true })`. The shell unmounts this page
+   *  when leaving the warehouse tab, so each fresh entry re-reads the prop — a
+   *  plain sidebar / LowStock entry passes it falsy → the usual default.
+   *  Closes `phase-4.5-chunk-2-alerts-tab-routing`. */
+  initialAlert?: boolean;
 }
 
 function categoryForSku(sku: string): string | null {
@@ -89,7 +97,11 @@ function statusLabel(status: LowStockStatus): string {
   return "OK";
 }
 
-export default function OperationWarehouse({ setTab, goMovements }: Props) {
+export default function OperationWarehouse({
+  setTab,
+  goMovements,
+  initialAlert,
+}: Props) {
   const warehouseQ = useOperationWarehouse();
   const catalogQ = useCatalog();
 
@@ -98,7 +110,12 @@ export default function OperationWarehouse({ setTab, goMovements }: Props) {
   const totalsBySku = warehouseQ.data?.totalsBySku ?? {};
 
   const [activeWh, setActiveWh] = useState<string | null>(null);
-  const [activeCat, setActiveCat] = useState<ActiveCat>("mattress");
+  // `initialAlert` lands the user on the cross-category Alerts view. Each entry
+  // to the warehouse tab remounts this page (the shell conditionally renders
+  // it), so the initial value is re-read fresh every time.
+  const [activeCat, setActiveCat] = useState<ActiveCat>(
+    initialAlert ? "alerts" : "mattress",
+  );
   const [search, setSearch] = useState("");
   const [adjustTarget, setAdjustTarget] = useState<{
     sku: string;
@@ -178,7 +195,9 @@ export default function OperationWarehouse({ setTab, goMovements }: Props) {
     const baseRows =
       activeCat === "reserved"
         ? rows.filter((r) => r.reserved > 0)
-        : rows.filter((r) => categoryForSku(r.sku) === activeCat);
+        : activeCat === "alerts"
+          ? rows.filter((r) => r.low_stock_status !== "ok")
+          : rows.filter((r) => categoryForSku(r.sku) === activeCat);
     if (!search.trim()) return baseRows;
     const q = search.trim().toLowerCase();
     return baseRows.filter((r) => {
@@ -362,6 +381,28 @@ export default function OperationWarehouse({ setTab, goMovements }: Props) {
             </button>
           );
         })}
+        {/* Phase 10 (2026-06-05) — Alerts pseudo-tab. Like Reserved it bypasses
+            the SKU-category filter; instead it surfaces every SKU at the active
+            warehouse whose per-warehouse status is low/out. Danger color hint
+            (vs Reserved's warning) signals severity. Seeded on mount by the
+            dashboard StockAlertsTile deep-link (`initialAlert`). Closes
+            `phase-4.5-chunk-2-alerts-tab-routing`. */}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeCat === "alerts"}
+          onClick={() => setActiveCat("alerts")}
+          data-testid="warehouse-cat-alerts"
+          className={[
+            "px-3.5 py-2 rounded-[4px] text-[12px] transition-colors border flex gap-2 items-center",
+            activeCat === "alerts"
+              ? "bg-base-900 text-white border-base-900 font-semibold"
+              : "bg-white text-danger border-danger font-medium hover:bg-base-50",
+          ].join(" ")}
+        >
+          <span className="text-[14px]">⚠</span>
+          <span>Alerts</span>
+        </button>
         {/* Pipeline v2 (C4) — Reserved pseudo-tab. Distinct color hint
             (warning border when inactive) signals it's not just another
             category but a different view. */}
@@ -490,9 +531,13 @@ export default function OperationWarehouse({ setTab, goMovements }: Props) {
               className="p-9 text-center text-base-500 text-[13px]"
               data-testid="warehouse-empty"
             >
-              {search
-                ? `No SKUs match "${search}" in ${activeCat}.`
-                : `No ${activeCat} stock at ${activeWarehouse.name} yet.`}
+              {activeCat === "alerts"
+                ? search
+                  ? `No low-stock alerts match "${search}" at ${activeWarehouse.name}.`
+                  : `No low-stock alerts at ${activeWarehouse.name} — everything's healthy.`
+                : search
+                  ? `No SKUs match "${search}" in ${activeCat}.`
+                  : `No ${activeCat} stock at ${activeWarehouse.name} yet.`}
             </div>
           ) : (
             filteredRows.map((row) => {
