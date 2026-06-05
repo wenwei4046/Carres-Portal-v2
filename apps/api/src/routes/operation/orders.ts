@@ -168,7 +168,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   const { data: order, error: e1 } = await sb
     .from("orders")
     .select(
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
     )
     .eq("id", id)
     .maybeSingle();

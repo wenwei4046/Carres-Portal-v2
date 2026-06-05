@@ -15,6 +15,7 @@ import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { useAuth } from "@/lib/auth";
 import AnnotationTimeline from "./AnnotationTimeline";
+import DeliveryChain from "./DeliveryChain";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
 import StageChip, { type OperationStage } from "./StageChip";
@@ -535,6 +536,18 @@ function DrawerBody({
             />
           </div>
           {order.do_number && <KV label="DO number" value={order.do_number} />}
+        </div>
+
+        {/* Multi-leg delivery chain (γ architecture · migration 0156). Single-leg
+            orders see a compact one-liner with a "Set up multi-leg route" CTA;
+            once stops are added, the timeline takes over. */}
+        <SectionHead>Delivery chain</SectionHead>
+        <div className="mb-4">
+          <DeliveryChain
+            orderId={order.id}
+            stops={order.delivery_stops}
+            fallbackPartnerId={order.delivery_partner_id}
+          />
         </div>
 
         {/* Annotations + activity timeline (Phase B) */}

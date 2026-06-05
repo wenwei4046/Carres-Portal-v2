@@ -63,6 +63,9 @@ import {
   type TransferReadyInput,
   type UpdateOrderInput,
   type WarehousePickInput,
+  type DeliveryStop,
+  type SetDeliveryChainInput,
+  type PatchDeliveryStopInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 
@@ -1663,6 +1666,12 @@ export interface operationOrderDetailOrder {
   dispatched_at: string | null;
   delivered_at: string | null;
   delivery_partner_id: string | null;
+  /** Migration 0156 — multi-leg delivery chain (γ). Null/empty = single-leg
+   *  (uses delivery_partner_id). Otherwise an ordered array of stops; each
+   *  carries partner_id + partner_name + from_loc + to_loc + per-leg POD
+   *  url + status. See `packages/shared/src/schemas/delivery-chain.ts` for
+   *  the typed shape. */
+  delivery_stops: DeliveryStop[] | null;
   dealer_id: string;
   outlet_id: string | null;
   /** 0098: auto-set by orders_auto_issue_on_dispatched_trg when
@@ -2332,6 +2341,57 @@ export function useAttachDoMutation(
       // alerts" stay stale for up to 30s after qty/reserved change.
       await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** 2026-06-05 (γ multi-leg) — replace the entire delivery chain for an order.
+ *  Single-leg orders (current behaviour) pass `stops:[]` to clear back to
+ *  delivery_partner_id-driven mode. Multi-leg orders send 2..N stops with
+ *  contiguous `leg` numbering. */
+export function useSetDeliveryChain(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<{ stops: DeliveryStop[] }, ApiError, SetDeliveryChainInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ stops: DeliveryStop[] }, ApiError, SetDeliveryChainInput>({
+    mutationFn: (input) =>
+      apiFetch<{ stops: DeliveryStop[] }>(
+        `/api/operation/orders/${orderId}/delivery-chain`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** 2026-06-05 (γ multi-leg) — sparse patch one leg of the chain. Use for:
+ *  marking status transitions (server auto-stamps timestamps), attaching POD
+ *  url after Storage upload, editing notes, or re-pointing partner mid-flight. */
+export function usePatchDeliveryStop(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<{ stop: DeliveryStop }, ApiError, { leg: number; patch: PatchDeliveryStopInput }>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ stop: DeliveryStop }, ApiError, { leg: number; patch: PatchDeliveryStopInput }>({
+    mutationFn: ({ leg, patch }) =>
+      apiFetch<{ stop: DeliveryStop }>(
+        `/api/operation/orders/${orderId}/delivery-stops/${leg}`,
+        { method: "PATCH", body: JSON.stringify(patch) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

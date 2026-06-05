@@ -152,6 +152,7 @@ function makeDetail(): operationOrderDetailResponse {
       dispatched_at: null,
       delivered_at: null,
       delivery_partner_id: null,
+      delivery_stops: null,
       dealer_id: "d-1",
       outlet_id: null,
       invoice_no: null,
