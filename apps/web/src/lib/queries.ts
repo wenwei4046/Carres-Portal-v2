@@ -1606,8 +1606,23 @@ export interface operationOrderListRow {
     | null;
   warehouse_id: string | null;
   customer_name: string;
+  /** Jess redesign step 2 — control-table row subtitle + extra columns. All
+   *  optional/nullable so the kanban OrderCard + existing fixtures that don't
+   *  populate them keep typechecking. */
+  customer_phone?: string | null;
   placed_at: string;
   delivery_date: string | null;
+  delivery_date_tbd?: boolean | null;
+  /** AutoCount provenance (migration 0132/0136). source_system='autocount'
+   *  drives the entry rule (AutoCount→Proceed tab, native→Placed); source_ref
+   *  is the CR/TCF doc-no list shown as the ref prefix. */
+  source_system?: string | null;
+  source_ref?: string[] | null;
+  /** Inbox-triage LP (migration 0136), a delivery_partners.id resolved to a
+   *  name client-side. Shown in the 物流 cell when no formal LP is set yet. */
+  ops_assigned_logistic?: string | null;
+  /** Compact line embed for the 货品 items summary (control table only). */
+  order_lines?: { sku: string; qty: number }[];
   delivery_partner_id: string | null;
   /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
    *  state. Set by `operation_confirm_proceed_request_v3` when Operation

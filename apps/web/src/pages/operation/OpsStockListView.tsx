@@ -33,6 +33,16 @@ interface Props {
   /** queryKey scope under qk.operation (e.g. 'opsStockReady'). Needed so
    *  each tab's cache is distinct + mutations can invalidate sibling tabs. */
   cacheKey: string;
+  /** Jess redesign step 3 — embedded inside the unified Stock On Hand shell.
+   *  Suppresses this component's own page header + outer page padding so the
+   *  parent owns the chrome (title + filter chips). Defaults to standalone. */
+  embedded?: boolean;
+  /** When provided, render THESE rows instead of fetching. Lets the On Hand
+   *  shell fetch the master /inventory grid ONCE, then client-side filter per
+   *  chip — instant switching + chip counts off a single round-trip. Mutations
+   *  still invalidate the ops-stock cache, which the parent's query listens to,
+   *  so the injected rows refresh after any action. */
+  rows?: OpsStockItem[];
 }
 
 export default function OpsStockListView(props: Props) {
@@ -43,6 +53,8 @@ export default function OpsStockListView(props: Props) {
     queryKey: listKey,
     queryFn: () => apiFetch(`/api/ops/stock${props.endpoint}`),
     refetchInterval: 20_000,
+    // Parent-injected rows bypass the fetch entirely.
+    enabled: props.rows === undefined,
   });
 
   function invalidateAll() {
@@ -104,7 +116,8 @@ export default function OpsStockListView(props: Props) {
     onSuccess: invalidateAll,
   });
 
-  const rows: OpsStockItem[] = listQ.data?.items ?? [];
+  const rows: OpsStockItem[] = props.rows ?? listQ.data?.items ?? [];
+  const loading = props.rows === undefined && listQ.isLoading;
 
   // Reserve action needs a SKU + a customer ref. We surface a tiny form
   // above the table (rather than per-row) since reserve picks oldest free
@@ -113,14 +126,16 @@ export default function OpsStockListView(props: Props) {
   const [reserveRef, setReserveRef] = useState("");
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <p className="text-xs uppercase tracking-wider text-base-500 mb-1">
-          {props.kicker}
-        </p>
-        <h1 className="text-3xl font-semibold text-base-900">{props.title}</h1>
-        <p className="text-sm text-base-600 mt-2">{props.blurb}</p>
-      </div>
+    <div className={props.embedded ? "" : "p-8 max-w-7xl mx-auto"}>
+      {!props.embedded && (
+        <div className="mb-6">
+          <p className="text-xs uppercase tracking-wider text-base-500 mb-1">
+            {props.kicker}
+          </p>
+          <h1 className="text-3xl font-semibold text-base-900">{props.title}</h1>
+          <p className="text-sm text-base-600 mt-2">{props.blurb}</p>
+        </div>
+      )}
 
       {props.actions.includes("reserve") ? (
         <section className="rounded border border-base-200 bg-white p-4 mb-4">
@@ -178,7 +193,7 @@ export default function OpsStockListView(props: Props) {
         </section>
       ) : null}
 
-      {listQ.isLoading ? (
+      {loading ? (
         <p className="text-sm text-base-500">Loading…</p>
       ) : rows.length === 0 ? (
         <div className="rounded border border-base-200 bg-white p-12 text-center">
@@ -273,7 +288,15 @@ function RowItem({
   const [newRef, setNewRef] = useState("");
   return (
     <tr className="border-t border-base-200 hover:bg-base-50">
-      <td className="px-3 py-2 font-mono text-base-900">{row.sku}</td>
+      {/* Unit ID = the minted per-unit serial (id-abc123456). Falls back to "—"
+          for legacy/seed rows that never got a unit_code. Previously this cell
+          showed row.sku, which (a) was wrong and (b) left the header row one
+          column wider than the body — fixed by adding the dedicated SKU cell
+          that follows. */}
+      <td className="px-3 py-2 font-mono text-[11px] text-base-900 whitespace-nowrap">
+        {row.unitCode ?? <span className="text-base-400">—</span>}
+      </td>
+      <td className="px-3 py-2 font-mono text-base-700">{row.sku}</td>
       <td className="px-3 py-2">
         <select
           value={row.condition}

@@ -540,7 +540,7 @@ function ActionCell({
           }}
           data-testid={`lp-inbound-confirm-${po.id}`}
         >
-          LP Pre-flight 代按
+          LP Pre-flight (proxy)
         </button>
         {directReceive}
       </div>

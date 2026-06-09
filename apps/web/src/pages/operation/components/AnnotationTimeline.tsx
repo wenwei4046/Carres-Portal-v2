@@ -11,9 +11,9 @@ import { fmtDate } from "@/lib/fmt-date";
 // ─── Tag helpers ─────────────────────────────────────────────────────────────
 
 const TAG_LABEL: Record<AnnotationTag, string> = {
-  follow_up: "待跟进",
-  escalate: "升级给 Jess",
-  resolved: "已解决",
+  follow_up: "Follow up",
+  escalate: "Escalate to Jess",
+  resolved: "Resolved",
 };
 
 const TAG_CLASS: Record<AnnotationTag, string> = {
@@ -41,14 +41,14 @@ function TagBadge({ tag }: { tag: AnnotationTag }) {
 // ─── Activity action label ────────────────────────────────────────────────────
 
 const ACTION_LABEL: Record<string, string> = {
-  annotation_added:  "备注",
-  inbox_assign:      "分配物流",
-  autocount_import:  "AutoCount 导入",
-  stock_reserve:     "库存预留",
-  stock_release:     "解除预留",
-  stock_reassign:    "改分配",
-  stock_takeout:     "出货",
-  stock_flag_repair: "标记维修",
+  annotation_added:  "Note",
+  inbox_assign:      "Assign logistic",
+  autocount_import:  "AutoCount import",
+  stock_reserve:     "Stock reserve",
+  stock_release:     "Stock release",
+  stock_reassign:    "Reassign",
+  stock_takeout:     "Takeout",
+  stock_flag_repair: "Flag repair",
 };
 
 function actionLabel(action: string): string {
@@ -136,9 +136,9 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
         onSuccess: () => {
           setContent("");
           setTag("");
-          toast.success("备注已保存");
+          toast.success("Note saved");
         },
-        onError: () => toast.error("保存失败，请重试"),
+        onError: () => toast.error("Save failed, please retry"),
       },
     );
   }
@@ -148,7 +148,7 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        placeholder="写备注…"
+        placeholder="Write a note…"
         rows={2}
         className="w-full text-[12px] px-2.5 py-2 border border-base-200 rounded-[4px] resize-none focus:outline-none focus:ring-1 focus:ring-accent placeholder-base-400 font-body"
       />
@@ -158,17 +158,17 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
           onChange={(e) => setTag(e.target.value as AnnotationTag | "")}
           className="text-[11px] border border-base-200 rounded-[4px] px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-accent"
         >
-          <option value="">无标签</option>
-          <option value="follow_up">🔔 待跟进</option>
-          <option value="escalate">🚨 升级给 Jess</option>
-          <option value="resolved">✅ 已解决</option>
+          <option value="">No tag</option>
+          <option value="follow_up">🔔 Follow up</option>
+          <option value="escalate">🚨 Escalate to Jess</option>
+          <option value="resolved">✅ Resolved</option>
         </select>
         <button
           type="submit"
           disabled={!content.trim() || mutation.isPending}
           className="ml-auto text-[11px] font-medium px-3 py-1 rounded-[4px] bg-accent text-white disabled:opacity-40 hover:bg-accent/90 transition-colors"
         >
-          {mutation.isPending ? "保存中…" : "保存备注"}
+          {mutation.isPending ? "Saving…" : "Save note"}
         </button>
       </div>
     </form>
@@ -188,9 +188,9 @@ export default function AnnotationTimeline({ orderId }: Props) {
   return (
     <div>
       {isLoading ? (
-        <div className="text-[12px] text-base-400 py-2">加载中…</div>
+        <div className="text-[12px] text-base-400 py-2">Loading…</div>
       ) : entries.length === 0 ? (
-        <div className="text-[12px] text-base-500 py-2">还没有备注或活动记录。</div>
+        <div className="text-[12px] text-base-500 py-2">No notes or activity yet.</div>
       ) : (
         <div className="bg-white border border-base-200 rounded-[4px] px-4 py-1 mb-3">
           {entries.map((e, i) => (

@@ -551,7 +551,7 @@ function DrawerBody({
         </div>
 
         {/* Annotations + activity timeline (Phase B) */}
-        <SectionHead>备注 &amp; 活动记录</SectionHead>
+        <SectionHead>Notes &amp; activity</SectionHead>
         <AnnotationTimeline orderId={order.id} />
 
         {/* Total */}

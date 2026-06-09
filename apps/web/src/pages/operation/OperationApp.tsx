@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import OperationSidebar from "./OperationSidebar";
 import OperationDashboard from "./OperationDashboard";
-import OperationOrders from "./OperationOrders";
+// Jess redesign step 2 (2026-06-08) — the Orders tab is now the unified control
+// table (merges the old kanban + Inbox + All-orders). The legacy kanban
+// `OperationOrders` is retained as a file (+ its test) but no longer routed.
+import OperationOrdersControl from "./OperationOrdersControl";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
@@ -15,10 +18,14 @@ import OperationSuppliers from "./OperationSuppliers";
 import OperationImport from "./OperationImport";
 import OperationInbox from "./OperationInbox";
 // 2026-05-20 — Phase A step 5 · per-unit stock register tabs (Carres Klang).
+// Jess redesign step 3 (2026-06-08): the four below are merged into the single
+// OperationStockOnHand chip-filtered list. Kept mounted (de-routed from the
+// sidebar) so nothing that still calls changeTab on their keys breaks.
 import OperationOpsReady from "./OperationOpsReady";
 import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
+import OperationStockOnHand from "./OperationStockOnHand";
 // Migration 0140 — Service Notes / Issue Tracker.
 import OperationServiceNotes from "./OperationServiceNotes";
 import type { MovementsFilters } from "@/lib/queries";
@@ -168,11 +175,13 @@ export default function OperationApp() {
           // internally on `useParams<{ slug? }>()` and `<Navigate replace>`
           // sends invalid/missing slugs to the default tab (`nice-future`).
           //
-          // Orders (`/operation/orders[/:stage]`) — the redesign mounts the
-          // same `OperationOrders` shell for both. With `:stage` missing it
-          // renders the Overall (6-col) kanban; with `:stage` set it renders
-          // the per-stage banner + card list. Invalid stage slugs fall back
-          // to Overall (parseStageParam guard inside OperationOrders).
+          // Orders (`/operation/orders[/:stage]`) — both paths mount the
+          // unified `OperationOrdersControl` table (Jess redesign step 2). The
+          // optional `:stage` preselects the matching status tab so legacy
+          // hand-typed kanban-stage URLs still land sensibly; unknown slugs
+          // fall back to the "All" tab (tabFromStageParam guard inside the
+          // component). The "+ Import" header button calls back into
+          // `changeTab("ops-import")` to flip to the AutoCount import page.
           //
           // Paths are RELATIVE because this is a descendant `<Routes>`
           // mounted inside App.tsx's `<Route path="/operation/*">`. React
@@ -186,8 +195,22 @@ export default function OperationApp() {
               path="procurement/:slug"
               element={<TabbedProcurementShell />}
             />
-            <Route path="orders" element={<OperationOrders />} />
-            <Route path="orders/:stage" element={<OperationOrders />} />
+            <Route
+              path="orders"
+              element={
+                <OperationOrdersControl
+                  onImport={() => changeTab("ops-import")}
+                />
+              }
+            />
+            <Route
+              path="orders/:stage"
+              element={
+                <OperationOrdersControl
+                  onImport={() => changeTab("ops-import")}
+                />
+              }
+            />
           </Routes>
         ) : (
           <>
@@ -209,6 +232,8 @@ export default function OperationApp() {
               />
             )}
             {tab === "catalog" && <OperationCatalog />}
+            {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
+            {tab === "stock-onhand" && <OperationStockOnHand />}
             {tab === "stock" && <OperationStock />}
             {tab === "all-orders" && <OperationAllOrders />}
             {tab === "suppliers" && <OperationSuppliers />}

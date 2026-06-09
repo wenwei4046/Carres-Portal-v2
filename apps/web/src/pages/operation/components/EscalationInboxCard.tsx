@@ -14,7 +14,7 @@ export default function EscalationInboxCard({ onViewOrder }: Props) {
       <div className="flex items-center gap-2 mb-3">
         <span className="text-[11px]">🚨</span>
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-red-600">
-          升级处理
+          Escalations
         </span>
         {items.length > 0 && (
           <span className="ml-auto text-[11px] font-mono font-semibold text-red-600">
@@ -24,9 +24,9 @@ export default function EscalationInboxCard({ onViewOrder }: Props) {
       </div>
 
       {isLoading ? (
-        <div className="text-[12px] text-base-400">加载中…</div>
+        <div className="text-[12px] text-base-400">Loading…</div>
       ) : items.length === 0 ? (
-        <div className="text-[12px] text-base-500 py-1">暂无升级事项 ✓</div>
+        <div className="text-[12px] text-base-500 py-1">No escalations ✓</div>
       ) : (
         <ul className="space-y-0">
           {items.map((item, i) => (

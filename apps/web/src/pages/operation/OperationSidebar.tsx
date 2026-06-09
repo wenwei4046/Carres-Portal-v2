@@ -5,85 +5,115 @@ import NavBadge from "@/components/NavBadge";
 import { useOperationBadges, useMarkOperationBadgeSeen } from "@/lib/queries";
 
 /**
- * operation sidebar — 5 nav items per spec §18.7, all enabled in Phase 4 MVP
- * (no disabled stubs). Pixel sizes mirror the Phase 3 PrincipalSidebar so the
- * HQ shell stays visually consistent across roles. Active items show a 3px
- * terracotta accent bar on the left + base-100 fill + base-900 text.
+ * operation sidebar — Jess redesign 2026-06-08.
+ *
+ * Collapsed to **6 top-level menus** (Dashboard · Orders · Receiving · Stock ·
+ * Catalog · Cases). Sub-views are shown as a nested list under the ACTIVE menu
+ * only — so by default the rail reads as 6 items instead of the old 8-group /
+ * 16-entry wall. The underlying routing keys are UNCHANGED (OperationApp still
+ * dispatches on the same keys), so this is a pure navigation reorg with no
+ * routing risk. Renames per the agreed model: Procurement→Receiving,
+ * Repair→Defective, Warehouse→On Hand, AutoCount/Klang-Stock/Network groups
+ * dissolved into Orders / Stock / Catalog.
+ *
+ * NOTE: deeper consolidation (Orders → one control grid with status tabs;
+ * Stock → On Hand + Movements with Ready/Reserved/Defective as filters; Cases →
+ * Issues/Refunds) lands when each page is rebuilt. This step only reframes nav.
  */
-interface NavItem {
-  k: string;
-  t: string;
+interface Leaf {
+  /** routing key consumed by OperationApp (unchanged) */
+  key: string;
+  label: string;
+}
+interface Section {
+  /** stable id for expand state (top-level row) */
+  id: string;
+  label: string;
   icon: string;
+  /** leaf section: a single routing key; parent section: children */
+  key?: string;
+  children?: Leaf[];
+  /** extra routing keys that belong to this section for highlight purposes but
+   *  aren't shown as their own nav rows (e.g. the AutoCount import page lives
+   *  under Orders but is reached via an in-page button, not a sidebar child). */
+  extraKeys?: string[];
+  /** badge counter key, if this menu carries an unread count */
+  badge?: "orders" | "procurement" | "service-notes";
 }
 
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+const SECTIONS: Section[] = [
+  { id: "dashboard", label: "Dashboard", icon: "◆", key: "dashboard" },
   {
-    label: "Pulse",
-    items: [
-      { k: "dashboard", t: "Dashboard", icon: "◆" },
-    ],
+    // Jess redesign step 2 — Orders is now ONE control table
+    // (OperationOrdersControl). Status filtering (Placed/Proceed/Pending/
+    // Scheduled/Completed/All) + AutoCount import live in-page, so the old
+    // Inbox / All orders / Import sub-rows are gone. extraKeys keeps the Orders
+    // row highlighted when the import page (or legacy inbox/all-orders routes)
+    // mounts.
+    id: "orders",
+    label: "Orders",
+    icon: "▣",
+    key: "orders",
+    badge: "orders",
+    extraKeys: ["ops-import", "ops-inbox", "all-orders"],
   },
   {
-    label: "Pipeline",
-    items: [
-      { k: "orders", t: "Orders", icon: "▣" },
-      { k: "procurement", t: "Procurement", icon: "▦" },
-    ],
+    id: "receiving",
+    label: "Receiving",
+    icon: "▦",
+    key: "procurement",
+    badge: "procurement",
   },
   {
-    // 2026-05-20 — Phase A · AutoCount integration. Replaces the operation
-    // team's Google Sheet workflow. Import = paste in the AutoCount listing
-    // CSV; Inbox = the triage queue of AutoCount-imported orders awaiting
-    // logistic assignment (NETS / TSDD / AL / HOUZS).
-    label: "AutoCount",
-    items: [
-      { k: "ops-import", t: "Import", icon: "↥" },
-      { k: "ops-inbox",  t: "Inbox",  icon: "▤" },
-    ],
-  },
-  {
-    // 2026-05-20 — Phase A step 5 · per-unit stock register (Carres Klang only).
-    // 4 mental modes per Loo M3: Ready / Reserved / Repair / Inventory.
-    label: "Klang Stock",
-    items: [
-      { k: "ops-ready",     t: "Ready",     icon: "★" },
-      { k: "ops-reserved",  t: "Reserved",  icon: "◐" },
-      { k: "ops-repair",    t: "Repair",    icon: "⚠" },
-      { k: "ops-inventory", t: "Inventory", icon: "▥" },
-    ],
-  },
-  {
+    // Jess redesign step 3 — Stock is now On Hand (one per-unit list with
+    // Ready/Reserved/Defective filter CHIPS) + Movements. The old Ready /
+    // Reserved / Defective / Inventory sub-rows collapse into On Hand's chips
+    // (Inventory → the "All" chip, dropped as a standalone). The per-SKU
+    // "On Hand"(warehouse) + "All warehouses"(stock) views are de-routed but
+    // kept mounted — the dashboard low-stock tile still deep-links to
+    // `warehouse`. extraKeys keeps the Stock highlight when any mount.
+    id: "stock",
     label: "Stock",
-    items: [
-      { k: "warehouse", t: "Warehouse", icon: "□" },
-      { k: "movements", t: "Movements", icon: "≡" },
+    icon: "□",
+    children: [
+      { key: "stock-onhand", label: "On Hand" },
+      { key: "movements", label: "Movements" },
+    ],
+    extraKeys: [
+      "warehouse",
+      "ops-ready",
+      "ops-reserved",
+      "ops-repair",
+      "ops-inventory",
+      "stock",
     ],
   },
   {
-    // Network = observation surfaces (read-only, cross-org reference).
-    label: "Network",
-    items: [
-      { k: "all-orders", t: "All orders", icon: "▤" },
-      { k: "stock", t: "All warehouses", icon: "▥" },
-      { k: "suppliers", t: "Suppliers", icon: "▦" },
-    ],
-  },
-  {
-    // Migration 0140 — Service Notes / Issue Tracker.
-    label: "Cases",
-    items: [
-      { k: "service-notes", t: "Service Notes", icon: "✎" },
-    ],
-  },
-  {
-    // 0074 catalog admin (Loo 2026-05-09 Q1=b, Q2=c). Same page mounts under
-    // /principal/catalog too — RLS write covers both roles via is_internal().
+    id: "catalog",
     label: "Catalog",
-    items: [
-      { k: "catalog", t: "SKU Catalog", icon: "▭" },
+    icon: "▭",
+    children: [
+      { key: "catalog", label: "SKU" },
+      { key: "suppliers", label: "Suppliers" },
     ],
+  },
+  {
+    id: "cases",
+    label: "Cases",
+    icon: "✎",
+    badge: "service-notes",
+    children: [{ key: "service-notes", label: "Service Notes" }],
   },
 ];
+
+/** All routing keys that belong to a section (leaf key + children keys). */
+function sectionKeys(s: Section): string[] {
+  const ks: string[] = [];
+  if (s.key) ks.push(s.key);
+  if (s.children) ks.push(...s.children.map((c) => c.key));
+  if (s.extraKeys) ks.push(...s.extraKeys);
+  return ks;
+}
 
 interface Props {
   active: string;
@@ -94,25 +124,40 @@ export default function OperationSidebar({ active, onChange }: Props) {
   const session = useAuth((s) => s.session);
   const email = session?.user?.email ?? "";
   const initials = email.slice(0, 2).toUpperCase();
-  // Loo 2026-05-10 — sidebar action-count badges. Failures/loading degrade
-  // silently to 0 (no badge render) so a transient API hiccup doesn't break
-  // the nav.
+
+  // Badge counts (Loo 2026-05-10/0152) — failures degrade silently to 0.
   const badgesQ = useOperationBadges();
-  // 0152 (Loo 2026-05-31) — LP-rejected orders surface in the Orders view
-  // (OrderCard "Reselect →"), so their unread count rides on the Orders tab
-  // badge; clicking Orders marks BOTH keys seen.
   const lpRejected = badgesQ.data?.lpRejected ?? 0;
   const badgeCount: Record<string, number> = {
     orders: (badgesQ.data?.orders ?? 0) + lpRejected,
     procurement: badgesQ.data?.procurement ?? 0,
     "service-notes": badgesQ.data?.serviceNotes ?? 0,
   };
-  // Mark-seen mutation (Loo 2026-05-11). Fires on click for keys that have
-  // a badge counter — optimistically zeros the count so the orange dot
-  // disappears instantly. Server reconciles on the next 30s poll if any
-  // items advanced between click and ack.
   const markSeen = useMarkOperationBadgeSeen();
-  const BADGE_KEYS = new Set(["orders", "procurement"]);
+
+  function fireMarkSeen(key: string) {
+    if (key === "orders" || key === "procurement") {
+      if ((badgeCount[key] ?? 0) > 0)
+        markSeen.mutate(key as "orders" | "procurement");
+    }
+    // 0152 — clicking into Orders also clears the LP-rejected unread count.
+    if (key === "orders" && lpRejected > 0) markSeen.mutate("lp_rejected");
+  }
+
+  // Which section owns the currently-active routing key → that one expands.
+  const activeSectionId =
+    SECTIONS.find((s) => sectionKeys(s).includes(active))?.id ?? "dashboard";
+
+  function clickSection(s: Section) {
+    if (s.key) {
+      onChange(s.key);
+      if (s.badge) fireMarkSeen(s.badge === "service-notes" ? "service-notes" : s.badge);
+    } else if (s.children && s.children.length > 0) {
+      const first = s.children[0].key;
+      onChange(first);
+      if (s.badge) fireMarkSeen(s.badge === "service-notes" ? "service-notes" : s.badge);
+    }
+  }
 
   return (
     <aside
@@ -129,62 +174,61 @@ export default function OperationSidebar({ active, onChange }: Props) {
         </button>
       </div>
 
-      <nav className="flex-1 px-3 pt-5 pb-1 flex flex-col gap-3.5 overflow-auto">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label}>
-            <div className="px-3.5 pb-1.5 text-[9px] uppercase tracking-[0.16em] text-base-500 font-semibold">
-              {group.label}
+      <nav className="flex-1 px-3 pt-3 pb-1 flex flex-col gap-0.5 overflow-auto">
+        {SECTIONS.map((s) => {
+          const isActiveSection = activeSectionId === s.id;
+          const isLeafActive = s.key != null && active === s.key;
+          const baseCls =
+            "relative w-full text-left px-3.5 py-[9px] rounded text-[13px] flex items-center gap-[11px]";
+          const cls =
+            isActiveSection
+              ? `${baseCls} bg-base-100 text-base-900 font-semibold cursor-pointer`
+              : `${baseCls} text-base-600 font-medium hover:bg-base-50 cursor-pointer`;
+          return (
+            <div key={s.id}>
+              <button type="button" onClick={() => clickSection(s)} className={cls}>
+                {(isActiveSection || isLeafActive) && (
+                  <span
+                    className="absolute left-0 top-[7px] bottom-[7px] bg-primary rounded-r-sm"
+                    style={{ width: 3 }}
+                  />
+                )}
+                <span
+                  className={`w-4 text-center text-[13px] ${
+                    isActiveSection ? "text-primary" : "text-base-400"
+                  }`}
+                >
+                  {s.icon}
+                </span>
+                <span className="flex-1">{s.label}</span>
+                {s.badge && <NavBadge count={badgeCount[s.badge] ?? 0} label={s.label} />}
+              </button>
+
+              {/* Children of the active parent section only. */}
+              {isActiveSection && s.children && (
+                <div className="mt-0.5 mb-1 ml-[26px] flex flex-col gap-px border-l border-base-200 pl-2">
+                  {s.children.map((c) => {
+                    const childActive = active === c.key;
+                    return (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => onChange(c.key)}
+                        className={`text-left px-2.5 py-[7px] rounded text-[12.5px] ${
+                          childActive
+                            ? "bg-base-100 text-base-900 font-semibold"
+                            : "text-base-600 font-medium hover:bg-base-50"
+                        }`}
+                      >
+                        {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <div className="flex flex-col gap-px">
-              {group.items.map((n) => {
-                const isActive = active === n.k;
-                const baseCls =
-                  "relative w-full text-left px-3.5 py-[9px] rounded text-[13px] flex items-center gap-[11px]";
-                const cls = isActive
-                  ? `${baseCls} bg-base-100 text-base-900 font-semibold cursor-pointer`
-                  : `${baseCls} text-base-600 font-medium hover:bg-base-50 cursor-pointer`;
-                return (
-                  <button
-                    key={n.k}
-                    type="button"
-                    onClick={() => {
-                      onChange(n.k);
-                      if (BADGE_KEYS.has(n.k) && (badgeCount[n.k] ?? 0) > 0) {
-                        markSeen.mutate(n.k as "orders" | "procurement");
-                      }
-                      // 0152 — Orders click also clears the LP-rejected unread
-                      // count (the reselect action lives in the Orders view).
-                      if (n.k === "orders" && lpRejected > 0) {
-                        markSeen.mutate("lp_rejected");
-                      }
-                    }}
-                    className={cls}
-                  >
-                    {isActive && (
-                      <span
-                        className="absolute left-0 top-[7px] bottom-[7px] bg-primary rounded-r-sm"
-                        style={{ width: 3 }}
-                      />
-                    )}
-                    <span
-                      className={`w-4 text-center text-[13px] ${
-                        isActive ? "text-primary" : "text-base-400"
-                      }`}
-                    >
-                      {n.icon}
-                    </span>
-                    <span className="flex-1">{n.t}</span>
-                    {/* Loo 2026-05-11: badge now uses "unread since last view"
-                        semantics — count = items where updated_at >
-                        user_nav_seen.last_seen_at. Click fires mark-seen +
-                        optimistic zero, so the dot clears immediately. */}
-                    <NavBadge count={badgeCount[n.k] ?? 0} label={n.t} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       <Link
