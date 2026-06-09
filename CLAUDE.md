@@ -304,7 +304,7 @@ Don't burn an hour spinning. Surface and ask.
 
 ## 17. Project status
 
-### 17.1 Current state (as of 2026-05-20)
+### 17.1 Current state (as of 2026-06-08)
 
 | | |
 |---|---|
@@ -313,12 +313,12 @@ Don't burn an hour spinning. Surface and ask.
 | Web URL | https://carres-portal.pages.dev |
 | API URL | https://carres-portal-v2-api.wwch.workers.dev |
 | DB | staging Supabase = prod, project_id `kfprgpjpaffedghytstl` |
-| Latest migration | **0154** `fix_per_unit_id_hooks` (corrects 0153 signature errors). 0151 = delivery e-sign · 0152 = STANDARD auto-dispatch + LP-reject branch · 0153+0154 = per-unit `id-abc123456` tracking. 0150 = `rename_hookka_ohana`. 0138-0147 per [[project_db_applied_state]] memory. |
+| Latest migration | **0158** `normalize_teow_name`. New since 0154: 0155 = +4 logistic partners (Teow/TT KL→JB, EU/SSY JB→SG) · 0156 = multi-leg delivery (`orders.delivery_stops` jsonb + GIN `jsonb_path_ops` index + `set_delivery_chain`/`patch_delivery_stop` RPCs) · 0157 = `NETS` rename · 0158 = `TEOW` all-caps rename. 0151-0154 = delivery e-sign / STANDARD auto-dispatch + LP-reject / per-unit `id-abc123456`. **TRACKER GAP**: `supabase_migrations.schema_migrations` (what `list_migrations` reads) stops at **0154** — 0155-0158 were applied out-of-band, so their 4 rows are missing even though the schema is fully live (verified 2026-06-08: 8 partners · `delivery_stops` jsonb · both RPCs). Backfill the 4 rows only if a clean `list_migrations` matters. |
 | Catalog state | 11 suppliers · 170 product_models · 1013 product_skus (target 1091, 78 source dupes in carres-sku-master.xlsx — see CFs) |
-| Orders state | 0 transactional orders; orders_so_seq reset to 1000; next nextval = SO-1001 (4 alpha test orders SO-1001..1004 wiped 2026-05-20) |
-| Test count | api 692/695 (3 pre-existing fails, see §17.7; measured 2026-06-04) · web 464/469 · shared 186/186 (web/shared as of 2026-05-31 ship) |
-| Web bundle | 2772 KiB raw / 817 KiB gzipped (built + deployed 2026-06-04; regression CF still open, see §17.5) |
-| API bundle | 1276.51 KiB raw / 241.12 KiB gzipped (deployed 2026-06-04, version `61240565`) |
+| Orders state | **158 orders** (verified 2026-06-08): 153 AutoCount-imported (`source_system='autocount'`, all status `place`, SO-1001..1158, ~575 units feeding supplier forecast) + 5 native test orders (SO-1116..1120, cancelled/proceed_order). 0 have `delivery_stops` set — multi-leg chain never live-exercised (see §17.3 Pending). next `orders_so_seq` ≈ SO-1159. |
+| Test count | api 708/711 (3 pre-existing fails) · web 473/478 (5 pre-existing fails) · shared 186/186 — measured 2026-06-08; all 8 fails pre-existing per §17.7, zero new regressions (+16 api delivery-chain, +9 web multi-leg/stock-alerts, all pass) |
+| Web bundle | 2782.60 KiB raw / 819.82 KiB gzipped (bundle `index-DNYl_-jY.js`; built+deployed 2026-06-05, hash matches live; bundle-size regression CF still open, see §17.5) |
+| API bundle | 1281.87 KiB raw / 241.86 KiB gzipped (dry-run measured 2026-06-08; live Worker version `1974bdea-bdbc-49d1-93d5-3cbef04ffb70` deployed 2026-06-05) |
 
 ### 17.2 Phase timeline
 
@@ -490,6 +490,14 @@ Sidebar comment updated; `PrincipalSidebar` no longer has any `enabled:false` en
 
 **2026-06-04 · e–i checklist verify + Incoming header fix + DEPLOY · commits `fa6c511` + `fe04b1c`** — Loo asked "did e/f/g/h/i get done?". All 5 verified done (f/g/h/i = 5/31 ship items D/F/B+C/E; e = supplier forecast at `place` status, confirmed against live DB: `supplier_pending_demand` includes any status not in delivered/cancelled — 153 place orders / 575 units feeding forecast at check time). One gap found + fixed (`fe04b1c`): `SupplierIncoming.tsx` category header summed committed-only, showing "0 units" for categories whose demand is mostly un-POed — now committed+pending, matching hero Total KPI. Also: `fa6c511` CLAUDE.md §2 plugin/skill discipline rule (no auto-invoking superpowers etc.); pulled PR #2-5 (AutoCount import SKU-resolver fixes: `.in()` double-quote escape, colorway-suffix strip, model-family + model-token fallbacks, empty-row skip + zod path on 400). **Deployed both** — api `61240565` (first deploy carrying PR #2-5) + web `index-CKm_OUPF.js` (first deploy carrying import fixes + header fix); 401-health + live-bundle markers verified; `SERVICE_ROLE` grep on dist clean. Wrangler OAuth had been overwritten by another account's login — Loo re-ran `wrangler login` to the `wwch` account mid-deploy. NOT merged (intentionally): `jess/ops-shell-and-stock` — Jess's 5/19 branch is the original Phase A dev (its migrations 0107-0110 collide with main's; content superseded by 0132-0137). Archive or delete after Jess confirms; do not merge.
 
+**2026-06-05 · Multi-leg delivery chain + 4 new logistic partners + AutoCount resolver hardening · migrations 0155-0158 · DEPLOYED · PRs #9-12 (parallel dev wenwei4046)** — Five ships in one session, all merged to main + deployed. Live: web `index-DNYl_-jY.js` (Pages) · api version `1974bdea-bdbc-49d1-93d5-3cbef04ffb70` (Workers). Schema verified still live 2026-06-08.
+- **AutoCount import 4-layer SKU resolver** — Loo's 192-row `listing 4 jun 26.csv` was killed by (a) a discount row with blank `Item Group` + (b) a supabase-js bug silently dropping catalog matches when descriptions contain `"`. New resolver: L1 exact · L2 color-strip (drops `/Col:NINJA-02`, `/M2402-4 Sand`) · L3 model-family (same model id, best-seater fit) · L4 model-token (drops width too — catches `SF03-HK5535/32"` against a `/24"`+`/30"`-only catalog). Real-world recovery on Loo's listing: **24/109 → 106/109**.
+- **4 new logistic partners** (migration **0155**) — Teow, TT (KL→JB), EU, SSY (JB→SG) for cross-state / cross-border chains. Roster now **8, all ALL-CAPS short codes**: `AL · EU · HOUZS · NETS · SSY · TEOW · TSDD · TT`.
+- **NETS rename** (**0157**) `Nets Sdn Bhd → NETS` + **TEOW rename** (**0158**) `Teow → TEOW` — short-form / all-caps consistency; 4 code/test/seed refs updated each.
+- **Multi-leg delivery chain (γ architecture)** — THE big one. Schema (**0156**): `orders.delivery_stops jsonb` (null/empty = single-leg, byte-identical to current flow; 1+ legs = chain) + GIN `jsonb_path_ops` index (powers "any leg has partner X" filter) + 2 SECURITY DEFINER RPCs — `set_delivery_chain` (validates contiguous 1..N legs + known partner_ids; operation/principal only) and `patch_delivery_stop` (merges sparse per-leg patch, auto-stamps milestone timestamps on status=picked_up/handed_off/delivered). API: `PUT /api/operation/orders/:id/delivery-chain` + `PATCH .../delivery-stops/:leg`. Shared contract `packages/shared/src/schemas/delivery-chain.ts`. UI: `apps/web/src/pages/operation/components/DeliveryChain.tsx` in Order detail drawer — single-leg shows compact pill + "Set up multi-leg route" CTA; chain view = vertical timeline + per-leg action buttons + inline notes editor + "+ Add another leg". **Design rationale** (0156 header comment): jsonb not relational because 80%+ orders are single-leg Klang Valley; revisit gate at ≥30% multi-leg → promote to relational `order_delivery_legs` (β), jsonb shape mirrors the would-be row shape so backfill = one `INSERT … SELECT`. POD-per-leg deferred to V2 (cols `pod_url` / `pod_signed_by` / `status` already on each leg).
+- **Stock alerts tab routing fix** (PR #12) — closes CF `phase-4.5-chunk-2-alerts-tab-routing`. `StockAlertsTile` + `OperationWarehouse` use the tab-state callback instead of a bare URL navigate.
+- **Doc catch-up 2026-06-08** (this entry, single-session): re-measured tests (api 708/711 · web 473/478 · shared 186/186, +25 net all-pass, 8 fails pre-existing) + bundles (web 2782.60/819.82 KiB, hash matches live · api 1281.87/241.86 KiB dry-run). Confirmed live schema matches checkpoint (8 partners + `delivery_stops` jsonb + 2 RPCs; 0/158 orders multi-leg). Flagged migration-tracker gap — 0155-0158 not in `schema_migrations` though schema is live (see §17.1). New CFs filed in §17.5.
+
 ### 17.4 Business model (locked 2026-05-03)
 
 - Dealer just sells. Customer pays HQ direct. No HQ→dealer credit/debt.
@@ -518,6 +526,8 @@ Sidebar comment updated; `PrincipalSidebar` no longer has any `enabled:false` en
 - `phase-10-bundle-size-regression` — Web build jumped 1064 → 2620 KiB raw (266 → 781 gzipped) between 0121 and 0123. Investigate tree-shaking impact.
 - `phase-10-issuance-groups-test-coverage` — `CreatePOModal.test.tsx` lacks end-to-end per-(sourceSo, sku, attrs) assertion. Add bundle-prefill test with `issuanceGroups.length === N`.
 - `phase-10-shortage-by-so-test-coverage` — Phase 3 server endpoint has 1 bySo test. Add 3-SO disjoint-SKUs fan-out + stockpile vs bundle scope.
+- `phase-10-multi-leg-pod-upload` — frontend Storage upload + bucket RLS for `delivery-orders/orders/<id>/legs/<n>/<ts>.<ext>` paths so partners can attach a POD photo per handoff. Each `delivery_stops` leg already carries `pod_url` / `pod_signed_by` / `status` cols (0156); needs RLS verification + UI wiring before frontend uploads via supabase-js. (From 2026-06-05 multi-leg ship — POD intentionally deferred to V2.)
+- `phase-10-smart-partner-suggest` — multi-leg "+ Add leg" form + Inbox partner dropdown should auto-recommend a partner from the customer's delivery state (Klang→NETS, Johor→TEOW/TT, Singapore→EU/SSY). Operation currently picks manually.
 
 **LOW**:
 - `phase-10-rename-script-blind-spot-doc` — 0121 + 0123 both missed alias patterns. Enumerate ALL alias patterns upfront next rename, OR use comprehensive regex `(?<![a-z_])<col>(?![a-z_])`. Worth a doc in `docs/superpowers/`.
@@ -536,9 +546,12 @@ Sidebar comment updated; `PrincipalSidebar` no longer has any `enabled:false` en
 - `phase-10-operation-procurement-page-ready-pill` — Operation procurement page has `ready_confirm_sent` branch at `ProcurementTabContent.tsx:515`; verify `ready_for_pickup` equivalent exists.
 - `phase-9-custom-domain` — Bind real domain to Pages once alpha stable. Q2 deferred Week 2+.
 - `phase-9-secret-rotation-cadence` — Quarterly rotation policy for Workers secrets.
+- `phase-10-orders-partner-filter-chip` — Orders kanban needs `[All] [NETS] [TEOW] …` filter chips so operation can see "all single-partner-X orders" the way the old spreadsheet had per-partner tabs. The 0156 GIN index on `delivery_stops` already supports the `@>` containment query.
+- `phase-10-stock-indicator-on-order-card` — Order kanban cards should show a 🟢/🟡/🔴 stock indicator inline so operation needn't open every drawer to gauge availability.
+- `phase-10-multi-leg-promotion-decision` (watch ~3 months from 2026-06-05) — γ jsonb design assumes <30% of orders are multi-leg. Track the ratio in production; if it crosses 30% OR per-partner reliability dashboards become a real ask, promote to first-class relational `order_delivery_legs` table (β). jsonb shape mirrors the relational shape so backfill = one `INSERT … SELECT`. (Currently 0/158 orders multi-leg.)
 
 **Pre-Phase-10 still open (low, deferred)** — full list in git history:
-- `phase-4.5-chunk-2-alerts-tab-routing` — StockAlertsTile useNavigate URL/tab desync
+- `phase-4.5-chunk-2-alerts-tab-routing` — StockAlertsTile useNavigate URL/tab desync **[CLOSED 2026-06-05** — PR #12: StockAlertsTile + OperationWarehouse now use the tab-state callback instead of a bare URL navigate.]
 - `phase-4.5-chunk-2-stock-alerts-high-threshold-expose` — `logistics_stock_alerts()` returns `low_threshold` only
 - `phase-4.5-chunk-1-lp-whitelist-tighten` — Trigger covers 20 of 29 PO columns; switch to allow-list
 - `phase-4.5-cleanup-at-own-wh-waiting-rename` — Irreversible enum recreate to drop deprecated `at_own_wh_waiting`
@@ -560,7 +573,8 @@ These pre-date Phase 10 cascade work and need separate cleanup. Documented so fu
 
 - **api**: `partner/pickups.test.ts > returns LP's POs` — mock chain stale post-0090
 - **api**: `supplier/pos.test.ts > GET /api/supplier/pos/:poId/threads` (2 tests) — mocks `.from()` while route uses `.rpc("supplier_threads_for_po")` post-0111
-- **web**: `HoOKkASofaTab.test.tsx` (4 fails) — `dab4439` Direct-receive escape hatch regression
+- **web**: `OhanaSofaTab.test.tsx` (4 fails) — `dab4439` Direct-receive escape hatch regression (file was `HoOKkASofaTab.test.tsx` before the 0150 Ohana rename)
+- **web**: `NiceFutureMattressTab.test.tsx` (1 fail) — supplier-name lookup assertion ("Nice Future Bedding" not rendered); pre-existing, verified via stash 2026-05-31, still failing 2026-06-08
 
 ### 17.8 Phase 9 alpha-readiness checklist (post-cleanup 2026-05-15)
 
