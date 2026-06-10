@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   useOperationOrders,
+  useOperationStock,
   useDeliveryPartners,
   type operationOrderListRow,
 } from "@/lib/queries";
@@ -98,18 +99,69 @@ function controlTabOf(o: operationOrderListRow): SettledTab {
   return o.source_system === "autocount" ? "proceed" : "placed";
 }
 
-/** Stock cell — derived from stage, NOT a live stock recount. ready_to_dispatch+
- *  means stock was already secured/reserved; awaiting means a confirmed
- *  shortage; earlier stages haven't been checked. Deriving from stage (rather
- *  than matching order_lines.sku against stock_balances) sidesteps the
- *  AutoCount free-text-SKU mismatch that would otherwise cry "short" on every
- *  imported order. */
-function stockReadiness(o: operationOrderListRow): "ready" | "short" | "unknown" {
+type StockState = "ready" | "in_stock" | "need_po" | "awaiting" | "unknown";
+
+interface StockInfo {
+  state: StockState;
+  /** Units needed / coverable from free stock — only on the matchable
+   *  early-stage states (in_stock / need_po). */
+  need?: number;
+  have?: number;
+  /** Per-SKU shortfall, for the need_po tooltip. */
+  short?: { sku: string; need: number; have: number }[];
+}
+
+/** Stock cell — HYBRID of pipeline stage + a live free-stock check.
+ *
+ *  Later stages are read from the pipeline, NOT recounted: ready_to_dispatch+
+ *  means stock was already secured/reserved (a free-balance recount would now
+ *  read 0 and wrongly cry "short"), and awaiting_operation_action means a PO is
+ *  already open against a confirmed shortage. So those stay stage-derived.
+ *
+ *  Early stages (placed / proceed_request) haven't reserved anything yet, so we
+ *  CAN compare each line's need against live free balance (availableBySku, from
+ *  /api/operation/stock — same source as the Stock On-Hand page):
+ *    • every line covered      → in_stock   ("fulfil from shelf")
+ *    • some line short          → need_po    ("make to order / raise PO")
+ *  AutoCount orders carry free-text SKUs that aren't in the catalog, so their
+ *  SKUs are absent from availableBySku → unknown ("—"), the old behaviour. The
+ *  map being undefined (stock still loading / errored) also falls back to
+ *  unknown, so the column degrades gracefully. */
+function stockReadiness(
+  o: operationOrderListRow,
+  availableBySku?: Map<string, number>,
+): StockInfo {
   const s = stageOf(o);
   if (s === "ready_to_dispatch" || s === "dispatched" || s === "delivered")
-    return "ready";
-  if (s === "awaiting_operation_action") return "short";
-  return "unknown";
+    return { state: "ready" };
+  if (s === "awaiting_operation_action") return { state: "awaiting" };
+
+  // Early stages: real free-stock check, only when the live map is present AND
+  // every line SKU is a known catalog SKU (else we can't honestly compute it).
+  const lines = o.order_lines ?? [];
+  if (!availableBySku || lines.length === 0) return { state: "unknown" };
+
+  const needBySku = new Map<string, number>();
+  for (const l of lines) {
+    const q = Number(l.qty || 0);
+    if (q > 0) needBySku.set(l.sku, (needBySku.get(l.sku) ?? 0) + q);
+  }
+  if (needBySku.size === 0) return { state: "unknown" };
+  for (const sku of needBySku.keys())
+    if (!availableBySku.has(sku)) return { state: "unknown" };
+
+  let need = 0;
+  let have = 0;
+  const short: { sku: string; need: number; have: number }[] = [];
+  for (const [sku, q] of needBySku) {
+    const avail = Math.max(0, availableBySku.get(sku) ?? 0);
+    need += q;
+    have += Math.min(avail, q);
+    if (avail < q) short.push({ sku, need: q, have: avail });
+  }
+  return short.length === 0
+    ? { state: "in_stock", need, have }
+    : { state: "need_po", need, have, short };
 }
 
 /** Countdown from today to a YYYY-MM-DD delivery date → short label + tone.
@@ -171,12 +223,24 @@ export default function OperationOrdersControl({ onImport }: Props) {
     search: search.trim() || undefined,
   });
   const partnersQ = useDeliveryPartners();
+  // Live free-balance map (sku → available) from the Stock On-Hand source. Its
+  // keys ARE the matchable catalog SKUs; AutoCount free-text SKUs are absent.
+  // `undefined` until loaded → the Stock cell falls back to stage-only state.
+  const stockQ = useOperationStock();
 
   const partnerName = useMemo(() => {
     const m = new Map<string, string>();
     for (const p of partnersQ.data?.partners ?? []) m.set(p.id, p.name);
     return m;
   }, [partnersQ.data]);
+
+  const availableBySku = useMemo(() => {
+    const rows = stockQ.data?.skus ?? [];
+    if (rows.length === 0) return undefined;
+    const m = new Map<string, number>();
+    for (const s of rows) m.set(s.sku, s.available);
+    return m;
+  }, [stockQ.data]);
 
   const orders = useMemo(() => data?.orders ?? [], [data]);
 
@@ -329,6 +393,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 key={o.id}
                 o={o}
                 partnerName={partnerName}
+                availableBySku={availableBySku}
                 onOpen={() => setOpenOrderId(o.id)}
               />
             ))}
@@ -349,17 +414,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
 function OrderRow({
   o,
   partnerName,
+  availableBySku,
   onOpen,
 }: {
   o: operationOrderListRow;
   partnerName: Map<string, string>;
+  availableBySku?: Map<string, number>;
   onOpen: () => void;
 }) {
   const ct = controlTabOf(o);
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
   const qtyTotal = lines.reduce((s, l) => s + Number(l.qty || 0), 0);
-  const stock = stockReadiness(o);
+  const stock = stockReadiness(o, availableBySku);
   const area = areaForAddress(o.customer_address ?? null);
 
   // Logistic: prefer the formal LP (joined name), fall back to the Inbox-triage
@@ -451,7 +518,7 @@ function OrderRow({
       </td>
       {/* Stock */}
       <td className="px-4 py-3 whitespace-nowrap">
-        <StockCell state={stock} />
+        <StockCell info={stock} />
       </td>
       {/* Logistic */}
       <td className="px-4 py-3 whitespace-nowrap">
@@ -475,20 +542,57 @@ function OrderRow({
   );
 }
 
-function StockCell({ state }: { state: "ready" | "short" | "unknown" }) {
-  if (state === "ready")
+/** Visual config per stock state. Two greens (pipeline-secured "Ready" vs
+ *  shelf-available "In stock") and two ambers ("Make to order" = no PO yet vs
+ *  "Awaiting stock" = PO already open) — same tone, distinct label so the
+ *  operator reads the next action at a glance. */
+const STOCK_CFG: Record<
+  Exclude<StockState, "unknown">,
+  { tone: string; dot: string; label: string }
+> = {
+  ready: { tone: "text-success", dot: "bg-success", label: "Ready" },
+  in_stock: { tone: "text-success", dot: "bg-success", label: "In stock" },
+  need_po: { tone: "text-warning", dot: "bg-warning", label: "Make to order" },
+  awaiting: { tone: "text-warning", dot: "bg-warning", label: "Awaiting stock" },
+};
+
+function StockCell({ info }: { info: StockInfo }) {
+  if (info.state === "unknown")
     return (
-      <span className="inline-flex items-center gap-1 text-[12px] text-success">
-        <span className="w-[7px] h-[7px] rounded-full bg-success" />Ready
+      <span data-stock-state="unknown" className="text-base-400">
+        —
       </span>
     );
-  if (state === "short")
-    return (
-      <span className="inline-flex items-center gap-1 text-[12px] text-warning">
-        <span className="w-[7px] h-[7px] rounded-full bg-warning" />Short
+  const cfg = STOCK_CFG[info.state];
+
+  // Real numbers (Jess's ask): show coverage on the matchable early states.
+  const showCounts =
+    (info.state === "in_stock" || info.state === "need_po") &&
+    info.need != null &&
+    info.have != null;
+  const title =
+    info.short && info.short.length > 0
+      ? "Short — " +
+        info.short.map((s) => `${shortSku(s.sku)} ${s.have}/${s.need}`).join(", ")
+      : undefined;
+
+  return (
+    <span
+      className="inline-flex flex-col gap-0.5"
+      title={title}
+      data-stock-state={info.state}
+    >
+      <span className={`inline-flex items-center gap-1 text-[12px] ${cfg.tone}`}>
+        <span className={`w-[7px] h-[7px] rounded-full ${cfg.dot}`} />
+        {cfg.label}
       </span>
-    );
-  return <span className="text-base-400">—</span>;
+      {showCounts && (
+        <span className="text-[10px] text-base-500 font-mono">
+          {info.have}/{info.need} units
+        </span>
+      )}
+    </span>
+  );
 }
 
 /** Trim a long/free-text SKU to a compact token for the items sub-line. */

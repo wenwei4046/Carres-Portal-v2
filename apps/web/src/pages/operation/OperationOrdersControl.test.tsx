@@ -6,6 +6,7 @@ import OperationOrdersControl from "./OperationOrdersControl";
 import type {
   operationOrdersListResponse,
   operationOrderListRow,
+  operationStockResponse,
   DeliveryPartnersListResponse,
 } from "@/lib/queries";
 
@@ -29,6 +30,7 @@ let partnersHookState: {
   isLoading: boolean;
   isError: boolean;
 };
+let stockHookState: { data: operationStockResponse | undefined };
 
 vi.mock("@/lib/queries", async () => {
   const actual =
@@ -37,8 +39,30 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     useOperationOrders: () => listHookState,
     useDeliveryPartners: () => partnersHookState,
+    useOperationStock: () => stockHookState,
   };
 });
+
+/** Minimal /api/operation/stock payload — only `sku` + `available` matter to the
+ *  control table's Stock column; the rest is padded to satisfy the type. */
+function stockResponse(
+  rows: { sku: string; available: number }[],
+): operationStockResponse {
+  return {
+    warehouses: [{ id: "w1", name: "Carres Klang" }],
+    skus: rows.map((r) => ({
+      sku: r.sku,
+      name: r.sku,
+      category: null,
+      price: 0,
+      available: r.available,
+      lowThreshold: 0,
+      incoming: 0,
+      perWarehouse: {},
+    })),
+    summary: { totalSkus: rows.length, lowStockCount: 0, openPos: 0 },
+  };
+}
 
 vi.mock("./components/OrderDetailDrawer", () => ({
   default: ({ orderId, onClose }: { orderId: string; onClose: () => void }) => (
@@ -158,6 +182,9 @@ beforeEach(() => {
     isLoading: false,
     isError: false,
   };
+  // Default: no stock snapshot loaded → Stock column falls back to stage-only
+  // state (the pre-existing behaviour the original tests assume).
+  stockHookState = { data: undefined };
 });
 
 describe("OperationOrdersControl", () => {
@@ -278,5 +305,115 @@ describe("OperationOrdersControl", () => {
     expect(
       screen.getByTestId("operation-orders-control-skeleton"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("OperationOrdersControl · Stock column", () => {
+  function oneRow(partial: Partial<operationOrderListRow> & { id: string; so: number }) {
+    listHookState.data = { orders: [makeRow(partial)] };
+  }
+
+  it("shows In stock + coverage when free balance covers every line (native, early stage)", () => {
+    oneRow({
+      id: "ns",
+      so: 2001,
+      status: "place",
+      source_system: null,
+      customer_name: "Native InStock",
+      order_lines: [
+        { sku: "SOFA-1", qty: 2 },
+        { sku: "BED-1", qty: 1 },
+      ],
+    });
+    stockHookState.data = stockResponse([
+      { sku: "SOFA-1", available: 5 },
+      { sku: "BED-1", available: 3 },
+    ]);
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    expect(within(row).getByText("In stock")).toBeInTheDocument();
+    // have = min(5,2)+min(3,1) = 3 ; need = 3
+    expect(within(row).getByText("3/3 units")).toBeInTheDocument();
+  });
+
+  it("shows Make to order + partial coverage when a line is short", () => {
+    oneRow({
+      id: "sh",
+      so: 2002,
+      status: "place",
+      source_system: null,
+      order_lines: [
+        { sku: "SOFA-1", qty: 3 },
+        { sku: "BED-1", qty: 2 },
+      ],
+    });
+    stockHookState.data = stockResponse([
+      { sku: "SOFA-1", available: 1 },
+      { sku: "BED-1", available: 2 },
+    ]);
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    expect(within(row).getByText("Make to order")).toBeInTheDocument();
+    // have = min(1,3)+min(2,2) = 3 ; need = 5
+    expect(within(row).getByText("3/5 units")).toBeInTheDocument();
+  });
+
+  it("falls back to — for AutoCount free-text SKUs absent from the catalog", () => {
+    oneRow({
+      id: "ac",
+      so: 2003,
+      status: "place",
+      source_system: "autocount",
+      order_lines: [{ sku: "Some Free Text Sofa", qty: 1 }],
+    });
+    stockHookState.data = stockResponse([{ sku: "SOFA-1", available: 5 }]);
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    expect(row.querySelector('[data-stock-state="unknown"]')).toBeTruthy();
+    expect(within(row).queryByText("In stock")).not.toBeInTheDocument();
+    expect(within(row).queryByText("Make to order")).not.toBeInTheDocument();
+  });
+
+  it("keeps Ready (stage-derived) for ready_to_dispatch even when free balance is 0", () => {
+    // Proves the reserved-double-count guard: stock is already reserved, so a
+    // naive free-balance recount (0 here) must NOT downgrade it to short.
+    oneRow({
+      id: "rd",
+      so: 2004,
+      status: "proceed_order",
+      operation_stage: "ready_to_dispatch",
+      order_lines: [{ sku: "SOFA-1", qty: 99 }],
+    });
+    stockHookState.data = stockResponse([{ sku: "SOFA-1", available: 0 }]);
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    expect(within(row).getByText("Ready")).toBeInTheDocument();
+    expect(row.querySelector('[data-stock-state="ready"]')).toBeTruthy();
+  });
+
+  it("shows Awaiting stock for awaiting_operation_action (PO already open)", () => {
+    oneRow({
+      id: "aw",
+      so: 2005,
+      status: "proceed_order",
+      operation_stage: "awaiting_operation_action",
+    });
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    expect(within(row).getByText("Awaiting stock")).toBeInTheDocument();
+  });
+
+  it("falls back to — for an early native order while the stock snapshot is still loading", () => {
+    oneRow({
+      id: "ld",
+      so: 2006,
+      status: "place",
+      source_system: null,
+      order_lines: [{ sku: "SOFA-1", qty: 1 }],
+    });
+    stockHookState.data = undefined; // not loaded yet
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    expect(row.querySelector('[data-stock-state="unknown"]')).toBeTruthy();
   });
 });

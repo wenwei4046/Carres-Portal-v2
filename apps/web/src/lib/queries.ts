@@ -1915,6 +1915,24 @@ export interface operationStockAlertRow {
 export interface operationStockAlertsResponse {
   alerts: operationStockAlertRow[];
 }
+/** GET /api/operation/stock — cross-warehouse availability (apps/api/src/routes/
+ *  operation/stock.ts). `available` = qty − reserved, summed across warehouses.
+ *  Shared by the Stock On-Hand page AND the Orders control table's Stock column
+ *  (via useOperationStock) so both surfaces agree on a SKU's free balance. */
+export interface operationStockResponse {
+  warehouses: { id: string; name: string }[];
+  skus: {
+    sku: string;
+    name: string;
+    category: string | null;
+    price: number;
+    available: number;
+    lowThreshold: number;
+    incoming: number;
+    perWarehouse: Record<string, { qty: number; reserved: number }>;
+  }[];
+  summary: { totalSkus: number; lowStockCount: number; openPos: number };
+}
 export interface operationReceivePoWithDoResponse {
   po_id: string;
   do_file_path: string;
@@ -2292,6 +2310,20 @@ export function useStockAlerts(
     queryKey: qk.operation.stockAlerts(),
     queryFn: () =>
       apiFetch<operationStockAlertsResponse>("/api/operation/stock-alerts"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Cross-warehouse stock snapshot — the Stock On-Hand source of truth, reused by
+ *  the Orders control table so its Stock column matches that page's free-balance
+ *  figures. 30s stale mirrors the other operation stock surfaces. */
+export function useOperationStock(
+  opts?: Partial<UseQueryOptions<operationStockResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.stock(),
+    queryFn: () => apiFetch<operationStockResponse>("/api/operation/stock"),
     staleTime: 30_000,
     ...opts,
   });
