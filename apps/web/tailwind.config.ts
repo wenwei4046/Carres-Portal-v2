@@ -94,17 +94,16 @@ export default {
         },
       },
       fontFamily: {
-        // Body / display both use DM Sans per the Warm Linen preset in
-        // reference/shared/styles.css. The proto reserves Big Shoulders Stencil
-        // for nothing in this preset; v2 keeps it on `font-stencil` for any
-        // future poster/login-mark surface but no current page uses it.
-        sans: ["DM Sans", "system-ui", "sans-serif"],
-        display: ["DM Sans", "system-ui", "sans-serif"],
+        // v17 (2026-06-09): Inter is the workhorse UI font for body + display.
+        // DM Sans kept in the fallback chain. Big Shoulders Stencil stays on
+        // `font-stencil` for future poster/login-mark surfaces.
+        sans: ["Inter", "DM Sans", "system-ui", "sans-serif"],
+        display: ["Inter", "DM Sans", "system-ui", "sans-serif"],
         // `font-body` is the explicit alias used by `lib/cjk.ts`'s ASCII
-        // branch — it points at the same DM Sans chain as `font-sans` so
-        // existing components are unaffected. Adding the alias keeps the
-        // CJK helper readable: `cjkClassName(s) → "font-cjk" | "font-body"`.
-        body: ["DM Sans", "system-ui", "sans-serif"],
+        // branch — same Inter chain as `font-sans`, so existing components are
+        // unaffected. Keeps the CJK helper readable:
+        // `cjkClassName(s) → "font-cjk" | "font-body"`.
+        body: ["Inter", "DM Sans", "system-ui", "sans-serif"],
         // CJK fallback chain. `lib/cjk.ts` switches surfaces with mixed CN/EN
         // text (dealer/customer/warehouse names) to this family so glyphs
         // render cleanly. Noto Sans SC also covers Latin so ASCII stays sharp.
