@@ -7,14 +7,13 @@ import { useOperationBadges, useMarkOperationBadgeSeen } from "@/lib/queries";
 /**
  * operation sidebar — Jess redesign 2026-06-08.
  *
- * Collapsed to **6 top-level menus** (Dashboard · Orders · Receiving · Stock ·
- * Catalog · Cases). Sub-views are shown as a nested list under the ACTIVE menu
- * only — so by default the rail reads as 6 items instead of the old 8-group /
- * 16-entry wall. The underlying routing keys are UNCHANGED (OperationApp still
- * dispatches on the same keys), so this is a pure navigation reorg with no
- * routing risk. Renames per the agreed model: Procurement→Receiving,
- * Repair→Defective, Warehouse→On Hand, AutoCount/Klang-Stock/Network groups
- * dissolved into Orders / Stock / Catalog.
+ * **7 top-level menus** (Dashboard · Orders · Purchase Order · Receiving · Stock
+ * · Catalog · Cases). Sub-views are shown as a nested list under the ACTIVE menu
+ * only. The underlying routing keys are UNCHANGED (OperationApp still dispatches
+ * on the same keys), so this is a pure navigation reorg with no routing risk.
+ * Renames per the agreed model: Procurement→Purchase Order + a new GRN-only
+ * Receiving (P3 Q3a=B split), Repair→Defective, Warehouse→On Hand, AutoCount/
+ * Klang-Stock/Network groups dissolved into Orders / Stock / Catalog.
  *
  * NOTE: deeper consolidation (Orders → one control grid with status tabs;
  * Stock → On Hand + Movements with Ready/Reserved/Defective as filters; Cases →
@@ -58,10 +57,21 @@ const SECTIONS: Section[] = [
     extraKeys: ["ops-import", "ops-inbox", "all-orders"],
   },
   {
-    id: "receiving",
-    label: "Receiving",
+    // P3 (Q3a=B menu split) — PO create/manage = the old Procurement
+    // (TabbedProcurementShell, URL-driven at /operation/procurement). Badge
+    // moved to Receiving (it counts POs ready to RECEIVE, not to create).
+    id: "purchase-order",
+    label: "Purchase Order",
     icon: "▦",
     key: "procurement",
+  },
+  {
+    // P3 — GRN-only receive station (待收 queue into Carres Klang). Carries the
+    // procurement badge (POs ready to receive) + clicking it marks that seen.
+    id: "receiving",
+    label: "Receiving",
+    icon: "↓",
+    key: "receiving",
     badge: "procurement",
   },
   {

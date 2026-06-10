@@ -9,6 +9,9 @@ import OperationOrdersControl from "./OperationOrdersControl";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
+// P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
+// Purchase Order (procurement) menu.
+import OperationReceiving from "./OperationReceiving";
 import OperationCatalog from "@/pages/catalog/OperationCatalog";
 // 2026-05-19 — Stock / All orders / Suppliers moved from Principal sidebar.
 import OperationStock from "./OperationStock";
@@ -231,6 +234,10 @@ export default function OperationApp() {
                 setTab={changeTab}
               />
             )}
+            {/* P3 — GRN receiving station (待收 queue). Distinct from the
+                Purchase Order menu (TabbedProcurementShell at
+                /operation/procurement); this is tab-state driven. */}
+            {tab === "receiving" && <OperationReceiving />}
             {tab === "catalog" && <OperationCatalog />}
             {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
             {tab === "stock-onhand" && <OperationStockOnHand />}
