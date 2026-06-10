@@ -1853,7 +1853,10 @@ export interface WarehouseSkuTotals {
   low_stock_status_aggregate: LowStockStatus;
 }
 export interface WarehouseListResponse {
-  warehouses: { id: string; name: string; address: string | null }[];
+  /** P4 — `owning_partner_id` NULL = Carres own warehouse (GRN-eligible, e.g.
+   *  Klang); non-NULL = LP-owned (e.g. HOUZS Balakong) — goods there are tracked
+   *  by Stock Location, not a Klang GRN. */
+  warehouses: { id: string; name: string; address: string | null; owning_partner_id?: string | null }[];
   byWarehouse: Record<string, WarehouseStockEntry[]>;
   totalsBySku: Record<string, WarehouseSkuTotals>;
 }

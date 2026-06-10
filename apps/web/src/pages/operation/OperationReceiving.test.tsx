@@ -27,11 +27,12 @@ function po(p: {
   status: "open" | "received" | "cancelled";
   sup_status: string;
   lines: { id: string; sku: string; qty: number; received_qty: number }[];
+  warehouse_id?: string;
 }) {
   return {
     id: p.id,
     supplier_id: p.supplier_id,
-    warehouse_id: "wh-klang",
+    warehouse_id: p.warehouse_id ?? "wh-klang",
     status: p.status,
     sup_status: p.sup_status,
     so: 1001,
@@ -121,5 +122,31 @@ describe("OperationReceiving", () => {
       expect(screen.getAllByText("Nice Future").length).toBeGreaterThan(0);
     });
     expect(screen.getByText("Ohana")).toBeInTheDocument();
+  });
+
+  it("P4 — excludes POs bound for an LP-owned warehouse once one exists (GRN = own WH only)", async () => {
+    apiFetchMock.mockImplementation((path: string) => {
+      if (typeof path === "string" && path.includes("/api/operation/suppliers"))
+        return Promise.resolve({ suppliers: SUPPLIERS });
+      if (typeof path === "string" && path.includes("/api/operation/warehouse"))
+        return Promise.resolve({
+          warehouses: [
+            { id: "wh-klang", name: "Carres Klang", address: "Klang", owning_partner_id: null },
+            { id: "wh-balakong", name: "HOUZS Balakong", address: "Balakong", owning_partner_id: "lp-houzs" },
+          ],
+        });
+      if (typeof path === "string" && path.includes("/api/operation/pos"))
+        return Promise.resolve({
+          pos: [
+            po({ id: "PO-3001", supplier_id: "sup-nf", status: "open", sup_status: "ready_for_pickup", warehouse_id: "wh-klang", lines: [{ id: "k1", sku: "MS01", qty: 2, received_qty: 0 }] }),
+            po({ id: "PO-3002", supplier_id: "sup-oh", status: "open", sup_status: "in_production", warehouse_id: "wh-balakong", lines: [{ id: "k2", sku: "SF02", qty: 1, received_qty: 0 }] }),
+          ],
+        });
+      return Promise.resolve({});
+    });
+    wrap(<OperationReceiving />);
+    // PO-3001 → Carres Klang (own WH) shows; PO-3002 → HOUZS Balakong (LP) excluded.
+    await waitFor(() => expect(screen.getByText("PO-3001")).toBeInTheDocument());
+    expect(screen.queryByText("PO-3002")).not.toBeInTheDocument();
   });
 });

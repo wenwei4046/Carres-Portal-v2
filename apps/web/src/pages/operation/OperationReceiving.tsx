@@ -82,10 +82,36 @@ export default function OperationReceiving() {
     return m;
   }, [warehouseQ.data]);
 
+  // P4 (multi-location) — GRN only covers goods INTO an OWN warehouse
+  // (owning_partner_id NULL, e.g. Carres Klang). LP-owned warehouses (HOUZS
+  // Balakong, OHANA) never hit a Klang GRN — goods there are tracked by the
+  // order's Stock Location instead. The own-WH filter only activates once an
+  // LP-owned warehouse actually exists; until then every PO is own-WH so the
+  // queue is unchanged (current master data has no LP warehouse).
+  const ownWarehouseIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const w of warehouseQ.data?.warehouses ?? [])
+      if (w.owning_partner_id == null) s.add(w.id);
+    return s;
+  }, [warehouseQ.data]);
+  const hasLpWarehouse = useMemo(
+    () =>
+      (warehouseQ.data?.warehouses ?? []).some(
+        (w) => w.owning_partner_id != null,
+      ),
+    [warehouseQ.data],
+  );
+
   const pos = useMemo(() => data?.pos ?? [], [data]);
 
-  // Cancelled POs never belong in a receive queue.
-  const live = useMemo(() => pos.filter((p) => p.status !== "cancelled"), [pos]);
+  // Cancelled POs never belong in a receive queue; then narrow to own-warehouse
+  // POs (GRN scope) once any LP-owned warehouse exists.
+  const live = useMemo(() => {
+    const notCancelled = pos.filter((p) => p.status !== "cancelled");
+    return hasLpWarehouse
+      ? notCancelled.filter((p) => ownWarehouseIds.has(p.warehouse_id))
+      : notCancelled;
+  }, [pos, hasLpWarehouse, ownWarehouseIds]);
 
   const counts = useMemo(() => {
     const c: Record<Tab, number> = { to_receive: 0, received: 0, all: live.length };
@@ -212,12 +238,13 @@ export default function OperationReceiving() {
       <div className="bg-white border border-base-200 rounded overflow-auto">
         <table
           className="w-full border-collapse text-[13px]"
-          style={{ minWidth: 820 }}
+          style={{ minWidth: 920 }}
         >
           <thead>
             <tr className="bg-base-50 border-b border-base-200">
               <Th>PO</Th>
               <Th>Supplier</Th>
+              <Th>Warehouse</Th>
               <Th>Items</Th>
               <Th>ETA</Th>
               <Th>Stage</Th>
@@ -228,7 +255,7 @@ export default function OperationReceiving() {
             {visible.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No purchase orders in this tab.
@@ -238,6 +265,7 @@ export default function OperationReceiving() {
             {visible.map((po) => {
               const { received, total } = poTotals(po);
               const supName = supplierById.get(po.supplier_id)?.name ?? "—";
+              const whName = warehouseById.get(po.warehouse_id)?.name ?? "—";
               const done = po.status === "received";
               return (
                 <tr
@@ -249,6 +277,9 @@ export default function OperationReceiving() {
                     {po.id}
                   </td>
                   <td className="px-4 py-3 text-base-800">{supName}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-base-700">
+                    {whName}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className="font-mono text-base-800">
                       {received}/{total}
