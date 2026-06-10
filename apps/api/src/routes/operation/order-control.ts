@@ -48,7 +48,7 @@ orderControlRouter.get("/:id/control", async (c) => {
   const { data, error } = await sb
     .from("ops_order_control")
     .select(
-      "order_id, stock_location, stock_eta, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, updated_at, updated_by",
+      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, updated_at, updated_by",
     )
     .eq("order_id", idCheck.data)
     .maybeSingle();
@@ -109,7 +109,7 @@ orderControlRouter.put("/:id/control", async (c) => {
       { onConflict: "order_id" },
     )
     .select(
-      "order_id, stock_location, stock_eta, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, updated_at, updated_by",
+      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, updated_at, updated_by",
     )
     .single();
   if (error) {

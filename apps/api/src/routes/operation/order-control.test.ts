@@ -68,6 +68,7 @@ const ROW = {
   order_id: ORDER_ID,
   stock_location: ["Carres Klang"],
   stock_eta: "2026-06-20",
+  delivery_time_slot: "Afternoon (12pm–3pm)",
   customer_request: "postponed",
   action_for_logistic: null,
   carres_remark: null,
@@ -227,6 +228,7 @@ describe("PUT /api/operation/orders/:id/control", () => {
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           stock_location: ["Carres Klang"],
+          delivery_time_slot: "Morning (9am–12pm)",
           payment_status: "Follow Up",
           customer_request: "postponed",
         }),
@@ -238,6 +240,7 @@ describe("PUT /api/operation/orders/:id/control", () => {
       {
         order_id: ORDER_ID,
         stock_location: ["Carres Klang"],
+        delivery_time_slot: "Morning (9am–12pm)",
         payment_status: "Follow Up",
         customer_request: "postponed",
         updated_by: "u1",

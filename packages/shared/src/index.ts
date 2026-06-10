@@ -373,6 +373,7 @@ export {
 export {
   STOCK_LOCATIONS,
   PAYMENT_STATUSES,
+  DELIVERY_TIME_SLOTS,
   opsOrderControlSchema,
   updateOpsOrderControlInput,
   opsOrderControlResponseSchema,

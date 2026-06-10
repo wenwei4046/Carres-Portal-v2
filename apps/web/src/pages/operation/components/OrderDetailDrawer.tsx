@@ -588,6 +588,8 @@ function DrawerBody({
             deliveryDateTbd={order.delivery_date_tbd}
             opsAssignedLogistic={order.ops_assigned_logistic ?? null}
             deliveryPartnerId={order.delivery_partner_id}
+            paid={order.paid}
+            orderTotal={total + addonsSum(addons)}
           />
         </div>
 

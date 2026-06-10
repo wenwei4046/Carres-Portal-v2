@@ -35,6 +35,17 @@ export const PAYMENT_STATUSES = [
   "Unpaid",
 ] as const;
 
+/** Suggested delivery time-slot windows for the drawer dropdown (the spec's
+ *  "delivery date + time slot"). Stored as free text (column is `text`) so the
+ *  operator can record a bespoke window via the remark fields if needed. */
+export const DELIVERY_TIME_SLOTS = [
+  "Morning (9am–12pm)",
+  "Afternoon (12pm–3pm)",
+  "Late afternoon (3pm–6pm)",
+  "Evening (after 6pm)",
+  "Anytime",
+] as const;
+
 /** ISO yyyy-mm-dd (no time) — matches the DB `date` column for stock_eta. */
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected yyyy-mm-dd");
 
@@ -43,6 +54,7 @@ export const opsOrderControlSchema = z.object({
   order_id: z.string().uuid(),
   stock_location: z.array(z.string()).default([]),
   stock_eta: isoDate.nullable(),
+  delivery_time_slot: z.string().nullable(),
   customer_request: z.string().nullable(),
   action_for_logistic: z.string().nullable(),
   carres_remark: z.string().nullable(),
@@ -63,6 +75,7 @@ export const updateOpsOrderControlInput = z
   .object({
     stock_location: z.array(z.string().trim().min(1)).max(10),
     stock_eta: isoDate.nullable(),
+    delivery_time_slot: z.string().max(100).nullable(),
     customer_request: z.string().max(2000).nullable(),
     action_for_logistic: z.string().max(2000).nullable(),
     carres_remark: z.string().max(2000).nullable(),
