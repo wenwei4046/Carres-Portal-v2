@@ -16,6 +16,8 @@ import { fmtDate } from "@/lib/fmt-date";
 import { useAuth } from "@/lib/auth";
 import AnnotationTimeline from "./AnnotationTimeline";
 import DeliveryChain from "./DeliveryChain";
+import OrderControlPanel from "./OrderControlPanel";
+import ServiceNoteModal from "./ServiceNoteModal";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
 import StageChip, { type OperationStage } from "./StageChip";
@@ -85,6 +87,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
   const [showConfirmProceed, setShowConfirmProceed] = useState(false);
   const [showTransferReady, setShowTransferReady] = useState(false);
   const [showTopUp, setShowTopUp] = useState(false);
+  const [showServiceNote, setShowServiceNote] = useState(false);
 
   // Esc-to-close listener at the drawer level. Modals install their own Esc
   // handlers; while a modal is open we let it consume the key first by gating
@@ -96,7 +99,8 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
       showAbandon ||
       showConfirmProceed ||
       showTransferReady ||
-      showTopUp;
+      showTopUp ||
+      showServiceNote;
     if (anyModalOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -114,6 +118,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
     showConfirmProceed,
     showTransferReady,
     showTopUp,
+    showServiceNote,
   ]);
 
   // 2026-05-10 (Loo) — "+ Issue POs" jumps to /operation/procurement with a
@@ -212,6 +217,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
               onConfirmProceedClick={() => setShowConfirmProceed(true)}
               onTransferReadyClick={() => setShowTransferReady(true)}
               onTopUpClick={() => setShowTopUp(true)}
+              onServiceNoteClick={() => setShowServiceNote(true)}
             />
             {showDispatch && (
               <DispatchModal
@@ -258,6 +264,23 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
                 }}
                 total={data.total}
                 onClose={() => setShowTopUp(false)}
+              />
+            )}
+            {showServiceNote && (
+              <ServiceNoteModal
+                mode="create"
+                prefill={{
+                  customerName: data.order.customer_name,
+                  customerPhone: data.order.customer_phone,
+                  customerAddress: data.order.customer_address,
+                  refNo: `SO-${data.order.so}`,
+                  orderId: data.order.id,
+                }}
+                onClose={() => setShowServiceNote(false)}
+                onSaved={() => {
+                  setShowServiceNote(false);
+                  toast.success("Service note created");
+                }}
               />
             )}
           </>
@@ -334,6 +357,7 @@ function DrawerError({
 interface DrawerBodyProps {
   data: NonNullable<ReturnType<typeof useOperationOrder>["data"]>;
   onClose: () => void;
+  onServiceNoteClick: () => void;
   onDispatchClick: () => void;
   onDOClick: () => void;
   onIssuePOsClick: () => void;
@@ -353,6 +377,7 @@ function DrawerBody({
   onConfirmProceedClick,
   onTransferReadyClick,
   onTopUpClick,
+  onServiceNoteClick,
 }: DrawerBodyProps) {
   const { order, lines, addons, total, warehouse, stockBalances, pos, threads } = data;
   // Loo 2026-05-12 — surface the SO PDF reprint button in the header. Hook
@@ -548,6 +573,52 @@ function DrawerBody({
             stops={order.delivery_stops}
             fallbackPartnerId={order.delivery_partner_id}
           />
+        </div>
+
+        {/* Editable control overlay — the "Master Sheet, live" fields (P2 ·
+            migration 0159). Stock location/ETA + 4 remark fields + payment
+            status, plus a region-derived carrier suggestion. */}
+        <SectionHead>Order control</SectionHead>
+        <div className="mb-4">
+          <OrderControlPanel
+            orderId={order.id}
+            customerAddress={order.customer_address ?? null}
+            status={order.status}
+            deliveryDate={order.delivery_date}
+            deliveryDateTbd={order.delivery_date_tbd}
+            opsAssignedLogistic={order.ops_assigned_logistic ?? null}
+            deliveryPartnerId={order.delivery_partner_id}
+          />
+        </div>
+
+        {/* Cases — quick-create linked to this order by SO# (P2). Service Note
+            is operation-owned + auto-fills from the order; Refund lives in
+            Finance; Issue needs the ops_issues table (not built yet). */}
+        <SectionHead>Cases</SectionHead>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            type="button"
+            onClick={onServiceNoteClick}
+            className="btn-secondary text-[12px]"
+          >
+            + Service Note
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Refunds are created in Finance → Refunds"
+            className="btn-secondary text-[12px] opacity-50 cursor-not-allowed"
+          >
+            + Refund
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Issues module coming — needs the ops_issues table"
+            className="btn-secondary text-[12px] opacity-50 cursor-not-allowed"
+          >
+            + Issue
+          </button>
         </div>
 
         {/* Annotations + activity timeline (Phase B) */}

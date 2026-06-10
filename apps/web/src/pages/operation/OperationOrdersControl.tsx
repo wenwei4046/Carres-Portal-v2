@@ -7,6 +7,7 @@ import {
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import { cjkClassName } from "@/lib/cjk";
+import { areaForAddress } from "@/lib/region";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import type { OperationStage } from "./components/StageChip";
 
@@ -109,6 +110,23 @@ function stockReadiness(o: operationOrderListRow): "ready" | "short" | "unknown"
     return "ready";
   if (s === "awaiting_operation_action") return "short";
   return "unknown";
+}
+
+/** Countdown from today to a YYYY-MM-DD delivery date → short label + tone.
+ *  <7 days carries the ⚠ (Jess's "Before 7 Days" prep flag). */
+function dueDays(
+  dateStr: string | null | undefined,
+): { label: string; tone: string } | null {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  if (diff < 0) return { label: `overdue ${-diff}d`, tone: "text-destructive" };
+  if (diff === 0) return { label: "today", tone: "text-warning" };
+  if (diff < 7) return { label: `${diff}d ⚠`, tone: "text-warning" };
+  return { label: `in ${diff}d`, tone: "text-base-500" };
 }
 
 /** Old kanban stage slug (still produced by hand-typed `/operation/orders/:stage`
@@ -281,14 +299,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
       <div className="bg-white border border-base-200 rounded overflow-auto">
         <table
           className="w-full border-collapse text-[13px]"
-          style={{ minWidth: 880 }}
+          style={{ minWidth: 960 }}
         >
           <thead>
             <tr className="bg-base-50 border-b border-base-200">
               <Th>Ref</Th>
               <Th>Customer</Th>
               <Th>Items</Th>
-              <Th>Date</Th>
+              <Th>Due</Th>
+              <Th>Area</Th>
               <Th>Stock</Th>
               <Th>Logistic</Th>
               <Th>Status</Th>
@@ -298,7 +317,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {visible.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -341,6 +360,7 @@ function OrderRow({
   const lines = o.order_lines ?? [];
   const qtyTotal = lines.reduce((s, l) => s + Number(l.qty || 0), 0);
   const stock = stockReadiness(o);
+  const area = areaForAddress(o.customer_address ?? null);
 
   // Logistic: prefer the formal LP (joined name), fall back to the Inbox-triage
   // assignment resolved via the partners map.
@@ -382,7 +402,6 @@ function OrderRow({
       <td className="px-4 py-3">
         <div className="text-base-800">
           {qtyTotal} unit{qtyTotal === 1 ? "" : "s"}
-          {lines.length > 1 ? ` · ${lines.length} lines` : ""}
         </div>
         {lines.length > 0 && (
           <div className="text-[10.5px] text-base-500 mt-0.5 font-mono leading-snug max-w-[220px] truncate">
@@ -394,14 +413,40 @@ function OrderRow({
           </div>
         )}
       </td>
-      {/* Delivery date */}
+      {/* Due date + countdown */}
       <td className="px-4 py-3 whitespace-nowrap text-base-700">
         {o.delivery_date_tbd ? (
           <span className="text-warning text-[12px]">TBD</span>
         ) : o.delivery_date ? (
-          fmtDate(o.delivery_date)
+          (() => {
+            const dd = dueDays(o.delivery_date);
+            return (
+              <div>
+                <div>{fmtDate(o.delivery_date)}</div>
+                {dd && (
+                  <div className={`text-[10.5px] font-semibold ${dd.tone}`}>
+                    {dd.label}
+                  </div>
+                )}
+              </div>
+            );
+          })()
         ) : (
           <span className="text-base-400">—</span>
+        )}
+      </td>
+      {/* Area — KV / Outstation derived from customer_address (region.ts) */}
+      <td className="px-4 py-3 whitespace-nowrap">
+        {area === "Unknown" ? (
+          <span className="text-base-400">—</span>
+        ) : (
+          <span
+            className={`text-[11px] font-medium ${
+              area === "KV" ? "text-success" : "text-warning"
+            }`}
+          >
+            {area}
+          </span>
         )}
       </td>
       {/* Stock */}

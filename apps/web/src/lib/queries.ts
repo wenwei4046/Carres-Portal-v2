@@ -66,6 +66,10 @@ import {
   type DeliveryStop,
   type SetDeliveryChainInput,
   type PatchDeliveryStopInput,
+  type OpsOrderControl,
+  type OpsOrderControlResponse,
+  type UpdateOpsOrderControlInput,
+  type SetOpsAssignedLogisticInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 
@@ -130,6 +134,10 @@ export const qk = {
     orders:    (filters?: operationOrderFilters) =>
       ["operation", "orders", filters ?? {}] as const,
     order:     (id: string) => ["operation", "orders", id] as const,
+    /** P2 (migration 0159) — editable ops_order_control overlay for the order
+     *  drawer. Nested under the order id so a blunt ["operation","orders"]
+     *  invalidation after any order mutation refreshes it too. */
+    orderControl: (id: string) => ["operation", "orders", id, "control"] as const,
     partners:  () => ["operation", "partners"] as const,
     suppliers: () => ["operation", "suppliers"] as const,
     pos:       (filters?: operationPoFilters) =>
@@ -1610,6 +1618,9 @@ export interface operationOrderListRow {
    *  optional/nullable so the kanban OrderCard + existing fixtures that don't
    *  populate them keep typechecking. */
   customer_phone?: string | null;
+  /** P2 (project-orders-control-spec) — drives the AREA (KV/Outstation) tag +
+   *  the suggested default carrier in the control table (apps/web/src/lib/region.ts). */
+  customer_address?: string | null;
   placed_at: string;
   delivery_date: string | null;
   delivery_date_tbd?: boolean | null;
@@ -1681,6 +1692,11 @@ export interface operationOrderDetailOrder {
   dispatched_at: string | null;
   delivered_at: string | null;
   delivery_partner_id: string | null;
+  /** P2 (migration 0136/0159) — planned logistic carrier set in Inbox/drawer
+   *  triage (status='place' orders). Distinct from delivery_partner_id (the
+   *  formal LP owned by the proceed/dispatch flow). Optional so existing detail
+   *  fixtures that predate the field keep typechecking. */
+  ops_assigned_logistic?: string | null;
   /** Migration 0156 — multi-leg delivery chain (γ). Null/empty = single-leg
    *  (uses delivery_partner_id). Otherwise an ordered array of stops; each
    *  carries partner_id + partner_name + from_loc + to_loc + per-leg POD
@@ -2403,6 +2419,111 @@ export function usePatchDeliveryStop(
         `/api/operation/orders/${orderId}/delivery-stops/${leg}`,
         { method: "PATCH", body: JSON.stringify(patch) },
       ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** P2 (migration 0159) — read the editable ops_order_control overlay for an
+ *  order. `null` id disables the query (mirror of useOperationOrder). An absent
+ *  overlay row comes back as `{ control: null }` → drawer shows all-default. */
+export function useOrderControl(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<OpsOrderControlResponse>>,
+) {
+  return useQuery({
+    queryKey: orderId
+      ? qk.operation.orderControl(orderId)
+      : (["operation", "orders", "null", "control"] as const),
+    queryFn: () =>
+      apiFetch<OpsOrderControlResponse>(
+        `/api/operation/orders/${orderId}/control`,
+      ),
+    enabled: !!orderId,
+    staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/** P2 (migration 0159) — sparse upsert of the order-control overlay. Invalidates
+ *  the overlay key + the orders list tree so the drawer + table reflect the
+ *  edit (the AREA / stock cells read from the same order data family). */
+export function useSaveOrderControl(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<{ control: OpsOrderControl }, ApiError, UpdateOpsOrderControlInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ control: OpsOrderControl }, ApiError, UpdateOpsOrderControlInput>({
+    mutationFn: (input) =>
+      apiFetch<{ control: OpsOrderControl }>(
+        `/api/operation/orders/${orderId}/control`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** P2 (migration 0136) — set/clear the planned logistic carrier
+ *  (orders.ops_assigned_logistic) from the order drawer. operation/principal,
+ *  status='place' only (the /ops-assign endpoint scopes it). Invalidates the
+ *  operation order detail + list so the drawer + table reflect the change. */
+export function useSetOpsAssignedLogistic(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; ops_assigned_logistic: string | null },
+      ApiError,
+      SetOpsAssignedLogisticInput
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; ops_assigned_logistic: string | null },
+    ApiError,
+    SetOpsAssignedLogisticInput
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; ops_assigned_logistic: string | null }>(
+        `/api/orders/${orderId}/ops-assign`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** P2 — set the delivery date (set_order_date RPC, status='place' only,
+ *  lead-time floor enforced server-side) from the order drawer. Operation
+ *  variant of useSetOrderDate: invalidates the operation order detail + list
+ *  (the dealer-facing hook keys on qk.order, which the operation surfaces
+ *  don't read). */
+export function useOperationSetDeliveryDate(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, SetOrderDateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, SetOrderDateInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>(`/api/orders/${orderId}/date`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });

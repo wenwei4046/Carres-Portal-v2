@@ -26,6 +26,7 @@ import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
+import orderControlRouter from "./routes/operation/order-control";
 import lpInboundRouter from "./routes/operation/lp-inbound";
 import resumeDispatchRouter from "./routes/operation/resume-dispatch";
 import recentCostRouter from "./routes/operation/recent-cost";
@@ -102,6 +103,8 @@ api.route("/operation/orders", operationOrdersRouter);
 api.route("/operation/orders", resumeDispatchRouter);
 // 0156 γ multi-leg — PUT /:id/delivery-chain + PATCH /:id/delivery-stops/:leg
 api.route("/operation/orders", deliveryChainRouter);
+// 0159 P2 control overlay — GET + PUT /:id/control
+api.route("/operation/orders", orderControlRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);

@@ -20,9 +20,21 @@ interface OrderLine {
   sourcePo: string | null;
 }
 
+/** Seed values for a create-mode modal opened from an order (P2 — the order
+ *  drawer's "+ Service Note" shortcut). Pre-fills the customer + order link so
+ *  the operator only fills the case-specific fields. */
+export interface ServiceNotePrefill {
+  customerName?: string;
+  customerPhone?: string | null;
+  customerAddress?: string | null;
+  refNo?: string;
+  orderId?: string;
+}
+
 interface Props {
   mode: "create" | "edit";
   id?: string;
+  prefill?: ServiceNotePrefill;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -31,12 +43,12 @@ const EMPTY_SECTION_A: SnSectionA = { task: "", deliverDate: null, logisticCompa
 const EMPTY_SECTION_B: SnSectionB = { task: "", deliverDate: null, supplierName: null, note: null };
 const EMPTY_SECTION_C: SnSectionC = { note1: null, note2: null };
 
-export default function ServiceNoteModal({ mode, id, onClose, onSaved }: Props) {
-  // Header state
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [refNo, setRefNo] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
+export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }: Props) {
+  // Header state — seeded from `prefill` when opened from an order drawer.
+  const [customerName, setCustomerName] = useState(prefill?.customerName ?? "");
+  const [customerPhone, setCustomerPhone] = useState(prefill?.customerPhone ?? "");
+  const [refNo, setRefNo] = useState(prefill?.refNo ?? "");
+  const [customerAddress, setCustomerAddress] = useState(prefill?.customerAddress ?? "");
   const [category, setCategory] = useState("");
   const [type, setType] = useState("");
   const [requestDate, setRequestDate] = useState(todayISO());
@@ -52,8 +64,8 @@ export default function ServiceNoteModal({ mode, id, onClose, onSaved }: Props) 
   const [useC, setUseC] = useState(false);
   const [sectionC, setSectionC] = useState<SnSectionC>(EMPTY_SECTION_C);
 
-  // Order link (set when SO lookup succeeds)
-  const [orderId, setOrderId] = useState<string | null>(null);
+  // Order link (seeded from prefill, or set when SO lookup succeeds)
+  const [orderId, setOrderId] = useState<string | null>(prefill?.orderId ?? null);
   const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "found" | "not-found">("idle");
   const [orderLines, setOrderLines] = useState<OrderLine[]>([]);
   const [selectedLineIds, setSelectedLineIds] = useState<Set<string>>(new Set());
@@ -108,6 +120,14 @@ export default function ServiceNoteModal({ mode, id, onClose, onSaved }: Props) 
       }
     }, 500);
   }
+
+  // Opened from an order drawer: kick the SO lookup once on mount so the
+  // "Products in this order" picker fills in from the linked order (customer
+  // fields are already seeded from `prefill`).
+  useEffect(() => {
+    if (mode === "create" && prefill?.refNo) handleRefNoChange(prefill.refNo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!detailQ.data) return;
