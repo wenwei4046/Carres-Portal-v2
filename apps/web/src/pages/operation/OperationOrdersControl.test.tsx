@@ -439,13 +439,13 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const row = screen.getByTestId("order-row");
     // Goods-unit total on the left — 2+1+3+1 = 7; Disposal (service) NOT counted.
     expect(within(row).getByText("7")).toBeInTheDocument();
-    // One boxed tag per category, coloured by tier:
-    // core purple (pill-draft) · accessories blue (pill-sent) · service grey.
-    expect(within(row).getByText("2× Mattress(Q)").className).toContain("pill-draft");
-    expect(within(row).getByText("1× Bedframe").className).toContain("pill-draft");
-    expect(within(row).getByText("3× Pillow").className).toContain("pill-sent");
-    expect(within(row).getByText("M.P").className).toContain("pill-sent");
-    expect(within(row).getByText("Disposal").className).toContain("pill-neutral");
+    // One boxed tag per category, MONOCHROME tiers by ink depth:
+    // core darkest · accessories mid-grey · service lightest.
+    expect(within(row).getByText("2× Mattress(Q)").className).toContain("text-base-900");
+    expect(within(row).getByText("1× Bedframe").className).toContain("text-base-900");
+    expect(within(row).getByText("3× Pillow").className).toContain("text-base-600");
+    expect(within(row).getByText("M.P").className).toContain("text-base-600");
+    expect(within(row).getByText("Disposal").className).toContain("text-base-400");
   });
 
   it("drops the duplicated qty inside the tag on single-category orders (A1)", () => {

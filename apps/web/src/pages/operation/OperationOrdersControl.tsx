@@ -277,14 +277,15 @@ function accShort(sku: string): string {
   return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 }
 
-/** Item TIER for colour-coding (Jess: core one colour, accessories one colour,
- *  service one colour): core furniture purple · accessory goods blue · service
- *  charges (Disposal / floor charge / install…) grey. */
+/** Item TIER chips — MONOCHROME (Jess: row was too colourful; colour stays
+ *  reserved for status signals). All three tiers keep the box (avoids
+ *  misreading) but tier = ink depth, not hue: core furniture darkest +
+ *  semibold · accessory goods mid-grey · service charges lightest. */
 type ItemKind = "core" | "acc" | "service";
 const ITEM_TAG: Record<ItemKind, string> = {
-  core: "pill-draft",
-  acc: "pill-sent",
-  service: "pill-neutral",
+  core: "bg-base-100 text-base-900",
+  acc: "bg-base-100 text-base-600 font-medium",
+  service: "bg-base-50 text-base-400 font-medium",
 };
 
 function lineKind(sku: string): ItemKind {
