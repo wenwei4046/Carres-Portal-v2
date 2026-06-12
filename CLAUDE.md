@@ -179,22 +179,27 @@ Do not write inline `useQuery({ queryKey: ['orders'] })` anywhere else.
 
 ## 10. Visual fidelity
 
-The `reference/` prototype is **the design**. Match pixel-for-pixel where reasonable. Do not improvise:
+**Visual design source of truth = v17 (locked 2026-06-09), NOT the warm-linen prototype.** The `reference/proto/*.jsx` files remain the source of truth for **layout + behaviour** (what goes where, which buttons / modals / columns exist), but the **visual tokens are v17**: clean modern SaaS + Carres warmth. Token NAMES are unchanged (`base-*`, `primary`, `accent`…) so components re-theme with zero churn — only the values flipped.
 
-- **Brand color**: `#D64F20` (terracotta)
-- **Default style preset**: Warm Linen (the `style-warm` preset in `reference/shared/styles.css`)
-- **Display font**: Big Shoulders Stencil Display (login mark)
-- **Body font**: DM Sans
+- **Brand color**: `#C44D2B` (flame) — supersedes the old `#D64F20` terracotta
+- **Neutrals**: Tailwind cool gray (`--base-50 … --base-900`)
+- **Page bg**: cream `#F5F1EA` (warmth kept); cards = white (hierarchy from borders + subtle shadow)
+- **Body + display font**: Inter (DM Sans in the fallback chain). Big Shoulders Stencil → `font-stencil`, login mark only
 - **Mono**: JetBrains Mono
-- All design tokens in `apps/web/tailwind.config.ts` named `--base-50/100/.../900`, `--accent`, `--accent-soft` to match `reference/`
+- Tokens live in `apps/web/src/index.css` (`:root`) + `apps/web/tailwind.config.ts`
+
+**v17 component utilities** (Phase 2, in `index.css @layer components` — use these instead of hand-rolling `text-[Npx]` / `bg-primary` buttons):
+- **Type scale**: `.t-h1` (32) · `.t-h2` (24) · `.t-h3` (18) · `.t-h4` (15) · `.t-body` (14) · `.t-small` (13) · `.t-tiny` (12) · `.t-micro` (11, uppercase)
+- **Button hierarchy**: `.btn-hero` = the ONE flame CTA per page (a genuine create / commit action only) · `.btn-primary` = **black** workhorse for every other primary · `.btn-secondary` / `.btn-ghost` · `.btn-danger` = red text on white (destructive, never filled)
+- **Status pills**: `.pill` + `.pill-{draft|sent|confirmed|collected|overdue|neutral}`. NOTE: the set has **no amber** — warning / low / pending states keep their semantic-color badges (add a `.pill-warning` from `--warning-soft` if pill coverage of those states is ever needed)
 
 When implementing a page:
-1. Open the corresponding `reference/proto/*.jsx` file
-2. Build the component using shadcn primitives + Tailwind tokens
-3. Run `/design-review` to compare against the prototype screenshot
-4. Iterate until it matches
+1. Open the corresponding `reference/proto/*.jsx` for **layout + behaviour**
+2. Build with shadcn primitives + Tailwind tokens + the v17 utilities above
+3. Run `/design-review` for **layout** fidelity (NOT colour — colour is v17, not the proto)
+4. Iterate until layout matches + v17 tokens applied
 
-If the prototype has 4 style presets (warm/slate/press/editorial), implement **only warm-linen** in v2. Other presets are deferred.
+Other proto style presets (slate / press / editorial) remain deferred; v17 is the single shipped look.
 
 ---
 
