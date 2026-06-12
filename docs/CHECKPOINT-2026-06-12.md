@@ -2,8 +2,9 @@
 
 > **For the next chat**: read `CLAUDE.md` first, then this file. This is the handoff
 > from the 2026-06-12 session (Orders table V2 + ops cockpit polish + Payments panel).
-> Everything below is **pushed to `origin/main` @ `0068421`** but **NOT deployed** —
-> deploy is the first job tomorrow.
+> **UPDATE same evening: §3 DEPLOY IS DONE ✅** — api version `e05f1a76` + web bundle
+> `index-CEfqcYcZ.js` live on the canonical URL, payments endpoint verified end-to-end
+> (155 rows with an operation JWT). Start at §4 (pending jobs) + §5/§6 (proposals).
 
 ---
 
@@ -59,7 +60,15 @@ portal; the bulk Mark-completed exists to clear them.
 
 ---
 
-## 3. Job 1 tomorrow — DEPLOY (api + web together)
+## 3. ~~Job 1 tomorrow~~ ✅ DONE same evening — DEPLOY (api + web together)
+
+> Executed 2026-06-12 evening on Jess's "deploy latest version": api Worker version
+> `e05f1a76-c787-4a31-a94d-b78a41cdd5e4` (1302.31 KiB / gz 245.32) · web bundle
+> `index-CEfqcYcZ.js` live on carres-portal.pages.dev (hash deployment `dffc2daf`) ·
+> dist SERVICE_ROLE grep clean · `/api/operation/payments` verified with a real
+> operation JWT → 155 rows. Remaining from this section: **Jess action** (bulk
+> Mark-completed sweep) + the §17 CLAUDE.md doc update. Original runbook kept below
+> for reference.
 
 Per [[project-web-deploy-mechanism]] (account `e2494242…`, wrangler via
 `corepack pnpm --filter @carres/api exec wrangler …`):
