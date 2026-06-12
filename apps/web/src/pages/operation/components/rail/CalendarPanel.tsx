@@ -102,22 +102,28 @@ export default function CalendarPanel() {
               key={i}
               type="button"
               onClick={() => setSelected(cell.key)}
-              className={`relative aspect-square rounded flex flex-col items-center justify-center text-[12px] transition-colors ${
-                isSel
-                  ? "bg-base-900 text-white"
-                  : isToday
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "text-base-700 hover:bg-base-100"
-              }`}
+              title={count > 0 ? `${count} deliver${count === 1 ? "y" : "ies"}` : undefined}
+              className="relative aspect-square flex items-center justify-center rounded-full hover:bg-base-100 transition-colors"
             >
-              <span>{cell.day}</span>
+              <span
+                className={`w-7 h-7 grid place-items-center rounded-full text-[12px] ${
+                  isToday
+                    ? "bg-primary text-white font-semibold"
+                    : isSel
+                      ? "ring-1 ring-base-900 text-base-900 font-semibold"
+                      : "text-base-700"
+                }`}
+              >
+                {cell.day}
+              </span>
               {count > 0 && (
-                <span
-                  className={`mt-0.5 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-bold leading-[15px] ${
-                    isSel ? "bg-white text-base-900" : "bg-primary text-white"
-                  }`}
-                >
-                  {count}
+                <span className="absolute bottom-0.5 flex gap-0.5">
+                  {Array.from({ length: Math.min(count, 3) }).map((_, di) => (
+                    <span
+                      key={di}
+                      className={`w-1 h-1 rounded-full ${isToday ? "bg-white" : "bg-primary"}`}
+                    />
+                  ))}
                 </span>
               )}
             </button>
@@ -139,21 +145,24 @@ export default function CalendarPanel() {
             {selectedOrders.map((o) => {
               const loc = locationForAddress(o.customer_address ?? null);
               return (
-                <div key={o.id} className="rounded border border-base-200 bg-white px-2.5 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-[12px] font-semibold text-base-900">SO-{o.so}</span>
-                    {loc.label && (
-                      <span
-                        className={`text-[11px] font-medium ${
-                          loc.area === "KV" ? "text-success" : loc.area === "Outstation" ? "text-warning" : "text-base-500"
-                        }`}
-                      >
-                        {loc.label}
-                      </span>
-                    )}
-                  </div>
-                  <div className={`text-[12px] text-base-700 mt-0.5 ${cjkClassName(o.customer_name)}`}>
-                    {o.customer_name || "—"}
+                <div key={o.id} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors">
+                  <span className="w-1 rounded-full bg-primary shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[12px] font-semibold text-base-900">SO-{o.so}</span>
+                      {loc.label && (
+                        <span
+                          className={`text-[11px] font-medium ${
+                            loc.area === "KV" ? "text-success" : loc.area === "Outstation" ? "text-warning" : "text-base-500"
+                          }`}
+                        >
+                          {loc.label}
+                        </span>
+                      )}
+                    </div>
+                    <div className={`text-[12px] text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
+                      {o.customer_name || "—"}
+                    </div>
                   </div>
                 </div>
               );
