@@ -1,0 +1,87 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { CalendarDays, StickyNote, ListTodo, X, type LucideIcon } from "lucide-react";
+import { apiFetch } from "@/lib/api";
+import type { OpsTask } from "@carres/shared";
+import CalendarPanel from "./rail/CalendarPanel";
+import KeepPanel from "./rail/KeepPanel";
+import TasksPanel, { TASKS_KEY } from "./rail/TasksPanel";
+
+/**
+ * OperationRightRail — Gmail-style collapsible right rail (Jess COO ask).
+ * A 52px icon strip (Calendar / Keep notes / Tasks) that expands a 320px panel.
+ * The Tasks icon carries a red badge = count of overdue tasks (open past the
+ * 60-min SLA) so the team is nudged to take action within the hour.
+ */
+type Panel = "calendar" | "keep" | "tasks";
+const TABS: { key: Panel; label: string; icon: LucideIcon }[] = [
+  { key: "calendar", label: "Calendar", icon: CalendarDays },
+  { key: "keep", label: "Notes", icon: StickyNote },
+  { key: "tasks", label: "Tasks", icon: ListTodo },
+];
+
+export default function OperationRightRail() {
+  const [active, setActive] = useState<Panel | null>(null);
+
+  // Overdue count — shares the TasksPanel cache (single fetch), drives the badge.
+  const { data: tasksData } = useQuery<{ tasks: OpsTask[] }>({
+    queryKey: TASKS_KEY,
+    queryFn: () => apiFetch("/api/ops/tasks"),
+    refetchInterval: 60_000,
+  });
+  const overdue = (tasksData?.tasks ?? []).filter((t) => t.overdue).length;
+
+  return (
+    <div className="flex h-screen sticky top-0">
+      {/* Active panel */}
+      {active && (
+        <div className="w-[320px] flex flex-col border-l border-base-200 bg-white">
+          <div className="flex items-center justify-between px-3.5 h-12 border-b border-base-100 shrink-0">
+            <div className="t-h4 text-base-900">
+              {TABS.find((t) => t.key === active)?.label}
+            </div>
+            <button
+              type="button"
+              onClick={() => setActive(null)}
+              className="p-1 rounded text-base-500 hover:bg-base-100"
+              aria-label="Close panel"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto p-3.5 min-h-0">
+            {active === "calendar" && <CalendarPanel />}
+            {active === "keep" && <KeepPanel />}
+            {active === "tasks" && <TasksPanel />}
+          </div>
+        </div>
+      )}
+
+      {/* Icon strip */}
+      <div className="w-[52px] flex flex-col items-center py-3 gap-1 border-l border-base-200 bg-white">
+        {TABS.map((t) => {
+          const isActive = active === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setActive(isActive ? null : t.key)}
+              title={t.label}
+              aria-label={t.label}
+              className={`relative w-9 h-9 rounded-full grid place-items-center transition-colors ${
+                isActive ? "bg-primary/10 text-primary" : "text-base-500 hover:bg-base-100"
+              }`}
+            >
+              <t.icon size={18} strokeWidth={2} />
+              {t.key === "tasks" && overdue > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-[10px] font-bold leading-[16px] text-center">
+                  {overdue}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

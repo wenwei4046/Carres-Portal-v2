@@ -31,6 +31,8 @@ import OperationOpsInventory from "./OperationOpsInventory";
 import OperationStockOnHand from "./OperationStockOnHand";
 // Migration 0140 — Service Notes / Issue Tracker.
 import OperationServiceNotes from "./OperationServiceNotes";
+// Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
+import OperationRightRail from "./components/OperationRightRail";
 import type { MovementsFilters } from "@/lib/queries";
 
 /**
@@ -163,10 +165,7 @@ export default function OperationApp() {
   return (
     <div
       className="min-h-screen text-base-900 grid"
-      style={{
-        gridTemplateColumns: "232px 1fr",
-        fontFamily: "DM Sans, sans-serif",
-      }}
+      style={{ gridTemplateColumns: "232px minmax(0, 1fr) auto" }}
     >
       <OperationSidebar active={activeTab} onChange={changeTab} />
       <main className="min-w-0 overflow-auto bg-base-50">
@@ -257,6 +256,7 @@ export default function OperationApp() {
           </>
         )}
       </main>
+      <OperationRightRail />
     </div>
   );
 }
