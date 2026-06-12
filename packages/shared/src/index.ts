@@ -374,6 +374,8 @@ export {
   STOCK_LOCATIONS,
   PAYMENT_STATUSES,
   DELIVERY_TIME_SLOTS,
+  STORAGE_RATES,
+  computeStorageFee,
   opsOrderControlSchema,
   updateOpsOrderControlInput,
   opsOrderControlResponseSchema,

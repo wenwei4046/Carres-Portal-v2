@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   PackageCheck,
   Boxes,
+  Wallet,
   BookOpen,
   LifeBuoy,
   type LucideIcon,
@@ -107,6 +108,14 @@ const SECTIONS: Section[] = [
       "ops-inventory",
       "stock",
     ],
+  },
+  {
+    // 0165 — Payments / collection (Master Sheet "Balance" tab): per-order
+    // balance owing + storage fees + payment status.
+    id: "payments",
+    label: "Payments",
+    icon: Wallet,
+    key: "payments",
   },
   {
     id: "catalog",

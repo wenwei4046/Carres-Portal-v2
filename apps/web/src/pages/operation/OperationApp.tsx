@@ -6,6 +6,7 @@ import OperationDashboard from "./OperationDashboard";
 // table (merges the old kanban + Inbox + All-orders). The legacy kanban
 // `OperationOrders` is retained as a file (+ its test) but no longer routed.
 import OperationOrdersControl from "./OperationOrdersControl";
+import OperationPayments from "./OperationPayments";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
@@ -237,6 +238,8 @@ export default function OperationApp() {
                 Purchase Order menu (TabbedProcurementShell at
                 /operation/procurement); this is tab-state driven. */}
             {tab === "receiving" && <OperationReceiving />}
+            {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
+            {tab === "payments" && <OperationPayments />}
             {tab === "catalog" && <OperationCatalog />}
             {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
             {tab === "stock-onhand" && <OperationStockOnHand />}
