@@ -116,7 +116,7 @@ export default function OperationStockOnHand() {
       {/* Header */}
       <div className="mb-[18px]">
         <div className="kicker">HQ · Operations · Carres Klang</div>
-        <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-semibold">
+        <h1 className="t-h1 font-display mt-1.5">
           On Hand
         </h1>
         <div className="text-[13px] text-base-600 mt-1.5">

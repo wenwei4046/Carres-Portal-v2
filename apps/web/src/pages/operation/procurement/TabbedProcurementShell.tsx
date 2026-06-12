@@ -109,7 +109,7 @@ export default function TabbedProcurementShell() {
       <div className="px-9 pt-7 pb-3 flex justify-between items-start gap-4">
         <div>
           <div className="kicker">Procurement</div>
-          <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
+          <h1 className="t-h1 font-display mt-1.5 text-base-900">
             Purchase orders
           </h1>
           <div className="font-body text-[13px] text-base-600 mt-1 max-w-[780px]">
@@ -120,7 +120,7 @@ export default function TabbedProcurementShell() {
         </div>
         <button
           type="button"
-          className="btn-primary text-[12px]"
+          className="btn-hero text-[12px]"
           onClick={() => setCreatePrefill({})}
           data-testid="new-po-button"
         >

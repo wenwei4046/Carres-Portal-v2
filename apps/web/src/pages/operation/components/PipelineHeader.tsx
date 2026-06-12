@@ -142,7 +142,7 @@ export default function PipelineHeader({
       {/* Title strap + right-side action buttons (V2 placeholders). */}
       <div className="flex justify-between items-start mb-[18px] gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-[28px] leading-[1.1] tracking-[-0.025em] font-bold text-base-900">
+          <h1 className="t-h1 font-display text-base-900">
             Orders
           </h1>
           <div className="font-body text-[12px] text-base-600 mt-1">

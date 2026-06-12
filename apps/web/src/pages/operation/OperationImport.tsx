@@ -121,7 +121,7 @@ export default function OperationImport() {
         <p className="text-xs uppercase tracking-wider text-base-500 mb-1">
           Operation · AutoCount
         </p>
-        <h1 className="text-3xl font-semibold text-base-900">
+        <h1 className="t-h1 text-base-900">
           Import listing
         </h1>
         <p className="text-sm text-base-600 mt-2">
@@ -256,7 +256,7 @@ export default function OperationImport() {
           </h2>
           <button
             type="button"
-            className="rounded bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-hero"
             disabled={usableRows.length === 0 || submitMut.isPending}
             onClick={submit}
           >

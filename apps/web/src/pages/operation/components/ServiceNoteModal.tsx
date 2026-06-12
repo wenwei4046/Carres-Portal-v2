@@ -523,7 +523,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
             type="button"
             disabled={!canSave || isBusy}
             onClick={() => saveMut.mutate(buildPayload())}
-            className="rounded bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-primary/90"
+            className="rounded bg-base-900 px-5 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-base-800"
           >
             {isBusy ? "Saving…" : mode === "create" ? "Create Case" : "Save Changes"}
           </button>

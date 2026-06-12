@@ -57,7 +57,7 @@ export default function OperationServiceNotes() {
       {/* Header */}
       <div className="mb-6">
         <p className="text-xs uppercase tracking-wider text-base-500 mb-1">Operation</p>
-        <h1 className="text-3xl font-semibold text-base-900">Service Notes</h1>
+        <h1 className="t-h1 text-base-900">Service Notes</h1>
         <p className="text-sm text-base-600 mt-2">
           Issue tracker · every case gets an SN number · printable for NETS / supplier
         </p>
@@ -87,7 +87,7 @@ export default function OperationServiceNotes() {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="rounded bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary/90"
+          className="btn-hero text-[13px] py-1.5"
         >
           + New Case
         </button>

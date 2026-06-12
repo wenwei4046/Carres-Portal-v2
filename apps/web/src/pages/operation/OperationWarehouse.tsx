@@ -244,7 +244,7 @@ export default function OperationWarehouse({
       <div className="flex justify-between items-start mb-[22px] gap-4">
         <div>
           <div className="kicker">Warehouse</div>
-          <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
+          <h1 className="t-h1 font-display mt-1.5 text-base-900">
             Stock balance
           </h1>
           <div className="font-body text-[13px] text-base-600 mt-1 max-w-[680px]">

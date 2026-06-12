@@ -132,7 +132,7 @@ export default function OpsStockListView(props: Props) {
           <p className="text-xs uppercase tracking-wider text-base-500 mb-1">
             {props.kicker}
           </p>
-          <h1 className="text-3xl font-semibold text-base-900">{props.title}</h1>
+          <h1 className="t-h1 text-base-900">{props.title}</h1>
           <p className="text-sm text-base-600 mt-2">{props.blurb}</p>
         </div>
       )}
@@ -163,7 +163,7 @@ export default function OpsStockListView(props: Props) {
             </label>
             <button
               type="button"
-              className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded bg-base-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-base-800 disabled:opacity-50"
               disabled={
                 !reserveSku.trim() ||
                 !reserveRef.trim() ||

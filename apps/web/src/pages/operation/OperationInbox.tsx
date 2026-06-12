@@ -100,7 +100,7 @@ export default function OperationInbox() {
         <p className="text-xs uppercase tracking-wider text-base-500 mb-1">
           Operation · Triage
         </p>
-        <h1 className="text-3xl font-semibold text-base-900">
+        <h1 className="t-h1 text-base-900">
           Inbox · awaiting logistic
         </h1>
         <p className="text-sm text-base-600 mt-2">

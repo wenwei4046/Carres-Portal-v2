@@ -192,7 +192,7 @@ export default function PoDetailModal({
           <div className="min-w-0">
             <div className="kicker">Purchase Order</div>
             <div
-              className="font-display text-[24px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900 font-mono"
+              className="t-h2 font-display mt-1.5 text-base-900 font-mono"
               title={po.id}
             >
               #PO-{poShortId}

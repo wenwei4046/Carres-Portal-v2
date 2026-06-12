@@ -67,7 +67,7 @@ export default function OperationAllOrders() {
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
         <div className="kicker">HQ · Operations</div>
-        <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-semibold">
+        <h1 className="t-h1 font-display mt-1.5">
           Every order, every dealer
         </h1>
         <div className="text-[13px] text-base-600 mt-1.5">
@@ -172,9 +172,18 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
   );
 }
 
+/** v17 status pills — the cross-dealer feed's four order states map cleanly
+ *  onto the pill vocab (no amber needed here). */
+const ALL_ORDERS_PILL: Record<OrderRow["status"], string> = {
+  place: "pill-neutral",
+  proceed_order: "pill-sent",
+  delivered: "pill-confirmed",
+  cancelled: "pill-overdue",
+};
+
 function StatusChip({ status }: { status: OrderRow["status"] }) {
   return (
-    <span className="inline-block text-[10px] px-2 py-[2px] bg-base-100 rounded uppercase font-semibold tracking-[0.05em] text-base-700">
+    <span className={`pill ${ALL_ORDERS_PILL[status]} capitalize`}>
       {status.replace("_", " ")}
     </span>
   );

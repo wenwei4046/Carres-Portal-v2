@@ -70,7 +70,7 @@ export default function RevertConfirmDialog({ orderId, so, kind, onClose }: Prop
         <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-1.5">
           Revert order
         </div>
-        <div className="font-display text-[18px] text-foreground mb-3 leading-tight">
+        <div className="t-h3 font-display text-foreground mb-3 leading-tight">
           Revert order #{so} from {c.fromLabel} to {c.toLabel}?
         </div>
         <div className="text-[12.5px] text-base-700 mb-5 leading-relaxed">
@@ -89,7 +89,7 @@ export default function RevertConfirmDialog({ orderId, so, kind, onClose }: Prop
             type="button"
             onClick={onConfirm}
             disabled={active.isPending}
-            className="px-3.5 py-2 bg-primary text-primary-foreground font-semibold rounded text-[12.5px] disabled:opacity-50"
+            className="px-3.5 py-2 bg-base-900 text-white font-semibold rounded text-[12.5px] hover:bg-base-800 disabled:opacity-50"
             data-testid="revert-confirm-button"
           >
             {active.isPending ? "Reverting…" : `Revert to ${c.toLabel}`}

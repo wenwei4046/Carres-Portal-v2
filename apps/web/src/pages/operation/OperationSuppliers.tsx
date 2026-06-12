@@ -50,7 +50,7 @@ export default function OperationSuppliers() {
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
         <div className="kicker">HQ · Network</div>
-        <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-semibold">
+        <h1 className="t-h1 font-display mt-1.5">
           Suppliers
         </h1>
         <div className="text-[13px] text-base-600 mt-1.5">
@@ -136,7 +136,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
         <div className="flex justify-between items-start mb-[18px]">
           <div>
             <div className="kicker">{supplier.slug ?? supplier.id.slice(0, 8)}</div>
-            <h2 className="font-display text-[22px] mt-1 font-semibold">
+            <h2 className="t-h2 font-display mt-1">
               {supplier.name}
             </h2>
             <div className="text-[12px] text-base-600 mt-1">

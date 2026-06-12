@@ -93,20 +93,20 @@
 
 @layer components {
   /* v17 button utilities — sentence case (no uppercase), 13px semibold, 6px
-   * radius. Phase 1 keeps `.btn-primary` brand-flame (the page's main action);
-   * the v17 HERO(flame) + PRIMARY(black) hierarchy is a per-page Phase 2 pass.
-   * `.btn-hero` + `.btn-danger` are provided now so Phase 2 is a class swap. */
+   * radius. Phase 2 hierarchy (locked): `.btn-hero` = the ONE flame CTA per page;
+   * `.btn-primary` = black workhorse for every other primary action;
+   * `.btn-danger` = red text on white for destructive actions. */
   .btn-primary {
     @apply inline-flex items-center justify-center
-           bg-primary text-primary-foreground
+           bg-base-900 text-white
            px-[18px] py-2.5 rounded-md
            text-[13px] font-semibold
            transition-colors
-           hover:bg-signature-700
+           hover:bg-base-800
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
-  /* HERO — the single flame CTA per page (v17). Same flame as primary today;
-   * becomes distinct once Phase 2 flips `.btn-primary` to black. */
+  /* HERO — the single flame CTA per page (v17). Now distinct from `.btn-primary`
+   * (black): flame marks the page's one primary action. */
   .btn-hero {
     @apply inline-flex items-center justify-center
            bg-primary text-primary-foreground
@@ -173,4 +173,26 @@
       0 1px 2px rgba(17, 24, 39, 0.04),
       0 1px 1px rgba(17, 24, 39, 0.03);
   }
+
+  /* v17 type scale (spec NOTES v17 §TYPOGRAPHY SIZES) — one class per role so
+   * pages stop hand-rolling `text-[Npx] font-* tracking-*`. Colour stays on the
+   * element (these set size/weight/tracking only). */
+  .t-h1    { @apply text-[32px] font-bold tracking-[-0.02em] leading-[1.05]; }
+  .t-h2    { @apply text-[24px] font-bold tracking-[-0.01em]; }
+  .t-h3    { @apply text-[18px] font-semibold; }
+  .t-h4    { @apply text-[15px] font-semibold; }
+  .t-body  { @apply text-[14px] font-normal; }
+  .t-small { @apply text-[13px] font-normal; }
+  .t-tiny  { @apply text-[12px] font-normal; }
+  .t-micro { @apply text-[11px] font-medium uppercase tracking-[0.05em]; }
+
+  /* v17 status pills (spec §STATUS PILLS) — bg/fg pairs hard-coded (not in the
+   * token ramp). Use `.pill` + one modifier. `.pill-neutral` uses tokens. */
+  .pill           { @apply inline-block text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full; }
+  .pill-draft     { background:#F3E8FF; color:#6B21A8; }
+  .pill-sent      { background:#DBEAFE; color:#1E40AF; }
+  .pill-confirmed { background:#DCFCE7; color:#166534; }
+  .pill-collected { background:#E0E7FF; color:#3730A3; }
+  .pill-overdue   { background:#FEE2E2; color:#991B1B; }
+  .pill-neutral   { @apply bg-base-100 text-base-700; }
 }

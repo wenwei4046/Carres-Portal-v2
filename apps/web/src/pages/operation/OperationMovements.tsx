@@ -316,7 +316,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
             <span className="mx-1.5 text-base-300">/</span>
             <span>Movement log</span>
           </div>
-          <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
+          <h1 className="t-h1 font-display mt-1.5 text-base-900">
             Stock in &amp; out history
           </h1>
           <div
@@ -651,7 +651,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
               >
                 <div className="flex justify-between items-center px-5 py-3.5 border-b border-base-100 bg-base-50">
                   <div>
-                    <div className="font-display text-[18px] font-semibold tracking-[-0.01em]">
+                    <div className="t-h3 font-display">
                       {g.label}
                     </div>
                     <div className="font-body text-[11px] text-base-500 mt-0.5">

@@ -415,7 +415,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       <div className="flex items-start justify-between gap-4 mb-[18px] flex-wrap">
         <div>
           <div className="kicker">HQ · Operations</div>
-          <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-semibold">
+          <h1 className="t-h1 font-display mt-1.5">
             Orders
           </h1>
           <div className="text-[13px] text-base-600 mt-1.5">
