@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useParams } from "react-router-dom";
 import {
   useOperationOrders,
@@ -9,6 +11,7 @@ import {
 import { fmtDate } from "@/lib/fmt-date";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
+import { apiFetch } from "@/lib/api";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import type { OperationStage } from "./components/StageChip";
 import {
@@ -17,6 +20,11 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  MoreVertical,
+  Truck,
+  Download,
+  ListTodo,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -327,6 +335,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [pageSize] = useState<number | "all">(50);
   const [page, setPage] = useState(0);
+  // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkMenu, setBulkMenu] = useState<null | "menu" | "assign">(null);
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -338,6 +349,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // keys ARE the matchable catalog SKUs; AutoCount free-text SKUs are absent.
   // `undefined` until loaded → the Stock cell falls back to stage-only state.
   const stockQ = useOperationStock();
+  const qc = useQueryClient();
+
+  // Bulk-action mutations: assign-logistic loops the Inbox ops-assign endpoint;
+  // create-tasks loops the ops cockpit /ops/tasks. CSV export is client-side.
+  const assignMut = useMutation({
+    mutationFn: (a: { orderId: string; partnerId: string | null }) =>
+      apiFetch(`/api/orders/${a.orderId}/ops-assign`, {
+        method: "POST",
+        body: JSON.stringify({ deliveryPartnerId: a.partnerId }),
+      }),
+  });
+  const taskMut = useMutation({
+    mutationFn: (body: { title: string; relatedOrderId: string }) =>
+      apiFetch("/api/ops/tasks", { method: "POST", body: JSON.stringify(body) }),
+  });
 
   const partnerName = useMemo(() => {
     const m = new Map<string, string>();
@@ -387,6 +413,92 @@ export default function OperationOrdersControl({ onImport }: Props) {
   }, [visible, pageSize, safePage]);
   const rangeStart = total === 0 ? 0 : safePage * (pageSize === "all" ? total : pageSize) + 1;
   const rangeEnd = pageSize === "all" ? total : Math.min(total, (safePage + 1) * pageSize);
+
+  // ── Bulk select (Gmail-style) ──────────────────────────────────────────────
+  const pagedIds = useMemo(() => paged.map((o) => o.id), [paged]);
+  const allPagedSelected =
+    pagedIds.length > 0 && pagedIds.every((id) => selected.has(id));
+  function toggleOne(id: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
+  function toggleAllPaged() {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (allPagedSelected) pagedIds.forEach((id) => n.delete(id));
+      else pagedIds.forEach((id) => n.add(id));
+      return n;
+    });
+  }
+  function clearSel() {
+    setSelected(new Set());
+    setBulkMenu(null);
+  }
+  const selectedOrders = orders.filter((o) => selected.has(o.id));
+
+  function exportSelectedCsv() {
+    const cell = (v: unknown) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = ["SO", "Customer", "Phone", "Units", "Items", "Deadline", "Location", "Logistic", "Status"];
+    const body = selectedOrders.map((o) => {
+      const ls = o.order_lines ?? [];
+      const units = ls.reduce((s, l) => s + Number(l.qty || 0), 0);
+      const loc = locationForAddress(o.customer_address ?? null);
+      const logi =
+        o.delivery_partners?.name ??
+        (o.ops_assigned_logistic ? partnerName.get(o.ops_assigned_logistic) ?? "" : "");
+      return [
+        `SO-${o.so}`, o.customer_name ?? "", o.customer_phone ?? "", units,
+        itemRollup(ls), o.delivery_date_tbd ? "TBD" : o.delivery_date ?? "",
+        loc.label ?? "", logi, TAB_LABEL[controlTabOf(o)],
+      ].map(cell).join(",");
+    });
+    const csv = [header.join(","), ...body].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `orders-${selectedOrders.length}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setBulkMenu(null);
+  }
+
+  async function bulkAssignLogistic(partnerId: string) {
+    const ids = [...selected];
+    try {
+      await Promise.all(ids.map((id) => assignMut.mutateAsync({ orderId: id, partnerId })));
+      toast.success(`Assigned ${ids.length} order${ids.length === 1 ? "" : "s"} → ${partnerName.get(partnerId) ?? "partner"}`);
+      clearSel();
+      void refetch();
+    } catch (e) {
+      toast.error(`Bulk assign failed — ${(e as Error).message}`);
+    }
+  }
+
+  async function bulkCreateTasks() {
+    const rows = selectedOrders;
+    try {
+      await Promise.all(
+        rows.map((o) =>
+          taskMut.mutateAsync({
+            title: `Follow up SO-${o.so}${o.customer_name ? ` — ${o.customer_name}` : ""}`,
+            relatedOrderId: o.id,
+          }),
+        ),
+      );
+      toast.success(`Created ${rows.length} follow-up task${rows.length === 1 ? "" : "s"}`);
+      qc.invalidateQueries({ queryKey: ["ops", "tasks"] });
+      clearSel();
+    } catch (e) {
+      toast.error(`Bulk task create failed — ${(e as Error).message}`);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -489,18 +601,31 @@ export default function OperationOrdersControl({ onImport }: Props) {
         })}
       </div>
 
-      {/* Rows-per-page + range + prev/next, ABOVE the table (Loo) so the list
-          never dumps all rows and the control is visible without scrolling. */}
-      {total > 0 && (
-        <Pager
-          safePage={safePage}
-          onPage={setPage}
-          total={total}
-          rangeStart={rangeStart}
-          rangeEnd={rangeEnd}
-          pageCount={pageCount}
-          onRefresh={() => void refetch()}
+      {/* Toolbar: bulk-action bar when rows are selected, else the pager. */}
+      {selected.size > 0 ? (
+        <BulkBar
+          count={selected.size}
+          menu={bulkMenu}
+          setMenu={setBulkMenu}
+          partners={partnersQ.data?.partners ?? []}
+          onAssign={bulkAssignLogistic}
+          onExport={exportSelectedCsv}
+          onTasks={bulkCreateTasks}
+          onClear={clearSel}
+          busy={assignMut.isPending || taskMut.isPending}
         />
+      ) : (
+        total > 0 && (
+          <Pager
+            safePage={safePage}
+            onPage={setPage}
+            total={total}
+            rangeStart={rangeStart}
+            rangeEnd={rangeEnd}
+            pageCount={pageCount}
+            onRefresh={() => void refetch()}
+          />
+        )
       )}
 
       {/* Table */}
@@ -511,6 +636,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
         >
           <thead>
             <tr className="bg-base-50 border-b border-base-200">
+              <th className="px-3 py-2.5 w-9">
+                <input
+                  type="checkbox"
+                  checked={allPagedSelected}
+                  onChange={toggleAllPaged}
+                  aria-label="Select all on this page"
+                  className="cursor-pointer accent-base-900 align-middle"
+                />
+              </th>
               <Th>Ref</Th>
               <Th>Customer</Th>
               <Th>Items</Th>
@@ -525,7 +659,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -538,6 +672,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 o={o}
                 partnerName={partnerName}
                 availableBySku={availableBySku}
+                selected={selected.has(o.id)}
+                onToggle={() => toggleOne(o.id)}
                 onOpen={() => setOpenOrderId(o.id)}
               />
             ))}
@@ -613,15 +749,125 @@ function Pager({
   );
 }
 
+/** Gmail-style bulk-action bar — shown when ≥1 order is selected. A ⋮ menu
+ *  expands to: Assign logistic (→ partner list) · Export CSV · Create tasks. */
+function BulkBar({
+  count,
+  menu,
+  setMenu,
+  partners,
+  onAssign,
+  onExport,
+  onTasks,
+  onClear,
+  busy,
+}: {
+  count: number;
+  menu: null | "menu" | "assign";
+  setMenu: (m: null | "menu" | "assign") => void;
+  partners: { id: string; name: string }[];
+  onAssign: (partnerId: string) => void;
+  onExport: () => void;
+  onTasks: () => void;
+  onClear: () => void;
+  busy: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2 mb-2.5 px-3 py-2 rounded bg-base-900 text-white">
+      <span className="text-[12px] font-semibold tabular-nums">
+        {count} selected
+      </span>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setMenu(menu ? null : "menu")}
+          disabled={busy}
+          className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded hover:bg-white/10 disabled:opacity-50"
+        >
+          <MoreVertical size={14} /> {busy ? "Working…" : "Actions"}
+        </button>
+        {menu && (
+          <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
+            {menu === "menu" ? (
+              <>
+                <BulkMenuItem icon={Truck} label="Assign logistic…" onClick={() => setMenu("assign")} />
+                <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
+                <BulkMenuItem icon={ListTodo} label="Create follow-up tasks" onClick={onTasks} />
+              </>
+            ) : (
+              <>
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
+                  Assign to…
+                </div>
+                {partners.length === 0 && (
+                  <div className="px-3 py-1.5 text-[12px] text-base-400">No partners.</div>
+                )}
+                {partners.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => onAssign(p.id)}
+                    className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-base-100"
+                  >
+                    {p.name}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setMenu("menu")}
+                  className="w-full text-left px-3 py-1.5 text-[11px] text-base-500 hover:bg-base-100 border-t border-base-100 mt-1"
+                >
+                  ← Back
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onClear}
+        className="ml-auto inline-flex items-center gap-1 text-[12px] text-base-300 hover:text-white"
+      >
+        <X size={14} /> Clear
+      </button>
+    </div>
+  );
+}
+
+function BulkMenuItem({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center gap-2 px-3 py-2 text-[12px] hover:bg-base-100"
+    >
+      <Icon size={14} className="text-base-500" /> {label}
+    </button>
+  );
+}
+
 function OrderRow({
   o,
   partnerName,
   availableBySku,
+  selected,
+  onToggle,
   onOpen,
 }: {
   o: operationOrderListRow;
   partnerName: Map<string, string>;
   availableBySku?: Map<string, number>;
+  selected: boolean;
+  onToggle: () => void;
   onOpen: () => void;
 }) {
   const ct = controlTabOf(o);
@@ -642,9 +888,18 @@ function OrderRow({
   return (
     <tr
       onClick={onOpen}
-      className="border-t border-base-100 hover:bg-base-50 cursor-pointer align-top"
+      className={`border-t border-base-100 hover:bg-base-50 cursor-pointer align-top ${selected ? "bg-primary/5" : ""}`}
       data-testid="order-row"
     >
+      <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          aria-label={`Select SO-${o.so}`}
+          className="cursor-pointer accent-base-900 align-middle"
+        />
+      </td>
       {/* Ref */}
       <td className="px-4 py-2.5 whitespace-nowrap">
         <div className="font-mono font-semibold text-base-900">SO-{o.so}</div>
