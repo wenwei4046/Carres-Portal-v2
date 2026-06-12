@@ -13,6 +13,7 @@ import {
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
+import { locationForAddress } from "@/lib/region";
 import { useAuth } from "@/lib/auth";
 import AnnotationTimeline from "./AnnotationTimeline";
 import DeliveryChain from "./DeliveryChain";
@@ -404,35 +405,72 @@ function DrawerBody({
     return "awaiting_operation_action";
   })();
   const shortages = calcShortages(lines, stockBalances);
-  const dealerName = order.dealers?.name ?? "—";
+  // Outstanding = order grand total − paid. AutoCount-imported orders often
+  // carry no line prices (total 0) → we can't compute a real balance, so the
+  // header pill hides rather than lie. Mirrors OrderControlPanel's PaymentSummary.
+  const grandTotal = total + addonsSum(addons);
+  const outstanding = Math.max(0, grandTotal - Number(order.paid || 0));
+  const hasTotal = grandTotal > 0;
+  const loc = locationForAddress(order.customer_address ?? null);
 
   return (
     <>
-      {/* Header */}
-      <div className="px-7 pt-5 pb-3.5 border-b border-base-100 flex justify-between items-start gap-3.5">
-        <div className="min-w-0 flex-1">
-          <div className="flex gap-2.5 items-center">
-            <span className="font-mono text-[12px] text-base-500">
-              #{order.so}
-            </span>
+      {/* Header — SO + stage, customer, and the OUTSTANDING balance pill up top
+          (Loo) so "who owes" is the first thing you see. Phone / location /
+          deadline / address live here now; the old separate Delivery section is
+          gone (dedupe). Stage-gated doc reprints sit in their own row below. */}
+      <div className="px-7 pt-5 pb-3.5 border-b border-base-100">
+        <div className="flex justify-between items-center gap-3">
+          <div className="flex gap-2.5 items-center min-w-0">
+            <span className="font-mono text-[12px] text-base-500">#{order.so}</span>
             <StageChip stage={stage} />
           </div>
-          <div
-            className={`${cjkClassName(order.customer_name)} text-[22px] font-semibold mt-1 tracking-[-0.02em] text-base-900`}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close drawer"
+            className="p-1 text-[20px] text-base-700 hover:text-base-900 leading-none shrink-0"
           >
-            {order.customer_name}
-          </div>
-          <div className="text-[12px] text-base-600 mt-0.5">{dealerName}</div>
+            ×
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          {/* 2026-05-13 (Loo) — stage gates the customer-doc affordances:
-           *    pre-dispatch  → Sales Order (the original quote/contract)
-           *    dispatched+   → Sales Invoice + Carres DO (the order has
-           *                    "become" the invoice; SO is no longer the
-           *                    live doc the customer is handed). 0098's
-           *                    BEFORE-UPDATE trigger seeds order.invoice_no
-           *                    and order.do_number at the same moment so
-           *                    both buttons surface together. */}
+
+        <div className="flex items-start justify-between gap-3 mt-1.5">
+          <div className="min-w-0">
+            <div
+              className={`${cjkClassName(order.customer_name)} text-[20px] font-semibold tracking-[-0.02em] text-base-900`}
+            >
+              {order.customer_name}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[12px] text-base-600">
+              {order.customer_phone && <span>{order.customer_phone}</span>}
+              {loc.label && (
+                <span
+                  className={
+                    loc.area === "Outstation" ? "text-warning font-medium" : ""
+                  }
+                >
+                  {loc.label}
+                  {loc.area === "Outstation" ? " · call first" : ""}
+                </span>
+              )}
+              <span>
+                Deadline{" "}
+                <span className="font-medium text-base-900">
+                  {order.delivery_date_tbd ? "TBD" : fmtDate(order.delivery_date)}
+                </span>
+              </span>
+            </div>
+            {order.customer_address && (
+              <div className="text-[11px] text-base-500 mt-1 leading-snug">
+                {order.customer_address}
+              </div>
+            )}
+          </div>
+          <BalancePill outstanding={outstanding} hasTotal={hasTotal} />
+        </div>
+
+        <div className="flex items-center gap-2 mt-2.5 empty:hidden">
           {role && stage !== "dispatched" && stage !== "delivered" && (
             <DownloadSalesOrderButton
               orderId={order.id}
@@ -452,14 +490,6 @@ function DrawerBody({
           {order.do_number && (
             <PrintDoButton orderId={order.id} doNumber={order.do_number} />
           )}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close drawer"
-            className="p-1 text-[20px] text-base-700 hover:text-base-900 leading-none"
-          >
-            ×
-          </button>
         </div>
       </div>
 
@@ -535,33 +565,6 @@ function DrawerBody({
           </>
         )}
 
-        {/* Customer & delivery */}
-        <SectionHead>Delivery</SectionHead>
-        <div className="bg-white border border-base-200 rounded-[4px] p-3.5 mb-4 grid grid-cols-2 gap-3">
-          <KV label="Phone" value={order.customer_phone ?? "—"} />
-          <KV
-            label="Deadline"
-            value={
-              order.delivery_date_tbd ? (
-                <em className="text-warning">TBD</em>
-              ) : (
-                fmtDate(order.delivery_date)
-              )
-            }
-          />
-          <div className="col-span-2">
-            <KV
-              label="Address"
-              value={
-                order.customer_address ?? (
-                  <em className="text-warning">Pending</em>
-                )
-              }
-            />
-          </div>
-          {order.do_number && <KV label="DO number" value={order.do_number} />}
-        </div>
-
         {/* Multi-leg delivery chain (γ architecture · migration 0156) — a rare
             cross-state / cross-border handoff feature (KL→JB→SG). Collapsed by
             default so it stops cluttering the common single-leg flow + stops the
@@ -631,9 +634,12 @@ function DrawerBody({
           </button>
         </div>
 
-        {/* Annotations + activity timeline (Phase B) */}
+        {/* Annotations + activity timeline (Phase B) — capped + scrollable so a
+            long history doesn't stretch the drawer to the floor (Loo). */}
         <SectionHead>Notes &amp; activity</SectionHead>
-        <AnnotationTimeline orderId={order.id} />
+        <div className="max-h-[300px] overflow-auto pr-1 -mr-1">
+          <AnnotationTimeline orderId={order.id} />
+        </div>
 
         {/* Total */}
         <div className="flex justify-between mt-4 py-3.5 border-t border-base-200">
@@ -653,6 +659,30 @@ function addonsSum(
   return (addons ?? []).reduce(
     (s, a) => s + Number(a.unit_price || 0) * Number(a.qty || 0),
     0,
+  );
+}
+
+/** Outstanding-balance pill for the drawer header — terracotta while the
+ *  customer still owes, green "Settled" once covered. Hidden when the order has
+ *  no computable total (AutoCount no-price imports) so it never shows a fake 0. */
+function BalancePill({
+  outstanding,
+  hasTotal,
+}: {
+  outstanding: number;
+  hasTotal: boolean;
+}) {
+  if (!hasTotal) return null;
+  if (outstanding <= 0)
+    return (
+      <span className="shrink-0 whitespace-nowrap text-[12px] font-medium text-success bg-success/10 px-2.5 py-1 rounded-full">
+        Settled
+      </span>
+    );
+  return (
+    <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+      Outstanding {RM(outstanding)}
+    </span>
   );
 }
 
