@@ -236,8 +236,8 @@ describe("OperationOrdersControl", () => {
     const row = screen
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1002"))!;
-    // 2 + 1 = 3 units across 2 lines
-    expect(within(row).getByText(/3 units/)).toBeInTheDocument();
+    // 2 + 1 = 3 goods units across 2 lines — bold "3×" on the left
+    expect(within(row).getByText("3×")).toBeInTheDocument();
     expect(within(row).getByText("CR0418")).toBeInTheDocument();
   });
 
@@ -423,25 +423,29 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     listHookState.data = { orders: [makeRow(partial)] };
   }
 
-  it("rolls items up into the Master-Sheet category short-form (A1)", () => {
+  it("rolls items up into boxed per-category tags, tier-coloured, services not counted (A1)", () => {
     oneRow({
       id: "r1",
       so: 3001,
       order_lines: [
-        { sku: "MS01-L1201S-Q", qty: 2 }, // Mattress, Queen
-        { sku: "BF02-1013", qty: 1 }, // Bedframe, no size
-        { sku: "Pillow", qty: 3 }, // accessory → short type name
-        { sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }, // → M.P
-        { sku: "Sofa Disposal", qty: 1 }, // → Disposal
+        { sku: "MS01-L1201S-Q", qty: 2 }, // Mattress, Queen → core
+        { sku: "BF02-1013", qty: 1 }, // Bedframe, no size → core
+        { sku: "Pillow", qty: 3 }, // accessory
+        { sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }, // → M.P, accessory
+        { sku: "Sofa Disposal", qty: 1 }, // → Disposal, SERVICE
       ],
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    expect(
-      within(row).getByText(
-        "2× Mattress(Q) · 1× Bedframe · Pillow ×3 · M.P · Disposal",
-      ),
-    ).toBeInTheDocument();
+    // Goods-unit total on the left — 2+1+3+1 = 7; Disposal (service) NOT counted.
+    expect(within(row).getByText("7×")).toBeInTheDocument();
+    // One boxed tag per category, coloured by tier:
+    // core purple (pill-draft) · accessories blue (pill-sent) · service grey.
+    expect(within(row).getByText("2× Mattress(Q)").className).toContain("pill-draft");
+    expect(within(row).getByText("1× Bedframe").className).toContain("pill-draft");
+    expect(within(row).getByText("3× Pillow").className).toContain("pill-sent");
+    expect(within(row).getByText("M.P").className).toContain("pill-sent");
+    expect(within(row).getByText("Disposal").className).toContain("pill-neutral");
   });
 
   it("shows the real delivery location for outstation + a 📞 flag, NOT the word 'Outstation' (A2/A4)", () => {

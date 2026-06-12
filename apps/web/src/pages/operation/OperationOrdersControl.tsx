@@ -277,32 +277,51 @@ function accShort(sku: string): string {
   return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 }
 
-/** Per-category colour for the item tags (Jess: box each category to avoid
- *  misreading). Reuses the design-system pill palette so colours are guaranteed
- *  present + consistent: Mattress blue · Bedframe amber · Sofa purple ·
- *  accessories neutral grey. */
-const ITEM_TAG: Record<CoreCat | "acc", string> = {
-  mattress: "pill-sent",
-  bedframe: "pill-warning",
-  sofa: "pill-draft",
-  acc: "pill-neutral",
+/** Item TIER for colour-coding (Jess: core one colour, accessories one colour,
+ *  service one colour): core furniture purple · accessory goods blue · service
+ *  charges (Disposal / floor charge / install…) grey. */
+type ItemKind = "core" | "acc" | "service";
+const ITEM_TAG: Record<ItemKind, string> = {
+  core: "pill-draft",
+  acc: "pill-sent",
+  service: "pill-neutral",
 };
 
-/** Roll a line list up into per-category TAGS (Jess: one boxed tag per
- *  category). Core goods carry qty + size; accessories the short type name
- *  (qty when >1). e.g. [{mattress,"2× Mattress(Q)"}, {acc,"2× Pillow"}]. */
+function lineKind(sku: string): ItemKind {
+  if (lineCategory(sku) !== "acc") return "core";
+  const name = accShort(sku);
+  return name === "Disposal" || name === "Service" ? "service" : "acc";
+}
+
+/** Physical-goods unit total — core + accessories. Service lines (Disposal,
+ *  floor charge…) are NOT units, so they don't count (matches the Master
+ *  Sheet's qty column: "8 X" = 2 Mattress + 2 Bedframe + 4 Pillow, Disposal
+ *  excluded). */
+function unitTotal(lines: { sku: string; qty: number }[]): number {
+  let t = 0;
+  for (const l of lines)
+    if (lineKind(l.sku) !== "service") t += Number(l.qty || 0);
+  return t;
+}
+
+/** Roll a line list up into boxed TAGS, one per category, ordered core →
+ *  accessories → services. Core goods carry qty + size; the rest their short
+ *  type name (qty when >1). e.g. [{core,"2× Mattress(Q)"}, {acc,"3× Pillow"},
+ *  {service,"Disposal"}]. */
 function itemTags(
   lines: { sku: string; qty: number }[],
-): { cat: CoreCat | "acc"; label: string }[] {
+): { kind: ItemKind; label: string }[] {
   const core = new Map<CoreCat, { qty: number; sizes: Set<string> }>();
-  const acc = new Map<string, number>();
+  const rest = new Map<string, { qty: number; kind: ItemKind }>();
   for (const l of lines) {
     const q = Number(l.qty || 0);
     if (q <= 0) continue;
     const cat = lineCategory(l.sku);
     if (cat === "acc") {
       const name = accShort(l.sku);
-      acc.set(name, (acc.get(name) ?? 0) + q);
+      const e = rest.get(name) ?? { qty: 0, kind: lineKind(l.sku) };
+      e.qty += q;
+      rest.set(name, e);
       continue;
     }
     const e = core.get(cat) ?? { qty: 0, sizes: new Set<string>() };
@@ -311,14 +330,18 @@ function itemTags(
     if (sz) e.sizes.add(sz);
     core.set(cat, e);
   }
-  const out: { cat: CoreCat | "acc"; label: string }[] = [];
+  const out: { kind: ItemKind; label: string }[] = [];
   for (const cat of CORE_ORDER) {
     const e = core.get(cat);
     if (!e) continue;
     const sizes = e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
-    out.push({ cat, label: `${e.qty}× ${CORE_LABEL[cat]}${sizes}` });
+    out.push({ kind: "core", label: `${e.qty}× ${CORE_LABEL[cat]}${sizes}` });
   }
-  for (const [name, q] of acc) out.push({ cat: "acc", label: q > 1 ? `${q}× ${name}` : name });
+  const restEntries = [...rest.entries()];
+  for (const wanted of ["acc", "service"] as const)
+    for (const [name, e] of restEntries)
+      if (e.kind === wanted)
+        out.push({ kind: e.kind, label: e.qty > 1 ? `${e.qty}× ${name}` : name });
   return out;
 }
 
@@ -519,7 +542,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const header = ["SO", "Customer", "Phone", "Units", "Items", "Deadline", "Location", "Logistic", "Status"];
     const body = selectedOrders.map((o) => {
       const ls = o.order_lines ?? [];
-      const units = ls.reduce((s, l) => s + Number(l.qty || 0), 0);
+      const units = unitTotal(ls);
       const loc = locationForAddress(o.customer_address ?? null);
       const logi =
         o.delivery_partners?.name ??
@@ -1004,7 +1027,7 @@ function OrderRow({
   const ct = controlTabOf(o);
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
-  const qtyTotal = lines.reduce((s, l) => s + Number(l.qty || 0), 0);
+  const qtyTotal = unitTotal(lines);
   const tags = itemTags(lines);
   const stock = stockReadiness(o, availableBySku);
   const loc = locationForAddress(o.customer_address ?? null);
@@ -1049,20 +1072,31 @@ function OrderRow({
           {o.customer_name || "—"}
         </div>
       </td>
-      {/* Items — total-units headline + one boxed colour tag per category
-          (Mattress blue · Bedframe amber · Sofa purple · accessories grey) so
-          nothing gets misread. Tooltip = full SKU list. */}
+      {/* Items — Master-Sheet style: goods-unit total as a bold number on the
+          LEFT (service lines don't count), boxed tags on the right coloured by
+          TIER (core purple · accessories blue · service grey). Tooltip = full
+          SKU list. */}
       <td className="px-4 py-2.5">
-        <div className="text-base-900 font-semibold">
-          {qtyTotal} unit{qtyTotal === 1 ? "" : "s"}
-        </div>
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1 max-w-[300px]" title={itemBreakdown(lines)}>
-            {tags.map((t, i) => (
-              <span key={i} className={`pill ${ITEM_TAG[t.cat]} text-[10px] px-1.5 py-0`}>
-                {t.label}
-              </span>
-            ))}
+        {lines.length === 0 ? (
+          <span className="text-base-400">—</span>
+        ) : (
+          <div className="flex items-start gap-2.5">
+            <span
+              className="text-[15px] font-semibold text-base-900 tabular-nums leading-snug whitespace-nowrap"
+              title={`${qtyTotal} goods unit${qtyTotal === 1 ? "" : "s"} (services not counted)`}
+            >
+              {qtyTotal}×
+            </span>
+            <div
+              className="flex flex-wrap gap-1 max-w-[280px] pt-0.5"
+              title={itemBreakdown(lines)}
+            >
+              {tags.map((t, i) => (
+                <span key={i} className={`pill ${ITEM_TAG[t.kind]} text-[10px] px-1.5 py-0`}>
+                  {t.label}
+                </span>
+              ))}
+            </div>
           </div>
         )}
       </td>
