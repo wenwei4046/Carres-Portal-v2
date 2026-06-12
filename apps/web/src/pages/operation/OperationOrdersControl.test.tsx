@@ -430,13 +430,17 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       order_lines: [
         { sku: "MS01-L1201S-Q", qty: 2 }, // Mattress, Queen
         { sku: "BF02-1013", qty: 1 }, // Bedframe, no size
-        { sku: "Pillow", qty: 3 }, // accessory
+        { sku: "Pillow", qty: 3 }, // accessory → short type name
+        { sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }, // → M.P
+        { sku: "Sofa Disposal", qty: 1 }, // → Disposal
       ],
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
     expect(
-      within(row).getByText("2× Mattress(Q) · 1× Bedframe · +3 accessories"),
+      within(row).getByText(
+        "2× Mattress(Q) · 1× Bedframe · Pillow ×3 · M.P · Disposal",
+      ),
     ).toBeInTheDocument();
   });
 

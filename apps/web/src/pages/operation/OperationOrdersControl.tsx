@@ -229,16 +229,33 @@ function lineSize(sku: string): string | null {
   return m ? m[1].toUpperCase() : null;
 }
 
-/** Roll a line list up into "2× Mattress(Q) · 1× Bedframe · +3 acc". */
+/** Short proper TYPE name for a non-core line — the list shows these instead of
+ *  a generic "accessories" (Loo: show Pillow / M.P / Disposal by name). The
+ *  drawer shows the full original name; this is the list-only short form. */
+function accShort(sku: string): string {
+  const s = sku.toLowerCase();
+  if (/pillow/.test(s)) return "Pillow";
+  if (/protector|protect|\bm\.?p\b/.test(s)) return "M.P";
+  if (/disposal|dispose/.test(s)) return "Disposal";
+  if (/floor|lift|stair|transport|delivery|charge|install/.test(s)) return "Service";
+  if (/topper/.test(s)) return "Topper";
+  const w = sku.trim().split(/[\s/]+/)[0] ?? sku;
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+}
+
+/** Roll a line list up into the list short-form, e.g.
+ *  "2× Mattress(Q) · 1× Bedframe · Pillow ×2 · M.P · Disposal". Core goods
+ *  carry qty + size; non-core show their short type name (qty only when >1). */
 function itemRollup(lines: { sku: string; qty: number }[]): string {
   const core = new Map<CoreCat, { qty: number; sizes: Set<string> }>();
-  let accQty = 0;
+  const acc = new Map<string, number>();
   for (const l of lines) {
     const q = Number(l.qty || 0);
     if (q <= 0) continue;
     const cat = lineCategory(l.sku);
     if (cat === "acc") {
-      accQty += q;
+      const name = accShort(l.sku);
+      acc.set(name, (acc.get(name) ?? 0) + q);
       continue;
     }
     const e = core.get(cat) ?? { qty: 0, sizes: new Set<string>() };
@@ -254,8 +271,7 @@ function itemRollup(lines: { sku: string; qty: number }[]): string {
     const sizes = e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
     parts.push(`${e.qty}× ${CORE_LABEL[cat]}${sizes}`);
   }
-  if (accQty > 0)
-    parts.push(`+${accQty} ${accQty === 1 ? "accessory" : "accessories"}`);
+  for (const [name, q] of acc) parts.push(q > 1 ? `${name} ×${q}` : name);
   return parts.join(" · ") || "—";
 }
 
@@ -465,6 +481,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
         })}
       </div>
 
+      {/* Rows-per-page + range + prev/next, ABOVE the table (Loo) so the list
+          never dumps all rows and the control is visible without scrolling. */}
+      {total > 0 && (
+        <Pager
+          pageSize={pageSize}
+          onPageSize={setPageSize}
+          safePage={safePage}
+          onPage={setPage}
+          total={total}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          pageCount={pageCount}
+        />
+      )}
+
       {/* Table */}
       <div className="bg-white border border-base-200 rounded overflow-auto">
         <table
@@ -507,73 +538,91 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </table>
       </div>
 
-      {/* Pagination — page-size + range + prev/next, so the list never dumps all
-          155 rows at once. */}
-      {total > 0 && (
-        <div className="flex items-center justify-between gap-3 mt-3 flex-wrap text-[12px] text-base-600">
-          <div className="flex items-center gap-2">
-            <span>Rows per page</span>
-            {PAGE_SIZES.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setPageSize(n)}
-                className={`px-2 py-1 rounded border text-[11px] ${
-                  pageSize === n
-                    ? "border-primary text-primary font-semibold bg-primary/5"
-                    : "border-base-200 text-base-600 hover:border-base-400"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setPageSize("all")}
-              className={`px-2 py-1 rounded border text-[11px] ${
-                pageSize === "all"
-                  ? "border-primary text-primary font-semibold bg-primary/5"
-                  : "border-base-200 text-base-600 hover:border-base-400"
-              }`}
-            >
-              All
-            </button>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="tabular-nums">
-              {rangeStart}–{rangeEnd} of {total}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={pageSize === "all" || safePage <= 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                className="px-2 py-1 rounded border border-base-200 text-[11px] disabled:opacity-40 hover:border-base-400"
-              >
-                ‹ Prev
-              </button>
-              <span className="tabular-nums text-[11px] text-base-500">
-                {safePage + 1}/{pageCount}
-              </span>
-              <button
-                type="button"
-                disabled={pageSize === "all" || safePage >= pageCount - 1}
-                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-                className="px-2 py-1 rounded border border-base-200 text-[11px] disabled:opacity-40 hover:border-base-400"
-              >
-                Next ›
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {openOrderId && (
         <OrderDetailDrawer
           orderId={openOrderId}
           onClose={() => setOpenOrderId(null)}
         />
       )}
+    </div>
+  );
+}
+
+function Pager({
+  pageSize,
+  onPageSize,
+  safePage,
+  onPage,
+  total,
+  rangeStart,
+  rangeEnd,
+  pageCount,
+}: {
+  pageSize: number | "all";
+  onPageSize: (n: number | "all") => void;
+  safePage: number;
+  onPage: (updater: (p: number) => number) => void;
+  total: number;
+  rangeStart: number;
+  rangeEnd: number;
+  pageCount: number;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 mb-3 flex-wrap text-[12px] text-base-600">
+      <div className="flex items-center gap-2">
+        <span>Rows per page</span>
+        {PAGE_SIZES.map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onPageSize(n)}
+            className={`px-2 py-1 rounded border text-[11px] ${
+              pageSize === n
+                ? "border-primary text-primary font-semibold bg-primary/5"
+                : "border-base-200 text-base-600 hover:border-base-400"
+            }`}
+          >
+            {n}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => onPageSize("all")}
+          className={`px-2 py-1 rounded border text-[11px] ${
+            pageSize === "all"
+              ? "border-primary text-primary font-semibold bg-primary/5"
+              : "border-base-200 text-base-600 hover:border-base-400"
+          }`}
+        >
+          All
+        </button>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="tabular-nums">
+          {rangeStart}–{rangeEnd} of {total}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={pageSize === "all" || safePage <= 0}
+            onClick={() => onPage((p) => Math.max(0, p - 1))}
+            className="px-2 py-1 rounded border border-base-200 text-[11px] disabled:opacity-40 hover:border-base-400"
+          >
+            ‹ Prev
+          </button>
+          <span className="tabular-nums text-[11px] text-base-500">
+            {safePage + 1}/{pageCount}
+          </span>
+          <button
+            type="button"
+            disabled={pageSize === "all" || safePage >= pageCount - 1}
+            onClick={() => onPage((p) => Math.min(pageCount - 1, p + 1))}
+            className="px-2 py-1 rounded border border-base-200 text-[11px] disabled:opacity-40 hover:border-base-400"
+          >
+            Next ›
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
