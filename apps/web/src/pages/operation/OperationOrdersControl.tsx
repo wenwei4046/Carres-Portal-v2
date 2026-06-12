@@ -8,7 +8,7 @@ import {
 } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import { cjkClassName } from "@/lib/cjk";
-import { areaForAddress } from "@/lib/region";
+import { locationForAddress } from "@/lib/region";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import type { OperationStage } from "./components/StageChip";
 
@@ -164,9 +164,13 @@ function stockReadiness(
     : { state: "need_po", need, have, short };
 }
 
-/** Countdown from today to a YYYY-MM-DD delivery date → short label + tone.
- *  <7 days carries the ⚠ (Jess's "Before 7 Days" prep flag). */
-function dueDays(
+/** Countdown from today to the deadline (customer's requested delivery date)
+ *  → short label + tone, encoding Jess's prep SOP off the deadline:
+ *    • ≤7 days  ⚠  stock must be at the warehouse (the "Before 7 Days" flag —
+ *                  standard early-receive to avoid last-minute damage)
+ *    • ≤3 days  📞 logistic must contact the customer to arrange delivery
+ *  overdue/today/≤3d read red; the 4–7d prep window reads amber. */
+function deadlineInfo(
   dateStr: string | null | undefined,
 ): { label: string; tone: string } | null {
   if (!dateStr) return null;
@@ -176,9 +180,69 @@ function dueDays(
   today.setHours(0, 0, 0, 0);
   const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
   if (diff < 0) return { label: `overdue ${-diff}d`, tone: "text-destructive" };
-  if (diff === 0) return { label: "today", tone: "text-warning" };
-  if (diff < 7) return { label: `${diff}d ⚠`, tone: "text-warning" };
+  if (diff === 0) return { label: "today 📞", tone: "text-destructive" };
+  if (diff <= 3) return { label: `${diff}d 📞`, tone: "text-destructive" };
+  if (diff <= 7) return { label: `${diff}d ⚠`, tone: "text-warning" };
   return { label: `in ${diff}d`, tone: "text-base-500" };
+}
+
+/** Item category short-form (Master Sheet model): core goods Mattress / Bedframe
+ *  / Sofa need POs + stock; everything else is accessory/service. Native SKUs
+ *  carry a `mattress:` / `bedframe:` / `sofa:` prefix; AutoCount free-text SKUs
+ *  use the `MS## / BF## / SF##|SOF##` item codes. A trailing `-K/-Q/-S` is the
+ *  size (King/Queen/Single). */
+type CoreCat = "mattress" | "bedframe" | "sofa";
+const CORE_LABEL: Record<CoreCat, string> = {
+  mattress: "Mattress",
+  bedframe: "Bedframe",
+  sofa: "Sofa",
+};
+const CORE_ORDER: CoreCat[] = ["mattress", "bedframe", "sofa"];
+
+function lineCategory(sku: string): CoreCat | "acc" {
+  const s = sku.trim();
+  if (s.includes(":")) {
+    const p = s.split(":")[0].toLowerCase();
+    return p === "mattress" || p === "bedframe" || p === "sofa" ? p : "acc";
+  }
+  if (/^ms\d/i.test(s)) return "mattress";
+  if (/^bf\d/i.test(s)) return "bedframe";
+  if (/^(sof|sf)\d/i.test(s)) return "sofa";
+  return "acc";
+}
+
+function lineSize(sku: string): string | null {
+  const m = sku.trim().match(/-([KQS])$/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/** Roll a line list up into "2× Mattress(Q) · 1× Bedframe · +3 acc". */
+function itemRollup(lines: { sku: string; qty: number }[]): string {
+  const core = new Map<CoreCat, { qty: number; sizes: Set<string> }>();
+  let accQty = 0;
+  for (const l of lines) {
+    const q = Number(l.qty || 0);
+    if (q <= 0) continue;
+    const cat = lineCategory(l.sku);
+    if (cat === "acc") {
+      accQty += q;
+      continue;
+    }
+    const e = core.get(cat) ?? { qty: 0, sizes: new Set<string>() };
+    e.qty += q;
+    const sz = lineSize(l.sku);
+    if (sz) e.sizes.add(sz);
+    core.set(cat, e);
+  }
+  const parts: string[] = [];
+  for (const cat of CORE_ORDER) {
+    const e = core.get(cat);
+    if (!e) continue;
+    const sizes = e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
+    parts.push(`${e.qty}× ${CORE_LABEL[cat]}${sizes}`);
+  }
+  if (accQty > 0) parts.push(`+${accQty} acc`);
+  return parts.join(" · ") || "—";
 }
 
 /** Old kanban stage slug (still produced by hand-typed `/operation/orders/:stage`
@@ -370,8 +434,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Ref</Th>
               <Th>Customer</Th>
               <Th>Items</Th>
-              <Th>Due</Th>
-              <Th>Area</Th>
+              <Th>Deadline</Th>
+              <Th>Location</Th>
               <Th>Stock</Th>
               <Th>Logistic</Th>
               <Th>Status</Th>
@@ -427,7 +491,7 @@ function OrderRow({
   const lines = o.order_lines ?? [];
   const qtyTotal = lines.reduce((s, l) => s + Number(l.qty || 0), 0);
   const stock = stockReadiness(o, availableBySku);
-  const area = areaForAddress(o.customer_address ?? null);
+  const loc = locationForAddress(o.customer_address ?? null);
 
   // Logistic: prefer the formal LP (joined name), fall back to the Inbox-triage
   // assignment resolved via the partners map.
@@ -471,28 +535,29 @@ function OrderRow({
           {qtyTotal} unit{qtyTotal === 1 ? "" : "s"}
         </div>
         {lines.length > 0 && (
-          <div className="text-[10.5px] text-base-500 mt-0.5 font-mono leading-snug max-w-[220px] truncate">
-            {lines
-              .slice(0, 2)
-              .map((l) => `${shortSku(l.sku)}×${l.qty}`)
-              .join(" · ")}
-            {lines.length > 2 ? ` +${lines.length - 2}` : ""}
+          <div className="text-[10.5px] text-base-600 mt-0.5 leading-snug max-w-[230px] truncate">
+            {itemRollup(lines)}
           </div>
         )}
       </td>
-      {/* Due date + countdown */}
-      <td className="px-4 py-3 whitespace-nowrap text-base-700">
+      {/* Deadline — customer's requested delivery date + prep-milestone countdown.
+          Tooltip spells out the SOP: stock at WH 7 days before, logistic
+          contacts the customer 2–3 days before. */}
+      <td
+        className="px-4 py-3 whitespace-nowrap text-base-700"
+        title="Deadline = customer's requested delivery date. Stock should be at the warehouse 7 days before; logistic contacts the customer 2–3 days before to arrange delivery."
+      >
         {o.delivery_date_tbd ? (
           <span className="text-warning text-[12px]">TBD</span>
         ) : o.delivery_date ? (
           (() => {
-            const dd = dueDays(o.delivery_date);
+            const dl = deadlineInfo(o.delivery_date);
             return (
               <div>
                 <div>{fmtDate(o.delivery_date)}</div>
-                {dd && (
-                  <div className={`text-[10.5px] font-semibold ${dd.tone}`}>
-                    {dd.label}
+                {dl && (
+                  <div className={`text-[10.5px] font-semibold ${dl.tone}`}>
+                    {dl.label}
                   </div>
                 )}
               </div>
@@ -502,18 +567,34 @@ function OrderRow({
           <span className="text-base-400">—</span>
         )}
       </td>
-      {/* Area — KV / Outstation derived from customer_address (region.ts) */}
+      {/* Location — the real delivery place from the imported address (city/state),
+          coloured by KV (green) vs Outstation (amber). Outstation carries a 📞
+          flag for the call-first-before-PO SOP. */}
       <td className="px-4 py-3 whitespace-nowrap">
-        {area === "Unknown" ? (
-          <span className="text-base-400">—</span>
-        ) : (
-          <span
-            className={`text-[11px] font-medium ${
-              area === "KV" ? "text-success" : "text-warning"
-            }`}
-          >
-            {area}
+        {loc.label ? (
+          <span className="inline-flex items-center gap-1">
+            <span
+              className={`text-[11px] font-medium ${
+                loc.area === "KV"
+                  ? "text-success"
+                  : loc.area === "Outstation"
+                    ? "text-warning"
+                    : "text-base-600"
+              }`}
+            >
+              {loc.label}
+            </span>
+            {loc.area === "Outstation" && (
+              <span
+                title="Outstation — confirm the delivery window with the customer before raising the PO (no warehouse buffer outstation)."
+                aria-label="call customer before raising PO"
+              >
+                📞
+              </span>
+            )}
           </span>
+        ) : (
+          <span className="text-base-400">—</span>
         )}
       </td>
       {/* Stock */}

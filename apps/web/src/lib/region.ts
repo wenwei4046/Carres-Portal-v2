@@ -170,6 +170,36 @@ export function areaForAddress(
   return region === "KV" ? "KV" : "Outstation";
 }
 
+/** Exact 5-digit postcode → city (first-wins), mirror of POSTCODE_TO_STATE. */
+const POSTCODE_TO_CITY = (() => {
+  const m = new Map<string, string>();
+  for (const cities of Object.values(MY_ADDRESS)) {
+    for (const [city, codes] of Object.entries(cities)) {
+      for (const pc of codes) if (!m.has(pc)) m.set(pc, city);
+    }
+  }
+  return m;
+})();
+
+/**
+ * Short delivery-LOCATION label for the Orders list — the *real* place from the
+ * imported address (the city when its 5-digit postcode is known, else the
+ * state), never the invented word "Outstation". The KV/Outstation `area` rides
+ * along for colour + the call-first SOP, but it is not the label.
+ */
+export function locationForAddress(
+  address: string | null | undefined,
+): { label: string | null; area: Area | "Unknown" } {
+  const area = areaForAddress(address);
+  if (!address) return { label: null, area };
+  if (/\bsingapore\b/.test(address.toLowerCase())) {
+    return { label: "Singapore", area };
+  }
+  const pc = address.toLowerCase().match(/\b(\d{5})\b/)?.[1];
+  const city = pc ? POSTCODE_TO_CITY.get(pc) : undefined;
+  return { label: city ?? detectState(address) ?? null, area };
+}
+
 /**
  * Suggested default carrier for an address — the overridable default the list
  * shows and the drawer pre-selects. Returns null when the region can't be

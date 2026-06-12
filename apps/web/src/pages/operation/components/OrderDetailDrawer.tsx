@@ -541,7 +541,7 @@ function DrawerBody({
         <div className="bg-white border border-base-200 rounded-[4px] p-3.5 mb-4 grid grid-cols-2 gap-3">
           <KV label="Phone" value={order.customer_phone ?? "—"} />
           <KV
-            label="Date"
+            label="Deadline"
             value={
               order.delivery_date_tbd ? (
                 <em className="text-warning">TBD</em>

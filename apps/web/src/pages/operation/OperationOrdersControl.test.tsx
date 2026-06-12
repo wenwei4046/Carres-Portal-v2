@@ -417,3 +417,70 @@ describe("OperationOrdersControl · Stock column", () => {
     expect(row.querySelector('[data-stock-state="unknown"]')).toBeTruthy();
   });
 });
+
+describe("OperationOrdersControl · listing columns (A1–A4)", () => {
+  function oneRow(partial: Partial<operationOrderListRow> & { id: string; so: number }) {
+    listHookState.data = { orders: [makeRow(partial)] };
+  }
+
+  it("rolls items up into the Master-Sheet category short-form (A1)", () => {
+    oneRow({
+      id: "r1",
+      so: 3001,
+      order_lines: [
+        { sku: "MS01-L1201S-Q", qty: 2 }, // Mattress, Queen
+        { sku: "BF02-1013", qty: 1 }, // Bedframe, no size
+        { sku: "Pillow", qty: 3 }, // accessory
+      ],
+    });
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    expect(
+      within(row).getByText("2× Mattress(Q) · 1× Bedframe · +3 acc"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the real delivery location for outstation + a 📞 flag, NOT the word 'Outstation' (A2/A4)", () => {
+    oneRow({
+      id: "r2",
+      so: 3002,
+      customer_address: "5, Lorong Y, Georgetown, Penang",
+    });
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    expect(within(row).getByText("Penang")).toBeInTheDocument();
+    expect(within(row).queryByText("Outstation")).not.toBeInTheDocument();
+    // 📞 call-first flag present for outstation
+    expect(
+      within(row).getByLabelText("call customer before raising PO"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a KV location in green with no 📞 flag (A2/A4)", () => {
+    oneRow({
+      id: "r3",
+      so: 3003,
+      customer_address: "12, Jln X, Shah Alam, Selangor",
+    });
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    expect(within(row).getByText("Selangor")).toBeInTheDocument();
+    expect(
+      within(row).queryByLabelText("call customer before raising PO"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("labels the date column 'Deadline' and shows the 📞 contact window inside 3 days (A3)", () => {
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 2);
+    const iso = soon.toISOString().slice(0, 10);
+    oneRow({ id: "r4", so: 3004, delivery_date: iso });
+    wrap(<OperationOrdersControl />);
+    // header renamed
+    const head = within(screen.getByRole("table")).getAllByRole("columnheader");
+    expect(head.map((h) => h.textContent)).toContain("Deadline");
+    // 2-day-out deadline → "2d 📞" contact-window cue
+    const row = screen.getByTestId("order-row");
+    expect(within(row).getByText("2d 📞")).toBeInTheDocument();
+  });
+});
