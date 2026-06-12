@@ -236,8 +236,8 @@ describe("OperationOrdersControl", () => {
     const row = screen
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1002"))!;
-    // 2 + 1 = 3 goods units across 2 lines — bold "3×" on the left
-    expect(within(row).getByText("3×")).toBeInTheDocument();
+    // 2 + 1 = 3 goods units across 2 lines — bold "3" on the left
+    expect(within(row).getByText("3")).toBeInTheDocument();
     expect(within(row).getByText("CR0418")).toBeInTheDocument();
   });
 
@@ -438,7 +438,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
     // Goods-unit total on the left — 2+1+3+1 = 7; Disposal (service) NOT counted.
-    expect(within(row).getByText("7×")).toBeInTheDocument();
+    expect(within(row).getByText("7")).toBeInTheDocument();
     // One boxed tag per category, coloured by tier:
     // core purple (pill-draft) · accessories blue (pill-sent) · service grey.
     expect(within(row).getByText("2× Mattress(Q)").className).toContain("pill-draft");
@@ -446,6 +446,20 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("3× Pillow").className).toContain("pill-sent");
     expect(within(row).getByText("M.P").className).toContain("pill-sent");
     expect(within(row).getByText("Disposal").className).toContain("pill-neutral");
+  });
+
+  it("drops the duplicated qty inside the tag on single-category orders (A1)", () => {
+    oneRow({
+      id: "r1b",
+      so: 3010,
+      order_lines: [{ sku: "SF03-HK5535", qty: 2 }], // sofa only
+    });
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    // "2 [Sofa]" — the left total carries the qty; no "2× Sofa" repetition.
+    expect(within(row).getByText("2")).toBeInTheDocument();
+    expect(within(row).getByText("Sofa")).toBeInTheDocument();
+    expect(within(row).queryByText("2× Sofa")).not.toBeInTheDocument();
   });
 
   it("shows the real delivery location for outstation + a 📞 flag, NOT the word 'Outstation' (A2/A4)", () => {

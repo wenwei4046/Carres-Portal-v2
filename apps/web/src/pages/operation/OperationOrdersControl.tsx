@@ -305,12 +305,13 @@ function unitTotal(lines: { sku: string; qty: number }[]): number {
 }
 
 /** Roll a line list up into boxed TAGS, one per category, ordered core →
- *  accessories → services. Core goods carry qty + size; the rest their short
- *  type name (qty when >1). e.g. [{core,"2× Mattress(Q)"}, {acc,"3× Pillow"},
- *  {service,"Disposal"}]. */
+ *  accessories → services. qty + name come back SEPARATE so the cell can drop
+ *  the qty on single-category orders (the left total already says it — avoids
+ *  the ugly "1× | 1× Sofa" repetition). e.g. [{core,2,"Mattress(Q)"},
+ *  {acc,3,"Pillow"}, {service,1,"Disposal"}]. */
 function itemTags(
   lines: { sku: string; qty: number }[],
-): { kind: ItemKind; label: string }[] {
+): { kind: ItemKind; qty: number; name: string }[] {
   const core = new Map<CoreCat, { qty: number; sizes: Set<string> }>();
   const rest = new Map<string, { qty: number; kind: ItemKind }>();
   for (const l of lines) {
@@ -330,24 +331,28 @@ function itemTags(
     if (sz) e.sizes.add(sz);
     core.set(cat, e);
   }
-  const out: { kind: ItemKind; label: string }[] = [];
+  const out: { kind: ItemKind; qty: number; name: string }[] = [];
   for (const cat of CORE_ORDER) {
     const e = core.get(cat);
     if (!e) continue;
     const sizes = e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
-    out.push({ kind: "core", label: `${e.qty}× ${CORE_LABEL[cat]}${sizes}` });
+    out.push({ kind: "core", qty: e.qty, name: `${CORE_LABEL[cat]}${sizes}` });
   }
-  const restEntries = [...rest.entries()];
   for (const wanted of ["acc", "service"] as const)
-    for (const [name, e] of restEntries)
-      if (e.kind === wanted)
-        out.push({ kind: e.kind, label: e.qty > 1 ? `${e.qty}× ${name}` : name });
+    for (const [name, e] of rest.entries())
+      if (e.kind === wanted) out.push({ kind: e.kind, qty: e.qty, name });
   return out;
+}
+
+/** Tag display label — qty-prefixed, except qty-1 accessories/services. */
+function tagLabel(t: { kind: ItemKind; qty: number; name: string }): string {
+  if (t.kind !== "core" && t.qty === 1) return t.name;
+  return `${t.qty}× ${t.name}`;
 }
 
 /** Flat single-line rollup (CSV export + tooltips). */
 function itemRollup(lines: { sku: string; qty: number }[]): string {
-  return itemTags(lines).map((t) => t.label).join(" · ") || "—";
+  return itemTags(lines).map(tagLabel).join(" · ") || "—";
 }
 
 /** Full item breakdown for the items-cell tooltip — answers "what are the +N
@@ -1072,20 +1077,24 @@ function OrderRow({
           {o.customer_name || "—"}
         </div>
       </td>
-      {/* Items — Master-Sheet style: goods-unit total as a bold number on the
-          LEFT (service lines don't count), boxed tags on the right coloured by
-          TIER (core purple · accessories blue · service grey). Tooltip = full
-          SKU list. */}
+      {/* Items — Master-Sheet style: goods-unit total as a bold number in a
+          fixed-width LEFT slot (service lines don't count; digits + tags align
+          down the column), boxed tags coloured by TIER (core purple ·
+          accessories blue · service grey). Single-category orders drop the
+          qty inside the tag — the left number already says it, so "1 [Sofa]"
+          instead of the ugly "1× [1× Sofa]". Tooltip = full SKU list. */}
       <td className="px-4 py-2.5">
         {lines.length === 0 ? (
           <span className="text-base-400">—</span>
         ) : (
-          <div className="flex items-start gap-2.5">
+          <div className="flex items-start gap-2">
             <span
-              className="text-[15px] font-semibold text-base-900 tabular-nums leading-snug whitespace-nowrap"
+              className={`min-w-[20px] text-right text-[15px] font-semibold tabular-nums leading-snug whitespace-nowrap ${
+                qtyTotal === 0 ? "text-base-400" : "text-base-900"
+              }`}
               title={`${qtyTotal} goods unit${qtyTotal === 1 ? "" : "s"} (services not counted)`}
             >
-              {qtyTotal}×
+              {qtyTotal}
             </span>
             <div
               className="flex flex-wrap gap-1 max-w-[280px] pt-0.5"
@@ -1093,7 +1102,7 @@ function OrderRow({
             >
               {tags.map((t, i) => (
                 <span key={i} className={`pill ${ITEM_TAG[t.kind]} text-[10px] px-1.5 py-0`}>
-                  {t.label}
+                  {tags.length === 1 && t.qty === qtyTotal ? t.name : tagLabel(t)}
                 </span>
               ))}
             </div>
