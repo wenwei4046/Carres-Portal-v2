@@ -8,9 +8,9 @@ import {
   useDeliveryPartners,
   type operationOrderListRow,
 } from "@/lib/queries";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { cjkClassName } from "@/lib/cjk";
-import { locationForAddress } from "@/lib/region";
+import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
 import { apiFetch } from "@/lib/api";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import type { OperationStage } from "./components/StageChip";
@@ -202,22 +202,35 @@ function stockReadiness(
  *  overdue/today/≤3d read red; the 4–7d prep window reads amber. */
 function deadlineInfo(
   dateStr: string | null | undefined,
-): { label: string; pill: string; icon: LucideIcon | null } | null {
+): { label: string; pill: string; urgent: boolean } | null {
   if (!dateStr) return null;
   const d = new Date(`${dateStr}T00:00:00`);
   if (Number.isNaN(d.getTime())) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
-  const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
-  // Coloured pill by urgency: overdue / call-window (≤3d) red, prep-window
-  // (4–7d, stock-to-WH) amber, comfortable (>7d) neutral. Phone icon on the
-  // ≤3d call window, alert on the prep window.
-  if (diff < 0) return { label: `Overdue ${days(-diff)}`, pill: "pill-overdue", icon: AlertTriangle };
-  if (diff === 0) return { label: "Due today", pill: "pill-overdue", icon: Phone };
-  if (diff <= 3) return { label: `Due in ${days(diff)}`, pill: "pill-overdue", icon: Phone };
-  if (diff <= 7) return { label: `Due in ${days(diff)}`, pill: "pill-warning", icon: AlertTriangle };
-  return { label: `Due in ${days(diff)}`, pill: "pill-neutral", icon: null };
+  // Jess: short form + ≤1 day = urgent (red). Overdue / today / tomorrow read
+  // red; everything else is a plain neutral "Nd" countdown.
+  if (diff < 0) return { label: `Overdue ${-diff}d`, pill: "pill-overdue", urgent: true };
+  if (diff === 0) return { label: "Today", pill: "pill-overdue", urgent: true };
+  if (diff === 1) return { label: "1d", pill: "pill-overdue", urgent: true };
+  return { label: `${diff}d`, pill: "pill-neutral", urgent: false };
+}
+
+/** Whether an order needs urgent attention — open (not delivered) + a deadline
+ *  ≤1 day out (today/tomorrow/overdue). Drives the top "Urgent" filter chip. */
+function isUrgentOrder(o: operationOrderListRow): boolean {
+  if (o.status === "delivered" || o.delivery_date_tbd || !o.delivery_date) return false;
+  return deadlineInfo(o.delivery_date)?.urgent ?? false;
+}
+
+/** Region bucket for the state filter chips: Klang Valley (grouped) · each
+ *  outstation state / Singapore · "Others" when undetectable. */
+const KV_LABEL = "Klang Valley";
+const OTHERS_LABEL = "Others";
+function regionBucket(address: string | null): string {
+  if (areaForAddress(address) === "KV") return KV_LABEL;
+  return detectState(address) ?? OTHERS_LABEL;
 }
 
 /** Item category short-form (Master Sheet model): core goods Mattress / Bedframe
@@ -264,14 +277,23 @@ function accShort(sku: string): string {
   return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 }
 
-/** Roll a line list up into CORE goods (Mattress/Bedframe/Sofa, qty + size) and
- *  ACCESSORIES (short type name, qty only when >1), kept separate so the list
- *  can show the furniture prominently and the add-ons muted — one-glance read.
- *  e.g. core ["2× Mattress(Q)", "1× Bedframe"], acc ["Pillow ×2", "Disposal"]. */
-function itemRollupParts(lines: { sku: string; qty: number }[]): {
-  core: string[];
-  acc: string[];
-} {
+/** Per-category colour for the item tags (Jess: box each category to avoid
+ *  misreading). Reuses the design-system pill palette so colours are guaranteed
+ *  present + consistent: Mattress blue · Bedframe amber · Sofa purple ·
+ *  accessories neutral grey. */
+const ITEM_TAG: Record<CoreCat | "acc", string> = {
+  mattress: "pill-sent",
+  bedframe: "pill-warning",
+  sofa: "pill-draft",
+  acc: "pill-neutral",
+};
+
+/** Roll a line list up into per-category TAGS (Jess: one boxed tag per
+ *  category). Core goods carry qty + size; accessories the short type name
+ *  (qty when >1). e.g. [{mattress,"2× Mattress(Q)"}, {acc,"2× Pillow"}]. */
+function itemTags(
+  lines: { sku: string; qty: number }[],
+): { cat: CoreCat | "acc"; label: string }[] {
   const core = new Map<CoreCat, { qty: number; sizes: Set<string> }>();
   const acc = new Map<string, number>();
   for (const l of lines) {
@@ -289,22 +311,20 @@ function itemRollupParts(lines: { sku: string; qty: number }[]): {
     if (sz) e.sizes.add(sz);
     core.set(cat, e);
   }
-  const coreParts: string[] = [];
+  const out: { cat: CoreCat | "acc"; label: string }[] = [];
   for (const cat of CORE_ORDER) {
     const e = core.get(cat);
     if (!e) continue;
     const sizes = e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
-    coreParts.push(`${e.qty}× ${CORE_LABEL[cat]}${sizes}`);
+    out.push({ cat, label: `${e.qty}× ${CORE_LABEL[cat]}${sizes}` });
   }
-  const accParts: string[] = [];
-  for (const [name, q] of acc) accParts.push(q > 1 ? `${name} ×${q}` : name);
-  return { core: coreParts, acc: accParts };
+  for (const [name, q] of acc) out.push({ cat: "acc", label: q > 1 ? `${q}× ${name}` : name });
+  return out;
 }
 
-/** Flat single-line rollup (CSV export + tooltips) — core then accessories. */
+/** Flat single-line rollup (CSV export + tooltips). */
 function itemRollup(lines: { sku: string; qty: number }[]): string {
-  const { core, acc } = itemRollupParts(lines);
-  return [...core, ...acc].join(" · ") || "—";
+  return itemTags(lines).map((t) => t.label).join(" · ") || "—";
 }
 
 /** Full item breakdown for the items-cell tooltip — answers "what are the +N
@@ -353,6 +373,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMenu, setBulkMenu] = useState<null | "menu" | "assign">(null);
+  // Urgent chip + state-region pills — both stack on top of the status tab.
+  const [urgentOnly, setUrgentOnly] = useState(false);
+  const [regionFilter, setRegionFilter] = useState<string | null>(null);
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -409,13 +432,46 @@ export default function OperationOrdersControl({ onImport }: Props) {
     return c;
   }, [orders]);
 
-  const visible = useMemo(() => {
-    if (tab === "all") return orders;
-    return orders.filter((o) => controlTabOf(o) === tab);
-  }, [orders, tab]);
+  // Status-tab filter first; the Urgent chip + region pills layer on top (all
+  // stackable). The chip/region counts are computed over the tab-filtered set
+  // so they reflect the current view.
+  const tabFiltered = useMemo(
+    () => (tab === "all" ? orders : orders.filter((o) => controlTabOf(o) === tab)),
+    [orders, tab],
+  );
+  const urgentCount = useMemo(() => tabFiltered.filter(isUrgentOrder).length, [tabFiltered]);
+  const regionEntries = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of tabFiltered) {
+      const b = regionBucket(o.customer_address ?? null);
+      m.set(b, (m.get(b) ?? 0) + 1);
+    }
+    const keys = [...m.keys()].sort((a, b) => {
+      if (a === KV_LABEL) return -1;
+      if (b === KV_LABEL) return 1;
+      if (a === OTHERS_LABEL) return 1;
+      if (b === OTHERS_LABEL) return -1;
+      return a.localeCompare(b);
+    });
+    return keys.map((k) => ({ region: k, count: m.get(k) ?? 0 }));
+  }, [tabFiltered]);
 
-  // Reset to the first page whenever the filtered set changes (tab/search/size).
-  useEffect(() => setPage(0), [tab, search, pageSize]);
+  const visible = useMemo(() => {
+    let r = tabFiltered;
+    if (urgentOnly) r = r.filter(isUrgentOrder);
+    if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
+    return r;
+  }, [tabFiltered, urgentOnly, regionFilter]);
+
+  // Most-recent order/import time → shown next to the count.
+  const latestIn = useMemo(() => {
+    let mx: string | null = null;
+    for (const o of orders) if (o.placed_at && (!mx || o.placed_at > mx)) mx = o.placed_at;
+    return mx;
+  }, [orders]);
+
+  // Reset to the first page whenever the filtered set changes.
+  useEffect(() => setPage(0), [tab, search, pageSize, urgentOnly, regionFilter]);
 
   const total = visible.length;
   const pageCount =
@@ -549,14 +605,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
     <div className="px-9 py-8 pb-14" data-testid="operation-orders-control">
       {/* Header — compact: title + inline count, no kicker/subtitle (Gmail-style) */}
       <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
-        <div className="flex items-baseline gap-2.5">
+        <div className="flex items-baseline gap-2.5 flex-wrap">
           <h1 className="t-h1 font-display">Orders</h1>
-          <span
-            className="text-[16px] font-medium text-base-400 tabular-nums"
-            title="Total orders"
-          >
-            {orders.length}
+          <span className="text-[14px] font-medium text-base-500 tabular-nums">
+            {orders.length} orders
           </span>
+          {latestIn && (
+            <span className="text-[12px] text-base-400" title="Most recent order / import">
+              · last in {fmtDateShort(latestIn)}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2.5">
           <input
@@ -578,42 +636,70 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </div>
       </div>
 
-      {/* Status tabs */}
-      <div
-        className="flex gap-1 p-1 bg-base-100 rounded mb-3.5 w-fit max-w-full overflow-auto"
-        role="tablist"
-        aria-label="Order status"
-      >
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(t.key)}
-              title={
-                t.key === "all"
-                  ? "Every active order"
-                  : TAB_DESC[t.key as SettledTab]
-              }
-              className={`px-3 py-1.5 text-[12px] rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                active
-                  ? "bg-white text-base-900 font-semibold shadow-sm"
-                  : "text-base-600 font-medium hover:text-base-900"
-              }`}
-            >
-              <span>{t.label}</span>
-              <span
-                className={`text-[10px] font-mono px-1.5 py-px rounded-full ${
-                  active ? "bg-base-100 text-base-700" : "bg-base-200 text-base-500"
+      {/* Status tabs (tier-coloured counts) + the Urgent chip */}
+      <div className="flex items-center gap-3 mb-2.5 flex-wrap">
+        <div
+          className="flex gap-1 p-1 bg-base-100 rounded w-fit max-w-full overflow-auto"
+          role="tablist"
+          aria-label="Order status"
+        >
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            const pill = t.key === "all" ? "pill-neutral" : TAB_PILL[t.key as SettledTab];
+            return (
+              <button
+                key={t.key}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(t.key)}
+                title={t.key === "all" ? "Every active order" : TAB_DESC[t.key as SettledTab]}
+                className={`px-3 py-1.5 text-[12px] rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  active
+                    ? "bg-white text-base-900 font-semibold shadow-sm"
+                    : "text-base-600 font-medium hover:text-base-900"
                 }`}
               >
-                {counts[t.key]}
-              </span>
-            </button>
-          );
-        })}
+                <span>{t.label}</span>
+                <span className={`pill ${pill} text-[10px] px-1.5 py-0`}>{counts[t.key]}</span>
+              </button>
+            );
+          })}
+        </div>
+        {urgentCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setUrgentOnly((v) => !v)}
+            title="Due within 1 day (today / tomorrow) or overdue"
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[12px] font-semibold transition-colors ${
+              urgentOnly
+                ? "bg-destructive text-white"
+                : "border border-destructive/40 text-destructive hover:bg-destructive/5"
+            }`}
+          >
+            <AlertTriangle size={13} strokeWidth={2.5} /> Urgent {urgentCount}
+          </button>
+        )}
+      </div>
+
+      {/* State-region filter pills (Jess: pick a state → select-all → assign
+          logistic). Stacks with the status tab + Urgent chip above. */}
+      <div className="flex items-center gap-1.5 mb-3.5 flex-wrap">
+        <span className="text-[11px] font-medium text-base-400 mr-0.5">Region</span>
+        <RegionChip
+          label="All"
+          count={tabFiltered.length}
+          active={regionFilter === null}
+          onClick={() => setRegionFilter(null)}
+        />
+        {regionEntries.map((e) => (
+          <RegionChip
+            key={e.region}
+            label={e.region}
+            count={e.count}
+            active={regionFilter === e.region}
+            onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+          />
+        ))}
       </div>
 
       {/* Toolbar: bulk-action bar when rows are selected, else the pager. */}
@@ -870,6 +956,36 @@ function BulkMenuItem({
   );
 }
 
+/** State-region filter pill (Klang Valley / each state / Others) + its count. */
+function RegionChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11.5px] transition-colors ${
+        active
+          ? "bg-base-900 text-white font-semibold"
+          : "bg-base-100 text-base-600 font-medium hover:bg-base-200"
+      }`}
+    >
+      {label}
+      <span className={`text-[10px] tabular-nums ${active ? "text-white/70" : "text-base-400"}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
 function OrderRow({
   o,
   partnerName,
@@ -889,7 +1005,7 @@ function OrderRow({
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
   const qtyTotal = lines.reduce((s, l) => s + Number(l.qty || 0), 0);
-  const { core, acc } = itemRollupParts(lines);
+  const tags = itemTags(lines);
   const stock = stockReadiness(o, availableBySku);
   const loc = locationForAddress(o.customer_address ?? null);
 
@@ -933,20 +1049,20 @@ function OrderRow({
           {o.customer_name || "—"}
         </div>
       </td>
-      {/* Items — one-glance: total units headline, then a single breakdown line
-          with core furniture dark + accessories muted (tooltip = full list). */}
+      {/* Items — total-units headline + one boxed colour tag per category
+          (Mattress blue · Bedframe amber · Sofa purple · accessories grey) so
+          nothing gets misread. Tooltip = full SKU list. */}
       <td className="px-4 py-2.5">
         <div className="text-base-900 font-semibold">
           {qtyTotal} unit{qtyTotal === 1 ? "" : "s"}
         </div>
-        {(core.length > 0 || acc.length > 0) && (
-          <div
-            className="text-[11.5px] leading-snug max-w-[260px] truncate mt-0.5"
-            title={itemBreakdown(lines)}
-          >
-            {core.length > 0 && <span className="text-base-700">{core.join(" · ")}</span>}
-            {core.length > 0 && acc.length > 0 && <span className="text-base-300"> · </span>}
-            {acc.length > 0 && <span className="text-base-400">{acc.join(" · ")}</span>}
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1 max-w-[300px]" title={itemBreakdown(lines)}>
+            {tags.map((t, i) => (
+              <span key={i} className={`pill ${ITEM_TAG[t.cat]} text-[10px] px-1.5 py-0`}>
+                {t.label}
+              </span>
+            ))}
           </div>
         )}
       </td>
@@ -966,8 +1082,10 @@ function OrderRow({
               <div className="flex flex-col items-start gap-1">
                 <div className="text-[12px] text-base-700">{fmtDate(o.delivery_date)}</div>
                 {dl && (
-                  <span className={`pill ${dl.pill} inline-flex items-center gap-1 whitespace-nowrap`}>
-                    {dl.icon && <dl.icon size={11} strokeWidth={2.5} />}
+                  <span
+                    className={`pill ${dl.pill} whitespace-nowrap ${dl.urgent ? "inline-flex items-center gap-1" : ""}`}
+                  >
+                    {dl.urgent && <AlertTriangle size={11} strokeWidth={2.5} />}
                     {dl.label}
                   </span>
                 )}
