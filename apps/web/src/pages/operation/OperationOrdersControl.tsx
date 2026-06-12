@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   useOperationOrders,
@@ -78,6 +78,19 @@ const TAB_LABEL: Record<SettledTab, string> = {
   scheduled: "Scheduled",
   completed: "Completed",
 };
+
+/** Plain-English meaning of each pipeline status — surfaced as a hover tooltip
+ *  on the tabs + the row Status chip so operation doesn't have to guess what
+ *  "Proceed" means. */
+const TAB_DESC: Record<SettledTab, string> = {
+  placed: "New order, not processed yet (a salesperson placed it)",
+  proceed: "Confirmed — being arranged. Every AutoCount-imported order starts here.",
+  pending: "PO raised — waiting for stock to arrive at the warehouse",
+  scheduled: "Stock secured — delivery partner assigned / out for delivery",
+  completed: "Delivered and closed",
+};
+
+const PAGE_SIZES = [50, 100] as const;
 
 /** Stage derivation — mirrors OperationOrders.stageOf so the two surfaces never
  *  disagree on where an order sits in the pipeline. */
@@ -241,8 +254,15 @@ function itemRollup(lines: { sku: string; qty: number }[]): string {
     const sizes = e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
     parts.push(`${e.qty}× ${CORE_LABEL[cat]}${sizes}`);
   }
-  if (accQty > 0) parts.push(`+${accQty} acc`);
+  if (accQty > 0)
+    parts.push(`+${accQty} ${accQty === 1 ? "accessory" : "accessories"}`);
   return parts.join(" · ") || "—";
+}
+
+/** Full item breakdown for the items-cell tooltip — answers "what are the +N
+ *  accessories" on hover without cluttering the row. */
+function itemBreakdown(lines: { sku: string; qty: number }[]): string {
+  return lines.map((l) => `${l.sku} ×${l.qty}`).join("\n");
 }
 
 /** Old kanban stage slug (still produced by hand-typed `/operation/orders/:stage`
@@ -280,6 +300,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState<number | "all">(50);
+  const [page, setPage] = useState(0);
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -325,6 +347,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (tab === "all") return orders;
     return orders.filter((o) => controlTabOf(o) === tab);
   }, [orders, tab]);
+
+  // Reset to the first page whenever the filtered set changes (tab/search/size).
+  useEffect(() => setPage(0), [tab, search, pageSize]);
+
+  const total = visible.length;
+  const pageCount =
+    pageSize === "all" ? 1 : Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = useMemo(() => {
+    if (pageSize === "all") return visible;
+    const start = safePage * pageSize;
+    return visible.slice(start, start + pageSize);
+  }, [visible, pageSize, safePage]);
+  const rangeStart = total === 0 ? 0 : safePage * (pageSize === "all" ? total : pageSize) + 1;
+  const rangeEnd = pageSize === "all" ? total : Math.min(total, (safePage + 1) * pageSize);
 
   if (isLoading) {
     return (
@@ -404,6 +441,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
               role="tab"
               aria-selected={active}
               onClick={() => setTab(t.key)}
+              title={
+                t.key === "all"
+                  ? "Every active order"
+                  : TAB_DESC[t.key as SettledTab]
+              }
               className={`px-3 py-1.5 text-[12px] rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                 active
                   ? "bg-white text-base-900 font-semibold shadow-sm"
@@ -442,7 +484,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             </tr>
           </thead>
           <tbody>
-            {visible.length === 0 && (
+            {total === 0 && (
               <tr>
                 <td
                   colSpan={8}
@@ -452,7 +494,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 </td>
               </tr>
             )}
-            {visible.map((o) => (
+            {paged.map((o) => (
               <OrderRow
                 key={o.id}
                 o={o}
@@ -464,6 +506,67 @@ export default function OperationOrdersControl({ onImport }: Props) {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination — page-size + range + prev/next, so the list never dumps all
+          155 rows at once. */}
+      {total > 0 && (
+        <div className="flex items-center justify-between gap-3 mt-3 flex-wrap text-[12px] text-base-600">
+          <div className="flex items-center gap-2">
+            <span>Rows per page</span>
+            {PAGE_SIZES.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setPageSize(n)}
+                className={`px-2 py-1 rounded border text-[11px] ${
+                  pageSize === n
+                    ? "border-primary text-primary font-semibold bg-primary/5"
+                    : "border-base-200 text-base-600 hover:border-base-400"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPageSize("all")}
+              className={`px-2 py-1 rounded border text-[11px] ${
+                pageSize === "all"
+                  ? "border-primary text-primary font-semibold bg-primary/5"
+                  : "border-base-200 text-base-600 hover:border-base-400"
+              }`}
+            >
+              All
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="tabular-nums">
+              {rangeStart}–{rangeEnd} of {total}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={pageSize === "all" || safePage <= 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="px-2 py-1 rounded border border-base-200 text-[11px] disabled:opacity-40 hover:border-base-400"
+              >
+                ‹ Prev
+              </button>
+              <span className="tabular-nums text-[11px] text-base-500">
+                {safePage + 1}/{pageCount}
+              </span>
+              <button
+                type="button"
+                disabled={pageSize === "all" || safePage >= pageCount - 1}
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                className="px-2 py-1 rounded border border-base-200 text-[11px] disabled:opacity-40 hover:border-base-400"
+              >
+                Next ›
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {openOrderId && (
         <OrderDetailDrawer
@@ -535,7 +638,10 @@ function OrderRow({
           {qtyTotal} unit{qtyTotal === 1 ? "" : "s"}
         </div>
         {lines.length > 0 && (
-          <div className="text-[10.5px] text-base-600 mt-0.5 leading-snug max-w-[230px] truncate">
+          <div
+            className="text-[10.5px] text-base-600 mt-0.5 leading-snug max-w-[230px] truncate"
+            title={itemBreakdown(lines)}
+          >
             {itemRollup(lines)}
           </div>
         )}
@@ -614,6 +720,7 @@ function OrderRow({
       {/* Status */}
       <td className="px-4 py-3 whitespace-nowrap">
         <span
+          title={TAB_DESC[ct]}
           className={`inline-block text-[9px] font-bold uppercase tracking-[0.12em] py-[3px] px-[7px] border rounded-[3px] ${TAB_CHIP[ct].text} ${TAB_CHIP[ct].border}`}
         >
           {TAB_LABEL[ct]}

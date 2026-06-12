@@ -436,7 +436,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
     expect(
-      within(row).getByText("2× Mattress(Q) · 1× Bedframe · +3 acc"),
+      within(row).getByText("2× Mattress(Q) · 1× Bedframe · +3 accessories"),
     ).toBeInTheDocument();
   });
 
@@ -482,5 +482,33 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // 2-day-out deadline → "2d 📞" contact-window cue
     const row = screen.getByTestId("order-row");
     expect(within(row).getByText("2d 📞")).toBeInTheDocument();
+  });
+
+  it("paginates — 50/page by default, Next + the 100 size button work", () => {
+    listHookState.data = {
+      orders: Array.from({ length: 120 }, (_, i) =>
+        makeRow({ id: `p${i}`, so: 4000 + i }),
+      ),
+    };
+    wrap(<OperationOrdersControl />);
+    expect(screen.getByText(/1.50 of 120/)).toBeInTheDocument();
+    expect(screen.getAllByTestId("order-row")).toHaveLength(50);
+
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
+    expect(screen.getByText(/51.100 of 120/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "100" }));
+    expect(screen.getByText(/1.100 of 120/)).toBeInTheDocument();
+    expect(screen.getAllByTestId("order-row")).toHaveLength(100);
+  });
+
+  it("gives each status tab a plain-English tooltip (legend)", () => {
+    oneRow({ id: "lg", so: 5001 });
+    wrap(<OperationOrdersControl />);
+    const proceedTab = screen.getByRole("tab", { name: /Proceed/ });
+    expect(proceedTab).toHaveAttribute(
+      "title",
+      expect.stringContaining("Confirmed"),
+    );
   });
 });
