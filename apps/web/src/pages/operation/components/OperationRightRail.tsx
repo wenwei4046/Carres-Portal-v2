@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, StickyNote, ListTodo, X, type LucideIcon } from "lucide-react";
+import { CalendarDays, Lightbulb, SquareCheck, X, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { OpsTask } from "@carres/shared";
 import CalendarPanel from "./rail/CalendarPanel";
@@ -14,10 +14,12 @@ import TasksPanel, { TASKS_KEY } from "./rail/TasksPanel";
  * 60-min SLA) so the team is nudged to take action within the hour.
  */
 type Panel = "calendar" | "keep" | "tasks";
-const TABS: { key: Panel; label: string; icon: LucideIcon }[] = [
-  { key: "calendar", label: "Calendar", icon: CalendarDays },
-  { key: "keep", label: "Notes", icon: StickyNote },
-  { key: "tasks", label: "Tasks", icon: ListTodo },
+// Gmail-style icons + per-app active colour (v17 tokens): Calendar blue,
+// Keep amber, Tasks blue — mirrors Google's side rail.
+const TABS: { key: Panel; label: string; icon: LucideIcon; active: string }[] = [
+  { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
+  { key: "keep", label: "Notes", icon: Lightbulb, active: "bg-warning-soft text-warning" },
+  { key: "tasks", label: "Tasks", icon: SquareCheck, active: "bg-info-soft text-info" },
 ];
 
 export default function OperationRightRail() {
@@ -69,7 +71,7 @@ export default function OperationRightRail() {
               title={t.label}
               aria-label={t.label}
               className={`relative w-9 h-9 rounded-full grid place-items-center transition-colors ${
-                isActive ? "bg-primary/10 text-primary" : "text-base-500 hover:bg-base-100"
+                isActive ? t.active : "text-base-500 hover:bg-base-100"
               }`}
             >
               <t.icon size={18} strokeWidth={2} />

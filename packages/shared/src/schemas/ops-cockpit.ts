@@ -24,6 +24,7 @@ export const opsNoteSchema = z.object({
   content: z.string(),
   color: z.string().nullable(),
   pinned: z.boolean(),
+  archived: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -47,6 +48,7 @@ export const updateOpsNoteInputSchema = z.object({
   content: z.string().optional(),
   color: z.string().trim().nullable().optional(),
   pinned: z.boolean().optional(),
+  archived: z.boolean().optional(),
 });
 export type UpdateOpsNoteInput = z.infer<typeof updateOpsNoteInputSchema>;
 

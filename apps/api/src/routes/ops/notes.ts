@@ -21,9 +21,11 @@ const notesRouter = new Hono<AppEnv>();
 
 notesRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+  const archived = c.req.query("archived") === "true";
   const { data, error } = await sb
     .from("ops_notes")
     .select("*")
+    .eq("archived", archived)
     .order("pinned", { ascending: false })
     .order("updated_at", { ascending: false });
   if (error) throw new HTTPException(500, { message: error.message });
@@ -58,6 +60,7 @@ notesRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
   if (parsed.content !== undefined) patch.content = parsed.content;
   if (parsed.color !== undefined) patch.color = parsed.color;
   if (parsed.pinned !== undefined) patch.pinned = parsed.pinned;
+  if (parsed.archived !== undefined) patch.archived = parsed.archived;
   const { data, error } = await sb
     .from("ops_notes")
     .update(patch)
@@ -86,6 +89,7 @@ interface RawNote {
   content: string;
   color: string | null;
   pinned: boolean;
+  archived: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -99,6 +103,7 @@ function shape(r: RawNote) {
     content: r.content,
     color: r.color,
     pinned: r.pinned,
+    archived: r.archived,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
