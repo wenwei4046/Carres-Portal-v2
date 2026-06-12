@@ -238,7 +238,8 @@ describe("OperationOrdersControl", () => {
       .find((r) => r.textContent?.includes("SO-1002"))!;
     // 2 + 1 = 3 goods units across 2 lines — bold "3" on the left
     expect(within(row).getByText("3")).toBeInTheDocument();
-    expect(within(row).getByText("CR0418")).toBeInTheDocument();
+    // the CR/TCF ref moved into the Order ID cell tooltip (P2)
+    expect(row.querySelector('td[title*="CR0418"]')).toBeTruthy();
   });
 
   it("resolves the triage LP (ops_assigned_logistic) via the partners map", () => {
@@ -444,15 +445,29 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("2× MS(Q)").className).toContain("text-base-900");
     expect(within(row).getByText("1× BF").className).toContain("text-base-900");
     expect(within(row).getByText("3× Pillow").className).toContain("text-base-600");
-    expect(within(row).getByText("M.P").className).toContain("text-base-600");
-    expect(within(row).getByText("Disposal").className).toContain("text-base-400");
+    expect(within(row).getByText("1× M.P").className).toContain("text-base-600");
+    expect(within(row).getByText("1× Disposal").className).toContain("text-base-400");
     // Two-line layout: core tags sit in a different flex row from acc/service.
     const coreRow = within(row).getByText("2× MS(Q)").parentElement;
     expect(coreRow).toBe(within(row).getByText("1× BF").parentElement);
     expect(coreRow).not.toBe(within(row).getByText("3× Pillow").parentElement);
     expect(within(row).getByText("3× Pillow").parentElement).toBe(
-      within(row).getByText("Disposal").parentElement,
+      within(row).getByText("1× Disposal").parentElement,
     );
+  });
+
+  it("always shows qty on accessory/service tags — even a lone qty-1 accessory (P1)", () => {
+    oneRow({
+      id: "p1",
+      so: 3011,
+      order_lines: [{ sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }],
+    });
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    // No qty-1 exemption: "1× M.P", never a bare "M.P" (only core keeps the
+    // single-category de-dup).
+    expect(within(row).getByText("1× M.P")).toBeInTheDocument();
+    expect(within(row).queryByText("M.P")).not.toBeInTheDocument();
   });
 
   it("drops the duplicated qty inside the tag on single-category orders (A1)", () => {
@@ -467,6 +482,57 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("2")).toBeInTheDocument();
     expect(within(row).getByText("SOF")).toBeInTheDocument();
     expect(within(row).queryByText("2× SOF")).not.toBeInTheDocument();
+  });
+
+  it("orders columns Status → Order ID → Deadline → Location → Logistic → Items → Stock with the customer under the SO (P2)", () => {
+    oneRow({
+      id: "p2",
+      so: 3012,
+      customer_name: "Tan Ah Kow",
+      customer_phone: "012-3456789",
+      source_ref: ["TCF2024/06-461"],
+    });
+    wrap(<OperationOrdersControl />);
+    const head = within(screen.getByRole("table")).getAllByRole("columnheader");
+    expect(head.map((h) => h.textContent)).toEqual([
+      "", // select-all checkbox
+      "Status",
+      "Order ID",
+      "Deadline",
+      "Location",
+      "Logistic",
+      "Items",
+      "Stock",
+    ]);
+    // Customer column is gone — the name renders INSIDE the Order ID cell.
+    const row = screen.getByTestId("order-row");
+    const idCell = within(row).getByText("SO-3012").closest("td")!;
+    expect(within(idCell as HTMLElement).getByText("Tan Ah Kow")).toBeInTheDocument();
+    // TCF ref + phone live in the cell tooltip, not as visible row text.
+    expect(idCell).toHaveAttribute("title", "TCF2024/06-461 · 012-3456789");
+    expect(within(row).queryByText("TCF2024/06-461")).not.toBeInTheDocument();
+  });
+
+  it("sorts by deadline ascending — overdue/earliest first, TBD + undated last (P3)", () => {
+    listHookState.data = {
+      orders: [
+        makeRow({ id: "s1", so: 6001, delivery_date: "2026-07-01", placed_at: "2026-06-01T00:00:00Z" }),
+        makeRow({ id: "s2", so: 6002, delivery_date: "2026-05-30", placed_at: "2026-06-02T00:00:00Z" }),
+        makeRow({ id: "s3", so: 6003, delivery_date: null, placed_at: "2026-06-03T00:00:00Z" }),
+        makeRow({
+          id: "s4",
+          so: 6004,
+          delivery_date: "2026-06-20",
+          delivery_date_tbd: true,
+          placed_at: "2026-06-04T00:00:00Z",
+        }),
+        makeRow({ id: "s5", so: 6005, delivery_date: "2026-06-15", placed_at: "2026-06-05T00:00:00Z" }),
+      ],
+    };
+    wrap(<OperationOrdersControl />);
+    // Dated rows ascend (5/30 → 6/15 → 7/1); the TBD + undated tail keeps the
+    // old newest-placed-first order (s4 placed 6/4 → s3 placed 6/3).
+    expect(rowsBySo()).toEqual(["6002", "6005", "6001", "6004", "6003"]);
   });
 
   it("shows the real delivery location for outstation + a 📞 flag, NOT the word 'Outstation' (A2/A4)", () => {

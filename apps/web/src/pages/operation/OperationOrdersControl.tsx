@@ -225,6 +225,21 @@ function isUrgentOrder(o: operationOrderListRow): boolean {
   return deadlineInfo(o.delivery_date)?.urgent ?? false;
 }
 
+/** Default sort — deadline ASCENDING (Jess P3): overdue/earliest first so the
+ *  table reads as a work queue. TBD + undated sink to the bottom; within that
+ *  tail (and on date ties) newest placed_at first, the old list default. */
+function compareByDeadline(
+  a: operationOrderListRow,
+  b: operationOrderListRow,
+): number {
+  const da = !a.delivery_date_tbd && a.delivery_date ? a.delivery_date : null;
+  const db = !b.delivery_date_tbd && b.delivery_date ? b.delivery_date : null;
+  if (da && db && da !== db) return da < db ? -1 : 1; // ISO dates compare lexically
+  if (da && !db) return -1;
+  if (!da && db) return 1;
+  return (b.placed_at ?? "").localeCompare(a.placed_at ?? "");
+}
+
 /** Region bucket for the state filter chips: Klang Valley (grouped) · each
  *  outstation state / Singapore · "Others" when undetectable. */
 const KV_LABEL = "Klang Valley";
@@ -349,9 +364,10 @@ function itemTags(
   return out;
 }
 
-/** Tag display label — qty-prefixed, except qty-1 accessories/services. */
+/** Tag display label — ALWAYS qty-prefixed ("1× M.P", "2× Disposal"), no qty-1
+ *  exemption (Jess P1: the standard format). The only bare tag is the
+ *  single-category CORE de-dup, decided at render time. */
 function tagLabel(t: { kind: ItemKind; qty: number; name: string }): string {
-  if (t.kind !== "core" && t.qty === 1) return t.name;
   return `${t.qty}× ${t.name}`;
 }
 
@@ -500,7 +516,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     let r = tabFiltered;
     if (urgentOnly) r = r.filter(isUrgentOrder);
     if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
-    return r;
+    return [...r].sort(compareByDeadline);
   }, [tabFiltered, urgentOnly, regionFilter]);
 
   // Most-recent order/import time → shown next to the count.
@@ -811,21 +827,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   className="cursor-pointer accent-base-900 align-middle"
                 />
               </th>
+              <Th>Status</Th>
               <Th>Order ID</Th>
-              <Th>Customer</Th>
-              <Th>Items</Th>
               <Th>Deadline</Th>
               <Th>Location</Th>
-              <Th>Stock</Th>
               <Th>Logistic</Th>
-              <Th>Status</Th>
+              <Th>Items</Th>
+              <Th>Stock</Th>
             </tr>
           </thead>
           <tbody>
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={8}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1100,60 +1115,24 @@ function OrderRow({
           className="cursor-pointer accent-base-900 align-middle"
         />
       </td>
-      {/* Ref */}
+      {/* Status — leads the row (Jess P2 column order) */}
       <td className="px-4 py-2.5 whitespace-nowrap">
-        <div className="font-mono font-semibold text-base-900">SO-{o.so}</div>
-        {ref.length > 0 && (
-          <div className="font-mono text-[10.5px] text-base-500 mt-0.5">
-            {ref.join(" + ")}
-          </div>
-        )}
+        <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
+          {TAB_LABEL[ct]}
+        </span>
       </td>
-      {/* Customer — name only; phone lives in the drawer (Jess: save list space) */}
-      <td className="px-4 py-2.5">
+      {/* Order ID — SO number with the customer name UNDER it (P2: Customer
+          column folded in; TCF/CR ref + phone live in the tooltip + drawer). */}
+      <td
+        className="px-4 py-2.5 whitespace-nowrap"
+        title={[ref.join(" + "), o.customer_phone].filter(Boolean).join(" · ") || undefined}
+      >
+        <div className="font-mono font-semibold text-base-900">SO-{o.so}</div>
         <div
-          className={`${cjkClassName(o.customer_name)} font-medium text-base-900`}
+          className={`${cjkClassName(o.customer_name)} text-[12px] font-medium text-base-700 max-w-[200px] truncate mt-0.5`}
         >
           {o.customer_name || "—"}
         </div>
-      </td>
-      {/* Items — Master-Sheet style: goods-unit total as a bold number in a
-          fixed-width LEFT slot (service lines don't count; digits + tags align
-          down the column), then TWO tag lines (Jess): line 1 = core goods
-          (MS/BF/SOF), line 2 = accessories + services. Monochrome tiers by ink
-          depth. Single-category orders drop the qty inside the tag — the left
-          number already says it ("1 [SOF]"). Tooltip = full SKU list. */}
-      <td className="px-4 py-2.5">
-        {lines.length === 0 ? (
-          <span className="text-base-400">—</span>
-        ) : (
-          <div className="flex items-start gap-2">
-            <span
-              className={`min-w-[20px] text-right text-[15px] font-semibold tabular-nums leading-snug whitespace-nowrap ${
-                qtyTotal === 0 ? "text-base-400" : "text-base-900"
-              }`}
-              title={`${qtyTotal} goods unit${qtyTotal === 1 ? "" : "s"} (services not counted)`}
-            >
-              {qtyTotal}
-            </span>
-            <div
-              className="flex flex-col gap-1 max-w-[280px] pt-0.5"
-              title={itemBreakdown(lines)}
-            >
-              {[tags.filter((t) => t.kind === "core"), tags.filter((t) => t.kind !== "core")]
-                .filter((row) => row.length > 0)
-                .map((row, ri) => (
-                  <div key={ri} className="flex flex-wrap gap-1">
-                    {row.map((t, i) => (
-                      <span key={i} className={`pill ${ITEM_TAG[t.kind]} text-[10px] px-1.5 py-0`}>
-                        {tags.length === 1 && t.qty === qtyTotal ? t.name : tagLabel(t)}
-                      </span>
-                    ))}
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
       </td>
       {/* Deadline — customer's requested delivery date + prep-milestone countdown.
           Tooltip spells out the SOP: stock at WH 7 days before, logistic
@@ -1215,10 +1194,6 @@ function OrderRow({
           <span className="text-base-400">—</span>
         )}
       </td>
-      {/* Stock */}
-      <td className="px-4 py-2.5 whitespace-nowrap">
-        <StockCell info={stock} />
-      </td>
       {/* Logistic */}
       <td className="px-4 py-2.5 whitespace-nowrap">
         {logistic ? (
@@ -1229,11 +1204,50 @@ function OrderRow({
           <span className="text-base-400">—</span>
         )}
       </td>
-      {/* Status */}
+      {/* Items — Master-Sheet style: goods-unit total as a bold number in a
+          fixed-width LEFT slot (service lines don't count; digits + tags align
+          down the column), then TWO tag lines (Jess): line 1 = core goods
+          (MS/BF/SOF), line 2 = accessories + services. Monochrome tiers by ink
+          depth. Single-category CORE orders drop the qty inside the tag — the
+          left number already says it ("1 [SOF]") — but acc/service tags always
+          carry qty (P1). Tooltip = full SKU list. */}
+      <td className="px-4 py-2.5">
+        {lines.length === 0 ? (
+          <span className="text-base-400">—</span>
+        ) : (
+          <div className="flex items-start gap-2">
+            <span
+              className={`min-w-[20px] text-right text-[15px] font-semibold tabular-nums leading-snug whitespace-nowrap ${
+                qtyTotal === 0 ? "text-base-400" : "text-base-900"
+              }`}
+              title={`${qtyTotal} goods unit${qtyTotal === 1 ? "" : "s"} (services not counted)`}
+            >
+              {qtyTotal}
+            </span>
+            <div
+              className="flex flex-col gap-1 max-w-[280px] pt-0.5"
+              title={itemBreakdown(lines)}
+            >
+              {[tags.filter((t) => t.kind === "core"), tags.filter((t) => t.kind !== "core")]
+                .filter((row) => row.length > 0)
+                .map((row, ri) => (
+                  <div key={ri} className="flex flex-wrap gap-1">
+                    {row.map((t, i) => (
+                      <span key={i} className={`pill ${ITEM_TAG[t.kind]} text-[10px] px-1.5 py-0`}>
+                        {t.kind === "core" && tags.length === 1 && t.qty === qtyTotal
+                          ? t.name
+                          : tagLabel(t)}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </td>
+      {/* Stock */}
       <td className="px-4 py-2.5 whitespace-nowrap">
-        <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
-          {TAB_LABEL[ct]}
-        </span>
+        <StockCell info={stock} />
       </td>
     </tr>
   );
