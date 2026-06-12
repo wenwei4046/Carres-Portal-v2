@@ -483,9 +483,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header renamed
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // 2-day-out deadline → "2d 📞" contact-window cue
+    // 2-day-out deadline → "2d" + a Phone icon contact-window cue
     const row = screen.getByTestId("order-row");
-    expect(within(row).getByText("2d 📞")).toBeInTheDocument();
+    expect(within(row).getByText("2d")).toBeInTheDocument();
   });
 
   it("paginates — 50/page by default, Next + the 100 size button work", () => {

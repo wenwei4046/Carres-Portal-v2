@@ -7,6 +7,7 @@ import {
   type MovementsFilters,
 } from "@/lib/queries";
 import type { ProductCategory, ProductSkuDto } from "@carres/shared";
+import { Download, ArrowUp, ArrowDown } from "lucide-react";
 
 /**
  * OperationMovements — HQ stock-in/out history with KPIs + period chips +
@@ -61,11 +62,11 @@ const PERIOD_CHIPS: { key: NonNullable<MovementsFilters["period"]>; label: strin
   { key: "custom", label: "Custom…" },
 ];
 
-const CATEGORY_OPTIONS: { key: "all" | ProductCategory; label: string; icon: string }[] = [
-  { key: "all", label: "All categories", icon: "" },
-  { key: "mattress", label: "Mattress", icon: "▭" },
-  { key: "bedframe", label: "Bed frame", icon: "▤" },
-  { key: "sofa", label: "Sofa", icon: "▦" },
+const CATEGORY_OPTIONS: { key: "all" | ProductCategory; label: string }[] = [
+  { key: "all", label: "All categories" },
+  { key: "mattress", label: "Mattress" },
+  { key: "bedframe", label: "Bed frame" },
+  { key: "sofa", label: "Sofa" },
 ];
 
 /** Convert a YYYY-MM-DD date input value into an ISO datetime string.
@@ -338,7 +339,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
             className="btn-secondary text-[12px] py-2 px-3.5"
             data-testid="movements-export-csv"
           >
-            ↓ Export CSV
+            <Download size={14} strokeWidth={2} className="inline -mt-px mr-1.5" />Export CSV
           </button>
           <button
             type="button"
@@ -374,8 +375,8 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           style={{ border: "1px solid rgba(50,120,80,.4)" }}
           data-testid="movements-kpi-in"
         >
-          <div className="label" style={{ color: "var(--success)" }}>
-            ↑ Stock in
+          <div className="label flex items-center gap-1" style={{ color: "var(--success)" }}>
+            <ArrowUp size={12} strokeWidth={2.5} /> Stock in
           </div>
           <div
             className="font-mono text-[28px] font-semibold mt-0.5 leading-none"
@@ -392,8 +393,8 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           style={{ border: "1px solid rgba(214,79,32,.4)" }}
           data-testid="movements-kpi-out"
         >
-          <div className="label" style={{ color: "var(--terracotta)" }}>
-            ↓ Stock out
+          <div className="label flex items-center gap-1" style={{ color: "var(--terracotta)" }}>
+            <ArrowDown size={12} strokeWidth={2.5} /> Stock out
           </div>
           <div
             className="font-mono text-[28px] font-semibold mt-0.5 leading-none"
@@ -563,7 +564,6 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
         >
           {CATEGORY_OPTIONS.map((c) => (
             <option key={c.key} value={c.key}>
-              {c.icon ? `${c.icon} ` : ""}
               {c.label}
             </option>
           ))}

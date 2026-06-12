@@ -3,6 +3,16 @@ import { useAuth } from "@/lib/auth";
 import CarresLockup from "@/components/CarresLockup";
 import NavBadge from "@/components/NavBadge";
 import { useOperationBadges, useMarkOperationBadgeSeen } from "@/lib/queries";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  ShoppingCart,
+  PackageCheck,
+  Boxes,
+  BookOpen,
+  LifeBuoy,
+  type LucideIcon,
+} from "lucide-react";
 
 /**
  * operation sidebar — Jess redesign 2026-06-08.
@@ -28,7 +38,7 @@ interface Section {
   /** stable id for expand state (top-level row) */
   id: string;
   label: string;
-  icon: string;
+  icon: LucideIcon;
   /** leaf section: a single routing key; parent section: children */
   key?: string;
   children?: Leaf[];
@@ -41,7 +51,7 @@ interface Section {
 }
 
 const SECTIONS: Section[] = [
-  { id: "dashboard", label: "Dashboard", icon: "◆", key: "dashboard" },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
   {
     // Jess redesign step 2 — Orders is now ONE control table
     // (OperationOrdersControl). Status filtering (Placed/Proceed/Pending/
@@ -51,7 +61,7 @@ const SECTIONS: Section[] = [
     // mounts.
     id: "orders",
     label: "Orders",
-    icon: "▣",
+    icon: ClipboardList,
     key: "orders",
     badge: "orders",
     extraKeys: ["ops-import", "ops-inbox", "all-orders"],
@@ -62,7 +72,7 @@ const SECTIONS: Section[] = [
     // moved to Receiving (it counts POs ready to RECEIVE, not to create).
     id: "purchase-order",
     label: "Purchase Order",
-    icon: "▦",
+    icon: ShoppingCart,
     key: "procurement",
   },
   {
@@ -70,7 +80,7 @@ const SECTIONS: Section[] = [
     // procurement badge (POs ready to receive) + clicking it marks that seen.
     id: "receiving",
     label: "Receiving",
-    icon: "↓",
+    icon: PackageCheck,
     key: "receiving",
     badge: "procurement",
   },
@@ -84,7 +94,7 @@ const SECTIONS: Section[] = [
     // `warehouse`. extraKeys keeps the Stock highlight when any mount.
     id: "stock",
     label: "Stock",
-    icon: "□",
+    icon: Boxes,
     children: [
       { key: "stock-onhand", label: "On Hand" },
       { key: "movements", label: "Movements" },
@@ -101,7 +111,7 @@ const SECTIONS: Section[] = [
   {
     id: "catalog",
     label: "Catalog",
-    icon: "▭",
+    icon: BookOpen,
     children: [
       { key: "catalog", label: "SKU" },
       { key: "suppliers", label: "Suppliers" },
@@ -110,7 +120,7 @@ const SECTIONS: Section[] = [
   {
     id: "cases",
     label: "Cases",
-    icon: "✎",
+    icon: LifeBuoy,
     badge: "service-notes",
     children: [{ key: "service-notes", label: "Service Notes" }],
   },
@@ -203,13 +213,13 @@ export default function OperationSidebar({ active, onChange }: Props) {
                     style={{ width: 3 }}
                   />
                 )}
-                <span
-                  className={`w-4 text-center text-[13px] ${
+                <s.icon
+                  size={17}
+                  strokeWidth={2}
+                  className={`shrink-0 ${
                     isActiveSection ? "text-primary" : "text-base-400"
                   }`}
-                >
-                  {s.icon}
-                </span>
+                />
                 <span className="flex-1">{s.label}</span>
                 {s.badge && <NavBadge count={badgeCount[s.badge] ?? 0} label={s.label} />}
               </button>

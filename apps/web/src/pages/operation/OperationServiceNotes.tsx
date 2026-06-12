@@ -10,6 +10,7 @@ import {
   type SnStage,
 } from "@carres/shared";
 import ServiceNoteModal from "./components/ServiceNoteModal";
+import { AlertTriangle } from "lucide-react";
 
 /**
  * Operation Service Notes — Issue Tracker.
@@ -181,7 +182,13 @@ export default function OperationServiceNotes() {
                       {r.deadline ? (
                         <span className={overdue ? "text-error-700 font-semibold" : "text-base-600"}>
                           {fmtDate(r.deadline)}
-                          {overdue && " ⚠"}
+                          {overdue && (
+                            <AlertTriangle
+                              size={11}
+                              strokeWidth={2.5}
+                              className="inline ml-0.5 -mt-px"
+                            />
+                          )}
                         </span>
                       ) : (
                         <span className="text-base-400">—</span>

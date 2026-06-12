@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import type { OpsStockItem, OpsStockListResponse } from "@carres/shared";
+import { AlertTriangle } from "lucide-react";
 
 /**
  * Shared list view for the 4 ops-stock pages (Ready / Reserved / Repair /
@@ -309,7 +310,7 @@ function RowItem({
           ))}
         </select>
         {row.needsRepair ? (
-          <span className="ml-1 text-warning-700 text-xs">⚠</span>
+          <AlertTriangle size={12} strokeWidth={2.5} className="ml-1 inline text-warning-700" />
         ) : null}
       </td>
       <td className="px-3 py-2">

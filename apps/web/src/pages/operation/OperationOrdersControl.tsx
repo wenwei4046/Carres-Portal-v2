@@ -11,6 +11,7 @@ import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import type { OperationStage } from "./components/StageChip";
+import { Phone, AlertTriangle, type LucideIcon } from "lucide-react";
 
 /**
  * OperationOrdersControl — the unified Orders **control table** (Jess redesign
@@ -188,18 +189,18 @@ function stockReadiness(
  *  overdue/today/≤3d read red; the 4–7d prep window reads amber. */
 function deadlineInfo(
   dateStr: string | null | undefined,
-): { label: string; tone: string } | null {
+): { label: string; tone: string; icon: LucideIcon | null } | null {
   if (!dateStr) return null;
   const d = new Date(`${dateStr}T00:00:00`);
   if (Number.isNaN(d.getTime())) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
-  if (diff < 0) return { label: `overdue ${-diff}d`, tone: "text-destructive" };
-  if (diff === 0) return { label: "today 📞", tone: "text-destructive" };
-  if (diff <= 3) return { label: `${diff}d 📞`, tone: "text-destructive" };
-  if (diff <= 7) return { label: `${diff}d ⚠`, tone: "text-warning" };
-  return { label: `in ${diff}d`, tone: "text-base-500" };
+  if (diff < 0) return { label: `overdue ${-diff}d`, tone: "text-destructive", icon: null };
+  if (diff === 0) return { label: "today", tone: "text-destructive", icon: Phone };
+  if (diff <= 3) return { label: `${diff}d`, tone: "text-destructive", icon: Phone };
+  if (diff <= 7) return { label: `${diff}d`, tone: "text-warning", icon: AlertTriangle };
+  return { label: `in ${diff}d`, tone: "text-base-500", icon: null };
 }
 
 /** Item category short-form (Master Sheet model): core goods Mattress / Bedframe
@@ -714,8 +715,11 @@ function OrderRow({
               <div>
                 <div>{fmtDate(o.delivery_date)}</div>
                 {dl && (
-                  <div className={`text-[10.5px] font-semibold ${dl.tone}`}>
+                  <div
+                    className={`text-[10.5px] font-semibold flex items-center gap-0.5 ${dl.tone}`}
+                  >
                     {dl.label}
+                    {dl.icon && <dl.icon size={11} strokeWidth={2.5} />}
                   </div>
                 )}
               </div>
@@ -747,7 +751,7 @@ function OrderRow({
                 title="Outstation — confirm the delivery window with the customer before raising the PO (no warehouse buffer outstation)."
                 aria-label="call customer before raising PO"
               >
-                📞
+                <Phone size={12} strokeWidth={2} className="inline text-warning" />
               </span>
             )}
           </span>
