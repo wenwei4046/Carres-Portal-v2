@@ -11,7 +11,14 @@ import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import type { OperationStage } from "./components/StageChip";
-import { Phone, AlertTriangle, type LucideIcon } from "lucide-react";
+import {
+  Phone,
+  AlertTriangle,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  type LucideIcon,
+} from "lucide-react";
 
 /**
  * OperationOrdersControl — the unified Orders **control table** (Jess redesign
@@ -93,8 +100,6 @@ const TAB_DESC: Record<SettledTab, string> = {
   scheduled: "Stock secured — delivery partner assigned / out for delivery",
   completed: "Delivered and closed",
 };
-
-const PAGE_SIZES = [50, 100] as const;
 
 /** Stage derivation — mirrors OperationOrders.stageOf so the two surfaces never
  *  disagree on where an order sits in the pipeline. */
@@ -320,7 +325,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
-  const [pageSize, setPageSize] = useState<number | "all">(50);
+  const [pageSize] = useState<number | "all">(50);
   const [page, setPage] = useState(0);
 
   // Server applies the search; we always fetch the full list and bucket
@@ -415,17 +420,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   return (
     <div className="px-9 py-8 pb-14" data-testid="operation-orders-control">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-[18px] flex-wrap">
-        <div>
-          <div className="kicker">HQ · Operations</div>
-          <h1 className="t-h1 font-display mt-1.5">
-            Orders
-          </h1>
-          <div className="text-[13px] text-base-600 mt-1.5">
-            {orders.length} order{orders.length !== 1 ? "s" : ""} · click a row
-            for full control
-          </div>
+      {/* Header — compact: title + inline count, no kicker/subtitle (Gmail-style) */}
+      <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
+        <div className="flex items-baseline gap-2.5">
+          <h1 className="t-h1 font-display">Orders</h1>
+          <span
+            className="text-[16px] font-medium text-base-400 tabular-nums"
+            title="Total orders"
+          >
+            {orders.length}
+          </span>
         </div>
         <div className="flex items-center gap-2.5">
           <input
@@ -489,14 +493,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
           never dumps all rows and the control is visible without scrolling. */}
       {total > 0 && (
         <Pager
-          pageSize={pageSize}
-          onPageSize={setPageSize}
           safePage={safePage}
           onPage={setPage}
           total={total}
           rangeStart={rangeStart}
           rangeEnd={rangeEnd}
           pageCount={pageCount}
+          onRefresh={() => void refetch()}
         />
       )}
 
@@ -553,79 +556,58 @@ export default function OperationOrdersControl({ onImport }: Props) {
 }
 
 function Pager({
-  pageSize,
-  onPageSize,
   safePage,
   onPage,
   total,
   rangeStart,
   rangeEnd,
   pageCount,
+  onRefresh,
 }: {
-  pageSize: number | "all";
-  onPageSize: (n: number | "all") => void;
   safePage: number;
   onPage: (updater: (p: number) => number) => void;
   total: number;
   rangeStart: number;
   rangeEnd: number;
   pageCount: number;
+  onRefresh: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 mb-3 flex-wrap text-[12px] text-base-600">
-      <div className="flex items-center gap-2">
-        <span>Rows per page</span>
-        {PAGE_SIZES.map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onPageSize(n)}
-            className={`px-2 py-1 rounded border text-[11px] ${
-              pageSize === n
-                ? "border-primary text-primary font-semibold bg-primary/5"
-                : "border-base-200 text-base-600 hover:border-base-400"
-            }`}
-          >
-            {n}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => onPageSize("all")}
-          className={`px-2 py-1 rounded border text-[11px] ${
-            pageSize === "all"
-              ? "border-primary text-primary font-semibold bg-primary/5"
-              : "border-base-200 text-base-600 hover:border-base-400"
-          }`}
-        >
-          All
-        </button>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="tabular-nums">
+    <div className="flex items-center justify-between gap-3 mb-2.5 text-[12px] text-base-600">
+      {/* Gmail-style toolbar (left) — refresh. Select-all + a ⋮ bulk-action menu
+          land in the next pass. */}
+      <button
+        type="button"
+        onClick={onRefresh}
+        title="Refresh"
+        aria-label="Refresh orders"
+        className="p-1.5 rounded text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
+      >
+        <RefreshCw size={15} strokeWidth={2} />
+      </button>
+      {/* Range + prev/next (right) */}
+      <div className="flex items-center gap-1.5">
+        <span className="tabular-nums text-base-500 mr-1">
           {rangeStart}–{rangeEnd} of {total}
         </span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            disabled={pageSize === "all" || safePage <= 0}
-            onClick={() => onPage((p) => Math.max(0, p - 1))}
-            className="px-2 py-1 rounded border border-base-200 text-[11px] disabled:opacity-40 hover:border-base-400"
-          >
-            ‹ Prev
-          </button>
-          <span className="tabular-nums text-[11px] text-base-500">
-            {safePage + 1}/{pageCount}
-          </span>
-          <button
-            type="button"
-            disabled={pageSize === "all" || safePage >= pageCount - 1}
-            onClick={() => onPage((p) => Math.min(pageCount - 1, p + 1))}
-            className="px-2 py-1 rounded border border-base-200 text-[11px] disabled:opacity-40 hover:border-base-400"
-          >
-            Next ›
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled={safePage <= 0}
+          onClick={() => onPage((p) => Math.max(0, p - 1))}
+          aria-label="Previous page"
+          className="p-1 rounded text-base-600 disabled:opacity-30 enabled:hover:bg-base-100 transition-colors"
+        >
+          <ChevronLeft size={18} strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          disabled={safePage >= pageCount - 1}
+          onClick={() => onPage((p) => Math.min(pageCount - 1, p + 1))}
+          aria-label="Next page"
+          className="p-1 rounded text-base-600 disabled:opacity-30 enabled:hover:bg-base-100 transition-colors"
+        >
+          <ChevronRight size={18} strokeWidth={2} />
+        </button>
       </div>
     </div>
   );
@@ -664,7 +646,7 @@ function OrderRow({
       data-testid="order-row"
     >
       {/* Ref */}
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-4 py-2.5 whitespace-nowrap">
         <div className="font-mono font-semibold text-base-900">SO-{o.so}</div>
         {ref.length > 0 && (
           <div className="font-mono text-[10.5px] text-base-500 mt-0.5">
@@ -673,7 +655,7 @@ function OrderRow({
         )}
       </td>
       {/* Customer */}
-      <td className="px-4 py-3">
+      <td className="px-4 py-2.5">
         <div
           className={`${cjkClassName(o.customer_name)} font-medium text-base-900`}
         >
@@ -686,7 +668,7 @@ function OrderRow({
         )}
       </td>
       {/* Items */}
-      <td className="px-4 py-3">
+      <td className="px-4 py-2.5">
         <div className="text-base-800">
           {qtyTotal} unit{qtyTotal === 1 ? "" : "s"}
         </div>
@@ -703,7 +685,7 @@ function OrderRow({
           Tooltip spells out the SOP: stock at WH 7 days before, logistic
           contacts the customer 2–3 days before. */}
       <td
-        className="px-4 py-3 whitespace-nowrap text-base-700"
+        className="px-4 py-2.5 whitespace-nowrap text-base-700"
         title="Deadline = customer's requested delivery date. Stock should be at the warehouse 7 days before; logistic contacts the customer 2–3 days before to arrange delivery."
       >
         {o.delivery_date_tbd ? (
@@ -732,7 +714,7 @@ function OrderRow({
       {/* Location — the real delivery place from the imported address (city/state),
           coloured by KV (green) vs Outstation (amber). Outstation carries a 📞
           flag for the call-first-before-PO SOP. */}
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-4 py-2.5 whitespace-nowrap">
         {loc.label ? (
           <span className="inline-flex items-center gap-1">
             <span
@@ -760,11 +742,11 @@ function OrderRow({
         )}
       </td>
       {/* Stock */}
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-4 py-2.5 whitespace-nowrap">
         <StockCell info={stock} />
       </td>
       {/* Logistic */}
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-4 py-2.5 whitespace-nowrap">
         {logistic ? (
           <span className="text-[12px] font-medium text-base-800">
             {logistic}
@@ -774,7 +756,7 @@ function OrderRow({
         )}
       </td>
       {/* Status */}
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-4 py-2.5 whitespace-nowrap">
         <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
           {TAB_LABEL[ct]}
         </span>

@@ -488,7 +488,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("2d")).toBeInTheDocument();
   });
 
-  it("paginates — 50/page by default, Next + the 100 size button work", () => {
+  it("paginates — 50/page by default, Next works", () => {
     listHookState.data = {
       orders: Array.from({ length: 120 }, (_, i) =>
         makeRow({ id: `p${i}`, so: 4000 + i }),
@@ -500,10 +500,6 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Next/ }));
     expect(screen.getByText(/51.100 of 120/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "100" }));
-    expect(screen.getByText(/1.100 of 120/)).toBeInTheDocument();
-    expect(screen.getAllByTestId("order-row")).toHaveLength(100);
   });
 
   it("gives each status tab a plain-English tooltip (legend)", () => {

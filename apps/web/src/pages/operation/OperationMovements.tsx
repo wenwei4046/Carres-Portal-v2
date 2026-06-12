@@ -660,8 +660,8 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
                   </div>
                   <div className="flex gap-[18px]">
                     <div className="text-right">
-                      <div className="label" style={{ color: "var(--success)" }}>
-                        ↑ in
+                      <div className="label flex items-center justify-end gap-1" style={{ color: "var(--success)" }}>
+                        <ArrowUp size={11} strokeWidth={2.5} /> in
                       </div>
                       <div
                         className="font-mono text-[18px] font-semibold"
@@ -671,8 +671,8 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="label" style={{ color: "var(--terracotta)" }}>
-                        ↓ out
+                      <div className="label flex items-center justify-end gap-1" style={{ color: "var(--terracotta)" }}>
+                        <ArrowDown size={11} strokeWidth={2.5} /> out
                       </div>
                       <div
                         className="font-mono text-[18px] font-semibold"
@@ -776,7 +776,8 @@ function MovementTableRow({
       ? "var(--terracotta)"
       : "var(--base-700)";
   const qtyPrefix = isIn ? "+" : isOut ? "−" : "Δ";
-  const kindLabel = isIn ? "↑ IN" : isOut ? "↓ OUT" : "ADJ";
+  const kindText = isIn ? "IN" : isOut ? "OUT" : "ADJ";
+  const KindIcon = isIn ? ArrowUp : isOut ? ArrowDown : null;
   const kindBg = isIn
     ? "rgba(50,120,80,.12)"
     : isOut
@@ -809,7 +810,10 @@ function MovementTableRow({
           }}
           data-testid={`movements-row-kind-${row.id}`}
         >
-          {kindLabel}
+          {KindIcon && (
+            <KindIcon size={10} strokeWidth={2.5} className="inline -mt-px mr-0.5" />
+          )}
+          {kindText}
         </span>
       </div>
       <div className="font-body font-medium truncate">{skuLabel}</div>
