@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useOperationOrders } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
+import { fmtDateShort } from "@/lib/fmt-date";
 
 /**
  * CalendarPanel — right-rail Calendar (Jess COO ask): a month grid showing how
@@ -103,10 +104,10 @@ export default function CalendarPanel() {
               type="button"
               onClick={() => setSelected(cell.key)}
               title={count > 0 ? `${count} deliver${count === 1 ? "y" : "ies"}` : undefined}
-              className="relative aspect-square flex items-center justify-center rounded-full hover:bg-base-100 transition-colors"
+              className="aspect-square flex flex-col items-center justify-center gap-0.5 rounded-lg hover:bg-base-100 transition-colors"
             >
               <span
-                className={`w-7 h-7 grid place-items-center rounded-full text-[12px] ${
+                className={`w-6 h-6 grid place-items-center rounded-full text-[12px] ${
                   isToday
                     ? "bg-primary text-white font-semibold"
                     : isSel
@@ -116,16 +117,15 @@ export default function CalendarPanel() {
               >
                 {cell.day}
               </span>
-              {count > 0 && (
-                <span className="absolute bottom-0.5 flex gap-0.5">
-                  {Array.from({ length: Math.min(count, 3) }).map((_, di) => (
-                    <span
-                      key={di}
-                      className={`w-1 h-1 rounded-full ${isToday ? "bg-white" : "bg-primary"}`}
-                    />
-                  ))}
-                </span>
-              )}
+              {/* delivery count for the day (replaces the dots) — total # of
+                  customer deliveries; fixed footprint keeps the grid aligned */}
+              <span
+                className={`h-3.5 min-w-[16px] px-1 grid place-items-center rounded-full text-[10px] font-bold leading-none ${
+                  count > 0 ? "bg-primary/10 text-primary" : "text-transparent"
+                }`}
+              >
+                {count > 0 ? count : "0"}
+              </span>
             </button>
           );
         })}
@@ -135,7 +135,7 @@ export default function CalendarPanel() {
       <div className="mt-3 pt-3 border-t border-base-200 flex-1 overflow-auto">
         <div className="t-micro text-base-500 mb-2">
           {selected
-            ? `${selectedOrders.length} deliver${selectedOrders.length === 1 ? "y" : "ies"} · ${selected.slice(5)}`
+            ? `${selectedOrders.length} deliver${selectedOrders.length === 1 ? "y" : "ies"} · ${fmtDateShort(selected)}`
             : "Pick a day"}
         </div>
         {selectedOrders.length === 0 ? (

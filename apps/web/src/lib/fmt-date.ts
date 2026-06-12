@@ -30,3 +30,14 @@ export function fmtDate(
   }
   return `${dow}, ${day} ${mon} ${yr}`;
 }
+
+/**
+ * Format an ISO date as "12 Jun 26" (no weekday). For compact spots like the
+ * Calendar panel's selected-day header.
+ */
+export function fmtDateShort(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
+  if (isNaN(d.getTime())) return "—";
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+}

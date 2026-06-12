@@ -228,6 +228,23 @@ function TaskRow({
             <span>{ago(t.createdAt)}</span>
           </div>
         )}
+        {/* Completed-row report: who finished it + when (the COO's "done" signal). */}
+        {done && (
+          <div className="text-[11px] text-base-400 flex items-center gap-1 flex-wrap mt-0.5">
+            {t.status === "cancelled" ? (
+              <span className="font-medium">Cancelled</span>
+            ) : (
+              <>
+                <span className="text-success font-medium">Done</span>
+                {t.claimedByName && (
+                  <span>by {t.claimedBy === myId ? "you" : t.claimedByName}</span>
+                )}
+                {t.doneAt && <span>· {ago(t.doneAt)}</span>}
+              </>
+            )}
+            {t.relatedSo && <span className="font-mono">SO-{t.relatedSo}</span>}
+          </div>
+        )}
       </div>
       <button
         type="button"

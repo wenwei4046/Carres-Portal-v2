@@ -75,10 +75,22 @@ tasksRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
       patch.claimed_by = c.var.auth.id;
       patch.claimed_at = now;
       break;
-    case "done":
+    case "done": {
       patch.status = "done";
       patch.done_at = now;
+      // Record who completed it: if nobody had claimed the task, whoever ticks
+      // it done becomes the recorded doer — so the COO always sees who did it.
+      const { data: cur } = await sb
+        .from("ops_tasks")
+        .select("claimed_by")
+        .eq("id", id)
+        .single();
+      if (cur && !cur.claimed_by) {
+        patch.claimed_by = c.var.auth.id;
+        patch.claimed_at = now;
+      }
       break;
+    }
     case "reopen":
       patch.status = "open";
       patch.claimed_by = null;

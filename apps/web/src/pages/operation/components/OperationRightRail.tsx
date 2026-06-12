@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Lightbulb, SquareCheck, X, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import type { OpsTask } from "@carres/shared";
+import type { OpsNote, OpsTask } from "@carres/shared";
 import CalendarPanel from "./rail/CalendarPanel";
 import KeepPanel from "./rail/KeepPanel";
 import TasksPanel, { TASKS_KEY } from "./rail/TasksPanel";
@@ -32,6 +32,21 @@ export default function OperationRightRail() {
     refetchInterval: 60_000,
   });
   const overdue = (tasksData?.tasks ?? []).filter((t) => t.overdue).length;
+
+  // Active-notes count — shares the KeepPanel "active" cache; badges the Keep
+  // icon with how many notes you've got (Jess ask).
+  const { data: notesData } = useQuery<{ notes: OpsNote[] }>({
+    queryKey: ["ops", "notes", "active"],
+    queryFn: () => apiFetch("/api/ops/notes"),
+  });
+  const notesCount = (notesData?.notes ?? []).length;
+
+  // Per-tab badge: Tasks = overdue (red alert), Keep = note count (neutral).
+  const badgeFor = (key: Panel): { n: number; tone: string } | null => {
+    if (key === "tasks" && overdue > 0) return { n: overdue, tone: "bg-danger" };
+    if (key === "keep" && notesCount > 0) return { n: notesCount, tone: "bg-base-700" };
+    return null;
+  };
 
   return (
     <div className="flex h-screen sticky top-0">
@@ -63,6 +78,7 @@ export default function OperationRightRail() {
       <div className="w-[52px] flex flex-col items-center py-3 gap-1 border-l border-base-200 bg-white">
         {TABS.map((t) => {
           const isActive = active === t.key;
+          const badge = badgeFor(t.key);
           return (
             <button
               key={t.key}
@@ -75,9 +91,11 @@ export default function OperationRightRail() {
               }`}
             >
               <t.icon size={18} strokeWidth={2} />
-              {t.key === "tasks" && overdue > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-[10px] font-bold leading-[16px] text-center">
-                  {overdue}
+              {badge && (
+                <span
+                  className={`absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full ${badge.tone} text-white text-[10px] font-bold leading-[16px] text-center`}
+                >
+                  {badge.n > 99 ? "99+" : badge.n}
                 </span>
               )}
             </button>
