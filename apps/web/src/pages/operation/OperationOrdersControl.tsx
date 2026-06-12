@@ -202,18 +202,22 @@ function stockReadiness(
  *  overdue/today/≤3d read red; the 4–7d prep window reads amber. */
 function deadlineInfo(
   dateStr: string | null | undefined,
-): { label: string; tone: string; icon: LucideIcon | null } | null {
+): { label: string; pill: string; icon: LucideIcon | null } | null {
   if (!dateStr) return null;
   const d = new Date(`${dateStr}T00:00:00`);
   if (Number.isNaN(d.getTime())) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
-  if (diff < 0) return { label: `overdue ${-diff}d`, tone: "text-destructive", icon: null };
-  if (diff === 0) return { label: "today", tone: "text-destructive", icon: Phone };
-  if (diff <= 3) return { label: `${diff}d`, tone: "text-destructive", icon: Phone };
-  if (diff <= 7) return { label: `${diff}d`, tone: "text-warning", icon: AlertTriangle };
-  return { label: `in ${diff}d`, tone: "text-base-500", icon: null };
+  const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
+  // Coloured pill by urgency: overdue / call-window (≤3d) red, prep-window
+  // (4–7d, stock-to-WH) amber, comfortable (>7d) neutral. Phone icon on the
+  // ≤3d call window, alert on the prep window.
+  if (diff < 0) return { label: `Overdue ${days(-diff)}`, pill: "pill-overdue", icon: AlertTriangle };
+  if (diff === 0) return { label: "Due today", pill: "pill-overdue", icon: Phone };
+  if (diff <= 3) return { label: `Due in ${days(diff)}`, pill: "pill-overdue", icon: Phone };
+  if (diff <= 7) return { label: `Due in ${days(diff)}`, pill: "pill-warning", icon: AlertTriangle };
+  return { label: `Due in ${days(diff)}`, pill: "pill-neutral", icon: null };
 }
 
 /** Item category short-form (Master Sheet model): core goods Mattress / Bedframe
@@ -260,10 +264,14 @@ function accShort(sku: string): string {
   return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 }
 
-/** Roll a line list up into the list short-form, e.g.
- *  "2× Mattress(Q) · 1× Bedframe · Pillow ×2 · M.P · Disposal". Core goods
- *  carry qty + size; non-core show their short type name (qty only when >1). */
-function itemRollup(lines: { sku: string; qty: number }[]): string {
+/** Roll a line list up into CORE goods (Mattress/Bedframe/Sofa, qty + size) and
+ *  ACCESSORIES (short type name, qty only when >1), kept separate so the list
+ *  can show the furniture prominently and the add-ons muted — one-glance read.
+ *  e.g. core ["2× Mattress(Q)", "1× Bedframe"], acc ["Pillow ×2", "Disposal"]. */
+function itemRollupParts(lines: { sku: string; qty: number }[]): {
+  core: string[];
+  acc: string[];
+} {
   const core = new Map<CoreCat, { qty: number; sizes: Set<string> }>();
   const acc = new Map<string, number>();
   for (const l of lines) {
@@ -281,15 +289,22 @@ function itemRollup(lines: { sku: string; qty: number }[]): string {
     if (sz) e.sizes.add(sz);
     core.set(cat, e);
   }
-  const parts: string[] = [];
+  const coreParts: string[] = [];
   for (const cat of CORE_ORDER) {
     const e = core.get(cat);
     if (!e) continue;
     const sizes = e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
-    parts.push(`${e.qty}× ${CORE_LABEL[cat]}${sizes}`);
+    coreParts.push(`${e.qty}× ${CORE_LABEL[cat]}${sizes}`);
   }
-  for (const [name, q] of acc) parts.push(q > 1 ? `${name} ×${q}` : name);
-  return parts.join(" · ") || "—";
+  const accParts: string[] = [];
+  for (const [name, q] of acc) accParts.push(q > 1 ? `${name} ×${q}` : name);
+  return { core: coreParts, acc: accParts };
+}
+
+/** Flat single-line rollup (CSV export + tooltips) — core then accessories. */
+function itemRollup(lines: { sku: string; qty: number }[]): string {
+  const { core, acc } = itemRollupParts(lines);
+  return [...core, ...acc].join(" · ") || "—";
 }
 
 /** Full item breakdown for the items-cell tooltip — answers "what are the +N
@@ -645,7 +660,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   className="cursor-pointer accent-base-900 align-middle"
                 />
               </th>
-              <Th>Ref</Th>
+              <Th>Order ID</Th>
               <Th>Customer</Th>
               <Th>Items</Th>
               <Th>Deadline</Th>
@@ -874,6 +889,7 @@ function OrderRow({
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
   const qtyTotal = lines.reduce((s, l) => s + Number(l.qty || 0), 0);
+  const { core, acc } = itemRollupParts(lines);
   const stock = stockReadiness(o, availableBySku);
   const loc = locationForAddress(o.customer_address ?? null);
 
@@ -909,30 +925,28 @@ function OrderRow({
           </div>
         )}
       </td>
-      {/* Customer */}
+      {/* Customer — name only; phone lives in the drawer (Jess: save list space) */}
       <td className="px-4 py-2.5">
         <div
           className={`${cjkClassName(o.customer_name)} font-medium text-base-900`}
         >
           {o.customer_name || "—"}
         </div>
-        {o.customer_phone && (
-          <div className="text-[11px] text-base-500 mt-0.5">
-            {o.customer_phone}
-          </div>
-        )}
       </td>
-      {/* Items */}
+      {/* Items — one-glance: total units headline, then a single breakdown line
+          with core furniture dark + accessories muted (tooltip = full list). */}
       <td className="px-4 py-2.5">
-        <div className="text-base-800">
+        <div className="text-base-900 font-semibold">
           {qtyTotal} unit{qtyTotal === 1 ? "" : "s"}
         </div>
-        {lines.length > 0 && (
+        {(core.length > 0 || acc.length > 0) && (
           <div
-            className="text-[10.5px] text-base-600 mt-0.5 leading-snug max-w-[230px] truncate"
+            className="text-[11.5px] leading-snug max-w-[260px] truncate mt-0.5"
             title={itemBreakdown(lines)}
           >
-            {itemRollup(lines)}
+            {core.length > 0 && <span className="text-base-700">{core.join(" · ")}</span>}
+            {core.length > 0 && acc.length > 0 && <span className="text-base-300"> · </span>}
+            {acc.length > 0 && <span className="text-base-400">{acc.join(" · ")}</span>}
           </div>
         )}
       </td>
@@ -944,20 +958,18 @@ function OrderRow({
         title="Deadline = customer's requested delivery date. Stock should be at the warehouse 7 days before; logistic contacts the customer 2–3 days before to arrange delivery."
       >
         {o.delivery_date_tbd ? (
-          <span className="text-warning text-[12px]">TBD</span>
+          <span className="pill pill-warning">TBD</span>
         ) : o.delivery_date ? (
           (() => {
             const dl = deadlineInfo(o.delivery_date);
             return (
-              <div>
-                <div>{fmtDate(o.delivery_date)}</div>
+              <div className="flex flex-col items-start gap-1">
+                <div className="text-[12px] text-base-700">{fmtDate(o.delivery_date)}</div>
                 {dl && (
-                  <div
-                    className={`text-[10.5px] font-semibold flex items-center gap-0.5 ${dl.tone}`}
-                  >
-                    {dl.label}
+                  <span className={`pill ${dl.pill} inline-flex items-center gap-1 whitespace-nowrap`}>
                     {dl.icon && <dl.icon size={11} strokeWidth={2.5} />}
-                  </div>
+                    {dl.label}
+                  </span>
                 )}
               </div>
             );
