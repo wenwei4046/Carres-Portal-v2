@@ -59,6 +59,9 @@ import dosRouter from "./routes/storage/dos";
 import opsStockRouter from "./routes/ops/stock";
 // Migration 0140 — Service Notes (SN / Issue Tracker).
 import snRouter from "./routes/ops/service-notes";
+// Migration 0162 — ops cockpit: Keep notes + Tasks board.
+import opsNotesRouter from "./routes/ops/notes";
+import opsTasksRouter from "./routes/ops/tasks";
 // Phase B (migration 0138) — order annotations + activity timeline.
 import annotationsRouter, { escalationsRouter } from "./routes/operation/annotations";
 import type { AppEnv } from "./types";
@@ -141,6 +144,8 @@ api.route("/supplier/threads", supplierThreadsRouter);
 api.route("/storage/dos", dosRouter);
 api.route("/ops/stock", opsStockRouter);
 api.route("/ops/service-notes", snRouter);
+api.route("/ops/notes", opsNotesRouter);
+api.route("/ops/tasks", opsTasksRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
 
