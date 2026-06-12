@@ -331,9 +331,8 @@ describe("OperationOrdersControl · Stock column", () => {
     ]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    expect(within(row).getByText("In stock")).toBeInTheDocument();
-    // have = min(5,2)+min(3,1) = 3 ; need = 3
-    expect(within(row).getByText("3/3 units")).toBeInTheDocument();
+    // have = min(5,2)+min(3,1) = 3 ; need = 3 → one green pill "Ready 3/3"
+    expect(within(row).getByText("Ready 3/3")).toBeInTheDocument();
   });
 
   it("shows Make to order + partial coverage when a line is short", () => {
@@ -353,12 +352,11 @@ describe("OperationOrdersControl · Stock column", () => {
     ]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    expect(within(row).getByText("Make to order")).toBeInTheDocument();
-    // have = min(1,3)+min(2,2) = 3 ; need = 5
-    expect(within(row).getByText("3/5 units")).toBeInTheDocument();
+    // have = min(1,3)+min(2,2) = 3 ; need = 5 → one amber pill "Waiting 3/5"
+    expect(within(row).getByText("Waiting 3/5")).toBeInTheDocument();
   });
 
-  it("falls back to — for AutoCount free-text SKUs absent from the catalog", () => {
+  it("falls back to a muted Not set for AutoCount free-text SKUs absent from the catalog", () => {
     oneRow({
       id: "ac",
       so: 2003,
@@ -370,8 +368,9 @@ describe("OperationOrdersControl · Stock column", () => {
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
     expect(row.querySelector('[data-stock-state="unknown"]')).toBeTruthy();
-    expect(within(row).queryByText("In stock")).not.toBeInTheDocument();
-    expect(within(row).queryByText("Make to order")).not.toBeInTheDocument();
+    expect(within(row).getByText("Not set")).toBeInTheDocument();
+    expect(within(row).queryByText(/^Ready/)).not.toBeInTheDocument();
+    expect(within(row).queryByText(/^Waiting/)).not.toBeInTheDocument();
   });
 
   it("keeps Ready (stage-derived) for ready_to_dispatch even when free balance is 0", () => {
@@ -391,7 +390,7 @@ describe("OperationOrdersControl · Stock column", () => {
     expect(row.querySelector('[data-stock-state="ready"]')).toBeTruthy();
   });
 
-  it("shows Awaiting stock for awaiting_operation_action (PO already open)", () => {
+  it("shows amber Waiting for awaiting_operation_action (PO already open)", () => {
     oneRow({
       id: "aw",
       so: 2005,
@@ -400,7 +399,8 @@ describe("OperationOrdersControl · Stock column", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    expect(within(row).getByText("Awaiting stock")).toBeInTheDocument();
+    expect(within(row).getByText("Waiting")).toBeInTheDocument();
+    expect(row.querySelector('[data-stock-state="awaiting"]')?.className).toContain("pill-warning");
   });
 
   it("falls back to — for an early native order while the stock snapshot is still loading", () => {
@@ -439,13 +439,20 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const row = screen.getByTestId("order-row");
     // Goods-unit total on the left — 2+1+3+1 = 7; Disposal (service) NOT counted.
     expect(within(row).getByText("7")).toBeInTheDocument();
-    // One boxed tag per category, MONOCHROME tiers by ink depth:
-    // core darkest · accessories mid-grey · service lightest.
-    expect(within(row).getByText("2× Mattress(Q)").className).toContain("text-base-900");
-    expect(within(row).getByText("1× Bedframe").className).toContain("text-base-900");
+    // Master-Sheet short codes (MS/BF/SOF), one boxed tag per category,
+    // MONOCHROME tiers: core darkest · accessories mid-grey · service lightest.
+    expect(within(row).getByText("2× MS(Q)").className).toContain("text-base-900");
+    expect(within(row).getByText("1× BF").className).toContain("text-base-900");
     expect(within(row).getByText("3× Pillow").className).toContain("text-base-600");
     expect(within(row).getByText("M.P").className).toContain("text-base-600");
     expect(within(row).getByText("Disposal").className).toContain("text-base-400");
+    // Two-line layout: core tags sit in a different flex row from acc/service.
+    const coreRow = within(row).getByText("2× MS(Q)").parentElement;
+    expect(coreRow).toBe(within(row).getByText("1× BF").parentElement);
+    expect(coreRow).not.toBe(within(row).getByText("3× Pillow").parentElement);
+    expect(within(row).getByText("3× Pillow").parentElement).toBe(
+      within(row).getByText("Disposal").parentElement,
+    );
   });
 
   it("drops the duplicated qty inside the tag on single-category orders (A1)", () => {
@@ -456,10 +463,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // "2 [Sofa]" — the left total carries the qty; no "2× Sofa" repetition.
+    // "2 [SOF]" — the left total carries the qty; no "2× SOF" repetition.
     expect(within(row).getByText("2")).toBeInTheDocument();
-    expect(within(row).getByText("Sofa")).toBeInTheDocument();
-    expect(within(row).queryByText("2× Sofa")).not.toBeInTheDocument();
+    expect(within(row).getByText("SOF")).toBeInTheDocument();
+    expect(within(row).queryByText("2× SOF")).not.toBeInTheDocument();
   });
 
   it("shows the real delivery location for outstation + a 📞 flag, NOT the word 'Outstation' (A2/A4)", () => {

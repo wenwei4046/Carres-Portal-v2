@@ -27,6 +27,7 @@ import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
+import bulkCompleteRouter from "./routes/operation/bulk-complete";
 import operationPaymentsRouter from "./routes/operation/payments";
 import lpInboundRouter from "./routes/operation/lp-inbound";
 import resumeDispatchRouter from "./routes/operation/resume-dispatch";
@@ -109,6 +110,8 @@ api.route("/operation/orders", resumeDispatchRouter);
 api.route("/operation/orders", deliveryChainRouter);
 // 0159 P2 control overlay — GET + PUT /:id/control
 api.route("/operation/orders", orderControlRouter);
+// 0166 bulk Mark-completed (AutoCount legacy cleanup) — POST /bulk-complete
+api.route("/operation/orders", bulkCompleteRouter);
 // 0165 Payments panel (Master Sheet "Balance" tab) — GET list
 api.route("/operation/payments", operationPaymentsRouter);
 api.route("/operation/partners", operationPartnersRouter);

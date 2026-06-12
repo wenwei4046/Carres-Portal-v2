@@ -24,6 +24,7 @@ import {
   Truck,
   Download,
   ListTodo,
+  CheckCircle2,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -239,10 +240,13 @@ function regionBucket(address: string | null): string {
  *  use the `MS## / BF## / SF##|SOF##` item codes. A trailing `-K/-Q/-S` is the
  *  size (King/Queen/Single). */
 type CoreCat = "mattress" | "bedframe" | "sofa";
+/** Master-Sheet short codes (Jess 2026-06-12): MS / BF / SOF — the vocabulary
+ *  the team already speaks (the sheet's MS/BF/SOF columns + AutoCount item
+ *  codes). Accessories keep full names. */
 const CORE_LABEL: Record<CoreCat, string> = {
-  mattress: "Mattress",
-  bedframe: "Bedframe",
-  sofa: "Sofa",
+  mattress: "MS",
+  bedframe: "BF",
+  sofa: "SOF",
 };
 const CORE_ORDER: CoreCat[] = ["mattress", "bedframe", "sofa"];
 
@@ -431,6 +435,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
     mutationFn: (body: { title: string; relatedOrderId: string }) =>
       apiFetch("/api/ops/tasks", { method: "POST", body: JSON.stringify(body) }),
   });
+  const completeMut = useMutation({
+    mutationFn: (orderIds: string[]) =>
+      apiFetch("/api/operation/orders/bulk-complete", {
+        method: "POST",
+        body: JSON.stringify({ orderIds }),
+      }),
+  });
 
   const partnerName = useMemo(() => {
     const m = new Map<string, string>();
@@ -600,6 +611,30 @@ export default function OperationOrdersControl({ onImport }: Props) {
     }
   }
 
+  // Bulk "Mark completed" (migration 0166) — AutoCount legacy cleanup. The RPC
+  // is server-scoped to source_system='autocount'; others come back skipped.
+  async function bulkMarkCompleted() {
+    const ids = [...selected];
+    const ok = window.confirm(
+      `Mark ${ids.length} order${ids.length === 1 ? "" : "s"} completed?\n\nOnly AutoCount-imported orders are completed — anything else is skipped.`,
+    );
+    if (!ok) return;
+    try {
+      const r = (await completeMut.mutateAsync(ids)) as {
+        completed: number;
+        skipped: number;
+      };
+      toast.success(
+        `Marked ${r.completed} completed` +
+          (r.skipped > 0 ? ` · ${r.skipped} skipped (not AutoCount / already closed)` : ""),
+      );
+      clearSel();
+      void refetch();
+    } catch (e) {
+      toast.error(`Bulk complete failed — ${(e as Error).message}`);
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="px-9 py-8 pb-14">
@@ -741,8 +776,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
           onAssign={bulkAssignLogistic}
           onExport={exportSelectedCsv}
           onTasks={bulkCreateTasks}
+          onComplete={bulkMarkCompleted}
           onClear={clearSel}
-          busy={assignMut.isPending || taskMut.isPending}
+          busy={assignMut.isPending || taskMut.isPending || completeMut.isPending}
         />
       ) : (
         total > 0 && (
@@ -889,6 +925,7 @@ function BulkBar({
   onAssign,
   onExport,
   onTasks,
+  onComplete,
   onClear,
   busy,
 }: {
@@ -899,6 +936,7 @@ function BulkBar({
   onAssign: (partnerId: string) => void;
   onExport: () => void;
   onTasks: () => void;
+  onComplete: () => void;
   onClear: () => void;
   busy: boolean;
 }) {
@@ -923,6 +961,7 @@ function BulkBar({
                 <BulkMenuItem icon={Truck} label="Assign logistic…" onClick={() => setMenu("assign")} />
                 <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
                 <BulkMenuItem icon={ListTodo} label="Create follow-up tasks" onClick={onTasks} />
+                <BulkMenuItem icon={CheckCircle2} label="Mark completed" onClick={onComplete} />
               </>
             ) : (
               <>
@@ -1080,10 +1119,10 @@ function OrderRow({
       </td>
       {/* Items — Master-Sheet style: goods-unit total as a bold number in a
           fixed-width LEFT slot (service lines don't count; digits + tags align
-          down the column), boxed tags coloured by TIER (core purple ·
-          accessories blue · service grey). Single-category orders drop the
-          qty inside the tag — the left number already says it, so "1 [Sofa]"
-          instead of the ugly "1× [1× Sofa]". Tooltip = full SKU list. */}
+          down the column), then TWO tag lines (Jess): line 1 = core goods
+          (MS/BF/SOF), line 2 = accessories + services. Monochrome tiers by ink
+          depth. Single-category orders drop the qty inside the tag — the left
+          number already says it ("1 [SOF]"). Tooltip = full SKU list. */}
       <td className="px-4 py-2.5">
         {lines.length === 0 ? (
           <span className="text-base-400">—</span>
@@ -1098,14 +1137,20 @@ function OrderRow({
               {qtyTotal}
             </span>
             <div
-              className="flex flex-wrap gap-1 max-w-[280px] pt-0.5"
+              className="flex flex-col gap-1 max-w-[280px] pt-0.5"
               title={itemBreakdown(lines)}
             >
-              {tags.map((t, i) => (
-                <span key={i} className={`pill ${ITEM_TAG[t.kind]} text-[10px] px-1.5 py-0`}>
-                  {tags.length === 1 && t.qty === qtyTotal ? t.name : tagLabel(t)}
-                </span>
-              ))}
+              {[tags.filter((t) => t.kind === "core"), tags.filter((t) => t.kind !== "core")]
+                .filter((row) => row.length > 0)
+                .map((row, ri) => (
+                  <div key={ri} className="flex flex-wrap gap-1">
+                    {row.map((t, i) => (
+                      <span key={i} className={`pill ${ITEM_TAG[t.kind]} text-[10px] px-1.5 py-0`}>
+                        {tags.length === 1 && t.qty === qtyTotal ? t.name : tagLabel(t)}
+                      </span>
+                    ))}
+                  </div>
+                ))}
             </div>
           </div>
         )}
@@ -1194,55 +1239,47 @@ function OrderRow({
   );
 }
 
-/** Visual config per stock state. Two greens (pipeline-secured "Ready" vs
- *  shelf-available "In stock") and two ambers ("Make to order" = no PO yet vs
- *  "Awaiting stock" = PO already open) — same tone, distinct label so the
- *  operator reads the next action at a glance. */
-const STOCK_CFG: Record<
-  Exclude<StockState, "unknown">,
-  { tone: string; dot: string; label: string }
-> = {
-  ready: { tone: "text-success", dot: "bg-success", label: "Ready" },
-  in_stock: { tone: "text-success", dot: "bg-success", label: "In stock" },
-  need_po: { tone: "text-warning", dot: "bg-warning", label: "Make to order" },
-  awaiting: { tone: "text-warning", dot: "bg-warning", label: "Awaiting stock" },
-};
-
+/** Stock cell — ONE three-state pill, one-glance (Jess): green Ready (stock
+ *  secured/reserved OR shelf covers it) · amber Waiting (short → PO needed, or
+ *  PO already open) · grey Not set (can't compute / nothing arranged). Coverage
+ *  numbers ride inside the pill where known ("Ready 3/3" / "Waiting 0/1");
+ *  tooltip carries the next-action detail. */
 function StockCell({ info }: { info: StockInfo }) {
   if (info.state === "unknown")
     return (
-      <span data-stock-state="unknown" className="text-base-400">
-        —
+      <span
+        data-stock-state="unknown"
+        className="pill pill-neutral text-base-400 font-medium"
+        title="Can't compute from the catalog (free-text SKU) — open the order to check stock"
+      >
+        Not set
       </span>
     );
-  const cfg = STOCK_CFG[info.state];
 
-  // Real numbers (Jess's ask): show coverage on the matchable early states.
-  const showCounts =
-    (info.state === "in_stock" || info.state === "need_po") &&
-    info.need != null &&
-    info.have != null;
-  const title =
-    info.short && info.short.length > 0
-      ? "Short — " +
-        info.short.map((s) => `${shortSku(s.sku)} ${s.have}/${s.need}`).join(", ")
-      : undefined;
+  const counts =
+    info.need != null && info.have != null ? ` ${info.have}/${info.need}` : "";
+  const cfg = {
+    ready: { pill: "pill-confirmed", label: "Ready", title: "Stock secured / reserved for this order" },
+    in_stock: { pill: "pill-confirmed", label: `Ready${counts}`, title: "Free warehouse stock covers every line" },
+    need_po: {
+      pill: "pill-warning",
+      label: `Waiting${counts}`,
+      title:
+        "Short — raise a PO" +
+        (info.short && info.short.length > 0
+          ? ": " + info.short.map((s) => `${shortSku(s.sku)} ${s.have}/${s.need}`).join(", ")
+          : ""),
+    },
+    awaiting: { pill: "pill-warning", label: "Waiting", title: "PO open — stock on the way" },
+  }[info.state];
 
   return (
     <span
-      className="inline-flex flex-col gap-0.5"
-      title={title}
+      className={`pill ${cfg.pill} whitespace-nowrap tabular-nums`}
+      title={cfg.title}
       data-stock-state={info.state}
     >
-      <span className={`inline-flex items-center gap-1 text-[12px] ${cfg.tone}`}>
-        <span className={`w-[7px] h-[7px] rounded-full ${cfg.dot}`} />
-        {cfg.label}
-      </span>
-      {showCounts && (
-        <span className="text-[10px] text-base-500 font-mono">
-          {info.have}/{info.need} units
-        </span>
-      )}
+      {cfg.label}
     </span>
   );
 }
