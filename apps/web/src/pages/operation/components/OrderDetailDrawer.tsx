@@ -490,7 +490,6 @@ function DrawerBody({
           <KV label="Source warehouse" value={warehouse?.name ?? <em className="text-base-500">—</em>} />
           <KV label="Total items" value={String(totalItems(lines))} />
           <div className="col-span-2">
-            <div className="label mb-2">Lines</div>
             {lines.map((l, i) => {
               const bal = stockBalances.find((b) => b.sku === l.sku);
               const have = bal ? Math.max(0, Number(bal.qty) - Number(bal.reserved)) : 0;
@@ -563,17 +562,26 @@ function DrawerBody({
           {order.do_number && <KV label="DO number" value={order.do_number} />}
         </div>
 
-        {/* Multi-leg delivery chain (γ architecture · migration 0156). Single-leg
-            orders see a compact one-liner with a "Set up multi-leg route" CTA;
-            once stops are added, the timeline takes over. */}
-        <SectionHead>Delivery chain</SectionHead>
-        <div className="mb-4">
-          <DeliveryChain
-            orderId={order.id}
-            stops={order.delivery_stops}
-            fallbackPartnerId={order.delivery_partner_id}
-          />
-        </div>
+        {/* Multi-leg delivery chain (γ architecture · migration 0156) — a rare
+            cross-state / cross-border handoff feature (KL→JB→SG). Collapsed by
+            default so it stops cluttering the common single-leg flow + stops the
+            "Set up shows nothing" confusion on partner-less orders; auto-opens
+            only when an order actually has legs set. */}
+        <details className="mb-4" open={(order.delivery_stops?.length ?? 0) > 0}>
+          <summary className="label cursor-pointer select-none">
+            Advanced · multi-leg route{" "}
+            <span className="text-[10px] font-normal normal-case tracking-normal text-base-400">
+              (cross-state / cross-border only)
+            </span>
+          </summary>
+          <div className="mt-2">
+            <DeliveryChain
+              orderId={order.id}
+              stops={order.delivery_stops}
+              fallbackPartnerId={order.delivery_partner_id}
+            />
+          </div>
+        </details>
 
         {/* Editable control overlay — the "Master Sheet, live" fields (P2 ·
             migration 0159). Stock location/ETA + 4 remark fields + payment
