@@ -70,9 +70,7 @@ export default function OpenPOsCard({ pos, onViewAll }: Props) {
                   ETA {po.eta_date ?? "—"} · {po.sup_status.replace(/_/g, " ")}
                 </div>
               </div>
-              <span className="font-mono text-[10px] uppercase tracking-[0.1em] font-semibold text-warning">
-                OPEN
-              </span>
+              <span className="pill pill-warning">OPEN</span>
             </div>
           ))
         )}

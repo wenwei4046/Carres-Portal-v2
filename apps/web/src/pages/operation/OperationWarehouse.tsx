@@ -86,11 +86,12 @@ function categoryForSku(sku: string): string | null {
   return null;
 }
 
-function statusColor(status: LowStockStatus): string {
-  if (status === "out") return "var(--danger)";
-  if (status === "low") return "var(--warning)";
-  return "var(--success)";
-}
+/** v17 status pills — out→red, low→amber, ok→green. */
+const STATUS_PILL: Record<LowStockStatus, string> = {
+  out: "pill-overdue",
+  low: "pill-warning",
+  ok: "pill-confirmed",
+};
 function statusLabel(status: LowStockStatus): string {
   if (status === "out") return "Out";
   if (status === "low") return "Low";
@@ -595,15 +596,8 @@ export default function OperationWarehouse({
                   </div>
                   <div className="text-right">
                     <span
-                      className="font-ui font-bold uppercase border rounded-[3px] inline-block"
+                      className={`pill ${STATUS_PILL[aggStatus]}`}
                       data-testid={`warehouse-badge-${row.sku}`}
-                      style={{
-                        fontSize: 9,
-                        letterSpacing: "0.12em",
-                        color: statusColor(aggStatus),
-                        borderColor: statusColor(aggStatus),
-                        padding: "3px 7px",
-                      }}
                     >
                       {statusLabel(aggStatus)}
                     </span>

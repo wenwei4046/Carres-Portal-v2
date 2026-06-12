@@ -314,13 +314,13 @@ function RowItem({
       </td>
       <td className="px-3 py-2">
         <span
-          className={
+          className={`pill capitalize ${
             row.status === "free"
-              ? "text-success-700 text-xs font-medium"
+              ? "pill-confirmed"
               : row.status === "reserved"
-                ? "text-base-700 text-xs font-medium"
-                : "text-base-400 text-xs"
-          }
+                ? "pill-collected"
+                : "pill-neutral"
+          }`}
         >
           {row.status}
         </span>

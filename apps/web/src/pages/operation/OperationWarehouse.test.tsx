@@ -300,20 +300,22 @@ describe("OperationWarehouse page", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("5. status badges render with correct color tokens per state", () => {
+  it("5. status badges render with the correct v17 pill per state", () => {
     setLoaded();
     render(wrap(<OperationWarehouse />));
     // Mattress tab: King = ok, Queen = low. Switch to bedframe to see Out.
+    // v17: outline color-token badges became `.pill` + a semantic modifier
+    // (ok→confirmed/green, low→warning/amber, out→overdue/red).
     const okBadge = screen.getByTestId(`warehouse-badge-${SKU_MATTRESS_KING}`);
     expect(okBadge.textContent).toBe("OK");
-    expect(okBadge.getAttribute("style")).toContain("var(--success)");
+    expect(okBadge.className).toContain("pill-confirmed");
     const lowBadge = screen.getByTestId(`warehouse-badge-${SKU_MATTRESS_QUEEN}`);
     expect(lowBadge.textContent).toBe("Low");
-    expect(lowBadge.getAttribute("style")).toContain("var(--warning)");
+    expect(lowBadge.className).toContain("pill-warning");
     fireEvent.click(screen.getByTestId("warehouse-cat-bedframe"));
     const outBadge = screen.getByTestId(`warehouse-badge-${SKU_BEDFRAME}`);
     expect(outBadge.textContent).toBe("Out");
-    expect(outBadge.getAttribute("style")).toContain("var(--danger)");
+    expect(outBadge.className).toContain("pill-overdue");
   });
 
   it("6. empty category shows the empty-state hint", () => {

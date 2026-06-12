@@ -53,6 +53,21 @@ function supStatusLabel(s: string): string {
   );
 }
 
+/** PO sup_status → v17 pill. pending/in_production = amber (waiting);
+ *  ready_for_pickup/delivered = green; reassign = red. */
+const SUP_STATUS_PILL: Record<string, string> = {
+  pending: "pill-warning",
+  in_production: "pill-warning",
+  ready_confirm_sent: "pill-sent",
+  ready_for_pickup: "pill-confirmed",
+  partially_shipped: "pill-collected",
+  delivered: "pill-confirmed",
+  reassign_needed: "pill-overdue",
+};
+function supStatusPill(s: string): string {
+  return SUP_STATUS_PILL[s] ?? "pill-neutral";
+}
+
 function poTotals(po: operationPoListRow): { received: number; total: number } {
   const lines = po.purchase_order_lines ?? [];
   return {
@@ -297,9 +312,7 @@ export default function OperationReceiving() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span
-                      className={`text-[11px] font-medium ${
-                        done ? "text-success" : "text-base-700"
-                      }`}
+                      className={`pill ${done ? "pill-confirmed" : supStatusPill(po.sup_status)}`}
                     >
                       {done ? "Received" : supStatusLabel(po.sup_status)}
                     </span>

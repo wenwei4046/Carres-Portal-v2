@@ -194,5 +194,9 @@
   .pill-confirmed { background:#DCFCE7; color:#166534; }
   .pill-collected { background:#E0E7FF; color:#3730A3; }
   .pill-overdue   { background:#FEE2E2; color:#991B1B; }
+  /* .pill-warning extends the v17 spec's 6 pills with the missing amber, so
+   * warning/low/pending/in-production states read as pills too (uses the v17
+   * --warning-soft #FEF3C7). Added 2026-06-12 per Jess. */
+  .pill-warning   { background:#FEF3C7; color:#92400E; }
   .pill-neutral   { @apply bg-base-100 text-base-700; }
 }

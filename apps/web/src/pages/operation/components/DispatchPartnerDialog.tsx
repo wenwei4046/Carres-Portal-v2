@@ -88,7 +88,7 @@ export default function DispatchPartnerDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
-        <h2 className="text-lg font-semibold mb-4">Dispatch — {poLabel ?? threadId.slice(0, 8)}</h2>
+        <h2 className="t-h3 mb-4">Dispatch — {poLabel ?? threadId.slice(0, 8)}</h2>
 
         <div className="mb-3">
           <label className="block text-sm font-medium mb-1">operation Partner</label>
@@ -134,16 +134,13 @@ export default function DispatchPartnerDialog({
         </div>
 
         <div className="flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-base-200 rounded"
-          >
+          <button onClick={onClose} className="btn-secondary">
             Cancel
           </button>
           <button
             onClick={() => dispatch.mutate()}
             disabled={!partnerId || !date || dispatch.isPending}
-            className="px-4 py-2 bg-accent text-white rounded disabled:opacity-50"
+            className="btn-primary"
           >
             {force ? "Force Dispatch" : "Send RFD / Dispatch"}
           </button>

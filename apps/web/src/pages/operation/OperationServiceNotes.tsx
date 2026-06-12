@@ -189,9 +189,7 @@ export default function OperationServiceNotes() {
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {r.status === "closed" ? (
-                        <span className="rounded bg-success-50 px-2 py-0.5 text-xs font-medium text-success-700">
-                          Closed
-                        </span>
+                        <span className="pill pill-confirmed">Closed</span>
                       ) : (
                         <StageBadge stage={stage as SnStage} />
                       )}
@@ -266,16 +264,18 @@ export default function OperationServiceNotes() {
 
 // ── Stage badge ────────────────────────────────────────────────────────────────
 
-const STAGE_COLORS: Record<SnStage, string> = {
-  collected:      "bg-base-100 text-base-700 border-base-200",
-  with_supplier:  "bg-orange-50 text-orange-700 border-orange-200",
-  supplier_done:  "bg-blue-50 text-blue-700 border-blue-200",
-  scheduled:      "bg-purple-50 text-purple-700 border-purple-200",
+/** v17 pills per SN stage — with_supplier=amber (waiting on supplier),
+ *  supplier_done=blue, scheduled=indigo, collected=neutral. */
+const STAGE_PILL: Record<SnStage, string> = {
+  collected:     "pill-neutral",
+  with_supplier: "pill-warning",
+  supplier_done: "pill-sent",
+  scheduled:     "pill-collected",
 };
 
 function StageBadge({ stage }: { stage: SnStage }) {
   return (
-    <span className={`rounded border px-2 py-0.5 text-xs font-medium ${STAGE_COLORS[stage]}`}>
+    <span className={`pill ${STAGE_PILL[stage]}`}>
       {SN_STAGE_LABELS[stage]}
     </span>
   );

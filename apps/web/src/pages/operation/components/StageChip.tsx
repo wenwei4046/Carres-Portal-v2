@@ -36,22 +36,16 @@ const STAGE_LABEL: Record<OperationStage, string> = {
   delivered: "Delivered",
 };
 
-const STAGE_TEXT: Record<OperationStage, string> = {
-  placed: "text-base-500",
-  proceed_request: "text-warning",
-  awaiting_operation_action: "text-warning",
-  ready_to_dispatch: "text-info",
-  dispatched: "text-primary",
-  delivered: "text-success",
-};
-
-const STAGE_BORDER: Record<OperationStage, string> = {
-  placed: "border-base-300",
-  proceed_request: "border-warning",
-  awaiting_operation_action: "border-warning",
-  ready_to_dispatch: "border-info",
-  dispatched: "border-primary",
-  delivered: "border-success",
+/** v17 status pills — each stage → a pill colour. warning=amber marks the
+ *  "waiting on stock" state; the full ramp reads neutral → purple → amber →
+ *  blue → indigo → green across the 6 stages. Replaces the old outline chip. */
+const STAGE_PILL: Record<OperationStage, string> = {
+  placed: "pill-neutral",
+  proceed_request: "pill-draft",
+  awaiting_operation_action: "pill-warning",
+  ready_to_dispatch: "pill-sent",
+  dispatched: "pill-collected",
+  delivered: "pill-confirmed",
 };
 
 export function stageLabel(stage: OperationStage): string {
@@ -60,10 +54,6 @@ export function stageLabel(stage: OperationStage): string {
 
 export default function StageChip({ stage }: Props) {
   return (
-    <span
-      className={`inline-block text-[9px] font-bold uppercase tracking-[0.12em] py-[3px] px-[7px] border rounded-[3px] ${STAGE_TEXT[stage]} ${STAGE_BORDER[stage]}`}
-    >
-      {STAGE_LABEL[stage]}
-    </span>
+    <span className={`pill ${STAGE_PILL[stage]}`}>{STAGE_LABEL[stage]}</span>
   );
 }

@@ -63,12 +63,15 @@ const TABS: { key: ControlTab; label: string }[] = [
 
 type SettledTab = Exclude<ControlTab, "all">;
 
-const TAB_CHIP: Record<SettledTab, { text: string; border: string }> = {
-  placed: { text: "text-base-500", border: "border-base-300" },
-  proceed: { text: "text-info", border: "border-info" },
-  pending: { text: "text-warning", border: "border-warning" },
-  scheduled: { text: "text-primary", border: "border-primary" },
-  completed: { text: "text-success", border: "border-success" },
+/** v17 status pills per control tab (warning=amber for Pending = waiting on
+ *  stock). placed→neutral, proceed→purple, pending→amber, scheduled→indigo,
+ *  completed→green. */
+const TAB_PILL: Record<SettledTab, string> = {
+  placed: "pill-neutral",
+  proceed: "pill-draft",
+  pending: "pill-warning",
+  scheduled: "pill-collected",
+  completed: "pill-confirmed",
 };
 
 const TAB_LABEL: Record<SettledTab, string> = {
@@ -768,10 +771,7 @@ function OrderRow({
       </td>
       {/* Status */}
       <td className="px-4 py-3 whitespace-nowrap">
-        <span
-          title={TAB_DESC[ct]}
-          className={`inline-block text-[9px] font-bold uppercase tracking-[0.12em] py-[3px] px-[7px] border rounded-[3px] ${TAB_CHIP[ct].text} ${TAB_CHIP[ct].border}`}
-        >
+        <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
           {TAB_LABEL[ct]}
         </span>
       </td>

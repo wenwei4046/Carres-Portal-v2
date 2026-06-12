@@ -207,7 +207,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
         {/* Modal header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-base-200">
           <div>
-            <h2 className="text-lg font-semibold text-base-900">
+            <h2 className="t-h3 text-base-900">
               {mode === "create" ? "New Case / Service Note" : `Edit ${detailQ.data?.snNo ?? "…"}`}
             </h2>
             <p className="text-xs text-base-500 mt-0.5">

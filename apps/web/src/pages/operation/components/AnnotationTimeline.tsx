@@ -166,7 +166,7 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
         <button
           type="submit"
           disabled={!content.trim() || mutation.isPending}
-          className="ml-auto text-[11px] font-medium px-3 py-1 rounded-[4px] bg-accent text-white disabled:opacity-40 hover:bg-accent/90 transition-colors"
+          className="ml-auto text-[11px] font-medium px-3 py-1 rounded-[4px] bg-base-900 text-white disabled:opacity-40 hover:bg-base-800 transition-colors"
         >
           {mutation.isPending ? "Saving…" : "Save note"}
         </button>
