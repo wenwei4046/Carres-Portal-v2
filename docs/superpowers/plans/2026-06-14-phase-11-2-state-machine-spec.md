@@ -129,3 +129,36 @@ delivered} (order-level; `waiting` stays thread/DB-only as before).
 apply 0167 to prod + deploy api+web + runtime lifecycle smoke (real-data value mapping; branch
 couldn't due to no-data/drift). Also drop the 0166 set_order_date 2-arg shim in the same cut.
 Test branch already deleted.
+
+## ✅ SHIPPED — coordinated prod cut (2026-06-14)
+
+Executed end-to-end against prod (`kfprgpjpaffedghytstl`). Pre-flight all green:
+no active DB sessions; no view/default deps on the enum; both stage indexes plain
+b-tree; wrangler authed as wwch (`e2494242…`) with workers+pages write; api dry-run
++ web build clean; TS sweep verified (0 retired enum literals in live `apps/`/`packages/` src).
+
+**Web env fix**: there was no `apps/web/.env.production`, so a plain `vite build` would
+embed `.env.local`'s localhost API URL. Created `apps/web/.env.production` (gitignored;
+loads only in production mode, so local dev + vitest still use `.env.local`) pinning prod
+Supabase + `VITE_API_BASE_URL=https://carres-portal-v2-api.wwch.workers.dev`. Bundle verified
+to embed prod URLs, no localhost, no service_role. This permanently fixes the fragile deploy.
+
+**Atomic cut (DB → api → web):**
+1. **0167 applied** (`apply_migration`, tracked) — `success:true`. Enum now =
+   `confirmed, in_production, ready_to_dispatch, waiting, dispatched, delivered` (6).
+   Data migrated: orders `proceed_request→confirmed` (1) + `awaiting_operation_action→in_production` (1);
+   thread `awaiting_operation_action→in_production` (1); `orders.status` UNTOUCHED (anchor preserved).
+   30 fns recreated (none lost), 3 triggers back, PASS G clean.
+2. **API deployed** — Worker version `621e425a-893c-46e2-a032-d12550b6d619`.
+3. **Web deployed** — bundle `index-DpaqrcW0.js` live on `carres-portal.pages.dev`.
+
+**0168 applied** — dropped the 0166 2-arg `set_order_date(uuid,date)` shim (verified no DB
+caller + live api sends `p_proceed_date`); only the 3-arg overload remains.
+
+**Smoke (all green):** API `/health`→200 `{"ok":true}`; live web serves new bundle hash;
+end-to-end operation login (`operation@carres.com`) → `GET /api/operation/orders`→200 with
+`operation_stage` rendering correctly (no enum errors). Proves new api + secrets + new enum
+end-to-end through the real recreated functions.
+
+**Migration tracker** now tips at 0168. Branch still drifted from main (older CLAUDE.md /
+deleted docs) — merge strategy is a separate decision.
