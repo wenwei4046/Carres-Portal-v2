@@ -309,21 +309,21 @@ Don't burn an hour spinning. Surface and ask.
 
 ## 17. Project status
 
-### 17.1 Current state (as of 2026-06-08)
+### 17.1 Current state (as of 2026-06-14)
 
 | | |
 |---|---|
-| Active phase | **Phase 10** — post-launch fixes + Phase A (AutoCount import + per-unit stock) |
+| Active phase | **Phase 11 shipped 2026-06-14** (PR #15): 11.1 salesperson Proceed Date + 11.2 `operation_stage` 7→6 collapse. Phase 10 post-launch fixes still ongoing. |
 | Project started | 2026-05-02 |
 | Web URL | https://carres-portal.pages.dev |
 | API URL | https://carres-portal-v2-api.wwch.workers.dev |
 | DB | staging Supabase = prod, project_id `kfprgpjpaffedghytstl` |
-| Latest migration | **0158** `normalize_teow_name`. New since 0154: 0155 = +4 logistic partners (Teow/TT KL→JB, EU/SSY JB→SG) · 0156 = multi-leg delivery (`orders.delivery_stops` jsonb + GIN `jsonb_path_ops` index + `set_delivery_chain`/`patch_delivery_stop` RPCs) · 0157 = `NETS` rename · 0158 = `TEOW` all-caps rename. 0151-0154 = delivery e-sign / STANDARD auto-dispatch + LP-reject / per-unit `id-abc123456`. **TRACKER GAP**: `supabase_migrations.schema_migrations` (what `list_migrations` reads) stops at **0154** — 0155-0158 were applied out-of-band, so their 4 rows are missing even though the schema is fully live (verified 2026-06-08: 8 partners · `delivery_stops` jsonb · both RPCs). Backfill the 4 rows only if a clean `list_migrations` matters. |
+| Latest migration | **0168** `drop_set_order_date_2arg_shim`. Phase 11: 0165 = `orders.proceed_date` + 3-arg `set_order_date` · 0166 = temp 2-arg shim (dropped by 0168) · **0167** = `operation_stage` enum 7→6 (`placed`/`proceed_request`→`confirmed`, `awaiting_operation_action`→`in_production`, `waiting` kept; `orders.status` UNTOUCHED as anchor; 30 fns + 3 triggers self-adaptively recreated) · 0168 = drop shim. The 6/12 ops-cockpit migrations 0159-0166 (`ops_order_control`, `ops_notes_tasks`, `ops_order_control_payments`, `ops_bulk_complete_orders`, etc.) are main's authentic files. **NOTE**: 0165 + 0166 each have TWO distinct files (an ops_* migration + an 11.1 migration sharing the number) — cosmetic only, this project applies migrations manually via MCP (tracker keys on timestamp, not filename). The 5 branch backfill duplicates were deleted in cleanup. |
 | Catalog state | 11 suppliers · 170 product_models · 1013 product_skus (target 1091, 78 source dupes in carres-sku-master.xlsx — see CFs) |
 | Orders state | **158 orders** (verified 2026-06-08): 153 AutoCount-imported (`source_system='autocount'`, all status `place`, SO-1001..1158, ~575 units feeding supplier forecast) + 5 native test orders (SO-1116..1120, cancelled/proceed_order). 0 have `delivery_stops` set — multi-leg chain never live-exercised (see §17.3 Pending). next `orders_so_seq` ≈ SO-1159. |
-| Test count | api 708/711 (3 pre-existing fails) · web 473/478 (5 pre-existing fails) · shared 186/186 — measured 2026-06-08; all 8 fails pre-existing per §17.7, zero new regressions (+16 api delivery-chain, +9 web multi-leg/stock-alerts, all pass) |
-| Web bundle | 2795.21 KiB raw / 823.03 KiB gzipped (bundle `index-BOjbe0Pf.js`; built+deployed 2026-06-12 = **v17 Phase 2**; CSS `index-U2my3MYz.css` 60.14 KiB; bundle-size regression CF still open, see §17.5) |
-| API bundle | 1281.87 KiB raw / 241.86 KiB gzipped (dry-run measured 2026-06-08; live Worker version `1974bdea-bdbc-49d1-93d5-3cbef04ffb70` deployed 2026-06-05) |
+| Test count | api 720/723 (3 pre-existing fails) · web 535/540 (5 pre-existing fails) · shared 193/193 — measured 2026-06-14; all 8 fails pre-existing per §17.7, zero new regressions from Phase 11 + merge |
+| Web bundle | 2853.89 KiB raw / 837.67 KiB gzipped (bundle `index-SUq9Dv0z.js`; CSS `index-DyA1QX3I.css` 63.26 KiB; built+deployed 2026-06-14 = Phase 11 + 6/12 ops overhaul; bundle-size regression CF still open, see §17.5) |
+| API bundle | 1304.42 KiB raw / 245.85 KiB gzipped (live Worker version `b08681a6-82a0-4d53-afec-9beb3d068a46` deployed 2026-06-14) |
 
 ### 17.2 Phase timeline
 
@@ -341,6 +341,7 @@ Don't burn an hour spinning. Surface and ask.
 | 8 Showroom + BD | ✅ | 2026-05-09 | `phase-8-complete` (`1f71eea`) · BD inquiry pipeline (migration 0072) |
 | 9 Production cutover | ✅ | 2026-05-10 ~23:25 | `phase-9-complete` · DB cleanup 2026-05-09, CF deploy 2026-05-10 |
 | 10 Post-launch | 🔵 in progress | from 2026-05-11 | See §17.3 work-log |
+| 11 Proceed Date + state collapse | ✅ | 2026-06-14 | PR #15 (`950c0ec`) · 11.1 proceed_date (0165) + 11.2 operation_stage 7→6 (0167). Spec: `docs/superpowers/plans/2026-06-14-phase-11-2-state-machine-spec.md`. Reconciled with main's 6/12 ops overhaul mid-merge (branch had forked 6/05 + missed it). |
 
 ### 17.3 Phase 10 work-log
 
@@ -400,6 +401,8 @@ Don't burn an hour spinning. Surface and ask.
 - `phase-10-smart-partner-suggest` — multi-leg "+ Add leg" form + Inbox partner dropdown should auto-recommend a partner from the customer's delivery state (Klang→NETS, Johor→TEOW/TT, Singapore→EU/SSY). Operation currently picks manually.
 
 **LOW**:
+- `phase-11-deploy-verify-branch-has-latest` — **LESSON (2026-06-14)**: deploying `phase/11.2-state-machine` straight to prod briefly reverted the 6/12 ops overhaul, because the branch had forked from main on 6/05 and never carried it. Fixed by merging main back in + reconciling the enum (PR #15). **Before deploying ANY branch to prod, confirm it contains main's latest *deployed* work** (`git log --oneline HEAD..origin/main` should be empty, or you're shipping a regression). Cheap pre-deploy check; would have caught this instantly.
+- `phase-11-migration-0165-0166-dual-files` — 0165 + 0166 each have two distinct files (an `ops_*` migration + an 11.1 migration sharing the number). Cosmetic only — migrations apply manually via MCP (tracker keys on timestamp). Renumbering was deliberately NOT done: the tracker records the exact names `0165_add_proceed_date` / `0166_set_order_date_2arg_compat_shim`, so renaming the files would desync file↔tracker. Leave unless a fresh `supabase db push` pipeline is ever introduced.
 - `phase-10-rename-script-blind-spot-doc` — 0121 + 0123 both missed alias patterns. Enumerate ALL alias patterns upfront next rename, OR use comprehensive regex `(?<![a-z_])<col>(?![a-z_])`. Worth a doc in `docs/superpowers/`.
 - `phase-10-pg-regex-word-boundary` — PG ARE `\b` is backspace, NOT word boundary. Use `\y` (PG-specific) or lookbehind. Tripped 0126 first apply.
 - `phase-10-historical-dl-literal-strings` — `audit_log` + `order_history` `'DL-'` / `Auto-promoted DL-%s` literals intentionally kept as historical record.
