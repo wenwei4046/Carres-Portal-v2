@@ -68,6 +68,35 @@ Migration 0167 (NOT applied here — coordinated prod window):
 
 ⚠️ Apply requires: (a) other session clear, (b) api+web deploy in the SAME window (the deployed code must match the new enum — a mismatch breaks the live order flow). This is why 11.2 ships as one coordinated cut, not piecemeal.
 
+## ⚠️ KEY FINDING (2026-06-14, from snapshotting spine fns)
+
+The collapse is DEEPER than a value-remap. Today `orders.status` is a STABLE ANCHOR
+during fulfilment — it sits at `proceed_order` the whole time while `operation_stage`
+moves. Many of the 30 functions use `status='proceed_order'` to mean "this order is in
+active fulfilment (not cancelled/delivered)". Examples found:
+- `_operation_auto_dispatch_if_ready`: `IF v_order.status <> 'proceed_order' ... RETURN false`
+- `orders_auto_status_delivered`: guarded on `status = 'proceed_order'` (this trigger gets DROPPED)
+- rollup trigger writes operation_stage freely (separate column) — under single axis it must
+  NOT clobber draft/confirmed (no-threads) or cancelled/on_hold (terminal/paused).
+
+Under single axis, status MOVES (confirmed→in_production→ready_to_dispatch→dispatched→delivered),
+so every "status='proceed_order'" anchor must be rewritten to a set-membership guard
+(e.g. `status NOT IN ('cancelled','delivered','on_hold')` or `status IN ('in_production','ready_to_dispatch')`).
+This is PER-FUNCTION SEMANTIC judgement, not mechanical. Higher risk than 0121; needs the
+coordinated-prod-window runtime smoke to fully validate (branch only validates syntax/structure
+because it's ~30 migrations behind prod due to the drift and can't be cheaply mirrored).
+
+### New rollup design (single axis)
+`orders_rollup_stage(uuid) RETURNS order_state`: returns NULL when no threads (→ trigger leaves
+status untouched); else all-delivered→delivered / all dispatched|delivered→dispatched /
+all ready|dispatched|delivered→ready_to_dispatch / else→in_production. Trigger writes
+`orders.status = rollup` only when rollup IS NOT NULL **and** `status NOT IN ('cancelled','on_hold')`.
+DROP `orders_auto_status_delivered` (rollup now sets delivered directly).
+
 ## Status
 
-- 2026-06-14: spec written in worktree. Authoring migration + TS sweep next; NOT applying to shared prod.
+- 2026-06-14: spec + KEY FINDING written. Branch `kilsjjaaenbobiiuqkfh` created but MIGRATIONS_FAILED
+  (drift — prod recorded-history is incomplete, branch is ~30 migrations behind, missing
+  ops_stock_items/ops_order_control + many cols). Usable for SYNTAX/STRUCTURE validation only.
+  Spine fn bodies snapshotted. Full 30-fn rewrite + TS sweep is the next substantial pass;
+  runtime smoke + deploy = coordinated prod window. Branch to DELETE when done ($0.013/hr).
