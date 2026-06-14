@@ -62,7 +62,12 @@ const MAX_ORDERS = 5;
  *  sync with the kanban guarantees the dashboard's at-a-glance counts match
  *  what the user sees when they click through. */
 function derivePipelineStage(o: operationOrderListRow): PipelineStage | null {
-  if (o.status === "place") return "placed";
+  if (o.status === "place") {
+    // AutoCount-imported orders are already-confirmed sales (not awaiting a
+    // proceed request) → Confirmed column, matching the Orders grid's
+    // controlTabOf rule. Only native place orders sit in Placed.
+    return o.source_system === "autocount" ? "confirmed" : "placed";
+  }
   const s = o.operation_stage;
   if (s === "confirmed" || s === "in_production" || s === "ready_to_dispatch" || s === "dispatched") {
     return s;

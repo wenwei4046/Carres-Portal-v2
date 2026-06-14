@@ -60,10 +60,12 @@ afterAll(() => _setJwksForTesting(null));
 /**
  * Mock the supabase user client for dashboard tests. The route does:
  *   1. sb.rpc("operation_dashboard_summary")
- *   2. sb.from("orders").select("id", { count: "exact", head: true }).eq("status", "place")
- *   3. sb.from("orders").select("id", { count: "exact", head: true }).eq("operation_stage", "confirmed")
+ *   2. Placed count   — .from('orders').select(...).eq('status','place').or(<native>)
+ *   3. Confirmed count — .from('orders').select(...).or(<confirmed OR autocount-place>)
  *
- * `placedCount` and `proceedRequestCount` set the return values for steps 2/3.
+ * Both count queries terminate on `.or(...)`; `.eq` (query 2 above) is an
+ * intermediate link. `placedCount` / `proceedRequestCount` set the return
+ * values for the first / second terminal `.or` call.
  */
 function mockDashboard(opts: {
   summary?: typeof SUMMARY_PAYLOAD | null;
@@ -76,19 +78,22 @@ function mockDashboard(opts: {
       ? { data: null, error: opts.rpcError }
       : { data: opts.summary ?? SUMMARY_PAYLOAD, error: null },
   );
-  // For each .from('orders') call, return a chainable that resolves on .eq(...)
-  // to { data: null, error: null, count: <chosen> }. The eq sequence determines
-  // which count we return — first .eq call is for status='place', second for
-  // operation_stage='confirmed'.
-  let eqCallIdx = 0;
+  // Each .from('orders') call returns a chainable where .eq() links onward and
+  // .or() is the terminal that resolves to { data, error, count }. The .or call
+  // order picks the count: first .or (placed query) → placedCount, second .or
+  // (confirmed query) → proceedRequestCount.
+  let orCallIdx = 0;
   const counts = [opts.placedCount ?? 0, opts.proceedRequestCount ?? 0];
   const from = vi.fn(() => {
-    const eq = vi.fn(() => {
-      const count = counts[eqCallIdx] ?? 0;
-      eqCallIdx += 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chain: any = {};
+    chain.eq = vi.fn(() => chain);
+    chain.or = vi.fn(() => {
+      const count = counts[orCallIdx] ?? 0;
+      orCallIdx += 1;
       return Promise.resolve({ data: null, error: null, count });
     });
-    return { select: vi.fn(() => ({ eq })) };
+    return { select: vi.fn(() => chain) };
   });
   vi.mocked(userClient).mockReturnValue({
     rpc,

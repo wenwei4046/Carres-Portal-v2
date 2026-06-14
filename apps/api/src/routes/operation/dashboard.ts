@@ -38,9 +38,18 @@ operationDashboardRouter.get("/", async (c) => {
 
   // Pipeline v2 extra counts. PostgREST's `head: true, count: 'exact'` returns
   // the count via response metadata without fetching rows.
+  //
+  // AutoCount-aware bucketing — mirrors the Orders grid's controlTabOf so the
+  // dashboard and the Orders table agree: an AutoCount-imported `status='place'`
+  // order is an already-confirmed sale, so it counts as Confirmed, NOT Placed.
+  // Only native place orders (dealer hasn't proceeded) stay in Placed.
   const [placedRes, proceedReqRes] = await Promise.all([
-    sb.from("orders").select("id", { count: "exact", head: true }).eq("status", "place"),
-    sb.from("orders").select("id", { count: "exact", head: true }).eq("operation_stage", "confirmed"),
+    // Placed = native place orders only (source null or non-autocount).
+    sb.from("orders").select("id", { count: "exact", head: true })
+      .eq("status", "place").or("source_system.is.null,source_system.neq.autocount"),
+    // Confirmed = confirmed-stage orders + AutoCount-imported place orders.
+    sb.from("orders").select("id", { count: "exact", head: true })
+      .or("operation_stage.eq.confirmed,and(status.eq.place,source_system.eq.autocount)"),
   ]);
   if (placedRes.error) {
     const m = mapPgError(placedRes.error);
