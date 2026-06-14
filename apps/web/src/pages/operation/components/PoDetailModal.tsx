@@ -75,6 +75,18 @@ function poDisplay(po: operationPoListRow): {
   return { label: "partial", color: "var(--info, #2563eb)" };
 }
 
+/** v17 pill per PO display status — open=amber (waiting), partial=indigo,
+ *  received=green, cancelled=grey. */
+const PO_DISPLAY_PILL: Record<
+  "open" | "partial" | "received" | "cancelled",
+  string
+> = {
+  open: "pill-warning",
+  partial: "pill-collected",
+  received: "pill-confirmed",
+  cancelled: "pill-neutral",
+};
+
 // v3-S2.3 — sup_status values that gate out the Receive button. Mid-pickup
 // flight states where Receive doesn't apply; mirrors the ActionCell carve-out
 // in operationProcurement.tsx (lines 463-489).
@@ -192,7 +204,7 @@ export default function PoDetailModal({
           <div className="min-w-0">
             <div className="kicker">Purchase Order</div>
             <div
-              className="font-display text-[24px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900 font-mono"
+              className="t-h2 font-display mt-1.5 text-base-900 font-mono"
               title={po.id}
             >
               #PO-{poShortId}
@@ -202,14 +214,7 @@ export default function PoDetailModal({
             </div>
           </div>
           <span
-            className="font-ui font-bold uppercase border rounded-[3px] flex-shrink-0"
-            style={{
-              fontSize: 9,
-              letterSpacing: "0.12em",
-              color: status.color,
-              borderColor: status.color,
-              padding: "3px 7px",
-            }}
+            className={`pill capitalize flex-shrink-0 ${PO_DISPLAY_PILL[status.label]}`}
             data-testid="po-detail-status-chip"
           >
             {status.label}

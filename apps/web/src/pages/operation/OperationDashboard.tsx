@@ -246,7 +246,7 @@ function Hero({ kpis, pipeline }: HeroProps) {
   return (
     <div>
       <div className="kicker">{fmtDate} &middot; operation</div>
-      <h1 className="font-display text-[36px] leading-[1.05] mt-2 tracking-[-0.025em] font-bold text-base-900">
+      <h1 className="t-h1 font-display mt-2 text-base-900">
         {kpis.today_deliveries} deliveries today.
         <br />
         <span className="text-base-600 font-medium">

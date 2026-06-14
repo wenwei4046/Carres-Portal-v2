@@ -31,6 +31,15 @@ out/
 .env.development
 .env.production
 .env.staging
+# EXCEPTION: apps/web/.env.production holds ONLY public, browser-safe values
+# (VITE_SUPABASE_URL + anon key + VITE_API_BASE_URL — all public-by-design; the
+# anon key is meant for the browser and RLS is the security boundary; the
+# service_role key is NEVER here, it lives only in Workers secrets). Committing
+# it makes every production build self-contained, so a `pnpm build` on a clone
+# WITHOUT .env.local can't ship an env-less bundle — that recurring footgun
+# (2026-06-04 + 2026-06-10) shipped a "Supabase not configured" prod login
+# outage. Vite still loads .env.local OVER this for local dev.
+!apps/web/.env.production
 
 # Cloudflare Workers local secrets (read by `wrangler dev`)
 .dev.vars

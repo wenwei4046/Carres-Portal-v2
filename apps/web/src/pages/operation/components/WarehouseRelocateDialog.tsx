@@ -65,7 +65,7 @@ export default function WarehouseRelocateDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
-        <h2 className="text-lg font-semibold mb-4">Relocate PO {poId}</h2>
+        <h2 className="t-h3 mb-4">Relocate PO {poId}</h2>
         <ul className="space-y-2 mb-4">
           {(warehouses ?? []).map((wh) => (
             <li key={wh.id}>
@@ -84,16 +84,13 @@ export default function WarehouseRelocateDialog({
           ))}
         </ul>
         <div className="flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-base-200 rounded"
-          >
+          <button onClick={onClose} className="btn-secondary">
             Cancel
           </button>
           <button
             onClick={() => relocate.mutate()}
             disabled={!selected || relocate.isPending}
-            className="px-4 py-2 bg-accent text-white rounded disabled:opacity-50"
+            className="btn-primary"
           >
             Relocate
           </button>

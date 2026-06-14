@@ -4,84 +4,84 @@
 
 @layer base {
   :root {
-    /* shadcn semantic tokens — three-layer editorial look. The proto's dashboard
-     * stacks three distinct shades for clear visual hierarchy:
-     *   1. Body (`--background`)  — light cool cream, almost off-white grey
-     *   2. Column wrapper (`--card`) — warmer cream, noticeably deeper than body
-     *   3. Inner kanban cards     — pure white (`bg-white` Tailwind utility)
-     * Loo confirmed this look via screenshot review on 2026-05-02. */
-    --background: 36 20% 95%;
-    --foreground: 340 5% 13%;
+    /* ===== Carres UI v17 (locked 2026-06-09) — clean modern SaaS + Carres warmth.
+     * Token NAMES are unchanged from the warm-linen system, so every component
+     * (bg-base-*, text-primary, bg-card, status badges…) re-themes with ZERO
+     * churn — only the VALUES flip:
+     *   • neutrals  → Tailwind cool gray
+     *   • brand     → flame (#C44D2B)
+     *   • status    → bright semantic
+     *   • page bg   → kept CREAM for Carres warmth (v17 page-bg option B)
+     *   • cards     → white (hierarchy now from borders + subtle shadow, not
+     *                 stacked cream layers)
+     * Approved by Loo via side-by-side preview 2026-06-09. */
+    --background: 38 33% 94%;          /* #F5F1EA — Carres cream page */
+    --foreground: 221 39% 11%;         /* gray-900 ink */
 
-    --card: 40 53% 97%;
-    --card-foreground: 340 5% 13%;
+    --card: 0 0% 100%;                 /* white cards */
+    --card-foreground: 221 39% 11%;
 
-    --popover: 40 53% 97%;
-    --popover-foreground: 340 5% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 221 39% 11%;
 
-    --primary: 15 74% 48%;
+    --primary: 13 64% 47%;             /* flame #C44D2B */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 30 18% 91%;
-    --secondary-foreground: 340 5% 13%;
+    --secondary: 220 14% 96%;          /* gray-100 */
+    --secondary-foreground: 221 39% 11%;
 
-    --muted: 30 12% 87%;
-    --muted-foreground: 18 6% 41%;
+    --muted: 220 13% 91%;              /* gray-200 */
+    --muted-foreground: 220 9% 46%;    /* gray-500 */
 
-    --accent: 21 80% 90%;
-    --accent-foreground: 15 74% 48%;
+    --accent: 18 51% 91%;              /* flame-light #F4E4DD */
+    --accent-foreground: 13 64% 47%;   /* flame */
 
-    --destructive: 0 64% 33%;
+    --destructive: 0 72% 51%;          /* red-600 #DC2626 */
     --destructive-foreground: 0 0% 100%;
 
-    /* --danger: vivid red (Tailwind red-700, proto #b91c1c) — for "out of stock" /
-       "overdue" / "negative net" accents. Distinct from --destructive (wine
-       --error) which is for error pills + form validation. Both come from
-       reference/shared/styles.css warm-linen palette. */
-    --danger: 0 79% 41%;
-    --danger-foreground: 0 0% 98%;
+    /* --danger: bright red (#DC2626) — "out of stock" / "overdue" / negative-net
+       accents. v17 collapses the old wine/red split into one semantic red. */
+    --danger: 0 72% 51%;
+    --danger-foreground: 0 0% 100%;
 
-    --border: 30 12% 87%;
-    --input: 30 12% 87%;
-    --ring: 15 74% 48%;
+    --border: 220 13% 91%;             /* gray-200 */
+    --input: 220 13% 91%;
+    --ring: 13 64% 47%;                /* flame focus ring */
 
-    --radius: 0.375rem;
+    --radius: 0.5rem;                  /* 8px (v17 lg) */
 
-    /* Carres warm-linen ramp (mirrors reference/shared/styles.css hex values) */
-    --base-50:  36 20% 95%;
-    --base-100: 30 18% 91%;
-    --base-200: 30 12% 87%;
-    --base-300: 33 10% 79%;
-    --base-400: 30 8% 66%;
-    --base-500: 28 6% 53%;
-    --base-600: 18 6% 41%;
-    --base-700: 20 6% 30%;
-    --base-800: 10 5% 22%;
-    --base-900: 340 5% 13%;
+    /* Neutral ramp — Tailwind cool gray (v17). Names kept = zero component churn. */
+    --base-50:  210 20% 98%;  /* #F9FAFB */
+    --base-100: 220 14% 96%;  /* #F3F4F6 */
+    --base-200: 220 13% 91%;  /* #E5E7EB */
+    --base-300: 216 12% 84%;  /* #D1D5DB */
+    --base-400: 218 11% 65%;  /* #9CA3AF */
+    --base-500: 220 9% 46%;   /* #6B7280 */
+    --base-600: 215 14% 34%;  /* #4B5563 */
+    --base-700: 217 19% 27%;  /* #374151 */
+    --base-800: 215 28% 17%;  /* #1F2937 */
+    --base-900: 221 39% 11%;  /* #111827 */
 
-    /* Brand */
-    --terracotta: 15 74% 48%;
+    /* Brand — flame (token name `--terracotta` kept for zero churn). */
+    --terracotta: 13 64% 47%;          /* #C44D2B */
 
-    /* Signature variants — light tints for active states + darker hover.
-     * Mirror reference/shared/styles.css lines 4-6 + observed proto usage. */
-    --signature-50:  23 84% 95%;  /* #FDF0E8 — pale peach: chip/card active fill */
-    --signature-100: 21 80% 90%;  /* #FAE0D2 — pale terracotta: "Start a sale" sub-label */
-    --signature-700: 15 79% 39%;  /* #B03C15 — darker terracotta: btn-primary hover */
+    /* Brand tints — active fills + darker hover. */
+    --signature-50:  18 51% 91%;  /* flame-light #F4E4DD — active chip/card fill */
+    --signature-100: 16 60% 85%;  /* a touch deeper */
+    --signature-700: 14 64% 37%;  /* flame-dark #9A3D22 — primary/hero hover */
 
-    /* Status palette — proto warm-linen Calm Operations.
-     * Mirrors reference/shared/styles.css lines 19-22. Used for pills, blocker /
-     * ready states, paid pct, success/warning bg fills, info chrome. */
-    --success:        100 30% 32%;  /* #4A6B3A — olive sage */
-    --success-soft:    83 27% 90%;  /* #E8EDE0 */
+    /* Status — v17 bright semantic + soft fills (Tailwind 600 / 100). */
+    --success:        142 71% 45%;  /* #16A34A */
+    --success-soft:   138 76% 93%;  /* #DCFCE7 */
     --success-foreground: 0 0% 100%;
-    --warning:         33 73% 45%;  /* #C97B1F — honey */
-    --warning-soft:    38 67% 91%;  /* #F7EBD7 */
+    --warning:         32 95% 44%;  /* #D97706 */
+    --warning-soft:    48 96% 89%;  /* #FEF3C7 */
     --warning-foreground: 0 0% 100%;
-    --info:           225 31% 42%;  /* #4A5A8B — slate blue */
-    --info-soft:      224 31% 90%;  /* #DFE3EE */
+    --info:           217 91% 60%;  /* #2563EB */
+    --info-soft:      214 95% 93%;  /* #DBEAFE */
     --info-foreground: 0 0% 100%;
-    /* --error == --destructive (#8B1E1E); kept distinct only for *-soft pairing */
-    --error-soft:      0 55% 90%;   /* #F4D9D9 */
+    /* --error shares the v17 red; *-soft kept for pill/callout fills. */
+    --error-soft:      0 93% 94%;   /* #FEE2E2 */
   }
 }
 
@@ -92,25 +92,36 @@
 }
 
 @layer components {
-  /* Proto button utilities — UPPERCASE, letter-spacing 0.06em, radius 4px,
-   * 13px font-semibold. Mirrors reference/shared/styles.css .btn-primary /
-   * .btn-secondary / .btn-ghost (lines 46-50). One source of truth for the
-   * Carres action button identity across every page. */
+  /* v17 button utilities — sentence case (no uppercase), 13px semibold, 6px
+   * radius. Phase 2 hierarchy (locked): `.btn-hero` = the ONE flame CTA per page;
+   * `.btn-primary` = black workhorse for every other primary action;
+   * `.btn-danger` = red text on white for destructive actions. */
   .btn-primary {
     @apply inline-flex items-center justify-center
+           bg-base-900 text-white
+           px-[18px] py-2.5 rounded-md
+           text-[13px] font-semibold
+           transition-colors
+           hover:bg-base-800
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  /* HERO — the single flame CTA per page (v17). Now distinct from `.btn-primary`
+   * (black): flame marks the page's one primary action. */
+  .btn-hero {
+    @apply inline-flex items-center justify-center
            bg-primary text-primary-foreground
-           px-[18px] py-2.5 rounded
-           text-[13px] font-semibold uppercase tracking-[0.06em]
+           px-[18px] py-2.5 rounded-md
+           text-[13px] font-semibold
            transition-colors
            hover:bg-signature-700
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center
-           bg-transparent text-base-900
+           bg-white text-base-900
            border border-base-300
-           px-[18px] py-2.5 rounded
-           text-[13px] font-semibold uppercase tracking-[0.06em]
+           px-[18px] py-2.5 rounded-md
+           text-[13px] font-semibold
            transition-colors
            hover:border-base-500
            disabled:opacity-40 disabled:cursor-not-allowed;
@@ -118,10 +129,22 @@
   .btn-ghost {
     @apply inline-flex items-center justify-center
            bg-transparent text-base-700
-           px-3.5 py-2
-           text-[13px] font-semibold uppercase tracking-[0.06em]
+           px-3.5 py-2 rounded-md
+           text-[13px] font-semibold
            transition-colors
-           hover:text-base-900
+           hover:text-base-900 hover:bg-base-100
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  /* DANGER — red text on white, never red-filled (v17). For destructive
+   * actions (cancel / delete). */
+  .btn-danger {
+    @apply inline-flex items-center justify-center
+           bg-white text-danger
+           border border-danger
+           px-[18px] py-2.5 rounded-md
+           text-[13px] font-semibold
+           transition-colors
+           hover:bg-error-soft
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
 
@@ -144,10 +167,36 @@
    * logistics pages render as transparent, breaking the visual hierarchy. */
   .card {
     background: #fff;
-    border: 1px solid rgba(34, 31, 32, 0.08);
-    border-radius: 6px;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 8px;
     box-shadow:
-      0 1px 2px rgba(34, 31, 32, 0.03),
-      0 1px 1px rgba(34, 31, 32, 0.02);
+      0 1px 2px rgba(17, 24, 39, 0.04),
+      0 1px 1px rgba(17, 24, 39, 0.03);
   }
+
+  /* v17 type scale (spec NOTES v17 §TYPOGRAPHY SIZES) — one class per role so
+   * pages stop hand-rolling `text-[Npx] font-* tracking-*`. Colour stays on the
+   * element (these set size/weight/tracking only). */
+  .t-h1    { @apply text-[32px] font-bold tracking-[-0.02em] leading-[1.05]; }
+  .t-h2    { @apply text-[24px] font-bold tracking-[-0.01em]; }
+  .t-h3    { @apply text-[18px] font-semibold; }
+  .t-h4    { @apply text-[15px] font-semibold; }
+  .t-body  { @apply text-[14px] font-normal; }
+  .t-small { @apply text-[13px] font-normal; }
+  .t-tiny  { @apply text-[12px] font-normal; }
+  .t-micro { @apply text-[11px] font-medium uppercase tracking-[0.05em]; }
+
+  /* v17 status pills (spec §STATUS PILLS) — bg/fg pairs hard-coded (not in the
+   * token ramp). Use `.pill` + one modifier. `.pill-neutral` uses tokens. */
+  .pill           { @apply inline-block text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full; }
+  .pill-draft     { background:#F3E8FF; color:#6B21A8; }
+  .pill-sent      { background:#DBEAFE; color:#1E40AF; }
+  .pill-confirmed { background:#DCFCE7; color:#166534; }
+  .pill-collected { background:#E0E7FF; color:#3730A3; }
+  .pill-overdue   { background:#FEE2E2; color:#991B1B; }
+  /* .pill-warning extends the v17 spec's 6 pills with the missing amber, so
+   * warning/low/pending/in-production states read as pills too (uses the v17
+   * --warning-soft #FEF3C7). Added 2026-06-12 per Jess. */
+  .pill-warning   { background:#FEF3C7; color:#92400E; }
+  .pill-neutral   { @apply bg-base-100 text-base-700; }
 }

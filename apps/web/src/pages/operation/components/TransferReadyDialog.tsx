@@ -8,6 +8,7 @@ import {
   type operationOrderDetailOrder,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "./Modal";
+import { AlertTriangle } from "lucide-react";
 
 /**
  * TransferReadyDialog — Pipeline v2 (Phase 4 C3) manual stock-on-hand transfer.
@@ -197,7 +198,7 @@ export default function TransferReadyDialog({
             </>
           ) : (
             <>
-              <strong>⚠ Some lines short</strong> — RPC will reject with{" "}
+              <strong><AlertTriangle size={13} strokeWidth={2} className="inline -mt-px mr-1" />Some lines short</strong> — RPC will reject with{" "}
               <code className="font-mono">insufficient_stock_for_reserve</code>.
               Use <strong>Issue POs</strong> instead.
               <div className="font-mono text-[11px] mt-1">

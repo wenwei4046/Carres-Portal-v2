@@ -86,6 +86,7 @@ export default function AbandonOrderModal({ order, onClose }: Props) {
         primary="Abandon order"
         primaryDisabled={!valid}
         primaryPending={abandon.isPending}
+        danger
       />
     </Modal>
   );

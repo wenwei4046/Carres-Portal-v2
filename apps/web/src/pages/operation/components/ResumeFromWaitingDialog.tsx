@@ -49,23 +49,20 @@ export default function ResumeFromWaitingDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
-        <h2 className="text-lg font-semibold mb-4">Resume from at_warehouse_waiting</h2>
+        <h2 className="t-h3 mb-4">Resume from at_warehouse_waiting</h2>
         <p className="text-sm text-base-600 mb-4">
           Order #{so} threads will be advanced from <code>waiting</code> →{" "}
           <code>ready_to_dispatch</code>. Customer date confirmation is off-system;
           click only after customer has confirmed.
         </p>
         <div className="flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-base-200 rounded"
-          >
+          <button onClick={onClose} className="btn-secondary">
             Cancel
           </button>
           <button
             onClick={() => resume.mutate()}
             disabled={resume.isPending}
-            className="px-4 py-2 bg-accent text-white rounded disabled:opacity-50"
+            className="btn-primary"
           >
             Resume to Dispatch
           </button>

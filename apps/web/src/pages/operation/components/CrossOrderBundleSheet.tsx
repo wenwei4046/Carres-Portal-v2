@@ -58,7 +58,7 @@ export default function CrossOrderBundleSheet({
         <button
           type="button"
           onClick={() => onBundleClick(selectedOrderIds)}
-          className="bg-primary text-primary-foreground hover:bg-signature-700 px-3.5 py-1.5 rounded text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors"
+          className="bg-primary text-primary-foreground hover:bg-signature-700 px-3.5 py-1.5 rounded text-[12px] font-semibold transition-colors"
         >
           + Create combined PO &rarr;
         </button>

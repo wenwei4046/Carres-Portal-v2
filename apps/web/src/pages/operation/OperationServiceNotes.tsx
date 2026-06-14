@@ -10,6 +10,7 @@ import {
   type SnStage,
 } from "@carres/shared";
 import ServiceNoteModal from "./components/ServiceNoteModal";
+import { AlertTriangle } from "lucide-react";
 
 /**
  * Operation Service Notes — Issue Tracker.
@@ -57,7 +58,7 @@ export default function OperationServiceNotes() {
       {/* Header */}
       <div className="mb-6">
         <p className="text-xs uppercase tracking-wider text-base-500 mb-1">Operation</p>
-        <h1 className="text-3xl font-semibold text-base-900">Service Notes</h1>
+        <h1 className="t-h1 text-base-900">Service Notes</h1>
         <p className="text-sm text-base-600 mt-2">
           Issue tracker · every case gets an SN number · printable for NETS / supplier
         </p>
@@ -87,7 +88,7 @@ export default function OperationServiceNotes() {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="rounded bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary/90"
+          className="btn-hero text-[13px] py-1.5"
         >
           + New Case
         </button>
@@ -181,7 +182,13 @@ export default function OperationServiceNotes() {
                       {r.deadline ? (
                         <span className={overdue ? "text-error-700 font-semibold" : "text-base-600"}>
                           {fmtDate(r.deadline)}
-                          {overdue && " ⚠"}
+                          {overdue && (
+                            <AlertTriangle
+                              size={11}
+                              strokeWidth={2.5}
+                              className="inline ml-0.5 -mt-px"
+                            />
+                          )}
                         </span>
                       ) : (
                         <span className="text-base-400">—</span>
@@ -189,9 +196,7 @@ export default function OperationServiceNotes() {
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {r.status === "closed" ? (
-                        <span className="rounded bg-success-50 px-2 py-0.5 text-xs font-medium text-success-700">
-                          Closed
-                        </span>
+                        <span className="pill pill-confirmed">Closed</span>
                       ) : (
                         <StageBadge stage={stage as SnStage} />
                       )}
@@ -266,16 +271,18 @@ export default function OperationServiceNotes() {
 
 // ── Stage badge ────────────────────────────────────────────────────────────────
 
-const STAGE_COLORS: Record<SnStage, string> = {
-  collected:      "bg-base-100 text-base-700 border-base-200",
-  with_supplier:  "bg-orange-50 text-orange-700 border-orange-200",
-  supplier_done:  "bg-blue-50 text-blue-700 border-blue-200",
-  scheduled:      "bg-purple-50 text-purple-700 border-purple-200",
+/** v17 pills per SN stage — with_supplier=amber (waiting on supplier),
+ *  supplier_done=blue, scheduled=indigo, collected=neutral. */
+const STAGE_PILL: Record<SnStage, string> = {
+  collected:     "pill-neutral",
+  with_supplier: "pill-warning",
+  supplier_done: "pill-sent",
+  scheduled:     "pill-collected",
 };
 
 function StageBadge({ stage }: { stage: SnStage }) {
   return (
-    <span className={`rounded border px-2 py-0.5 text-xs font-medium ${STAGE_COLORS[stage]}`}>
+    <span className={`pill ${STAGE_PILL[stage]}`}>
       {SN_STAGE_LABELS[stage]}
     </span>
   );

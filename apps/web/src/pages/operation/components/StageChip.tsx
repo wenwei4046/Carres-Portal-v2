@@ -36,22 +36,17 @@ const STAGE_LABEL: Record<OperationStage, string> = {
   delivered: "Delivered",
 };
 
-const STAGE_TEXT: Record<OperationStage, string> = {
-  placed: "text-base-500",
-  confirmed: "text-warning",
-  in_production: "text-warning",
-  ready_to_dispatch: "text-info",
-  dispatched: "text-primary",
-  delivered: "text-success",
-};
-
-const STAGE_BORDER: Record<OperationStage, string> = {
-  placed: "border-base-300",
-  confirmed: "border-warning",
-  in_production: "border-warning",
-  ready_to_dispatch: "border-info",
-  dispatched: "border-primary",
-  delivered: "border-success",
+/** v17 status pills — each stage → a pill colour. warning=amber marks the
+ *  "in production" state; the full ramp reads neutral → purple → amber →
+ *  blue → indigo → green across the 6 stages. Replaces the old outline chip.
+ *  Keys use the 11.2 collapsed enum (confirmed/in_production). */
+const STAGE_PILL: Record<OperationStage, string> = {
+  placed: "pill-neutral",
+  confirmed: "pill-draft",
+  in_production: "pill-warning",
+  ready_to_dispatch: "pill-sent",
+  dispatched: "pill-collected",
+  delivered: "pill-confirmed",
 };
 
 export function stageLabel(stage: OperationStage): string {
@@ -60,10 +55,6 @@ export function stageLabel(stage: OperationStage): string {
 
 export default function StageChip({ stage }: Props) {
   return (
-    <span
-      className={`inline-block text-[9px] font-bold uppercase tracking-[0.12em] py-[3px] px-[7px] border rounded-[3px] ${STAGE_TEXT[stage]} ${STAGE_BORDER[stage]}`}
-    >
-      {STAGE_LABEL[stage]}
-    </span>
+    <span className={`pill ${STAGE_PILL[stage]}`}>{STAGE_LABEL[stage]}</span>
   );
 }

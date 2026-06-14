@@ -6,6 +6,7 @@ import type {
   ProductSkuDto,
   SofaFabricDto,
 } from "@carres/shared";
+import { AlertTriangle } from "lucide-react";
 
 // T42-C1 — Form state uses `ManualCostSource` (3-value, no `auto_issued`)
 // rather than the wider DB-level `CostSource` (4-value). The `auto_issued`
@@ -1378,7 +1379,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                   style={{ color: "var(--brand-signature)" }}
                   data-testid={`po-line-attrs-missing-${i}`}
                 >
-                  ⚠{" "}
+                  <AlertTriangle size={12} strokeWidth={2.5} className="inline -mt-px mr-1 text-warning" />
                   {model.category === "bedframe"
                     ? "Pick color + gap so the supplier knows which version to make."
                     : "Pick fabric so the supplier knows which version to upholster."}
@@ -1411,7 +1412,7 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                     </>
                   ) : (
                     <span style={{ color: "var(--brand-signature)" }}>
-                      ⚠ No cost on this SKU yet — set it in Catalog before
+                      <AlertTriangle size={12} strokeWidth={2.5} className="inline -mt-px mr-1 text-warning" />No cost on this SKU yet — set it in Catalog before
                       issuing the PO.
                     </span>
                   )}

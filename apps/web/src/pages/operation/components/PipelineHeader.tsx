@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { LayoutGrid, Bell, Filter, Download } from "lucide-react";
 import type { OperationStage } from "./StageChip";
 
 /**
@@ -142,7 +143,7 @@ export default function PipelineHeader({
       {/* Title strap + right-side action buttons (V2 placeholders). */}
       <div className="flex justify-between items-start mb-[18px] gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-[28px] leading-[1.1] tracking-[-0.025em] font-bold text-base-900">
+          <h1 className="t-h1 font-display text-base-900">
             Orders
           </h1>
           <div className="font-body text-[12px] text-base-600 mt-1">
@@ -175,7 +176,7 @@ export default function PipelineHeader({
             title="Alerts — coming soon"
             className="px-3 py-2 rounded-full text-[12px] border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
           >
-            ⌥ Alerts
+            <Bell size={13} className="inline -mt-px mr-1" />Alerts
           </button>
           <button
             type="button"
@@ -200,7 +201,7 @@ export default function PipelineHeader({
           active={activeStage === null}
           testid="pipeline-chip-overall"
         >
-          ▦ Overall <span className="ml-1.5 inline-block min-w-[18px] text-center text-[11px] tabular-nums opacity-80">{totalIncoming}</span>
+          <LayoutGrid size={13} className="inline -mt-px mr-1" />Overall <span className="ml-1.5 inline-block min-w-[18px] text-center text-[11px] tabular-nums opacity-80">{totalIncoming}</span>
         </ChipLink>
         {STAGE_LABELS.map((s) => (
           <ChipLink
@@ -248,7 +249,7 @@ export default function PipelineHeader({
             title="Multi-criteria filter — coming soon"
             className="px-3 py-1.5 rounded-full text-[12px] border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
           >
-            ▽ Filter
+            <Filter size={13} className="inline -mt-px mr-1" />Filter
           </button>
           <button
             type="button"
@@ -257,7 +258,7 @@ export default function PipelineHeader({
             title="Export CSV — coming soon"
             className="px-3 py-1.5 rounded-full text-[12px] border border-base-200 bg-card text-base-700 opacity-60 cursor-not-allowed"
           >
-            ⤓ Export
+            <Download size={13} className="inline -mt-px mr-1" />Export
           </button>
         </div>
       </div>

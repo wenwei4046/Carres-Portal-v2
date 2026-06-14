@@ -10,6 +10,16 @@ import type { ProductCategory, ProductSkuDto } from "@carres/shared";
 import AdjustStockModal from "./components/AdjustStockModal";
 import ReserveDrilldownDialog from "./components/ReserveDrilldownDialog";
 import SetThresholdDialog from "./components/SetThresholdDialog";
+import {
+  BedDouble,
+  Bed,
+  Sofa,
+  AlertTriangle,
+  CircleDot,
+  ArrowUpDown,
+  Settings2,
+  type LucideIcon,
+} from "lucide-react";
 
 /**
  * OperationWarehouse — HQ stock balance per warehouse with category tabs +
@@ -54,10 +64,10 @@ import SetThresholdDialog from "./components/SetThresholdDialog";
  *  ProductCategory and behave as before. */
 type ActiveCat = ProductCategory | "reserved" | "alerts";
 
-const CATEGORIES: { key: ProductCategory; label: string; icon: string }[] = [
-  { key: "mattress", label: "Mattress", icon: "▭" },
-  { key: "bedframe", label: "Bed frame", icon: "▤" },
-  { key: "sofa", label: "Sofa", icon: "▦" },
+const CATEGORIES: { key: ProductCategory; label: string; icon: LucideIcon }[] = [
+  { key: "mattress", label: "Mattress", icon: BedDouble },
+  { key: "bedframe", label: "Bed frame", icon: Bed },
+  { key: "sofa", label: "Sofa", icon: Sofa },
 ];
 
 interface Props {
@@ -86,11 +96,12 @@ function categoryForSku(sku: string): string | null {
   return null;
 }
 
-function statusColor(status: LowStockStatus): string {
-  if (status === "out") return "var(--danger)";
-  if (status === "low") return "var(--warning)";
-  return "var(--success)";
-}
+/** v17 status pills — out→red, low→amber, ok→green. */
+const STATUS_PILL: Record<LowStockStatus, string> = {
+  out: "pill-overdue",
+  low: "pill-warning",
+  ok: "pill-confirmed",
+};
 function statusLabel(status: LowStockStatus): string {
   if (status === "out") return "Out";
   if (status === "low") return "Low";
@@ -244,7 +255,7 @@ export default function OperationWarehouse({
       <div className="flex justify-between items-start mb-[22px] gap-4">
         <div>
           <div className="kicker">Warehouse</div>
-          <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
+          <h1 className="t-h1 font-display mt-1.5 text-base-900">
             Stock balance
           </h1>
           <div className="font-body text-[13px] text-base-600 mt-1 max-w-[680px]">
@@ -274,7 +285,7 @@ export default function OperationWarehouse({
             }}
             data-testid="warehouse-movement-log-button"
           >
-            ⇅ Movement log →
+            <ArrowUpDown size={14} strokeWidth={2} className="mr-1.5" /> Movement log →
           </button>
         </div>
       </div>
@@ -376,7 +387,7 @@ export default function OperationWarehouse({
                   : "bg-white text-base-700 border-base-200 font-medium hover:border-base-400",
               ].join(" ")}
             >
-              <span className="text-[14px]">{c.icon}</span>
+              <c.icon size={15} strokeWidth={2} />
               <span>{c.label}</span>
             </button>
           );
@@ -400,7 +411,7 @@ export default function OperationWarehouse({
               : "bg-white text-danger border-danger font-medium hover:bg-base-50",
           ].join(" ")}
         >
-          <span className="text-[14px]">⚠</span>
+          <AlertTriangle size={15} strokeWidth={2} />
           <span>Alerts</span>
         </button>
         {/* Pipeline v2 (C4) — Reserved pseudo-tab. Distinct color hint
@@ -419,7 +430,7 @@ export default function OperationWarehouse({
               : "bg-white text-warning border-warning font-medium hover:bg-warning-soft",
           ].join(" ")}
         >
-          <span className="text-[14px]">⊙</span>
+          <CircleDot size={15} strokeWidth={2} />
           <span>Reserved</span>
         </button>
       </div>
@@ -595,15 +606,8 @@ export default function OperationWarehouse({
                   </div>
                   <div className="text-right">
                     <span
-                      className="font-ui font-bold uppercase border rounded-[3px] inline-block"
+                      className={`pill ${STATUS_PILL[aggStatus]}`}
                       data-testid={`warehouse-badge-${row.sku}`}
-                      style={{
-                        fontSize: 9,
-                        letterSpacing: "0.12em",
-                        color: statusColor(aggStatus),
-                        borderColor: statusColor(aggStatus),
-                        padding: "3px 7px",
-                      }}
                     >
                       {statusLabel(aggStatus)}
                     </span>
@@ -631,7 +635,7 @@ export default function OperationWarehouse({
                           : `Low ${row.low_threshold ?? "—"} / High ${row.high_threshold ?? "—"}`
                       }
                     >
-                      ⚙ Threshold
+                      <Settings2 size={13} strokeWidth={2} className="mr-1" /> Threshold
                     </button>
                     <button
                       type="button"

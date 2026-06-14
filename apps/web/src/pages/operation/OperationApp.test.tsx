@@ -45,6 +45,10 @@ vi.mock("./procurement/TabbedProcurementShell", () => ({
     <div data-testid="procurement-shell-stub">procurement-shell</div>
   ),
 }));
+// The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
+vi.mock("./components/OperationRightRail", () => ({
+  default: () => <div data-testid="right-rail-stub">rail</div>,
+}));
 
 import OperationApp from "./OperationApp";
 

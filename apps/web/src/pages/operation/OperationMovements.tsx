@@ -7,6 +7,7 @@ import {
   type MovementsFilters,
 } from "@/lib/queries";
 import type { ProductCategory, ProductSkuDto } from "@carres/shared";
+import { Download, ArrowUp, ArrowDown } from "lucide-react";
 
 /**
  * OperationMovements — HQ stock-in/out history with KPIs + period chips +
@@ -61,11 +62,11 @@ const PERIOD_CHIPS: { key: NonNullable<MovementsFilters["period"]>; label: strin
   { key: "custom", label: "Custom…" },
 ];
 
-const CATEGORY_OPTIONS: { key: "all" | ProductCategory; label: string; icon: string }[] = [
-  { key: "all", label: "All categories", icon: "" },
-  { key: "mattress", label: "Mattress", icon: "▭" },
-  { key: "bedframe", label: "Bed frame", icon: "▤" },
-  { key: "sofa", label: "Sofa", icon: "▦" },
+const CATEGORY_OPTIONS: { key: "all" | ProductCategory; label: string }[] = [
+  { key: "all", label: "All categories" },
+  { key: "mattress", label: "Mattress" },
+  { key: "bedframe", label: "Bed frame" },
+  { key: "sofa", label: "Sofa" },
 ];
 
 /** Convert a YYYY-MM-DD date input value into an ISO datetime string.
@@ -316,7 +317,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
             <span className="mx-1.5 text-base-300">/</span>
             <span>Movement log</span>
           </div>
-          <h1 className="font-display text-[32px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-bold text-base-900">
+          <h1 className="t-h1 font-display mt-1.5 text-base-900">
             Stock in &amp; out history
           </h1>
           <div
@@ -338,7 +339,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
             className="btn-secondary text-[12px] py-2 px-3.5"
             data-testid="movements-export-csv"
           >
-            ↓ Export CSV
+            <Download size={14} strokeWidth={2} className="inline -mt-px mr-1.5" />Export CSV
           </button>
           <button
             type="button"
@@ -374,8 +375,8 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           style={{ border: "1px solid rgba(50,120,80,.4)" }}
           data-testid="movements-kpi-in"
         >
-          <div className="label" style={{ color: "var(--success)" }}>
-            ↑ Stock in
+          <div className="label flex items-center gap-1" style={{ color: "var(--success)" }}>
+            <ArrowUp size={12} strokeWidth={2.5} /> Stock in
           </div>
           <div
             className="font-mono text-[28px] font-semibold mt-0.5 leading-none"
@@ -392,8 +393,8 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           style={{ border: "1px solid rgba(214,79,32,.4)" }}
           data-testid="movements-kpi-out"
         >
-          <div className="label" style={{ color: "var(--terracotta)" }}>
-            ↓ Stock out
+          <div className="label flex items-center gap-1" style={{ color: "var(--terracotta)" }}>
+            <ArrowDown size={12} strokeWidth={2.5} /> Stock out
           </div>
           <div
             className="font-mono text-[28px] font-semibold mt-0.5 leading-none"
@@ -563,7 +564,6 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
         >
           {CATEGORY_OPTIONS.map((c) => (
             <option key={c.key} value={c.key}>
-              {c.icon ? `${c.icon} ` : ""}
               {c.label}
             </option>
           ))}
@@ -651,7 +651,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
               >
                 <div className="flex justify-between items-center px-5 py-3.5 border-b border-base-100 bg-base-50">
                   <div>
-                    <div className="font-display text-[18px] font-semibold tracking-[-0.01em]">
+                    <div className="t-h3 font-display">
                       {g.label}
                     </div>
                     <div className="font-body text-[11px] text-base-500 mt-0.5">
@@ -660,8 +660,8 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
                   </div>
                   <div className="flex gap-[18px]">
                     <div className="text-right">
-                      <div className="label" style={{ color: "var(--success)" }}>
-                        ↑ in
+                      <div className="label flex items-center justify-end gap-1" style={{ color: "var(--success)" }}>
+                        <ArrowUp size={11} strokeWidth={2.5} /> in
                       </div>
                       <div
                         className="font-mono text-[18px] font-semibold"
@@ -671,8 +671,8 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="label" style={{ color: "var(--terracotta)" }}>
-                        ↓ out
+                      <div className="label flex items-center justify-end gap-1" style={{ color: "var(--terracotta)" }}>
+                        <ArrowDown size={11} strokeWidth={2.5} /> out
                       </div>
                       <div
                         className="font-mono text-[18px] font-semibold"
@@ -776,7 +776,8 @@ function MovementTableRow({
       ? "var(--terracotta)"
       : "var(--base-700)";
   const qtyPrefix = isIn ? "+" : isOut ? "−" : "Δ";
-  const kindLabel = isIn ? "↑ IN" : isOut ? "↓ OUT" : "ADJ";
+  const kindText = isIn ? "IN" : isOut ? "OUT" : "ADJ";
+  const KindIcon = isIn ? ArrowUp : isOut ? ArrowDown : null;
   const kindBg = isIn
     ? "rgba(50,120,80,.12)"
     : isOut
@@ -809,7 +810,10 @@ function MovementTableRow({
           }}
           data-testid={`movements-row-kind-${row.id}`}
         >
-          {kindLabel}
+          {KindIcon && (
+            <KindIcon size={10} strokeWidth={2.5} className="inline -mt-px mr-0.5" />
+          )}
+          {kindText}
         </span>
       </div>
       <div className="font-body font-medium truncate">{skuLabel}</div>

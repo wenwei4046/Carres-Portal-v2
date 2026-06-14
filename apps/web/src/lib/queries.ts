@@ -66,6 +66,10 @@ import {
   type DeliveryStop,
   type SetDeliveryChainInput,
   type PatchDeliveryStopInput,
+  type OpsOrderControl,
+  type OpsOrderControlResponse,
+  type UpdateOpsOrderControlInput,
+  type SetOpsAssignedLogisticInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 
@@ -130,6 +134,10 @@ export const qk = {
     orders:    (filters?: operationOrderFilters) =>
       ["operation", "orders", filters ?? {}] as const,
     order:     (id: string) => ["operation", "orders", id] as const,
+    /** P2 (migration 0159) — editable ops_order_control overlay for the order
+     *  drawer. Nested under the order id so a blunt ["operation","orders"]
+     *  invalidation after any order mutation refreshes it too. */
+    orderControl: (id: string) => ["operation", "orders", id, "control"] as const,
     partners:  () => ["operation", "partners"] as const,
     suppliers: () => ["operation", "suppliers"] as const,
     pos:       (filters?: operationPoFilters) =>
@@ -1606,8 +1614,26 @@ export interface operationOrderListRow {
     | null;
   warehouse_id: string | null;
   customer_name: string;
+  /** Jess redesign step 2 — control-table row subtitle + extra columns. All
+   *  optional/nullable so the kanban OrderCard + existing fixtures that don't
+   *  populate them keep typechecking. */
+  customer_phone?: string | null;
+  /** P2 (project-orders-control-spec) — drives the AREA (KV/Outstation) tag +
+   *  the suggested default carrier in the control table (apps/web/src/lib/region.ts). */
+  customer_address?: string | null;
   placed_at: string;
   delivery_date: string | null;
+  delivery_date_tbd?: boolean | null;
+  /** AutoCount provenance (migration 0132/0136). source_system='autocount'
+   *  drives the entry rule (AutoCount→Proceed tab, native→Placed); source_ref
+   *  is the CR/TCF doc-no list shown as the ref prefix. */
+  source_system?: string | null;
+  source_ref?: string[] | null;
+  /** Inbox-triage LP (migration 0136), a delivery_partners.id resolved to a
+   *  name client-side. Shown in the 物流 cell when no formal LP is set yet. */
+  ops_assigned_logistic?: string | null;
+  /** Compact line embed for the 货品 items summary (control table only). */
+  order_lines?: { sku: string; qty: number }[];
   delivery_partner_id: string | null;
   /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
    *  state. Set by `operation_confirm_proceed_request_v3` when Operation
@@ -1660,12 +1686,21 @@ export interface operationOrderDetailOrder {
   customer_address_unknown: boolean;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
+  /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
+   *  date, pairs with delivery_date. Null on pre-11.1 / AutoCount orders.
+   *  Optional so detail fixtures that predate the field keep typechecking. */
+  proceed_date?: string | null;
   placed_at: string;
   do_number: string | null;
   do_note: string | null;
   dispatched_at: string | null;
   delivered_at: string | null;
   delivery_partner_id: string | null;
+  /** P2 (migration 0136/0159) — planned logistic carrier set in Inbox/drawer
+   *  triage (status='place' orders). Distinct from delivery_partner_id (the
+   *  formal LP owned by the proceed/dispatch flow). Optional so existing detail
+   *  fixtures that predate the field keep typechecking. */
+  ops_assigned_logistic?: string | null;
   /** Migration 0156 — multi-leg delivery chain (γ). Null/empty = single-leg
    *  (uses delivery_partner_id). Otherwise an ordered array of stops; each
    *  carries partner_id + partner_name + from_loc + to_loc + per-leg POD
@@ -1822,7 +1857,10 @@ export interface WarehouseSkuTotals {
   low_stock_status_aggregate: LowStockStatus;
 }
 export interface WarehouseListResponse {
-  warehouses: { id: string; name: string; address: string | null }[];
+  /** P4 — `owning_partner_id` NULL = Carres own warehouse (GRN-eligible, e.g.
+   *  Klang); non-NULL = LP-owned (e.g. HOUZS Balakong) — goods there are tracked
+   *  by Stock Location, not a Klang GRN. */
+  warehouses: { id: string; name: string; address: string | null; owning_partner_id?: string | null }[];
   byWarehouse: Record<string, WarehouseStockEntry[]>;
   totalsBySku: Record<string, WarehouseSkuTotals>;
 }
@@ -1880,6 +1918,24 @@ export interface operationStockAlertRow {
 }
 export interface operationStockAlertsResponse {
   alerts: operationStockAlertRow[];
+}
+/** GET /api/operation/stock — cross-warehouse availability (apps/api/src/routes/
+ *  operation/stock.ts). `available` = qty − reserved, summed across warehouses.
+ *  Shared by the Stock On-Hand page AND the Orders control table's Stock column
+ *  (via useOperationStock) so both surfaces agree on a SKU's free balance. */
+export interface operationStockResponse {
+  warehouses: { id: string; name: string }[];
+  skus: {
+    sku: string;
+    name: string;
+    category: string | null;
+    price: number;
+    available: number;
+    lowThreshold: number;
+    incoming: number;
+    perWarehouse: Record<string, { qty: number; reserved: number }>;
+  }[];
+  summary: { totalSkus: number; lowStockCount: number; openPos: number };
 }
 export interface operationReceivePoWithDoResponse {
   po_id: string;
@@ -2263,6 +2319,20 @@ export function useStockAlerts(
   });
 }
 
+/** Cross-warehouse stock snapshot — the Stock On-Hand source of truth, reused by
+ *  the Orders control table so its Stock column matches that page's free-balance
+ *  figures. 30s stale mirrors the other operation stock surfaces. */
+export function useOperationStock(
+  opts?: Partial<UseQueryOptions<operationStockResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.stock(),
+    queryFn: () => apiFetch<operationStockResponse>("/api/operation/stock"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 /** Movements log. Default period='30d'; cap at 200 rows server-side. */
 export function useOperationMovements(
   filters: MovementsFilters = {},
@@ -2388,6 +2458,111 @@ export function usePatchDeliveryStop(
         `/api/operation/orders/${orderId}/delivery-stops/${leg}`,
         { method: "PATCH", body: JSON.stringify(patch) },
       ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** P2 (migration 0159) — read the editable ops_order_control overlay for an
+ *  order. `null` id disables the query (mirror of useOperationOrder). An absent
+ *  overlay row comes back as `{ control: null }` → drawer shows all-default. */
+export function useOrderControl(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<OpsOrderControlResponse>>,
+) {
+  return useQuery({
+    queryKey: orderId
+      ? qk.operation.orderControl(orderId)
+      : (["operation", "orders", "null", "control"] as const),
+    queryFn: () =>
+      apiFetch<OpsOrderControlResponse>(
+        `/api/operation/orders/${orderId}/control`,
+      ),
+    enabled: !!orderId,
+    staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/** P2 (migration 0159) — sparse upsert of the order-control overlay. Invalidates
+ *  the overlay key + the orders list tree so the drawer + table reflect the
+ *  edit (the AREA / stock cells read from the same order data family). */
+export function useSaveOrderControl(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<{ control: OpsOrderControl }, ApiError, UpdateOpsOrderControlInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ control: OpsOrderControl }, ApiError, UpdateOpsOrderControlInput>({
+    mutationFn: (input) =>
+      apiFetch<{ control: OpsOrderControl }>(
+        `/api/operation/orders/${orderId}/control`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** P2 (migration 0136) — set/clear the planned logistic carrier
+ *  (orders.ops_assigned_logistic) from the order drawer. operation/principal,
+ *  status='place' only (the /ops-assign endpoint scopes it). Invalidates the
+ *  operation order detail + list so the drawer + table reflect the change. */
+export function useSetOpsAssignedLogistic(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; ops_assigned_logistic: string | null },
+      ApiError,
+      SetOpsAssignedLogisticInput
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; ops_assigned_logistic: string | null },
+    ApiError,
+    SetOpsAssignedLogisticInput
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ id: string; ops_assigned_logistic: string | null }>(
+        `/api/orders/${orderId}/ops-assign`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** P2 — set the delivery date (set_order_date RPC, status='place' only,
+ *  lead-time floor enforced server-side) from the order drawer. Operation
+ *  variant of useSetOrderDate: invalidates the operation order detail + list
+ *  (the dealer-facing hook keys on qk.order, which the operation surfaces
+ *  don't read). */
+export function useOperationSetDeliveryDate(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, SetOrderDateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, SetOrderDateInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>(`/api/orders/${orderId}/date`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });

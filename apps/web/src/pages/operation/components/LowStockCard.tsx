@@ -26,7 +26,7 @@ export default function LowStockCard({ lowStock, onViewAll }: Props) {
     <div className="bg-white border border-base-200 rounded-md overflow-hidden">
       <header className="px-[18px] py-3.5 flex items-baseline justify-between">
         <div>
-          <div className="font-display text-[15px] font-semibold text-base-900">
+          <div className="t-h4 font-display text-base-900">
             Low stock
           </div>
           <div className="text-[11px] text-base-500 mt-0.5">

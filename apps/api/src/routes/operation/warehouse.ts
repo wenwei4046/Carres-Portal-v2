@@ -80,7 +80,10 @@ interface SkuTotals {
 operationWarehouseRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const [whRes, sbRes] = await Promise.all([
-    sb.from("warehouses").select("id, name, address").order("name"),
+    // P4 (multi-location) — owning_partner_id surfaces own-WH (NULL = Carres own,
+    // e.g. Klang; non-NULL = LP-owned, e.g. HOUZS Balakong). The Receiving GRN
+    // queue uses it to show only goods coming INTO an own warehouse.
+    sb.from("warehouses").select("id, name, address, owning_partner_id").order("name"),
     sb
       .from("stock_balances")
       // T42-pass3-C1 — include thresholds so the FE can prefill SetThresholdDialog.

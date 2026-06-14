@@ -123,7 +123,21 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // embed is ambiguous → PostgREST PGRST201 → mapPgError default → 500.
       // Do NOT remove the hint. Same rule for every order-level embed of
       // delivery_partners (print-do-data below + partner/pickups.ts).
-      "id, so, status, operation_stage, warehouse_id, customer_name, placed_at, delivery_date, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at)",
+      // 2026-06-08 (Jess redesign step 2) — the Orders **control table**
+      // (OperationOrdersControl) consumes this same list. It needs a few extra
+      // flat columns the kanban OrderCard never used: customer_phone (row
+      // subtitle), delivery_date_tbd (交期 cell), source_system + source_ref
+      // (CR/TCF/SO ref prefix + the AutoCount→Proceed / native→Placed tab
+      // entry rule), ops_assigned_logistic (Inbox-triage LP shown in the 物流
+      // cell when no formal LP yet), and a compact order_lines(sku,qty) embed
+      // for the 货品 items summary. All additive — the kanban ignores them.
+      // ops_assigned_logistic stays a raw id here (resolved to a name client
+      // side via the partners list) to avoid a 2nd ambiguous delivery_partners
+      // FK embed (orders has two FKs to delivery_partners → PGRST201/500).
+      // 2026-06-09 (Jess P2, project-orders-control-spec) — customer_address
+      // added so the control table can tag each row KV / Outstation + suggest a
+      // default carrier (apps/web/src/lib/region.ts) without opening the drawer.
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, placed_at, delivery_date, delivery_date_tbd, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -168,7 +182,10 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   const { data: order, error: e1 } = await sb
     .from("orders")
     .select(
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
+      // 2026-06-09 (Jess P2) — ops_assigned_logistic surfaced so the drawer's
+      // OrderControlPanel can show + inline-edit the planned carrier (region
+      // default, overridable) on status='place' orders.
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, proceed_date, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
     )
     .eq("id", id)
     .maybeSingle();

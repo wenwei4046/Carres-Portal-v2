@@ -54,7 +54,7 @@ export default function OperationStock() {
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
         <div className="kicker">HQ · Operations</div>
-        <h1 className="font-display text-[30px] leading-[1.05] mt-1.5 tracking-[-0.025em] font-semibold">
+        <h1 className="t-h1 font-display mt-1.5">
           Stock across the network
         </h1>
         <div className="text-[13px] text-base-600 mt-1.5">

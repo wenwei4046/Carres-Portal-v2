@@ -368,3 +368,19 @@ export {
   type PatchDeliveryStopInput,
   type DeliveryChainResponse,
 } from "./schemas/delivery-chain";
+
+// Migration 0159 — Orders control-grid overlay (P2 editable drawer).
+export {
+  STOCK_LOCATIONS,
+  PAYMENT_STATUSES,
+  DELIVERY_TIME_SLOTS,
+  STORAGE_RATES,
+  computeStorageFee,
+  opsOrderControlSchema,
+  updateOpsOrderControlInput,
+  opsOrderControlResponseSchema,
+  type OpsOrderControl,
+  type UpdateOpsOrderControlInput,
+  type OpsOrderControlResponse,
+} from "./schemas/ops-order-control";
+export * from "./schemas/ops-cockpit";

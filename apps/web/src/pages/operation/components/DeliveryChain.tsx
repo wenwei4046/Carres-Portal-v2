@@ -278,7 +278,7 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
             <div className="flex gap-2">
               <button
                 type="button"
-                className="rounded bg-primary px-2 py-0.5 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="rounded bg-base-900 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-base-800 disabled:opacity-50"
                 disabled={patchPending}
                 onClick={() => {
                   onPatch({ notes: noteDraft || null });
@@ -315,7 +315,7 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
         <div className="mt-2 flex justify-end">
           <button
             type="button"
-            className="rounded bg-primary px-2 py-1 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="rounded bg-base-900 px-2 py-1 text-[11px] font-medium text-white hover:bg-base-800 disabled:opacity-50"
             disabled={patchPending}
             onClick={() => onPatch({ status: nextStatus.status })}
           >

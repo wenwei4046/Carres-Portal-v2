@@ -68,12 +68,14 @@ function poReceivedQty(po: operationPoListRow): number {
   );
 }
 
-function statusColor(st: ReturnType<typeof poDisplayStatus>): string {
-  if (st === "received") return "var(--success)";
-  if (st === "partial") return "var(--info, #2563eb)";
-  if (st === "cancelled") return "var(--base-400)";
-  return "var(--warning)";
-}
+/** v17 pill per PO display status — open=amber, partial=indigo, received=green,
+ *  cancelled=grey. Same mapping as PoDetailModal. */
+const PO_STATUS_PILL: Record<ReturnType<typeof poDisplayStatus>, string> = {
+  open: "pill-warning",
+  partial: "pill-collected",
+  received: "pill-confirmed",
+  cancelled: "pill-neutral",
+};
 
 export interface ProcurementTabContentProps {
   slug: ProcurementTabSlug;
@@ -252,7 +254,6 @@ export default function ProcurementTabContent({
           const total = poTotalQty(po);
           const got = poReceivedQty(po);
           const st = poDisplayStatus(po);
-          const stColor = statusColor(st);
           const orders = po.orders ?? [];
           return (
             <div
@@ -352,16 +353,7 @@ export default function ProcurementTabContent({
                 )}
               </div>
               <div className="text-right pt-0.5">
-                <span
-                  className="font-ui font-bold uppercase border rounded-[3px]"
-                  style={{
-                    fontSize: 9,
-                    letterSpacing: "0.12em",
-                    color: stColor,
-                    borderColor: stColor,
-                    padding: "3px 7px",
-                  }}
-                >
+                <span className={`pill capitalize ${PO_STATUS_PILL[st]}`}>
                   {st}
                 </span>
               </div>
@@ -499,10 +491,6 @@ function ActionCell({
       <button
         type="button"
         className="btn-primary text-[11px] py-1 px-2.5"
-        style={{
-          background: "var(--brand-signature)",
-          borderColor: "var(--brand-signature)",
-        }}
         onClick={(e) => {
           e.stopPropagation();
           onReassign();
@@ -540,7 +528,7 @@ function ActionCell({
           }}
           data-testid={`lp-inbound-confirm-${po.id}`}
         >
-          LP Pre-flight 代按
+          LP Pre-flight (proxy)
         </button>
         {directReceive}
       </div>

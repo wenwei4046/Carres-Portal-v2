@@ -88,7 +88,7 @@ export function Modal({ title, onClose, children, size = "default" }: ModalProps
         }}
       >
         <div className="px-6 pt-4 pb-3 border-b border-base-100 flex justify-between items-center">
-          <div className="font-display text-[17px] font-semibold tracking-[-0.01em]">
+          <div className="t-h3 font-display">
             {title}
           </div>
           <button
@@ -112,6 +112,9 @@ interface ModalActionsProps {
   primary: string;
   primaryDisabled?: boolean;
   primaryPending?: boolean;
+  /** Render the primary as a destructive action — v17 `.btn-danger`
+   *  (red text on white, never filled). Default false → black `.btn-primary`. */
+  danger?: boolean;
 }
 
 export function ModalActions({
@@ -120,6 +123,7 @@ export function ModalActions({
   primary,
   primaryDisabled,
   primaryPending,
+  danger,
 }: ModalActionsProps) {
   return (
     <div className="flex justify-end gap-2 mt-1">
@@ -130,7 +134,7 @@ export function ModalActions({
         type="button"
         onClick={onPrimary}
         disabled={primaryDisabled || primaryPending}
-        className="btn-primary text-[12px] disabled:opacity-40"
+        className={`${danger ? "btn-danger" : "btn-primary"} text-[12px] disabled:opacity-40`}
       >
         {primaryPending ? "Working…" : primary}
       </button>
