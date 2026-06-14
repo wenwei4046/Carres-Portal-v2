@@ -57,4 +57,8 @@ New files 0155+, never edit frozen ones. Enum change = create new type + swap co
 
 ## Status log
 
-- 2026-06-14: branch created, plan written. Starting 11.1.
+- 2026-06-14: branch created, plan written.
+- 2026-06-14: **migration backfill** — discovered repo↔DB drift; 0155-0158 (local) were applied to prod but unrecorded in schema_migrations; 5 ops_* migrations (notes/tasks, team members, order-control payments, bulk-complete) were applied to prod (6/12) + code merged to main but had NO repo files. Backfilled them as 0159-0164 (file-only, not re-applied). Commit `c42f2eb`.
+- 2026-06-14: **11.1 Proceed Date DONE** — migration 0165 applied to prod; shared+api+web wired; tests green (shared 186/186, api 708 pass /3 pre-existing fail, web 476 pass /5 pre-existing fail); live guard smoke confirmed (proceed>delivery → 22023 proceed_after_delivery). Commit `18360a8`.
+  - ⚠️ **PROD CONSISTENCY**: 0165 DROPped set_order_date(uuid,date) 2-arg; deployed (old) API still calls 2-arg → confirm-date flow 404s on prod until api redeploy. MUST deploy api+web (or add a temp 2-arg shim) before 11.2 drags on.
+- NEXT: 11.2 state-machine collapse (single axis, 30 fns + 3 triggers, UI sweep).
