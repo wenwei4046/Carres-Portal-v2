@@ -1,0 +1,73 @@
+# Phase 11.2 — State-machine collapse (single axis) — SPEC
+
+> Worktree `phase/11.2-state-machine` (off 11.1). Isolates CODE only — the live DB
+> is shared with another active session, so the enum migration is authored here
+> but applied to prod ONLY in a coordinated window (don't crash the other session).
+
+## The collapse
+
+Today: TWO axes kept in sync by triggers.
+- `orders.status` (`order_status`): place · proceed_order · delivered · cancelled
+- `orders.operation_stage` (`operation_stage`, nullable): placed · proceed_request · awaiting_operation_action · ready_to_dispatch · dispatched · waiting · delivered
+- `order_supplier_threads.operation_stage` (`operation_stage`): per-line; order stage = rollup of thread stages.
+
+Target: ONE axis. New enum `order_state` on `orders.status`; **DROP `orders.operation_stage`**; threads keep a per-line stage column (`order_state`) that the rollup aggregates into `orders.status`.
+
+## New enum `order_state` (ordered)
+
+| value | meaning | replaces (status / operation_stage) |
+|---|---|---|
+| `draft` | dealer building, not handed to ops | status=place / stage=NULL |
+| `confirmed` | dealer proceeded (≥50% paid), in ops queue | status=proceed_order + stage=proceed_request |
+| `in_production` | ops accepted, buying/producing | stage=awaiting_operation_action |
+| `ready_to_dispatch` | goods at WH, ready for customer leg | stage=ready_to_dispatch (+ waiting folds here) |
+| `dispatched` | out for customer delivery | stage=dispatched |
+| `delivered` | e-signed, done | status=delivered + stage=delivered |
+| `on_hold` | paused (credit/customer) | (new) |
+| `cancelled` | cancelled | status=cancelled |
+
+Thread stages use only: `in_production` (initial), `ready_to_dispatch`, `dispatched`, `delivered`, `on_hold`. (draft/confirmed are order-level pre-thread.)
+
+## Value mapping (for mechanical literal swaps in function bodies)
+
+orders.status literals: `'place'`→`'draft'` · `'proceed_order'`→`'confirmed'` · `'delivered'`→`'delivered'` · `'cancelled'`→`'cancelled'`
+operation_stage literals (when the fn was writing orders.operation_stage OR thread.operation_stage): `'placed'`→`'draft'` · `'proceed_request'`→`'confirmed'` · `'awaiting_operation_action'`→`'in_production'` · `'ready_to_dispatch'`→`'ready_to_dispatch'` · `'dispatched'`→`'dispatched'` · `'waiting'`→`'ready_to_dispatch'` · `'delivered'`→`'delivered'`
+
+## Structural changes (NOT mechanical — per-function care)
+
+1. **orders.operation_stage column DROPPED.** Every function that wrote `orders.operation_stage = X` now writes `orders.status = map(X)`. Functions that wrote BOTH `orders.status` and `orders.operation_stage` collapse to a single `orders.status` write.
+2. **`orders_rollup_stage(uuid)`** now returns/writes `orders.status` (was operation_stage). Rollup rule unchanged in spirit: all threads delivered→delivered; all dispatched/delivered→dispatched; all ready/dispatched/delivered→ready_to_dispatch; no threads→(leave order-level draft/confirmed); else→in_production. MUST NOT clobber draft/confirmed/cancelled/on_hold order-level states when threads don't exist or order is terminal.
+3. **`orders_auto_status_delivered` trigger + fn → DROPPED.** Redundant under single axis (rollup sets status='delivered' directly). Removing it is the whole point.
+4. **`orders_auto_issue_on_dispatched`** keys on `NEW.status = 'dispatched'` (was operation_stage). Still auto-issues invoice + DO# on the dispatch transition.
+5. **`proceed_order`** (the 50%-gate): `status` place→`'confirmed'` in one write (drops the separate operation_stage='proceed_request').
+6. **`operation_confirm_proceed_request_v3`**: validates `status='confirmed'` (was status=proceed_order + stage=proceed_request); threads start `in_production`; buffer auto-skip → order+threads `ready_to_dispatch`.
+7. **`_operation_auto_dispatch_if_ready`**, assign/reselect/dispatch, receive (`operation_receive_*`, `partner_pickup_threads`), deliver (`partner_attach_pod`, `operation_attach_do_and_deliver`), revert/abandon/bulk-complete, reads (`operation_dashboard_summary`, `finance_ar_aging`, `partner_threads_to_deliver`): swap column + value literals per mapping; gate `cancelled` only.
+
+## Function blast radius (30, from live DB 2026-06-14)
+
+_operation_auto_dispatch_if_ready, lp_reject_order, operation_abandon_order, operation_assign_partner, operation_attach_do_and_deliver, operation_confirm_proceed_request_v3, operation_dashboard_summary, operation_dispatch_customer_leg, operation_issue_pos_for_order, operation_partner_accept_rfd, operation_receive_po_line, operation_receive_po_with_do, operation_receive_threads, operation_resume_dispatch_from_waiting, operation_revert_order_dispatched_to_ready, operation_revert_order_proceed_to_placed, operation_warehouse_pick, ops_bulk_complete_orders, order_dispatch, order_partner_advance, order_proceed, orders_auto_issue_on_dispatched, orders_auto_status_delivered (DROP), orders_rollup_stage, orders_rollup_stage_trigger, partner_attach_pod, partner_confirm_receive, partner_pickup_threads, partner_threads_to_deliver, proceed_order.
+
+Plus `create_order` (default) + `set_order_date`/`update_order` (only touch status indirectly).
+
+## TS / UI sweep
+
+- `packages/shared/src/schemas/orders.ts`: collapse `orderStatusSchema` + `operationStageSchema` into one `orderStateSchema`; `orderSchema.status` = new enum; drop `operationStage` field (or keep as deprecated alias mapped from status during transition — decide).
+- `db-types.ts`: `OrderStatus`/`OperationStage` → `OrderState`; OrderRow.status; drop operation_stage.
+- `adapters.ts`: orderFromRow status mapping; drop operationStage.
+- UI: kanban columns + badges + filters across dealer/operation/partner/supplier/finance keyed on status/operationStage → new enum. (OperationOrders, DealerOrders/Dashboard, partner/supplier kanbans, badges.ts, finance.)
+
+## Migration strategy (mirror 0121)
+
+Migration 0167 (NOT applied here — coordinated prod window):
+1. Snapshot all 30 fn defs into a TEMP table.
+2. DROP triggers + dependent functions.
+3. `CREATE TYPE order_state`; add new values; `ALTER TABLE orders ALTER status TYPE order_state USING map(...)`; `ALTER TABLE orders DROP COLUMN operation_stage`; `ALTER TABLE order_supplier_threads ALTER operation_stage TYPE order_state USING map(...)` (rename to `stage`?).
+4. Recreate 30 fns from snapshot with column+value transforms; DROP orders_auto_status_delivered.
+5. Backfill: existing orders.status remap (place→draft etc.); thread stages remap.
+6. Sanity asserts.
+
+⚠️ Apply requires: (a) other session clear, (b) api+web deploy in the SAME window (the deployed code must match the new enum — a mismatch breaks the live order flow). This is why 11.2 ships as one coordinated cut, not piecemeal.
+
+## Status
+
+- 2026-06-14: spec written in worktree. Authoring migration + TS sweep next; NOT applying to shared prod.
