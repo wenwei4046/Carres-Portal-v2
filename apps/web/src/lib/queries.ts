@@ -1624,6 +1624,9 @@ export interface operationOrderListRow {
   placed_at: string;
   delivery_date: string | null;
   delivery_date_tbd?: boolean | null;
+  /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
+   *  ("Process") date, pairs with delivery_date. Null on pre-11.1 / AutoCount orders. */
+  proceed_date?: string | null;
   /** AutoCount provenance (migration 0132/0136). source_system='autocount'
    *  drives the entry rule (AutoCount→Proceed tab, native→Placed); source_ref
    *  is the CR/TCF doc-no list shown as the ref prefix. */
