@@ -46,6 +46,25 @@ function internalOnly(c: { var: { auth: { role: string } } }) {
   }
 }
 
+// product_skus exceeds Supabase's 1000-row REST cap (1013+ live), so the bundle
+// MUST page through or it silently drops SKUs (latent bug surfaced 2026-06-14:
+// the dealer wizard + Create-PO were missing every SKU past the first 1000).
+async function fetchAllSkus(sb: ReturnType<typeof userClient>): Promise<DB.ProductSkuRow[]> {
+  const all: DB.ProductSkuRow[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from("product_skus")
+      .select("*")
+      .range(from, from + PAGE - 1);
+    if (error) throw new HTTPException(500, { message: error.message });
+    const rows = (data ?? []) as DB.ProductSkuRow[];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return all;
+}
+
 /**
  * GET /api/catalog — single bundle of everything the wizard's product picker
  * needs. Filters out discontinued models (and their skus + fabrics, since both
@@ -71,15 +90,15 @@ catalogRouter.get("/", async (c) => {
   // Run the 5 small queries in parallel — each is a simple `select *` against a
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, skusR, fabricsR, addonsR, floorR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
-    sb.from("product_skus").select("*"),
+    fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
     sb.from("addons").select("*").eq("active", true),
     sb.from("floor_config").select("*").eq("id", 1).maybeSingle(),
   ]);
 
-  for (const r of [modelsR, skusR, fabricsR, addonsR, floorR]) {
+  for (const r of [modelsR, fabricsR, addonsR, floorR]) {
     if (r.error) throw new HTTPException(500, { message: r.error.message });
   }
   if (!floorR.data) {
@@ -91,7 +110,7 @@ catalogRouter.get("/", async (c) => {
   // Filter skus + fabrics to only those whose model is in the non-discontinued
   // set. Cheaper than a server-side join for catalogs of this size (~50 models).
   const liveModelIds = new Set((modelsR.data ?? []).map((m) => m.id));
-  const liveSkus = (skusR.data ?? []).filter((s) => {
+  const liveSkus = allSkus.filter((s) => {
     const row = s as DB.ProductSkuRow;
     if (!liveModelIds.has(row.model_id)) return false;
     // 0170 (Loo 2026-06-14) — sell-side ON/OFF. Non-admin consumers (dealer
