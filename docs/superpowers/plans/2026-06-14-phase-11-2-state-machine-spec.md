@@ -95,8 +95,33 @@ DROP `orders_auto_status_delivered` (rollup now sets delivered directly).
 
 ## Status
 
-- 2026-06-14: spec + KEY FINDING written. Branch `kilsjjaaenbobiiuqkfh` created but MIGRATIONS_FAILED
-  (drift — prod recorded-history is incomplete, branch is ~30 migrations behind, missing
-  ops_stock_items/ops_order_control + many cols). Usable for SYNTAX/STRUCTURE validation only.
-  Spine fn bodies snapshotted. Full 30-fn rewrite + TS sweep is the next substantial pass;
-  runtime smoke + deploy = coordinated prod window. Branch to DELETE when done ($0.013/hr).
+- 2026-06-14: spec + KEY FINDING written. Branch `kilsjjaaenbobiiuqkfh` MIGRATIONS_FAILED (drift)
+  but DB ACTIVE_HEALTHY → usable for syntax/structure validation.
+
+## DECISION: MIDDLE PATH (Loo "go with your recommended", 2026-06-14)
+
+Keep `orders.status` as the stable business anchor (UNTOUCHED → all guard semantics safe).
+Only clean `operation_stage` values 7→6 (mechanical, 0121-pattern):
+`placed`+`proceed_request`→`confirmed` · `awaiting_operation_action`→`in_production` ·
+`waiting` KEPT (relocated-WH edge) · `ready_to_dispatch`/`dispatched`/`delivered` unchanged.
+
+### DB migration 0167 — AUTHORED + VALIDATED ✅
+`supabase/migrations/0167_clean_operation_stage_values.sql` — self-adaptive in-SQL
+snapshot→drop triggers→drop fns (plain, no CASCADE — plpgsql calls are late-bound)→swap enum
+type→migrate columns (USING value map)→recreate fns (replace 3 quoted literals)→recreate
+triggers→PASS G sanity. **Applied to branch `kilsjjaaenbobiiuqkfh` SUCCESS**: enum =
+`confirmed,in_production,ready_to_dispatch,waiting,dispatched,delivered`; old type dropped;
+28 fns recreated (none lost); 0 fns reference retired values; 3 triggers back.
+
+### REMAINING (atomic TS sweep + coordinated cut)
+1. **TS sweep (ATOMIC — 7→6 breaks typecheck chain-wide)**: db-types OperationStage, domain,
+   schemas/orders `operationStageSchema`, schemas/operation stage filter, sops.ts
+   `OperationStageV3` + SOP stage arrays, queries.ts union types, + UI/tests value literals.
+   ⚠️ SUBTLETY: OperationOrders kanban has a SYNTHETIC `placed` column derived from
+   `status='place'` (draft orders), NOT from operation_stage. Don't blind-merge it — the draft
+   bucket stays status-derived; only the operation_stage `proceed_request`/`awaiting_operation_action`
+   columns rename to `confirmed`/`in_production`. Needs per-file judgement (OperationOrders.tsx
+   stageOf + column defs, OperationDashboard StageCards, BDDealerDetail, badges.ts, dashboard.ts).
+2. **Coordinated prod window**: apply 0167 to prod + deploy api+web atomically (other session
+   paused) + runtime lifecycle smoke (the value MAPPING on real data — branch couldn't, no data/drift).
+3. Delete test branch `kilsjjaaenbobiiuqkfh` ($0.013/hr).
