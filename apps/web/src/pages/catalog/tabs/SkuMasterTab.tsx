@@ -12,6 +12,7 @@ import { useDeleteCatalogSku, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../components/atoms";
 import NewSkuModal from "./NewSkuModal";
+import EditSkuModal from "./EditSkuModal";
 
 /**
  * SKU Master — flat 7-column product table (+ a leading select column for bulk
@@ -27,7 +28,7 @@ import NewSkuModal from "./NewSkuModal";
  */
 
 const VISIBLE_CAP = 300;
-const GRID_COLS = "32px 150px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 130px 92px";
+const GRID_COLS = "32px 150px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 130px 92px 60px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -51,6 +52,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   const [editMode, setEditMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
+  const [editRow, setEditRow] = useState<FlatRow | null>(null);
 
   const del = useDeleteCatalogSku();
 
@@ -227,6 +229,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <div className="label">Size</div>
           <div className="label text-right">Price</div>
           <div className="label">Status</div>
+          <div className="label" />
         </div>
 
         {visible.length === 0 && (
@@ -242,11 +245,15 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             editMode={editMode}
             selected={selected.has(r.sku.id)}
             onToggle={toggleRow}
+            onEdit={setEditRow}
           />
         ))}
       </div>
 
       {newOpen && <NewSkuModal models={catalog.models} onClose={() => setNewOpen(false)} />}
+      {editRow && (
+        <EditSkuModal sku={editRow.sku} model={editRow.model} onClose={() => setEditRow(null)} />
+      )}
     </div>
   );
 }
@@ -256,11 +263,13 @@ const SkuRowView = memo(function SkuRowView({
   editMode,
   selected,
   onToggle,
+  onEdit,
 }: {
   row: FlatRow;
   editMode: boolean;
   selected: boolean;
   onToggle: (id: string) => void;
+  onEdit: (row: FlatRow) => void;
 }) {
   const { sku, category, productName } = row;
   const patch = usePatchCatalogSku();
@@ -336,6 +345,16 @@ const SkuRowView = memo(function SkuRowView({
         ) : (
           <SkuStatusPill posActive={sku.posActive !== false} />
         )}
+      </div>
+      <div className="text-right">
+        <button
+          type="button"
+          onClick={() => onEdit(row)}
+          className="btn-ghost text-[11px]"
+          data-testid={`sku-edit-${sku.sku}`}
+        >
+          Edit
+        </button>
       </div>
     </div>
   );
