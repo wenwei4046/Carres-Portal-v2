@@ -8,8 +8,8 @@
  *   - 9px font-ui (DM Sans), letter-spacing 0.12em, font-weight 700, uppercase
  *   - color + border match the operation_FLOW accent palette:
  *       placed                       → base-500 (muted, read-only feel)
- *       proceed_request              → warning  (signature-tinted, action-needed feel)
- *       awaiting_operation_action    → warning  (honey)
+ *       confirmed              → warning  (signature-tinted, action-needed feel)
+ *       in_production    → warning  (honey)
  *       ready_to_dispatch            → info     (slate blue)
  *       dispatched                   → primary  (terracotta == --brand-signature in proto)
  *       delivered                    → success  (olive)
@@ -17,8 +17,8 @@
  */
 export type OperationStage =
   | "placed"
-  | "proceed_request"
-  | "awaiting_operation_action"
+  | "confirmed"
+  | "in_production"
   | "ready_to_dispatch"
   | "dispatched"
   | "delivered";
@@ -29,8 +29,8 @@ interface Props {
 
 const STAGE_LABEL: Record<OperationStage, string> = {
   placed: "Placed",
-  proceed_request: "Proceed Request",
-  awaiting_operation_action: "Awaiting operation Action",
+  confirmed: "Confirmed",
+  in_production: "In Production",
   ready_to_dispatch: "Ready to Dispatch",
   dispatched: "Dispatched",
   delivered: "Delivered",
@@ -38,8 +38,8 @@ const STAGE_LABEL: Record<OperationStage, string> = {
 
 const STAGE_TEXT: Record<OperationStage, string> = {
   placed: "text-base-500",
-  proceed_request: "text-warning",
-  awaiting_operation_action: "text-warning",
+  confirmed: "text-warning",
+  in_production: "text-warning",
   ready_to_dispatch: "text-info",
   dispatched: "text-primary",
   delivered: "text-success",
@@ -47,8 +47,8 @@ const STAGE_TEXT: Record<OperationStage, string> = {
 
 const STAGE_BORDER: Record<OperationStage, string> = {
   placed: "border-base-300",
-  proceed_request: "border-warning",
-  awaiting_operation_action: "border-warning",
+  confirmed: "border-warning",
+  in_production: "border-warning",
   ready_to_dispatch: "border-info",
   dispatched: "border-primary",
   delivered: "border-success",

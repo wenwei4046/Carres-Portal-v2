@@ -113,15 +113,19 @@ triggers→PASS G sanity. **Applied to branch `kilsjjaaenbobiiuqkfh` SUCCESS**: 
 `confirmed,in_production,ready_to_dispatch,waiting,dispatched,delivered`; old type dropped;
 28 fns recreated (none lost); 0 fns reference retired values; 3 triggers back.
 
-### REMAINING (atomic TS sweep + coordinated cut)
-1. **TS sweep (ATOMIC — 7→6 breaks typecheck chain-wide)**: db-types OperationStage, domain,
-   schemas/orders `operationStageSchema`, schemas/operation stage filter, sops.ts
-   `OperationStageV3` + SOP stage arrays, queries.ts union types, + UI/tests value literals.
-   ⚠️ SUBTLETY: OperationOrders kanban has a SYNTHETIC `placed` column derived from
-   `status='place'` (draft orders), NOT from operation_stage. Don't blind-merge it — the draft
-   bucket stays status-derived; only the operation_stage `proceed_request`/`awaiting_operation_action`
-   columns rename to `confirmed`/`in_production`. Needs per-file judgement (OperationOrders.tsx
-   stageOf + column defs, OperationDashboard StageCards, BDDealerDetail, badges.ts, dashboard.ts).
-2. **Coordinated prod window**: apply 0167 to prod + deploy api+web atomically (other session
-   paused) + runtime lifecycle smoke (the value MAPPING on real data — branch couldn't, no data/drift).
-3. Delete test branch `kilsjjaaenbobiiuqkfh` ($0.013/hr).
+### TS sweep — DONE + VALIDATED ✅
+Simplified vs the original worry: KEEP `placed` (operation kanban's synthetic draft bucket,
+derived from status='place' — unchanged), only 1:1 rename `proceed_request`→`confirmed` and
+`awaiting_operation_action`→`in_production` (quoted tokens + bare-word `\b` identifiers, never
+touching the `confirm_proceed_request` fn name) + display labels (Proceed Request→Confirmed,
+Awaiting operation Action→In Production). 33 files (shared types/schemas/sops + operation
+pages/components + api operation routes + tests). **typecheck clean (shared+api+web); shared
+186/186; api 708 pass /3 pre-existing; web 476 pass /5 pre-existing — ZERO new failures.**
+New OperationStage TS type = {placed, confirmed, in_production, ready_to_dispatch, dispatched,
+delivered} (order-level; `waiting` stays thread/DB-only as before).
+
+### REMAINING — coordinated prod cut only
+**Coordinated window** (needs Loo): pause other session + confirm wrangler=wwch, then ATOMIC:
+apply 0167 to prod + deploy api+web + runtime lifecycle smoke (real-data value mapping; branch
+couldn't due to no-data/drift). Also drop the 0166 set_order_date 2-arg shim in the same cut.
+Test branch already deleted.

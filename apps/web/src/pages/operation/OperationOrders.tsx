@@ -29,7 +29,7 @@ import type { OperationStage } from "./components/StageChip";
  *  - **Overall** (URL `/operation/orders`, no `:stage` param) — 6-column
  *    Pipeline v2 kanban. Click-to-expand columns are preserved (Phase 4
  *    C3.2: focused column gets `flex:4`, siblings shrink to `flex:0.4`).
- *    Cross-order bundle bar surfaces when ≥1 awaiting_operation_action
+ *    Cross-order bundle bar surfaces when ≥1 in_production
  *    order is selected.
  *
  *  - **Single-stage** (URL `/operation/orders/:stage`) — banner + full-width
@@ -38,8 +38,8 @@ import type { OperationStage } from "./components/StageChip";
  *
  * Pipeline v2 operation_FLOW (mirrors proto + C1 enum extension):
  *   placed                       → "Awaiting request"        · action null
- *   proceed_request              → "Awaiting your decision"  · action "Confirm"
- *   awaiting_operation_action    → "PO open with supplier"   · action "Check stock"
+ *   confirmed              → "Awaiting your decision"  · action "Confirm"
+ *   in_production    → "PO open with supplier"   · action "Check stock"
  *   ready_to_dispatch            → "Stock secured"           · action "Assign delivery"
  *   dispatched                   → "With delivery partner"   · action "Attach DO"
  *   delivered                    → "DO on file"              · action null
@@ -63,8 +63,8 @@ const operation_FLOW: ReadonlyArray<{
   action: string | null;
 }> = [
   { key: "placed",            label: "Placed",            hint: "Awaiting request",        action: null },
-  { key: "proceed_request",   label: "Proceed Request",   hint: "Awaiting your decision",  action: "Confirm" },
-  { key: "awaiting_operation_action", label: "Awaiting operation Action", hint: "PO open with supplier", action: "Check stock" },
+  { key: "confirmed",   label: "Confirmed",   hint: "Awaiting your decision",  action: "Confirm" },
+  { key: "in_production", label: "In Production", hint: "PO open with supplier", action: "Check stock" },
   { key: "ready_to_dispatch", label: "Ready to Dispatch", hint: "Stock secured",           action: "Assign delivery" },
   { key: "dispatched",        label: "Dispatched",        hint: "With delivery partner",   action: "Attach DO" },
   { key: "delivered",         label: "Delivered",         hint: "DO on file",              action: null },
@@ -100,7 +100,7 @@ export default function OperationOrders() {
   // Resume from waiting (Phase 4.5a Task 36) — dialog only; no header chip in
   // V1 of the redesign. See top docstring carry-forward note.
   const [resumeFor, setResumeFor] = useState<number | null>(null);
-  // 2026-05-12 (Loo) — back-arrow on Proceed Request + Dispatched cards.
+  // 2026-05-12 (Loo) — back-arrow on Confirmed + Dispatched cards.
   const [revertFor, setRevertFor] = useState<
     { orderId: string; so: number; kind: "proceed" | "dispatch" } | null
   >(null);
@@ -123,7 +123,7 @@ export default function OperationOrders() {
   //                          hasn't been pushed to operation yet)
   //   - operation_stage    → use it directly when set
   //   - else status='delivered' → delivered (legacy seed safety net)
-  //   - else                → awaiting_operation_action (legacy proceed_order
+  //   - else                → in_production (legacy proceed_order
   //                          rows without a operation_stage value still exist
   //                          in older seed data; default them to the work
   //                          bucket)
@@ -131,14 +131,14 @@ export default function OperationOrders() {
     if (o.status === "place") return "placed";
     if (o.operation_stage) return o.operation_stage as OperationStage;
     if (o.status === "delivered") return "delivered";
-    return "awaiting_operation_action";
+    return "in_production";
   };
 
   const stageCounts = useMemo(() => {
     const counts: Record<OperationStage, number> = {
       placed: 0,
-      proceed_request: 0,
-      awaiting_operation_action: 0,
+      confirmed: 0,
+      in_production: 0,
       ready_to_dispatch: 0,
       dispatched: 0,
       delivered: 0,
@@ -175,8 +175,8 @@ export default function OperationOrders() {
   const ordersByStage = useMemo(() => {
     const buckets: Record<OperationStage, operationOrderListRow[]> = {
       placed: [],
-      proceed_request: [],
-      awaiting_operation_action: [],
+      confirmed: [],
+      in_production: [],
       ready_to_dispatch: [],
       dispatched: [],
       delivered: [],
@@ -195,21 +195,21 @@ export default function OperationOrders() {
   };
   const clearSelected = () => setSelectedDls(new Set());
 
-  // Bundle eligibility — only awaiting_operation_action orders can be bundled
+  // Bundle eligibility — only in_production orders can be bundled
   // into a single PO. We restrict the selectable IDs server-side via the
   // bundle CTA, so a stale selection from another stage never reaches the
   // server (defence-in-depth on top of the OrderCard's `selectable` gate).
   const selectedOrderIds = useMemo(() => {
     return allOrders
       .filter(
-        (o) => selectedDls.has(o.so) && stageOf(o) === "awaiting_operation_action",
+        (o) => selectedDls.has(o.so) && stageOf(o) === "in_production",
       )
       .map((o) => o.id);
   }, [allOrders, selectedDls]);
 
   function selectAllInColumn(stageKey: OperationStage) {
-    if (stageKey !== "awaiting_operation_action") return;
-    const stageOrders = ordersByStage.awaiting_operation_action;
+    if (stageKey !== "in_production") return;
+    const stageOrders = ordersByStage.in_production;
     const stageDls = stageOrders.map((o) => o.so);
     const allSelected = stageDls.every((so) => selectedDls.has(so));
     setSelectedDls((prev) => {
@@ -260,7 +260,7 @@ export default function OperationOrders() {
 
   // Bundle bar visible on Overall (any selected) + Awaiting stage page.
   const bundleBarApplies =
-    activeStage === null || activeStage === "awaiting_operation_action";
+    activeStage === null || activeStage === "in_production";
 
   return (
     <div className="px-9 py-7" data-testid="operation-orders">
@@ -359,7 +359,7 @@ export default function OperationOrders() {
                   <OrderCard
                     key={o.id}
                     order={o}
-                    selectable={activeStage === "awaiting_operation_action"}
+                    selectable={activeStage === "in_production"}
                     selected={selectedDls.has(o.so)}
                     onToggleSelect={() => toggleSelect(o.so)}
                     onOpen={() => setOpenOrderId(o.id)}

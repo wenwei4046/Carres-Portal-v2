@@ -21,7 +21,7 @@ import type { AppEnv } from "../../types";
  *
  * Badge keys (all operation-scoped use the `operation:` prefix so future
  * roles can co-exist in the same user_nav_seen table without collision):
- *   operation:orders       — orders.operation_stage = 'awaiting_operation_action'
+ *   operation:orders       — orders.operation_stage = 'in_production'
  *   operation:procurement  — POs in the Pickup-action bucket (see below)
  *
  * First-time view (no row in user_nav_seen) treats last_seen_at as epoch,
@@ -75,7 +75,7 @@ operationBadgesRouter.get("/", async (c) => {
     sb
       .from("orders")
       .select("id", { count: "exact", head: true })
-      .eq("operation_stage", "awaiting_operation_action")
+      .eq("operation_stage", "in_production")
       .gt("updated_at", ordersSince),
     sb
       .from("purchase_orders")

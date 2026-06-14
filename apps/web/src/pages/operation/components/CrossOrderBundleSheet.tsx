@@ -1,6 +1,6 @@
 /**
  * CrossOrderBundleSheet — bottom action bar that appears when one or more
- * awaiting_operation_action orders are checkbox-selected on the kanban. Lets operation
+ * in_production orders are checkbox-selected on the kanban. Lets operation
  * combine all the shortages into one PO.
  *
  * Mirrors `reference/proto/operation-orders.jsx` lines 78-126 (the

@@ -17,8 +17,8 @@ export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
 export const operationStageSchema = z.enum([
   "placed",
-  "proceed_request",
-  "awaiting_operation_action",
+  "confirmed",
+  "in_production",
   "ready_to_dispatch",
   "dispatched",
   "delivered",

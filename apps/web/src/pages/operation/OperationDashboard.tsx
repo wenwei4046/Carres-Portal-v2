@@ -158,7 +158,7 @@ export default function OperationDashboard({ setTab, goWarehouse }: Props) {
       {/* Five pipeline columns — Pipeline v2 (C3) widens the dashboard's
           at-a-glance row from the proto's 3 to mirror the kanban's 6-stage
           shape (delivered is the side-card / drawer surface, not a column).
-          Order matches the kanban: Placed → Proceed Request → Awaiting
+          Order matches the kanban: Placed → Confirmed → Awaiting
           operation Action → Ready to Dispatch → Dispatched. */}
       <div className="grid grid-cols-5 gap-3.5 mb-7">
         <PipelineColumn
@@ -170,18 +170,18 @@ export default function OperationDashboard({ setTab, goWarehouse }: Props) {
           onOpenOrder={() => setTab("orders")}
         />
         <PipelineColumn
-          stage="proceed_request"
-          label="Proceed Request"
+          stage="confirmed"
+          label="Confirmed"
           hint="awaiting your decision"
-          count={pipeline.proceed_request}
+          count={pipeline.confirmed}
           orders={orders}
           onOpenOrder={() => setTab("orders")}
         />
         <PipelineColumn
-          stage="awaiting_operation_action"
-          label="Awaiting operation action"
+          stage="in_production"
+          label="In Production"
           hint="auto-PO issued"
-          count={pipeline.awaiting_operation_action}
+          count={pipeline.in_production}
           orders={orders}
           onOpenOrder={() => setTab("orders")}
         />
@@ -250,7 +250,7 @@ function Hero({ kpis, pipeline }: HeroProps) {
         {kpis.today_deliveries} deliveries today.
         <br />
         <span className="text-base-600 font-medium">
-          {pipeline.awaiting_operation_action} waiting on stock,{" "}
+          {pipeline.in_production} waiting on stock,{" "}
           {pipeline.ready_to_dispatch} ready to ship.
         </span>
       </h1>

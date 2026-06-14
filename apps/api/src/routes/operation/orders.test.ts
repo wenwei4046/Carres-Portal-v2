@@ -56,7 +56,7 @@ describe("GET /api/operation/orders", () => {
     id: "00000000-0000-0000-0000-000000000a01",
     so: 4001,
     status: "proceed_order",
-    operation_stage: "awaiting_operation_action",
+    operation_stage: "in_production",
     warehouse_id: "00000000-0000-0000-0000-000000000w01",
     customer_name: "Tan Ah Kow",
     placed_at: "2026-05-03T10:00:00Z",
@@ -146,16 +146,16 @@ describe("GET /api/operation/orders", () => {
     expect(eq).toHaveBeenCalledWith("status", "place");
   });
 
-  it("filters by stage=proceed_request via operation_stage column", async () => {
+  it("filters by stage=confirmed via operation_stage column", async () => {
     const { eq } = mockOrdersList([]);
     const jwt = await makeJwt("operation");
     await app.fetch(
-      new Request("http://t/api/operation/orders?stage=proceed_request", {
+      new Request("http://t/api/operation/orders?stage=confirmed", {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
     );
-    expect(eq).toHaveBeenCalledWith("operation_stage", "proceed_request");
+    expect(eq).toHaveBeenCalledWith("operation_stage", "confirmed");
   });
 
   it("filters by stage when query param provided", async () => {
@@ -309,10 +309,10 @@ describe("GET /api/operation/orders/:id", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns aggregated detail for an awaiting_operation_action order", async () => {
+  it("returns aggregated detail for an in_production order", async () => {
     mockDetailQueries({
       order: {
-        id: ORDER_ID, so: 4001, status: "proceed_order", operation_stage: "awaiting_operation_action",
+        id: ORDER_ID, so: 4001, status: "proceed_order", operation_stage: "in_production",
         warehouse_id: "00000000-0000-0000-0000-000000000w01",
         customer_name: "Tan Ah Kow", customer_phone: "+60123456789", customer_address: "...",
         delivery_date: "2026-05-10", placed_at: "2026-05-03T10:00:00Z",
@@ -895,7 +895,7 @@ describe("POST /api/operation/orders/:id/confirm-proceed (migration 0147 — ite
       data: {
         order_id: ORDER_ID,
         so: 4001,
-        operation_stage: "awaiting_operation_action",
+        operation_stage: "in_production",
         auto_skipped: false,
         po_id: null,
         threads: [],
@@ -961,10 +961,10 @@ describe("POST /api/operation/orders/:id/confirm-proceed (migration 0147 — ite
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("returns 422 with code='wrong_stage' when called on non-proceed_request order", async () => {
+  it("returns 422 with code='wrong_stage' when called on non-confirmed order", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: null,
-      error: { code: "22023", message: "order is not in proceed_request stage", details: "wrong_stage" },
+      error: { code: "22023", message: "order is not in confirmed stage", details: "wrong_stage" },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
@@ -1218,10 +1218,10 @@ describe("POST /api/operation/orders/:id/transfer-ready", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("returns 422 with code='wrong_stage' when not in proceed_request/awaiting_operation_action", async () => {
+  it("returns 422 with code='wrong_stage' when not in confirmed/in_production", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: null,
-      error: { code: "22023", message: "order not in proceed_request/awaiting_operation_action state", details: "wrong_stage" },
+      error: { code: "22023", message: "order not in confirmed/in_production state", details: "wrong_stage" },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
@@ -1381,16 +1381,16 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     ]);
   });
 
-  it("stays at awaiting_operation_action when any thread has shortage", async () => {
+  it("stays at in_production when any thread has shortage", async () => {
     // Migration 0039 contract: if even ONE thread would be short, the RPC
-    // takes NO reserve action — every thread stays at awaiting_operation_action.
+    // takes NO reserve action — every thread stays at in_production.
     // auto_skipped is false, po_id is null (no PO was created at confirm time;
     // PO creation happens later via Auto-fill).
     const rpc = vi.fn().mockResolvedValue({
       data: {
         order_id: ORDER_ID,
         so: 4001,
-        operation_stage: "awaiting_operation_action",
+        operation_stage: "in_production",
         auto_skipped: false,
         po_id: null,
         threads: [
@@ -1399,7 +1399,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
             supplier_id: SUPPLIER_NF,
             category: "mattress",
             sop_name: "STANDARD",
-            stage: "awaiting_operation_action",
+            stage: "in_production",
             po_id: null,
           },
         ],
@@ -1422,8 +1422,8 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     const body = (await res.json()) as any;
     expect(body.order.auto_skipped).toBe(false);
     expect(body.order.po_id).toBeNull();
-    expect(body.order.operation_stage).toBe("awaiting_operation_action");
-    expect(body.order.threads[0].stage).toBe("awaiting_operation_action");
+    expect(body.order.operation_stage).toBe("in_production");
+    expect(body.order.threads[0].stage).toBe("in_production");
     assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", [
       "p_order_id",
       "p_delivery_partner_id",
@@ -1433,14 +1433,14 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
   it("does not auto-skip if even one thread has shortage (ALL-or-NONE atomicity)", async () => {
     // Migration 0039 explicit invariant: auto-skip is all-or-nothing. A
     // mixed-thread order where one supplier has stock and another doesn't
-    // MUST land all threads at awaiting_operation_action, never half-promoted.
+    // MUST land all threads at in_production, never half-promoted.
     // This guards against partial reservations that would leak buffer stock
     // without a corresponding ready_to_dispatch promotion.
     const rpc = vi.fn().mockResolvedValue({
       data: {
         order_id: ORDER_ID,
         so: 4002,
-        operation_stage: "awaiting_operation_action",
+        operation_stage: "in_production",
         auto_skipped: false,
         po_id: null,
         threads: [
@@ -1451,7 +1451,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
             category: "mattress",
             sop_name: "STANDARD",
             // Despite local sufficiency, atomicity rule keeps it awaiting.
-            stage: "awaiting_operation_action",
+            stage: "in_production",
             po_id: null,
           },
           // Thread B: supplier short — drives the all-or-nothing decision.
@@ -1460,7 +1460,7 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
             supplier_id: SUPPLIER_HK,
             category: "sofa",
             sop_name: "SOFA_SPECIAL",
-            stage: "awaiting_operation_action",
+            stage: "in_production",
             po_id: null,
           },
         ],
@@ -1482,11 +1482,11 @@ describe("Phase 4.5a confirm auto-skip-from-stock", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(body.order.auto_skipped).toBe(false);
-    // Critical: every thread stays at awaiting_operation_action — no partial
+    // Critical: every thread stays at in_production — no partial
     // promotions even when one supplier could have served from buffer.
     expect(body.order.threads).toHaveLength(2);
     for (const t of body.order.threads) {
-      expect(t.stage).toBe("awaiting_operation_action");
+      expect(t.stage).toBe("in_production");
       expect(t.po_id).toBeNull();
     }
     assertRpcCallShape(rpc, "operation_confirm_proceed_request_v3", [
@@ -1673,7 +1673,7 @@ describe("POST /api/operation/orders/:id/revert-proceed", () => {
       data: null,
       error: {
         code: "22023",
-        message: "Order is not in proceed_request stage",
+        message: "Order is not in confirmed stage",
         details: "wrong_stage",
       },
     });

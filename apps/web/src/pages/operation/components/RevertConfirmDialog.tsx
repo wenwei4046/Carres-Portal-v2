@@ -25,7 +25,7 @@ type Props = {
 
 const COPY = {
   proceed: {
-    fromLabel: "Proceed Request",
+    fromLabel: "Confirmed",
     toLabel: "Placed",
     sideEffect: "The order goes back to the dealer side as if Proceed was never pressed.",
   },

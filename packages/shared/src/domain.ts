@@ -230,13 +230,13 @@ export interface Order {
   approvalCode: string | null;
   installmentMonths: 6 | 12 | null;
 
-  // v3-S3 (migration 0028) added `awaiting_operation_action` + `waiting`.
+  // v3-S3 (migration 0028) added `in_production` + `waiting`.
   // Phase 4.5a (2026-05-05): legacy `awaiting_stock` value fully removed —
   // T5 swept FE/tests, T6 (migration 0040) dropped it from the DB enum.
   // operation_stage now matches this union 1:1.
   operationStage:
-    | "placed" | "proceed_request"
-    | "awaiting_operation_action"
+    | "placed" | "confirmed"
+    | "in_production"
     | "ready_to_dispatch" | "dispatched"
     | "waiting" | "delivered"
     | null;

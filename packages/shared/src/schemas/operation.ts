@@ -194,7 +194,7 @@ export type CreatePosBatchResponse = z.infer<typeof createPosBatchResponse>;
  * `warehousePickInput` — POST /api/operation/orders/:id/warehouse.
  * Maps to `operation_warehouse_pick(order_id, warehouse_id)` RPC. Manual
  * override of the auto-picked source warehouse. Only allowed when
- * `operation_stage = awaiting_operation_action` AND no open POs (P0001 has_open_pos).
+ * `operation_stage = in_production` AND no open POs (P0001 has_open_pos).
  */
 export const warehousePickInput = z.object({
   warehouseId: z.string().uuid(),
@@ -215,7 +215,7 @@ export type WarehousePickInput = z.infer<typeof warehousePickInput>;
  * `warehouseId` is intentionally NOT on this schema. v3 RPC picks the source
  * warehouse internally (auto-skip from `own` buffer based on stock coverage).
  * Operation overrides via the separate `transferReadyInputSchema` route once
- * the order is in awaiting_operation_action.
+ * the order is in in_production.
  */
 export const confirmProceedRequestInputSchema = z.object({
   deliveryPartnerId: z.string().uuid(),
@@ -259,7 +259,7 @@ export type LpRejectOrderInput = z.infer<typeof lpRejectOrderInput>;
  * `transferReadyInputSchema` — POST /api/operation/orders/:id/transfer-ready
  * (Pipeline v2, C2 / migration 0024). Maps to RPC
  * `operation_warehouse_pick(p_order_id, p_warehouse_id)` — the RPC's
- * source-stage guard widens to IN ('proceed_request', 'awaiting_operation_action'),
+ * source-stage guard widens to IN ('confirmed', 'in_production'),
  * so this same RPC powers both warehouse-override and the v2 transfer flow.
  * Naming kept distinct from `warehousePickInput` because the FE entry points
  * are conceptually different (one is "change warehouse", the other is
@@ -284,7 +284,7 @@ export type IssuePosForOrderInput = z.infer<typeof issuePosForOrderInput>;
 /**
  * `recheckStockInput` — POST /api/operation/orders/:id/recheck-stock.
  * Re-runs `operation_pick_warehouse` + `operation_calc_shortages` for an
- * `awaiting_operation_action` order in case stock landed via transfer between
+ * `in_production` order in case stock landed via transfer between
  * visits (proto E1, §17.3). Body is empty; `.strict()` rejects extras.
  */
 export const recheckStockInput = z.object({}).strict();
@@ -367,12 +367,12 @@ export type ReassignPoWarehouseInput = z.infer<typeof reassignPoWarehouseInput>;
  * stage: 'all' (default) or one of the operation stages. Pipeline v2 (C3,
  *   migration 0023) added 'placed' (synthetic — derived from `status='place'`
  *   in the route since pre-push orders don't necessarily have stage written
- *   yet) and 'proceed_request' (post-proceed_order, pre-triage).
+ *   yet) and 'confirmed' (post-proceed_order, pre-triage).
  * channel: 'all' (default) | 'dealers' | 'showrooms'.
  * search: free-text matched against customer_name (ILIKE) AND parsed as int for so exact match.
  */
 export const ListOperationOrdersQuery = z.object({
-  stage: z.enum(['all', 'placed', 'proceed_request', 'awaiting_operation_action', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
+  stage: z.enum(['all', 'placed', 'confirmed', 'in_production', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
   channel: z.enum(['all', 'dealers', 'showrooms']).default('all'),
   search: z.string().trim().max(100).optional(),
 }).strict();
@@ -525,7 +525,7 @@ export type ReservedDrilldownResponse = z.infer<typeof reservedDrilldownResponse
 /**
  * `awaitingStockShortageResponse` — GET /api/operation/pos/awaiting-stock-shortage
  * (Pipeline v2, C5.3). Server-side aggregation of SKU-level shortages across
- * every order currently in `operation_stage='awaiting_operation_action'`.
+ * every order currently in `operation_stage='in_production'`.
  *
  * Shape per row:
  *   - `sku`: the product SKU.
@@ -536,7 +536,7 @@ export type ReservedDrilldownResponse = z.infer<typeof reservedDrilldownResponse
  *   - `shortage`: `need - available`. Always > 0; rows where avail >= need are
  *      filtered out server-side.
  *
- * The route returns `{shortage: []}` when no awaiting_operation_action orders
+ * The route returns `{shortage: []}` when no in_production orders
  * or every SKU is fully covered. Sorted by `sku` ascending for stable test
  * snapshots.
  *
@@ -651,7 +651,7 @@ export type ListMovementsQuery = z.infer<typeof listMovementsQuery>;
  *
  * Sidebar action-count feed. Each numeric field maps 1:1 to a nav item that
  * carries a red-dot badge in `OperationSidebar`:
- *   - orders       → Pipeline → Orders         (awaiting_operation_action)
+ *   - orders       → Pipeline → Orders         (in_production)
  *   - procurement  → Pipeline → Procurement    (Pickup-action POs)
  *
  * Other roles use the same `{ key: count }` shape under their own routes

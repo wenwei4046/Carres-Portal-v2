@@ -51,8 +51,8 @@ const STAGE_LABELS: ReadonlyArray<{
   label: string;
 }> = [
   { slug: "placed",                    num: "01", label: "Order received" },
-  { slug: "proceed_request",           num: "02", label: "Proceed requested" },
-  { slug: "awaiting_operation_action", num: "03", label: "Awaiting operation" },
+  { slug: "confirmed",           num: "02", label: "Proceed requested" },
+  { slug: "in_production", num: "03", label: "In Production" },
   { slug: "ready_to_dispatch",         num: "04", label: "Ready to dispatch" },
   { slug: "dispatched",                num: "05", label: "Dispatched" },
   { slug: "delivered",                 num: "06", label: "Delivered" },
@@ -129,8 +129,8 @@ export default function PipelineHeader({
   const location = useLocation();
   const totalIncoming =
     stageCounts.placed +
-    stageCounts.proceed_request +
-    stageCounts.awaiting_operation_action +
+    stageCounts.confirmed +
+    stageCounts.in_production +
     stageCounts.ready_to_dispatch +
     stageCounts.dispatched +
     stageCounts.delivered;
