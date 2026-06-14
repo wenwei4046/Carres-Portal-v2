@@ -24,6 +24,13 @@ import {
   type ProductSkuPatchInput,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
+  type SizesActiveInput,
+  type GenerateSkusInput,
+  type FloorConfigPatchInput,
+  type AddonCreateInput,
+  type AddonPatchInput,
+  type AddonDto,
+  type FloorConfigDto,
   type ConfirmProceedRequestInput,
   type LpRejectOrderInput,
   type ReselectPartnerInput,
@@ -72,6 +79,7 @@ import {
   type SetOpsAssignedLogisticInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
+import { uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
   dealers:      () => ["dealers"] as const,
@@ -4468,6 +4476,105 @@ export function useDeleteSofaFabric() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/sofa-fabrics/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0169-0173 — Product & Maintenance mutations (Modular + Maintenance tabs).
+// Each invalidates ['catalog'] so the admin bundle + every consumer
+// (dealer wizard, Create-PO) re-reads on the next mount.
+// ---------------------------------------------------------------------------
+
+/** Modular "active sizes" cascade — writes allowed_options.sizes AND flips
+ *  pos_active across the model's size SKUs (in-set on, others off). Never
+ *  touches discontinued_at. */
+export function useToggleSizesActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelId, input }: { modelId: string; input: SizesActiveInput }) =>
+      apiFetch<{ ok: true; sizes: string[] }>(
+        `/api/catalog/models/${modelId}/sizes-active`,
+        catalogJson("PATCH", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** Materialize one SKU per variant (from allowed_options.sizes or an explicit
+ *  list). Idempotent — existing codes are skipped server-side. */
+export function useGenerateSkus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelId, input }: { modelId: string; input: GenerateSkusInput }) =>
+      apiFetch<{ ok: true; generated: number; skipped: number }>(
+        `/api/catalog/models/${modelId}/generate-skus`,
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** Photo upload (signed-upload flow in photo-upload.ts). Takes the raw File;
+ *  the helper shrinks → signs → uploads → stores → returns the updated model. */
+export function useSetModelPhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelId, file }: { modelId: string; file: Blob }) =>
+      uploadModelPhoto(modelId, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteModelPhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (modelId: string) =>
+      apiFetch<{ model: ProductModelDto }>(
+        `/api/catalog/models/${modelId}/photo`,
+        catalogJson("DELETE"),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** Delivery-fee singleton (floor_config, id=1). Principal-only server-side
+ *  (floor_write_principal) — the Maintenance editor UI-gates to principal. */
+export function usePatchFloorConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: FloorConfigPatchInput) =>
+      apiFetch<{ floorConfig: FloorConfigDto }>(
+        "/api/catalog/floor-config",
+        catalogJson("PATCH", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useCreateAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AddonCreateInput) =>
+      apiFetch<{ addon: AddonDto }>("/api/catalog/addons", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function usePatchAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, patch }: { key: string; patch: AddonPatchInput }) =>
+      apiFetch<{ addon: AddonDto }>(`/api/catalog/addons/${key}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/addons/${key}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

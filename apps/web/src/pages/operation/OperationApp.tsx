@@ -13,7 +13,7 @@ import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
 // P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
 // Purchase Order (procurement) menu.
 import OperationReceiving from "./OperationReceiving";
-import OperationCatalog from "@/pages/catalog/OperationCatalog";
+import ProductMaintenancePage from "@/pages/catalog/ProductMaintenancePage";
 // 2026-05-19 — Stock / All orders / Suppliers moved from Principal sidebar.
 import OperationStock from "./OperationStock";
 import OperationAllOrders from "./OperationAllOrders";
@@ -240,7 +240,7 @@ export default function OperationApp() {
             {tab === "receiving" && <OperationReceiving />}
             {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
             {tab === "payments" && <OperationPayments />}
-            {tab === "catalog" && <OperationCatalog />}
+            {tab === "catalog" && <ProductMaintenancePage />}
             {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
             {tab === "stock-onhand" && <OperationStockOnHand />}
             {tab === "stock" && <OperationStock />}

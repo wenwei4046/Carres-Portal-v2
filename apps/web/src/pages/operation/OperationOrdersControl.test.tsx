@@ -502,7 +502,12 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
   it("labels the date column 'Deadline' and shows the 📞 contact window inside 3 days (A3)", () => {
     const soon = new Date();
     soon.setDate(soon.getDate() + 2);
-    const iso = soon.toISOString().slice(0, 10);
+    // Build the ISO date from LOCAL parts (not toISOString, which is UTC):
+    // deadlineInfo parses `${date}T00:00:00` as local midnight, so a UTC date
+    // is a day behind in UTC+8 during local early-morning hours and the
+    // countdown reads "1d" instead of "2d" (flaky-by-timezone, surfaced when
+    // the suite ran in MYT pre-dawn). Local parts keep it exactly 2 days out.
+    const iso = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, "0")}-${String(soon.getDate()).padStart(2, "0")}`;
     oneRow({ id: "r4", so: 3004, delivery_date: iso });
     wrap(<OperationOrdersControl />);
     // header renamed

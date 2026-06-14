@@ -309,21 +309,21 @@ Don't burn an hour spinning. Surface and ask.
 
 ## 17. Project status
 
-### 17.1 Current state (as of 2026-06-14)
+### 17.1 Current state (as of 2026-06-15)
 
 | | |
 |---|---|
-| Active phase | **Phase 11 shipped 2026-06-14** (PR #15): 11.1 salesperson Proceed Date + 11.2 `operation_stage` 7→6 collapse. Phase 10 post-launch fixes still ongoing. |
+| Active phase | **Catalog "Product & Maintenance" shipped 2026-06-15** (PR #19): 3-tab page (SKU Master · Modular · narrow Maintenance) replacing the old single-page Catalog; backend migrations 0169-0173. Phase 11 shipped 2026-06-14 (PR #15): 11.1 Proceed Date + 11.2 `operation_stage` 7→6. Phase 10 post-launch fixes still ongoing. |
 | Project started | 2026-05-02 |
 | Web URL | https://carres-portal.pages.dev |
 | API URL | https://carres-portal-v2-api.wwch.workers.dev |
 | DB | staging Supabase = prod, project_id `kfprgpjpaffedghytstl` |
-| Latest migration | **0168** `drop_set_order_date_2arg_shim`. Phase 11: 0165 = `orders.proceed_date` + 3-arg `set_order_date` · 0166 = temp 2-arg shim (dropped by 0168) · **0167** = `operation_stage` enum 7→6 (`placed`/`proceed_request`→`confirmed`, `awaiting_operation_action`→`in_production`, `waiting` kept; `orders.status` UNTOUCHED as anchor; 30 fns + 3 triggers self-adaptively recreated) · 0168 = drop shim. The 6/12 ops-cockpit migrations 0159-0166 (`ops_order_control`, `ops_notes_tasks`, `ops_order_control_payments`, `ops_bulk_complete_orders`, etc.) are main's authentic files. **NOTE**: 0165 + 0166 each have TWO distinct files (an ops_* migration + an 11.1 migration sharing the number) — cosmetic only, this project applies migrations manually via MCP (tracker keys on timestamp, not filename). The 5 branch backfill duplicates were deleted in cleanup. |
-| Catalog state | 11 suppliers · 170 product_models · 1013 product_skus (target 1091, 78 source dupes in carres-sku-master.xlsx — see CFs) |
+| Latest migration | **0173** `storage_product_model_photos_bucket` (Catalog rebuild, applied + on prod 2026-06-14). Catalog migrations 0169-0173: 0169 enum +accessory/+service · 0170 `product_skus.pos_active`+`description` · 0171 `product_models.photo_url`+`allowed_options` + `product_skus.supplier_id` nullable · 0172 `addons.service_sku` + 4 `SVC-` Service SKUs under the `service-addons` model · 0173 public `product-model-photos` bucket. Prior — **0168** `drop_set_order_date_2arg_shim`. Phase 11: 0165 = `orders.proceed_date` + 3-arg `set_order_date` · 0166 = temp 2-arg shim (dropped by 0168) · **0167** = `operation_stage` enum 7→6 (`placed`/`proceed_request`→`confirmed`, `awaiting_operation_action`→`in_production`, `waiting` kept; `orders.status` UNTOUCHED as anchor; 30 fns + 3 triggers self-adaptively recreated) · 0168 = drop shim. The 6/12 ops-cockpit migrations 0159-0166 (`ops_order_control`, `ops_notes_tasks`, `ops_order_control_payments`, `ops_bulk_complete_orders`, etc.) are main's authentic files. **NOTE**: 0165 + 0166 each have TWO distinct files (an ops_* migration + an 11.1 migration sharing the number) — cosmetic only, this project applies migrations manually via MCP (tracker keys on timestamp, not filename). The 5 branch backfill duplicates were deleted in cleanup. |
+| Catalog state | 11 suppliers · 171 product_models (170 + the 0172 `service-addons` parent) · **1017 product_skus** (1013 AutoCount + 4 `SVC-` Service SKUs). Categories widened 3→5 (+accessory, +service). product_skus carry `pos_active` (sell-side ON/OFF, distinct from `discontinued_at`) + editable `description`; product_models carry `photo_url` + `allowed_options` jsonb. (Original target 1091, 78 source dupes in carres-sku-master.xlsx — see CFs.) |
 | Orders state | **158 orders** (verified 2026-06-08): 153 AutoCount-imported (`source_system='autocount'`, all status `place`, SO-1001..1158, ~575 units feeding supplier forecast) + 5 native test orders (SO-1116..1120, cancelled/proceed_order). 0 have `delivery_stops` set — multi-leg chain never live-exercised (see §17.3 Pending). next `orders_so_seq` ≈ SO-1159. |
-| Test count | api 720/723 (3 pre-existing fails) · web 535/540 (5 pre-existing fails) · shared 193/193 — measured 2026-06-14; all 8 fails pre-existing per §17.7, zero new regressions from Phase 11 + merge |
-| Web bundle | 2853.89 KiB raw / 837.67 KiB gzipped (bundle `index-SUq9Dv0z.js`; CSS `index-DyA1QX3I.css` 63.26 KiB; built+deployed 2026-06-14 = Phase 11 + 6/12 ops overhaul; bundle-size regression CF still open, see §17.5) |
-| API bundle | 1304.42 KiB raw / 245.85 KiB gzipped (live Worker version `b08681a6-82a0-4d53-afec-9beb3d068a46` deployed 2026-06-14) |
+| Test count | api **732/735** (3 pre-existing fails) · web 535/540 (5 pre-existing fails) · shared 193/193 — measured 2026-06-15; all 8 fails pre-existing per §17.7, zero new regressions from the Catalog rebuild. (Catalog added 12 API tests + fixed a latent GET-pagination test (`.range` mock) + a timezone-flaky deadline countdown test.) |
+| Web bundle | 2880.12 KiB raw / 843.65 KiB gzipped (bundle `index-I7BROrvu.js`; CSS `index-B295aI5-.css` 63.76 KiB; built+deployed 2026-06-15 = Catalog rebuild; bundle-size regression CF still open, see §17.5) |
+| API bundle | 1304.42 KiB raw / 245.85 KiB gzipped baseline. **Catalog API deployed 2026-06-14 (Worker `f15ce6ce`, +catalog routes, backward-compatible)**; the PR #19 follow-ups were frontend-only and did not redeploy the Worker. |
 
 ### 17.2 Phase timeline
 
@@ -342,6 +342,7 @@ Don't burn an hour spinning. Surface and ask.
 | 9 Production cutover | ✅ | 2026-05-10 ~23:25 | `phase-9-complete` · DB cleanup 2026-05-09, CF deploy 2026-05-10 |
 | 10 Post-launch | 🔵 in progress | from 2026-05-11 | See §17.3 work-log |
 | 11 Proceed Date + state collapse | ✅ | 2026-06-14 | PR #15 (`950c0ec`) · 11.1 proceed_date (0165) + 11.2 operation_stage 7→6 (0167). Spec: `docs/superpowers/plans/2026-06-14-phase-11-2-state-machine-spec.md`. Reconciled with main's 6/12 ops overhaul mid-merge (branch had forked 6/05 + missed it). |
+| Catalog P&M rebuild | ✅ | 2026-06-15 | PR #19 · 3-tab **Product & Maintenance** (migrations 0169-0173 + shared + API + frontend) replacing the old single-page Catalog. Plan: `docs/superpowers/plans/2026-06-14-catalog-product-maintenance-rebuild.md`. Deployed + live-smoked. |
 
 ### 17.3 Phase 10 work-log
 
@@ -368,6 +369,7 @@ Don't burn an hour spinning. Surface and ask.
 - **2026-06-04** · e–i checklist verify + Incoming header fix + deploy (`fa6c511` + `fe04b1c`)
 - **2026-06-05** · Multi-leg delivery chain + 4 logistic partners + AutoCount resolver · migrations 0155-0158 · PRs #9-12
 - **2026-06-12** · v17 Phase 2 design pass — type scale + button hierarchy + status pills (design SoT now v17)
+- **2026-06-14/15** · Catalog → "Product & Maintenance" 3-tab rebuild · migrations 0169-0173 + shared + API + frontend · PR #19 · null-supplier Create-PO guard + deployed + live-smoked
 
 ### 17.4 Business model (locked 2026-05-03)
 
@@ -382,6 +384,7 @@ Don't burn an hour spinning. Surface and ask.
 - `phase-9-rotate-principal-password` — principal@carres.com still at password='111' (Phase 9 known-risk; rotate Week 2). If brute-force detected: `update auth.users set encrypted_password = crypt('<new>', gen_salt('bf')) where email='principal@carres.com'`. PDPA fine up to RM 300k if principal-level breach.
 
 **MEDIUM**:
+- `catalog-server-null-supplier-po-guard` — the null-supplier (service/accessory) Create-PO guard is FE-only (explicit `SUPPLIERLESS_CATEGORIES` short-circuit in `findSupplierForSku` + orphan band, 2026-06-15). Defense-in-depth: also reject any PO line whose `product_skus.supplier_id IS NULL` server-side in `operation_create_po` / `apps/api/src/routes/operation/pos.ts`, so a bypassed UI can't slip one through.
 - `phase-10-supplier-pos-list-urgency-blank` — supplier PO LIST embed silently null because orders has no supplier read policy post-0111. Refactor list enrichment to SECURITY DEFINER RPC, OR add non-recursive supplier orders policy. Drawer works (uses RPC).
 - `phase-10-abandon-cascade-to-po` — `operation_abandon_order` doesn't cascade to linked POs. PO may waste supplier production capacity.
 - `phase-10-cogs-real-source` — `finance_monthly_pl` 55% revenue placeholder. Real: `sum(purchase_order_lines.cost * received_qty)` post-Phase-6.
@@ -401,6 +404,8 @@ Don't burn an hour spinning. Surface and ask.
 - `phase-10-smart-partner-suggest` — multi-leg "+ Add leg" form + Inbox partner dropdown should auto-recommend a partner from the customer's delivery state (Klang→NETS, Johor→TEOW/TT, Singapore→EU/SSY). Operation currently picks manually.
 
 **LOW**:
+- `catalog-web-component-tests` — the new Product & Maintenance pages (`apps/web/src/pages/catalog/**`) have no web component/E2E tests yet (API side is covered in `catalog.test.ts`). Add a SkuMaster render + price-readback test, a Modular sizes-cascade test, and an E2E smoke (load page → filter Service → toggle a SKU off → persists after reload).
+- `catalog-addon-reenable-by-key` — disabling an add-on removes it from the active-only GET bundle; restore is via re-adding the same key (the form PATCHes `active=true` on the duplicate-key 500). Fine for v1; a dedicated "show disabled add-ons" read would be cleaner if add-on churn grows.
 - `phase-11-deploy-verify-branch-has-latest` — **LESSON (2026-06-14)**: deploying `phase/11.2-state-machine` straight to prod briefly reverted the 6/12 ops overhaul, because the branch had forked from main on 6/05 and never carried it. Fixed by merging main back in + reconciling the enum (PR #15). **Before deploying ANY branch to prod, confirm it contains main's latest *deployed* work** (`git log --oneline HEAD..origin/main` should be empty, or you're shipping a regression). Cheap pre-deploy check; would have caught this instantly.
 - `phase-11-migration-0165-0166-dual-files` — 0165 + 0166 each have two distinct files (an `ops_*` migration + an 11.1 migration sharing the number). Cosmetic only — migrations apply manually via MCP (tracker keys on timestamp). Renumbering was deliberately NOT done: the tracker records the exact names `0165_add_proceed_date` / `0166_set_order_date_2arg_compat_shim`, so renaming the files would desync file↔tracker. Leave unless a fresh `supabase db push` pipeline is ever introduced.
 - `phase-10-rename-script-blind-spot-doc` — 0121 + 0123 both missed alias patterns. Enumerate ALL alias patterns upfront next rename, OR use comprehensive regex `(?<![a-z_])<col>(?![a-z_])`. Worth a doc in `docs/superpowers/`.

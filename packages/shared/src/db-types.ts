@@ -45,7 +45,7 @@ export type ApprovalKind      = "refund" | "discount" | "new_dealer" | "top_up" 
 export type ApprovalStatus    = "pending" | "approved" | "rejected";
 export type InquiryKind       = "new_dealer" | "expansion" | "product";
 export type InquiryStage      = "new" | "contacted" | "qualified" | "converted" | "lost";
-export type ProductCategory   = "mattress" | "bedframe" | "sofa";
+export type ProductCategory   = "mattress" | "bedframe" | "sofa" | "accessory" | "service"; // 0169
 export type VariantKind       = "size" | "preset" | "part";
 export type StockMovementKind = "in" | "out" | "adjust";
 // Migration 0027 (v3-S3). 'own' = HQ-controlled warehouse (default for legacy
@@ -121,6 +121,9 @@ export interface ProductModelRow {
   gaps: string[] | null;
   sofa_mode: "preset" | "custom" | "both" | null;
   discontinued_at: string | null;
+  // 0171 — model photo (public URL) + generate-skus option pool.
+  photo_url: string | null;
+  allowed_options: Record<string, string[] | undefined>;
 }
 
 export interface ProductSkuRow {
@@ -141,6 +144,9 @@ export interface ProductSkuRow {
   cost: number | null;
   // 0074 — soft-delete flag for the catalog admin UI.
   discontinued_at: string | null;
+  // 0170 — sell-side ON/OFF (DISTINCT from discontinued_at) + editable description.
+  pos_active: boolean;
+  description: string | null;
 }
 
 export interface SofaFabricRow {
@@ -161,6 +167,8 @@ export interface AddonRow {
   name: string;
   price: number;
   active: boolean;
+  // 0172 — links the add-on to a real Service-category SKU (bare SVC- code).
+  service_sku: string | null;
 }
 
 export interface FloorConfigRow {

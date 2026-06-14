@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
 import {
   Adapters,
   DB,
@@ -10,12 +11,59 @@ import {
   productSkuPatchInput,
   sofaFabricCreateInput,
   sofaFabricPatchInput,
+  sizesActiveInput,
+  generateSkusInput,
+  floorConfigPatchInput,
+  addonCreateInput,
+  addonPatchInput,
+  PRODUCT_MODEL_PHOTOS_BUCKET,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
 
 const catalogRouter = new Hono<AppEnv>();
+
+// Loo 2026-06-14 — new SKU codes are `{MODEL_KEY}-{variant}` (uppercase, dash),
+// matching the AutoCount-style scheme the 1013 existing SKUs use. NOT the legacy
+// `category:model_key:variant` colon format (which 0148 documented as broken).
+function deriveSkuCode(modelKey: string, variant: string): string {
+  return `${modelKey.toUpperCase()}-${variant}`;
+}
+
+// Service/accessory categories carry no supplier (their SKUs are internal:
+// delivery / disposal / labour / pure accessories). The create-SKU supplier
+// requirement is relaxed for them.
+const SUPPLIERLESS_CATEGORIES = new Set(["service", "accessory"]);
+
+const ALLOWED_PHOTO_MIMES = ["image/jpeg", "image/png", "image/webp"] as const;
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+
+function internalOnly(c: { var: { auth: { role: string } } }) {
+  const role = c.var.auth.role;
+  if (role !== "operation" && role !== "principal") {
+    throw new HTTPException(403, { message: "operation/principal only" });
+  }
+}
+
+// product_skus exceeds Supabase's 1000-row REST cap (1013+ live), so the bundle
+// MUST page through or it silently drops SKUs (latent bug surfaced 2026-06-14:
+// the dealer wizard + Create-PO were missing every SKU past the first 1000).
+async function fetchAllSkus(sb: ReturnType<typeof userClient>): Promise<DB.ProductSkuRow[]> {
+  const all: DB.ProductSkuRow[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from("product_skus")
+      .select("*")
+      .range(from, from + PAGE - 1);
+    if (error) throw new HTTPException(500, { message: error.message });
+    const rows = (data ?? []) as DB.ProductSkuRow[];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return all;
+}
 
 /**
  * GET /api/catalog — single bundle of everything the wizard's product picker
@@ -42,15 +90,15 @@ catalogRouter.get("/", async (c) => {
   // Run the 5 small queries in parallel — each is a simple `select *` against a
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, skusR, fabricsR, addonsR, floorR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
-    sb.from("product_skus").select("*"),
+    fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
     sb.from("addons").select("*").eq("active", true),
     sb.from("floor_config").select("*").eq("id", 1).maybeSingle(),
   ]);
 
-  for (const r of [modelsR, skusR, fabricsR, addonsR, floorR]) {
+  for (const r of [modelsR, fabricsR, addonsR, floorR]) {
     if (r.error) throw new HTTPException(500, { message: r.error.message });
   }
   if (!floorR.data) {
@@ -62,9 +110,16 @@ catalogRouter.get("/", async (c) => {
   // Filter skus + fabrics to only those whose model is in the non-discontinued
   // set. Cheaper than a server-side join for catalogs of this size (~50 models).
   const liveModelIds = new Set((modelsR.data ?? []).map((m) => m.id));
-  const liveSkus = (skusR.data ?? []).filter((s) =>
-    liveModelIds.has((s as DB.ProductSkuRow).model_id),
-  );
+  const liveSkus = allSkus.filter((s) => {
+    const row = s as DB.ProductSkuRow;
+    if (!liveModelIds.has(row.model_id)) return false;
+    // 0170 (Loo 2026-06-14) — sell-side ON/OFF. Non-admin consumers (dealer
+    // wizard, Create-PO) only see pos_active SKUs; the catalog admin (admin=true)
+    // sees OFF SKUs too so it can toggle them back on. Existing orders/POs that
+    // reference an OFF SKU's code rehydrate by code directly, not via this bundle.
+    if (!adminMode && row.pos_active === false) return false;
+    return true;
+  });
   const liveFabrics = (fabricsR.data ?? []).filter((f) =>
     liveModelIds.has((f as DB.SofaFabricRow).model_id),
   );
@@ -113,6 +168,7 @@ catalogRouter.post("/models", async (c) => {
       colors: parsed.data.colors ?? null,
       gaps: parsed.data.gaps ?? null,
       sofa_mode: parsed.data.sofaMode ?? null,
+      allowed_options: parsed.data.allowedOptions ?? {},
     })
     .select("*")
     .single();
@@ -141,6 +197,9 @@ catalogRouter.patch("/models/:id", async (c) => {
   // 0075 — restore toggle (Loo 2026-05-09).
   if (parsed.data.discontinuedAt !== undefined)
     patch.discontinued_at = parsed.data.discontinuedAt;
+  // 0171 — option pool edits (Modular AllowedOptionsPanel / Maintenance).
+  if (parsed.data.allowedOptions !== undefined)
+    patch.allowed_options = parsed.data.allowedOptions;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
@@ -208,15 +267,16 @@ catalogRouter.post("/skus", async (c) => {
   if (!modelRow) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
-  const skuCode = `${modelRow.category}:${modelRow.model_key}:${parsed.data.variant}`;
+  const skuCode = deriveSkuCode(modelRow.model_key, parsed.data.variant);
+  const supplierless = SUPPLIERLESS_CATEGORIES.has(modelRow.category);
 
-  // 0074 bugfix (Loo 2026-05-09): product_skus.supplier_id is NOT NULL on
+  // 0074 bugfix (Loo 2026-05-09): product_skus.supplier_id was NOT NULL on
   // staging/prod. Auto-resolve from suppliers.cat_covered[] when the caller
   // doesn't pass an explicit supplierId — same routing rule the Create-PO
-  // modal uses (`findSupplierForSku`). Falls back to 422 when no supplier
-  // covers this category yet.
+  // modal uses. 0171 (Loo 2026-06-14): service/accessory SKUs carry NO supplier,
+  // so the requirement is relaxed for them (supplier_id stays null).
   let supplierId: string | null = parsed.data.supplierId ?? null;
-  if (!supplierId) {
+  if (!supplierId && !supplierless) {
     const { data: supRow, error: supErr } = await sb
       .from("suppliers")
       .select("id")
@@ -250,6 +310,8 @@ catalogRouter.post("/skus", async (c) => {
       price: parsed.data.price,
       cost: parsed.data.cost ?? null,
       supplier_id: supplierId,
+      description: parsed.data.description ?? null,
+      pos_active: parsed.data.posActive ?? true,
     })
     .select("*")
     .single();
@@ -276,14 +338,17 @@ catalogRouter.patch("/skus/:id", async (c) => {
   // 0075 — restore toggle (Loo 2026-05-09).
   if (parsed.data.discontinuedAt !== undefined)
     patch.discontinued_at = parsed.data.discontinuedAt;
+  // 0170 — sell-side toggle + editable description.
+  if (parsed.data.posActive !== undefined) patch.pos_active = parsed.data.posActive;
+  if (parsed.data.description !== undefined) patch.description = parsed.data.description;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
 
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  // If variant changed we must re-derive the sku code so split_part(sku,':',3)
-  // stays in sync. Look up the model first to know category + model_key.
+  // If variant changed we re-derive the sku code so it stays consistent with the
+  // {MODEL_KEY}-{variant} scheme. Look up the model first to know model_key.
   if (parsed.data.variant !== undefined) {
     const { data: skuRow, error: skuErr } = await sb
       .from("product_skus")
@@ -299,11 +364,11 @@ catalogRouter.patch("/skus/:id", async (c) => {
     }
     const { data: modelRow } = await sb
       .from("product_models")
-      .select("category, model_key")
+      .select("model_key")
       .eq("id", skuRow.model_id)
       .maybeSingle();
     if (modelRow) {
-      patch.sku = `${modelRow.category}:${modelRow.model_key}:${parsed.data.variant}`;
+      patch.sku = deriveSkuCode(modelRow.model_key, parsed.data.variant);
     }
   }
 
@@ -415,6 +480,318 @@ catalogRouter.delete("/sofa-fabrics/:id", async (c) => {
   }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "fabric not found" }, 404);
+  }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0169-0173 — Product & Maintenance: sizes-active cascade, generate-skus,
+// model photo (signed-upload), floor-config + addons (Maintenance tab).
+// All internal-only (operation/principal); RLS is the real boundary.
+// ---------------------------------------------------------------------------
+
+// PATCH /models/:id/sizes-active — `sizes` is the new ACTIVE set. Writes
+// allowed_options.sizes and cascades pos_active across the model's size SKUs
+// (in-set => on, others => off). NEVER touches discontinued_at.
+catalogRouter.patch("/models/:id/sizes-active", async (c) => {
+  internalOnly(c);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, sizesActiveInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: modelRow, error: mErr } = await sb
+    .from("product_models")
+    .select("allowed_options")
+    .eq("id", id)
+    .maybeSingle();
+  if (mErr) { const m = mapPgError(mErr); return c.json(m.body, m.status); }
+  if (!modelRow) {
+    return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
+  }
+
+  const nextOpts = {
+    ...((modelRow.allowed_options as Record<string, unknown>) ?? {}),
+    sizes: parsed.data.sizes,
+  };
+  const { error: upErr } = await sb
+    .from("product_models")
+    .update({ allowed_options: nextOpts })
+    .eq("id", id);
+  if (upErr) { const m = mapPgError(upErr); return c.json(m.body, m.status); }
+
+  // Cascade: all size SKUs off, then turn the in-set ones on. Two idempotent
+  // bulk updates (no per-row loop). Never touches discontinued_at.
+  const offRes = await sb
+    .from("product_skus")
+    .update({ pos_active: false })
+    .eq("model_id", id)
+    .eq("variant_kind", "size");
+  if (offRes.error) { const m = mapPgError(offRes.error); return c.json(m.body, m.status); }
+  if (parsed.data.sizes.length > 0) {
+    const onRes = await sb
+      .from("product_skus")
+      .update({ pos_active: true })
+      .eq("model_id", id)
+      .eq("variant_kind", "size")
+      .in("variant", parsed.data.sizes);
+    if (onRes.error) { const m = mapPgError(onRes.error); return c.json(m.body, m.status); }
+  }
+  return c.json({ ok: true, sizes: parsed.data.sizes });
+});
+
+// POST /models/:id/generate-skus — materialize one SKU per variant (from
+// allowed_options.sizes or an explicit list). Code = {MODEL_KEY}-{variant}.
+// Idempotent: existing codes are skipped, not 409'd.
+catalogRouter.post("/models/:id/generate-skus", async (c) => {
+  internalOnly(c);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, generateSkusInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: modelRow, error: mErr } = await sb
+    .from("product_models")
+    .select("category, model_key, allowed_options")
+    .eq("id", id)
+    .maybeSingle();
+  if (mErr) { const m = mapPgError(mErr); return c.json(m.body, m.status); }
+  if (!modelRow) {
+    return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
+  }
+
+  const optSizes = ((modelRow.allowed_options as { sizes?: string[] })?.sizes) ?? [];
+  const variants = (parsed.data.variants ?? optSizes).filter((v) => v.trim().length > 0);
+  if (variants.length === 0) {
+    return c.json({ ok: true, generated: 0, skipped: 0, message: "no variants to generate" });
+  }
+
+  // Supplier resolution (size categories need one; service/accessory don't).
+  let supplierId: string | null = null;
+  if (!SUPPLIERLESS_CATEGORIES.has(modelRow.category)) {
+    const { data: supRow, error: supErr } = await sb
+      .from("suppliers")
+      .select("id")
+      .contains("cat_covered", [modelRow.category])
+      .limit(1)
+      .maybeSingle();
+    if (supErr) { const m = mapPgError(supErr); return c.json(m.body, m.status); }
+    if (!supRow) {
+      return c.json(
+        {
+          error: "rule_violation",
+          code: "no_supplier_for_category",
+          message: `No supplier currently covers ${modelRow.category}. Configure one before generating ${modelRow.category} SKUs.`,
+        },
+        422,
+      );
+    }
+    supplierId = supRow.id as string;
+  }
+
+  const codeFor = (v: string) => deriveSkuCode(modelRow.model_key, v);
+  const wantCodes = variants.map(codeFor);
+  const { data: existingRows, error: exErr } = await sb
+    .from("product_skus")
+    .select("sku")
+    .in("sku", wantCodes);
+  if (exErr) { const m = mapPgError(exErr); return c.json(m.body, m.status); }
+  const existing = new Set((existingRows ?? []).map((r) => (r as { sku: string }).sku));
+
+  const toInsert = variants
+    .filter((v) => !existing.has(codeFor(v)))
+    .map((v) => ({
+      model_id: id,
+      sku: codeFor(v),
+      variant: v,
+      variant_kind: "size" as const,
+      price: parsed.data.price ?? 0,
+      cost: null,
+      supplier_id: supplierId,
+      pos_active: true,
+    }));
+
+  let generated = 0;
+  if (toInsert.length > 0) {
+    const { data, error } = await sb
+      .from("product_skus")
+      .insert(toInsert)
+      .select("id");
+    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    generated = (data ?? []).length;
+  }
+  return c.json({ ok: true, generated, skipped: variants.length - generated });
+});
+
+// ----- Model photo (signed-upload pattern, mirrors storage/dos + partner/pod) -----
+
+const photoSignSchema = z
+  .object({
+    mimeType: z.enum(ALLOWED_PHOTO_MIMES),
+    sizeBytes: z.number().int().positive().max(MAX_PHOTO_BYTES),
+  })
+  .strict();
+
+catalogRouter.post("/models/:id/photo/sign-upload", async (c) => {
+  internalOnly(c);
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = photoSignSchema.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: issue?.message ?? "invalid input", field: issue?.path.join(".") ?? "unknown" },
+      422,
+    );
+  }
+  const ext =
+    parsed.data.mimeType === "image/jpeg" ? "jpg" : parsed.data.mimeType === "image/png" ? "png" : "webp";
+  const path = `${id}/${crypto.randomUUID()}.${ext}`;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.storage
+    .from(PRODUCT_MODEL_PHOTOS_BUCKET)
+    .createSignedUploadUrl(path);
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ token: data.token, path: data.path });
+});
+
+const photoStoreSchema = z.object({ path: z.string().min(1).max(500) }).strict();
+
+// PATCH /models/:id/photo — after the browser uploads to the signed URL, store
+// the resulting public URL. The path must belong to this model (anti-spoof).
+catalogRouter.patch("/models/:id/photo", async (c) => {
+  internalOnly(c);
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = photoStoreSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: "path required" }, 422);
+  }
+  if (!parsed.data.path.startsWith(`${id}/`)) {
+    return c.json({ error: "invalid_input", code: "path_mismatch", message: "path does not belong to this model" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const pub = sb.storage.from(PRODUCT_MODEL_PHOTOS_BUCKET).getPublicUrl(parsed.data.path);
+  const { data, error } = await sb
+    .from("product_models")
+    .update({ photo_url: pub.data.publicUrl })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
+  }
+  return c.json({ model: Adapters.productModelFromRow(data as DB.ProductModelRow) });
+});
+
+catalogRouter.delete("/models/:id/photo", async (c) => {
+  internalOnly(c);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("product_models")
+    .update({ photo_url: null })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
+  }
+  return c.json({ model: Adapters.productModelFromRow(data as DB.ProductModelRow) });
+});
+
+// ----- Maintenance: delivery-fee (floor_config) + add-ons -----
+
+// PATCH /floor-config — the delivery-fee singleton (id=1). RLS is principal-only
+// (floor_write_principal); operation users 403 here by design (UI gates too).
+catalogRouter.patch("/floor-config", async (c) => {
+  internalOnly(c);
+  const parsed = await parseJsonBody(c, floorConfigPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.freeUpToFloor !== undefined) patch.free_up_to_floor = parsed.data.freeUpToFloor;
+  if (parsed.data.perFloorPerItem !== undefined) patch.per_floor_per_item = parsed.data.perFloorPerItem;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("floor_config")
+    .update(patch)
+    .eq("id", 1)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "floor_config row missing" }, 404);
+  }
+  return c.json({ floorConfig: Adapters.floorConfigFromRow(data as DB.FloorConfigRow) });
+});
+
+catalogRouter.post("/addons", async (c) => {
+  internalOnly(c);
+  const parsed = await parseJsonBody(c, addonCreateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("addons")
+    .insert({
+      key: parsed.data.key,
+      name: parsed.data.name,
+      price: parsed.data.price,
+      active: parsed.data.active ?? true,
+      service_sku: parsed.data.serviceSku ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ addon: Adapters.addonFromRow(data as DB.AddonRow) }, 201);
+});
+
+catalogRouter.patch("/addons/:key", async (c) => {
+  internalOnly(c);
+  const key = c.req.param("key");
+  const parsed = await parseJsonBody(c, addonPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.name !== undefined) patch.name = parsed.data.name;
+  if (parsed.data.price !== undefined) patch.price = parsed.data.price;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.serviceSku !== undefined) patch.service_sku = parsed.data.serviceSku;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("addons")
+    .update(patch)
+    .eq("key", key)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "addon not found" }, 404);
+  }
+  return c.json({ addon: Adapters.addonFromRow(data as DB.AddonRow) });
+});
+
+// Soft-disable (active=false) rather than hard delete so the service_sku link
+// + any historical reference survive.
+catalogRouter.delete("/addons/:key", async (c) => {
+  internalOnly(c);
+  const key = c.req.param("key");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("addons")
+    .update({ active: false })
+    .eq("key", key)
+    .select("key")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "addon not found" }, 404);
   }
   return c.json({ ok: true });
 });
