@@ -46,7 +46,7 @@ export interface Salesperson {
 
 export interface ProductModel {
   id: string;
-  category: "mattress" | "bedframe" | "sofa";
+  category: "mattress" | "bedframe" | "sofa" | "accessory" | "service"; // 0169
   modelKey: string;
   name: string;
   blurb: string | null;
@@ -55,6 +55,9 @@ export interface ProductModel {
   sofaMode: "preset" | "custom" | "both" | null;
   // 0074 — soft-delete flag for the catalog admin UI (Loo 2026-05-09).
   discontinuedAt?: string | null;
+  // 0171 — model photo (public URL) + generate-skus option pool.
+  photoUrl?: string | null;
+  allowedOptions?: Record<string, string[] | undefined>;
 }
 
 export interface ProductSku {
@@ -74,6 +77,10 @@ export interface ProductSku {
   // (the proto-era convention that's no longer how SKUs are formatted).
   supplierId: string | null;
   discontinuedAt?: string | null;
+  // 0170 — sell-side ON/OFF (Modular toggle, DISTINCT from discontinuedAt) +
+  // editable sell-side description.
+  posActive?: boolean;
+  description?: string | null;
 }
 
 export interface SofaFabric {
@@ -92,6 +99,8 @@ export interface Addon {
   name: string;
   price: number;
   active: boolean;
+  // 0172 — links the add-on to a real Service-category SKU (bare SVC- code).
+  serviceSku?: string | null;
 }
 
 export interface FloorConfig {

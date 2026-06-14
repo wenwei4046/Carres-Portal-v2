@@ -44,6 +44,9 @@ export const productModelFromRow = (r: DB.ProductModelRow): D.ProductModel => ({
   gaps: r.gaps,
   sofaMode: r.sofa_mode,
   discontinuedAt: r.discontinued_at,
+  // 0171 — photo + option pool (default to an empty pool when absent).
+  photoUrl: r.photo_url ?? null,
+  allowedOptions: r.allowed_options ?? {},
 });
 
 export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
@@ -59,6 +62,10 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   // 2026-05-17 — pass through SKU-level supplier ownership.
   supplierId: r.supplier_id,
   discontinuedAt: r.discontinued_at,
+  // 0170 — sell-side flag (default true to match the column default when a
+  // legacy query didn't select it) + editable description.
+  posActive: r.pos_active ?? true,
+  description: r.description ?? null,
 });
 
 export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
@@ -75,6 +82,8 @@ export const addonFromRow = (r: DB.AddonRow): D.Addon => ({
   name: r.name,
   price: Number(r.price),
   active: r.active,
+  // 0172 — link to the Service-category SKU (bare SVC- code).
+  serviceSku: r.service_sku ?? null,
 });
 
 export const floorConfigFromRow = (r: DB.FloorConfigRow): D.FloorConfig => ({

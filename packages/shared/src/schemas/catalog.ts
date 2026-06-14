@@ -10,11 +10,32 @@ import { z } from "zod";
  * principal/internal sees all). Used by wizard Step 1 to pick the outlet + SP.
  */
 
-export const productCategorySchema = z.enum(["mattress", "bedframe", "sofa"]);
+// 0169 (Product & Maintenance rebuild) — widened 3->5. 'accessory' and 'service'
+// carry no variant axis (one SKU per model); 'service' is the bucket for
+// delivery / disposal / labour SKUs (SVC-... codes).
+export const productCategorySchema = z.enum([
+  "mattress",
+  "bedframe",
+  "sofa",
+  "accessory",
+  "service",
+]);
 export type ProductCategory = z.infer<typeof productCategorySchema>;
 
 export const variantKindSchema = z.enum(["size", "preset", "part"]);
 export type VariantKind = z.infer<typeof variantKindSchema>;
+
+// 0171 — model option pool consumed by generate-skus. Loose by design (a
+// category may grow new axes); the four known keys are typed, extras pass through.
+export const allowedOptionsSchema = z
+  .object({
+    sizes: z.array(z.string()).optional(),
+    compartments: z.array(z.string()).optional(),
+    colors: z.array(z.string()).optional(),
+    gaps: z.array(z.string()).optional(),
+  })
+  .passthrough();
+export type AllowedOptions = z.infer<typeof allowedOptionsSchema>;
 
 export const productModelSchema = z.object({
   id: z.string().uuid(),
@@ -29,6 +50,9 @@ export const productModelSchema = z.object({
   // GET /api/catalog filters discontinued models out, so consumer code
   // generally treats this as always null. Catalog admin endpoints surface it.
   discontinuedAt: z.string().nullable().optional(),
+  // 0171 — model photo (public URL) + the generate-skus option pool.
+  photoUrl: z.string().nullable().optional(),
+  allowedOptions: allowedOptionsSchema.optional(),
 });
 export type ProductModelDto = z.infer<typeof productModelSchema>;
 
@@ -45,10 +69,15 @@ export const productSkuSchema = z.object({
   // still serialize cleanly; the Create-PO submit gate refuses lines whose
   // SKU has cost=null.
   cost: z.number().nullable(),
-  // 2026-05-17 — SKU-level supplier_id (NOT NULL on DB since 0074). Required
-  // for CreatePOModal to route lines to the right supplier group.
+  // 2026-05-17 — SKU-level supplier_id. Nullable since 0171 (service/accessory
+  // SKUs have no supplier). Required for CreatePOModal to route procurable lines
+  // to the right supplier group; a null-supplier SKU may not enter a Create-PO line.
   supplierId: z.string().uuid().nullable(),
   discontinuedAt: z.string().nullable().optional(),
+  // 0170 — sell-side ON/OFF (Modular toggle), DISTINCT from discontinuedAt
+  // (cost/PO side). + editable description column.
+  posActive: z.boolean().optional(),
+  description: z.string().nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
 
@@ -63,11 +92,18 @@ export const sofaFabricSchema = z.object({
 });
 export type SofaFabricDto = z.infer<typeof sofaFabricSchema>;
 
+// 0172 — service_sku links each add-on to a real Service-category SKU (bare
+// SVC- code that joins product_skus.sku) so every charge rolls up under a SKU.
+export const serviceSkuCodeSchema = z
+  .string()
+  .regex(/^SVC-[A-Z0-9-]+$/, "service SKU code must look like SVC-DISPOSE-MATTRESS");
+
 export const addonSchema = z.object({
   key: z.string(),
   name: z.string(),
   price: z.number(),
   active: z.boolean(),
+  serviceSku: serviceSkuCodeSchema.nullable().optional(),
 });
 export type AddonDto = z.infer<typeof addonSchema>;
 
@@ -150,6 +186,9 @@ export const productModelCreateInput = z
     colors: z.array(z.string().trim().regex(colorOrGapValueRegex)).max(20).nullable().optional(),
     gaps: z.array(z.string().trim().regex(colorOrGapValueRegex)).max(20).nullable().optional(),
     sofaMode: z.enum(["preset", "custom", "both"]).nullable().optional(),
+    // 0171 — option pool (sizes/compartments/colors/gaps) the generate-skus
+    // endpoint expands. Edited by the Modular AllowedOptionsPanel + Maintenance.
+    allowedOptions: allowedOptionsSchema.optional(),
   })
   .strict();
 export type ProductModelCreateInput = z.infer<typeof productModelCreateInput>;
@@ -173,6 +212,8 @@ export const productSkuCreateInput = z
     price: z.number().nonnegative(),
     cost: z.number().nonnegative().nullable().optional(),
     supplierId: z.string().uuid().nullable().optional(),
+    description: z.string().trim().max(200).nullable().optional(),
+    posActive: z.boolean().optional(),
   })
   .strict();
 export type ProductSkuCreateInput = z.infer<typeof productSkuCreateInput>;
@@ -186,6 +227,9 @@ export const productSkuPatchInput = z
     supplierId: z.string().uuid().nullable().optional(),
     // 0075 (Loo 2026-05-09) — restore toggle.
     discontinuedAt: z.string().datetime().nullable().optional(),
+    // 0170 — Edit-Prices / Modular toggle / inline description edit.
+    posActive: z.boolean().optional(),
+    description: z.string().trim().max(200).nullable().optional(),
   })
   .strict();
 export type ProductSkuPatchInput = z.infer<typeof productSkuPatchInput>;
@@ -224,3 +268,69 @@ export const salespersonCreateInputSchema = z.object({
   outletId: z.string().uuid().nullable().optional(),
 }).strict();
 export type SalespersonCreateInput = z.infer<typeof salespersonCreateInputSchema>;
+
+// ---------------------------------------------------------------------------
+// 0169-0173 — Product & Maintenance rebuild inputs.
+// ---------------------------------------------------------------------------
+
+/** PATCH /models/:id/sizes-active — `sizes` is the new set of ACTIVE sizes;
+ *  the server writes allowed_options.sizes and cascades pos_active across the
+ *  model's variant_kind='size' SKUs (in-set => on, others => off). Never touches
+ *  discontinuedAt. */
+export const sizesActiveInput = z
+  .object({ sizes: z.array(z.string().trim().min(1).max(60)).max(50) })
+  .strict();
+export type SizesActiveInput = z.infer<typeof sizesActiveInput>;
+
+/** POST /models/:id/generate-skus — materialize one SKU per variant. If
+ *  `variants` is omitted the server expands the model's allowed_options (e.g.
+ *  .sizes). Code = `{MODEL_KEY}-{variant}` (Loo 2026-06-14, NOT colon format).
+ *  Idempotent: existing codes are skipped (23505 -> skipped, not 409). */
+export const generateSkusInput = z
+  .object({
+    variants: z.array(z.string().trim().min(1).max(60)).max(100).optional(),
+    price: z.number().nonnegative().optional(),
+  })
+  .strict();
+export type GenerateSkusInput = z.infer<typeof generateSkusInput>;
+
+/** GET /catalog admin filters for the SKU Master grid. */
+export const skuMasterListQuery = z
+  .object({
+    category: productCategorySchema.optional(),
+    search: z.string().trim().max(100).optional(),
+    posActive: z.coerce.boolean().optional(),
+  })
+  .strict();
+export type SkuMasterListQuery = z.infer<typeof skuMasterListQuery>;
+
+/** PATCH /floor-config — the delivery-fee singleton (id=1). Principal-gated. */
+export const floorConfigPatchInput = z
+  .object({
+    freeUpToFloor: z.number().int().nonnegative().optional(),
+    perFloorPerItem: z.number().nonnegative().optional(),
+  })
+  .strict();
+export type FloorConfigPatchInput = z.infer<typeof floorConfigPatchInput>;
+
+/** Add-ons CRUD (Maintenance tab). */
+export const addonCreateInput = z
+  .object({
+    key: z.string().trim().min(2).max(60).regex(/^[a-z0-9-]+$/, "key must be kebab-case"),
+    name: z.string().trim().min(2).max(80),
+    price: z.number().nonnegative(),
+    active: z.boolean().optional(),
+    serviceSku: serviceSkuCodeSchema.nullable().optional(),
+  })
+  .strict();
+export type AddonCreateInput = z.infer<typeof addonCreateInput>;
+
+export const addonPatchInput = z
+  .object({
+    name: z.string().trim().min(2).max(80).optional(),
+    price: z.number().nonnegative().optional(),
+    active: z.boolean().optional(),
+    serviceSku: serviceSkuCodeSchema.nullable().optional(),
+  })
+  .strict();
+export type AddonPatchInput = z.infer<typeof addonPatchInput>;

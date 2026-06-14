@@ -44,3 +44,34 @@ export function minDeliveryDateISO(leadDays: number, today: Date = new Date()): 
   d.setDate(d.getDate() + leadDays);
   return d.toISOString().slice(0, 10);
 }
+
+// ---------------------------------------------------------------------------
+// 0169-0173 — Product & Maintenance rebuild constants.
+// ---------------------------------------------------------------------------
+
+/** The 5 product categories (0169). Order = the SKU-Master / Modular filter order. */
+export const PRODUCT_CATEGORIES = [
+  "mattress",
+  "bedframe",
+  "sofa",
+  "accessory",
+  "service",
+] as const;
+
+/** Bare Service-category SKU codes (0172) — also the value stored in
+ *  addons.service_sku and product_skus.sku (no colon namespacing). */
+export const SERVICE_SKU = {
+  delivery: "SVC-DELIVERY",
+  disposeMattress: "SVC-DISPOSE-MATTRESS",
+  disposeSofa: "SVC-DISPOSE-SOFA",
+  disposeBedframe: "SVC-DISPOSE-BEDFRAME",
+} as const;
+
+/** DB CHECK + zod guard for a service SKU code. */
+export const SERVICE_SKU_REGEX = /^SVC-[A-Z0-9-]+$/;
+
+/** Seeded internal supplier (0134) that owns the Service/Accessory SKUs. */
+export const CARRES_INTERNAL_SUPPLIER_SLUG = "carres-internal";
+
+/** Public Storage bucket for product model photos (0173). */
+export const PRODUCT_MODEL_PHOTOS_BUCKET = "product-model-photos";
