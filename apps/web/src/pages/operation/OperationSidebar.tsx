@@ -119,10 +119,10 @@ const SECTIONS: Section[] = [
   },
   {
     id: "catalog",
-    label: "Catalog",
+    label: "Product & Maintenance",
     icon: BookOpen,
     children: [
-      { key: "catalog", label: "SKU" },
+      { key: "catalog", label: "Products" },
       { key: "suppliers", label: "Suppliers" },
     ],
   },

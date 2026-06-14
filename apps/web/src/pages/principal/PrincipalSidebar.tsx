@@ -46,7 +46,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       // Phase-5 stub to live link; same page also mounts under
       // /operation/catalog. RLS write covers principal+operation via
       // is_internal().
-      { k: "catalog", t: "Catalog & Pricing", icon: "▭", enabled: true },
+      { k: "catalog", t: "Product & Maintenance", icon: "▭", enabled: true },
     ],
   },
   {

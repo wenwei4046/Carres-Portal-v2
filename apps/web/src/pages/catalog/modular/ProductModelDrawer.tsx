@@ -1,0 +1,696 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import type {
+  AllowedOptions,
+  ProductCategory,
+  ProductModelDto,
+  ProductSkuDto,
+} from "@carres/shared";
+import { ApiError } from "@/lib/api";
+import {
+  useDeleteModelPhoto,
+  useGenerateSkus,
+  usePatchCatalogModel,
+  usePatchCatalogSku,
+  useSetModelPhoto,
+  useToggleSizesActive,
+} from "@/lib/queries";
+import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
+import { CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../components/atoms";
+
+/**
+ * ProductModelDrawer — right slide-over for one model. Sections:
+ *   • Photo card        — signed-upload (shrink → sign → upload → store) + remove
+ *   • Option pools      — Sizes (active-set; cascades pos_active across size
+ *                         SKUs) + Compartments / Colors / Gaps (pure pools that
+ *                         feed Generate SKUs)
+ *   • Variant SKUs      — per-SKU ON/OFF (pos_active) + All on / All off
+ *   • Generate SKUs     — materialize one SKU per ticked size (idempotent)
+ *
+ * "Active sizes" is the cascade endpoint: the chip set IS allowed_options.sizes
+ * (what Generate targets). The chip UNIVERSE is the union of (a) that active set,
+ * (b) every materialized size variant, and (c) sizes typed this session
+ * (`extraSizes`). (c) matters because a just-added size that hasn't been
+ * Generated yet lives only in allowed_options.sizes — without it, toggling that
+ * size off (or "All off") would rewrite the active set and the chip would vanish
+ * with no SKU to keep it. Tracking session-added sizes keeps it re-activatable.
+ */
+
+type OptionAxis = "sizes" | "compartments" | "colors" | "gaps";
+
+const AXES_BY_CATEGORY: Record<ProductCategory, OptionAxis[]> = {
+  mattress: ["sizes"],
+  bedframe: ["sizes", "colors", "gaps"],
+  sofa: ["sizes", "compartments", "colors"],
+  accessory: [],
+  service: [],
+};
+
+const AXIS_LABEL: Record<OptionAxis, string> = {
+  sizes: "Sizes",
+  compartments: "Compartments",
+  colors: "Colours",
+  gaps: "Gaps",
+};
+
+export default function ProductModelDrawer({
+  model,
+  skus,
+  onClose,
+}: {
+  model: ProductModelDto;
+  skus: ProductSkuDto[];
+  onClose: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [generateOpen, setGenerateOpen] = useState(false);
+  // Sizes typed this session — unioned into the chip universe so a freshly
+  // added (not-yet-Generated) size survives an "All off" / toggle-off and stays
+  // re-activatable. Reset per model via the key in ModularTab.
+  const [extraSizes, setExtraSizes] = useState<string[]>([]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const axes = AXES_BY_CATEGORY[model.category];
+  const opts: AllowedOptions = model.allowedOptions ?? {};
+
+  // Size universe = active set ∪ every materialized size variant (so the chips
+  // survive "All off").
+  const sizeUniverse = useMemo(() => {
+    const set = new Set<string>(opts.sizes ?? []);
+    for (const s of skus) if (s.variantKind === "size") set.add(s.variant);
+    for (const s of extraSizes) set.add(s);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [opts.sizes, skus, extraSizes]);
+
+  return (
+    <div
+      role="presentation"
+      onClick={onClose}
+      className="fixed inset-0 z-[60] flex justify-end"
+      style={{ background: "rgba(34,31,32,0.5)" }}
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Edit ${model.name}`}
+        onClick={(e) => e.stopPropagation()}
+        className="h-full w-full max-w-[560px] bg-card text-card-foreground border-l border-base-200 overflow-auto"
+      >
+        {/* Header */}
+        <div className="px-6 pt-4 pb-3 border-b border-base-100 flex justify-between items-start sticky top-0 bg-card z-10">
+          <div>
+            <div className="t-h3 font-display">{model.name}</div>
+            <div className="t-tiny text-base-500 mt-0.5 flex items-center gap-1.5">
+              {CATEGORY_LABEL[model.category]} · <CodeChip>{model.modelKey}</CodeChip>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="p-1 text-[18px] text-base-700 hover:text-base-900 leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="p-6 flex flex-col gap-6">
+          <PhotoCard model={model} />
+          <BlurbField model={model} />
+
+          {axes.map((axis) =>
+            axis === "sizes" ? (
+              <SizeActivePool
+                key="sizes"
+                model={model}
+                universe={sizeUniverse}
+                active={new Set(opts.sizes ?? [])}
+                onRegisterSize={(s) =>
+                  setExtraSizes((prev) => (prev.includes(s) ? prev : [...prev, s]))
+                }
+              />
+            ) : (
+              <ChipPool key={axis} model={model} axis={axis} values={opts[axis] ?? []} />
+            ),
+          )}
+
+          {axes.length === 0 && (
+            <p className="t-tiny text-base-400">
+              No variant axes for {CATEGORY_LABEL[model.category]} — manage its SKUs in SKU Master.
+            </p>
+          )}
+
+          <VariantSkuTable skus={skus} />
+
+          {axes.includes("sizes") && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setGenerateOpen(true)}
+                className="btn-primary text-[12px]"
+                data-testid="generate-skus-open"
+              >
+                Generate SKUs
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {generateOpen && (
+        <GenerateSkusModal
+          model={model}
+          universe={sizeUniverse}
+          existing={new Set(skus.map((s) => s.variant))}
+          onClose={() => setGenerateOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Photo card
+// ---------------------------------------------------------------------------
+
+function PhotoCard({ model }: { model: ProductModelDto }) {
+  const setPhoto = useSetModelPhoto();
+  const delPhoto = useDeleteModelPhoto();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-pick of the same file
+    if (!file) return;
+    setPhoto.mutate(
+      { modelId: model.id, file },
+      {
+        onSuccess: () => toast.success("Photo updated"),
+        onError: (err: unknown) =>
+          toast.error(err instanceof ApiError ? err.message : (err as Error).message || "Upload failed"),
+      },
+    );
+  }
+
+  function remove() {
+    if (!confirm("Remove this model photo?")) return;
+    delPhoto.mutate(model.id, {
+      onSuccess: () => toast.success("Photo removed"),
+      onError: (err: unknown) =>
+        toast.error(err instanceof ApiError ? err.message : "Remove failed"),
+    });
+  }
+
+  return (
+    <div>
+      <div className="label mb-2">Photo</div>
+      <div className="flex items-center gap-4">
+        {model.photoUrl ? (
+          <img
+            src={model.photoUrl}
+            alt={model.name}
+            className="w-24 h-24 object-cover rounded-[6px] border border-base-200 bg-base-50"
+          />
+        ) : (
+          <div className="w-24 h-24 rounded-[6px] border border-dashed border-base-300 bg-base-50 grid place-items-center text-base-300 text-[28px]">
+            ▦
+          </div>
+        )}
+        <div className="flex flex-col gap-2">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={onPick}
+            data-testid="model-photo-input"
+          />
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={setPhoto.isPending}
+            className="btn-secondary text-[12px]"
+          >
+            {setPhoto.isPending ? "Uploading…" : model.photoUrl ? "Replace photo" : "Upload photo"}
+          </button>
+          {model.photoUrl && (
+            <button
+              type="button"
+              onClick={remove}
+              disabled={delPhoto.isPending}
+              className="btn-danger text-[12px]"
+            >
+              Remove
+            </button>
+          )}
+          <span className="t-tiny text-base-400">JPEG/PNG/WebP · auto-shrunk to ≤2 MB</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Blurb (model tagline)
+// ---------------------------------------------------------------------------
+
+function BlurbField({ model }: { model: ProductModelDto }) {
+  const patch = usePatchCatalogModel();
+  function commit(raw: string) {
+    const next = raw.trim();
+    if (next === (model.blurb ?? "")) return;
+    patch.mutate(
+      { id: model.id, patch: { blurb: next || null } },
+      {
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+  return (
+    <label className="block">
+      <span className="label block mb-1">Description / blurb</span>
+      <input
+        defaultValue={model.blurb ?? ""}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        placeholder="Short tagline shown to dealers"
+        className={INPUT_CLS}
+      />
+    </label>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Size active pool (cascade) — chips toggle pos_active across size SKUs
+// ---------------------------------------------------------------------------
+
+function SizeActivePool({
+  model,
+  universe,
+  active,
+  onRegisterSize,
+}: {
+  model: ProductModelDto;
+  universe: string[];
+  active: Set<string>;
+  onRegisterSize: (size: string) => void;
+}) {
+  const toggle = useToggleSizesActive();
+  const [adding, setAdding] = useState("");
+
+  function setActive(next: string[]) {
+    toggle.mutate(
+      { modelId: model.id, input: { sizes: next } },
+      {
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  function toggleSize(size: string) {
+    const next = new Set(active);
+    if (next.has(size)) next.delete(size);
+    else next.add(size);
+    setActive(Array.from(next));
+  }
+
+  function addSize() {
+    const v = adding.trim();
+    setAdding("");
+    if (!v) return;
+    // Track it locally so it survives a later "All off", then activate it.
+    onRegisterSize(v);
+    if (active.has(v)) return;
+    setActive([...Array.from(active), v]);
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="label">Active sizes</div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setActive(universe)}
+            disabled={toggle.isPending || universe.length === 0}
+            className="btn-ghost text-[11px]"
+          >
+            All on
+          </button>
+          <button
+            type="button"
+            onClick={() => setActive([])}
+            disabled={toggle.isPending}
+            className="btn-ghost text-[11px]"
+          >
+            All off
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {universe.length === 0 && (
+          <span className="t-tiny text-base-400">No sizes yet — add one below, then Generate SKUs.</span>
+        )}
+        {universe.map((size) => {
+          const on = active.has(size);
+          return (
+            <button
+              key={size}
+              type="button"
+              onClick={() => toggleSize(size)}
+              disabled={toggle.isPending}
+              aria-pressed={on}
+              className={`t-tiny font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                on
+                  ? "bg-base-900 text-white border-base-900"
+                  : "bg-white text-base-500 border-base-300 hover:border-base-500"
+              }`}
+              data-testid={`size-chip-${size}`}
+            >
+              {size}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex gap-2 mt-2">
+        <input
+          value={adding}
+          onChange={(e) => setAdding(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") addSize();
+          }}
+          placeholder="Add a size (e.g. Super King)"
+          className={`${INPUT_CLS} max-w-[220px]`}
+        />
+        <button type="button" onClick={addSize} className="btn-ghost text-[11px]">
+          + Add size
+        </button>
+      </div>
+      <p className="t-tiny text-base-400 mt-1.5">
+        Turning a size on/off shows or hides every SKU of that size from dealers.
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Generic chip pool (compartments / colours / gaps) — pure allowed_options pool
+// ---------------------------------------------------------------------------
+
+function ChipPool({
+  model,
+  axis,
+  values,
+}: {
+  model: ProductModelDto;
+  axis: Exclude<OptionAxis, "sizes">;
+  values: string[];
+}) {
+  const patch = usePatchCatalogModel();
+  const [adding, setAdding] = useState("");
+
+  function write(next: string[]) {
+    const allowedOptions: AllowedOptions = { ...(model.allowedOptions ?? {}), [axis]: next };
+    patch.mutate(
+      { id: model.id, patch: { allowedOptions } },
+      {
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  function add() {
+    const v = adding.trim();
+    setAdding("");
+    if (!v || values.includes(v)) return;
+    write([...values, v]);
+  }
+
+  return (
+    <div>
+      <div className="label mb-2">{AXIS_LABEL[axis]}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {values.length === 0 && <span className="t-tiny text-base-400">None yet.</span>}
+        {values.map((v) => (
+          <span
+            key={v}
+            className="inline-flex items-center gap-1 t-tiny font-medium px-2.5 py-1 rounded-full bg-base-100 text-base-700"
+          >
+            {v}
+            <button
+              type="button"
+              onClick={() => write(values.filter((x) => x !== v))}
+              disabled={patch.isPending}
+              aria-label={`Remove ${v}`}
+              className="text-base-400 hover:text-danger leading-none"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2 mt-2">
+        <input
+          value={adding}
+          onChange={(e) => setAdding(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") add();
+          }}
+          placeholder={`Add a ${AXIS_LABEL[axis].toLowerCase().replace(/s$/, "")}`}
+          className={`${INPUT_CLS} max-w-[220px]`}
+        />
+        <button type="button" onClick={add} className="btn-ghost text-[11px]">
+          + Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Variant SKU table — per-SKU pos_active toggle + All on / All off
+// ---------------------------------------------------------------------------
+
+function VariantSkuTable({ skus }: { skus: ProductSkuDto[] }) {
+  const patch = usePatchCatalogSku();
+  const [bulkBusy, setBulkBusy] = useState(false);
+  // Track the single SKU mid-toggle so one in-flight mutation doesn't disable
+  // every row's pill (the shared hook's isPending would otherwise freeze all).
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const sorted = useMemo(
+    () => [...skus].sort((a, b) => a.variant.localeCompare(b.variant, undefined, { numeric: true })),
+    [skus],
+  );
+
+  function toggleOne(sku: ProductSkuDto) {
+    setTogglingId(sku.id);
+    patch.mutate(
+      { id: sku.id, patch: { posActive: sku.posActive === false } },
+      {
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+        onSettled: () => setTogglingId((cur) => (cur === sku.id ? null : cur)),
+      },
+    );
+  }
+
+  async function setAll(next: boolean) {
+    setBulkBusy(true);
+    const results = await Promise.allSettled(
+      sorted
+        .filter((s) => (s.posActive !== false) !== next)
+        .map((s) => patch.mutateAsync({ id: s.id, patch: { posActive: next } })),
+    );
+    setBulkBusy(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) toast.error(`${failed} SKU${failed === 1 ? "" : "s"} failed`);
+    else toast.success(next ? "All SKUs ON" : "All SKUs OFF");
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="label">Variant SKUs ({sorted.length})</div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setAll(true)}
+            disabled={bulkBusy || sorted.length === 0}
+            className="btn-ghost text-[11px]"
+          >
+            All on
+          </button>
+          <button
+            type="button"
+            onClick={() => setAll(false)}
+            disabled={bulkBusy || sorted.length === 0}
+            className="btn-ghost text-[11px]"
+          >
+            All off
+          </button>
+        </div>
+      </div>
+      <div className="border border-base-200 rounded-[4px] overflow-hidden">
+        {sorted.length === 0 && (
+          <div className="t-tiny text-base-400 px-3 py-3">
+            No SKUs yet. Use Generate SKUs (sizes) or + New SKU.
+          </div>
+        )}
+        {sorted.map((sku) => (
+          <div
+            key={sku.id}
+            className="grid items-center gap-3 px-3 py-1.5 border-b border-base-100 last:border-b-0"
+            style={{ gridTemplateColumns: "1fr 90px 64px", opacity: sku.discontinuedAt ? 0.5 : 1 }}
+            data-testid={`variant-row-${sku.sku}`}
+          >
+            <div className="min-w-0">
+              <div className="t-small text-base-800">{sku.variant}</div>
+              <div className="font-mono text-[10px] text-base-500">{sku.sku}</div>
+            </div>
+            <div className="text-right font-mono text-[11px] text-base-700">
+              {sku.price === 0 ? <span className="text-base-400">—</span> : sku.price.toFixed(2)}
+            </div>
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => toggleOne(sku)}
+                disabled={togglingId === sku.id || bulkBusy || !!sku.discontinuedAt}
+                title="Toggle visible to dealers"
+                aria-label={`Toggle ${sku.sku}`}
+              >
+                <SkuStatusPill posActive={sku.posActive !== false} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Generate SKUs modal
+// ---------------------------------------------------------------------------
+
+function GenerateSkusModal({
+  model,
+  universe,
+  existing,
+  onClose,
+}: {
+  model: ProductModelDto;
+  universe: string[];
+  existing: Set<string>;
+  onClose: () => void;
+}) {
+  const gen = useGenerateSkus();
+  // Default-tick the sizes that don't have a SKU yet (the useful case); keep
+  // existing ones unticked so the dialog reads as "what's missing".
+  const [ticked, setTicked] = useState<Set<string>>(
+    () => new Set(universe.filter((s) => !existing.has(s))),
+  );
+  const [price, setPrice] = useState("");
+
+  function toggle(size: string) {
+    setTicked((prev) => {
+      const n = new Set(prev);
+      if (n.has(size)) n.delete(size);
+      else n.add(size);
+      return n;
+    });
+  }
+
+  const variants = Array.from(ticked);
+  const priceNum = price.trim() === "" ? undefined : Number(price);
+  const priceValid = priceNum === undefined || (Number.isFinite(priceNum) && priceNum >= 0);
+
+  function submit() {
+    if (variants.length === 0 || !priceValid) return;
+    gen.mutate(
+      { modelId: model.id, input: { variants, ...(priceNum !== undefined ? { price: priceNum } : {}) } },
+      {
+        onSuccess: (r) => {
+          toast.success(`Generated ${r.generated} · skipped ${r.skipped}`);
+          onClose();
+        },
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Generate failed"),
+      },
+    );
+  }
+
+  return (
+    <Modal title={`Generate SKUs · ${model.name}`} onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <div>
+          <div className="label mb-1.5">Sizes</div>
+          <div className="flex flex-wrap gap-1.5">
+            {universe.length === 0 && (
+              <span className="t-tiny text-base-400">
+                No sizes defined. Add sizes in Active sizes first.
+              </span>
+            )}
+            {universe.map((size) => {
+              const on = ticked.has(size);
+              const made = existing.has(size);
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => toggle(size)}
+                  aria-pressed={on}
+                  className={`t-tiny font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                    on
+                      ? "bg-base-900 text-white border-base-900"
+                      : "bg-white text-base-500 border-base-300 hover:border-base-500"
+                  }`}
+                  title={made ? "Already has a SKU (will be skipped if re-ticked)" : ""}
+                >
+                  {size}
+                  {made && " ✓"}
+                </button>
+              );
+            })}
+          </div>
+          <p className="t-tiny text-base-400 mt-1.5">
+            Codes mint as <span className="font-mono">{model.modelKey.toUpperCase()}-SIZE</span>. Existing
+            codes are skipped.
+          </p>
+        </div>
+        <label className="block">
+          <span className="label block mb-1">Default price (RM, optional)</span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="0.00 — set later in SKU Master"
+            className={INPUT_CLS}
+          />
+        </label>
+      </div>
+      <ModalActions
+        onCancel={onClose}
+        onPrimary={submit}
+        primary={`Generate ${variants.length}`}
+        primaryDisabled={variants.length === 0 || !priceValid}
+        primaryPending={gen.isPending}
+      />
+    </Modal>
+  );
+}
