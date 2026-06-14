@@ -538,7 +538,7 @@ describe("Catalog admin — DELETE /api/catalog/models/:id (soft-delete)", () =>
 });
 
 describe("Catalog admin — POST /api/catalog/skus", () => {
-  it("derives sku string from model.category + model_key + variant", async () => {
+  it("derives sku as {MODEL_KEY}-{variant} (Loo 2026-06-14, dash format)", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(
       buildWriteSb({
@@ -567,7 +567,7 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
         writeReturn: {
           id: "00000000-0000-0000-0000-00000000bb01",
           model_id: MODEL_ID_LIVE,
-          sku: "mattress:carres-classic:Twin",
+          sku: "CARRES-CLASSIC-Twin",
           variant: "Twin",
           variant_kind: "size",
           price: 2400,
@@ -594,9 +594,7 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
     );
     expect(res.status).toBe(201);
     const insert = recorded.find((r) => r.op === "insert");
-    expect((insert?.payload as { sku: string }).sku).toBe(
-      "mattress:carres-classic:Twin",
-    );
+    expect((insert?.payload as { sku: string }).sku).toBe("CARRES-CLASSIC-Twin");
     expect((insert?.payload as { cost: number }).cost).toBe(1300);
   });
 });
