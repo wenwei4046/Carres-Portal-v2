@@ -243,6 +243,8 @@ export default function DealerNewOrder({ open, onClose }: Props) {
         },
         delivery: {
           date: draft.delivery.dateTbd ? null : draft.delivery.date,
+          // Phase 11.1 — proceed date pairs with delivery date; null when TBD.
+          proceedDate: draft.delivery.dateTbd ? null : (draft.delivery.proceedDate || null),
           dateTbd: draft.delivery.dateTbd,
           floor: draft.delivery.floor,
           hasLift: draft.delivery.hasLift,

@@ -43,7 +43,7 @@ function validDraft(): WizardDraft {
       emergencyRelationship: "Spouse",
       emergencyRelationshipOther: "",
     },
-    delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false, stairItems: null },
+    delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false, stairItems: null, proceedDate: "" },
     lines: [],
     addons: [],
     paid: 0,
@@ -351,6 +351,7 @@ describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
   it("accepts mattress date == today + 14", () => {
     const d = validDraft();
     d.delivery.date = isoToday(14);
+    d.delivery.proceedDate = isoToday(0);
     expect(step3DateValid(d, 14, TODAY)).toBe(true);
   });
 
@@ -363,13 +364,40 @@ describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
   it("accepts sofa date == today + 21", () => {
     const d = validDraft();
     d.delivery.date = isoToday(21);
+    d.delivery.proceedDate = isoToday(0);
     expect(step3DateValid(d, 21, TODAY)).toBe(true);
   });
 
   it("accepts any future date when minLeadDays = 0 (non-gated cart)", () => {
     const d = validDraft();
     d.delivery.date = isoToday(1);
+    d.delivery.proceedDate = isoToday(0);
     expect(step3DateValid(d, 0, TODAY)).toBe(true);
+  });
+
+  // Phase 11.1 — proceed (production-start) date validation.
+  it("rejects when proceed date is missing", () => {
+    const d = validDraft();
+    d.delivery.date = isoToday(21);
+    d.delivery.proceedDate = "";
+    expect(step3DateValid(d, 14, TODAY)).toBe(false);
+    expect(step3DateFirstIssue(d, 14, TODAY)).toContain("Proceed date");
+  });
+
+  it("rejects when proceed date is after the delivery date", () => {
+    const d = validDraft();
+    d.delivery.date = isoToday(14);
+    d.delivery.proceedDate = isoToday(20);
+    expect(step3DateValid(d, 14, TODAY)).toBe(false);
+    expect(step3DateFirstIssue(d, 14, TODAY)).toContain("on or before");
+  });
+
+  it("rejects when proceed date is in the past", () => {
+    const d = validDraft();
+    d.delivery.date = isoToday(14);
+    d.delivery.proceedDate = isoToday(-3);
+    expect(step3DateValid(d, 14, TODAY)).toBe(false);
+    expect(step3DateFirstIssue(d, 14, TODAY)).toContain("past");
   });
 });
 

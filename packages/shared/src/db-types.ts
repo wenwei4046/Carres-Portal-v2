@@ -263,6 +263,10 @@ export interface OrderRow {
   customer_emergency: string | null;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
+  // Phase 11.1 (migration 0165) — salesperson-entered planned production-start
+  // ("Proceed") date. Pairs with delivery_date via delivery_date_tbd
+  // (both-or-neither). NULL when TBD. Must be <= delivery_date.
+  proceed_date: string | null;
   delivery_floor: number;
   delivery_has_lift: boolean;
   delivery_stair_items: number | null;

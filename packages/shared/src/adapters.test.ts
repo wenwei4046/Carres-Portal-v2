@@ -18,7 +18,7 @@ function baseInput(over: Partial<CreateOrderInput> = {}): CreateOrderInput {
       billingSame: true,
       emergency: "Tan Junior · 012-9988776 · Spouse",
     },
-    delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false },
+    delivery: { date: "2026-06-01", proceedDate: "2026-05-15", dateTbd: false, floor: 1, hasLift: false },
     lines: [
       {
         sku: "mattress:carres-classic:queen",
@@ -50,6 +50,7 @@ describe("orderInputToRpcPayload", () => {
     expect(out.customer_phone).toBe("012-3456789");
     expect(out.customer_emergency).toBe("Tan Junior · 012-9988776 · Spouse");
     expect(out.delivery_date).toBe("2026-06-01");
+    expect(out.proceed_date).toBe("2026-05-15");
     expect(out.delivery_date_tbd).toBe(false);
     expect(out.delivery_floor).toBe(1);
     expect(out.delivery_has_lift).toBe(false);
@@ -94,11 +95,13 @@ describe("orderInputToRpcPayload", () => {
   it("nulls delivery_date when dateTbd is true", () => {
     const out = orderInputToRpcPayload(
       baseInput({
-        delivery: { date: null, dateTbd: true, floor: 1, hasLift: false },
+        delivery: { date: null, proceedDate: "2026-05-15", dateTbd: true, floor: 1, hasLift: false },
       }),
       DEALER_ID,
     );
     expect(out.delivery_date).toBeNull();
+    // Phase 11.1 — proceed date is also nulled when the order is TBD.
+    expect(out.proceed_date).toBeNull();
     expect(out.delivery_date_tbd).toBe(true);
   });
 

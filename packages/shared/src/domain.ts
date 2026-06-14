@@ -211,6 +211,9 @@ export interface Order {
 
   delivery: {
     date: string | null;
+    /** Phase 11.1 — salesperson-entered planned production-start ("Proceed")
+     *  date. Pairs with `date` via `dateTbd` (both-or-neither). <= `date`. */
+    proceedDate: string | null;
     dateTbd: boolean;
     floor: number;
     hasLift: boolean;

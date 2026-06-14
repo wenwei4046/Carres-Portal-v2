@@ -108,6 +108,10 @@ export interface WizardDraft {
   };
   delivery: {
     date: string;
+    // Phase 11.1 (Loo) — salesperson-entered planned production-start
+    // ("Proceed") date. Paired with `date` via the same `dateTbd` toggle
+    // (both-or-neither). Must be on/before `date`. Empty string = not picked.
+    proceedDate: string;
     dateTbd: boolean;
     floor: number;
     hasLift: boolean;
@@ -163,7 +167,7 @@ export function emptyDraft(): WizardDraft {
       emergencyRelationship: "",
       emergencyRelationshipOther: "",
     },
-    delivery: { date: "", dateTbd: false, floor: 1, hasLift: false, stairItems: null, asap: false },
+    delivery: { date: "", proceedDate: "", dateTbd: false, floor: 1, hasLift: false, stairItems: null, asap: false },
     lines: [],
     addons: [],
     paid: 0,
@@ -215,6 +219,12 @@ export function loadDraft(): WizardDraft | null {
     // draft never had, breaking save/load round-trip equality).
     const delivery = {
       ...parsed.delivery,
+      // Phase 11.1 — backfill proceedDate for drafts saved before this field
+      // existed, so old in-flight drafts restore cleanly.
+      proceedDate:
+        typeof parsed.delivery.proceedDate === "string"
+          ? parsed.delivery.proceedDate
+          : "",
       stairItems:
         typeof parsed.delivery.stairItems === "number"
           ? parsed.delivery.stairItems
@@ -359,6 +369,21 @@ export function step3DateFirstIssue(
     if (picked < new Date(min.toISOString().slice(0, 10))) {
       return `Delivery — earliest date is ${min.toISOString().slice(0, 10)} (${minLeadDays}-day lead time)`;
     }
+  }
+  // Phase 11.1 (Loo) — the salesperson must ALSO commit a proceed
+  // (production-start) date whenever a delivery date is set. It can't be in the
+  // past and can't be after the delivery date (you don't start building after
+  // you've promised delivery). TBD orders skip this (handled by the early
+  // return above) — both dates get filled in later via the confirm-date flow.
+  if (!d.delivery.proceedDate) {
+    return "Proceed date — pick when production should start, or tick 'Confirm later'";
+  }
+  const todayIso = today.toISOString().slice(0, 10);
+  if (d.delivery.proceedDate < todayIso) {
+    return `Proceed date — can't be in the past (earliest ${todayIso})`;
+  }
+  if (d.delivery.proceedDate > d.delivery.date) {
+    return "Proceed date — must be on or before the delivery date";
   }
   return null;
 }
