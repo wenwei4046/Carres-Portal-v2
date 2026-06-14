@@ -88,6 +88,12 @@ function buildSb(
       return chain;
     };
     chain.maybeSingle = async () => ({ data: rows[0] ?? null, error: null });
+    // c132b97 — GET /api/catalog pages product_skus via `.range(from, to)` to
+    // beat Supabase's 1000-row REST cap. The mock returns the whole stubbed
+    // set in one page (test fixtures are always < 1000 rows, so fetchAllSkus
+    // breaks after the first page).
+    chain.range = (_from: number, _to: number) =>
+      Promise.resolve({ data: rows, error: null });
     chain.then = (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
       resolve({ data: rows, error: null });
     return chain;
@@ -691,5 +697,400 @@ describe("Catalog admin — sofa fabrics CRUD", () => {
     expect(res.status).toBe(200);
     const upd = recorded.find((r) => r.op === "update");
     expect((upd!.payload as { discontinued_at: string }).discontinued_at).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0169-0173 — Product & Maintenance endpoints (pos_active filter, sizes-active
+// cascade, generate-skus idempotency, service no-supplier relaxation, photo
+// sign-upload + role gates, floor-config + addons).
+// ---------------------------------------------------------------------------
+
+/**
+ * scriptedSb — a more capable mock than buildWriteSb for the multi-query
+ * endpoints. Each `.from(table)` chain is BOTH thenable (so routes that
+ * `await sb.from(...).update().eq()` directly resolve to `{data,error}`) AND
+ * exposes `.maybeSingle()/.single()`. `.then` returns the inserted rows once
+ * `.insert()` ran on that chain, else `reads[table+"__list"]`.
+ */
+function scriptedSb(opts: {
+  reads?: Record<string, unknown>;
+  inserted?: unknown[];
+  records?: { table: string; op: "insert" | "update"; body: unknown }[];
+}): SbStub {
+  const reads = opts.reads ?? {};
+  const inserted = opts.inserted ?? [{ id: "00000000-0000-0000-0000-0000000insrt" }];
+  const records = opts.records ?? [];
+  const mk = (table: string) => {
+    let didInsert = false;
+    const chain: Record<string, unknown> = {};
+    chain.select = () => chain;
+    chain.eq = () => chain;
+    chain.in = () => chain;
+    chain.contains = () => chain;
+    chain.limit = () => chain;
+    chain.is = () => chain;
+    chain.order = () => chain;
+    chain.insert = (body: unknown) => {
+      didInsert = true;
+      records.push({ table, op: "insert", body });
+      return chain;
+    };
+    chain.update = (body: unknown) => {
+      records.push({ table, op: "update", body });
+      return chain;
+    };
+    chain.maybeSingle = async () => ({ data: reads[table] ?? null, error: null });
+    chain.single = async () => ({
+      data: didInsert ? inserted[0] ?? null : reads[table] ?? null,
+      error: null,
+    });
+    chain.then = (resolve: (v: { data: unknown; error: null }) => unknown) =>
+      resolve({ data: didInsert ? inserted : (reads[`${table}__list`] ?? []), error: null });
+    return chain;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { from: (table: string) => mk(table) } as any;
+}
+
+describe("GET /api/catalog — pos_active sell-side filter (0170)", () => {
+  const SKU_ON = "00000000-0000-0000-0000-00000000bb10";
+  const SKU_OFF = "00000000-0000-0000-0000-00000000bb11";
+
+  function bundle() {
+    return {
+      product_models: [
+        {
+          id: MODEL_ID_LIVE,
+          category: "mattress",
+          model_key: "carres-classic",
+          name: "Classic",
+          blurb: null,
+          colors: null,
+          gaps: null,
+          sofa_mode: null,
+          discontinued_at: null,
+          photo_url: null,
+          allowed_options: {},
+        },
+      ],
+      product_skus: [
+        {
+          id: SKU_ON,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Queen",
+          variant: "Queen",
+          variant_kind: "size",
+          price: 1500,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+          pos_active: true,
+          description: null,
+        },
+        {
+          id: SKU_OFF,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-King",
+          variant: "King",
+          variant_kind: "size",
+          price: 1800,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+          pos_active: false,
+          description: null,
+        },
+      ],
+      sofa_fabrics: [],
+      addons: [],
+      floor_config: [{ id: 1, free_up_to_floor: 2, per_floor_per_item: 50 }],
+    };
+  }
+
+  it("dealer (non-admin) bundle drops pos_active=false SKUs", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb(bundle()));
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.skus.map((s) => s.id)).toEqual([SKU_ON]);
+  });
+
+  it("admin bundle keeps OFF SKUs so the editor can toggle them back on", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb(bundle()));
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog?admin=true", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.skus.map((s) => s.id).sort()).toEqual([SKU_ON, SKU_OFF].sort());
+    expect(body.skus.find((s) => s.id === SKU_OFF)?.posActive).toBe(false);
+  });
+});
+
+describe("POST /api/catalog/skus — service category no-supplier relaxation (0171)", () => {
+  it("inserts a service SKU with supplier_id null (no 422)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "service", model_key: "service-addons" },
+          ],
+          // NOTE: no suppliers row — a service SKU must insert anyway.
+        },
+        recorded,
+        writeReturn: {
+          id: "00000000-0000-0000-0000-00000000bb20",
+          model_id: MODEL_ID_LIVE,
+          sku: "SERVICE-ADDONS-Install",
+          variant: "Install",
+          variant_kind: "preset",
+          price: 120,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+          pos_active: true,
+          description: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Install",
+          variantKind: "preset",
+          price: 120,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const insert = recorded.find((r) => r.op === "insert");
+    expect((insert?.payload as { supplier_id: unknown }).supplier_id).toBeNull();
+  });
+});
+
+describe("PATCH /api/catalog/models/:id/sizes-active (0171 cascade)", () => {
+  it("writes allowed_options.sizes + cascades pos_active, never discontinued_at", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: { product_models: { allowed_options: { sizes: ["Queen"] } } },
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/sizes-active`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sizes: ["Queen", "King"] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; sizes: string[] };
+    expect(body.sizes).toEqual(["Queen", "King"]);
+
+    const modelUpdate = records.find((r) => r.table === "product_models");
+    expect((modelUpdate?.body as { allowed_options: { sizes: string[] } }).allowed_options.sizes).toEqual([
+      "Queen",
+      "King",
+    ]);
+    // Two cascade updates on product_skus (all-off, then in-set-on).
+    const skuUpdates = records.filter((r) => r.table === "product_skus");
+    expect(skuUpdates).toHaveLength(2);
+    expect(skuUpdates.map((u) => (u.body as { pos_active: boolean }).pos_active)).toEqual([
+      false,
+      true,
+    ]);
+    // The cascade NEVER touches discontinued_at.
+    for (const r of records) {
+      expect(r.body).not.toHaveProperty("discontinued_at");
+    }
+  });
+
+  it("403s for a dealer (internal-only)", async () => {
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/sizes-active`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sizes: ["Queen"] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
+  it("skips existing codes and only inserts the missing variant", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "carres-classic",
+            allowed_options: { sizes: ["Queen", "King"] },
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          // Queen already exists → only King should be inserted.
+          product_skus__list: [{ sku: "CARRES-CLASSIC-Queen" }],
+        },
+        inserted: [{ id: "00000000-0000-0000-0000-00000000bb30" }],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { generated: number; skipped: number };
+    expect(body).toMatchObject({ generated: 1, skipped: 1 });
+    const insert = records.find((r) => r.op === "insert");
+    const rows = insert?.body as { sku: string }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sku).toBe("CARRES-CLASSIC-King");
+  });
+});
+
+describe("Photo sign-upload — role gate + validation (0173)", () => {
+  it("403s for a dealer", async () => {
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/photo/sign-upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ mimeType: "image/jpeg", sizeBytes: 1000 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("422s an operation user on a non-image mime / oversize", async () => {
+    vi.mocked(userClient).mockReturnValue(scriptedSb({}));
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/photo/sign-upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ mimeType: "application/pdf", sizeBytes: 1000 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("Maintenance — floor-config + addons role gate", () => {
+  it("floor-config 403s for a dealer", async () => {
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/floor-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ freeUpToFloor: 3 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("floor-config patches free_up_to_floor for an internal user", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: { id: 1, free_up_to_floor: 3, per_floor_per_item: 60 },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/floor-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ freeUpToFloor: 3, perFloorPerItem: 60 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ free_up_to_floor: 3, per_floor_per_item: 60 });
+  });
+
+  it("addons POST inserts for an internal user", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          key: "dispose-mattress",
+          name: "Dispose old mattress",
+          price: 50,
+          active: true,
+          service_sku: "SVC-DISPOSE-MATTRESS",
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/addons", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "dispose-mattress",
+          name: "Dispose old mattress",
+          price: 50,
+          serviceSku: "SVC-DISPOSE-MATTRESS",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.payload).toMatchObject({
+      key: "dispose-mattress",
+      service_sku: "SVC-DISPOSE-MATTRESS",
+    });
+  });
+
+  it("addons POST 422s an invalid service SKU code", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/addons", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "bad-addon",
+          name: "Bad addon",
+          price: 10,
+          serviceSku: "NOT-A-SVC-CODE",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
   });
 });
