@@ -75,3 +75,11 @@ export const CARRES_INTERNAL_SUPPLIER_SLUG = "carres-internal";
 
 /** Public Storage bucket for product model photos (0173). */
 export const PRODUCT_MODEL_PHOTOS_BUCKET = "product-model-photos";
+
+/**
+ * Categories whose SKUs carry NO supplier (0171) — they're internal
+ * (delivery / disposal / labour / pure accessories). Such SKUs must NEVER
+ * enter a Create-PO line. Mirrors the server set in apps/api/src/routes/catalog.ts;
+ * the FE Create-PO guard reads this so the boundary is explicit, not emergent.
+ */
+export const SUPPLIERLESS_CATEGORIES = ["service", "accessory"] as const;

@@ -11,6 +11,7 @@ export {
   SERVICE_SKU_REGEX,
   CARRES_INTERNAL_SUPPLIER_SLUG,
   PRODUCT_MODEL_PHOTOS_BUCKET,
+  SUPPLIERLESS_CATEGORIES,
   type DeliveryLeadCategory,
 } from "./constants";
 
