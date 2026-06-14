@@ -396,13 +396,13 @@ function DrawerBody({
     (t) => t.delivery_partner_id !== null,
   );
   // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
-  // new placed/proceed_request enum values without falling through to a
-  // bogus awaiting_operation_action default.
+  // new placed/confirmed enum values without falling through to a
+  // bogus in_production default.
   const stage: OperationStage = (() => {
     if (order.status === "place") return "placed";
     if (order.operation_stage) return order.operation_stage as OperationStage;
     if (order.status === "delivered") return "delivered";
-    return "awaiting_operation_action";
+    return "in_production";
   })();
   const shortages = calcShortages(lines, stockBalances);
   // Outstanding = order grand total − paid. AutoCount-imported orders often
@@ -597,6 +597,7 @@ function DrawerBody({
             status={order.status}
             deliveryDate={order.delivery_date}
             deliveryDateTbd={order.delivery_date_tbd}
+            proceedDate={order.proceed_date ?? null}
             opsAssignedLogistic={order.ops_assigned_logistic ?? null}
             deliveryPartnerId={order.delivery_partner_id}
             paid={order.paid}
@@ -744,7 +745,7 @@ function ActionBar({
       </div>
     );
   }
-  if (stage === "proceed_request") {
+  if (stage === "confirmed") {
     return (
       <div>
         <div className="text-[12px] text-base-700 mb-2 font-body">
@@ -770,7 +771,7 @@ function ActionBar({
       </div>
     );
   }
-  if (stage === "awaiting_operation_action") {
+  if (stage === "in_production") {
     return (
       <div>
         <div className="text-[12px] text-warning mb-2 font-body">

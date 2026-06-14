@@ -180,6 +180,8 @@ function OrderBody({
         <KV label="Phone" value={order.customer.phone ?? "—"} />
         <KV label="Address" value={order.customer.addressUnknown ? "Pending" : (order.customer.address ?? "—")} />
         <KV label="Delivery" value={order.delivery.dateTbd ? "TBD" : (order.delivery.date ?? "—")} />
+        {/* Phase 11.1 — proceed (production-start) date */}
+        <KV label="Proceed" value={order.delivery.dateTbd ? "TBD" : (order.delivery.proceedDate ?? "—")} />
       </div>
 
       {/* Items */}

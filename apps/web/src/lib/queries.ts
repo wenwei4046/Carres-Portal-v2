@@ -160,7 +160,7 @@ export const qk = {
      *  awaiting stock" button on CreatePOModal. Lazy: fired only on click via
      *  the hook's `refetch()`. Nested under `pos` so future blunt
      *  invalidations on `["operation","pos"]` reach this cache too (e.g. when
-     *  a PO is issued, the awaiting_operation_action pool changes).
+     *  a PO is issued, the in_production pool changes).
      *
      *  `dls` (optional, sorted) scopes shortage to a specific so set, used by
      *  the cross-order bundle prefill flow. Sorting keeps the cache key stable
@@ -1481,10 +1481,10 @@ export interface operationPipelineCounts {
   /** Pipeline v2 (C3): orders with `status='place'` — dealer-side, not yet
    *  proceeded. Counted via the dashboard route since the RPC is frozen. */
   placed: number;
-  /** Pipeline v2 (C3): orders with `operation_stage='proceed_request'` —
+  /** Pipeline v2 (C3): orders with `operation_stage='confirmed'` —
    *  awaiting HQ operation triage decision. */
-  proceed_request: number;
-  awaiting_operation_action: number;
+  confirmed: number;
+  in_production: number;
   ready_to_dispatch: number;
   dispatched: number;
 }
@@ -1567,8 +1567,8 @@ export interface operationOrderThreadRow {
   category: string;
   operation_stage:
     | "placed"
-    | "proceed_request"
-    | "awaiting_operation_action"
+    | "confirmed"
+    | "in_production"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered";
@@ -1590,7 +1590,7 @@ export interface operationOrderThreadRow {
 /** Row in GET /api/operation/orders. Embedded `dealers(name)` is a PostgREST
  *  nested fetch shape — the route forwards it verbatim.
  *
- *  Pipeline v2 (C1/C2): adds `'placed'` + `'proceed_request'` to operation_stage
+ *  Pipeline v2 (C1/C2): adds `'placed'` + `'confirmed'` to operation_stage
  *  and widens status to include the dealer-side `'place'` value (orders that
  *  haven't been pushed to operation yet still surface in the kanban so HQ can
  *  see what's coming).
@@ -1606,8 +1606,8 @@ export interface operationOrderListRow {
   status: "place" | "proceed_order" | "delivered";
   operation_stage:
     | "placed"
-    | "proceed_request"
-    | "awaiting_operation_action"
+    | "confirmed"
+    | "in_production"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered"
@@ -1673,8 +1673,8 @@ export interface operationOrderDetailOrder {
   status: string;
   operation_stage:
     | "placed"
-    | "proceed_request"
-    | "awaiting_operation_action"
+    | "confirmed"
+    | "in_production"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered"
@@ -1686,6 +1686,10 @@ export interface operationOrderDetailOrder {
   customer_address_unknown: boolean;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
+  /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
+   *  date, pairs with delivery_date. Null on pre-11.1 / AutoCount orders.
+   *  Optional so detail fixtures that predate the field keep typechecking. */
+  proceed_date?: string | null;
   placed_at: string;
   do_number: string | null;
   do_note: string | null;
@@ -2272,7 +2276,7 @@ export function useReservedDrilldown(
  *  "Auto-fill from awaiting stock" button. Lazy: `enabled: false` so the
  *  query only fires when the user clicks the button (via `refetch()`). The
  *  result replaces the modal's `lines` state. staleTime is 0 so a fresh
- *  refetch is always triggered — the awaiting_operation_action pool can change between
+ *  refetch is always triggered — the in_production pool can change between
  *  clicks (e.g. user dispatches an order, abandons one).
  *
  *  Bundle scoping: when `dls` is non-empty the query appends `?dls=1,2,3` so
@@ -2597,7 +2601,7 @@ export function useAbandonOrderMutation(
   });
 }
 
-/** 2026-05-12 (Loo) — back-arrow from Proceed Request column → Placed.
+/** 2026-05-12 (Loo) — back-arrow from Confirmed column → Placed.
  *  No body. Server enforces operation or principal role + RPC 0095 enforces
  *  current stage. */
 export function useRevertOrderProceedMutation(
@@ -2650,7 +2654,7 @@ export function useRevertOrderDispatchMutation(
   });
 }
 
-/** Manual override of the auto-picked source warehouse (E1 awaiting_operation_action). */
+/** Manual override of the auto-picked source warehouse (E1 in_production). */
 export function useWarehousePickMutation(
   orderId: string,
   opts?: Partial<
@@ -2674,8 +2678,8 @@ export function useWarehousePickMutation(
   });
 }
 
-/** Pipeline v2 (C2 / migration 0024) — confirm a `proceed_request` order.
- *  RPC `operation_confirm_proceed_request` decides awaiting_operation_action vs
+/** Pipeline v2 (C2 / migration 0024) — confirm a `confirmed` order.
+ *  RPC `operation_confirm_proceed_request` decides in_production vs
  *  ready_to_dispatch based on shortage at the chosen warehouse. `warehouseId`
  *  is optional — RPC accepts NULL when the order already has a warehouse_id.
  *
@@ -2835,8 +2839,8 @@ export function usePartnerIncomingOrders() {
   });
 }
 
-/** Pipeline v2 (C2 / migration 0024) — flip a `proceed_request` or
- *  `awaiting_operation_action` order directly to `ready_to_dispatch`. Wraps
+/** Pipeline v2 (C2 / migration 0024) — flip a `confirmed` or
+ *  `in_production` order directly to `ready_to_dispatch`. Wraps
  *  `operation_warehouse_pick` whose source-stage guard widens to permit both
  *  stages. `warehouseId` is REQUIRED here (the RPC raises 22023
  *  `warehouse_required` on NULL — confirm-proceed accepts NULL via a different
@@ -2901,7 +2905,7 @@ export function useRecheckStockMutation(
   });
 }
 
-/** Auto-issue POs for an awaiting_operation_action order's shortages. Body empty. */
+/** Auto-issue POs for an in_production order's shortages. Body empty. */
 export function useIssuePosForOrderMutation(
   orderId: string,
   opts?: Partial<
@@ -2943,7 +2947,7 @@ export function useCreatePoMutation(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      // If the PO is tied to a SO (single or via so_refs), the awaiting_operation_action
+      // If the PO is tied to a SO (single or via so_refs), the in_production
       // drawer for those orders should refresh. Bust the orders sub-tree too.
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
@@ -2961,7 +2965,7 @@ export function useCreatePoMutation(
  * (say) the 3rd supplier validation fails.
  *
  * Cache invalidation matches useCreatePoMutation (pos / dashboard / warehouse
- * / orders sub-trees) so the procurement list, KPI strip, awaiting_operation_action
+ * / orders sub-trees) so the procurement list, KPI strip, in_production
  * drawers, and the warehouse stock view all refresh after the batch lands.
  *
  * de8bf4e pattern: spread `...opts` BEFORE `onSuccess` so caller-supplied
@@ -3024,7 +3028,7 @@ export function useReceivePoWithDoMutation(
       // alerts" stay stale for up to 30s after qty/reserved change.
       await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
-      // Receiving stock can unblock awaiting_operation_action orders → invalidate orders.
+      // Receiving stock can unblock in_production orders → invalidate orders.
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
@@ -3064,7 +3068,7 @@ export function useReceivePoAsPartnerMutation(
       // Partner-side caches.
       await qc.invalidateQueries({ queryKey: ["partner"] });
       // operation-side caches (PO appears in Received tab; warehouse stock
-      // bumped; orders may unblock awaiting_operation_action).
+      // bumped; orders may unblock in_production).
       await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
       await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });

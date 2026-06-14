@@ -49,6 +49,7 @@ function renderPanel(props: { paid: number; orderTotal: number }) {
       status="place"
       deliveryDate={null}
       deliveryDateTbd={false}
+      proceedDate={null}
       opsAssignedLogistic={null}
       deliveryPartnerId={null}
       paid={props.paid}

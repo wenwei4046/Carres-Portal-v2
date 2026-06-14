@@ -64,6 +64,15 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
   );
   const [selected, setSelected] = useState<Date>(initialDate);
 
+  // Phase 11.1 — confirming a TBD order now sets BOTH the delivery date and the
+  // proceed (production-start) date. Proceed is bounded today..deliveryDate.
+  const toIso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const todayIso = toIso(today);
+  const selectedIso = toIso(selected);
+  const [proceedDate, setProceedDate] = useState<string>(toIso(today));
+  const proceedValid = proceedDate >= todayIso && proceedDate <= selectedIso;
+
   const setDateMut = useSetOrderDate(order.id, {
     onSuccess: () => {
       toast.success(`Delivery date set for #${order.so}`);
@@ -129,15 +138,12 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
    *  both past dates AND the production lead-time floor when one applies. */
   const isBlocked = (d: Date) => d < minPickable;
 
-  function handleSubmit() {
-    if (isBlocked(selected) || setDateMut.isPending) return;
-    const yyyy = selected.getFullYear();
-    const mm = String(selected.getMonth() + 1).padStart(2, "0");
-    const dd = String(selected.getDate()).padStart(2, "0");
-    setDateMut.mutate({ date: `${yyyy}-${mm}-${dd}` });
-  }
+  const canSubmit = !isBlocked(selected) && proceedValid && !setDateMut.isPending;
 
-  const canSubmit = !isBlocked(selected) && !setDateMut.isPending;
+  function handleSubmit() {
+    if (!canSubmit) return;
+    setDateMut.mutate({ date: selectedIso, proceedDate });
+  }
   const selectedLabel = selected.toLocaleDateString("en-MY", {
     weekday: "short",
     day: "numeric",
@@ -255,6 +261,30 @@ export default function ConfirmDateModal({ order, onClose }: Props) {
           <p className="font-display text-[18px] font-semibold mt-0.5 text-base-900">
             {selectedLabel}
           </p>
+        </div>
+
+        {/* Phase 11.1 — proceed (production-start) date, paired with delivery */}
+        <div className="rounded p-3 bg-base-50 border border-base-200">
+          <label className="block">
+            <span className="text-xs text-base-600">Proceed date · production start</span>
+            <input
+              type="date"
+              value={proceedDate}
+              min={todayIso}
+              max={selectedIso}
+              onChange={(e) => setProceedDate(e.target.value)}
+              className="mt-1 w-full px-3 py-2 border border-base-300 rounded text-sm outline-none focus:border-primary bg-white"
+              data-testid="confirm-proceed-date"
+            />
+          </label>
+          <p className="text-[11px] text-base-500 mt-1.5">
+            When production should start — on or before the delivery date.
+          </p>
+          {!proceedValid && (
+            <p className="text-[11px] text-warning mt-1">
+              Proceed date must be today or later and on/before the delivery date.
+            </p>
+          )}
         </div>
       </div>
 

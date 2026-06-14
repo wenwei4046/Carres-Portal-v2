@@ -43,8 +43,8 @@ type OrderRow = {
   so: number;
   status: "place" | "proceed_order" | "delivered" | "cancelled";
   operationStage:
-    | "proceed_request"
-    | "awaiting_operation_action"
+    | "confirmed"
+    | "in_production"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered"
@@ -342,7 +342,7 @@ function StageChip({ o }: { o: OrderRow }) {
     } else if (stage === "delivered") {
       label = "Delivered";
       cls = "bg-success-soft text-success";
-    } else if (stage === "awaiting_operation_action") {
+    } else if (stage === "in_production") {
       label = "Awaiting HQ";
       cls = "bg-primary/10 text-primary";
     } else {

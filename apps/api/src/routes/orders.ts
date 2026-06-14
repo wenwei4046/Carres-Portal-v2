@@ -1190,6 +1190,9 @@ ordersRouter.post("/:id/date", (c) =>
     rpcArgs: (body) => ({
       p_order_id: c.req.param("id"),
       p_date: body.date,
+      // Phase 11.1 — confirming a TBD order sets BOTH dates (proceed pairs with
+      // delivery). The schema enforces proceedDate <= date.
+      p_proceed_date: body.proceedDate,
     }),
   }),
 );
@@ -1267,6 +1270,8 @@ ordersRouter.patch("/:id", async (c) => {
   const del = parsed.data.delivery;
   if (del) {
     if ("date" in del) flat.delivery_date = del.date ?? "";
+    // Phase 11.1 — proceed date editable alongside delivery date.
+    if ("proceedDate" in del) flat.proceed_date = del.proceedDate ?? "";
     if ("dateTbd" in del) flat.delivery_date_tbd = del.dateTbd;
     if ("floor" in del) flat.delivery_floor = del.floor;
     if ("hasLift" in del) flat.delivery_has_lift = del.hasLift;

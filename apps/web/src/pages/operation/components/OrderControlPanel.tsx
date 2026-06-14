@@ -40,6 +40,10 @@ interface Props {
   status: string;
   deliveryDate: string | null;
   deliveryDateTbd: boolean;
+  /** orders.proceed_date — Phase 11.1 planned production-start date. Passed so
+   *  an inline delivery-date edit can re-send the now-required proceed date
+   *  (set_order_date demands a proceed date <= delivery date). */
+  proceedDate: string | null;
   /** orders.ops_assigned_logistic — the planned carrier (status='place'). */
   opsAssignedLogistic: string | null;
   /** orders.delivery_partner_id — the formal LP (post-dispatch); shown
@@ -84,6 +88,7 @@ export default function OrderControlPanel({
   status,
   deliveryDate,
   deliveryDateTbd,
+  proceedDate,
   opsAssignedLogistic,
   deliveryPartnerId,
   paid,
@@ -255,7 +260,11 @@ export default function OrderControlPanel({
               onChange={(e) => {
                 const v = e.target.value;
                 if (ISO_DATE.test(v) && v !== deliveryDate) {
-                  setDate.mutate({ date: v });
+                  // Phase 11.1: set_order_date requires a proceed date <= the
+                  // delivery date. Keep the existing proceed date when still
+                  // valid; otherwise default it to the new delivery date.
+                  const pd = proceedDate && proceedDate <= v ? proceedDate : v;
+                  setDate.mutate({ date: v, proceedDate: pd });
                 }
               }}
               className="w-full px-2 py-1.5 border border-base-200 rounded text-[12px] bg-white outline-none focus:border-base-700 disabled:bg-base-100"

@@ -192,6 +192,9 @@ export const orderFromRow = (
   },
   delivery: {
     date: r.delivery_date,
+    // Phase 11.1 — `?? null` so rows fetched before migration 0165 (which added
+    // the column) surface as null rather than tripping zod's nullable check.
+    proceedDate: r.proceed_date ?? null,
     dateTbd: r.delivery_date_tbd,
     floor: r.delivery_floor,
     hasLift: r.delivery_has_lift,
@@ -386,6 +389,8 @@ export const orderInputToRpcPayload = (
   customer_billing_same: input.customer.billingSame,
   customer_emergency: input.customer.emergency,
   delivery_date: input.delivery.dateTbd ? null : input.delivery.date,
+  // Phase 11.1 — proceed date pairs with delivery date; both nulled when TBD.
+  proceed_date: input.delivery.dateTbd ? null : input.delivery.proceedDate,
   delivery_date_tbd: input.delivery.dateTbd,
   delivery_floor: input.delivery.floor,
   delivery_has_lift: input.delivery.hasLift,

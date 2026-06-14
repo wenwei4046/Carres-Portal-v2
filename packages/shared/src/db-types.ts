@@ -8,15 +8,15 @@ export type Role =
   | "operation" | "supplier" | "partner" | "finance" | "bd";
 
 export type OrderStatus       = "place" | "proceed_order" | "delivered" | "cancelled";
-// `awaiting_operation_action` and `waiting` added in migration 0028 (v3-S3).
+// `in_production` and `waiting` added in migration 0028 (v3-S3).
 // Phase 4.5a T5 (2026-05-05): legacy `awaiting_stock` alias removed from FE
 // vocabulary in lockstep with migrations 0038/0038b/0039 (RPC body sweep).
 // Phase 4.5a T6 (2026-05-05): migration 0040 dropped `awaiting_stock` from the
 // DB-side enum via DROP TYPE … CASCADE recreate. DB and FE vocabularies are
 // now back in sync. Tuple matches Supabase-generated types verbatim.
 export type OperationStage    =
-  | "placed" | "proceed_request"
-  | "awaiting_operation_action"
+  | "placed" | "confirmed"
+  | "in_production"
   | "ready_to_dispatch" | "dispatched"
   | "waiting" | "delivered";
 export type PartnerStage      = "assigned" | "picked_from_wh" | "en_route" | "delivered";
@@ -263,6 +263,10 @@ export interface OrderRow {
   customer_emergency: string | null;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
+  // Phase 11.1 (migration 0165) — salesperson-entered planned production-start
+  // ("Proceed") date. Pairs with delivery_date via delivery_date_tbd
+  // (both-or-neither). NULL when TBD. Must be <= delivery_date.
+  proceed_date: string | null;
   delivery_floor: number;
   delivery_has_lift: boolean;
   delivery_stair_items: number | null;

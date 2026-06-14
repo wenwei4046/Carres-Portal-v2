@@ -123,13 +123,13 @@ const ROWS: operationOrderListRow[] = [
     ],
   }),
   // C — proceed_request → Proceed
-  makeRow({ id: "c", so: 1003, status: "proceed_order", operation_stage: "proceed_request" }),
+  makeRow({ id: "c", so: 1003, status: "proceed_order", operation_stage: "confirmed" }),
   // D — awaiting → Pending, with a triage LP that resolves via partners map
   makeRow({
     id: "d",
     so: 1004,
     status: "proceed_order",
-    operation_stage: "awaiting_operation_action",
+    operation_stage: "in_production",
     ops_assigned_logistic: "p-nets",
   }),
   // E — ready_to_dispatch → Scheduled, with a formal LP joined
@@ -272,7 +272,7 @@ describe("OperationOrdersControl", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={["/operation/orders/awaiting_operation_action"]}>
+        <MemoryRouter initialEntries={["/operation/orders/in_production"]}>
           <Routes>
             <Route
               path="/operation/orders/:stage"
@@ -282,7 +282,7 @@ describe("OperationOrdersControl", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    // awaiting_operation_action maps to the Pending tab → only order d.
+    // in_production maps to the Pending tab → only order d.
     expect(rowsBySo()).toEqual(["1004"]);
   });
 
@@ -395,7 +395,7 @@ describe("OperationOrdersControl · Stock column", () => {
       id: "aw",
       so: 2005,
       status: "proceed_order",
-      operation_stage: "awaiting_operation_action",
+      operation_stage: "in_production",
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");

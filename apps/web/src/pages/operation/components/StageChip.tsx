@@ -8,8 +8,8 @@
  *   - 9px font-ui (DM Sans), letter-spacing 0.12em, font-weight 700, uppercase
  *   - color + border match the operation_FLOW accent palette:
  *       placed                       → base-500 (muted, read-only feel)
- *       proceed_request              → warning  (signature-tinted, action-needed feel)
- *       awaiting_operation_action    → warning  (honey)
+ *       confirmed              → warning  (signature-tinted, action-needed feel)
+ *       in_production    → warning  (honey)
  *       ready_to_dispatch            → info     (slate blue)
  *       dispatched                   → primary  (terracotta == --brand-signature in proto)
  *       delivered                    → success  (olive)
@@ -17,8 +17,8 @@
  */
 export type OperationStage =
   | "placed"
-  | "proceed_request"
-  | "awaiting_operation_action"
+  | "confirmed"
+  | "in_production"
   | "ready_to_dispatch"
   | "dispatched"
   | "delivered";
@@ -29,20 +29,21 @@ interface Props {
 
 const STAGE_LABEL: Record<OperationStage, string> = {
   placed: "Placed",
-  proceed_request: "Proceed Request",
-  awaiting_operation_action: "Awaiting operation Action",
+  confirmed: "Confirmed",
+  in_production: "In Production",
   ready_to_dispatch: "Ready to Dispatch",
   dispatched: "Dispatched",
   delivered: "Delivered",
 };
 
 /** v17 status pills — each stage → a pill colour. warning=amber marks the
- *  "waiting on stock" state; the full ramp reads neutral → purple → amber →
- *  blue → indigo → green across the 6 stages. Replaces the old outline chip. */
+ *  "in production" state; the full ramp reads neutral → purple → amber →
+ *  blue → indigo → green across the 6 stages. Replaces the old outline chip.
+ *  Keys use the 11.2 collapsed enum (confirmed/in_production). */
 const STAGE_PILL: Record<OperationStage, string> = {
   placed: "pill-neutral",
-  proceed_request: "pill-draft",
-  awaiting_operation_action: "pill-warning",
+  confirmed: "pill-draft",
+  in_production: "pill-warning",
   ready_to_dispatch: "pill-sent",
   dispatched: "pill-collected",
   delivered: "pill-confirmed",

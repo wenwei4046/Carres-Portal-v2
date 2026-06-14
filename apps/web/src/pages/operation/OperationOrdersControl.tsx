@@ -116,7 +116,7 @@ function stageOf(o: operationOrderListRow): OperationStage {
   if (o.status === "place") return "placed";
   if (o.operation_stage) return o.operation_stage as OperationStage;
   if (o.status === "delivered") return "delivered";
-  return "awaiting_operation_action";
+  return "in_production";
 }
 
 /** Which control tab an order belongs to. */
@@ -124,8 +124,8 @@ function controlTabOf(o: operationOrderListRow): SettledTab {
   const s = stageOf(o);
   if (s === "delivered") return "completed";
   if (s === "dispatched" || s === "ready_to_dispatch") return "scheduled";
-  if (s === "awaiting_operation_action") return "pending";
-  if (s === "proceed_request") return "proceed";
+  if (s === "in_production") return "pending";
+  if (s === "confirmed") return "proceed";
   // s === "placed": entry rule splits by source.
   return o.source_system === "autocount" ? "proceed" : "placed";
 }
@@ -165,7 +165,7 @@ function stockReadiness(
   const s = stageOf(o);
   if (s === "ready_to_dispatch" || s === "dispatched" || s === "delivered")
     return { state: "ready" };
-  if (s === "awaiting_operation_action") return { state: "awaiting" };
+  if (s === "in_production") return { state: "awaiting" };
 
   // Early stages: real free-stock check, only when the live map is present AND
   // every line SKU is a known catalog SKU (else we can't honestly compute it).
@@ -372,9 +372,9 @@ function tabFromStageParam(raw: string | undefined): ControlTab | null {
   switch (raw) {
     case "placed":
       return "placed";
-    case "proceed_request":
+    case "confirmed":
       return "proceed";
-    case "awaiting_operation_action":
+    case "in_production":
       return "pending";
     case "ready_to_dispatch":
     case "dispatched":

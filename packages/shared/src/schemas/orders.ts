@@ -17,8 +17,8 @@ export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
 export const operationStageSchema = z.enum([
   "placed",
-  "proceed_request",
-  "awaiting_operation_action",
+  "confirmed",
+  "in_production",
   "ready_to_dispatch",
   "dispatched",
   "delivered",
@@ -78,6 +78,9 @@ export const orderSchema = z.object({
   }),
   delivery: z.object({
     date: z.string().nullable(),
+    // Phase 11.1 — salesperson-entered planned production-start ("Proceed")
+    // date. Pairs with `date` via `dateTbd`; <= `date`.
+    proceedDate: z.string().nullable(),
     dateTbd: z.boolean(),
     floor: z.number(),
     hasLift: z.boolean(),
@@ -172,6 +175,9 @@ export const createOrderInputSchema = z.object({
   }),
   delivery: z.object({
     date: z.string().nullable(),
+    // Phase 11.1 — proceed date pairs with `date` (both-or-neither via
+    // `dateTbd`) and must be <= `date`. Cross-field rules in the superRefine.
+    proceedDate: z.string().nullable(),
     dateTbd: z.boolean(),
     floor: z.number().int().min(1).max(MAX_DELIVERY_FLOOR),
     hasLift: z.boolean(),
@@ -197,6 +203,21 @@ export const createOrderInputSchema = z.object({
    *  RPC re-checks the cross-field rule and rejects with 22023. */
   installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
 }).superRefine((data, ctx) => {
+  // Phase 11.1 — Proceed date pairs with Delivery date. When the order is NOT
+  // marked TBD, both dates are required and proceed date must be on/before the
+  // delivery date (you can't start building after you promised delivery). ISO
+  // YYYY-MM-DD strings compare lexicographically, so a plain `>` is correct.
+  if (!data.delivery.dateTbd) {
+    if (!data.delivery.date) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "date"], message: "delivery date is required unless marked TBD" });
+    }
+    if (!data.delivery.proceedDate) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date is required unless marked TBD" });
+    }
+    if (data.delivery.date && data.delivery.proceedDate && data.delivery.proceedDate > data.delivery.date) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date must be on or before the delivery date" });
+    }
+  }
   if (data.paymentMethod === "installment") {
     if (data.installmentMonths === null) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["installmentMonths"], message: "required for installment" });
@@ -255,6 +276,12 @@ export const setOrderDateInputSchema = z.object({
    *  separate `dateTbd` checkbox is what flips the order back to TBD via the
    *  full edit modal. */
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** Phase 11.1 — confirming a previously-TBD order now sets BOTH dates (the
+   *  proceed date pairs with the delivery date). Must be on/before `date`. */
+  proceedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+}).refine((v) => v.proceedDate <= v.date, {
+  path: ["proceedDate"],
+  message: "proceed date must be on or before the delivery date",
 });
 export type SetOrderDateInput = z.infer<typeof setOrderDateInputSchema>;
 
@@ -286,6 +313,8 @@ export const updateOrderInputSchema = z
     delivery: z
       .object({
         date: z.string().nullable().optional(),
+        // Phase 11.1 — editable alongside the delivery date on a Place order.
+        proceedDate: z.string().nullable().optional(),
         dateTbd: z.boolean().optional(),
         floor: z.number().int().min(1).max(MAX_DELIVERY_FLOOR).optional(),
         hasLift: z.boolean().optional(),
