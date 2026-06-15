@@ -11,16 +11,19 @@ import { ApiError } from "@/lib/api";
 import { useDeleteCatalogSku, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../components/atoms";
+import { PillTabs, type PillTab } from "../components/PillTabs";
 import NewSkuModal from "./NewSkuModal";
 import EditSkuModal from "./EditSkuModal";
 
 /**
  * SKU Master — flat 7-column product table (+ a leading select column for bulk
  * delete). Columns: Product code · Description · Product name · Category ·
- * Size · Price · Status. Filter by category + free-text search; "Edit Prices"
- * flips the Price column to inline inputs (commit on blur, verified by the
- * catalog re-fetch the patch triggers). Price 0 renders as a muted "not set" —
- * we NEVER surface cost here (cost is the PO side; it lives on Create-PO).
+ * Size · Price/Cost · Status. Filter by category + free-text search; "Edit
+ * Prices" flips the value column to inline inputs (commit on blur, verified by
+ * the catalog re-fetch the patch triggers). A `Retail | COGS` toggle (Loo
+ * 2026-06-15) switches that column between the SKU's retail price and its COGS
+ * (`product_skus.cost`, the per-unit procurement cost that also auto-fills onto
+ * every Create-PO line). 0 / null renders as a muted "not set".
  *
  * Performance: the live catalog has 1000+ SKUs. We render at most VISIBLE_CAP
  * rows and show a "refine your filter" banner past that, rather than mount
@@ -31,6 +34,15 @@ const VISIBLE_CAP = 300;
 const GRID_COLS = "32px 150px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 130px 92px 60px";
 
 type CatFilter = ProductCategory | "all";
+
+// Retail = product_skus.price (selling); COGS = product_skus.cost (procurement).
+// Both ship in the same `/api/catalog` bundle, so the toggle is instant — no
+// extra fetch — and both PATCH through the same `/skus/:id` route.
+type PriceMode = "retail" | "cogs";
+const PRICE_VIEW_TABS = [
+  { key: "retail", label: "Retail" },
+  { key: "cogs", label: "COGS" },
+] as const satisfies readonly PillTab<PriceMode>[];
 
 interface FlatRow {
   sku: ProductSkuDto;
@@ -49,6 +61,7 @@ function fmtPrice(n: number): string {
 export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) {
   const [category, setCategory] = useState<CatFilter>("all");
   const [search, setSearch] = useState("");
+  const [priceMode, setPriceMode] = useState<PriceMode>("retail");
   const [editMode, setEditMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
@@ -178,13 +191,19 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               {del.isPending ? "Working…" : `Delete ${selected.size}`}
             </button>
           )}
+          <PillTabs
+            tabs={PRICE_VIEW_TABS}
+            active={priceMode}
+            onChange={setPriceMode}
+            ariaLabel="Value column — retail price or COGS"
+          />
           <button
             type="button"
             onClick={() => setEditMode((v) => !v)}
             className={`${editMode ? "btn-secondary" : "btn-primary"} text-[12px]`}
             data-testid="sku-edit-prices"
           >
-            {editMode ? "Done editing" : "Edit Prices"}
+            {editMode ? "Done editing" : `Edit ${priceMode === "retail" ? "Prices" : "Costs"}`}
           </button>
           <button
             type="button"
@@ -227,7 +246,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <div className="label">Product</div>
           <div className="label">Category</div>
           <div className="label">Size</div>
-          <div className="label text-right">Price</div>
+          <div className="label text-right">{priceMode === "retail" ? "Price" : "Cost"}</div>
           <div className="label">Status</div>
           <div className="label" />
         </div>
@@ -243,6 +262,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             key={r.sku.id}
             row={r}
             editMode={editMode}
+            priceMode={priceMode}
             selected={selected.has(r.sku.id)}
             onToggle={toggleRow}
             onEdit={setEditRow}
@@ -261,12 +281,14 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
 const SkuRowView = memo(function SkuRowView({
   row,
   editMode,
+  priceMode,
   selected,
   onToggle,
   onEdit,
 }: {
   row: FlatRow;
   editMode: boolean;
+  priceMode: PriceMode;
   selected: boolean;
   onToggle: (id: string) => void;
   onEdit: (row: FlatRow) => void;
@@ -275,19 +297,26 @@ const SkuRowView = memo(function SkuRowView({
   const patch = usePatchCatalogSku();
   const discontinued = !!sku.discontinuedAt;
 
-  function commitPrice(raw: string) {
+  // The active value column: retail price (never null) or COGS cost (nullable).
+  const current = priceMode === "retail" ? sku.price : sku.cost;
+  const fieldLabel = priceMode === "retail" ? "price" : "cost";
+
+  function commitValue(raw: string) {
     const trimmed = raw.trim();
-    if (trimmed === "") return; // empty = no change (price is non-null on the column)
+    // Empty = no change. Clearing a COGS back to null is intentionally
+    // modal-only (EditSkuModal); the inline grid never nulls a value.
+    if (trimmed === "") return;
     const val = Number(trimmed);
     if (!Number.isFinite(val) || val < 0) {
       toast.error("Enter a non-negative number");
       return;
     }
-    if (val === sku.price) return;
+    if (val === current) return;
+    const body = priceMode === "retail" ? { price: val } : { cost: val };
     patch.mutate(
-      { id: sku.id, patch: { price: val } },
+      { id: sku.id, patch: body },
       {
-        onSuccess: () => toast.success(`${sku.sku} · price updated`),
+        onSuccess: () => toast.success(`${sku.sku} · ${fieldLabel} updated`),
         onError: (e: unknown) =>
           toast.error(e instanceof ApiError ? e.message : "Update failed"),
       },
@@ -322,21 +351,24 @@ const SkuRowView = memo(function SkuRowView({
       <div className="text-right">
         {editMode ? (
           <input
+            // key on priceMode so flipping Retail↔COGS while editing resets the
+            // uncontrolled defaultValue to the other field's current value.
+            key={priceMode}
             type="number"
             min={0}
             step="0.01"
-            defaultValue={sku.price}
-            onBlur={(e) => commitPrice(e.target.value)}
+            defaultValue={current ?? ""}
+            onBlur={(e) => commitValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
-            aria-label={`${sku.sku} price`}
+            aria-label={`${sku.sku} ${fieldLabel}`}
             className={`${INPUT_CLS} text-right font-mono text-[12px]`}
           />
-        ) : sku.price === 0 ? (
-          <span className="t-tiny text-base-400 italic">price not set</span>
+        ) : current == null || current === 0 ? (
+          <span className="t-tiny text-base-400 italic">{fieldLabel} not set</span>
         ) : (
-          <span className="font-mono text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
+          <span className="font-mono text-[12px] text-base-800">{fmtPrice(current)}</span>
         )}
       </div>
       <div>
