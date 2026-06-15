@@ -12,6 +12,7 @@ import {
   Wallet,
   BookOpen,
   LifeBuoy,
+  Table2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -66,6 +67,15 @@ const SECTIONS: Section[] = [
     key: "orders",
     badge: "orders",
     extraKeys: ["ops-import", "ops-inbox", "all-orders"],
+  },
+  {
+    // 0174 — Sales Order Maintenance: AutoCount-style configurable SO grid
+    // (resize / filter / show-hide columns + curated option lists). Distinct
+    // from the Orders control table above — this is the line-level data grid.
+    id: "sales-order-maintenance",
+    label: "SO Maintenance",
+    icon: Table2,
+    key: "sales-order-maintenance",
   },
   {
     // P3 (Q3a=B menu split) — PO create/manage = the old Procurement

@@ -407,3 +407,33 @@ export {
   type OpsOrderControlResponse,
 } from "./schemas/ops-order-control";
 export * from "./schemas/ops-cockpit";
+
+// Sales Order Maintenance — AutoCount-style configurable SO grid (2026-06-16).
+// See docs/superpowers/plans/2026-06-16-sales-order-maintenance.md.
+export {
+  SO_GRID_COLUMN_TYPES,
+  SO_GRID_COLUMN_SOURCES,
+  SO_GRID_COLUMN_GROUPS,
+  SO_GRID_COLUMNS,
+  SO_GRID_COLUMN_KEYS,
+  SO_GRID_OPTION_KEYS,
+  soGridColumnDef,
+  soGridColumnConfigSchema,
+  soGridConfigSchema,
+  updateSoGridConfigSchema,
+  soGridCellValueSchema,
+  soGridRowSchema,
+  soGridResponseSchema,
+  defaultSoGridConfig,
+  mergeSoGridConfig,
+  type SoGridColumnType,
+  type SoGridColumnSource,
+  type SoGridColumnGroup,
+  type SoGridColumnDef,
+  type SoGridColumnConfig,
+  type SoGridConfig,
+  type UpdateSoGridConfigInput,
+  type SoGridCellValue,
+  type SoGridRow,
+  type SoGridResponse,
+} from "./schemas/sales-order-maintenance";
