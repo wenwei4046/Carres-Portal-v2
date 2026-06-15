@@ -195,9 +195,11 @@ export const createOrderInputSchema = z.object({
    *  for full-payment workflows; this field always represents the *initial*
    *  deposit method. */
   paymentMethod: z.enum(["online", "credit", "installment"]),
-  /** Bank/EDC approval code from the slip, when method ∈ {credit, installment}.
-   *  Required for those methods (≥ 3 chars), null for "online". The wizard
-   *  enforces the ≥3 rule; the schema accepts any non-empty string when given. */
+  /** Bank/EDC approval (or bank reference) code from the slip. Required for ALL
+   *  methods (≥ 3 chars) as of 2026-06-16: online = bank reference / FT number,
+   *  credit/installment = EDC approval code — Finance reconciles the deposit
+   *  against the bank statement with it. The wizard enforces the ≥3 rule; the
+   *  schema accepts any non-empty string (null only for legacy/imported rows). */
   approvalCode: z.string().nullable(),
   /** Installment plan months. Only valid when paymentMethod === "installment".
    *  RPC re-checks the cross-field rule and rejects with 22023. */

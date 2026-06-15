@@ -4,9 +4,9 @@ import { useAuth } from "@/lib/auth";
 
 interface Props {
   order: Order;
-  /** Reset wizard back to a fresh draft + Step 1 (no close). */
+  /** Reset the flow back to a fresh draft + the CATALOG step (no navigation). */
   onNewOrder: () => void;
-  /** Close the modal entirely and return to dashboard. */
+  /** Leave the POS — caller clears the draft and navigates to the orders list. */
   onClose: () => void;
 }
 
@@ -63,7 +63,7 @@ export default function ThankYou({ order, onNewOrder, onClose }: Props) {
             + New order
           </button>
           <button type="button" onClick={onClose} className="btn-primary flex-1">
-            Back to dashboard
+            View orders
           </button>
         </div>
       </div>

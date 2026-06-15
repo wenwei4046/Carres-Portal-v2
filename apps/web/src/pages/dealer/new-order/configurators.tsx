@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import type {
-  CatalogResponse,
   ProductCategory,
   ProductModelDto,
   ProductSkuDto,
@@ -8,9 +7,23 @@ import type {
 } from "@carres/shared";
 import type { DraftLine } from "./draft";
 
-const CATEGORIES: { key: ProductCategory; label: string; icon: string }[] = [
+/**
+ * Per-category product configurators + the sofa-mutex helper, extracted from
+ * the legacy `ProductPicker` so BOTH the old inline picker (now removed) and
+ * the new full-screen POS catalog flow (`dealer/pos/*`) build identical
+ * `DraftLine` objects from one source of truth.
+ *
+ * Each configurator owns its own transient state and only commits a DraftLine
+ * via `onAdd` when the user clicks Add. The CALLER is responsible for forcing
+ * a remount (`key={model.id}`) when the selected model changes — see the
+ * SO-1006 note in `SofaConfigurator` / `BedframeConfigurator` below.
+ */
+
+/** The three configurable product families (accessory/service have no
+ *  variant axis and are not sold through these configurators). */
+export const PRODUCT_CATEGORIES: { key: ProductCategory; label: string; icon: string }[] = [
   { key: "mattress", label: "Mattress", icon: "▭" },
-  { key: "bedframe", label: "Bed frame", icon: "▤" },
+  { key: "bedframe", label: "Bed Frame", icon: "▤" },
   { key: "sofa", label: "Sofa", icon: "▦" },
 ];
 
@@ -43,230 +56,7 @@ export function lockedCategoriesFor(
   return locked;
 }
 
-interface Props {
-  catalog: CatalogResponse;
-  onAddLine: (line: DraftLine) => void;
-  /** Lines already on the draft — used to lock conflicting category tabs
-   *  per the sofa-vs-(mattress|bedframe) mutex rule (migration 0089). */
-  draftLines: DraftLine[];
-}
-
-/**
- * 3-category product picker — proto-faithful 2-col model card grid.
- *   Category tab bar → grid of model cards (2-col) → inline configurator at
- *   bottom when a model is selected.
- *
- *   Mattress: pick model → pick size SKU → qty → Add
- *   Bedframe: pick model → pick size SKU + color + gap → qty → Add
- *   Sofa (full per D2): pick model → mode (preset / custom for sofa_mode='both';
- *     locked otherwise) → pick a SKU + optional fabric (with surcharge) → qty → Add
- *
- * Each configurator owns its own transient state and only mutates parent state
- * via `onAddLine` when the user explicitly clicks Add. Resets on add.
- */
-export default function ProductPicker({ catalog, onAddLine, draftLines }: Props) {
-  const [activeCat, setActiveCat] = useState<ProductCategory>("mattress");
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-
-  // Pre-index for fast model→skus + model→fabrics lookups.
-  const skusByModel = useMemo(() => {
-    const m = new Map<string, ProductSkuDto[]>();
-    for (const s of catalog.skus) {
-      const arr = m.get(s.modelId) ?? [];
-      arr.push(s);
-      m.set(s.modelId, arr);
-    }
-    return m;
-  }, [catalog.skus]);
-
-  const fabricsByModel = useMemo(() => {
-    const m = new Map<string, SofaFabricDto[]>();
-    for (const f of catalog.sofaFabrics) {
-      const arr = m.get(f.modelId) ?? [];
-      arr.push(f);
-      m.set(f.modelId, arr);
-    }
-    return m;
-  }, [catalog.sofaFabrics]);
-
-  // sku → category, derived from catalog. Used by lockedCategoriesFor to
-  // classify the lines already on the draft.
-  const skuToCategory = useMemo(() => {
-    const modelById = new Map(catalog.models.map((m) => [m.id, m]));
-    const m = new Map<string, ProductCategory>();
-    for (const s of catalog.skus) {
-      const model = modelById.get(s.modelId);
-      if (model) m.set(s.sku, model.category);
-    }
-    return m;
-  }, [catalog.models, catalog.skus]);
-
-  const lockedCats = useMemo(
-    () => lockedCategoriesFor(draftLines, skuToCategory),
-    [draftLines, skuToCategory],
-  );
-
-  // If the user was on a category that just became locked (e.g. they added
-  // a sofa line while sitting on the sofa tab — that doesn't lock sofa
-  // itself, but adding a mattress line WOULD lock sofa if the user later
-  // switched), bounce to the first unlocked one. Defensive — normal flow
-  // can't reach this since the user can't pick a locked tab in the first
-  // place, but covers prop-change races.
-  useEffect(() => {
-    if (lockedCats.has(activeCat)) {
-      const next = CATEGORIES.find((c) => !lockedCats.has(c.key));
-      if (next) {
-        setActiveCat(next.key);
-        setSelectedModelId(null);
-      }
-    }
-  }, [lockedCats, activeCat]);
-
-  const inCat = catalog.models.filter((m) => m.category === activeCat);
-  const selected = selectedModelId ? catalog.models.find((m) => m.id === selectedModelId) : null;
-  const selectedSkus = selected ? skusByModel.get(selected.id) ?? [] : [];
-  const selectedFabrics = selected ? fabricsByModel.get(selected.id) ?? [] : [];
-
-  function handleAdd(line: DraftLine) {
-    onAddLine(line);
-    setSelectedModelId(null);
-  }
-
-  const lockHint =
-    lockedCats.has("sofa")
-      ? "Sofa is locked because this order already has mattress or bed frame."
-      : lockedCats.size > 0
-        ? "Mattress + bed frame are locked because this order already has a sofa."
-        : null;
-
-  return (
-    <div className="rounded border border-base-200 bg-white overflow-hidden">
-      {/* Category tabs */}
-      <div className="flex border-b border-base-100">
-        {CATEGORIES.map((c) => {
-          const active = activeCat === c.key;
-          const locked = lockedCats.has(c.key);
-          return (
-            <button
-              key={c.key}
-              onClick={() => {
-                if (locked) return;
-                setActiveCat(c.key);
-                setSelectedModelId(null);
-              }}
-              disabled={locked}
-              aria-disabled={locked}
-              title={
-                locked
-                  ? c.key === "sofa"
-                    ? "Sofa cannot mix with mattress / bed frame in the same order."
-                    : "Mattress / bed frame cannot mix with sofa in the same order."
-                  : undefined
-              }
-              data-testid={`category-tab-${c.key}`}
-              className={`flex-1 px-4 py-3 text-center border-b-2 transition-colors ${
-                locked
-                  ? "bg-base-50 border-transparent text-base-400 cursor-not-allowed"
-                  : active
-                    ? "bg-white border-primary text-base-900"
-                    : "bg-base-50 border-transparent text-base-600 hover:text-base-900"
-              }`}
-            >
-              <span className="text-base mr-1.5">{locked ? "🔒" : c.icon}</span>
-              <span className="text-[13px] font-semibold">{c.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {lockHint && (
-        <div
-          className="px-4 py-2 bg-warning/10 border-b border-warning/20 text-[11px] text-base-700"
-          data-testid="category-lock-hint"
-        >
-          {lockHint}
-        </div>
-      )}
-
-      {/* Model grid (2-col) */}
-      {inCat.length === 0 && (
-        <p className="px-8 py-8 text-center text-xs text-base-500">
-          No {activeCat} models in catalog.
-        </p>
-      )}
-      {inCat.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
-          {inCat.map((model) => {
-            const skuCount = (skusByModel.get(model.id) ?? []).length;
-            const active = selectedModelId === model.id;
-            return (
-              <button
-                key={model.id}
-                onClick={() => setSelectedModelId(active ? null : model.id)}
-                className={`text-left p-3 rounded border-[1.5px] transition-colors ${
-                  active
-                    ? "border-primary bg-signature-50"
-                    : "border-base-200 bg-white hover:border-primary/40"
-                }`}
-              >
-                <div className="text-[13px] font-semibold">{model.name}</div>
-                {model.blurb && (
-                  <div className="text-[11px] text-base-500 mt-0.5">{model.blurb}</div>
-                )}
-                <div className="text-[10px] text-base-500 mt-1.5 font-mono">
-                  {skuCount} variant{skuCount === 1 ? "" : "s"}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Inline configurator for the selected model */}
-      {selected && (
-        <div className="border-t border-base-100 p-3.5 bg-base-50">
-          {selected.category === "mattress" && (
-            <MattressConfigurator model={selected} skus={selectedSkus} onAdd={handleAdd} />
-          )}
-          {selected.category === "bedframe" && (
-            // 2026-05-18 (Loo screenshot — SO-1006 saved no fabric / no color).
-            // `key={selected.id}` forces a remount on model switch so
-            // useState(model.colors?.[0]) + useState(model.gaps?.[0]) re-init
-            // with the new model's defaults. Without the key, dropdown state
-            // leaked across models — stale color/gap id matched nothing in
-            // the new model's options, dropdown silently rendered blank, and
-            // the line was added with `attrs: null`.
-            <BedframeConfigurator key={selected.id} model={selected} skus={selectedSkus} onAdd={handleAdd} />
-          )}
-          {selected.category === "sofa" && (
-            // 2026-05-18 (Loo screenshot — SO-1006 Kestrel L-shape saved
-            // `attrs = { mode: "preset" }` with NO fabric even though Kestrel
-            // has 2 fabrics configured). Same root cause as bedframe above:
-            // useState(fabrics[0]?.id) only runs on initial mount, so
-            // switching from one sofa model to another within a wizard
-            // session kept the OLD model's fabric id in `fabricId`. The id
-            // didn't match any new-model option → `fabrics.find(...)` returned
-            // undefined → `if (fabric)` branch skipped → attrs saved blank.
-            // `key={selected.id}` forces a fresh mount per model.
-            <SofaConfigurator
-              key={selected.id}
-              model={selected}
-              skus={selectedSkus}
-              fabrics={selectedFabrics}
-              onAdd={handleAdd}
-            />
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Configurators — each owns transient state, calls onAdd to commit a DraftLine.
-// -----------------------------------------------------------------------------
-
-function newLocalId(): string {
+export function newLocalId(): string {
   // crypto.randomUUID is available in modern browsers and JSDOM 22+.
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -274,7 +64,7 @@ function newLocalId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function MattressConfigurator({
+export function MattressConfigurator({
   model,
   skus,
   onAdd,
@@ -333,7 +123,7 @@ function MattressConfigurator({
   );
 }
 
-function BedframeConfigurator({
+export function BedframeConfigurator({
   model,
   skus,
   onAdd,
@@ -342,6 +132,13 @@ function BedframeConfigurator({
   skus: ProductSkuDto[];
   onAdd: (line: DraftLine) => void;
 }) {
+  // 2026-05-18 (Loo screenshot — SO-1006 saved no fabric / no color). The
+  // CALLER must remount this with `key={model.id}` on model switch so
+  // useState(model.colors?.[0]) + useState(model.gaps?.[0]) re-init with the
+  // new model's defaults. Without the remount, dropdown state leaks across
+  // models — a stale color/gap id matches nothing in the new model's options,
+  // the dropdown silently renders blank, and the line is added with attrs that
+  // don't reflect a real selection.
   const [skuId, setSkuId] = useState<string>("");
   const [color, setColor] = useState<string>(model.colors?.[0] ?? "");
   const [gap, setGap] = useState<string>(model.gaps?.[0] ?? "");
@@ -427,7 +224,7 @@ function BedframeConfigurator({
   );
 }
 
-function SofaConfigurator({
+export function SofaConfigurator({
   model,
   skus,
   fabrics,
@@ -440,6 +237,13 @@ function SofaConfigurator({
 }) {
   // Mode = 'preset' (pick a complete sub-model) or 'custom' (pick a part).
   // sofa_mode tells which modes are allowed; 'both' shows tabs.
+  //
+  // 2026-05-18 (Loo screenshot — SO-1006 Kestrel L-shape saved
+  // `attrs = { mode: "preset" }` with NO fabric even though Kestrel has 2
+  // fabrics). useState(fabrics[0]?.id) only runs on initial mount, so the
+  // CALLER must remount with `key={model.id}` on model switch — otherwise the
+  // old model's fabric id sticks, matches no new-model option, and the line is
+  // added blank.
   const allowed: ("preset" | "custom")[] =
     model.sofaMode === "both"
       ? ["preset", "custom"]
@@ -467,9 +271,8 @@ function SofaConfigurator({
     if (fabric) {
       // 2026-05-12 (Loo): persist fabric_id (FK) alongside fabric_name
       // (display) + fabric_surcharge (price). Without fabric_id, the
-      // operation CreatePOModal autofill cascade can't pre-select the
-      // fabric chip even when the dealer DID pick one — the cascade keys
-      // off id, not display name. See CreatePOModal.tsx:144.
+      // operation CreatePOModal autofill cascade can't pre-select the fabric
+      // chip even when the dealer DID pick one — the cascade keys off id.
       attrs.fabric_id = fabric.id;
       attrs.fabric_name = fabric.fabricName;
       attrs.fabric_surcharge = surcharge;
@@ -578,9 +381,37 @@ function SofaConfigurator({
   );
 }
 
+/**
+ * Render the configurator that matches a model's category. Returns null for
+ * accessory/service (no variant axis). The CALLER must key this by model.id
+ * (a fresh mount per model) so the per-category useState defaults re-init —
+ * see the SO-1006 notes above.
+ */
+export function ConfiguratorForModel({
+  model,
+  skus,
+  fabrics,
+  onAdd,
+}: {
+  model: ProductModelDto;
+  skus: ProductSkuDto[];
+  fabrics: SofaFabricDto[];
+  onAdd: (line: DraftLine) => void;
+}) {
+  if (model.category === "mattress") {
+    return <MattressConfigurator model={model} skus={skus} onAdd={onAdd} />;
+  }
+  if (model.category === "bedframe") {
+    return <BedframeConfigurator model={model} skus={skus} onAdd={onAdd} />;
+  }
+  if (model.category === "sofa") {
+    return <SofaConfigurator model={model} skus={skus} fabrics={fabrics} onAdd={onAdd} />;
+  }
+  return null;
+}
+
 // -----------------------------------------------------------------------------
-// Shared atoms (kept inline since file is already long; if these grow larger
-// they can move into a per-wizard atoms file in a later slice).
+// Shared field atoms
 // -----------------------------------------------------------------------------
 
 function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
