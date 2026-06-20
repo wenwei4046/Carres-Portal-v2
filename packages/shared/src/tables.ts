@@ -38,6 +38,12 @@ export const FLOOR_CONFIG     = "floor_config" as const;
 export const FABRIC_TIER_ADDON_CONFIG    = "fabric_tier_addon_config" as const;
 export const MODEL_FABRIC_TIER_OVERRIDES = "model_fabric_tier_overrides" as const;
 
+// 0177 — fixed-set combos (套餐): a named bundle sold at one combo_price, with
+// its component SKUs in combo_components. explodeCombo() splits the price back
+// across the components at submit time.
+export const COMBOS           = "combos" as const;
+export const COMBO_COMPONENTS = "combo_components" as const;
+
 // ---------------------------------------------------------------------------
 // People / org tables
 // ---------------------------------------------------------------------------

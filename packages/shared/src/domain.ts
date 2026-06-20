@@ -128,6 +128,33 @@ export interface Addon {
   serviceSku?: string | null;
 }
 
+/**
+ * One component SKU inside a combo (migration 0177). `qty` = how many of this
+ * SKU the bundle contains; `sortOrder` drives the deterministic explode order
+ * (the last component absorbs the rounding residue in explodeCombo).
+ */
+export interface ComboComponent {
+  sku: string;
+  qty: number;
+  sortOrder: number;
+}
+
+/**
+ * A fixed-set combo / bundle (套餐, migration 0177) sold at one `comboPrice`.
+ * `comboFromRow` maps the `combos` row; `components` is attached by the caller
+ * (the API assembles the nested `combo_components` rows, the same way other
+ * nested domain objects are composed).
+ */
+export interface Combo {
+  id: string;
+  comboKey: string;
+  name: string;
+  comboPrice: number;
+  active: boolean;
+  effectiveFrom: string;
+  components: ComboComponent[];
+}
+
 export interface FloorConfig {
   id: number;
   freeUpToFloor: number;
