@@ -501,6 +501,59 @@ export {
   type ExplodedSofaLine,
 } from "./sofa-pricing";
 
+// Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /
+// arm-cap closure). No DOM/React; cm-space math reused by the web builder + P4
+// explode. `mirrorCode` / `computeSofaPrice` are NOT re-exported here — they
+// already ship from `sofa-pricing` (the geometry module imports mirrorCode).
+export {
+  SOFA_MODULES,
+  MODULE_EDGES_BASE,
+  DEFAULT_FOOTPRINT,
+  ROOM_W,
+  ROOM_H,
+  SNAP_CM,
+  CONTACT_TOL,
+  EDGE_W,
+  EDGE_N,
+  EDGE_E,
+  EDGE_S,
+  parseCompartmentStructure,
+  familyRepresentative,
+  findModule,
+  normalizeCompartmentCode,
+  representativeArtCode,
+  isAccessoryModule,
+  classifySofaCompartment,
+  moduleFootprint,
+  cellBbox,
+  cellRenderBox,
+  cellsBbox,
+  centerCellsWithin,
+  centerCellsInRoom,
+  cellEdges,
+  lCapEdgeOf,
+  edgeContacts,
+  groupSofas,
+  orderSofaCellsLeftToRight,
+  findSnap,
+  hasArmConflict,
+  analyzeSofa,
+  type Rot,
+  type Depth,
+  type GeoCell,
+  type SofaModuleSpec,
+  type CompartmentStructure,
+  type SofaCompartmentGroup,
+  type EdgeType,
+  type EdgeIdx,
+  type Bbox,
+  type SnapDelta,
+  type ViolationReason,
+  type ArmViolation,
+  type ClosureFailure,
+  type SofaAnalysis,
+} from "./sofa-geometry";
+
 // Table-name constants (prevents raw string literals in application code).
 export * from "./tables";
 
