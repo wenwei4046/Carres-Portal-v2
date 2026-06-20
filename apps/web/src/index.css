@@ -264,5 +264,6 @@
   @media (prefers-reduced-motion: reduce) {
     .animate-page-enter, .animate-cart-pulse { animation: none; }
     .pos-card { transition: none; }
+    .pos-card:hover { transform: none; }
   }
 }
