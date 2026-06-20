@@ -66,6 +66,9 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   // legacy query didn't select it) + editable description.
   posActive: r.pos_active ?? true,
   description: r.description ?? null,
+  // 0178 — nullable link to a sofa compartment type (additive, null on every
+  // existing SKU).
+  compartmentId: r.compartment_id ?? null,
 });
 
 export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
@@ -143,6 +146,39 @@ export const comboFromRow = (r: DB.ComboRow): D.Combo => ({
   active: r.active,
   effectiveFrom: r.effective_from,
   components: [],
+});
+
+/**
+ * Maps a `sofa_compartments` row to the camelCase domain shape (migration 0178).
+ * `default_price` is Postgres numeric(12,2) — `Number()` normalises the
+ * string|number PostgREST surfaces it as. `seat_count` is nullable and stays
+ * null (not coerced to 0) so "unspecified" is distinct from "zero seats".
+ */
+export const sofaCompartmentFromRow = (r: DB.SofaCompartmentRow): D.SofaCompartment => ({
+  id: r.id,
+  code: r.code,
+  description: r.description ?? null,
+  seatCount: r.seat_count == null ? null : Number(r.seat_count),
+  armConfig: r.arm_config ?? null,
+  iconUrl: r.icon_url ?? null,
+  defaultPrice: Number(r.default_price),
+  sortOrder: Number(r.sort_order),
+  active: r.active,
+});
+
+/**
+ * Maps a `model_sofa_compartments` row to the camelCase domain shape (0178).
+ * `price_override` is nullable: `null` means "inherit the pool default_price"
+ * and must stay null (not coerced to 0) so callers can distinguish "no override"
+ * from "override set to zero".
+ */
+export const modelSofaCompartmentFromRow = (
+  r: DB.ModelSofaCompartmentRow,
+): D.ModelSofaCompartment => ({
+  modelId: r.model_id,
+  compartmentId: r.compartment_id,
+  priceOverride: r.price_override == null ? null : Number(r.price_override),
+  sortOrder: Number(r.sort_order),
 });
 
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({

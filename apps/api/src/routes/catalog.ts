@@ -25,6 +25,11 @@ import {
   MODEL_FABRIC_TIER_OVERRIDES,
   COMBOS,
   COMBO_COMPONENTS,
+  sofaCompartmentCreateInput,
+  sofaCompartmentPatchInput,
+  modelSofaCompartmentInput,
+  SOFA_COMPARTMENTS,
+  MODEL_SOFA_COMPARTMENTS,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
@@ -150,7 +155,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -168,6 +173,10 @@ catalogRouter.get("/", async (c) => {
     // stored but NOT gated in v1.
     sb.from(COMBOS).select("*"),
     sb.from(COMBO_COMPONENTS).select("*"),
+    // 0178 — sofa compartment pool + per-model offered rows (additive). The
+    // maintenance UI is the only consumer in Phase 1; returned unfiltered.
+    sb.from(SOFA_COMPARTMENTS).select("*"),
+    sb.from(MODEL_SOFA_COMPARTMENTS).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -177,6 +186,8 @@ catalogRouter.get("/", async (c) => {
   if (tierOverridesR.error) throw new HTTPException(500, { message: tierOverridesR.error.message });
   if (combosR.error) throw new HTTPException(500, { message: combosR.error.message });
   if (comboComponentsR.error) throw new HTTPException(500, { message: comboComponentsR.error.message });
+  if (sofaCompsR.error) throw new HTTPException(500, { message: sofaCompsR.error.message });
+  if (modelSofaCompsR.error) throw new HTTPException(500, { message: modelSofaCompsR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -244,6 +255,13 @@ catalogRouter.get("/", async (c) => {
     ),
     // 0177 — fixed-set combos (additive; pre-0177 clients ignore this key).
     combos,
+    // 0178 — sofa compartment pool + per-model offered (additive; optional).
+    sofaCompartments: (sofaCompsR.data ?? []).map(
+      (r) => Adapters.sofaCompartmentFromRow(r as DB.SofaCompartmentRow),
+    ),
+    modelSofaCompartments: (modelSofaCompsR.data ?? []).map(
+      (r) => Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow),
+    ),
   });
 
   // 0074 — was `private, max-age=300` but the browser cache was beating
@@ -1195,6 +1213,149 @@ catalogRouter.delete("/combos/:id", async (c) => {
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "combo not found" }, 404);
   }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0178 — Sofa compartments (the "Base" pool) + per-model offered set. All
+// writes are principal-only ("Master Admin"), mirroring the 0176/0177 gate:
+// early friendly 403 here, with RLS (sofa_compartments_write_principal /
+// model_sofa_compartments_write_principal) the real boundary — we forward the
+// USER JWT (userClient) so RLS runs. Compartments become real product_skus in
+// a later phase; Phase 1 is the pool + offered + price maintenance only.
+// ---------------------------------------------------------------------------
+
+const SOFA_COMPARTMENT_MSG = "Only the principal (Master Admin) can manage sofa compartments";
+
+// POST /sofa-compartments — create a pool compartment (principal-only).
+catalogRouter.post("/sofa-compartments", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const parsed = await parseJsonBody(c, sofaCompartmentCreateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SOFA_COMPARTMENTS)
+    .insert({
+      code: parsed.data.code,
+      description: parsed.data.description ?? null,
+      seat_count: parsed.data.seatCount ?? null,
+      arm_config: parsed.data.armConfig ?? null,
+      icon_url: parsed.data.iconUrl ?? null,
+      default_price: parsed.data.defaultPrice ?? 0,
+      sort_order: parsed.data.sortOrder ?? 0,
+      active: parsed.data.active ?? true,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "compartment insert returned no row" }, 500);
+  }
+  return c.json({ compartment: Adapters.sofaCompartmentFromRow(data as DB.SofaCompartmentRow) }, 201);
+});
+
+// PATCH /sofa-compartments/:id — update pool fields (principal-only); empty → 422.
+catalogRouter.patch("/sofa-compartments/:id", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, sofaCompartmentPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.code !== undefined) patch.code = parsed.data.code;
+  if (parsed.data.description !== undefined) patch.description = parsed.data.description;
+  if (parsed.data.seatCount !== undefined) patch.seat_count = parsed.data.seatCount;
+  if (parsed.data.armConfig !== undefined) patch.arm_config = parsed.data.armConfig;
+  if (parsed.data.iconUrl !== undefined) patch.icon_url = parsed.data.iconUrl;
+  if (parsed.data.defaultPrice !== undefined) patch.default_price = parsed.data.defaultPrice;
+  if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SOFA_COMPARTMENTS)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
+  }
+  return c.json({ compartment: Adapters.sofaCompartmentFromRow(data as DB.SofaCompartmentRow) });
+});
+
+// DELETE /sofa-compartments/:id — soft-delete via active=false (principal-only).
+// (sofa_compartments has no discontinued_at; `active` is the on/off flag.)
+catalogRouter.delete("/sofa-compartments/:id", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SOFA_COMPARTMENTS)
+    .update({ active: false, updated_at: new Date().toISOString(), updated_by: c.var.auth.id })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
+  }
+  return c.json({ ok: true });
+});
+
+// PUT /models/:modelId/compartments/:compartmentId — upsert the per-model
+// offered row (principal-only). priceOverride null = inherit the pool default.
+catalogRouter.put("/models/:modelId/compartments/:compartmentId", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const modelId = c.req.param("modelId");
+  const compartmentId = c.req.param("compartmentId");
+  const parsed = await parseJsonBody(c, modelSofaCompartmentInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(MODEL_SOFA_COMPARTMENTS)
+    .upsert(
+      {
+        model_id: modelId,
+        compartment_id: compartmentId,
+        price_override: parsed.data.priceOverride ?? null,
+        sort_order: parsed.data.sortOrder ?? 0,
+        updated_at: new Date().toISOString(),
+        updated_by: c.var.auth.id,
+      },
+      { onConflict: "model_id,compartment_id" },
+    )
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "upsert returned no row" }, 404);
+  }
+  return c.json({ modelSofaCompartment: Adapters.modelSofaCompartmentFromRow(data as DB.ModelSofaCompartmentRow) });
+});
+
+// DELETE /models/:modelId/compartments/:compartmentId — un-offer (hard-delete
+// the offered row; principal-only). Idempotent: removing a non-existent offered
+// row still returns ok.
+catalogRouter.delete("/models/:modelId/compartments/:compartmentId", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const modelId = c.req.param("modelId");
+  const compartmentId = c.req.param("compartmentId");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb
+    .from(MODEL_SOFA_COMPARTMENTS)
+    .delete()
+    .eq("model_id", modelId)
+    .eq("compartment_id", compartmentId);
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   return c.json({ ok: true });
 });
 

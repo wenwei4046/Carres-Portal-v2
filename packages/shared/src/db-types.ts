@@ -147,6 +147,10 @@ export interface ProductSkuRow {
   // 0170 — sell-side ON/OFF (DISTINCT from discontinued_at) + editable description.
   pos_active: boolean;
   description: string | null;
+  // 0178 (sofa engine Phase 1) — additive, nullable FK to sofa_compartments.
+  // Only future generated compartment SKUs set it; links a compartment SKU to
+  // its pool type. NULL for every existing (non-compartment) SKU.
+  compartment_id: string | null;
 }
 
 export interface SofaFabricRow {
@@ -229,6 +233,43 @@ export interface ComboComponentRow {
   sku: string;
   qty: number;
   sort_order: number;
+}
+
+/**
+ * `sofa_compartments` (migration 0178, sofa engine Phase 1). The principal-owned
+ * compartment pool / type catalog — every sofa segment type (e.g. `1A(LHF)`,
+ * `1NA`, `2A(RHF)`) with a description + default price. A model declares which
+ * of these it offers via `model_sofa_compartments`. `default_price` is the pool
+ * RM price; a per-model `price_override` may supersede it. `code` is unique.
+ */
+export interface SofaCompartmentRow {
+  id: string;
+  code: string;
+  description: string | null;
+  seat_count: number | null;
+  arm_config: string | null;
+  icon_url: string | null;
+  default_price: number;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `model_sofa_compartments` (migration 0178). One row = the model offers this
+ * compartment. PK is (model_id, compartment_id). `price_override` NULL means
+ * "use the pool's default_price"; a value (>= 0) supersedes it for this model.
+ */
+export interface ModelSofaCompartmentRow {
+  model_id: string;
+  compartment_id: string;
+  price_override: number | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
 }
 
 export interface FloorConfigRow {

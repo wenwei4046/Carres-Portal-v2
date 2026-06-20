@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { AddonDto, CatalogResponse } from "@carres/shared";
+import type { AddonDto, CatalogResponse, SofaCompartmentDto } from "@carres/shared";
 import { MAX_DELIVERY_FLOOR } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
@@ -9,6 +9,9 @@ import {
   usePatchAddon,
   usePatchFloorConfig,
   useUpdateFabricTierConfig,
+  useCreateSofaCompartment,
+  useUpdateSofaCompartment,
+  useDeleteSofaCompartment,
 } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
@@ -35,6 +38,7 @@ export default function MaintenanceTab({
     <div className="flex flex-col gap-8 max-w-[680px]">
       <DeliveryFeeSection catalog={catalog} isPrincipal={isPrincipal} />
       <FabricTierDeltasCard catalog={catalog} isPrincipal={isPrincipal} />
+      <SofaCompartmentsSection catalog={catalog} isPrincipal={isPrincipal} />
       <AddonsSection addons={catalog.addons} />
     </div>
   );
@@ -468,6 +472,203 @@ function AddonAddForm({ onDone }: { onDone: () => void }) {
       <p className="t-tiny text-base-400 basis-full">
         Re-using a disabled add-on's key restores it.
       </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 0178 — Sofa compartments (the "Base" pool) — principal-gated
+// ---------------------------------------------------------------------------
+
+function SofaCompartmentsSection({
+  catalog,
+  isPrincipal,
+}: {
+  catalog: CatalogResponse;
+  isPrincipal: boolean;
+}) {
+  const [adding, setAdding] = useState(false);
+  const compartments = (catalog.sofaCompartments ?? [])
+    .filter((c) => c.active)
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-1">
+        <div className="t-h4 font-display">Sofa Compartments</div>
+        {isPrincipal && (
+          <button type="button" onClick={() => setAdding((v) => !v)} className="btn-ghost text-[12px]">
+            {adding ? "Close" : "+ Add compartment"}
+          </button>
+        )}
+      </div>
+      <p className="t-tiny text-base-500 mb-3">
+        The compartment pool (1A(LHF), 1NA, 2A(RHF), …). A sofa is assembled from
+        these; each sofa model ticks which it offers in the Modular tab.
+        {!isPrincipal && " Principal only — read-only for your role."}
+      </p>
+
+      {adding && isPrincipal && <SofaCompartmentAddForm onDone={() => setAdding(false)} />}
+
+      <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
+        <div
+          className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
+          style={{ gridTemplateColumns: "120px minmax(160px,1.6fr) 130px 110px" }}
+        >
+          <div className="label">Code</div>
+          <div className="label">Description</div>
+          <div className="label text-right">Default price (RM)</div>
+          <div className="label text-right">Actions</div>
+        </div>
+        {compartments.length === 0 && (
+          <div className="t-small text-base-500 px-3 py-4">No compartments configured.</div>
+        )}
+        {compartments.map((comp) => (
+          <SofaCompartmentRow key={comp.id} comp={comp} isPrincipal={isPrincipal} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SofaCompartmentRow({
+  comp,
+  isPrincipal,
+}: {
+  comp: SofaCompartmentDto;
+  isPrincipal: boolean;
+}) {
+  const patch = useUpdateSofaCompartment();
+  const del = useDeleteSofaCompartment();
+
+  function commitDescription(raw: string) {
+    const next = raw.trim();
+    if (next === (comp.description ?? "")) return;
+    patch.mutate(
+      { id: comp.id, patch: { description: next || null } },
+      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
+    );
+  }
+  function commitPrice(raw: string) {
+    const v = Number(raw.trim());
+    if (!Number.isFinite(v) || v < 0 || v === comp.defaultPrice) return;
+    patch.mutate(
+      { id: comp.id, patch: { defaultPrice: v } },
+      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
+    );
+  }
+  function remove() {
+    if (!confirm(`Disable compartment "${comp.code}"? It will drop off this list.`)) return;
+    del.mutate(comp.id, {
+      onSuccess: () => toast.success(`${comp.code} disabled`),
+      onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Disable failed"),
+    });
+  }
+
+  return (
+    <div
+      className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
+      style={{ gridTemplateColumns: "120px minmax(160px,1.6fr) 130px 110px" }}
+      data-testid={`compartment-row-${comp.code}`}
+    >
+      <div>
+        <CodeChip>{comp.code}</CodeChip>
+      </div>
+      <input
+        defaultValue={comp.description ?? ""}
+        disabled={!isPrincipal}
+        onBlur={(e) => commitDescription(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        aria-label={`${comp.code} description`}
+        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[13px] outline-none bg-transparent disabled:opacity-60"
+      />
+      <input
+        type="number"
+        min={0}
+        step="0.01"
+        defaultValue={comp.defaultPrice}
+        disabled={!isPrincipal}
+        onBlur={(e) => commitPrice(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        aria-label={`${comp.code} default price`}
+        className={`${INPUT_CLS} text-right font-mono text-[12px] disabled:opacity-60`}
+      />
+      <div className="text-right">
+        {isPrincipal && (
+          <button type="button" onClick={remove} disabled={del.isPending} className="btn-danger text-[11px]">
+            Disable
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SofaCompartmentAddForm({ onDone }: { onDone: () => void }) {
+  const create = useCreateSofaCompartment();
+  const [code, setCode] = useState("");
+  const [description, setDescription] = useState("");
+  const [seatCount, setSeatCount] = useState("");
+  const [price, setPrice] = useState("");
+  const busy = create.isPending;
+
+  const codeValid = code.trim().length >= 1 && /^[A-Za-z0-9()\-_/. ]+$/.test(code.trim());
+  const priceNum = price.trim() === "" ? 0 : Number(price);
+  const seatNum = seatCount.trim() === "" ? null : Number(seatCount);
+  const valid =
+    codeValid &&
+    Number.isFinite(priceNum) &&
+    priceNum >= 0 &&
+    (seatNum === null || (Number.isInteger(seatNum) && seatNum >= 0));
+
+  async function submit() {
+    if (!valid) return;
+    try {
+      await create.mutateAsync({
+        code: code.trim(),
+        description: description.trim() || null,
+        seatCount: seatNum,
+        defaultPrice: priceNum,
+      });
+      toast.success(`Added ${code.trim()}`);
+      onDone();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Add failed");
+    }
+  }
+
+  return (
+    <div className="bg-base-50 border border-base-200 rounded-[4px] p-4 mb-3 flex flex-wrap gap-3 items-end">
+      <label className="block">
+        <span className="label block mb-1">Code</span>
+        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="1A(LHF)" className={`${INPUT_CLS} w-32 font-mono`} />
+      </label>
+      <label className="block">
+        <span className="label block mb-1">Description</span>
+        <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="1 seat, ONE arm (left)" className={`${INPUT_CLS} w-60`} />
+      </label>
+      <label className="block">
+        <span className="label block mb-1">Seats</span>
+        <input type="number" min={0} step="1" value={seatCount} onChange={(e) => setSeatCount(e.target.value)} className={`${INPUT_CLS} w-20`} />
+      </label>
+      <label className="block">
+        <span className="label block mb-1">Default price (RM)</span>
+        <input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className={`${INPUT_CLS} w-28`} />
+      </label>
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!valid || busy}
+        className="btn-primary text-[12px] disabled:opacity-40"
+        data-testid="compartment-add-submit"
+      >
+        {busy ? "Saving…" : "Add"}
+      </button>
     </div>
   );
 }

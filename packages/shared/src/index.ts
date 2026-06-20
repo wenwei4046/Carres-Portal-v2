@@ -126,6 +126,12 @@ export {
   comboSchema,
   comboCreateInput,
   comboPatchInput,
+  // 0178 — sofa compartment pool + per-model offered schemas.
+  sofaCompartmentSchema,
+  sofaCompartmentCreateInput,
+  sofaCompartmentPatchInput,
+  modelSofaCompartmentSchema,
+  modelSofaCompartmentInput,
   serviceSkuCodeSchema,
   sizesActiveInput,
   generateSkusInput,
@@ -168,6 +174,12 @@ export {
   type ComboDto,
   type ComboCreateInput,
   type ComboPatchInput,
+  // 0178 — sofa compartment Dto + input types.
+  type SofaCompartmentDto,
+  type SofaCompartmentCreateInput,
+  type SofaCompartmentPatchInput,
+  type ModelSofaCompartmentDto,
+  type ModelSofaCompartmentInput,
 } from "./schemas/catalog";
 
 export {
@@ -445,6 +457,13 @@ export {
 // (mirrors how CostSource is surfaced above). The zod schemas + Dto types live
 // in the schemas/catalog export block.
 export type { Combo, ComboComponent } from "./domain";
+
+// 0178 — sofa compartment domain types (camelCased). Top-level alias so the API
+// + web can `import type { SofaCompartment } from "@carres/shared"` without
+// dipping into Domain.* (mirrors the Combo alias above). The zod schemas + Dto
+// types live in the schemas/catalog export block; the adapters are reached via
+// Adapters.* like comboFromRow / fabricTierConfigFromRow.
+export type { SofaCompartment, ModelSofaCompartment } from "./domain";
 
 // Table-name constants (prevents raw string literals in application code).
 export * from "./tables";
