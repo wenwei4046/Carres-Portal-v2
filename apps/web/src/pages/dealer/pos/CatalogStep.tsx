@@ -49,7 +49,11 @@ export default function CatalogStep({
   cartOpen: boolean;
   onCartOpenChange: (open: boolean) => void;
 }) {
-  const index = useMemo(() => buildCatalogIndex(catalog), [catalog]);
+  const index = useMemo(
+    () =>
+      buildCatalogIndex(catalog, catalog.fabricTierConfig, catalog.modelFabricTierOverrides),
+    [catalog],
+  );
   const activeAddons = useMemo(() => catalog.addons.filter((a) => a.active), [catalog.addons]);
 
   const [activeRail, setActiveRail] = useState<RailKey>("all");
@@ -246,6 +250,8 @@ export default function CatalogStep({
           meta={index.meta.get(configureModel.id)}
           skus={index.skusByModel.get(configureModel.id) ?? []}
           fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
+          fabricTierConfig={catalog.fabricTierConfig}
+          modelFabricTierOverrides={catalog.modelFabricTierOverrides}
           onAdd={addLine}
           onClose={() => setConfigureModelId(null)}
         />

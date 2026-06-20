@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import type { ProductModelDto, ProductSkuDto, SofaFabricDto } from "@carres/shared";
+import type { ProductModelDto, ProductSkuDto, SofaFabricDto, FabricTierGlobalConfig, ModelFabricTierOverrideDto } from "@carres/shared";
 import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import type { DraftLine } from "../new-order/draft";
 import { ConfiguratorForModel } from "../new-order/configurators";
@@ -19,6 +19,8 @@ export default function ConfigureDrawer({
   meta,
   skus,
   fabrics,
+  fabricTierConfig,
+  modelFabricTierOverrides,
   onAdd,
   onClose,
 }: {
@@ -26,6 +28,8 @@ export default function ConfigureDrawer({
   meta: ModelMeta | undefined;
   skus: ProductSkuDto[];
   fabrics: SofaFabricDto[];
+  fabricTierConfig?: FabricTierGlobalConfig | null;
+  modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -96,6 +100,8 @@ export default function ConfigureDrawer({
             model={model}
             skus={skus}
             fabrics={fabrics}
+            fabricTierConfig={fabricTierConfig}
+            modelFabricTierOverrides={modelFabricTierOverrides}
             onAdd={(line) => {
               onAdd(line);
               onClose();

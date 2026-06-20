@@ -5,7 +5,10 @@ import type {
   ProductModelDto,
   ProductSkuDto,
   SofaFabricDto,
+  FabricTierGlobalConfig,
+  ModelFabricTierOverrideDto,
 } from "@carres/shared";
+import { resolveFabricDelta } from "@carres/shared";
 import type { DraftLine } from "./draft";
 
 /**
@@ -225,11 +228,17 @@ export function SofaConfigurator({
   model,
   skus,
   fabrics,
+  fabricTierConfig,
+  modelFabricTierOverrides,
   onAdd,
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
   fabrics: SofaFabricDto[];
+  /** Global tier delta config (from catalog bundle, migration 0176). May be absent on pre-0176 bundles — safe fallback is delta=0. */
+  fabricTierConfig?: FabricTierGlobalConfig | null;
+  /** Per-model tier overrides array (from catalog bundle). May be absent; looked up by model.id. */
+  modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
   // Mode = 'preset' (pick a complete sub-model) or 'custom' (pick a part).
@@ -259,8 +268,22 @@ export function SofaConfigurator({
 
   const sku = skusForMode.find((s) => s.id === skuId);
   const fabric = fabrics.find((f) => f.id === fabricId);
-  const surcharge = fabric?.surcharge ?? 0;
-  const unitPrice = (sku?.price ?? 0) + surcharge;
+
+  // Per-model override (null means "inherit from global config").
+  const overrideForThisModel =
+    modelFabricTierOverrides?.find((o) => o.modelId === model.id) ?? null;
+
+  // Resolve effective delta via the tier helper. For PRICE_1 (or when config
+  // is absent/pre-0176), this always returns 0 — identical to the old surcharge
+  // path. The legacy per-fabric `fabric.surcharge` is NOT added on top; it is
+  // now superseded by the tier delta as the price knob.
+  const effectiveDelta = resolveFabricDelta(
+    fabric?.tier ?? "PRICE_1",
+    overrideForThisModel,
+    fabricTierConfig ?? null,
+  );
+
+  const unitPrice = (sku?.price ?? 0) + effectiveDelta;
 
   function add() {
     if (!sku) return;
@@ -270,9 +293,12 @@ export function SofaConfigurator({
       // (display) + fabric_surcharge (price). Without fabric_id, the
       // operation CreatePOModal autofill cascade can't pre-select the fabric
       // chip even when the dealer DID pick one — the cascade keys off id.
+      // fabric_surcharge carries the resolved effectiveDelta so the DraftLine
+      // contract is unchanged. fabric_tier is the new metadata key (additive).
       attrs.fabric_id = fabric.id;
       attrs.fabric_name = fabric.fabricName;
-      attrs.fabric_surcharge = surcharge;
+      attrs.fabric_surcharge = effectiveDelta;
+      attrs.fabric_tier = fabric.tier;
     }
     onAdd({
       localId: newLocalId(),
@@ -280,7 +306,7 @@ export function SofaConfigurator({
       qty,
       attrs,
       unitPrice,
-      label: `${model.name} · ${sku.variant}${fabric ? ` · ${fabric.fabricName}` : ""}${surcharge ? ` (+RM ${surcharge})` : ""}`,
+      label: `${model.name} · ${sku.variant}${fabric ? ` · ${fabric.fabricName}` : ""}${effectiveDelta > 0 ? ` (+RM ${effectiveDelta})` : ""}`,
     });
     setSkuId("");
     setFabricId(fabrics[0]?.id ?? "");
@@ -343,7 +369,7 @@ export function SofaConfigurator({
             {fabrics.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.fabricName}
-                {f.surcharge > 0 ? ` (+RM ${f.surcharge})` : ""}
+                {effectiveDelta > 0 && fabricId === f.id ? ` (+RM ${effectiveDelta})` : ""}
               </option>
             ))}
           </select>
@@ -358,9 +384,9 @@ export function SofaConfigurator({
             <span className="pos-price-rm">RM</span>
             {unitPrice.toLocaleString()}
           </span>
-          {surcharge > 0 && (
+          {effectiveDelta > 0 && (
             <span className="t-tiny text-base-500">
-              (base RM {sku.price.toLocaleString()} + fabric RM {surcharge})
+              (base RM {sku.price.toLocaleString()} + fabric RM {effectiveDelta})
             </span>
           )}
         </div>
@@ -390,11 +416,15 @@ export function ConfiguratorForModel({
   model,
   skus,
   fabrics,
+  fabricTierConfig,
+  modelFabricTierOverrides,
   onAdd,
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
   fabrics: SofaFabricDto[];
+  fabricTierConfig?: FabricTierGlobalConfig | null;
+  modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
   if (model.category === "mattress") {
@@ -404,7 +434,16 @@ export function ConfiguratorForModel({
     return <BedframeConfigurator model={model} skus={skus} onAdd={onAdd} />;
   }
   if (model.category === "sofa") {
-    return <SofaConfigurator model={model} skus={skus} fabrics={fabrics} onAdd={onAdd} />;
+    return (
+      <SofaConfigurator
+        model={model}
+        skus={skus}
+        fabrics={fabrics}
+        fabricTierConfig={fabricTierConfig}
+        modelFabricTierOverrides={modelFabricTierOverrides}
+        onAdd={onAdd}
+      />
+    );
   }
   return null;
 }
