@@ -180,6 +180,13 @@ export {
   type SofaCompartmentPatchInput,
   type ModelSofaCompartmentDto,
   type ModelSofaCompartmentInput,
+  // 0179 — sofa combo pricing schemas + input/Dto types.
+  sofaComboSchema,
+  sofaComboCreateInput,
+  sofaComboPatchInput,
+  type SofaComboDto,
+  type SofaComboCreateInput,
+  type SofaComboPatchInput,
 } from "./schemas/catalog";
 
 export {
@@ -464,6 +471,14 @@ export type { Combo, ComboComponent } from "./domain";
 // types live in the schemas/catalog export block; the adapters are reached via
 // Adapters.* like comboFromRow / fabricTierConfigFromRow.
 export type { SofaCompartment, ModelSofaCompartment } from "./domain";
+
+// 0179 — sofa engine Phase 2: sofa combo domain type + the row→domain adapter +
+// the canonical seat-height axis. `sofaComboFromRow` is also reachable via
+// `Adapters.*` (like comboFromRow); the top-level alias mirrors the Combo/
+// SofaCompartment surfacing above so the API + web can import it directly.
+export type { SofaCombo } from "./domain";
+export { sofaComboFromRow } from "./adapters";
+export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
 
 // Table-name constants (prevents raw string literals in application code).
 export * from "./tables";

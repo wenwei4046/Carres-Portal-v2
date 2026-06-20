@@ -4,12 +4,14 @@ import {
   orderInputToRpcPayload,
   orderSupplierThreadFromRow,
   productSkuFromRow,
+  sofaComboFromRow,
   sofaCompartmentFromRow,
 } from "./adapters";
 import type {
   ModelSofaCompartmentRow,
   OrderSupplierThreadRow,
   ProductSkuRow,
+  SofaComboPricingRow,
   SofaCompartmentRow,
 } from "./db-types";
 import type { CreateOrderInput } from "./schemas/orders";
@@ -391,6 +393,68 @@ describe("modelSofaCompartmentFromRow", () => {
   it("distinguishes an explicit zero override from null", () => {
     const out = modelSofaCompartmentFromRow(baseRow({ price_override: 0 }));
     expect(out.priceOverride).toBe(0);
+  });
+});
+
+describe("sofaComboFromRow", () => {
+  function baseRow(over: Partial<SofaComboPricingRow> = {}): SofaComboPricingRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000f0001",
+      model_id: "00000000-0000-0000-0000-0000000d0001",
+      slots: [
+        ["2A(LHF)", "2A(RHF)"],
+        ["L(LHF)", "L(RHF)"],
+      ],
+      tier: "PRICE_1",
+      // Postgres jsonb numerics can arrive as strings over PostgREST.
+      prices_by_height: {
+        "24": "2640.00" as unknown as number,
+        "28": 2750,
+        "30": null,
+      },
+      label: "Oslo L-shape",
+      effective_from: "2026-06-21",
+      active: true,
+      discontinued_at: null,
+      created_at: "2026-06-21T08:00:00.000Z",
+      updated_at: "2026-06-21T08:00:00.000Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("round-trips snake->camel + coerces numeric prices, preserves null prices", () => {
+    const out = sofaComboFromRow(baseRow());
+    expect(out.id).toBe("00000000-0000-0000-0000-0000000f0001");
+    expect(out.modelId).toBe("00000000-0000-0000-0000-0000000d0001");
+    expect(out.slots).toEqual([
+      ["2A(LHF)", "2A(RHF)"],
+      ["L(LHF)", "L(RHF)"],
+    ]);
+    expect(out.tier).toBe("PRICE_1");
+    expect(out.pricesByHeight["24"]).toBe(2640);
+    expect(typeof out.pricesByHeight["24"]).toBe("number");
+    expect(out.pricesByHeight["28"]).toBe(2750);
+    expect(out.pricesByHeight["30"]).toBeNull();
+    expect(out.label).toBe("Oslo L-shape");
+    expect(out.effectiveFrom).toBe("2026-06-21");
+    expect(out.active).toBe(true);
+    expect(out.discontinuedAt).toBeNull();
+  });
+
+  it("defaults slots=[] and pricesByHeight={} when the DB sends null", () => {
+    const out = sofaComboFromRow(
+      baseRow({
+        slots: null as unknown as string[][],
+        prices_by_height: null as unknown as Record<string, number | null>,
+        tier: null,
+        label: null,
+      }),
+    );
+    expect(out.slots).toEqual([]);
+    expect(out.pricesByHeight).toEqual({});
+    expect(out.tier).toBeNull();
+    expect(out.label).toBeNull();
   });
 });
 

@@ -181,6 +181,32 @@ export const modelSofaCompartmentFromRow = (
   sortOrder: Number(r.sort_order),
 });
 
+/**
+ * Maps a `sofa_combo_pricing` row to the camelCase `SofaCombo` (0179).
+ * `slots` defaults to `[]` and `prices_by_height` to `{}` when the DB sends
+ * null. Every numeric price inside `prices_by_height` is `Number()`-coerced
+ * (PostgREST may serialize jsonb numerics as strings) while a `null` price is
+ * preserved (null = the combo does not apply at that height).
+ */
+export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
+  const rawPrices = r.prices_by_height ?? {};
+  const pricesByHeight: Record<string, number | null> = {};
+  for (const [height, price] of Object.entries(rawPrices)) {
+    pricesByHeight[height] = price == null ? null : Number(price);
+  }
+  return {
+    id: r.id,
+    modelId: r.model_id,
+    slots: r.slots ?? [],
+    tier: (r.tier ?? null) as D.SofaCombo["tier"],
+    pricesByHeight,
+    label: r.label ?? null,
+    effectiveFrom: r.effective_from,
+    active: r.active,
+    discontinuedAt: r.discontinued_at ?? null,
+  };
+};
+
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({
   id: r.id,
   name: r.name,
