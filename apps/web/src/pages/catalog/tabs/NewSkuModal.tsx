@@ -8,20 +8,23 @@ import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Mod
 import { CATEGORY_LABEL, CodeChip } from "../components/atoms";
 
 /**
- * + New SKU — two modes:
- *   • "New product" (default) — the model has never existed: pick a category,
- *     type the product name (→ kebab model key), a first size + price, and we
- *     create BOTH the model and its first SKU in one go.
- *   • "Add to existing model" — add another size/variant under a model that
- *     already exists.
+ * + New SKU -- two modes:
+ *   "New product" (default) -- the model has never existed: pick a category,
+ *   type the product name (-> kebab model key), a first size + price, and we
+ *   create BOTH the model and its first SKU in one go.
+ *   "Add to existing model" -- add another size/variant under a model that
+ *   already exists.
  *
  * Either way the server derives the code as `{MODEL_KEY}-{variant}` and (for
  * service/accessory categories) skips the supplier requirement.
+ *
+ * Cost is optional on creation (blank = null). If provided it auto-fills onto
+ * every Create-PO line that references this SKU.
  */
 
 type Mode = "new" | "existing";
 
-// kebab-case the display name → internal model_key (Loo never types the key).
+// kebab-case the display name -> internal model_key (Loo never types the key).
 function deriveModelKey(name: string): string {
   return name
     .trim()
@@ -50,6 +53,7 @@ export default function NewSkuModal({
   // shared fields
   const [variant, setVariant] = useState("");
   const [price, setPrice] = useState("");
+  const [cost, setCost] = useState(""); // blank -> null (cost is optional on creation)
   const [description, setDescription] = useState("");
   // new-product fields
   const [category, setCategory] = useState<ProductCategory>("mattress");
@@ -72,9 +76,18 @@ export default function NewSkuModal({
 
   const priceNum = price.trim() === "" ? 0 : Number(price);
   const priceOk = Number.isFinite(priceNum) && priceNum >= 0;
+
+  // cost: blank = null (not set); a non-negative number is valid
+  const costTrimmed = cost.trim();
+  const costNum: number | null = costTrimmed === "" ? null : Number(costTrimmed);
+  const costOk =
+    costTrimmed === "" ||
+    (Number.isFinite(costNum as number) && (costNum as number) >= 0);
+
   const valid =
     variant.trim().length > 0 &&
     priceOk &&
+    costOk &&
     (mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel);
 
   const pending = createModel.isPending || createSku.isPending;
@@ -101,13 +114,14 @@ export default function NewSkuModal({
         variant: variant.trim(),
         variantKind: kind,
         price: priceNum,
+        cost: costNum,
         description: description.trim() || null,
       });
       toast.success(`Added ${codePreview || variant.trim()}`);
       onClose();
     } catch (e) {
       // If the model was created but the SKU insert failed (e.g. no supplier
-      // covers this category yet), the model persists — surface the reason so
+      // covers this category yet), the model persists -- surface the reason so
       // the user can fix it (add a supplier / pick a different category).
       toast.error(e instanceof ApiError ? e.message : "Add failed");
     }
@@ -175,10 +189,10 @@ export default function NewSkuModal({
               data-testid="new-sku-model"
               className={INPUT_CLS}
             >
-              <option value="">Select a model…</option>
+              <option value="">Select a model...</option>
               {sortedModels.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {CATEGORY_LABEL[m.category]} · {m.name}
+                  {CATEGORY_LABEL[m.category]} {m.name}
                 </option>
               ))}
             </select>
@@ -202,7 +216,7 @@ export default function NewSkuModal({
         </label>
 
         <label className="block">
-          <span className="label block mb-1">Price (RM, optional — leave blank for “not set”)</span>
+          <span className="label block mb-1">Price (RM, optional)</span>
           <input
             type="number"
             min={0}
@@ -211,6 +225,20 @@ export default function NewSkuModal({
             onChange={(e) => setPrice(e.target.value)}
             placeholder="0.00"
             data-testid="new-sku-price"
+            className={INPUT_CLS}
+          />
+        </label>
+
+        <label className="block">
+          <span className="label block mb-1">Cost (RM, optional)</span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            placeholder="not set"
+            data-testid="new-sku-cost"
             className={INPUT_CLS}
           />
         </label>

@@ -5,16 +5,18 @@ import { ApiError } from "@/lib/api";
 import { usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
+import { skuMargin } from "../margin";
 
 /**
  * Edit SKU — per-row editor. Editable: Product name (the model name, shared by
- * every SKU of that model), Description, Price. Product code is READ-ONLY by
- * design (Loo 2026-06-15): the code is a join key for orders / POs / stock, so
- * letting it change would orphan those references. Size is shown read-only for
- * context (it drives the code; change it via the Modular tab).
+ * every SKU of that model), Description, Price, Cost (nullable). Product code is
+ * READ-ONLY by design (Loo 2026-06-15): the code is a join key for orders / POs
+ * / stock, so letting it change would orphan those references. Size is shown
+ * read-only for context (it drives the code; change it via the Modular tab).
  *
- * Name patches the model (PATCH /models); description + price patch the SKU
- * (PATCH /skus). Only changed fields are sent.
+ * Name patches the model (PATCH /models); description + price + cost patch the
+ * SKU (PATCH /skus). Only changed fields are sent. Blank cost input → null.
+ * Margin (plan margin / base margin for sofa) is shown live and read-only.
  */
 export default function EditSkuModal({
   sku,
@@ -31,21 +33,36 @@ export default function EditSkuModal({
   const [name, setName] = useState(model?.name ?? "");
   const [description, setDescription] = useState(sku.description ?? "");
   const [price, setPrice] = useState(String(sku.price));
+  // cost: blank string = null ("not set"); a numeric string = the cost value
+  const [cost, setCost] = useState(sku.cost !== null ? String(sku.cost) : "");
 
   const priceNum = Number(price);
   const priceOk = price.trim() !== "" && Number.isFinite(priceNum) && priceNum >= 0;
+
+  // Derive costNum/costOk — blank is valid (→ null); a non-negative number is valid
+  const costTrimmed = cost.trim();
+  const costNum: number | null = costTrimmed === "" ? null : Number(costTrimmed);
+  const costOk =
+    costTrimmed === "" ||
+    (Number.isFinite(costNum as number) && (costNum as number) >= 0);
+
   const nameOk = !model || name.trim().length >= 2;
-  const valid = priceOk && nameOk;
+  const valid = priceOk && costOk && nameOk;
   const pending = patchSku.isPending || patchModel.isPending;
+
+  // Live margin: use the current input values for instant feedback
+  const liveMargin = skuMargin(priceOk ? priceNum : sku.price, costOk ? costNum : sku.cost);
+  const marginLabel = model?.category === "sofa" ? "base margin" : "plan margin";
 
   async function save() {
     if (!valid) return;
     try {
-      // SKU-level: description + price (only if changed).
-      const skuPatch: { description?: string | null; price?: number } = {};
+      // SKU-level: description + price + cost (only if changed).
+      const skuPatch: { description?: string | null; price?: number; cost?: number | null } = {};
       const nextDesc = description.trim() || null;
       if (nextDesc !== (sku.description ?? null)) skuPatch.description = nextDesc;
       if (priceNum !== sku.price) skuPatch.price = priceNum;
+      if (costNum !== sku.cost) skuPatch.cost = costNum;
       if (Object.keys(skuPatch).length > 0) {
         await patchSku.mutateAsync({ id: sku.id, patch: skuPatch });
       }
@@ -116,6 +133,40 @@ export default function EditSkuModal({
               className={`${INPUT_CLS} text-right font-mono`}
             />
           </label>
+        </div>
+
+        {/* Cost + live margin */}
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="label block mb-1">Cost (RM)</span>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              placeholder="not set"
+              data-testid="edit-sku-cost"
+              className={`${INPUT_CLS} text-right font-mono`}
+            />
+            <div className="t-tiny text-base-400 mt-1">Blank = not set (null).</div>
+          </label>
+          <div>
+            <span className="label block mb-1">{marginLabel}</span>
+            {liveMargin === null ? (
+              <div className="t-small text-base-400 italic mt-2">— set cost to compute</div>
+            ) : (
+              <div
+                className={`font-mono text-[13px] mt-2 ${liveMargin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
+                data-testid="edit-sku-margin"
+              >
+                RM {liveMargin.amount.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className="text-base-400 text-[11px] ml-1">
+                  ({(liveMargin.pct * 100).toFixed(1)}%)
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
