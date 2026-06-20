@@ -98,8 +98,8 @@ export default function SignaturePad({ value, onChange, caption }: Props) {
   return (
     <div>
       <div
-        className={`relative rounded overflow-hidden bg-card border-2 ${
-          signed ? "border-success" : "border-base-300"
+        className={`relative rounded-xl overflow-hidden bg-card border-2 transition-colors ${
+          signed ? "border-primary" : "border-base-200"
         }`}
       >
         <canvas
@@ -122,7 +122,7 @@ export default function SignaturePad({ value, onChange, caption }: Props) {
           </div>
         )}
         {signed && (
-          <div className="absolute top-2 left-3 text-[10px] font-semibold tracking-[0.1em] uppercase text-success">
+          <div className="absolute top-2 left-3 text-[10px] font-semibold tracking-[0.1em] uppercase text-primary">
             ✓ Signed
           </div>
         )}

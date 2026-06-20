@@ -46,7 +46,7 @@ export default function StairCarryFields({
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="font-display text-base font-semibold tracking-[-0.01em]">Delivery access</h3>
+        <h3 className="kicker">Delivery access</h3>
         <p className="text-[11px] text-base-500">
           1F–{cfg.freeUpToFloor}F free · {rm(cfg.perFloorPerItem)} per floor per item from{" "}
           {cfg.freeUpToFloor + 1}F · max {MAX_DELIVERY_FLOOR}F
@@ -55,7 +55,7 @@ export default function StairCarryFields({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 items-end">
         <Field label="Floor">
-          <div className="flex items-center gap-1.5 border border-base-300 bg-white rounded px-1.5 py-1">
+          <div className="flex items-center gap-1.5 border-[1.5px] border-base-200 bg-white rounded-xl px-1.5 py-1">
             <button
               type="button"
               onClick={() => setFloor(draft.delivery.floor - 1)}
@@ -84,7 +84,7 @@ export default function StairCarryFields({
         </Field>
 
         <Field label={itemsTotal > 0 ? `Quantity (max ${itemsTotal})` : "Quantity"}>
-          <div className="flex items-center gap-1.5 border border-base-300 bg-white rounded px-1.5 py-1">
+          <div className="flex items-center gap-1.5 border-[1.5px] border-base-200 bg-white rounded-xl px-1.5 py-1">
             <button
               type="button"
               onClick={() => bumpStairItems(-1, itemsTotal)}

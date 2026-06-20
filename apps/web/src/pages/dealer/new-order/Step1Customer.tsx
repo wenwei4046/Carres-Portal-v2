@@ -255,7 +255,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="font-display text-base font-semibold tracking-[-0.01em]">{title}</h3>
+        <h3 className="kicker">{title}</h3>
         {hint && <p className="text-[11px] text-base-500">{hint}</p>}
       </div>
       {children}
@@ -290,8 +290,9 @@ function inputClass({ disabled }: { disabled?: boolean } = {}) {
   // Two-tone gating cue: active fields are pure WHITE (next to fill, draws
   // the eye); disabled / waiting-on-prerequisite fields fall back to the
   // body cream so the form's filling order reads at a glance.
+  // 2990s re-skin: rounded-xl, 1.5px border, flame focus ring.
   if (disabled) {
-    return "w-full px-3 py-2.5 text-sm font-body rounded border border-base-300 bg-base-50 text-base-500 cursor-not-allowed outline-none";
+    return "w-full px-3 py-2.5 text-sm font-body rounded-xl border-[1.5px] border-base-300 bg-base-50 text-base-500 cursor-not-allowed outline-none";
   }
-  return "w-full px-3 py-2.5 text-sm font-body rounded border border-base-300 bg-white outline-none focus:border-primary";
+  return "w-full px-3 py-2.5 text-sm font-body rounded-xl border-[1.5px] border-base-200 bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors";
 }
