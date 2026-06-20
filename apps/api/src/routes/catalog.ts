@@ -21,7 +21,13 @@ import {
   PRODUCT_MODEL_PHOTOS_BUCKET,
   FABRIC_TIER_ADDON_CONFIG,
   MODEL_FABRIC_TIER_OVERRIDES,
+  COMBOS,
+  COMBO_COMPONENTS,
 } from "@carres/shared";
+// 0177 — combo CRUD schemas. These live in schemas/catalog.ts and are reached
+// via the `@carres/shared/schemas/*` subpath export (same pattern the codebase
+// uses for `@carres/shared/domain`); they are not re-exported from the barrel.
+import { comboCreateInput, comboPatchInput } from "@carres/shared/schemas/catalog";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
@@ -53,11 +59,15 @@ function internalOnly(c: { var: { auth: { role: string } } }) {
 // 0176 — fabric-tier config + override writes are principal-only.
 // Same gate pattern as the 0175 SKU price/cost lock: early 403 before the
 // DB round-trip; RLS is still the real enforcement boundary.
-function principalOnly(c: { var: { auth: { role: string } } }) {
+// 0177 — generalized to accept a caller-specific message (combos reuse this
+// gate). The default keeps the original fabric-tier string so the existing
+// callers + their tests are unchanged.
+function principalOnly(
+  c: { var: { auth: { role: string } } },
+  message = "Only the principal (Master Admin) can modify fabric tier configuration",
+) {
   if (c.var.auth.role !== "principal") {
-    throw new HTTPException(403, {
-      message: "Only the principal (Master Admin) can modify fabric tier configuration",
-    });
+    throw new HTTPException(403, { message });
   }
 }
 
@@ -142,7 +152,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -153,6 +163,13 @@ catalogRouter.get("/", async (c) => {
     sb.from(FABRIC_TIER_ADDON_CONFIG).select("*").eq("id", 1).maybeSingle(),
     // 0176 — all override rows (sparse table; most models have no row).
     sb.from(MODEL_FABRIC_TIER_OVERRIDES).select("*"),
+    // 0177 — combos + their components. Fetched unfiltered; the active /
+    // discontinued_at filter is applied client-side below (like the skus
+    // pos_active filter), since each combo also needs its components joined in
+    // JS anyway. A combo is "effective immediately" — `effective_from` is
+    // stored but NOT gated in v1.
+    sb.from(COMBOS).select("*"),
+    sb.from(COMBO_COMPONENTS).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -160,6 +177,8 @@ catalogRouter.get("/", async (c) => {
   }
   if (tierConfigR.error) throw new HTTPException(500, { message: tierConfigR.error.message });
   if (tierOverridesR.error) throw new HTTPException(500, { message: tierOverridesR.error.message });
+  if (combosR.error) throw new HTTPException(500, { message: combosR.error.message });
+  if (comboComponentsR.error) throw new HTTPException(500, { message: comboComponentsR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -189,6 +208,31 @@ catalogRouter.get("/", async (c) => {
     ? Adapters.fabricTierConfigFromRow(tierConfigR.data as DB.FabricTierAddonConfigRow)
     : { sofaTier2Delta: 0, sofaTier3Delta: 0 };
 
+  // 0177 — assemble each combo with its components (sorted by sort_order asc;
+  // the last component absorbs the rounding residue in explodeCombo). Non-admin
+  // consumers (POS) only see live combos (active && not discontinued); admin
+  // (maintenance tab) sees ALL combos so it can re-activate / restore them.
+  const comboRows = (combosR.data ?? []).filter((row) => {
+    if (adminMode) return true;
+    const r = row as DB.ComboRow;
+    return r.active === true && r.discontinued_at == null;
+  });
+  const componentsByCombo = new Map<string, DB.ComboComponentRow[]>();
+  for (const row of comboComponentsR.data ?? []) {
+    const cc = row as DB.ComboComponentRow;
+    const list = componentsByCombo.get(cc.combo_id) ?? [];
+    list.push(cc);
+    componentsByCombo.set(cc.combo_id, list);
+  }
+  const combos = comboRows.map((row) => {
+    const r = row as DB.ComboRow;
+    const components = (componentsByCombo.get(r.id) ?? [])
+      .slice()
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((cc) => Adapters.comboComponentFromRow(cc));
+    return { ...Adapters.comboFromRow(r), components };
+  });
+
   const body = catalogResponseSchema.parse({
     models: (modelsR.data ?? []).map((m) => Adapters.productModelFromRow(m as DB.ProductModelRow)),
     skus: liveSkus.map((s) => Adapters.productSkuFromRow(s as DB.ProductSkuRow)),
@@ -200,6 +244,8 @@ catalogRouter.get("/", async (c) => {
     modelFabricTierOverrides: (tierOverridesR.data ?? []).map(
       (r) => Adapters.modelFabricTierOverrideFromRow(r as DB.ModelFabricTierOverrideRow),
     ),
+    // 0177 — fixed-set combos (additive; pre-0177 clients ignore this key).
+    combos,
   });
 
   // 0074 — was `private, max-age=300` but the browser cache was beating
@@ -953,6 +999,205 @@ catalogRouter.put("/model-fabric-tier-override/:modelId", async (c) => {
   return c.json({
     override: Adapters.modelFabricTierOverrideFromRow(data as DB.ModelFabricTierOverrideRow),
   });
+});
+
+// ---------------------------------------------------------------------------
+// 0177 — Combos (套餐). Fixed-set bundles sold at one combo_price; component
+// SKUs split the price back via explodeCombo() at submit time. All writes are
+// principal-only ("Master Admin"), mirroring the 0176 fabric-tier write gate:
+// early friendly 403 here, with RLS (combos_write_principal /
+// combo_components_write_principal) as the real boundary — we forward the USER
+// JWT (userClient) so RLS runs.
+// ---------------------------------------------------------------------------
+
+const COMBO_PRINCIPAL_MSG = "Only the principal (Master Admin) can manage combos";
+
+// kebab-case slug from the combo name: lowercase, spaces → dash, strip anything
+// outside [a-z0-9-]. A name that slugifies to empty (e.g. Chinese-only) yields
+// "" → the caller falls back to a random `combo-<hex>` key.
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+// POST /combos — create a combo + its components (principal-only).
+// Atomicity (no new RPC in v1): supabase-js can't wrap two statements in a
+// single txn without an RPC, so if the components insert fails we COMPENSATE by
+// deleting the just-created combo row — no orphan combo is left behind.
+catalogRouter.post("/combos", async (c) => {
+  principalOnly(c, COMBO_PRINCIPAL_MSG);
+  const parsed = await parseJsonBody(c, comboCreateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const comboKey =
+    parsed.data.comboKey?.trim() ||
+    slugify(parsed.data.name) ||
+    `combo-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+
+  const { data: comboRow, error: comboErr } = await sb
+    .from(COMBOS)
+    .insert({
+      combo_key: comboKey,
+      name: parsed.data.name,
+      combo_price: parsed.data.comboPrice,
+      active: parsed.data.active ?? true,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (comboErr) {
+    const m = mapPgError(comboErr);
+    return c.json(m.body, m.status);
+  }
+  if (!comboRow) {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "combo insert returned no row" }, 500);
+  }
+  const newId = (comboRow as DB.ComboRow).id;
+
+  const componentRows = parsed.data.components.map((comp, i) => ({
+    combo_id: newId,
+    sku: comp.sku,
+    qty: comp.qty,
+    sort_order: comp.sortOrder ?? i,
+  }));
+  const { error: compErr } = await sb.from(COMBO_COMPONENTS).insert(componentRows);
+  if (compErr) {
+    // Compensating delete — remove the orphan combo so a half-created bundle
+    // doesn't linger. (Best-effort: if the delete itself fails the original
+    // error still wins; v1-acceptable per the brief.)
+    await sb.from(COMBOS).delete().eq("id", newId);
+    const m = mapPgError(compErr);
+    return c.json(m.body, m.status);
+  }
+
+  const combo = {
+    ...Adapters.comboFromRow(comboRow as DB.ComboRow),
+    components: [...componentRows]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((r) => Adapters.comboComponentFromRow(r as DB.ComboComponentRow)),
+  };
+  return c.json({ combo }, 201);
+});
+
+// PATCH /combos/:id — update scalar fields and/or REPLACE the component set
+// (principal-only). Components-replace = delete-then-insert; if the re-insert
+// fails after the delete there is a small window with no components for the
+// combo (v1-acceptable: no multi-statement txn without an RPC).
+catalogRouter.patch("/combos/:id", async (c) => {
+  principalOnly(c, COMBO_PRINCIPAL_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, comboPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.name !== undefined) patch.name = parsed.data.name;
+  if (parsed.data.comboPrice !== undefined) patch.combo_price = parsed.data.comboPrice;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.comboKey !== undefined) patch.combo_key = parsed.data.comboKey;
+
+  const hasComponents = parsed.data.components !== undefined;
+  if (Object.keys(patch).length === 0 && !hasComponents) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Always stamp updated_at / updated_by when there's at least one scalar field;
+  // if ONLY components change we still touch the combo row so updated_* reflects
+  // the edit.
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+
+  const { data: comboRow, error: comboErr } = await sb
+    .from(COMBOS)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (comboErr) {
+    const m = mapPgError(comboErr);
+    return c.json(m.body, m.status);
+  }
+  if (!comboRow) {
+    return c.json({ error: "not_found", code: "not_found", message: "combo not found" }, 404);
+  }
+
+  let componentRows: { combo_id: string; sku: string; qty: number; sort_order: number }[] = [];
+  if (hasComponents) {
+    componentRows = (parsed.data.components ?? []).map((comp, i) => ({
+      combo_id: id,
+      sku: comp.sku,
+      qty: comp.qty,
+      sort_order: comp.sortOrder ?? i,
+    }));
+    // Replace the set: delete the old components, then insert the new ones.
+    const { error: delErr } = await sb.from(COMBO_COMPONENTS).delete().eq("combo_id", id);
+    if (delErr) {
+      const m = mapPgError(delErr);
+      return c.json(m.body, m.status);
+    }
+    if (componentRows.length > 0) {
+      const { error: insErr } = await sb.from(COMBO_COMPONENTS).insert(componentRows);
+      if (insErr) {
+        const m = mapPgError(insErr);
+        return c.json(m.body, m.status);
+      }
+    }
+  } else {
+    // Components untouched → read the existing set so the response is complete.
+    const { data: existing, error: readErr } = await sb
+      .from(COMBO_COMPONENTS)
+      .select("*")
+      .eq("combo_id", id);
+    if (readErr) {
+      const m = mapPgError(readErr);
+      return c.json(m.body, m.status);
+    }
+    componentRows = (existing ?? []) as { combo_id: string; sku: string; qty: number; sort_order: number }[];
+  }
+
+  const combo = {
+    ...Adapters.comboFromRow(comboRow as DB.ComboRow),
+    components: [...componentRows]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((r) => Adapters.comboComponentFromRow(r as DB.ComboComponentRow)),
+  };
+  return c.json({ combo });
+});
+
+// DELETE /combos/:id — soft-delete (principal-only), mirroring DELETE /models
+// and /skus: stamp discontinued_at and flip active=false so GET / hides it
+// from POS while the maintenance tab (admin=true) can still restore it.
+catalogRouter.delete("/combos/:id", async (c) => {
+  principalOnly(c, COMBO_PRINCIPAL_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(COMBOS)
+    .update({
+      active: false,
+      discontinued_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "combo not found" }, 404);
+  }
+  return c.json({ ok: true });
 });
 
 export default catalogRouter;
