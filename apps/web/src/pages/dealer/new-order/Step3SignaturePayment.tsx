@@ -224,6 +224,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               <button
                 key={p.label}
                 type="button"
+                aria-pressed={active}
                 onClick={() => {
                   if (p.pct === 50) onChange({ ...draft, paid: minDeposit });
                   else if (p.pct === 100) onChange({ ...draft, paid: total });
@@ -299,6 +300,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               <button
                 key={m.id}
                 type="button"
+                aria-pressed={active}
                 onClick={() => setPay({ method: m.id })}
                 className={`pos-pay-card text-center${active ? " pos-selected" : ""}`}
               >
@@ -365,6 +367,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
                     <button
                       key={m}
                       type="button"
+                      aria-pressed={active}
                       onClick={() => setPay({ installmentMonths: m })}
                       className={`pos-pay-card text-center${active ? " pos-selected" : ""}`}
                     >

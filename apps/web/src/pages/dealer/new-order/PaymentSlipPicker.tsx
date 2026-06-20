@@ -96,8 +96,8 @@ export default function PaymentSlipPicker({ label, hint, slip, onChange }: Props
     <div>
       <div className="label mb-1.5">{label}</div>
       <div className="border-[1.5px] border-dashed border-base-300 rounded-xl bg-card px-4 py-6 text-center flex flex-col items-center gap-3">
-        {/* Camera icon tile */}
-        <div className="w-10 h-10 rounded-xl bg-signature-50 flex items-center justify-center">
+        {/* Camera icon tile — decorative; hidden from screen readers */}
+        <div className="w-10 h-10 rounded-xl bg-signature-50 flex items-center justify-center" aria-hidden="true">
           <Camera size={20} className="text-primary" strokeWidth={1.75} />
         </div>
 
