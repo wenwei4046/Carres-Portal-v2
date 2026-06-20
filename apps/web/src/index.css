@@ -264,10 +264,11 @@
   @keyframes pos-drawer-slide-in { from { transform:translateX(100%); } to { transform:translateX(0); } }
   .animate-page-enter { animation: pos-page-enter .32s cubic-bezier(0.22,1,0.36,1) both; }
   .animate-cart-pulse { animation: pos-cart-pulse .28s cubic-bezier(0.22,1,0.36,1); }
+  .animate-drawer-slide-in { animation: pos-drawer-slide-in 0.26s cubic-bezier(0.22,1,0.36,1) both; }
   @media (prefers-reduced-motion: reduce) {
     .animate-page-enter, .animate-cart-pulse { animation: none; }
+    .animate-drawer-slide-in { animation: none; }
     .pos-card { transition: none; }
     .pos-card:hover { transform: none; }
-    [style*="pos-drawer-slide-in"] { animation: none; }
   }
 }

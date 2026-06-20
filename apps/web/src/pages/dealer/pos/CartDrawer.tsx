@@ -69,12 +69,11 @@ export default function CartDrawer({
 
       {/* White slide-in panel */}
       <div
-        className="fixed inset-y-0 right-0 z-[60] flex flex-col bg-white"
+        className="fixed inset-y-0 right-0 z-[60] flex flex-col bg-white animate-drawer-slide-in"
         style={{
           width: 460,
           maxWidth: "100vw",
           boxShadow: "-4px 0 32px rgba(17,24,39,0.12)",
-          animation: "pos-drawer-slide-in 0.26s cubic-bezier(0.22,1,0.36,1) both",
         }}
         role="dialog"
         aria-modal="true"

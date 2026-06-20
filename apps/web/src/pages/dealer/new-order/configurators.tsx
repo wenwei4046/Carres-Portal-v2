@@ -114,7 +114,7 @@ export function MattressConfigurator({
         <button
           onClick={add}
           disabled={!sku}
-          className="btn-hero whitespace-nowrap"
+          className="btn-primary whitespace-nowrap"
         >
           + Add
         </button>
@@ -212,7 +212,7 @@ export function BedframeConfigurator({
         <button
           onClick={add}
           disabled={!sku}
-          className="btn-hero whitespace-nowrap"
+          className="btn-primary whitespace-nowrap"
         >
           + Add
         </button>
@@ -371,7 +371,7 @@ export function SofaConfigurator({
         <button
           onClick={add}
           disabled={!sku}
-          className="btn-hero whitespace-nowrap"
+          className="btn-primary whitespace-nowrap"
         >
           + Add
         </button>
