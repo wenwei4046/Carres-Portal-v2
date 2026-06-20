@@ -504,7 +504,8 @@ export {
 // Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /
 // arm-cap closure). No DOM/React; cm-space math reused by the web builder + P4
 // explode. `mirrorCode` / `computeSofaPrice` are NOT re-exported here — they
-// already ship from `sofa-pricing` (the geometry module imports mirrorCode).
+// already ship from `sofa-pricing`; the geometry module has no imports (the
+// web auto-mirror-on-drop in Task 3 imports mirrorCode from `sofa-pricing`).
 export {
   SOFA_MODULES,
   MODULE_EDGES_BASE,
