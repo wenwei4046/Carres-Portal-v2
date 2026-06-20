@@ -182,6 +182,11 @@ describe("GET /api/catalog", () => {
           floor_config: [
             { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
           ],
+          // 0176 — fabric tier tables (seeded to zero deltas + no overrides).
+          fabric_tier_addon_config: [
+            { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+          ],
+          model_fabric_tier_overrides: [],
         },
         recorded,
       ),
@@ -218,6 +223,10 @@ describe("GET /api/catalog", () => {
 
     // active=true filter on addons applied
     expect(recorded.addons).toContainEqual({ method: "eq", col: "active", val: true });
+
+    // 0176 — fabricTierConfig seeded at {0,0} + no model overrides
+    expect(body.fabricTierConfig).toEqual({ sofaTier2Delta: 0, sofaTier3Delta: 0 });
+    expect(body.modelFabricTierOverrides).toEqual([]);
 
     // Cache hint
     // 0074 — switched from `private, max-age=300` to `no-store` so the
@@ -352,7 +361,7 @@ describe("GET /api/salespersons", () => {
 
 interface AdminCall {
   table: string;
-  op: "insert" | "update";
+  op: "insert" | "update" | "upsert";
   payload: unknown;
 }
 
@@ -384,6 +393,13 @@ function buildWriteSb(opts: {
       mode = "write";
       writeBody = body;
       recorded.push({ table, op: "update", payload: body });
+      return chain;
+    };
+    // 0176 — upsert support for model-fabric-tier-override route.
+    chain.upsert = (body: unknown, _opts?: unknown) => {
+      mode = "write";
+      writeBody = body;
+      recorded.push({ table, op: "upsert", payload: body });
       return chain;
     };
     chain.eq = (col: string, val: unknown) => {
@@ -857,6 +873,7 @@ describe("Catalog admin — sofa fabrics CRUD", () => {
           fabric_name: "Linen Slate",
           surcharge: 250,
           discontinued_at: null,
+          tier: "PRICE_1",
         },
       }),
     );
@@ -881,6 +898,8 @@ describe("Catalog admin — sofa fabrics CRUD", () => {
       surcharge: 250,
       // 0075 — colors defaults to null when caller omits the field.
       colors: null,
+      // 0176 — tier defaults to PRICE_1 when caller omits the field.
+      tier: "PRICE_1",
     });
   });
 
@@ -1011,6 +1030,11 @@ describe("GET /api/catalog — pos_active sell-side filter (0170)", () => {
       sofa_fabrics: [],
       addons: [],
       floor_config: [{ id: 1, free_up_to_floor: 2, per_floor_per_item: 50 }],
+      // 0176 — fabric tier tables required by the new parallel bundle fetch.
+      fabric_tier_addon_config: [
+        { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+      ],
+      model_fabric_tier_overrides: [],
     };
   }
 
@@ -1295,6 +1319,208 @@ describe("Maintenance — floor-config + addons role gate", () => {
           price: 10,
           serviceSku: "NOT-A-SVC-CODE",
         }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0176 — Fabric tier pricing (config singleton + per-model overrides).
+// ---------------------------------------------------------------------------
+
+describe("0176 — PATCH /api/catalog/fabric-tier-config (principal only)", () => {
+  it("principal updates the tier config and returns the updated values", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: 1,
+          sofa_tier2_delta: 300,
+          sofa_tier3_delta: 700,
+          updated_at: "2026-06-20T00:00:00Z",
+          updated_by: "11111111-1111-1111-1111-000000000999",
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabric-tier-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sofaTier2Delta: 300, sofaTier3Delta: 700 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { fabricTierConfig: { sofaTier2Delta: number; sofaTier3Delta: number } };
+    expect(body.fabricTierConfig).toEqual({ sofaTier2Delta: 300, sofaTier3Delta: 700 });
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ sofa_tier2_delta: 300, sofa_tier3_delta: 700 });
+  });
+
+  it("non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabric-tier-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sofaTier2Delta: 300, sofaTier3Delta: 700 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/Master Admin/i);
+  });
+
+  it("dealer → 403", async () => {
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabric-tier-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sofaTier2Delta: 0, sofaTier3Delta: 0 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("422s negative deltas", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabric-tier-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sofaTier2Delta: -100, sofaTier3Delta: 0 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("0176 — PUT /api/catalog/model-fabric-tier-override/:modelId (principal only)", () => {
+  it("principal upserts an override and returns the row", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          model_id: MODEL_ID_LIVE,
+          tier2_delta: 200,
+          tier3_delta: null,
+          updated_at: "2026-06-20T00:00:00Z",
+          updated_by: "11111111-1111-1111-1111-000000000999",
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-fabric-tier-override/${MODEL_ID_LIVE}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tier2Delta: 200, tier3Delta: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      override: { modelId: string; tier2Delta: number | null; tier3Delta: number | null };
+    };
+    expect(body.override).toMatchObject({ modelId: MODEL_ID_LIVE, tier2Delta: 200, tier3Delta: null });
+  });
+
+  it("principal can set both deltas to null (inherit from global)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          model_id: MODEL_ID_LIVE,
+          tier2_delta: null,
+          tier3_delta: null,
+          updated_at: "2026-06-20T00:00:00Z",
+          updated_by: "11111111-1111-1111-1111-000000000999",
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-fabric-tier-override/${MODEL_ID_LIVE}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tier2Delta: null, tier3Delta: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      override: { tier2Delta: number | null; tier3Delta: number | null };
+    };
+    expect(body.override.tier2Delta).toBeNull();
+    expect(body.override.tier3Delta).toBeNull();
+  });
+
+  it("non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-fabric-tier-override/${MODEL_ID_LIVE}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tier2Delta: 100, tier3Delta: 200 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("0176 — PATCH /api/catalog/sofa-fabrics/:id persists tier", () => {
+  const FABRIC_ID = "00000000-0000-0000-0000-00000000cc02";
+
+  it("persists tier PRICE_2 when sent in the patch body", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: FABRIC_ID,
+          model_id: MODEL_ID_LIVE,
+          fabric_name: "Velvet Ash",
+          surcharge: 300,
+          colors: null,
+          discontinued_at: null,
+          tier: "PRICE_2",
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-fabrics/${FABRIC_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tier: "PRICE_2" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect((upd?.payload as { tier: string }).tier).toBe("PRICE_2");
+    const body = (await res.json()) as { fabric: { tier: string } };
+    expect(body.fabric.tier).toBe("PRICE_2");
+  });
+
+  it("422s on an invalid tier value", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-fabrics/${FABRIC_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tier: "PRICE_99" }),
       }),
       env,
     );
