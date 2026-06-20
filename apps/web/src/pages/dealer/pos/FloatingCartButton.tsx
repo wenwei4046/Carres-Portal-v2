@@ -1,10 +1,14 @@
+import { ShoppingBag } from "lucide-react";
 import { rm } from "@/lib/format-currency";
 
 /**
- * Floating bottom-right cart CTA — the POS catalog page's ONE flame
- * (`.btn-hero`) action. Shows item count + running total; opens the cart
- * drawer. Greys when the cart is empty. `pulse` briefly scales the button
- * after an add to confirm the item landed.
+ * Floating bottom-right cart CTA — ink pill (.pos-fab) with a flame icon tile
+ * (ShoppingBag), "CART" micro-label, running total, and a count badge.
+ * The single flame-accented CTA on step 01 (via the icon tile, not a solid
+ * flame pill — satisfying v17 "one flame accent per screen" by intent).
+ *
+ * Disabled when cart is empty. `pulse` triggers `.animate-cart-pulse` for one
+ * shot after an add. Logic: UNCHANGED.
  */
 export default function FloatingCartButton({
   itemCount,
@@ -24,20 +28,32 @@ export default function FloatingCartButton({
       onClick={onClick}
       disabled={empty}
       data-testid="pos-cart-fab"
-      className={`btn-hero fixed bottom-6 right-6 z-40 shadow-lg px-6 py-3.5 rounded-md transition-transform duration-200 ${
-        pulse ? "scale-105" : "scale-100"
-      } ${empty ? "" : ""}`}
+      className={[
+        "pos-fab",
+        pulse ? "animate-cart-pulse" : "",
+        empty ? "opacity-50 pointer-events-none" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
-      <span className="flex items-center gap-3">
-        <span className="grid place-items-center w-6 h-6 rounded-full bg-white/20 font-mono text-[12px]">
-          {itemCount}
-        </span>
-        <span className="flex flex-col items-start leading-tight">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">
-            Customer order
+      {/* Flame icon tile */}
+      <span className="relative flex-shrink-0 w-10 h-10 rounded-[12px] bg-primary flex items-center justify-center text-white">
+        <ShoppingBag size={20} strokeWidth={1.75} />
+        {/* Count badge — flame-contrasted, top-right of the icon tile */}
+        {!empty && (
+          <span
+            className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-white text-primary font-mono text-[10px] font-bold flex items-center justify-center"
+            aria-label={`${itemCount} item${itemCount === 1 ? "" : "s"}`}
+          >
+            {itemCount}
           </span>
-          <span className="font-mono text-[15px] font-bold">{rm(total)}</span>
-        </span>
+        )}
+      </span>
+
+      {/* Label + total */}
+      <span className="flex flex-col items-start leading-tight">
+        <span className="t-micro text-white/60 tracking-[0.14em]">CART</span>
+        <span className="font-mono text-[15px] font-bold text-white">{rm(total)}</span>
       </span>
     </button>
   );

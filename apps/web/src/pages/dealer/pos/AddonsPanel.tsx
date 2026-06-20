@@ -1,3 +1,4 @@
+import { Plus, X, Minus } from "lucide-react";
 import type { AddonDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
@@ -8,11 +9,9 @@ import {
 } from "../new-order/draft";
 
 /**
- * Add-ons grid for the POS catalog "Add-ons" rail entry. Lifted from the
- * legacy Step2Products add-on block: a card grid over `catalog.addons`,
- * disposal add-ons carry a required size picker (red border until set — the
- * `step2Valid` disposal-size gate, surfaced again on the cart's Proceed CTA).
- * Writes to `draft.addons` only.
+ * Add-ons grid for the POS catalog "Add-ons" rail entry. Re-skinned as small
+ * .pos-card tiles; disposal add-ons keep the required-size gate (red border
+ * until a size is chosen). All toggle/qty/size logic: UNCHANGED.
  */
 export default function AddonsPanel({
   addons,
@@ -65,52 +64,58 @@ export default function AddonsPanel({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+    <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))" }}>
       {addons.map((a) => {
         const selected = draft.addons.find((d) => d.key === a.key);
+
         if (!selected) {
           return (
             <button
               key={a.key}
               type="button"
               onClick={() => toggleAddon(a.key)}
-              className="card text-left px-3.5 py-3 hover:border-primary transition-colors"
+              className="pos-card text-left p-4 flex flex-col gap-2 group"
             >
-              <div className="t-small font-medium">+ {a.name}</div>
-              <div className="font-mono text-[11px] text-base-500 mt-1">{rm(a.price)}</div>
+              <div className="flex items-start justify-between gap-1">
+                <span className="t-small font-semibold text-base-900">{a.name}</span>
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-base-100 group-hover:bg-primary group-hover:text-white flex items-center justify-center transition-colors">
+                  <Plus size={13} strokeWidth={2} />
+                </span>
+              </div>
+              <span className="font-mono text-[13px] text-base-500">{rm(a.price)}</span>
             </button>
           );
         }
+
         return (
-          <div
-            key={a.key}
-            className="rounded-md px-3.5 py-3 border-[1.5px] border-primary bg-signature-50"
-          >
+          <div key={a.key} className="pos-card pos-selected p-4 flex flex-col gap-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="t-small font-medium truncate">+ {a.name}</div>
-                <div className="font-mono text-[11px] text-base-500 mt-1">
+                <div className="t-small font-semibold text-base-900 truncate">{a.name}</div>
+                <div className="font-mono text-[12px] text-base-500 mt-0.5">
                   {rm(selected.unitPrice)} ea
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => toggleAddon(a.key)}
-                className="text-base-500 hover:text-destructive text-sm leading-none px-1 -mt-0.5"
+                className="flex-shrink-0 w-6 h-6 rounded-full bg-base-100 hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors"
                 aria-label={`Remove ${a.name}`}
               >
-                ×
+                <X size={13} strokeWidth={2} />
               </button>
             </div>
-            <div className="flex items-center justify-between gap-2 mt-2">
-              <div className="flex items-center gap-1.5 bg-white border border-base-300 rounded px-1.5 py-0.5">
+
+            {/* Qty stepper */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1 border border-base-200 rounded-lg overflow-hidden">
                 <button
                   type="button"
                   onClick={() => bumpAddonQty(a.key, -1)}
-                  className="px-2 py-0.5 text-sm rounded hover:bg-base-100"
+                  className="w-7 h-7 flex items-center justify-center hover:bg-base-50 transition-colors"
                   aria-label={`Decrease ${a.name} quantity`}
                 >
-                  −
+                  <Minus size={12} strokeWidth={2} />
                 </button>
                 <span className="font-mono text-[12px] w-5 text-center tabular-nums">
                   {selected.qty}
@@ -118,27 +123,25 @@ export default function AddonsPanel({
                 <button
                   type="button"
                   onClick={() => bumpAddonQty(a.key, 1)}
-                  className="px-2 py-0.5 text-sm rounded hover:bg-base-100"
+                  className="w-7 h-7 flex items-center justify-center hover:bg-base-50 transition-colors"
                   aria-label={`Increase ${a.name} quantity`}
                 >
-                  +
+                  <Plus size={12} strokeWidth={2} />
                 </button>
               </div>
-              <span className="font-mono text-[12px] font-semibold text-primary">
-                {rm(selected.unitPrice * selected.qty)}
-              </span>
+              <span className="pos-price text-[14px]">{rm(selected.unitPrice * selected.qty)}</span>
             </div>
+
+            {/* Disposal size gate — red border until chosen */}
             {isDisposalAddon(a.key) && (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-[10.5px] uppercase tracking-[0.06em] font-semibold text-base-500">
-                  Size
-                </span>
+              <div className="flex items-center gap-2 pt-1">
+                <span className="kicker text-base-400">Size</span>
                 <select
                   value={selected.attrs?.size ?? ""}
                   onChange={(e) => setAddonSize(a.key, e.target.value)}
                   aria-label={`${a.name} size`}
-                  className={`flex-1 h-7 px-2 border rounded text-[11.5px] bg-white outline-none focus:border-primary ${
-                    selected.attrs?.size ? "border-base-300" : "border-destructive/60"
+                  className={`flex-1 h-7 px-2 rounded-lg border text-[11.5px] bg-white outline-none focus:border-primary transition-colors ${
+                    selected.attrs?.size ? "border-base-200" : "border-destructive/60"
                   }`}
                 >
                   <option value="">Select size…</option>

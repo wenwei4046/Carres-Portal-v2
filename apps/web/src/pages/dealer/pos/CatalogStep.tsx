@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { CatalogResponse, ProductCategory } from "@carres/shared";
@@ -28,6 +29,10 @@ const CARD_ORDER: ProductCategory[] = ["mattress", "bedframe", "sofa"];
  * product card grid (+ an "Add-ons" panel), a configure drawer per model, a
  * cart drawer, and the floating cart CTA. Builds `DraftLine`/`DraftAddon`
  * objects identical to the legacy wizard so the submit pipeline is untouched.
+ *
+ * Visual re-skin (2990s style): sticky pill-search toolbar, auto-fill card
+ * grid (minmax 240px), flame rail, price-hero cards, ink-pill cart FAB.
+ * All data-flow logic (mergeLine, mutex, toast): UNCHANGED.
  */
 export default function CatalogStep({
   draft,
@@ -73,6 +78,19 @@ export default function CatalogStep({
     return m;
   }, [index.productModels]);
 
+  // Which model IDs have lines in the cart (for .pos-selected ring on cards).
+  // DraftLine.sku is the sku code string; match against ProductSkuDto.sku.
+  const modelIdsInCart = useMemo(() => {
+    const cartSkus = new Set(draft.lines.map((l) => l.sku));
+    const s = new Set<string>();
+    for (const [modelId, skus] of index.skusByModel) {
+      if (skus.some((sk) => cartSkus.has(sk.sku))) {
+        s.add(modelId);
+      }
+    }
+    return s;
+  }, [draft.lines, index.skusByModel]);
+
   const railEntries: RailEntry[] = [
     { key: "all", label: "All products", count: index.productModels.length, icon: RAIL_ICON.all },
     {
@@ -117,6 +135,8 @@ export default function CatalogStep({
 
   function addLine(line: DraftLine) {
     onChange({ ...draft, lines: mergeLine(draft.lines, line) });
+    // Trigger the one-shot FAB pulse (class applied by FloatingCartButton when
+    // pulse=true; cleared after 220ms).
     setPulse(true);
     window.setTimeout(() => setPulse(false), 220);
     toast.success("Added to cart");
@@ -132,32 +152,41 @@ export default function CatalogStep({
   return (
     <div className="flex h-full min-h-0">
       {/* Left category rail */}
-      <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-base-200 bg-card overflow-auto px-3 py-4">
+      <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-base-100 bg-white overflow-auto px-2 py-4">
         <CategoryRail entries={railEntries} active={activeRail} onSelect={setActiveRail} />
         <div className="mt-auto pt-6 px-3">
           <p className="label mb-1.5">Honest pricing</p>
-          <p className="t-tiny text-base-500 leading-relaxed">
+          <p className="t-tiny text-base-400 leading-relaxed">
             Every model is priced on its own — no markups, no surprises. What you see is the floor
             price.
           </p>
         </div>
       </aside>
 
-      {/* Main: search + grid / add-ons */}
+      {/* Main: sticky toolbar + grid / add-ons */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="flex items-center gap-3 px-5 py-3.5 border-b border-base-200 bg-background/80 backdrop-blur sticky top-0 z-10">
-          <div className="relative flex-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base-400 text-sm">⌕</span>
+        {/* Sticky toolbar */}
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-base-100 bg-white/90 backdrop-blur sticky top-0 z-10">
+          {/* Pill search input with flame focus ring */}
+          <div className="relative flex-1 max-w-sm">
+            <Search
+              size={15}
+              strokeWidth={1.75}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base-400 pointer-events-none"
+            />
             <input
               type="search"
               value={rawSearch}
               onChange={(e) => setRawSearch(e.target.value)}
               placeholder="Search by name, model, fabric…"
               aria-label="Search catalog"
-              className="w-full pl-9 pr-3 py-2.5 rounded-md border border-base-300 bg-white t-small outline-none focus:border-primary"
+              className="w-full pl-9 pr-4 py-2 rounded-full border border-base-200 bg-base-50 t-small outline-none
+                         focus:border-primary focus:ring-2 focus:ring-primary/15 focus:bg-white transition-all"
             />
           </div>
-          <span className="t-tiny text-base-500 whitespace-nowrap">
+
+          {/* Section label + count */}
+          <span className="t-tiny text-base-400 whitespace-nowrap">
             {activeRail === "addons"
               ? `${activeAddons.length} add-on${activeAddons.length === 1 ? "" : "s"}`
               : `${shownModelCount} item${shownModelCount === 1 ? "" : "s"}`}
@@ -181,13 +210,18 @@ export default function CatalogStep({
                       {models.length} model{models.length === 1 ? "" : "s"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {/* Auto-fill grid: minmax(240px, 1fr) */}
+                  <div
+                    className="grid gap-4"
+                    style={{ gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))" }}
+                  >
                     {models.map((model) => (
                       <ProductCard
                         key={model.id}
                         model={model}
                         meta={index.meta.get(model.id)!}
                         locked={lockedCats.has(model.category)}
+                        inCart={modelIdsInCart.has(model.id)}
                         onConfigure={() => setConfigureModelId(model.id)}
                       />
                     ))}
