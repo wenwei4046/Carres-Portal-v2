@@ -282,8 +282,8 @@ export default function DealerPos() {
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-background text-foreground">
-      {/* Top bar */}
-      <header className="shrink-0 border-b border-base-200 bg-card px-5 py-2.5 flex items-center gap-4">
+      {/* Top bar — 56px fixed height, white over cream page, hairline bottom border. */}
+      <header className="shrink-0 h-14 border-b border-base-200 bg-white px-5 flex items-center gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <CarresLockup size={22} />
           <div className="hidden sm:block border-l border-base-200 pl-3 min-w-0">
@@ -371,16 +371,21 @@ export default function DealerPos() {
               : "Loading catalog…"}
           </CenterMessage>
         ) : step === 1 ? (
-          <CatalogStep
-            draft={draft}
-            onChange={setDraft}
-            catalog={catalogQ.data}
-            onProceed={() => setStep(2)}
-            cartOpen={cartOpen}
-            onCartOpenChange={setCartOpen}
-          />
+          /* Step 1 — full-screen CatalogStep; keyed so step-enter plays on
+             re-entry from step 2 back-click. CatalogStep manages its own
+             internal layout (category rail + grid + cart drawer). */
+          <div key={1} className="animate-page-enter h-full">
+            <CatalogStep
+              draft={draft}
+              onChange={setDraft}
+              catalog={catalogQ.data}
+              onProceed={() => setStep(2)}
+              cartOpen={cartOpen}
+              onCartOpenChange={setCartOpen}
+            />
+          </div>
         ) : step === 2 ? (
-          <div className="h-full overflow-auto">
+          <div key={2} className="animate-page-enter h-full overflow-auto">
             {outletsQ.data && salespersonsQ.data ? (
               <CustomerStep
                 draft={draft}
@@ -401,7 +406,7 @@ export default function DealerPos() {
             )}
           </div>
         ) : (
-          <div className="h-full overflow-auto">
+          <div key={3} className="animate-page-enter h-full overflow-auto">
             <div className="mx-auto max-w-3xl w-full px-6 py-8">
               <Step3SignaturePayment draft={draft} onChange={setDraft} catalog={catalogQ.data} />
             </div>
