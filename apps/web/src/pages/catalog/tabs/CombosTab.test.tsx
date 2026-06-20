@@ -10,6 +10,10 @@
  *  - Implied-discount readout computes Σ(component price × qty) − combo price.
  *  - Edit pre-fills an existing combo + components; Save calls useUpdateCombo
  *    with the replacement set.
+ *  - The SKU picker is now a SEARCHABLE combobox (not a native <select>):
+ *    click the row trigger to open, type to filter by code/description, then
+ *    click the matching option. `pickSku` below drives that flow; a focused
+ *    test asserts the query narrows the option list.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
@@ -97,6 +101,21 @@ function wrap(ui: React.ReactNode) {
   return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
 }
 
+/**
+ * Drive the searchable SKU picker for component row `i`: open it, type the SKU
+ * code to filter, then pick the matching option. Replaces the old native
+ * `<select>` `fireEvent.change(..., { value })` calls.
+ */
+function pickSku(i: number, code: string) {
+  // The collapsed trigger and the open search input share the same test id.
+  fireEvent.click(screen.getByTestId(`combo-comp-sku-${i}`));
+  fireEvent.change(screen.getByTestId(`combo-comp-sku-${i}`), {
+    target: { value: code },
+  });
+  // mousedown (not click) drives the pick — that's what the picker listens for.
+  fireEvent.mouseDown(screen.getByTestId(`combo-comp-sku-${i}-opt-${code}`));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockCreateMutateAsync.mockResolvedValue({ combo: {} });
@@ -167,7 +186,7 @@ describe("CombosTab — create", () => {
     fireEvent.change(screen.getByTestId("combo-price"), { target: { value: "2500" } });
 
     // first component row exists; pick the sofa SKU + qty 2
-    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "SOFA-A" } });
+    pickSku(0, "SOFA-A");
     fireEvent.change(screen.getByTestId("combo-comp-qty-0"), { target: { value: "2" } });
 
     fireEvent.click(screen.getByTestId("combo-save"));
@@ -188,47 +207,93 @@ describe("CombosTab — create", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Searchable SKU picker
+// ---------------------------------------------------------------------------
+describe("CombosTab — searchable SKU picker", () => {
+  it("typing a query narrows the rendered SKU options (search works)", () => {
+    render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("combos-add"));
+
+    // open row 0's picker — all 4 fixture SKUs are options initially
+    fireEvent.click(screen.getByTestId("combo-comp-sku-0"));
+    const list = screen.getByTestId("combo-comp-sku-0-list");
+    expect(within(list).getByTestId("combo-comp-sku-0-opt-SOFA-A")).toBeInTheDocument();
+    expect(within(list).getByTestId("combo-comp-sku-0-opt-MATT-A")).toBeInTheDocument();
+
+    // type "sofa" → only SOFA-A survives the code/description filter
+    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "sofa" } });
+    expect(screen.queryByTestId("combo-comp-sku-0-opt-SOFA-A")).toBeInTheDocument();
+    expect(screen.queryByTestId("combo-comp-sku-0-opt-MATT-A")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("combo-comp-sku-0-opt-BF-A")).not.toBeInTheDocument();
+  });
+
+  it("filters by description as well as code", () => {
+    // give one SKU a distinctive description, then search for that word
+    const catalog = makeCatalog();
+    catalog.skus = catalog.skus.map((s) =>
+      s.sku === "MATT-A" ? { ...s, description: "Orthopedic plush topper" } : s,
+    );
+    render(wrap(<CombosTab catalog={catalog} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("combos-add"));
+    fireEvent.click(screen.getByTestId("combo-comp-sku-0"));
+    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "orthopedic" } });
+    // matched purely on description
+    expect(screen.queryByTestId("combo-comp-sku-0-opt-MATT-A")).toBeInTheDocument();
+    expect(screen.queryByTestId("combo-comp-sku-0-opt-SOFA-A")).not.toBeInTheDocument();
+  });
+
+  it("clearing a picked SKU resets the row", () => {
+    render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("combos-add"));
+    pickSku(0, "SOFA-A");
+    expect(screen.getByTestId("combo-comp-sku-0").textContent).toContain("SOFA-A");
+    fireEvent.click(screen.getByTestId("combo-comp-sku-0-clear"));
+    expect(screen.getByTestId("combo-comp-sku-0").textContent).not.toContain("SOFA-A");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Sofa-mutex author warning
 // ---------------------------------------------------------------------------
 describe("CombosTab — sofa-mutex warning", () => {
   it("sofa + mattress components → warning banner shown", () => {
     render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
     fireEvent.click(screen.getByTestId("combos-add"));
-    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "SOFA-A" } });
+    pickSku(0, "SOFA-A");
     fireEvent.click(screen.getByTestId("combo-add-row"));
-    fireEvent.change(screen.getByTestId("combo-comp-sku-1"), { target: { value: "MATT-A" } });
+    pickSku(1, "MATT-A");
     expect(screen.getByTestId("combo-mutex-warning")).toBeInTheDocument();
   });
 
   it("sofa + bedframe components → warning banner shown", () => {
     render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
     fireEvent.click(screen.getByTestId("combos-add"));
-    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "SOFA-A" } });
+    pickSku(0, "SOFA-A");
     fireEvent.click(screen.getByTestId("combo-add-row"));
-    fireEvent.change(screen.getByTestId("combo-comp-sku-1"), { target: { value: "BF-A" } });
+    pickSku(1, "BF-A");
     expect(screen.getByTestId("combo-mutex-warning")).toBeInTheDocument();
   });
 
   it("sofa-only → NO warning", () => {
     render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
     fireEvent.click(screen.getByTestId("combos-add"));
-    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "SOFA-A" } });
+    pickSku(0, "SOFA-A");
     expect(screen.queryByTestId("combo-mutex-warning")).not.toBeInTheDocument();
   });
 
   it("mattress-only → NO warning", () => {
     render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
     fireEvent.click(screen.getByTestId("combos-add"));
-    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "MATT-A" } });
+    pickSku(0, "MATT-A");
     expect(screen.queryByTestId("combo-mutex-warning")).not.toBeInTheDocument();
   });
 
   it("sofa + accessory → NO warning (accessory doesn't trigger the mutex)", () => {
     render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
     fireEvent.click(screen.getByTestId("combos-add"));
-    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "SOFA-A" } });
+    pickSku(0, "SOFA-A");
     fireEvent.click(screen.getByTestId("combo-add-row"));
-    fireEvent.change(screen.getByTestId("combo-comp-sku-1"), { target: { value: "ACC-A" } });
+    pickSku(1, "ACC-A");
     expect(screen.queryByTestId("combo-mutex-warning")).not.toBeInTheDocument();
   });
 });
@@ -241,9 +306,9 @@ describe("CombosTab — implied discount", () => {
     render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
     fireEvent.click(screen.getByTestId("combos-add"));
     // SOFA-A (2000) ×1 + MATT-A (1200) ×2 = 4400 components total
-    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "SOFA-A" } });
+    pickSku(0, "SOFA-A");
     fireEvent.click(screen.getByTestId("combo-add-row"));
-    fireEvent.change(screen.getByTestId("combo-comp-sku-1"), { target: { value: "MATT-A" } });
+    pickSku(1, "MATT-A");
     fireEvent.change(screen.getByTestId("combo-comp-qty-1"), { target: { value: "2" } });
     fireEvent.change(screen.getByTestId("combo-price"), { target: { value: "4000" } });
 
@@ -258,7 +323,7 @@ describe("CombosTab — implied discount", () => {
     render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
     fireEvent.click(screen.getByTestId("combos-add"));
     // SOFA-A (2000) ×1 = 2,000 components total
-    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "SOFA-A" } });
+    pickSku(0, "SOFA-A");
     // combo priced ABOVE the component total → negative "saves" → markup branch
     fireEvent.change(screen.getByTestId("combo-price"), { target: { value: "2500" } });
 
@@ -284,9 +349,10 @@ describe("CombosTab — edit", () => {
     expect(name.value).toBe("Starter Set");
     const price = screen.getByTestId("combo-price") as HTMLInputElement;
     expect(price.value).toBe("2800");
-    // two component rows pre-filled
-    expect((screen.getByTestId("combo-comp-sku-0") as HTMLSelectElement).value).toBe("SOFA-A");
-    expect((screen.getByTestId("combo-comp-sku-1") as HTMLSelectElement).value).toBe("MATT-A");
+    // two component rows pre-filled — the collapsed picker trigger shows the
+    // picked SKU code as its label.
+    expect(screen.getByTestId("combo-comp-sku-0").textContent).toContain("SOFA-A");
+    expect(screen.getByTestId("combo-comp-sku-1").textContent).toContain("MATT-A");
 
     // change price + save
     fireEvent.change(price, { target: { value: "2600" } });

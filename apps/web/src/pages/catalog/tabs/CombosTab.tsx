@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Plus, Trash2, Minus, AlertTriangle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2, Minus, AlertTriangle, Search, ChevronDown, X } from "lucide-react";
 import { toast } from "sonner";
 import type {
   CatalogResponse,
@@ -224,6 +224,219 @@ function ComboRow({
 }
 
 // ---------------------------------------------------------------------------
+// Searchable SKU picker
+// ---------------------------------------------------------------------------
+
+type SkuOption = CatalogResponse["skus"][number];
+
+/** Cap the rendered list so a 1k-SKU catalog never paints all rows at once. */
+const SKU_RESULT_CAP = 50;
+
+/**
+ * A searchable single-SKU picker — replaces the old native <select> that
+ * listed all ~1017 SKUs. Controlled `value` is the SKU code (same string the
+ * native select drove); `onChange(code)` reports a pick (or "" when cleared).
+ *
+ * Behaviour:
+ *   • text input filters `options` by code OR description (case-insensitive),
+ *     capping the rendered list at SKU_RESULT_CAP with a "refine search" hint
+ *     when more match;
+ *   • click a result (or Enter on the highlighted one) to pick → input collapses
+ *     to show the picked code;
+ *   • ArrowUp / ArrowDown move the highlight, Escape closes, blur closes;
+ *   • a small clear (X) button resets the row's SKU.
+ *
+ * Self-contained (plain React, no new deps) so it touches nothing outside this
+ * tab and can't regress the PO flow.
+ */
+function SkuPicker({
+  value,
+  options,
+  onChange,
+  testId,
+}: {
+  value: string;
+  options: SkuOption[];
+  onChange: (sku: string) => void;
+  testId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlight, setHighlight] = useState(0);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = useMemo(
+    () => options.find((o) => o.sku === value),
+    [options, value],
+  );
+
+  // Filter by code OR description, case-insensitive; cap the rendered list.
+  const q = query.trim().toLowerCase();
+  const matches = useMemo(() => {
+    if (!q) return options;
+    return options.filter(
+      (o) =>
+        o.sku.toLowerCase().includes(q) ||
+        (o.description ?? "").toLowerCase().includes(q),
+    );
+  }, [options, q]);
+  const shown = matches.slice(0, SKU_RESULT_CAP);
+  const overflow = matches.length - shown.length;
+
+  // Close on outside click.
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  function openPanel() {
+    setQuery("");
+    setHighlight(0);
+    setOpen(true);
+    // focus the search box on next paint
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  function pick(sku: string) {
+    onChange(sku);
+    setOpen(false);
+    setQuery("");
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((h) => Math.min(h + 1, shown.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(h - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const opt = shown[highlight];
+      if (opt) pick(opt.sku);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className="relative flex-1" ref={wrapRef}>
+      {open ? (
+        <div className="relative">
+          <Search
+            size={14}
+            strokeWidth={2.2}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-400 pointer-events-none"
+          />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setHighlight(0);
+            }}
+            onKeyDown={onKeyDown}
+            placeholder="Search by code or description…"
+            className={`${INPUT_CLS} pl-8`}
+            data-testid={testId}
+            role="combobox"
+            aria-expanded="true"
+            aria-autocomplete="list"
+          />
+          <div
+            className="absolute z-20 left-0 right-0 mt-1 max-h-60 overflow-auto rounded-[4px] border border-base-200 bg-white shadow-md"
+            role="listbox"
+            data-testid={`${testId}-list`}
+          >
+            {shown.length === 0 ? (
+              <div className="t-tiny text-base-400 px-3 py-2">No SKUs match.</div>
+            ) : (
+              shown.map((o, idx) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="option"
+                  aria-selected={idx === highlight}
+                  // onMouseDown (not onClick) so the pick fires before the
+                  // input's blur can close the panel.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    pick(o.sku);
+                  }}
+                  onMouseEnter={() => setHighlight(idx)}
+                  className={`block w-full text-left px-3 py-1.5 ${
+                    idx === highlight ? "bg-base-100" : "hover:bg-base-50"
+                  }`}
+                  data-testid={`${testId}-opt-${o.sku}`}
+                >
+                  <span className="font-mono text-[12px] text-base-900">{o.sku}</span>
+                  {o.description ? (
+                    <span className="t-tiny text-base-500 ml-2">{o.description}</span>
+                  ) : null}
+                </button>
+              ))
+            )}
+            {overflow > 0 && (
+              <div className="t-tiny text-base-400 px-3 py-1.5 border-t border-base-100">
+                +{overflow} more — refine your search
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={openPanel}
+          className={`${INPUT_CLS} flex items-center justify-between text-left ${
+            value ? "font-mono" : "text-base-400"
+          }`}
+          data-testid={testId}
+        >
+          <span className="truncate">
+            {value ? (
+              <>
+                {value}
+                {selected?.description ? (
+                  <span className="t-tiny text-base-500 ml-2 font-sans">
+                    {selected.description}
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              "Select a SKU…"
+            )}
+          </span>
+          {value ? (
+            <span
+              role="button"
+              aria-label="clear SKU"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange("");
+              }}
+              className="ml-1 text-base-400 hover:text-base-700 shrink-0"
+              data-testid={`${testId}-clear`}
+            >
+              <X size={14} strokeWidth={2.2} />
+            </span>
+          ) : (
+            <ChevronDown size={14} strokeWidth={2.2} className="text-base-400 shrink-0" />
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Editor (create + edit)
 // ---------------------------------------------------------------------------
 
@@ -415,20 +628,12 @@ function ComboEditor({
                   className="flex items-center gap-2"
                   data-testid={`combo-comp-row-${i}`}
                 >
-                  <select
+                  <SkuPicker
                     value={row.sku}
-                    onChange={(e) => setRow(i, { sku: e.target.value })}
-                    className={`${INPUT_CLS} flex-1 font-mono`}
-                    data-testid={`combo-comp-sku-${i}`}
-                  >
-                    <option value="">Select a SKU…</option>
-                    {skuOptions.map((s) => (
-                      <option key={s.id} value={s.sku}>
-                        {s.sku}
-                        {s.description ? ` — ${s.description}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                    options={skuOptions}
+                    onChange={(sku) => setRow(i, { sku })}
+                    testId={`combo-comp-sku-${i}`}
+                  />
                   {/* qty stepper */}
                   <div className="inline-flex items-center border border-base-300 rounded-[4px] overflow-hidden">
                     <button
