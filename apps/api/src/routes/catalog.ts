@@ -892,26 +892,15 @@ const fabricTierConfigPatchInput = fabricTierConfigSchema;
 // Body: { sofaTier2Delta: number, sofaTier3Delta: number } (both nonnegative).
 catalogRouter.patch("/fabric-tier-config", async (c) => {
   principalOnly(c);
-  const raw = await c.req.json().catch(() => ({}));
-  const parsed = fabricTierConfigPatchInput.safeParse(raw);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "invalid_param",
-        message: issue?.message ?? "invalid input",
-        field: issue?.path.join(".") ?? "unknown",
-      },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, fabricTierConfigPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from(FABRIC_TIER_ADDON_CONFIG)
     .update({
       sofa_tier2_delta: parsed.data.sofaTier2Delta,
       sofa_tier3_delta: parsed.data.sofaTier3Delta,
+      updated_at: new Date().toISOString(),
       updated_by: c.var.auth.id,
     })
     .eq("id", 1)
@@ -937,20 +926,8 @@ const modelFabricTierOverrideInput = modelFabricTierOverrideSchema.omit({ modelI
 catalogRouter.put("/model-fabric-tier-override/:modelId", async (c) => {
   principalOnly(c);
   const modelId = c.req.param("modelId");
-  const raw = await c.req.json().catch(() => ({}));
-  const parsed = modelFabricTierOverrideInput.safeParse(raw);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return c.json(
-      {
-        error: "invalid_input",
-        code: "invalid_param",
-        message: issue?.message ?? "invalid input",
-        field: issue?.path.join(".") ?? "unknown",
-      },
-      422,
-    );
-  }
+  const parsed = await parseJsonBody(c, modelFabricTierOverrideInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from(MODEL_FABRIC_TIER_OVERRIDES)
@@ -959,6 +936,7 @@ catalogRouter.put("/model-fabric-tier-override/:modelId", async (c) => {
         model_id: modelId,
         tier2_delta: parsed.data.tier2Delta,
         tier3_delta: parsed.data.tier3Delta,
+        updated_at: new Date().toISOString(),
         updated_by: c.var.auth.id,
       },
       { onConflict: "model_id" },

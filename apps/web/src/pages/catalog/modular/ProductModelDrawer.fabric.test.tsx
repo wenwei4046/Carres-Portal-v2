@@ -243,8 +243,49 @@ describe("SofaFabricsPanel — Add fabric", () => {
         />,
       ),
     );
-    fireEvent.click(screen.getByTestId("fabric-add-toggle"));
+    // Non-principal: the "+ Add fabric" toggle button is hidden entirely
+    expect(screen.queryByTestId("fabric-add-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("fabric-add-tier")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("fabric-add-submit")).not.toBeInTheDocument();
+  });
+});
+
+describe("SofaFabricsPanel — fabric write surface principal gate (T5-a)", () => {
+  it("principal sees the add-toggle button and remove buttons", () => {
+    render(
+      wrap(
+        <ProductModelDrawer
+          model={MODEL_SOFA}
+          skus={SKUS}
+          catalog={makeCatalog()}
+          isPrincipal={true}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("fabric-add-toggle")).toBeInTheDocument();
+    expect(screen.getByTestId(`fabric-remove-${FABRIC_P1.id}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`fabric-remove-${FABRIC_P2.id}`)).toBeInTheDocument();
+  });
+
+  it("non-principal sees NO add-toggle, NO remove buttons, NO name inputs (read-only)", () => {
+    render(
+      wrap(
+        <ProductModelDrawer
+          model={MODEL_SOFA}
+          skus={SKUS}
+          catalog={makeCatalog()}
+          isPrincipal={false}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    expect(screen.queryByTestId("fabric-add-toggle")).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`fabric-remove-${FABRIC_P1.id}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`fabric-remove-${FABRIC_P2.id}`)).not.toBeInTheDocument();
+    // Name is rendered as read-only span, not input
+    expect(screen.queryByTestId(`fabric-name-input-${FABRIC_P1.id}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId(`fabric-name-readonly-${FABRIC_P1.id}`)).toBeInTheDocument();
   });
 });
 

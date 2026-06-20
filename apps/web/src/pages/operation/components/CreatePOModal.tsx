@@ -6,7 +6,7 @@ import type {
   ProductSkuDto,
   SofaFabricDto,
 } from "@carres/shared";
-import { SUPPLIERLESS_CATEGORIES } from "@carres/shared";
+import { SUPPLIERLESS_CATEGORIES, resolveFabricDelta } from "@carres/shared";
 import { AlertTriangle } from "lucide-react";
 
 // T42-C1 — Form state uses `ManualCostSource` (3-value, no `auto_issued`)
@@ -1352,12 +1352,21 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                         const f = fabrics.find(
                           (x) => x.id === e.target.value,
                         );
+                        const overrideForModel =
+                          (catalogQ.data?.modelFabricTierOverrides ?? []).find(
+                            (o) => o.modelId === l.modelId,
+                          ) ?? null;
                         setLine(i, {
                           attrs: f
                             ? {
                                 fabric_id: f.id,
                                 fabric_name: f.fabricName,
-                                fabric_surcharge: f.surcharge,
+                                fabric_tier: f.tier,
+                                fabric_surcharge: resolveFabricDelta(
+                                  f.tier,
+                                  overrideForModel,
+                                  catalogQ.data?.fabricTierConfig ?? null,
+                                ),
                               }
                             : null,
                         });

@@ -634,14 +634,16 @@ function SofaFabricsPanel({
     <div>
       <div className="flex items-center justify-between mb-1">
         <div className="label">Fabrics</div>
-        <button
-          type="button"
-          onClick={() => setAdding((v) => !v)}
-          className="btn-ghost text-[11px]"
-          data-testid="fabric-add-toggle"
-        >
-          {adding ? "Close" : "+ Add fabric"}
-        </button>
+        {isPrincipal && (
+          <button
+            type="button"
+            onClick={() => setAdding((v) => !v)}
+            className="btn-ghost text-[11px]"
+            data-testid="fabric-add-toggle"
+          >
+            {adding ? "Close" : "+ Add fabric"}
+          </button>
+        )}
       </div>
       <p className="t-tiny text-base-500 mb-3">
         Fabric options for this sofa model. Tier sets the price band (P1 = base, no delta).
@@ -724,13 +726,18 @@ function FabricRow({
       style={{ gridTemplateColumns: "minmax(120px,1fr) 100px 96px 64px" }}
       data-testid={`fabric-row-${fabric.id}`}
     >
-      <input
-        defaultValue={fabric.fabricName}
-        onBlur={(e) => commitName(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-        aria-label={`${fabric.id} name`}
-        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[13px] outline-none bg-transparent"
-      />
+      {isPrincipal ? (
+        <input
+          defaultValue={fabric.fabricName}
+          onBlur={(e) => commitName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          aria-label={`${fabric.id} name`}
+          className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[13px] outline-none bg-transparent"
+          data-testid={`fabric-name-input-${fabric.id}`}
+        />
+      ) : (
+        <span className="t-small text-base-800 px-2" data-testid={`fabric-name-readonly-${fabric.id}`}>{fabric.fabricName}</span>
+      )}
       <div className="font-mono text-[12px] text-base-700 px-2">
         {fabric.surcharge > 0 ? `+${fabric.surcharge.toFixed(2)}` : "—"}
       </div>
@@ -751,15 +758,19 @@ function FabricRow({
         <span className="t-tiny text-base-600 px-2" data-testid={`fabric-tier-readonly-${fabric.id}`}>{TIER_LABELS[fabric.tier]}</span>
       )}
       <div className="text-right">
-        <button
-          type="button"
-          onClick={remove}
-          disabled={del.isPending}
-          className="btn-danger text-[11px]"
-          data-testid={`fabric-remove-${fabric.id}`}
-        >
-          Remove
-        </button>
+        {isPrincipal ? (
+          <button
+            type="button"
+            onClick={remove}
+            disabled={del.isPending}
+            className="btn-danger text-[11px]"
+            data-testid={`fabric-remove-${fabric.id}`}
+          >
+            Remove
+          </button>
+        ) : (
+          <span />
+        )}
       </div>
     </div>
   );

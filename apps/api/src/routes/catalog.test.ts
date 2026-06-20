@@ -1476,6 +1476,8 @@ describe("0176 — PUT /api/catalog/model-fabric-tier-override/:modelId (princip
       env,
     );
     expect(res.status).toBe(403);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/Master Admin/i);
   });
 });
 

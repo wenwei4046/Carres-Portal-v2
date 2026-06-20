@@ -17,7 +17,7 @@
  * (camelCase, sku + qty + attrs + unitPrice) plus a transient `localId` used
  * for React keys + Remove targeting since real `id` lands only after the RPC
  * inserts the row. attrs may carry { color, gap } for bedframe or
- * { fabric_name, fabric_surcharge } for sofa custom-with-fabric.
+ * { fabric_name, fabric_surcharge, fabric_tier } for sofa custom-with-fabric.
  */
 export interface DraftLine {
   localId: string;

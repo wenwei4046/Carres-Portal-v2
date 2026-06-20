@@ -366,12 +366,15 @@ export function SofaConfigurator({
             className={selectClass({ disabled: fabrics.length === 0 })}
           >
             {fabrics.length === 0 && <option value="">— none —</option>}
-            {fabrics.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.fabricName}
-                {effectiveDelta > 0 && fabricId === f.id ? ` (+RM ${effectiveDelta})` : ""}
-              </option>
-            ))}
+            {fabrics.map((f) => {
+              const d = resolveFabricDelta(f.tier, overrideForThisModel, fabricTierConfig ?? null);
+              return (
+                <option key={f.id} value={f.id}>
+                  {f.fabricName}
+                  {d > 0 ? ` (+RM ${d})` : ""}
+                </option>
+              );
+            })}
           </select>
         </FieldLabel>
       </div>
