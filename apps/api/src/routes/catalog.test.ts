@@ -2427,3 +2427,255 @@ describe("0177 — DELETE /api/catalog/combos/:id (principal only)", () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 0179 — Sofa combo pricing. GET bundles `sofaCombos` (active-filtered for
+// non-principal / non-admin); all writes principal-only ("Master Admin"); slots
+// canonicalized on save.
+// ---------------------------------------------------------------------------
+describe("0179 — sofa combo pricing (GET bundle + principal-gated CRUD)", () => {
+  const SOFA_COMBO_ID = "00000000-0000-0000-0000-0000000f0001";
+  const SOFA_COMBO_ID_2 = "00000000-0000-0000-0000-0000000f0002";
+  const sofaComboRow = (over: Record<string, unknown> = {}) => ({
+    id: SOFA_COMBO_ID,
+    model_id: MODEL_ID_LIVE,
+    slots: [["2A(LHF)", "2A(RHF)"], ["L(LHF)", "L(RHF)"]],
+    tier: null,
+    prices_by_height: { "24": 2640, "28": 2750 },
+    label: "L-shape combo",
+    effective_from: "2026-06-21",
+    active: true,
+    discontinued_at: null,
+    created_at: "2026-06-21T00:00:00Z",
+    updated_at: "2026-06-21T00:00:00Z",
+    updated_by: null,
+    ...over,
+  });
+
+  // A minimal catalog GET fixture (floor_config row 1 required) + the sofa
+  // combo rows under test.
+  const getBundle = (sofaCombos: unknown[]) => ({
+    product_models: [
+      {
+        id: MODEL_ID_LIVE,
+        category: "sofa",
+        model_key: "carres-sofa",
+        name: "Sofa",
+        blurb: null,
+        colors: null,
+        gaps: null,
+        sofa_mode: null,
+        discontinued_at: null,
+      },
+    ],
+    product_skus: [],
+    sofa_fabrics: [],
+    addons: [],
+    floor_config: [
+      { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
+    ],
+    fabric_tier_addon_config: [
+      { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+    ],
+    model_fabric_tier_overrides: [],
+    sofa_combo_pricing: sofaCombos,
+  });
+
+  it("GET /api/catalog includes sofaCombos (mapped via sofaComboFromRow)", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb(getBundle([sofaComboRow()])));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.sofaCombos).toHaveLength(1);
+    expect(body.sofaCombos?.[0]).toMatchObject({
+      id: SOFA_COMBO_ID,
+      modelId: MODEL_ID_LIVE,
+      slots: [["2A(LHF)", "2A(RHF)"], ["L(LHF)", "L(RHF)"]],
+      tier: null,
+      pricesByHeight: { "24": 2640, "28": 2750 },
+      label: "L-shape combo",
+    });
+  });
+
+  it("non-admin excludes active:false / discontinued sofa combos; ?admin=true includes them", async () => {
+    const rows = [
+      sofaComboRow(), // live
+      sofaComboRow({ id: SOFA_COMBO_ID_2, active: false }), // inactive
+    ];
+    // POS (non-admin) — only the live combo.
+    vi.mocked(userClient).mockReturnValue(buildSb(getBundle(rows)));
+    let jwt = await makeJwt("dealer", DEALER_ID);
+    let res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    let body = (await res.json()) as CatalogResponse;
+    expect(body.sofaCombos?.map((x) => x.id)).toEqual([SOFA_COMBO_ID]);
+
+    // admin=true — both.
+    vi.mocked(userClient).mockReturnValue(buildSb(getBundle(rows)));
+    jwt = await makeJwt("principal", null);
+    res = await app.fetch(
+      new Request("http://t/api/catalog?admin=true", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    body = (await res.json()) as CatalogResponse;
+    expect(body.sofaCombos?.map((x) => x.id).sort()).toEqual([SOFA_COMBO_ID, SOFA_COMBO_ID_2].sort());
+  });
+
+  it("POST /sofa-combos — principal inserts (slots canonicalized) → 201", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          // Deliberately UNsorted within-slot + slots out of order + a dupe code
+          // to prove canonicalization (sort within slot, de-dupe, sort slots).
+          slots: [["L(RHF)", "L(LHF)"], ["2A(RHF)", "2A(LHF)", "2A(LHF)"]],
+          pricesByHeight: { "24": 2640, "28": 2750 },
+          label: "L-shape combo",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("sofa_combo_pricing");
+    const payload = ins?.payload as { model_id: string; slots: string[][]; prices_by_height: Record<string, number> };
+    expect(payload.model_id).toBe(MODEL_ID_LIVE);
+    // Codes sorted within each slot; empty slot dropped; dupes removed; slots
+    // sorted by first code (canonicalizeSofaSlots).
+    expect(payload.slots).toEqual([["2A(LHF)", "2A(RHF)"], ["L(LHF)", "L(RHF)"]]);
+    expect(payload.prices_by_height).toEqual({ "24": 2640, "28": 2750 });
+    const body = (await res.json()) as { sofaCombo: { id: string; modelId: string } };
+    expect(body.sofaCombo).toMatchObject({ id: SOFA_COMBO_ID, modelId: MODEL_ID_LIVE });
+  });
+
+  it("POST /sofa-combos — non-principal → 403 (/Master Admin/i)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId: MODEL_ID_LIVE, slots: [["2A(LHF)"]] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("PATCH /sofa-combos/:id — empty body → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH /sofa-combos/:id — principal updates slots (canonicalized) → 200", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ slots: [["2A(RHF)", "2A(LHF)"]], pricesByHeight: { "30": 2900 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    const payload = upd?.payload as { slots: string[][]; prices_by_height: Record<string, number> };
+    expect(payload.slots).toEqual([["2A(LHF)", "2A(RHF)"]]);
+    expect(payload.prices_by_height).toEqual({ "30": 2900 });
+  });
+
+  it("PATCH /sofa-combos/:id — non-principal → 403 (/Master Admin/i)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ active: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("PATCH /sofa-combos/:id — missing row → 404", async () => {
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ writeReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ active: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/sofa combo not found/i);
+  });
+
+  it("DELETE /sofa-combos/:id — soft-delete via active=false + discontinued_at → 200", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { id: SOFA_COMBO_ID } }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    const payload = upd?.payload as { active: boolean; discontinued_at: string };
+    expect(payload.active).toBe(false);
+    expect(payload.discontinued_at).toBeTruthy();
+  });
+
+  it("DELETE /sofa-combos/:id — non-principal → 403 (/Master Admin/i)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("DELETE /sofa-combos/:id — missing row → 404", async () => {
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ writeReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/sofa combo not found/i);
+  });
+});
