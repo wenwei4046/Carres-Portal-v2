@@ -583,7 +583,8 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
         },
       }),
     );
-    const jwt = await makeJwt("operation", null);
+    // 0175 — setting price+cost on create is principal-only (Master Admin).
+    const jwt = await makeJwt("principal", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/skus", {
         method: "POST",
@@ -624,7 +625,8 @@ describe("Catalog admin — PATCH /api/catalog/skus/:id", () => {
         },
       }),
     );
-    const jwt = await makeJwt("operation", null);
+    // 0175 — changing cost is principal-only (Master Admin).
+    const jwt = await makeJwt("principal", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/skus/00000000-0000-0000-0000-00000000bb01", {
         method: "PATCH",
@@ -636,6 +638,210 @@ describe("Catalog admin — PATCH /api/catalog/skus/:id", () => {
     expect(res.status).toBe(200);
     const upd = recorded.find((r) => r.op === "update");
     expect(upd?.payload).toEqual({ cost: 950 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0175 — Master-Admin pricing lock. Only the principal may SET/CHANGE
+// product_skus.price or .cost. The DB trigger is the real boundary; this API
+// gate returns a clean 403 before the round-trip. All OTHER SKU edits stay
+// open to internal (operation) roles, and a non-principal may still create an
+// UNPRICED sku (price 0 / cost null).
+// ---------------------------------------------------------------------------
+describe("0175 — SKU price/cost lock (principal only)", () => {
+  const SKU_ID = "00000000-0000-0000-0000-00000000bb01";
+
+  it("PATCH price by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ price: 1999 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/Master Admin/i);
+  });
+
+  it("PATCH cost by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: 950 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH cost:null (clearing) by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH a non-price/cost field (pos_active) by a non-principal → allowed", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: SKU_ID,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Queen",
+          variant: "queen",
+          variant_kind: "size",
+          price: 1500,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+          pos_active: false,
+          description: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ posActive: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toEqual({ pos_active: false });
+  });
+
+  it("PATCH price by the principal → allowed", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: SKU_ID,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Queen",
+          variant: "queen",
+          variant_kind: "size",
+          price: 1999,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+          pos_active: true,
+          description: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ price: 1999 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ price: 1999 });
+  });
+
+  it("POST a priced sku by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Twin",
+          variantKind: "size",
+          price: 2400,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("POST a costed sku by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Twin",
+          variantKind: "size",
+          price: 0,
+          cost: 1300,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("POST an UNPRICED sku (price 0 / cost null) by a non-principal → allowed", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-classic" },
+          ],
+          suppliers: [
+            { id: "00000000-0000-0000-0000-00000000ff01", cat_covered: ["mattress"] },
+          ],
+        },
+        recorded,
+        writeReturn: {
+          id: SKU_ID,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Twin",
+          variant: "Twin",
+          variant_kind: "size",
+          price: 0,
+          cost: null,
+          supplier_id: "00000000-0000-0000-0000-00000000ff01",
+          discontinued_at: null,
+          pos_active: true,
+          description: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Twin",
+          variantKind: "size",
+          price: 0,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const insert = recorded.find((r) => r.op === "insert");
+    expect((insert?.payload as { price: number }).price).toBe(0);
   });
 });
 
@@ -863,7 +1069,8 @@ describe("POST /api/catalog/skus — service category no-supplier relaxation (01
         },
       }),
     );
-    const jwt = await makeJwt("operation", null);
+    // 0175 — setting price on create is principal-only (Master Admin).
+    const jwt = await makeJwt("principal", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/skus", {
         method: "POST",

@@ -8,6 +8,7 @@ import type {
 } from "@carres/shared";
 import { PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useDeleteCatalogSku, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../components/atoms";
@@ -49,6 +50,12 @@ function fmtPrice(n: number): string {
 }
 
 export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) {
+  // Phase 2 (0175): only the principal ("Master Admin") may set/change SKU
+  // price + cost. Non-principal internal users see those cells read-only — the
+  // inline price/cost editor + the per-row Edit modal's price/cost fields are
+  // gated. Every other catalog edit (pos_active, description, name, delete,
+  // + New SKU as UNPRICED) stays available.
+  const isPrincipal = useAuth((s) => s.role) === "principal";
   const [category, setCategory] = useState<CatFilter>("all");
   const [search, setSearch] = useState("");
   const [editMode, setEditMode] = useState(false);
@@ -180,14 +187,24 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               {del.isPending ? "Working…" : `Delete ${selected.size}`}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setEditMode((v) => !v)}
-            className={`${editMode ? "btn-secondary" : "btn-primary"} text-[12px]`}
-            data-testid="sku-edit-prices"
-          >
-            {editMode ? "Done editing" : "Edit Prices"}
-          </button>
+          {isPrincipal ? (
+            <button
+              type="button"
+              onClick={() => setEditMode((v) => !v)}
+              className={`${editMode ? "btn-secondary" : "btn-primary"} text-[12px]`}
+              data-testid="sku-edit-prices"
+            >
+              {editMode ? "Done editing" : "Edit Prices"}
+            </button>
+          ) : (
+            <span
+              className="t-tiny text-base-400 italic"
+              data-testid="sku-price-lock-hint"
+              title="Price + cost are set by the principal (Master Admin)"
+            >
+              Prices: Master Admin only
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setNewOpen(true)}
@@ -246,7 +263,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <SkuRowView
             key={r.sku.id}
             row={r}
-            editMode={editMode}
+            editMode={editMode && isPrincipal}
             selected={selected.has(r.sku.id)}
             onToggle={toggleRow}
             onEdit={setEditRow}

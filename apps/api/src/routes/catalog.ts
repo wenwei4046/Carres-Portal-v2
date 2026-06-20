@@ -46,6 +46,42 @@ function internalOnly(c: { var: { auth: { role: string } } }) {
   }
 }
 
+// Phase 2 Master-Admin pricing lock (migration 0175): only the principal may
+// SET or CHANGE product_skus.price / .cost. The DB trigger
+// (enforce_sku_price_cost_principal_only) is the real boundary — the catalog
+// write path forwards the USER JWT (userClient), so RLS + the trigger run; this
+// early gate just turns the raw 42501 into a clean, friendly 403 before the
+// round-trip. All OTHER catalog edits (pos_active, description, name, modular,
+// add-ons, supplier_id) stay open to internal roles.
+const SKU_PRICE_COST_ERROR =
+  "Only the principal (Master Admin) can set SKU price or cost";
+
+// POST /skus: a non-principal MAY create an UNPRICED sku (price 0 / cost null);
+// block only when they try to seed a price or cost.
+function gateSkuCreatePriceCost(
+  c: { var: { auth: { role: string } } },
+  data: { price: number; cost?: number | null },
+) {
+  if (c.var.auth.role === "principal") return;
+  const setsPrice = data.price !== 0;
+  const setsCost = data.cost !== null && data.cost !== undefined;
+  if (setsPrice || setsCost) {
+    throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
+  }
+}
+
+// PATCH /skus/:id: block when a non-principal includes a price or cost key at
+// all (presence = intent to change; `cost: null` clearing counts as a change).
+function gateSkuPatchPriceCost(
+  c: { var: { auth: { role: string } } },
+  data: { price?: number; cost?: number | null },
+) {
+  if (c.var.auth.role === "principal") return;
+  if (data.price !== undefined || data.cost !== undefined) {
+    throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
+  }
+}
+
 // product_skus exceeds Supabase's 1000-row REST cap (1013+ live), so the bundle
 // MUST page through or it silently drops SKUs (latent bug surfaced 2026-06-14:
 // the dealer wizard + Create-PO were missing every SKU past the first 1000).
@@ -249,6 +285,9 @@ catalogRouter.delete("/models/:id", async (c) => {
 catalogRouter.post("/skus", async (c) => {
   const parsed = await parseJsonBody(c, productSkuCreateInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // Phase 2 (0175): principal-only price/cost. Non-principal may still create an
+  // unpriced SKU (price 0 / cost null) for the principal to price later.
+  gateSkuCreatePriceCost(c, parsed.data);
   const sb = userClient(c.env, c.var.auth.jwt);
 
   // SKU code = `<category>:<model_key>:<variant>` to match the existing
@@ -329,6 +368,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   const id = c.req.param("id");
   const parsed = await parseJsonBody(c, productSkuPatchInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // Phase 2 (0175): principal-only price/cost. All other SKU edits (variant,
+  // pos_active, description, supplier, restore toggle) stay open to internal.
+  gateSkuPatchPriceCost(c, parsed.data);
   const patch: Record<string, unknown> = {};
   if (parsed.data.variant !== undefined) patch.variant = parsed.data.variant;
   if (parsed.data.variantKind !== undefined) patch.variant_kind = parsed.data.variantKind;

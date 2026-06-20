@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import type { ProductCategory, ProductModelDto, VariantKind } from "@carres/shared";
 import { PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useCreateCatalogModel, useCreateCatalogSku } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CATEGORY_LABEL, CodeChip } from "../components/atoms";
@@ -46,6 +47,11 @@ export default function NewSkuModal({
   models: ProductModelDto[];
   onClose: () => void;
 }) {
+  // Phase 2 (0175): price + cost are principal-only ("Master Admin"). A
+  // non-principal may still create a SKU — it's just UNPRICED (price 0 / cost
+  // null) and the principal prices it later. Hide the price/cost fields and
+  // force the unpriced payload for them.
+  const isPrincipal = useAuth((s) => s.role) === "principal";
   const createModel = useCreateCatalogModel();
   const createSku = useCreateCatalogSku();
   const [mode, setMode] = useState<Mode>("new");
@@ -86,8 +92,8 @@ export default function NewSkuModal({
 
   const valid =
     variant.trim().length > 0 &&
-    priceOk &&
-    costOk &&
+    // Price/cost only gate validity when the principal can actually set them.
+    (!isPrincipal || (priceOk && costOk)) &&
     (mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel);
 
   const pending = createModel.isPending || createSku.isPending;
@@ -113,8 +119,10 @@ export default function NewSkuModal({
         modelId: targetModelId,
         variant: variant.trim(),
         variantKind: kind,
-        price: priceNum,
-        cost: costNum,
+        // 0175 — non-principal creates an UNPRICED SKU (price 0 / cost null);
+        // the principal prices it later. Principal can seed price/cost here.
+        price: isPrincipal ? priceNum : 0,
+        cost: isPrincipal ? costNum : null,
         description: description.trim() || null,
       });
       toast.success(`Added ${codePreview || variant.trim()}`);
@@ -215,33 +223,48 @@ export default function NewSkuModal({
           )}
         </label>
 
-        <label className="block">
-          <span className="label block mb-1">Price (RM, optional)</span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="0.00"
-            data-testid="new-sku-price"
-            className={INPUT_CLS}
-          />
-        </label>
+        {isPrincipal ? (
+          <>
+            <label className="block">
+              <span className="label block mb-1">Price (RM, optional)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="0.00"
+                data-testid="new-sku-price"
+                className={INPUT_CLS}
+              />
+            </label>
 
-        <label className="block">
-          <span className="label block mb-1">Cost (RM, optional)</span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={cost}
-            onChange={(e) => setCost(e.target.value)}
-            placeholder="not set"
-            data-testid="new-sku-cost"
-            className={INPUT_CLS}
-          />
-        </label>
+            <label className="block">
+              <span className="label block mb-1">Cost (RM, optional)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                placeholder="not set"
+                data-testid="new-sku-cost"
+                className={INPUT_CLS}
+              />
+            </label>
+          </>
+        ) : (
+          <div
+            className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2"
+            data-testid="new-sku-price-lock-hint"
+          >
+            <div className="t-small text-base-600">Price &amp; cost</div>
+            <div className="t-tiny text-base-400 mt-0.5">
+              Set by the principal (Master Admin). This SKU is created unpriced —
+              the principal will price it.
+            </div>
+          </div>
+        )}
 
         <label className="block">
           <span className="label block mb-1">Description (optional)</span>

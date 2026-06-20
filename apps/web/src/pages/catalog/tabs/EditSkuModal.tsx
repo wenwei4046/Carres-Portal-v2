@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { ProductModelDto, ProductSkuDto } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
@@ -27,6 +28,10 @@ export default function EditSkuModal({
   model: ProductModelDto | undefined;
   onClose: () => void;
 }) {
+  // Phase 2 (0175): price + cost are principal-only ("Master Admin"). For
+  // non-principal users the price/cost fields render read-only and are never
+  // included in the SKU patch; name + description stay editable.
+  const isPrincipal = useAuth((s) => s.role) === "principal";
   const patchSku = usePatchCatalogSku();
   const patchModel = usePatchCatalogModel();
 
@@ -47,7 +52,8 @@ export default function EditSkuModal({
     (Number.isFinite(costNum as number) && (costNum as number) >= 0);
 
   const nameOk = !model || name.trim().length >= 2;
-  const valid = priceOk && costOk && nameOk;
+  // Non-principal can't edit price/cost, so their validity doesn't gate Save.
+  const valid = nameOk && (!isPrincipal || (priceOk && costOk));
   const pending = patchSku.isPending || patchModel.isPending;
 
   // Live margin: use the current input values for instant feedback
@@ -57,12 +63,16 @@ export default function EditSkuModal({
   async function save() {
     if (!valid) return;
     try {
-      // SKU-level: description + price + cost (only if changed).
+      // SKU-level: description + (principal-only) price + cost (only if changed).
       const skuPatch: { description?: string | null; price?: number; cost?: number | null } = {};
       const nextDesc = description.trim() || null;
       if (nextDesc !== (sku.description ?? null)) skuPatch.description = nextDesc;
-      if (priceNum !== sku.price) skuPatch.price = priceNum;
-      if (costNum !== sku.cost) skuPatch.cost = costNum;
+      // 0175 — only the principal can change price/cost. Skip these for everyone
+      // else so the API gate / DB trigger is never tripped on a benign edit.
+      if (isPrincipal) {
+        if (priceNum !== sku.price) skuPatch.price = priceNum;
+        if (costNum !== sku.cost) skuPatch.cost = costNum;
+      }
       if (Object.keys(skuPatch).length > 0) {
         await patchSku.mutateAsync({ id: sku.id, patch: skuPatch });
       }
@@ -121,36 +131,70 @@ export default function EditSkuModal({
             <input value={sku.variant} disabled className={`${INPUT_CLS} disabled:opacity-60`} />
             <div className="t-tiny text-base-400 mt-1">Change via Modular.</div>
           </div>
-          <label className="block">
-            <span className="label block mb-1">Price (RM)</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              data-testid="edit-sku-price"
-              className={`${INPUT_CLS} text-right font-mono`}
-            />
-          </label>
+          {isPrincipal ? (
+            <label className="block">
+              <span className="label block mb-1">Price (RM)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                data-testid="edit-sku-price"
+                className={`${INPUT_CLS} text-right font-mono`}
+              />
+            </label>
+          ) : (
+            <div>
+              <span className="label block mb-1">Price (RM)</span>
+              <div
+                className="t-small font-mono text-right text-base-700 mt-2"
+                data-testid="edit-sku-price-readonly"
+              >
+                {sku.price === 0 ? (
+                  <span className="text-base-400 italic">not set</span>
+                ) : (
+                  sku.price.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                )}
+              </div>
+              <div className="t-tiny text-base-400 mt-1">Master Admin only.</div>
+            </div>
+          )}
         </div>
 
         {/* Cost + live margin */}
         <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="label block mb-1">Cost (RM)</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={cost}
-              onChange={(e) => setCost(e.target.value)}
-              placeholder="not set"
-              data-testid="edit-sku-cost"
-              className={`${INPUT_CLS} text-right font-mono`}
-            />
-            <div className="t-tiny text-base-400 mt-1">Blank = not set (null).</div>
-          </label>
+          {isPrincipal ? (
+            <label className="block">
+              <span className="label block mb-1">Cost (RM)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                placeholder="not set"
+                data-testid="edit-sku-cost"
+                className={`${INPUT_CLS} text-right font-mono`}
+              />
+              <div className="t-tiny text-base-400 mt-1">Blank = not set (null).</div>
+            </label>
+          ) : (
+            <div>
+              <span className="label block mb-1">Cost (RM)</span>
+              <div
+                className="t-small font-mono text-right text-base-700 mt-2"
+                data-testid="edit-sku-cost-readonly"
+              >
+                {sku.cost === null ? (
+                  <span className="text-base-400 italic">not set</span>
+                ) : (
+                  sku.cost.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                )}
+              </div>
+              <div className="t-tiny text-base-400 mt-1">Master Admin only.</div>
+            </div>
+          )}
           <div>
             <span className="label block mb-1">{marginLabel}</span>
             {liveMargin === null ? (

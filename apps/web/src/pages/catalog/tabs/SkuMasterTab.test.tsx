@@ -19,6 +19,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CatalogResponse } from "@carres/shared";
 import SkuMasterTab from "./SkuMasterTab";
 import EditSkuModal from "./EditSkuModal";
+import NewSkuModal from "./NewSkuModal";
 import type { ProductSkuDto, ProductModelDto } from "@carres/shared";
 
 // ---------------------------------------------------------------------------
@@ -27,11 +28,24 @@ import type { ProductSkuDto, ProductModelDto } from "@carres/shared";
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 // ---------------------------------------------------------------------------
+// Auth mock — 0175 price/cost lock reads the current role. Default to
+// "principal" (Master Admin) so the Task-1 cost/margin edit tests keep
+// exercising the editable path; flip `mockRole` per-test for the lock cases.
+// useAuth is a Zustand selector hook: useAuth((s) => s.role).
+// ---------------------------------------------------------------------------
+let mockRole: string | null = "principal";
+vi.mock("@/lib/auth", () => ({
+  useAuth: (selector: (s: { role: string | null }) => unknown) =>
+    selector({ role: mockRole }),
+}));
+
+// ---------------------------------------------------------------------------
 // Mutation stubs — replaced per-test in beforeEach
 // ---------------------------------------------------------------------------
 const mockPatchMutate = vi.fn();
 const mockPatchMutateAsync = vi.fn();
 const mockDeleteMutate = vi.fn();
+const mockCreateSkuMutateAsync = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   usePatchCatalogSku: () => ({
@@ -47,6 +61,16 @@ vi.mock("@/lib/queries", () => ({
   usePatchCatalogModel: () => ({
     mutate: vi.fn(),
     mutateAsync: vi.fn().mockResolvedValue({}),
+    isPending: false,
+  }),
+  useCreateCatalogModel: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ model: { id: "m-new" } }),
+    isPending: false,
+  }),
+  useCreateCatalogSku: () => ({
+    mutate: vi.fn(),
+    mutateAsync: mockCreateSkuMutateAsync,
     isPending: false,
   }),
 }));
@@ -130,6 +154,11 @@ function wrap(ui: React.ReactNode) {
 beforeEach(() => {
   mockPatchMutate.mockReset();
   mockPatchMutateAsync.mockReset();
+  mockCreateSkuMutateAsync.mockReset();
+  mockCreateSkuMutateAsync.mockResolvedValue({ sku: { id: "s-new" } });
+  // Default every test to the Master Admin (principal) — the price/cost lock
+  // tests below override this to a non-principal role.
+  mockRole = "principal";
 });
 
 describe("SkuMasterTab — cost column", () => {
@@ -344,5 +373,92 @@ describe("EditSkuModal — cost field + margin round-trip", () => {
     await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
     const args = mockPatchMutateAsync.mock.calls[0][0];
     expect(args.patch.cost).toBe(1800);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0175 — Master-Admin price/cost lock. Non-principal internal users see
+// price + cost READ-ONLY (no inline editor, no modal fields); principal keeps
+// full edit (Task-1 behaviour above).
+// ---------------------------------------------------------------------------
+describe("0175 — price/cost lock (non-principal read-only)", () => {
+  it("principal sees the 'Edit Prices' button", () => {
+    mockRole = "principal";
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    expect(screen.getByTestId("sku-edit-prices")).toBeInTheDocument();
+    expect(screen.queryByTestId("sku-price-lock-hint")).not.toBeInTheDocument();
+  });
+
+  it("operation (non-principal) sees NO 'Edit Prices' button, shows the lock hint", () => {
+    mockRole = "operation";
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    expect(screen.queryByTestId("sku-edit-prices")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sku-price-lock-hint")).toBeInTheDocument();
+    // The cost cell still shows the value read-only (no input).
+    const costCell = screen.getByTestId("sku-cost-CLOUD-KING");
+    expect(costCell.textContent).toContain("2,100");
+    expect(costCell.querySelector("input")).toBeNull();
+  });
+
+  it("EditSkuModal: non-principal gets read-only price/cost, no input fields", () => {
+    mockRole = "operation";
+    render(wrap(<EditSkuModal sku={SKU_COST_SET} model={MODEL_MAT} onClose={() => {}} />));
+    expect(screen.queryByTestId("edit-sku-price")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("edit-sku-cost")).not.toBeInTheDocument();
+    expect(screen.getByTestId("edit-sku-price-readonly").textContent).toContain("3,500");
+    expect(screen.getByTestId("edit-sku-cost-readonly").textContent).toContain("2,100");
+    // Name is still editable for internal users.
+    expect(screen.getByTestId("edit-sku-name")).toBeInTheDocument();
+  });
+
+  it("EditSkuModal: non-principal Save never sends price/cost (only description/name)", async () => {
+    mockRole = "operation";
+    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_SET });
+    render(wrap(<EditSkuModal sku={SKU_COST_SET} model={MODEL_MAT} onClose={vi.fn()} />));
+    fireEvent.change(screen.getByTestId("edit-sku-description"), {
+      target: { value: "new desc" },
+    });
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
+    const args = mockPatchMutateAsync.mock.calls[0][0];
+    expect(args.patch.description).toBe("new desc");
+    expect(args.patch).not.toHaveProperty("price");
+    expect(args.patch).not.toHaveProperty("cost");
+  });
+
+  it("NewSkuModal: non-principal sees NO price/cost inputs (shows lock hint)", () => {
+    mockRole = "operation";
+    render(wrap(<NewSkuModal models={[MODEL_MAT, MODEL_SOFA]} onClose={() => {}} />));
+    expect(screen.queryByTestId("new-sku-price")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("new-sku-cost")).not.toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-price-lock-hint")).toBeInTheDocument();
+  });
+
+  it("NewSkuModal: non-principal creates an UNPRICED sku (price 0 / cost null)", async () => {
+    mockRole = "operation";
+    render(wrap(<NewSkuModal models={[MODEL_MAT, MODEL_SOFA]} onClose={vi.fn()} />));
+    // New product: fill name + variant; price/cost fields are absent.
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lite Foam" } });
+    fireEvent.change(screen.getByTestId("new-sku-variant"), { target: { value: "Queen" } });
+    fireEvent.click(screen.getByText("Create product + SKU"));
+    await waitFor(() => expect(mockCreateSkuMutateAsync).toHaveBeenCalledOnce());
+    const args = mockCreateSkuMutateAsync.mock.calls[0][0];
+    expect(args.price).toBe(0);
+    expect(args.cost).toBeNull();
+  });
+
+  it("NewSkuModal: principal can seed price + cost", async () => {
+    mockRole = "principal";
+    render(wrap(<NewSkuModal models={[MODEL_MAT, MODEL_SOFA]} onClose={vi.fn()} />));
+    expect(screen.getByTestId("new-sku-price")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lux Foam" } });
+    fireEvent.change(screen.getByTestId("new-sku-variant"), { target: { value: "King" } });
+    fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "2990" } });
+    fireEvent.change(screen.getByTestId("new-sku-cost"), { target: { value: "1800" } });
+    fireEvent.click(screen.getByText("Create product + SKU"));
+    await waitFor(() => expect(mockCreateSkuMutateAsync).toHaveBeenCalledOnce());
+    const args = mockCreateSkuMutateAsync.mock.calls[0][0];
+    expect(args.price).toBe(2990);
+    expect(args.cost).toBe(1800);
   });
 });
