@@ -304,6 +304,9 @@ export default function CatalogStep({
           fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
           fabricTierConfig={catalog.fabricTierConfig}
           modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+          sofaCompartments={catalog.sofaCompartments}
+          modelSofaCompartments={catalog.modelSofaCompartments}
+          sofaCombos={catalog.sofaCombos}
           onAdd={addLine}
           onClose={() => setConfigureModelId(null)}
         />
