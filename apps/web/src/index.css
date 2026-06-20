@@ -251,19 +251,23 @@
     border: 1.5px solid rgba(17,24,39,0.10);
   }
 
-  /* Drawer scrim — ink wash + blur (matches v17 white-drawer convention). */
-  .pos-drawer-scrim { @apply fixed inset-0 z-40;
+  /* Drawer scrim — ink wash + blur (matches v17 white-drawer convention).
+   * z-[55] sits above the cart FAB (z-50) so scrim covers the whole page
+   * when a drawer is open. Drawer panel goes on z-[60] above the scrim. */
+  .pos-drawer-scrim { @apply fixed inset-0 z-[55];
                       background: rgba(17,24,39,0.40); backdrop-filter: blur(4px); }
 }
 
 @layer utilities {
   @keyframes pos-page-enter { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
   @keyframes pos-cart-pulse { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+  @keyframes pos-drawer-slide-in { from { transform:translateX(100%); } to { transform:translateX(0); } }
   .animate-page-enter { animation: pos-page-enter .32s cubic-bezier(0.22,1,0.36,1) both; }
   .animate-cart-pulse { animation: pos-cart-pulse .28s cubic-bezier(0.22,1,0.36,1); }
   @media (prefers-reduced-motion: reduce) {
     .animate-page-enter, .animate-cart-pulse { animation: none; }
     .pos-card { transition: none; }
     .pos-card:hover { transform: none; }
+    [style*="pos-drawer-slide-in"] { animation: none; }
   }
 }
