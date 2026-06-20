@@ -357,19 +357,22 @@ describe("pickSofaCombo", () => {
         [combo()],
       ),
     ).toBeNull();
-    // price 0 / null at the height → does not apply
-    expect(
-      pickSofaCombo(
-        { modelId: MODEL, builtCodes: ["2A(LHF)", "L(RHF)"], tier: "PRICE_1", height: "30", asOf: ASOF },
-        [combo({ pricesByHeight: { "30": 0 } })],
-      ),
-    ).toBeNull();
+    // null at the height → no price set → combo does NOT apply (filtered out).
     expect(
       pickSofaCombo(
         { modelId: MODEL, builtCodes: ["2A(LHF)", "L(RHF)"], tier: "PRICE_1", height: "30", asOf: ASOF },
         [combo({ pricesByHeight: { "30": null } })],
       ),
     ).toBeNull();
+    // literal 0 at the height SURVIVES the filter (faithful to 2990s
+    // pickComboMatch — a numeric price, incl. 0, is kept). The `> 0` decision
+    // is made POST-rank by computeSofaPrice, not by this filter.
+    const zeroPick = pickSofaCombo(
+      { modelId: MODEL, builtCodes: ["2A(LHF)", "L(RHF)"], tier: "PRICE_1", height: "30", asOf: ASOF },
+      [combo({ pricesByHeight: { "30": 0 } })],
+    );
+    expect(zeroPick).not.toBeNull();
+    expect(zeroPick!.priceMyr).toBe(0);
   });
 });
 
@@ -475,6 +478,19 @@ describe("computeSofaPrice — combo override", () => {
       { combos: [combo()] }, // combo only prices 24 + 28
     );
     const r = computeSofaPrice(build({ height: "30" }), snap);
+    expect(r.basis).toBe("a_la_carte");
+    expect(r.total).toBe(1800);
+  });
+
+  it("0-priced WINNER blocks a lower combo (2990s post-rank gate) → à-la-carte, no retry", () => {
+    // Newer combo priced literal 0 @28 + older combo priced 2750 @28; à-la-carte = 1800.
+    // 2990s: the newer-0 wins ranking (newest effective_from), then the `> 0`
+    // gate falls the whole group to à-la-carte — it does NOT retry the older
+    // positive combo. (Pre-fix Carres dropped the 0-combo pre-rank, so 2750 won.)
+    const older = combo({ id: "old", effectiveFrom: "2026-01-01", pricesByHeight: { "28": 2750 } });
+    const newerZero = combo({ id: "new0", effectiveFrom: "2026-05-01", pricesByHeight: { "28": 0 } });
+    const snap = snapshotFrom({ "2A(LHF)": 1000, "L(RHF)": 800 }, { combos: [older, newerZero] });
+    const r = computeSofaPrice(build({ asOf: ASOF }), snap);
     expect(r.basis).toBe("a_la_carte");
     expect(r.total).toBe(1800);
   });

@@ -226,7 +226,10 @@ const todayIso = (): string => new Date().toISOString().slice(0, 10);
  *
  * Filter: active && !discontinued, model match, tier match (`row.tier === null`
  * OR `row.tier === args.tier`), `effective_from <= asOf`, a numeric
- * `prices_by_height[height] > 0`, slots coverable by `matchSofaCombo`.
+ * `prices_by_height[height]` (incl. literal 0 — kept through the filter; the
+ * `> 0` gate is applied POST-rank by `computeSofaPrice`, matching 2990s
+ * `groupPrice` so a 0-priced WINNER falls to à-la-carte WITHOUT retrying a
+ * lower-priority combo), slots coverable by `matchSofaCombo`.
  * Rank: company+tier (2) > company+any (1) (customer tiers 3/4 deferred).
  * Returns `null` when nothing qualifies.
  */
@@ -246,7 +249,11 @@ export function pickSofaCombo(
     if (c.tier !== null && args.tier !== null && c.tier !== args.tier) continue;
     if (c.effectiveFrom > asOf) continue;
     const price = c.pricesByHeight?.[args.height];
-    if (typeof price !== "number" || !(price > 0)) continue;
+    // A numeric price (incl. literal 0) survives the filter — faithful to 2990s
+    // pickComboMatch. The `> 0` decision is made POST-rank by computeSofaPrice,
+    // so a 0-priced winner falls to à-la-carte without retrying a lower combo.
+    // null / undefined (no price set for this height) → combo does not apply.
+    if (typeof price !== "number") continue;
     const subset = matchSofaCombo(built, c.slots);
     if (!subset) continue;
     candidates.push({ combo: c, price, subset });
