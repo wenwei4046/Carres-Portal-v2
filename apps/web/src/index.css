@@ -270,5 +270,7 @@
     .animate-drawer-slide-in { animation: none; }
     .pos-card { transition: none; }
     .pos-card:hover { transform: none; }
+    .pos-fab { transition: none; }
+    .pos-fab:hover, .pos-fab:active { transform: none; }
   }
 }
