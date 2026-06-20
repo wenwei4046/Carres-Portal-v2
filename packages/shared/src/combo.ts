@@ -32,7 +32,8 @@ export interface ExplodedComboLine {
  *   2. Sort components by `sortOrder` ascending, STABLE (ties keep input order).
  *   3. `comboCents = round(comboPrice * 100)`.
  *   4. Per component i: `unitCatalog_i = max(0, skuPrice(sku_i))`,
- *      `weight_i = unitCatalog_i * qty_i`.
+ *      `weight_i = unitCatalog_i * qty_i`. A non-finite price (NaN/undefined,
+ *      e.g. a SKU absent from the caller's catalog) counts as 0 weight.
  *   5. `W = Σ weight_i`. If `W <= 0` (all components zero-price), fall back to
  *      splitting by unit count: `weight_i = qty_i`, `W = Σ qty_i`.
  *   6. For every component EXCEPT the last (in sorted order):
@@ -71,8 +72,17 @@ export function explodeCombo(
   // 3. Whole price in integer cents.
   const comboCents = Math.round(combo.comboPrice * 100);
 
-  // 4. Catalog weight per component (clamp negative catalog prices to 0).
-  let weights = sorted.map((c) => Math.max(0, skuPrice(c.sku)) * c.qty);
+  // 4. Catalog weight per component (clamp negative catalog prices to 0). A
+  // non-finite / missing price (skuPrice returns NaN or undefined for a SKU not
+  // in the caller's catalog bundle) counts as 0 weight — it MUST NOT poison the
+  // split into NaN (the `W <= 0` fallback below never fires for NaN since
+  // `NaN <= 0` is false). Such a component is priced at 0 and the rest absorb
+  // the combo price; the caller (POS) should still ensure component prices are
+  // available, but this keeps the helper total-safe.
+  let weights = sorted.map((c) => {
+    const p = skuPrice(c.sku);
+    return Number.isFinite(p) ? Math.max(0, p) * c.qty : 0;
+  });
   let W = weights.reduce((acc, w) => acc + w, 0);
 
   // 5. All zero-price → split by unit count instead of value.

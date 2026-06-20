@@ -160,6 +160,54 @@ describe("explodeCombo", () => {
     expect(sumLines(lines)).toBe(3000.0);
   });
 
+  it("8. residue lands on the LAST component (not the first): 100 across 3 equal-price q1 → 33.33/33.33/33.34", () => {
+    const lines = explodeCombo(
+      {
+        comboKey: "c8",
+        name: "Combo 8",
+        comboPrice: 100.0,
+        components: [comp("A", 1, 0), comp("B", 1, 1), comp("C", 1, 2)],
+      },
+      priceMap({ A: 100, B: 100, C: 100 }),
+    );
+
+    expect(lines).toHaveLength(3);
+    // 10000c / 3 = 3333.33 each. A,B (not last) round to 3333 -> 33.33.
+    // C (last) absorbs the +1c residue: 10000 - 6666 = 3334 -> 33.34.
+    // Asserting the EXACT per-line prices pins residue-on-last: moving the
+    // residue to the first line would make A=33.34 and fail here.
+    expect(lines[0].unitPrice).toBe(33.33); // A
+    expect(lines[1].unitPrice).toBe(33.33); // B
+    expect(lines[2].unitPrice).toBe(33.34); // C — carries the residue
+    expect(sumLines(lines)).toBe(100.0);
+  });
+
+  it("9. non-finite/missing sku price → 0 weight, never NaN; valid line keeps full price, Σ exact", () => {
+    // skuPrice returns undefined for the missing SKU (cast to number to mimic a
+    // catalog lookup that simply has no entry — the hazard the guard prevents).
+    const lookup = (sku: string): number =>
+      sku === "VALID" ? 100 : (undefined as unknown as number);
+    const lines = explodeCombo(
+      {
+        comboKey: "c9",
+        name: "Combo 9",
+        comboPrice: 300,
+        components: [comp("VALID", 1, 0), comp("MISSING", 1, 1)],
+      },
+      lookup,
+    );
+
+    expect(lines).toHaveLength(2);
+    // No unitPrice is NaN.
+    for (const l of lines) expect(Number.isNaN(l.unitPrice)).toBe(false);
+    // VALID carries the whole price (MISSING contributes 0 weight → 0.00).
+    expect(lines[0].sku).toBe("VALID");
+    expect(lines[0].unitPrice).toBe(300.0);
+    expect(lines[1].unitPrice).toBe(0.0);
+    // Σ still exact.
+    expect(sumLines(lines)).toBe(300.0);
+  });
+
   it("empty components → []", () => {
     const lines = explodeCombo(
       { comboKey: "empty", name: "Empty", comboPrice: 100, components: [] },
