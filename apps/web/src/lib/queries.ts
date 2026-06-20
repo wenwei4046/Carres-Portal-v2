@@ -4542,12 +4542,12 @@ export { usePatchSofaFabric as useUpdateSofaFabric };
  * Invalidates the whole `['catalog']` tree so the admin bundle re-fetches.
  */
 export function useUpdateFabricTierConfig(
-  opts?: Partial<UseMutationOptions<{ config: FabricTierConfigDto }, ApiError, FabricTierConfigDto>>,
+  opts?: Partial<UseMutationOptions<{ fabricTierConfig: FabricTierConfigDto }, ApiError, FabricTierConfigDto>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ config: FabricTierConfigDto }, ApiError, FabricTierConfigDto>({
+  return useMutation<{ fabricTierConfig: FabricTierConfigDto }, ApiError, FabricTierConfigDto>({
     mutationFn: (input) =>
-      apiFetch<{ config: FabricTierConfigDto }>(
+      apiFetch<{ fabricTierConfig: FabricTierConfigDto }>(
         "/api/catalog/fabric-tier-config",
         catalogJson("PATCH", input),
       ),
