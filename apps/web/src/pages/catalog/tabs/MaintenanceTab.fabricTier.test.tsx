@@ -31,6 +31,10 @@ vi.mock("@/lib/queries", () => ({
   useCreateAddon:            () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   usePatchAddon:             () => ({ mutate: mockAddonMutate, mutateAsync: vi.fn(), isPending: false }),
   useDeleteAddon:            () => ({ mutate: vi.fn(), isPending: false }),
+  // 0178 — sofa compartment hooks (MaintenanceTab now renders SofaCompartmentsSection).
+  useCreateSofaCompartment:  () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useUpdateSofaCompartment:  () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteSofaCompartment:  () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -134,5 +138,63 @@ describe("FabricTierDeltasCard — principal-gating", () => {
     const saveBtn = screen.getByTestId("global-tier-save") as HTMLButtonElement;
     // No changes made — dirty=false → disabled
     expect(saveBtn).toBeDisabled();
+  });
+});
+
+// 0178 — Sofa Compartments pool section (sofa engine Phase 1).
+describe("SofaCompartmentsSection — render + gating", () => {
+  function catalogWithCompartments(): CatalogResponse {
+    return makeCatalog({
+      sofaCompartments: [
+        {
+          id: "00000000-0000-0000-0000-0000000c0001",
+          code: "1A(LHF)",
+          description: "1 seat, ONE arm (left)",
+          seatCount: 1,
+          armConfig: "left",
+          iconUrl: null,
+          defaultPrice: 250,
+          sortOrder: 1,
+          active: true,
+        },
+        {
+          id: "00000000-0000-0000-0000-0000000c0002",
+          code: "1NA",
+          description: "1 seat, NO arms",
+          seatCount: 1,
+          armConfig: null,
+          iconUrl: null,
+          defaultPrice: 200,
+          sortOrder: 2,
+          active: false, // disabled → should NOT render
+        },
+      ],
+    });
+  }
+
+  it("renders the heading + active rows, hides disabled compartments", () => {
+    render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={true} />));
+    expect(screen.getByText("Sofa Compartments")).toBeInTheDocument();
+    expect(screen.getByTestId("compartment-row-1A(LHF)")).toBeInTheDocument();
+    expect(screen.queryByTestId("compartment-row-1NA")).not.toBeInTheDocument();
+  });
+
+  it("principal: shows the + Add compartment control + a Disable action", () => {
+    render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={true} />));
+    expect(screen.getByText("+ Add compartment")).toBeInTheDocument();
+    expect(screen.getByText("Disable")).toBeInTheDocument();
+  });
+
+  it("non-principal: read-only — no Add control, no Disable button", () => {
+    render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={false} />));
+    expect(screen.queryByText("+ Add compartment")).not.toBeInTheDocument();
+    expect(screen.getByTestId("compartment-row-1A(LHF)")).toBeInTheDocument();
+    expect(screen.queryByText("Disable")).not.toBeInTheDocument();
+  });
+
+  it("compartment default price input reflects the catalog value", () => {
+    render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={true} />));
+    const priceInput = screen.getByLabelText("1A(LHF) default price") as HTMLInputElement;
+    expect(priceInput.value).toBe("250");
   });
 });

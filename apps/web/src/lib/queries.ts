@@ -27,6 +27,11 @@ import {
   type ComboDto,
   type ComboCreateInput,
   type ComboPatchInput,
+  type SofaCompartmentDto,
+  type SofaCompartmentCreateInput,
+  type SofaCompartmentPatchInput,
+  type ModelSofaCompartmentDto,
+  type ModelSofaCompartmentInput,
   type SizesActiveInput,
   type GenerateSkusInput,
   type FloorConfigPatchInput,
@@ -4446,7 +4451,7 @@ export function usePickupEventPrint(eventId: string | null) {
 // next consumer mount (Create-PO modal, dealer wizard, etc.).
 // ---------------------------------------------------------------------------
 
-function catalogJson(method: "POST" | "PATCH" | "DELETE", body?: unknown) {
+function catalogJson(method: "POST" | "PATCH" | "PUT" | "DELETE", body?: unknown) {
   return {
     method,
     headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
@@ -4572,6 +4577,69 @@ export function useDeleteCombo() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/combos/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// 0178 — sofa compartment pool + per-model offered (sofa engine Phase 1). CRUD
+// hooks mirroring the sofa-fabric / combo hooks; all invalidate ['catalog'] so
+// the admin bundle re-fetches. Principal-only at the API/RLS layer; the UI gate
+// in the maintenance page is a friendly read-only veneer.
+export function useCreateSofaCompartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SofaCompartmentCreateInput) =>
+      apiFetch<{ compartment: SofaCompartmentDto }>("/api/catalog/sofa-compartments", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateSofaCompartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: SofaCompartmentPatchInput }) =>
+      apiFetch<{ compartment: SofaCompartmentDto }>(`/api/catalog/sofa-compartments/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteSofaCompartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/sofa-compartments/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpsertModelSofaCompartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      modelId,
+      compartmentId,
+      input,
+    }: {
+      modelId: string;
+      compartmentId: string;
+      input: ModelSofaCompartmentInput;
+    }) =>
+      apiFetch<{ modelSofaCompartment: ModelSofaCompartmentDto }>(
+        `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
+        catalogJson("PUT", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteModelSofaCompartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelId, compartmentId }: { modelId: string; compartmentId: string }) =>
+      apiFetch<{ ok: true }>(
+        `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
+        catalogJson("DELETE"),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }
