@@ -55,7 +55,7 @@ function presetSku(id: string, modelId: string, variant: string, price: number):
   return { id, modelId, sku: `${variant}-sku`, variant, variantKind: "preset", price, cost: null, supplierId: null };
 }
 function fabric(id: string, modelId: string, name: string, surcharge: number): SofaFabricDto {
-  return { id, modelId, fabricName: name, surcharge, colors: null };
+  return { id, modelId, fabricName: name, surcharge, colors: null, tier: "PRICE_1" };
 }
 
 describe("ConfigureDrawer — sofa model-switch fabric reset", () => {

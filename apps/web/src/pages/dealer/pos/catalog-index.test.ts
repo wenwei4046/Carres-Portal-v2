@@ -17,8 +17,8 @@ function catalog(): CatalogResponse {
       { id: "s4", modelId: "m-acc", sku: "PILLOW-STD", variant: "Std", variantKind: "size", price: 120, cost: null, supplierId: null },
     ],
     sofaFabrics: [
-      { id: "f1", modelId: "m-sofa", fabricName: "Linen Natural", surcharge: 300, colors: null },
-      { id: "f2", modelId: "m-sofa", fabricName: "Velvet Teal", surcharge: 800, colors: null },
+      { id: "f1", modelId: "m-sofa", fabricName: "Linen Natural", surcharge: 300, colors: null, tier: "PRICE_1" as const },
+      { id: "f2", modelId: "m-sofa", fabricName: "Velvet Teal", surcharge: 800, colors: null, tier: "PRICE_1" as const },
     ],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },

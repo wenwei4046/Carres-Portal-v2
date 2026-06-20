@@ -81,6 +81,12 @@ export const productSkuSchema = z.object({
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
 
+// 0176 — three price tiers for sofa fabrics. PRICE_1 = base (zero delta);
+// PRICE_2/PRICE_3 = mid/premium with deltas resolved from per-model override
+// or the global `fabric_tier_addon_config` singleton.
+export const fabricTierSchema = z.enum(["PRICE_1", "PRICE_2", "PRICE_3"]);
+export type FabricTierValue = z.infer<typeof fabricTierSchema>;
+
 export const sofaFabricSchema = z.object({
   id: z.string().uuid(),
   modelId: z.string().uuid(),
@@ -89,6 +95,9 @@ export const sofaFabricSchema = z.object({
   // 0075 — fabric color options (Loo 2026-05-09).
   colors: z.array(z.string()).nullable(),
   discontinuedAt: z.string().nullable().optional(),
+  // 0176 — price tier. Defaults to PRICE_1 so existing serialized catalog
+  // responses (pre-0176 rows) remain valid without a migration re-fetch.
+  tier: fabricTierSchema.default("PRICE_1"),
 });
 export type SofaFabricDto = z.infer<typeof sofaFabricSchema>;
 
@@ -114,12 +123,39 @@ export const floorConfigSchema = z.object({
 });
 export type FloorConfigDto = z.infer<typeof floorConfigSchema>;
 
+// 0176 — global tier config singleton + per-model overrides schemas.
+
+/**
+ * `fabric_tier_addon_config` (singleton, id=1). Holds the global RM delta for
+ * PRICE_2 and PRICE_3 sofa fabrics when no per-model override is set.
+ */
+export const fabricTierConfigSchema = z.object({
+  sofaTier2Delta: z.number().nonnegative(),
+  sofaTier3Delta: z.number().nonnegative(),
+});
+export type FabricTierConfigDto = z.infer<typeof fabricTierConfigSchema>;
+
+/**
+ * One row from `model_fabric_tier_overrides`. Nullable deltas = inherit from
+ * global config; 0 = explicit zero (no tier premium for this model).
+ */
+export const modelFabricTierOverrideSchema = z.object({
+  modelId: z.string().uuid(),
+  tier2Delta: z.number().nullable(),
+  tier3Delta: z.number().nullable(),
+});
+export type ModelFabricTierOverrideDto = z.infer<typeof modelFabricTierOverrideSchema>;
+
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
   skus: z.array(productSkuSchema),
   sofaFabrics: z.array(sofaFabricSchema),
   addons: z.array(addonSchema),
   floorConfig: floorConfigSchema,
+  // 0176 — fabric tier pricing config (additive, backward-compatible).
+  // The API endpoint adds these; pre-0176 clients that don't read them are unaffected.
+  fabricTierConfig: fabricTierConfigSchema.optional(),
+  modelFabricTierOverrides: z.array(modelFabricTierOverrideSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 
@@ -241,6 +277,8 @@ export const sofaFabricCreateInput = z
     surcharge: z.number().nonnegative(),
     // 0075 — fabric colors (Loo 2026-05-09).
     colors: z.array(z.string().trim().regex(colorOrGapValueRegex)).max(20).nullable().optional(),
+    // 0176 — price tier. Optional on create; server defaults to PRICE_1.
+    tier: fabricTierSchema.optional(),
   })
   .strict();
 export type SofaFabricCreateInput = z.infer<typeof sofaFabricCreateInput>;
@@ -252,6 +290,8 @@ export const sofaFabricPatchInput = z
     colors: z.array(z.string().trim().regex(colorOrGapValueRegex)).max(20).nullable().optional(),
     // 0075 (Loo 2026-05-09) — restore toggle.
     discontinuedAt: z.string().datetime().nullable().optional(),
+    // 0176 — tier change (PRICE_1/2/3).
+    tier: fabricTierSchema.optional(),
   })
   .strict();
 export type SofaFabricPatchInput = z.infer<typeof sofaFabricPatchInput>;

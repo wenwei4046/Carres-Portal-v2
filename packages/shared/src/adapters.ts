@@ -75,6 +75,33 @@ export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
   surcharge: Number(r.surcharge),
   colors: r.colors,
   discontinuedAt: r.discontinued_at,
+  // 0176 — default to PRICE_1 if the column is absent on a legacy row fetched
+  // before the migration applied (belt-and-suspenders; the DB default also
+  // sets PRICE_1 for all pre-existing rows).
+  tier: (r.tier ?? "PRICE_1") as D.FabricTier,
+});
+
+/**
+ * Maps a `fabric_tier_addon_config` row to the camelCase domain shape.
+ * Postgres numeric(12,2) columns surface as strings or numbers depending on
+ * the PostgREST version; `Number()` normalises both.
+ */
+export const fabricTierConfigFromRow = (r: DB.FabricTierAddonConfigRow): D.FabricTierConfig => ({
+  sofaTier2Delta: Number(r.sofa_tier2_delta),
+  sofaTier3Delta: Number(r.sofa_tier3_delta),
+});
+
+/**
+ * Maps a `model_fabric_tier_overrides` row to the camelCase domain shape.
+ * Nullable deltas: `null` means "inherit from global" and must stay null
+ * (not coerced to 0) so callers can distinguish "set to zero" from "unset".
+ */
+export const modelFabricTierOverrideFromRow = (
+  r: DB.ModelFabricTierOverrideRow,
+): D.ModelFabricTierOverride => ({
+  modelId: r.model_id,
+  tier2Delta: r.tier2_delta == null ? null : Number(r.tier2_delta),
+  tier3Delta: r.tier3_delta == null ? null : Number(r.tier3_delta),
 });
 
 export const addonFromRow = (r: DB.AddonRow): D.Addon => ({

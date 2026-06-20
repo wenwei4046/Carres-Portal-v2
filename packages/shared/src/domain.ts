@@ -4,12 +4,16 @@
  */
 
 import type { CostSource, OperationStage } from "./db-types";
+import type { FabricTier } from "./fabric-tier";
 
 // Re-exported so UI code can write `import type { CostSource } from
 // "@carres/shared/domain"` alongside the rest of the camelCase surface.
 // The enum labels themselves are 1:1 with DB (snake-cased like the other DB
 // enums consumed in domain types — see Order.status, PartnerStage, etc.).
 export type { CostSource };
+
+// 0176 — fabric tier type re-exported for UI consumption.
+export type { FabricTier };
 
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
@@ -92,6 +96,27 @@ export interface SofaFabric {
   // product_models.colors[] pattern.
   colors: string[] | null;
   discontinuedAt?: string | null;
+  // 0176 — price tier. PRICE_1 = base (no delta), PRICE_2/3 = mid/premium.
+  tier: FabricTier;
+}
+
+/**
+ * Global fabric tier config singleton (migration 0176). Sourced from the
+ * `fabric_tier_addon_config` table (id=1). Deltas are in RM and always >= 0.
+ */
+export interface FabricTierConfig {
+  sofaTier2Delta: number;
+  sofaTier3Delta: number;
+}
+
+/**
+ * Per-model fabric tier delta override (migration 0176). Keyed by model UUID.
+ * Nullable deltas mean "inherit from global config" — 0 is a valid set value.
+ */
+export interface ModelFabricTierOverride {
+  modelId: string;
+  tier2Delta: number | null;
+  tier3Delta: number | null;
 }
 
 export interface Addon {

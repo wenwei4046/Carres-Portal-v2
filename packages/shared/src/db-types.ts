@@ -160,6 +160,35 @@ export interface SofaFabricRow {
   colors: string[] | null;
   // 0074 — soft-delete flag for the catalog admin UI.
   discontinued_at: string | null;
+  // 0176 — price tier (PRICE_1|PRICE_2|PRICE_3). DEFAULT 'PRICE_1' in DB;
+  // the adapter falls back to 'PRICE_1' if absent for safety.
+  tier: string;
+}
+
+/**
+ * `fabric_tier_addon_config` (migration 0176). Singleton row (id=1) that holds
+ * the global tier price delta for mid and premium sofa fabrics. `updated_at` +
+ * `updated_by` track who last changed the config in the Catalog admin UI.
+ */
+export interface FabricTierAddonConfigRow {
+  id: number;
+  sofa_tier2_delta: number;
+  sofa_tier3_delta: number;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `model_fabric_tier_overrides` (migration 0176). Optional per-model tier delta
+ * override keyed by `model_id` (PK). `tier2_delta` / `tier3_delta` are nullable —
+ * NULL means "inherit from global config"; 0 means "explicitly no premium".
+ */
+export interface ModelFabricTierOverrideRow {
+  model_id: string;
+  tier2_delta: number | null;
+  tier3_delta: number | null;
+  updated_at: string;
+  updated_by: string | null;
 }
 
 export interface AddonRow {
