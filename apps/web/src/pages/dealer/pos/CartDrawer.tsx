@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { X, Trash2, Minus, Plus } from "lucide-react";
 import { rm } from "@/lib/format-currency";
 import {
   step2Valid,
@@ -57,104 +58,147 @@ export default function CartDrawer({
   const empty = draft.lines.length === 0 && draft.addons.length === 0;
 
   return (
-    <div
-      onClick={onClose}
-      role="presentation"
-      className="fixed inset-0 z-[60] flex justify-end"
-      style={{ background: "rgba(34,31,32,0.55)" }}
-    >
+    <>
+      {/* Ink-wash + blur scrim */}
       <div
-        onClick={(e) => e.stopPropagation()}
+        onClick={onClose}
+        role="presentation"
+        className="pos-drawer-scrim"
+        aria-hidden="true"
+      />
+
+      {/* White slide-in panel */}
+      <div
+        className="fixed inset-y-0 right-0 z-[60] flex flex-col bg-white animate-drawer-slide-in"
+        style={{
+          width: 460,
+          maxWidth: "100vw",
+          boxShadow: "-4px 0 32px rgba(17,24,39,0.12)",
+        }}
         role="dialog"
         aria-modal="true"
         aria-label="Cart"
-        className="bg-card text-card-foreground border-l border-base-200 h-screen flex flex-col"
-        style={{ width: 460, maxWidth: "100vw" }}
         data-testid="pos-cart-drawer"
       >
-        <header className="px-6 pt-5 pb-3.5 border-b border-base-100 flex items-center justify-between gap-4">
+        {/* Header */}
+        <header
+          className="px-6 pt-5 pb-4 flex items-center justify-between gap-4 shrink-0"
+          style={{ borderBottom: "1px solid hsl(var(--base-200))" }}
+        >
           <div>
-            <p className="kicker">Customer order</p>
-            <h2 className="t-h3 mt-0.5">
+            <p className="kicker mb-0.5">Customer order</p>
+            <h2 className="t-h3">
               {items} item{items === 1 ? "" : "s"}
             </h2>
           </div>
           <button
             onClick={onClose}
-            aria-label="Close"
-            className="btn-ghost text-xl leading-none px-2 py-1"
+            aria-label="Close cart"
+            className="btn-ghost p-2 shrink-0"
           >
-            ×
+            <X size={18} strokeWidth={1.75} />
           </button>
         </header>
 
+        {/* Scrollable line list */}
         <div className="flex-1 overflow-auto px-6 py-4">
           {empty ? (
-            <p className="t-small text-base-500 text-center py-10">
+            <p className="t-small text-base-500 text-center py-12">
               Your cart is empty — pick a product to get started.
             </p>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               {draft.lines.map((l) => (
-                <div key={l.localId} className="flex items-start justify-between gap-3">
+                <div key={l.localId} className="pos-card p-3 flex items-start gap-3">
+                  {/* Product photo placeholder */}
+                  <div
+                    className="shrink-0 rounded-xl bg-base-100 flex items-center justify-center text-base-400"
+                    style={{ width: 56, height: 56, fontSize: 22 }}
+                    aria-hidden="true"
+                  >
+                    ▦
+                  </div>
+
+                  {/* Name + SKU + qty stepper */}
                   <div className="min-w-0 flex-1">
-                    <div className="t-small truncate">{l.label}</div>
-                    <div className="font-mono text-[10px] text-base-500 mt-0.5">
-                      {rm(l.unitPrice)} ea · {l.sku}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-1.5">
+                    <div className="t-small font-medium text-base-900 truncate">{l.label}</div>
+                    <div className="font-mono text-[11px] text-base-500 mt-0.5">{l.sku}</div>
+
+                    {/* Pill stepper */}
+                    <div className="flex items-center gap-2 mt-2">
                       <button
                         type="button"
                         onClick={() => bumpLineQty(l.localId, -1)}
-                        className="px-1.5 py-0.5 text-[11px] border border-base-200 rounded hover:border-primary/40"
+                        disabled={l.qty <= 1}
                         aria-label="Decrease quantity"
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-base-200 text-base-600 transition-colors hover:border-base-400 hover:text-base-900 disabled:opacity-30 disabled:cursor-not-allowed"
                       >
-                        −
+                        <Minus size={13} strokeWidth={1.75} />
                       </button>
-                      <span className="font-mono text-[11px] w-6 text-center">{l.qty}</span>
+                      <span className="font-mono text-[13px] font-semibold w-6 text-center text-base-900">
+                        {l.qty}
+                      </span>
                       <button
                         type="button"
                         onClick={() => bumpLineQty(l.localId, 1)}
-                        className="px-1.5 py-0.5 text-[11px] border border-base-200 rounded hover:border-primary/40"
                         aria-label="Increase quantity"
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-base-200 text-base-600 transition-colors hover:border-base-400 hover:text-base-900"
                       >
-                        +
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeLine(l.localId)}
-                        className="ml-2 text-[10px] text-base-500 hover:text-destructive"
-                      >
-                        Remove
+                        <Plus size={13} strokeWidth={1.75} />
                       </button>
                     </div>
                   </div>
-                  <span className="font-mono text-[13px] font-semibold whitespace-nowrap">
-                    {rm(l.unitPrice * l.qty)}
-                  </span>
+
+                  {/* Line price + remove */}
+                  <div className="shrink-0 flex flex-col items-end gap-2 pt-0.5">
+                    <span className="pos-price text-[16px]">
+                      <span className="pos-price-rm">RM</span>
+                      {(l.unitPrice * l.qty).toLocaleString()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeLine(l.localId)}
+                      aria-label={`Remove ${l.label}`}
+                      className="text-base-400 hover:text-destructive transition-colors"
+                    >
+                      <Trash2 size={15} strokeWidth={1.75} />
+                    </button>
+                  </div>
                 </div>
               ))}
 
+              {/* Add-ons */}
               {draft.addons.length > 0 && (
-                <div className="border-t border-base-100 pt-3 flex flex-col gap-2">
+                <div
+                  className="flex flex-col gap-3 pt-3"
+                  style={{ borderTop: "1px solid hsl(var(--base-100))" }}
+                >
                   {draft.addons.map((a) => (
-                    <div key={a.key} className="flex items-start justify-between gap-3 text-base-600">
+                    <div
+                      key={a.key}
+                      className="flex items-start justify-between gap-3 text-base-600"
+                    >
                       <div className="min-w-0 flex-1">
                         <div className="t-small">
                           + {a.name}
-                          {a.attrs?.size && <span className="text-base-700"> · {a.attrs.size}</span>}
-                          {a.qty > 1 && <span className="text-base-500"> ×{a.qty}</span>}
+                          {a.attrs?.size && (
+                            <span className="text-base-700"> · {a.attrs.size}</span>
+                          )}
+                          {a.qty > 1 && (
+                            <span className="text-base-500"> ×{a.qty}</span>
+                          )}
                         </div>
                         <button
                           type="button"
                           onClick={() => removeAddon(a.key)}
-                          className="text-[10px] text-base-500 hover:text-destructive mt-0.5"
+                          className="text-[11px] text-base-500 hover:text-destructive mt-0.5 transition-colors"
                         >
                           Remove
                         </button>
                       </div>
-                      <span className="font-mono text-[13px] font-semibold whitespace-nowrap">
-                        {rm(a.unitPrice * a.qty)}
+                      <span className="pos-price text-[14px] shrink-0">
+                        <span className="pos-price-rm">RM</span>
+                        {(a.unitPrice * a.qty).toLocaleString()}
                       </span>
                     </div>
                   ))}
@@ -164,36 +208,52 @@ export default function CartDrawer({
           )}
         </div>
 
-        <footer className="px-6 py-4 border-t border-base-100 bg-base-50">
-          <div className="flex justify-between text-base-600 t-small">
+        {/* Footer — subtotal + total + proceed */}
+        <footer
+          className="px-6 py-5 shrink-0 bg-white"
+          style={{ borderTop: "1px solid hsl(var(--base-200))" }}
+        >
+          <div className="flex justify-between items-center text-base-600 t-small">
             <span>Items subtotal</span>
             <span className="font-mono">{rm(lineSub)}</span>
           </div>
           {addonSub > 0 && (
-            <div className="flex justify-between text-base-600 t-small mt-1">
+            <div className="flex justify-between items-center text-base-600 t-small mt-1.5">
               <span>Add-ons</span>
               <span className="font-mono">{rm(addonSub)}</span>
             </div>
           )}
-          <div className="flex justify-between mt-2 pt-2 border-t border-base-200">
-            <span className="t-h4">Total</span>
-            <span className="font-mono text-base font-bold">{rm(total)}</span>
-          </div>
-          <p className="t-tiny text-base-500 mt-1">Stair carry (if any) is added at the next step.</p>
 
+          {/* Total row */}
+          <div
+            className="flex justify-between items-baseline mt-3 pt-3"
+            style={{ borderTop: "1px solid hsl(var(--base-200))" }}
+          >
+            <span className="t-h4 text-base-900">Total</span>
+            <span className="pos-price text-[26px]">
+              <span className="pos-price-rm">RM</span>
+              {total.toLocaleString()}
+            </span>
+          </div>
+
+          <p className="t-tiny text-base-500 mt-1.5">
+            Stair carry (if any) is added at the next step.
+          </p>
+
+          {/* Proceed — BLACK btn-primary (flame belongs to the FAB) */}
           <button
             type="button"
             onClick={onProceed}
             disabled={!ready}
-            className="btn-primary w-full mt-3"
+            className="btn-primary w-full mt-4"
           >
             Proceed to Customer →
           </button>
           {!ready && blockReason && (
-            <p className="t-tiny text-warning text-center mt-1.5">{blockReason}</p>
+            <p className="t-tiny text-warning text-center mt-2">{blockReason}</p>
           )}
         </footer>
       </div>
-    </div>
+    </>
   );
 }

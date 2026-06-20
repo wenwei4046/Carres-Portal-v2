@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import type { ProductModelDto, ProductSkuDto, SofaFabricDto } from "@carres/shared";
-import { rm } from "@/lib/format-currency";
+import { X } from "lucide-react";
+import type { ProductModelDto, ProductSkuDto, SofaFabricDto, FabricTierGlobalConfig, ModelFabricTierOverrideDto } from "@carres/shared";
 import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import type { DraftLine } from "../new-order/draft";
 import { ConfiguratorForModel } from "../new-order/configurators";
@@ -19,6 +19,8 @@ export default function ConfigureDrawer({
   meta,
   skus,
   fabrics,
+  fabricTierConfig,
+  modelFabricTierOverrides,
   onAdd,
   onClose,
 }: {
@@ -26,6 +28,8 @@ export default function ConfigureDrawer({
   meta: ModelMeta | undefined;
   skus: ProductSkuDto[];
   fabrics: SofaFabricDto[];
+  fabricTierConfig?: FabricTierGlobalConfig | null;
+  modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -38,52 +42,66 @@ export default function ConfigureDrawer({
   }, [onClose]);
 
   return (
-    <div
-      onClick={onClose}
-      role="presentation"
-      className="fixed inset-0 z-[60] flex justify-end"
-      style={{ background: "rgba(34,31,32,0.55)" }}
-    >
+    <>
+      {/* Ink-wash + blur scrim */}
       <div
-        onClick={(e) => e.stopPropagation()}
+        onClick={onClose}
+        role="presentation"
+        className="pos-drawer-scrim"
+        aria-hidden="true"
+      />
+
+      {/* White slide-in panel */}
+      <div
+        className="fixed inset-y-0 right-0 z-[60] flex flex-col bg-white animate-drawer-slide-in"
+        style={{
+          width: 460,
+          maxWidth: "100vw",
+          boxShadow: "-4px 0 32px rgba(17,24,39,0.12)",
+        }}
         role="dialog"
         aria-modal="true"
         aria-label={`Configure ${model.name}`}
-        className="bg-card text-card-foreground border-l border-base-200 h-screen overflow-auto flex flex-col"
-        style={{ width: 460, maxWidth: "100vw" }}
         data-testid="pos-configure-drawer"
       >
-        <header className="px-6 pt-5 pb-3.5 border-b border-base-100 flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="kicker text-base-400">{CATEGORY_LABEL[model.category]}</p>
-            <h2 className="t-h3 mt-0.5 truncate">{model.name}</h2>
+        {/* Header — model name + live-price hero */}
+        <header
+          className="px-6 pt-5 pb-4 flex items-start justify-between gap-4"
+          style={{ borderBottom: "1px solid hsl(var(--base-200))" }}
+        >
+          <div className="min-w-0 flex-1">
+            <p className="kicker mb-0.5">{CATEGORY_LABEL[model.category]}</p>
+            <h2 className="t-h3 truncate">{model.name}</h2>
             {meta && (
-              <p className="t-tiny text-base-500 mt-0.5">
-                From{" "}
-                <span className="font-mono font-semibold text-base-900">
-                  {rm(meta.fromPrice)}
+              <p className="mt-1 leading-none">
+                <span className="pos-price-rm t-tiny">From RM</span>
+                <span className="pos-price text-[22px]">
+                  {meta.fromPrice.toLocaleString()}
                 </span>
               </p>
             )}
           </div>
           <button
             onClick={onClose}
-            aria-label="Close"
-            className="btn-ghost text-xl leading-none px-2 py-1"
+            aria-label="Close configure drawer"
+            className="btn-ghost p-2 mt-0.5 shrink-0"
           >
-            ×
+            <X size={18} strokeWidth={1.75} />
           </button>
         </header>
 
-        <div className="p-6 flex-1">
+        {/* Configurator body */}
+        <div className="p-6 flex-1 overflow-auto">
           {model.blurb && (
-            <p className="t-small text-base-600 mb-4">{model.blurb}</p>
+            <p className="t-small text-base-500 mb-5">{model.blurb}</p>
           )}
           <ConfiguratorForModel
             key={model.id}
             model={model}
             skus={skus}
             fabrics={fabrics}
+            fabricTierConfig={fabricTierConfig}
+            modelFabricTierOverrides={modelFabricTierOverrides}
             onAdd={(line) => {
               onAdd(line);
               onClose();
@@ -91,6 +109,6 @@ export default function ConfigureDrawer({
           />
         </div>
       </div>
-    </div>
+    </>
   );
 }

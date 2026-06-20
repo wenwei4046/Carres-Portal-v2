@@ -183,7 +183,7 @@ function Section({
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="font-display text-base font-semibold tracking-[-0.01em]">{title}</h3>
+        <h3 className="kicker">{title}</h3>
         {hint && <p className="text-[11px] text-base-500">{hint}</p>}
       </div>
       {children}
@@ -223,7 +223,10 @@ function InlineCheckbox({
 }
 
 function inputClass({ disabled }: { disabled?: boolean } = {}) {
-  return `w-full px-3 py-2.5 border border-base-300 rounded text-sm outline-none focus:border-primary ${
-    disabled ? "bg-base-50 text-base-500 cursor-not-allowed" : "bg-white"
+  // 2990s re-skin: rounded-xl, 1.5px border, flame focus ring.
+  return `w-full px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl text-sm outline-none transition-colors ${
+    disabled
+      ? "bg-base-50 text-base-500 cursor-not-allowed border-base-300"
+      : "bg-white focus:border-primary focus:ring-2 focus:ring-primary/10"
   }`;
 }

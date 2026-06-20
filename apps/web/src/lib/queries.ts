@@ -80,6 +80,8 @@ import {
   type SoGridResponse,
   type SoGridConfig,
   type UpdateSoGridConfigInput,
+  type FabricTierConfigDto,
+  type ModelFabricTierOverrideDto,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadModelPhoto } from "./photo-upload";
@@ -4527,6 +4529,71 @@ export function useDeleteSofaFabric() {
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/sofa-fabrics/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// 0176 — Alias so callers can use the Task-5 brief's naming convention.
+// Both names are exported; the underlying hook is the same.
+export { usePatchSofaFabric as useUpdateSofaFabric };
+
+/**
+ * PATCH /api/catalog/fabric-tier-config — update the global tier deltas
+ * (sofaTier2Delta / sofaTier3Delta). Principal-only at the RLS layer.
+ * Invalidates the whole `['catalog']` tree so the admin bundle re-fetches.
+ */
+export function useUpdateFabricTierConfig(
+  opts?: Partial<UseMutationOptions<{ fabricTierConfig: FabricTierConfigDto }, ApiError, FabricTierConfigDto>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ fabricTierConfig: FabricTierConfigDto }, ApiError, FabricTierConfigDto>({
+    mutationFn: (input) =>
+      apiFetch<{ fabricTierConfig: FabricTierConfigDto }>(
+        "/api/catalog/fabric-tier-config",
+        catalogJson("PATCH", input),
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["catalog"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * PUT /api/catalog/model-fabric-tier-override/:modelId — upsert a per-model
+ * tier delta override. Pass `tier2Delta: null` / `tier3Delta: null` to revert
+ * that tier's delta to the global config. Principal-only at the RLS layer.
+ * Invalidates the whole `['catalog']` tree.
+ */
+export function useUpsertModelFabricTierOverride(
+  opts?: Partial<
+    UseMutationOptions<
+      { override: ModelFabricTierOverrideDto },
+      ApiError,
+      { modelId: string; tier2Delta: number | null; tier3Delta: number | null }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { override: ModelFabricTierOverrideDto },
+    ApiError,
+    { modelId: string; tier2Delta: number | null; tier3Delta: number | null }
+  >({
+    mutationFn: ({ modelId, tier2Delta, tier3Delta }) =>
+      apiFetch<{ override: ModelFabricTierOverrideDto }>(
+        `/api/catalog/model-fabric-tier-override/${modelId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tier2Delta, tier3Delta }),
+        },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["catalog"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }
 

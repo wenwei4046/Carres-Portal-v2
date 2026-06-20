@@ -8,19 +8,21 @@ import type {
 } from "@carres/shared";
 import { PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useDeleteCatalogSku, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../components/atoms";
+import { skuMargin } from "../margin";
 import NewSkuModal from "./NewSkuModal";
 import EditSkuModal from "./EditSkuModal";
 
 /**
- * SKU Master — flat 7-column product table (+ a leading select column for bulk
- * delete). Columns: Product code · Description · Product name · Category ·
- * Size · Price · Status. Filter by category + free-text search; "Edit Prices"
- * flips the Price column to inline inputs (commit on blur, verified by the
- * catalog re-fetch the patch triggers). Price 0 renders as a muted "not set" —
- * we NEVER surface cost here (cost is the PO side; it lives on Create-PO).
+ * SKU Master — flat product table with cost + plan-margin visibility for the
+ * Master Admin. Columns: Product code · Description · Product name · Category ·
+ * Size · Price · Cost · Margin · Status. Filter by category + free-text search;
+ * "Edit Prices" flips the Price and Cost cells to inline inputs (commit on blur,
+ * verified by the catalog re-fetch the patch triggers). Price 0 renders as a
+ * muted "not set"; Cost null renders as a muted "not set" — NEVER coerced to 0.
  *
  * Performance: the live catalog has 1000+ SKUs. We render at most VISIBLE_CAP
  * rows and show a "refine your filter" banner past that, rather than mount
@@ -28,7 +30,8 @@ import EditSkuModal from "./EditSkuModal";
  */
 
 const VISIBLE_CAP = 300;
-const GRID_COLS = "32px 150px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 130px 92px 60px";
+// 9 columns: checkbox · code · desc · product · category · size · price · cost · margin · status · edit
+const GRID_COLS = "32px 150px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 110px 90px 92px 60px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -47,6 +50,12 @@ function fmtPrice(n: number): string {
 }
 
 export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) {
+  // Phase 2 (0175): only the principal ("Master Admin") may set/change SKU
+  // price + cost. Non-principal internal users see those cells read-only — the
+  // inline price/cost editor + the per-row Edit modal's price/cost fields are
+  // gated. Every other catalog edit (pos_active, description, name, delete,
+  // + New SKU as UNPRICED) stays available.
+  const isPrincipal = useAuth((s) => s.role) === "principal";
   const [category, setCategory] = useState<CatFilter>("all");
   const [search, setSearch] = useState("");
   const [editMode, setEditMode] = useState(false);
@@ -178,14 +187,24 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               {del.isPending ? "Working…" : `Delete ${selected.size}`}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setEditMode((v) => !v)}
-            className={`${editMode ? "btn-secondary" : "btn-primary"} text-[12px]`}
-            data-testid="sku-edit-prices"
-          >
-            {editMode ? "Done editing" : "Edit Prices"}
-          </button>
+          {isPrincipal ? (
+            <button
+              type="button"
+              onClick={() => setEditMode((v) => !v)}
+              className={`${editMode ? "btn-secondary" : "btn-primary"} text-[12px]`}
+              data-testid="sku-edit-prices"
+            >
+              {editMode ? "Done editing" : "Edit Prices"}
+            </button>
+          ) : (
+            <span
+              className="t-tiny text-base-400 italic"
+              data-testid="sku-price-lock-hint"
+              title="Price + cost are set by the principal (Master Admin)"
+            >
+              Prices: Master Admin only
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setNewOpen(true)}
@@ -228,6 +247,8 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <div className="label">Category</div>
           <div className="label">Size</div>
           <div className="label text-right">Price</div>
+          <div className="label text-right">Cost</div>
+          <div className="label text-right">Margin</div>
           <div className="label">Status</div>
           <div className="label" />
         </div>
@@ -242,7 +263,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <SkuRowView
             key={r.sku.id}
             row={r}
-            editMode={editMode}
+            editMode={editMode && isPrincipal}
             selected={selected.has(r.sku.id)}
             onToggle={toggleRow}
             onEdit={setEditRow}
@@ -274,6 +295,8 @@ const SkuRowView = memo(function SkuRowView({
   const { sku, category, productName } = row;
   const patch = usePatchCatalogSku();
   const discontinued = !!sku.discontinuedAt;
+  const margin = skuMargin(sku.price, sku.cost);
+  const marginLabel = category === "sofa" ? "base margin" : "plan margin";
 
   function commitPrice(raw: string) {
     const trimmed = raw.trim();
@@ -288,6 +311,25 @@ const SkuRowView = memo(function SkuRowView({
       { id: sku.id, patch: { price: val } },
       {
         onSuccess: () => toast.success(`${sku.sku} · price updated`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  function commitCost(raw: string) {
+    const trimmed = raw.trim();
+    // blank input → set cost to null ("not set")
+    const val = trimmed === "" ? null : Number(trimmed);
+    if (val !== null && (!Number.isFinite(val) || val < 0)) {
+      toast.error("Enter a non-negative number");
+      return;
+    }
+    if (val === sku.cost) return;
+    patch.mutate(
+      { id: sku.id, patch: { cost: val } },
+      {
+        onSuccess: () => toast.success(`${sku.sku} · cost updated`),
         onError: (e: unknown) =>
           toast.error(e instanceof ApiError ? e.message : "Update failed"),
       },
@@ -319,6 +361,8 @@ const SkuRowView = memo(function SkuRowView({
         {category ? CATEGORY_LABEL[category] : "—"}
       </div>
       <div className="t-small text-base-700">{sku.variant}</div>
+
+      {/* Price */}
       <div className="text-right">
         {editMode ? (
           <input
@@ -339,6 +383,47 @@ const SkuRowView = memo(function SkuRowView({
           <span className="font-mono text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
         )}
       </div>
+
+      {/* Cost */}
+      <div className="text-right" data-testid={`sku-cost-${sku.sku}`}>
+        {editMode ? (
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            defaultValue={sku.cost ?? ""}
+            placeholder="—"
+            onBlur={(e) => commitCost(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            aria-label={`${sku.sku} cost`}
+            className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+          />
+        ) : sku.cost === null ? (
+          <span className="t-tiny text-base-400 italic">not set</span>
+        ) : (
+          <span className="font-mono text-[12px] text-base-700">{fmtPrice(sku.cost)}</span>
+        )}
+      </div>
+
+      {/* Margin */}
+      <div className="text-right" data-testid={`sku-margin-${sku.sku}`}>
+        {margin === null ? (
+          <span className="t-tiny text-base-400 italic" title={`${marginLabel} · cost not set`}>—</span>
+        ) : (
+          <span
+            className={`font-mono text-[12px] ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
+            title={marginLabel}
+          >
+            {fmtPrice(margin.amount)}
+            <span className="text-base-400 text-[10px] ml-0.5">
+              {(margin.pct * 100).toFixed(1)}%
+            </span>
+          </span>
+        )}
+      </div>
+
       <div>
         {discontinued ? (
           <span className="pill pill-neutral">Discontinued</span>

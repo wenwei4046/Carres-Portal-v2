@@ -1,3 +1,5 @@
+import { Lock } from "lucide-react";
+
 export type RailKey = "all" | "mattress" | "bedframe" | "sofa" | "addons";
 
 export interface RailEntry {
@@ -12,9 +14,9 @@ export interface RailEntry {
 
 /**
  * Left category rail for the POS catalog — "All products / Mattress / Bed
- * Frame / Sofa / Add-ons" with per-entry counts. Active entry fills ink-black
- * (same token logic as the catalog `CategoryChip`, vertical layout). Locked
- * entries grey out with a 🔒 per the sofa-mutex rule.
+ * Frame / Sofa / Add-ons" with per-entry counts. Active entry = flame text +
+ * flame left-accent bar. Locked entries = grey + Lucide Lock icon (stroke
+ * 1.75) — sofa-mutex. Counts + mutex bounce logic: UNCHANGED.
  */
 export default function CategoryRail({
   entries,
@@ -44,19 +46,34 @@ export default function CategoryRail({
                 : undefined
             }
             data-testid={`pos-rail-${e.key}`}
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-left transition-colors ${
+            className={[
+              "relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-colors",
               e.locked
-                ? "text-base-400 cursor-not-allowed"
+                ? "text-base-300 cursor-not-allowed"
                 : isActive
-                  ? "bg-base-900 text-white"
-                  : "text-base-700 hover:bg-base-100"
-            }`}
+                  ? "text-primary bg-primary/6 font-semibold"
+                  : "text-base-600 hover:bg-base-100",
+            ].join(" ")}
           >
-            <span className="w-4 text-center text-[13px]">{e.locked ? "🔒" : e.icon}</span>
-            <span className="t-small font-semibold flex-1 truncate">{e.label}</span>
+            {/* Flame left-accent bar for active entry */}
+            {isActive && !e.locked && (
+              <span
+                className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-primary"
+                aria-hidden="true"
+              />
+            )}
+
+            <span className="w-4 text-center text-[13px] select-none flex items-center justify-center">
+              {e.locked ? (
+                <Lock size={13} strokeWidth={1.75} />
+              ) : (
+                <span>{e.icon}</span>
+              )}
+            </span>
+            <span className="t-small flex-1 truncate">{e.label}</span>
             <span
-              className={`font-mono text-[11px] ${
-                isActive ? "text-white/70" : "text-base-400"
+              className={`font-mono text-[11px] tabular-nums ${
+                isActive ? "text-primary/70" : "text-base-400"
               }`}
             >
               {e.count}

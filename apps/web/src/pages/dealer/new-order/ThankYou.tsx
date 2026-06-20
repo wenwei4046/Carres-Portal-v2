@@ -1,3 +1,4 @@
+import { CheckCircle2 } from "lucide-react";
 import type { Order } from "@carres/shared";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import { useAuth } from "@/lib/auth";
@@ -11,8 +12,11 @@ interface Props {
 }
 
 /**
- * Post-submit confirmation screen — proto-faithful: solid sage success badge
- * + "Thank you" hero + "What's next" 3-step list + two CTA buttons.
+ * Post-submit confirmation screen — 2990s confirmed-screen feel:
+ * flame CheckCircle2 icon in a flame-tinted ring, CO-{so} order ref heading,
+ * what's-next numbered list, Download Sales Order, and two CTAs:
+ *   • "+ New order"  → flame .btn-hero  (resets draft, stays in POS)
+ *   • "View orders"  → .btn-secondary   (clears draft, navigates away)
  *
  * Order ID format: `CO-{so}` where so is the dealer-local sequence (the DB
  * column populated by create_order RPC). Same display string the dealer
@@ -21,34 +25,60 @@ interface Props {
 export default function ThankYou({ order, onNewOrder, onClose }: Props) {
   const role = useAuth((s) => s.role);
   return (
-    <div className="text-center overflow-hidden">
-      <div className="px-9 pt-11 pb-7 bg-base-50">
-        <div className="w-16 h-16 mx-auto mb-[18px] rounded-full bg-success text-white grid place-items-center text-[28px] leading-none">
-          ✓
+    <div className="animate-page-enter overflow-hidden">
+      {/* ── Hero band ── */}
+      <div className="px-9 pt-12 pb-8 text-center">
+        {/* Flame ring + icon */}
+        <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-primary/10 grid place-items-center">
+          <CheckCircle2
+            size={32}
+            strokeWidth={1.75}
+            className="text-primary"
+            aria-hidden="true"
+          />
         </div>
-        <div className="font-display text-[32px] tracking-[-0.025em] font-semibold leading-tight">
-          Thank you
-        </div>
-        <div className="text-sm text-base-600 mt-1.5">
-          Order <span className="font-mono font-semibold text-base-900">CO-{order.so}</span> has
-          been submitted to Carres.
-        </div>
+
+        {/* Order ref */}
+        <p className="kicker mb-2">Order confirmed</p>
+        <h1 className="t-h2 font-semibold tracking-[-0.025em] text-base-900">
+          CO-{order.so}
+        </h1>
+        <p className="t-body text-base-500 mt-1">
+          Submitted to Carres — we'll take it from here.
+        </p>
       </div>
-      <div className="px-9 pt-5 pb-7 text-left">
-        <div className="label mb-1.5">What's next</div>
-        <ol className="m-0 pl-[18px] text-[13px] text-base-700 leading-[1.7] font-body list-decimal">
-          <li>
-            Order sits in <strong>Place</strong> until you click <em>Proceed</em> when the
-            customer is ready.
-          </li>
-          <li>operation will issue a PO and prepare the goods.</li>
-          <li>
-            Once the DO is submitted, the order moves to <strong>Delivered</strong>.
-          </li>
-        </ol>
+
+      {/* ── Body ── */}
+      <div className="px-9 pb-9 text-left space-y-6">
+        {/* What's next */}
+        <div>
+          <p className="kicker mb-3">What happens next</p>
+          <ol className="list-none m-0 p-0 space-y-3">
+            {[
+              <>
+                Order sits in <strong className="text-base-800">Place</strong> until you click{" "}
+                <em>Proceed</em> when the customer is ready.
+              </>,
+              "Operation will issue a PO and prepare the goods.",
+              <>
+                Once the DO is submitted, the order moves to{" "}
+                <strong className="text-base-800">Delivered</strong>.
+              </>,
+            ].map((step, i) => (
+              <li key={i} className="flex gap-3 items-start">
+                <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary t-tiny font-semibold grid place-items-center">
+                  {i + 1}
+                </span>
+                <span className="t-body text-base-600 leading-snug">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        {/* Download SO */}
         {role && (
-          <div className="mt-[22px]">
-            <div className="label mb-1.5">Print for customer</div>
+          <div>
+            <p className="kicker mb-2">Print for customer</p>
             <DownloadSalesOrderButton
               orderId={order.id}
               so={order.so}
@@ -58,11 +88,14 @@ export default function ThankYou({ order, onNewOrder, onClose }: Props) {
             />
           </div>
         )}
-        <div className="flex gap-2.5 mt-[22px]">
-          <button type="button" onClick={onNewOrder} className="btn-secondary flex-1">
+
+        {/* CTAs */}
+        <div className="flex flex-col gap-2.5 pt-1">
+          {/* ONE flame hero CTA on this screen */}
+          <button type="button" onClick={onNewOrder} className="btn-hero w-full">
             + New order
           </button>
-          <button type="button" onClick={onClose} className="btn-primary flex-1">
+          <button type="button" onClick={onClose} className="btn-secondary w-full">
             View orders
           </button>
         </div>

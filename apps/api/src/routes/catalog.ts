@@ -11,12 +11,16 @@ import {
   productSkuPatchInput,
   sofaFabricCreateInput,
   sofaFabricPatchInput,
+  fabricTierConfigSchema,
+  modelFabricTierOverrideSchema,
   sizesActiveInput,
   generateSkusInput,
   floorConfigPatchInput,
   addonCreateInput,
   addonPatchInput,
   PRODUCT_MODEL_PHOTOS_BUCKET,
+  FABRIC_TIER_ADDON_CONFIG,
+  MODEL_FABRIC_TIER_OVERRIDES,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
@@ -43,6 +47,53 @@ function internalOnly(c: { var: { auth: { role: string } } }) {
   const role = c.var.auth.role;
   if (role !== "operation" && role !== "principal") {
     throw new HTTPException(403, { message: "operation/principal only" });
+  }
+}
+
+// 0176 — fabric-tier config + override writes are principal-only.
+// Same gate pattern as the 0175 SKU price/cost lock: early 403 before the
+// DB round-trip; RLS is still the real enforcement boundary.
+function principalOnly(c: { var: { auth: { role: string } } }) {
+  if (c.var.auth.role !== "principal") {
+    throw new HTTPException(403, {
+      message: "Only the principal (Master Admin) can modify fabric tier configuration",
+    });
+  }
+}
+
+// Phase 2 Master-Admin pricing lock (migration 0175): only the principal may
+// SET or CHANGE product_skus.price / .cost. The DB trigger
+// (enforce_sku_price_cost_principal_only) is the real boundary — the catalog
+// write path forwards the USER JWT (userClient), so RLS + the trigger run; this
+// early gate just turns the raw 42501 into a clean, friendly 403 before the
+// round-trip. All OTHER catalog edits (pos_active, description, name, modular,
+// add-ons, supplier_id) stay open to internal roles.
+const SKU_PRICE_COST_ERROR =
+  "Only the principal (Master Admin) can set SKU price or cost";
+
+// POST /skus: a non-principal MAY create an UNPRICED sku (price 0 / cost null);
+// block only when they try to seed a price or cost.
+function gateSkuCreatePriceCost(
+  c: { var: { auth: { role: string } } },
+  data: { price: number; cost?: number | null },
+) {
+  if (c.var.auth.role === "principal") return;
+  const setsPrice = data.price !== 0;
+  const setsCost = data.cost !== null && data.cost !== undefined;
+  if (setsPrice || setsCost) {
+    throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
+  }
+}
+
+// PATCH /skus/:id: block when a non-principal includes a price or cost key at
+// all (presence = intent to change; `cost: null` clearing counts as a change).
+function gateSkuPatchPriceCost(
+  c: { var: { auth: { role: string } } },
+  data: { price?: number; cost?: number | null },
+) {
+  if (c.var.auth.role === "principal") return;
+  if (data.price !== undefined || data.cost !== undefined) {
+    throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
   }
 }
 
@@ -87,20 +138,28 @@ catalogRouter.get("/", async (c) => {
   // consumers (dealer wizard, Create-PO modal) get the default filtered list.
   const adminMode = c.req.query("admin") === "true";
 
-  // Run the 5 small queries in parallel — each is a simple `select *` against a
+  // Run the 7 small queries in parallel — each is a simple `select *` against a
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
+  // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
     sb.from("addons").select("*").eq("active", true),
     sb.from("floor_config").select("*").eq("id", 1).maybeSingle(),
+    // 0176 — singleton row (id=1). Use maybeSingle so a missing seed row
+    // doesn't throw; we fall back to {0,0} defaults below.
+    sb.from(FABRIC_TIER_ADDON_CONFIG).select("*").eq("id", 1).maybeSingle(),
+    // 0176 — all override rows (sparse table; most models have no row).
+    sb.from(MODEL_FABRIC_TIER_OVERRIDES).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
     if (r.error) throw new HTTPException(500, { message: r.error.message });
   }
+  if (tierConfigR.error) throw new HTTPException(500, { message: tierConfigR.error.message });
+  if (tierOverridesR.error) throw new HTTPException(500, { message: tierOverridesR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -124,12 +183,23 @@ catalogRouter.get("/", async (c) => {
     liveModelIds.has((f as DB.SofaFabricRow).model_id),
   );
 
+  // 0176 — safe fallback when the seed row is absent (shouldn't happen on a
+  // properly migrated DB, but avoids NaN propagation on a fresh empty DB).
+  const fabricTierConfig = tierConfigR.data
+    ? Adapters.fabricTierConfigFromRow(tierConfigR.data as DB.FabricTierAddonConfigRow)
+    : { sofaTier2Delta: 0, sofaTier3Delta: 0 };
+
   const body = catalogResponseSchema.parse({
     models: (modelsR.data ?? []).map((m) => Adapters.productModelFromRow(m as DB.ProductModelRow)),
     skus: liveSkus.map((s) => Adapters.productSkuFromRow(s as DB.ProductSkuRow)),
     sofaFabrics: liveFabrics.map((f) => Adapters.sofaFabricFromRow(f as DB.SofaFabricRow)),
     addons: (addonsR.data ?? []).map((a) => Adapters.addonFromRow(a as DB.AddonRow)),
     floorConfig: Adapters.floorConfigFromRow(floorR.data as DB.FloorConfigRow),
+    // 0176 — fabric tier pricing (additive; pre-0176 clients ignore these keys).
+    fabricTierConfig,
+    modelFabricTierOverrides: (tierOverridesR.data ?? []).map(
+      (r) => Adapters.modelFabricTierOverrideFromRow(r as DB.ModelFabricTierOverrideRow),
+    ),
   });
 
   // 0074 — was `private, max-age=300` but the browser cache was beating
@@ -249,6 +319,9 @@ catalogRouter.delete("/models/:id", async (c) => {
 catalogRouter.post("/skus", async (c) => {
   const parsed = await parseJsonBody(c, productSkuCreateInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // Phase 2 (0175): principal-only price/cost. Non-principal may still create an
+  // unpriced SKU (price 0 / cost null) for the principal to price later.
+  gateSkuCreatePriceCost(c, parsed.data);
   const sb = userClient(c.env, c.var.auth.jwt);
 
   // SKU code = `<category>:<model_key>:<variant>` to match the existing
@@ -329,6 +402,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   const id = c.req.param("id");
   const parsed = await parseJsonBody(c, productSkuPatchInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // Phase 2 (0175): principal-only price/cost. All other SKU edits (variant,
+  // pos_active, description, supplier, restore toggle) stay open to internal.
+  gateSkuPatchPriceCost(c, parsed.data);
   const patch: Record<string, unknown> = {};
   if (parsed.data.variant !== undefined) patch.variant = parsed.data.variant;
   if (parsed.data.variantKind !== undefined) patch.variant_kind = parsed.data.variantKind;
@@ -421,6 +497,8 @@ catalogRouter.post("/sofa-fabrics", async (c) => {
       surcharge: parsed.data.surcharge,
       // 0075 — fabric colors (Loo 2026-05-09).
       colors: parsed.data.colors ?? null,
+      // 0176 — price tier. Defaults to PRICE_1 if caller omits the field.
+      tier: parsed.data.tier ?? "PRICE_1",
     })
     .select("*")
     .single();
@@ -445,6 +523,9 @@ catalogRouter.patch("/sofa-fabrics/:id", async (c) => {
   // 0075 — restore toggle: PATCH discontinuedAt:null clears the soft-delete.
   if (parsed.data.discontinuedAt !== undefined)
     patch.discontinued_at = parsed.data.discontinuedAt;
+  // 0176 — tier change (PRICE_1/2/3). No principal gate at the API layer for
+  // v1 (RLS on sofa_fabrics uses is_internal(); tier is further gated in the UI).
+  if (parsed.data.tier !== undefined) patch.tier = parsed.data.tier;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
@@ -794,6 +875,84 @@ catalogRouter.delete("/addons/:key", async (c) => {
     return c.json({ error: "not_found", code: "not_found", message: "addon not found" }, 404);
   }
   return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0176 — Fabric tier pricing admin (principal-only).
+// The DB singleton (fabric_tier_addon_config id=1) holds the global RM deltas
+// for PRICE_2 / PRICE_3 sofa fabrics. Per-model overrides live in
+// model_fabric_tier_overrides (sparse; only models with non-default deltas
+// have a row). Both tables are RLS principal-only-write; we also gate here for
+// a friendly 403 before the round-trip (same pattern as the 0175 SKU lock).
+// ---------------------------------------------------------------------------
+
+const fabricTierConfigPatchInput = fabricTierConfigSchema;
+
+// PATCH /fabric-tier-config — update the global tier delta singleton (id=1).
+// Body: { sofaTier2Delta: number, sofaTier3Delta: number } (both nonnegative).
+catalogRouter.patch("/fabric-tier-config", async (c) => {
+  principalOnly(c);
+  const parsed = await parseJsonBody(c, fabricTierConfigPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(FABRIC_TIER_ADDON_CONFIG)
+    .update({
+      sofa_tier2_delta: parsed.data.sofaTier2Delta,
+      sofa_tier3_delta: parsed.data.sofaTier3Delta,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .eq("id", 1)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "fabric_tier_addon_config row missing" },
+      404,
+    );
+  }
+  return c.json({
+    fabricTierConfig: Adapters.fabricTierConfigFromRow(data as DB.FabricTierAddonConfigRow),
+  });
+});
+
+const modelFabricTierOverrideInput = modelFabricTierOverrideSchema.omit({ modelId: true });
+
+// PUT /model-fabric-tier-override/:modelId — upsert a per-model tier override.
+// Body: { tier2Delta: number|null, tier3Delta: number|null }
+// null = inherit from global config; 0 = explicit no-premium for this model.
+catalogRouter.put("/model-fabric-tier-override/:modelId", async (c) => {
+  principalOnly(c);
+  const modelId = c.req.param("modelId");
+  const parsed = await parseJsonBody(c, modelFabricTierOverrideInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(MODEL_FABRIC_TIER_OVERRIDES)
+    .upsert(
+      {
+        model_id: modelId,
+        tier2_delta: parsed.data.tier2Delta,
+        tier3_delta: parsed.data.tier3Delta,
+        updated_at: new Date().toISOString(),
+        updated_by: c.var.auth.id,
+      },
+      { onConflict: "model_id" },
+    )
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "upsert returned no row" },
+      404,
+    );
+  }
+  return c.json({
+    override: Adapters.modelFabricTierOverrideFromRow(data as DB.ModelFabricTierOverrideRow),
+  });
 });
 
 export default catalogRouter;

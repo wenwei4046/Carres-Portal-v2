@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Check, Pencil, RotateCcw } from "lucide-react";
 
 interface Props {
   /** PNG dataURL of the captured signature, or null when blank. */
@@ -98,8 +99,8 @@ export default function SignaturePad({ value, onChange, caption }: Props) {
   return (
     <div>
       <div
-        className={`relative rounded overflow-hidden bg-card border-2 ${
-          signed ? "border-success" : "border-base-300"
+        className={`relative rounded-xl overflow-hidden bg-card border-2 transition-colors ${
+          signed ? "border-primary" : "border-base-200"
         }`}
       >
         <canvas
@@ -118,12 +119,18 @@ export default function SignaturePad({ value, onChange, caption }: Props) {
         />
         {!signed && (
           <div className="absolute inset-0 grid place-items-center pointer-events-none text-base-400 text-sm">
-            ✎ Sign here
+            <span className="inline-flex items-center gap-1.5">
+              <Pencil size={14} strokeWidth={1.75} aria-hidden />
+              Sign here
+            </span>
           </div>
         )}
         {signed && (
-          <div className="absolute top-2 left-3 text-[10px] font-semibold tracking-[0.1em] uppercase text-success">
-            ✓ Signed
+          <div className="absolute top-2 left-3 text-[10px] font-semibold tracking-[0.1em] uppercase text-primary">
+            <span className="inline-flex items-center gap-1">
+              <Check size={14} strokeWidth={1.75} aria-hidden />
+              Signed
+            </span>
           </div>
         )}
       </div>
@@ -132,7 +139,10 @@ export default function SignaturePad({ value, onChange, caption }: Props) {
           {caption ?? "By signing, customer agrees to the terms below."}
         </span>
         <button type="button" onClick={clear} className="btn-ghost text-[11px] px-2.5 py-1">
-          ↻ Clear
+          <span className="inline-flex items-center gap-1">
+            <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
+            Clear
+          </span>
         </button>
       </div>
     </div>

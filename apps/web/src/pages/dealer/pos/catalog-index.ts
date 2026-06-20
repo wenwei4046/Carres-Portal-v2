@@ -1,10 +1,13 @@
 import type {
   CatalogResponse,
+  FabricTierGlobalConfig,
+  ModelFabricTierOverrideDto,
   ProductCategory,
   ProductModelDto,
   ProductSkuDto,
   SofaFabricDto,
 } from "@carres/shared";
+import { resolveFabricDelta } from "@carres/shared";
 
 /**
  * Derived, memoizable view of the catalog bundle for the POS grid: per-model
@@ -37,7 +40,11 @@ export interface CatalogIndex {
   meta: Map<string, ModelMeta>;
 }
 
-export function buildCatalogIndex(catalog: CatalogResponse): CatalogIndex {
+export function buildCatalogIndex(
+  catalog: CatalogResponse,
+  fabricTierConfig?: FabricTierGlobalConfig | null,
+  modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null,
+): CatalogIndex {
   const skusByModel = new Map<string, ProductSkuDto[]>();
   for (const s of catalog.skus) {
     const arr = skusByModel.get(s.modelId) ?? [];
@@ -70,7 +77,15 @@ export function buildCatalogIndex(catalog: CatalogResponse): CatalogIndex {
     const fabrics = fabricsByModel.get(m.id) ?? [];
     let fromPrice = Math.min(...skus.map((s) => s.price));
     if (m.category === "sofa" && fabrics.length > 0) {
-      fromPrice += Math.min(...fabrics.map((f) => f.surcharge));
+      // Use tier-based delta for from-price. Per-model override resolved once
+      // per model; fallback to global config; fallback to 0 (pre-0176 bundles).
+      const overrideForModel = modelFabricTierOverrides?.find((o) => o.modelId === m.id) ?? null;
+      const minDelta = Math.min(
+        ...fabrics.map((f) =>
+          resolveFabricDelta(f.tier ?? "PRICE_1", overrideForModel, fabricTierConfig ?? null),
+        ),
+      );
+      fromPrice += minDelta;
     }
 
     const optionCount =

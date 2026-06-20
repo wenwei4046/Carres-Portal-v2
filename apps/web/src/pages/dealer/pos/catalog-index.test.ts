@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { CatalogResponse } from "@carres/shared";
+import type { CatalogResponse, FabricTierGlobalConfig, ModelFabricTierOverrideDto } from "@carres/shared";
 import { buildCatalogIndex } from "./catalog-index";
 
 function catalog(): CatalogResponse {
@@ -17,13 +17,27 @@ function catalog(): CatalogResponse {
       { id: "s4", modelId: "m-acc", sku: "PILLOW-STD", variant: "Std", variantKind: "size", price: 120, cost: null, supplierId: null },
     ],
     sofaFabrics: [
-      { id: "f1", modelId: "m-sofa", fabricName: "Linen Natural", surcharge: 300, colors: null },
-      { id: "f2", modelId: "m-sofa", fabricName: "Velvet Teal", surcharge: 800, colors: null },
+      { id: "f1", modelId: "m-sofa", fabricName: "Linen Natural", surcharge: 300, colors: null, tier: "PRICE_1" as const },
+      { id: "f2", modelId: "m-sofa", fabricName: "Velvet Teal", surcharge: 800, colors: null, tier: "PRICE_1" as const },
     ],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
   };
 }
+
+/** Catalog with P2/P3 fabrics for the sofa model. */
+function catalogWithTiers(): CatalogResponse {
+  return {
+    ...catalog(),
+    sofaFabrics: [
+      { id: "f1", modelId: "m-sofa", fabricName: "Linen Natural", surcharge: 0, colors: null, tier: "PRICE_1" as const },
+      { id: "f2", modelId: "m-sofa", fabricName: "Velvet Teal", surcharge: 0, colors: null, tier: "PRICE_2" as const },
+      { id: "f3", modelId: "m-sofa", fabricName: "Silk Premium", surcharge: 0, colors: null, tier: "PRICE_3" as const },
+    ],
+  };
+}
+
+const CONFIG: FabricTierGlobalConfig = { sofaTier2Delta: 100, sofaTier3Delta: 200 };
 
 describe("buildCatalogIndex", () => {
   it("includes only mattress/bedframe/sofa models with ≥1 sku", () => {
@@ -40,11 +54,72 @@ describe("buildCatalogIndex", () => {
     expect(idx.meta.get("m-mat")!.optionCount).toBe(2);
   });
 
-  it("adds the cheapest fabric surcharge to sofa from-price", () => {
+  // --- P1 backward-compat: no tier config → from-price still uses delta=0 ---
+  it("sofa from-price: all P1 fabrics with no config → delta 0 (unchanged from before)", () => {
     const idx = buildCatalogIndex(catalog());
-    // base 5000 + cheapest fabric 300
-    expect(idx.meta.get("m-sofa")!.fromPrice).toBe(5300);
-    expect(idx.meta.get("m-sofa")!.optionNoun).toBe("option");
+    // base 5000 + min(delta for P1, P1) = 5000 + 0
+    expect(idx.meta.get("m-sofa")!.fromPrice).toBe(5000);
+  });
+
+  it("sofa from-price: all P1 fabrics with config present → delta 0 (P1 always 0)", () => {
+    const idx = buildCatalogIndex(catalog(), CONFIG);
+    // Both fabrics are PRICE_1 → delta 0 regardless of config
+    expect(idx.meta.get("m-sofa")!.fromPrice).toBe(5000);
+  });
+
+  // --- Legacy test preserved: surcharge field no longer drives from-price ---
+  // (fabrics have surcharge=300/800 but tier=P1 so delta=0; from-price = 5000)
+  it("sofa from-price uses tier delta not surcharge field", () => {
+    const idx = buildCatalogIndex(catalog(), CONFIG);
+    // surcharge field is 300 and 800 but tier is PRICE_1 → delta 0
+    expect(idx.meta.get("m-sofa")!.fromPrice).toBe(5000);
+  });
+
+  // --- P2/P3 tier delta path ---
+  it("sofa from-price: P1/P2/P3 fabrics → min delta applied (P1=0 wins)", () => {
+    const idx = buildCatalogIndex(catalogWithTiers(), CONFIG);
+    // min delta: P1→0, P2→100, P3→200 → min is 0; from-price = 5000 + 0
+    expect(idx.meta.get("m-sofa")!.fromPrice).toBe(5000);
+  });
+
+  it("sofa from-price: only P2/P3 fabrics → min tier delta applied", () => {
+    const onlyTiered: CatalogResponse = {
+      ...catalog(),
+      sofaFabrics: [
+        { id: "f2", modelId: "m-sofa", fabricName: "Velvet Teal", surcharge: 0, colors: null, tier: "PRICE_2" as const },
+        { id: "f3", modelId: "m-sofa", fabricName: "Silk Premium", surcharge: 0, colors: null, tier: "PRICE_3" as const },
+      ],
+    };
+    const idx = buildCatalogIndex(onlyTiered, CONFIG);
+    // min delta: P2→100, P3→200 → min is 100; from-price = 5000 + 100
+    expect(idx.meta.get("m-sofa")!.fromPrice).toBe(5100);
+  });
+
+  it("sofa from-price: per-model override wins over global config", () => {
+    const overrides: ModelFabricTierOverrideDto[] = [
+      { modelId: "m-sofa", tier2Delta: 50, tier3Delta: null },
+    ];
+    const onlyP2: CatalogResponse = {
+      ...catalog(),
+      sofaFabrics: [
+        { id: "f2", modelId: "m-sofa", fabricName: "Velvet Teal", surcharge: 0, colors: null, tier: "PRICE_2" as const },
+      ],
+    };
+    const idx = buildCatalogIndex(onlyP2, CONFIG, overrides);
+    // override tier2Delta=50 wins over global 100; from-price = 5000 + 50
+    expect(idx.meta.get("m-sofa")!.fromPrice).toBe(5050);
+  });
+
+  it("sofa from-price: no config → delta 0 even for P2/P3 (safe fallback)", () => {
+    const idx = buildCatalogIndex(catalogWithTiers());
+    // No config → resolveFabricDelta returns 0 for all tiers
+    expect(idx.meta.get("m-sofa")!.fromPrice).toBe(5000);
+  });
+
+  it("sofa from-price: 0 fabrics → just min sku price", () => {
+    const noFabrics: CatalogResponse = { ...catalog(), sofaFabrics: [] };
+    const idx = buildCatalogIndex(noFabrics, CONFIG);
+    expect(idx.meta.get("m-sofa")!.fromPrice).toBe(5000);
   });
 
   it("maps sku → category for the mutex", () => {

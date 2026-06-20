@@ -117,6 +117,10 @@ export {
   sofaFabricPatchInput,
   // 0169-0173 — Product & Maintenance rebuild.
   allowedOptionsSchema,
+  // 0176 — fabric tier pricing schemas.
+  fabricTierSchema,
+  fabricTierConfigSchema,
+  modelFabricTierOverrideSchema,
   serviceSkuCodeSchema,
   sizesActiveInput,
   generateSkusInput,
@@ -151,6 +155,9 @@ export {
   type ProductSkuPatchInput,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
+  type FabricTierValue,
+  type FabricTierConfigDto,
+  type ModelFabricTierOverrideDto,
 } from "./schemas/catalog";
 
 export {
@@ -407,6 +414,17 @@ export {
   type OpsOrderControlResponse,
 } from "./schemas/ops-order-control";
 export * from "./schemas/ops-cockpit";
+
+// Migration 0176 — fabric tier pricing resolver + types.
+export {
+  resolveFabricDelta,
+  type FabricTier,
+  type FabricTierOverride,
+  type FabricTierGlobalConfig,
+} from "./fabric-tier";
+
+// Table-name constants (prevents raw string literals in application code).
+export * from "./tables";
 
 // Sales Order Maintenance — AutoCount-style configurable SO grid (2026-06-16).
 // See docs/superpowers/plans/2026-06-16-sales-order-maintenance.md.

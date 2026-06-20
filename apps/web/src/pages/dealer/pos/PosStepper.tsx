@@ -6,8 +6,11 @@ const STEPS = [
 
 /**
  * Top-bar progress stepper — 01 CATALOG · 02 CUSTOMER · 03 CONFIRM. Completed
- * steps are clickable to go back; the current step is flame-filled; forward
+ * steps are clickable to go back; the current step is flame-bordered; forward
  * steps are inert (advancing is gated by the footer Continue button).
+ *
+ * Uses the `.pos-step-pill` / `.is-active` / `.is-done` utilities from
+ * `index.css` (Task 1 foundation).
  */
 export default function PosStepper({
   step,
@@ -27,34 +30,23 @@ export default function PosStepper({
             <button
               type="button"
               onClick={() => clickable && onStepClick(s.n)}
-              disabled={!clickable}
+              disabled={!clickable && !active}
               aria-current={active ? "step" : undefined}
               data-testid={`pos-step-${s.n}`}
-              className={`flex items-center gap-2 rounded-full pl-1 pr-3 py-1 transition-colors ${
-                clickable ? "cursor-pointer hover:bg-base-100" : "cursor-default"
-              }`}
+              className={[
+                "pos-step-pill",
+                active ? "is-active" : "",
+                done ? "is-done" : "",
+                clickable ? "cursor-pointer rounded-full px-2 py-1 hover:bg-base-100 transition-colors" : "cursor-default",
+              ]
+                .filter(Boolean)
+                .join(" ")}
             >
-              <span
-                className={`grid place-items-center w-6 h-6 rounded-full font-mono text-[11px] font-bold ${
-                  active
-                    ? "bg-primary text-white"
-                    : done
-                      ? "bg-base-900 text-white"
-                      : "bg-base-200 text-base-500"
-                }`}
-              >
-                {done ? "✓" : String(s.n).padStart(2, "0")}
-              </span>
-              <span
-                className={`t-micro ${
-                  active ? "text-base-900" : done ? "text-base-700" : "text-base-400"
-                }`}
-              >
-                {s.label}
-              </span>
+              <span className="num">{String(s.n).padStart(2, "0")}</span>
+              {s.label.toUpperCase()}
             </button>
             {i < STEPS.length - 1 && (
-              <span className={`w-6 h-px ${done ? "bg-base-900" : "bg-base-200"}`} />
+              <span className={`w-6 h-px ${done ? "bg-base-400" : "bg-base-200"}`} />
             )}
           </li>
         );

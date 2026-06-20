@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { Minus, Plus } from "lucide-react";
 import type {
   ProductCategory,
   ProductModelDto,
   ProductSkuDto,
   SofaFabricDto,
+  FabricTierGlobalConfig,
+  ModelFabricTierOverrideDto,
 } from "@carres/shared";
+import { resolveFabricDelta } from "@carres/shared";
 import type { DraftLine } from "./draft";
 
 /**
@@ -92,12 +96,12 @@ export function MattressConfigurator({
   }
 
   return (
-    <div className="grid grid-cols-[1fr_80px_auto] gap-2.5 items-end">
+    <div className="flex flex-col gap-5">
       <FieldLabel label="Size">
         <select
           value={skuId}
           onChange={(e) => setSkuId(e.target.value)}
-          className={inputClass()}
+          className={selectClass()}
         >
           <option value="">— pick size —</option>
           {skus.map((s) => (
@@ -107,18 +111,17 @@ export function MattressConfigurator({
           ))}
         </select>
       </FieldLabel>
-      <FieldLabel label="Qty">
-        <input
-          type="number"
-          min={1}
-          value={qty}
-          onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-          className={inputClass()}
-        />
-      </FieldLabel>
-      <button onClick={add} disabled={!sku} className="btn-primary whitespace-nowrap">
-        + Add
-      </button>
+
+      <div className="flex items-end justify-between gap-4">
+        <QtyPill qty={qty} onChange={setQty} />
+        <button
+          onClick={add}
+          disabled={!sku}
+          className="btn-primary whitespace-nowrap"
+        >
+          + Add
+        </button>
+      </div>
     </div>
   );
 }
@@ -160,13 +163,13 @@ export function BedframeConfigurator({
   }
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="grid grid-cols-3 gap-2.5">
+    <div className="flex flex-col gap-5">
+      <div className="grid grid-cols-3 gap-3">
         <FieldLabel label="Size">
           <select
             value={skuId}
             onChange={(e) => setSkuId(e.target.value)}
-            className={inputClass()}
+            className={selectClass()}
           >
             <option value="">— pick size —</option>
             {skus.map((s) => (
@@ -181,7 +184,7 @@ export function BedframeConfigurator({
             value={color}
             onChange={(e) => setColor(e.target.value)}
             disabled={!model.colors?.length}
-            className={inputClass({ disabled: !model.colors?.length })}
+            className={selectClass({ disabled: !model.colors?.length })}
           >
             {(model.colors ?? []).map((c) => (
               <option key={c} value={c}>
@@ -195,7 +198,7 @@ export function BedframeConfigurator({
             value={gap}
             onChange={(e) => setGap(e.target.value)}
             disabled={!model.gaps?.length}
-            className={inputClass({ disabled: !model.gaps?.length })}
+            className={selectClass({ disabled: !model.gaps?.length })}
           >
             <option value="">— none —</option>
             {(model.gaps ?? []).map((g) => (
@@ -206,17 +209,14 @@ export function BedframeConfigurator({
           </select>
         </FieldLabel>
       </div>
-      <div className="grid grid-cols-[80px_auto] gap-2.5 items-end justify-end">
-        <FieldLabel label="Qty">
-          <input
-            type="number"
-            min={1}
-            value={qty}
-            onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-            className={inputClass()}
-          />
-        </FieldLabel>
-        <button onClick={add} disabled={!sku} className="btn-primary whitespace-nowrap">
+
+      <div className="flex items-end justify-between gap-4">
+        <QtyPill qty={qty} onChange={setQty} />
+        <button
+          onClick={add}
+          disabled={!sku}
+          className="btn-primary whitespace-nowrap"
+        >
           + Add
         </button>
       </div>
@@ -228,11 +228,17 @@ export function SofaConfigurator({
   model,
   skus,
   fabrics,
+  fabricTierConfig,
+  modelFabricTierOverrides,
   onAdd,
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
   fabrics: SofaFabricDto[];
+  /** Global tier delta config (from catalog bundle, migration 0176). May be absent on pre-0176 bundles — safe fallback is delta=0. */
+  fabricTierConfig?: FabricTierGlobalConfig | null;
+  /** Per-model tier overrides array (from catalog bundle). May be absent; looked up by model.id. */
+  modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
   // Mode = 'preset' (pick a complete sub-model) or 'custom' (pick a part).
@@ -262,8 +268,22 @@ export function SofaConfigurator({
 
   const sku = skusForMode.find((s) => s.id === skuId);
   const fabric = fabrics.find((f) => f.id === fabricId);
-  const surcharge = fabric?.surcharge ?? 0;
-  const unitPrice = (sku?.price ?? 0) + surcharge;
+
+  // Per-model override (null means "inherit from global config").
+  const overrideForThisModel =
+    modelFabricTierOverrides?.find((o) => o.modelId === model.id) ?? null;
+
+  // Resolve effective delta via the tier helper. For PRICE_1 (or when config
+  // is absent/pre-0176), this always returns 0 — identical to the old surcharge
+  // path. The legacy per-fabric `fabric.surcharge` is NOT added on top; it is
+  // now superseded by the tier delta as the price knob.
+  const effectiveDelta = resolveFabricDelta(
+    fabric?.tier ?? "PRICE_1",
+    overrideForThisModel,
+    fabricTierConfig ?? null,
+  );
+
+  const unitPrice = (sku?.price ?? 0) + effectiveDelta;
 
   function add() {
     if (!sku) return;
@@ -273,9 +293,12 @@ export function SofaConfigurator({
       // (display) + fabric_surcharge (price). Without fabric_id, the
       // operation CreatePOModal autofill cascade can't pre-select the fabric
       // chip even when the dealer DID pick one — the cascade keys off id.
+      // fabric_surcharge carries the resolved effectiveDelta so the DraftLine
+      // contract is unchanged. fabric_tier is the new metadata key (additive).
       attrs.fabric_id = fabric.id;
       attrs.fabric_name = fabric.fabricName;
-      attrs.fabric_surcharge = surcharge;
+      attrs.fabric_surcharge = effectiveDelta;
+      attrs.fabric_tier = fabric.tier;
     }
     onAdd({
       localId: newLocalId(),
@@ -283,7 +306,7 @@ export function SofaConfigurator({
       qty,
       attrs,
       unitPrice,
-      label: `${model.name} · ${sku.variant}${fabric ? ` · ${fabric.fabricName}` : ""}${surcharge ? ` (+RM ${surcharge})` : ""}`,
+      label: `${model.name} · ${sku.variant}${fabric ? ` · ${fabric.fabricName}` : ""}${effectiveDelta > 0 ? ` (+RM ${effectiveDelta})` : ""}`,
     });
     setSkuId("");
     setFabricId(fabrics[0]?.id ?? "");
@@ -291,10 +314,10 @@ export function SofaConfigurator({
   }
 
   return (
-    <div className="flex flex-col gap-2.5">
-      {/* Mode pills (visible only when sofa_mode='both') */}
+    <div className="flex flex-col gap-5">
+      {/* Mode pills (visible only when sofa_mode='both') — 2990s chip style */}
       {allowed.length > 1 && (
-        <div className="flex gap-1.5">
+        <div className="flex gap-2">
           {allowed.map((m) => (
             <button
               key={m}
@@ -302,11 +325,12 @@ export function SofaConfigurator({
                 setMode(m);
                 setSkuId("");
               }}
-              className={`px-3 py-1.5 text-xs rounded border-[1.5px] ${
+              className={[
+                "px-4 py-2 text-[13px] font-semibold rounded-xl border-[1.5px] transition-colors",
                 mode === m
-                  ? "border-primary bg-signature-50 text-primary font-semibold"
-                  : "border-base-200 text-base-700 hover:border-primary/40"
-              }`}
+                  ? "pos-selected border-primary bg-signature-50 text-primary"
+                  : "border-base-200 text-base-600 hover:border-primary/40",
+              ].join(" ")}
             >
               {m === "preset" ? "Preset" : "Custom (parts)"}
             </button>
@@ -315,16 +339,16 @@ export function SofaConfigurator({
       )}
 
       {skusForMode.length === 0 && (
-        <p className="text-xs text-base-500">No {mode} variants for this model yet.</p>
+        <p className="t-small text-base-500">No {mode} variants for this model yet.</p>
       )}
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-3">
         <FieldLabel label={mode === "preset" ? "Preset" : "Part"}>
           <select
             value={skuId}
             onChange={(e) => setSkuId(e.target.value)}
             disabled={skusForMode.length === 0}
-            className={inputClass({ disabled: skusForMode.length === 0 })}
+            className={selectClass({ disabled: skusForMode.length === 0 })}
           >
             <option value="">— pick {mode === "preset" ? "preset" : "part"} —</option>
             {skusForMode.map((s) => (
@@ -339,41 +363,45 @@ export function SofaConfigurator({
             value={fabricId}
             onChange={(e) => setFabricId(e.target.value)}
             disabled={fabrics.length === 0}
-            className={inputClass({ disabled: fabrics.length === 0 })}
+            className={selectClass({ disabled: fabrics.length === 0 })}
           >
             {fabrics.length === 0 && <option value="">— none —</option>}
-            {fabrics.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.fabricName}
-                {f.surcharge > 0 ? ` (+RM ${f.surcharge})` : ""}
-              </option>
-            ))}
+            {fabrics.map((f) => {
+              const d = resolveFabricDelta(f.tier, overrideForThisModel, fabricTierConfig ?? null);
+              return (
+                <option key={f.id} value={f.id}>
+                  {f.fabricName}
+                  {d > 0 ? ` (+RM ${d})` : ""}
+                </option>
+              );
+            })}
           </select>
         </FieldLabel>
       </div>
 
-      <div className="grid grid-cols-[80px_1fr_auto] gap-2.5 items-end">
-        <FieldLabel label="Qty">
-          <input
-            type="number"
-            min={1}
-            value={qty}
-            onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-            className={inputClass()}
-          />
-        </FieldLabel>
-        <div className="text-xs text-base-500 self-end pb-2.5">
-          Unit price{" "}
-          <span className="font-mono font-semibold text-base-900">
-            RM {unitPrice.toLocaleString()}
+      {/* Live unit price */}
+      {sku && (
+        <div className="flex items-baseline gap-1.5">
+          <span className="t-small text-base-500">Unit price</span>
+          <span className="pos-price text-[20px]">
+            <span className="pos-price-rm">RM</span>
+            {unitPrice.toLocaleString()}
           </span>
-          {surcharge > 0 && (
-            <span className="ml-1.5 text-[10px]">
-              (base RM {sku?.price.toLocaleString() ?? 0} + fabric RM {surcharge})
+          {effectiveDelta > 0 && (
+            <span className="t-tiny text-base-500">
+              (base RM {sku.price.toLocaleString()} + fabric RM {effectiveDelta})
             </span>
           )}
         </div>
-        <button onClick={add} disabled={!sku} className="btn-primary whitespace-nowrap">
+      )}
+
+      <div className="flex items-end justify-between gap-4">
+        <QtyPill qty={qty} onChange={setQty} />
+        <button
+          onClick={add}
+          disabled={!sku}
+          className="btn-primary whitespace-nowrap"
+        >
           + Add
         </button>
       </div>
@@ -391,11 +419,15 @@ export function ConfiguratorForModel({
   model,
   skus,
   fabrics,
+  fabricTierConfig,
+  modelFabricTierOverrides,
   onAdd,
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
   fabrics: SofaFabricDto[];
+  fabricTierConfig?: FabricTierGlobalConfig | null;
+  modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
   if (model.category === "mattress") {
@@ -405,7 +437,16 @@ export function ConfiguratorForModel({
     return <BedframeConfigurator model={model} skus={skus} onAdd={onAdd} />;
   }
   if (model.category === "sofa") {
-    return <SofaConfigurator model={model} skus={skus} fabrics={fabrics} onAdd={onAdd} />;
+    return (
+      <SofaConfigurator
+        model={model}
+        skus={skus}
+        fabrics={fabrics}
+        fabricTierConfig={fabricTierConfig}
+        modelFabricTierOverrides={modelFabricTierOverrides}
+        onAdd={onAdd}
+      />
+    );
   }
   return null;
 }
@@ -417,17 +458,48 @@ export function ConfiguratorForModel({
 function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="label block mb-1">{label}</span>
+      <span className="label block mb-1.5">{label}</span>
       {children}
     </label>
   );
 }
 
-function inputClass({ disabled }: { disabled?: boolean } = {}) {
+/** Pill stepper — round −/+ buttons flanking a centered qty count. */
+function QtyPill({ qty, onChange }: { qty: number; onChange: (n: number) => void }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="label">Qty</span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(1, qty - 1))}
+          disabled={qty <= 1}
+          aria-label="Decrease quantity"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-base-200 text-base-600 transition-colors hover:border-base-400 hover:text-base-900 disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <Minus size={14} strokeWidth={1.75} />
+        </button>
+        <span className="font-mono text-[15px] font-semibold w-8 text-center text-base-900">
+          {qty}
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(qty + 1)}
+          aria-label="Increase quantity"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-base-200 text-base-600 transition-colors hover:border-base-400 hover:text-base-900"
+        >
+          <Plus size={14} strokeWidth={1.75} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function selectClass({ disabled }: { disabled?: boolean } = {}) {
   // Active inputs go white (gating cue: white = next to fill); disabled
   // selectors fall back to body cream so the user sees what's locked.
   if (disabled) {
-    return "w-full px-2.5 py-2 text-sm font-body rounded border border-base-300 bg-base-50 text-base-500 cursor-not-allowed outline-none";
+    return "w-full px-3 py-2.5 text-[13px] font-body rounded-lg border border-base-200 bg-base-50 text-base-400 cursor-not-allowed outline-none appearance-none";
   }
-  return "w-full px-2.5 py-2 text-sm font-body rounded border border-base-300 bg-white outline-none focus:border-primary";
+  return "w-full px-3 py-2.5 text-[13px] font-body rounded-lg border border-base-200 bg-white outline-none focus:border-primary transition-colors appearance-none cursor-pointer";
 }

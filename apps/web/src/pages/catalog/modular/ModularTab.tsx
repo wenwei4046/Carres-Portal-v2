@@ -27,7 +27,13 @@ const GRID_COLS = "56px 96px 130px minmax(160px,1.3fr) 92px minmax(140px,1fr) 64
 
 type CatFilter = ProductCategory | "all";
 
-export default function ModularTab({ catalog }: { catalog: CatalogResponse }) {
+export default function ModularTab({
+  catalog,
+  isPrincipal = false,
+}: {
+  catalog: CatalogResponse;
+  isPrincipal?: boolean;
+}) {
   const [category, setCategory] = useState<CatFilter>("all");
   const [drawerModelId, setDrawerModelId] = useState<string | null>(null);
 
@@ -111,6 +117,8 @@ export default function ModularTab({ catalog }: { catalog: CatalogResponse }) {
           key={drawerModel.id}
           model={drawerModel}
           skus={skusByModel.get(drawerModel.id) ?? []}
+          catalog={catalog}
+          isPrincipal={isPrincipal}
           onClose={() => setDrawerModelId(null)}
         />
       )}
