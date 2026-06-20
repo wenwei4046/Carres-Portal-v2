@@ -480,6 +480,27 @@ export type { SofaCombo } from "./domain";
 export { sofaComboFromRow } from "./adapters";
 export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
 
+// Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo
+// match + explodeSofaBuild). No DB/IO; runs identically on web + (Phase 4) Hono.
+export {
+  resolveCompartmentPrice,
+  mirrorCode,
+  canonicalizeSofaSlots,
+  matchSofaCombo,
+  pickSofaCombo,
+  computeSofaPrice,
+  explodeSofaBuild,
+  type SofaComboLike,
+  type PickSofaComboArgs,
+  type SofaComboPick,
+  type SofaBuildCell,
+  type SofaBuild,
+  type SofaPricingSnapshot,
+  type SofaPriceBasis,
+  type SofaPriceResult,
+  type ExplodedSofaLine,
+} from "./sofa-pricing";
+
 // Table-name constants (prevents raw string literals in application code).
 export * from "./tables";
 
