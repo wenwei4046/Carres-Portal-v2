@@ -7,6 +7,8 @@ import type {
   ProductModelDto,
   ProductSkuDto,
   SofaFabricDto,
+  SofaCompartmentDto,
+  ModelSofaCompartmentDto,
   FabricTierValue,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
@@ -21,6 +23,8 @@ import {
   useSetModelPhoto,
   useToggleSizesActive,
   useUpsertModelFabricTierOverride,
+  useUpsertModelSofaCompartment,
+  useDeleteModelSofaCompartment,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../components/atoms";
@@ -171,6 +175,16 @@ export default function ProductModelDrawer({
               tierOverride={
                 (catalog.modelFabricTierOverrides ?? []).find((o) => o.modelId === model.id) ?? null
               }
+              isPrincipal={isPrincipal ?? false}
+            />
+          )}
+
+          {/* Offered compartments panel (0178) — sofa models only */}
+          {model.category === "sofa" && catalog && (
+            <SofaCompartmentsOfferedPanel
+              modelId={model.id}
+              pool={(catalog.sofaCompartments ?? []).filter((c) => c.active)}
+              offered={(catalog.modelSofaCompartments ?? []).filter((o) => o.modelId === model.id)}
               isPrincipal={isPrincipal ?? false}
             />
           )}
@@ -681,6 +695,117 @@ function SofaFabricsPanel({
         override={tierOverride}
         isPrincipal={isPrincipal}
       />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 0178 — Offered compartments panel: which pool compartments this sofa model
+// offers + an optional per-model price override. Sofa-only, principal-gated.
+// ---------------------------------------------------------------------------
+
+function SofaCompartmentsOfferedPanel({
+  modelId,
+  pool,
+  offered,
+  isPrincipal,
+}: {
+  modelId: string;
+  pool: SofaCompartmentDto[];
+  offered: ModelSofaCompartmentDto[];
+  isPrincipal: boolean;
+}) {
+  const upsert = useUpsertModelSofaCompartment();
+  const del = useDeleteModelSofaCompartment();
+  const offeredById = new Map(offered.map((o) => [o.compartmentId, o]));
+
+  function toggle(comp: SofaCompartmentDto, on: boolean) {
+    const opts = {
+      onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed"),
+    };
+    if (on) {
+      upsert.mutate({ modelId, compartmentId: comp.id, input: { priceOverride: null } }, opts);
+    } else {
+      del.mutate({ modelId, compartmentId: comp.id }, opts);
+    }
+  }
+
+  function commitOverride(comp: SofaCompartmentDto, raw: string) {
+    const trimmed = raw.trim();
+    const next = trimmed === "" ? null : Number(trimmed);
+    if (next !== null && (!Number.isFinite(next) || next < 0)) return;
+    const cur = offeredById.get(comp.id)?.priceOverride ?? null;
+    if (next === cur) return;
+    upsert.mutate(
+      { modelId, compartmentId: comp.id, input: { priceOverride: next } },
+      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
+    );
+  }
+
+  const COLS = "44px 110px minmax(120px,1fr) 130px";
+
+  return (
+    <div className="mb-4">
+      <div className="label mb-1">Offered compartments</div>
+      <p className="t-tiny text-base-500 mb-3">
+        Tick which pool compartments this sofa model offers. Leave the price blank
+        to use the pool default; enter a price to override it for this model.
+        {!isPrincipal && " Principal only — read-only for your role."}
+      </p>
+      <div className="border border-base-200 rounded-[4px] overflow-hidden">
+        <div
+          className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
+          style={{ gridTemplateColumns: COLS }}
+        >
+          <div className="label">Offer</div>
+          <div className="label">Code</div>
+          <div className="label">Description</div>
+          <div className="label text-right">Price override</div>
+        </div>
+        {pool.length === 0 && (
+          <div className="t-small text-base-500 px-3 py-3">
+            No compartments in the pool yet — add them in Maintenance → Sofa Compartments.
+          </div>
+        )}
+        {pool.map((comp) => {
+          const row = offeredById.get(comp.id);
+          const isOffered = row != null;
+          return (
+            <div
+              key={comp.id}
+              className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
+              style={{ gridTemplateColumns: COLS }}
+              data-testid={`offered-row-${comp.code}`}
+            >
+              <input
+                type="checkbox"
+                checked={isOffered}
+                disabled={!isPrincipal}
+                onChange={(e) => toggle(comp, e.target.checked)}
+                aria-label={`offer ${comp.code}`}
+                data-testid={`offered-check-${comp.code}`}
+              />
+              <CodeChip>{comp.code}</CodeChip>
+              <span className="t-small text-base-600 truncate">{comp.description ?? "—"}</span>
+              <input
+                key={`po-${comp.id}-${row?.priceOverride ?? "x"}-${isOffered}`}
+                type="number"
+                min={0}
+                step="0.01"
+                defaultValue={row?.priceOverride ?? ""}
+                placeholder={comp.defaultPrice.toFixed(2)}
+                disabled={!isPrincipal || !isOffered}
+                onBlur={(e) => commitOverride(comp, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                aria-label={`${comp.code} price override`}
+                className={`${INPUT_CLS} text-right font-mono text-[12px] disabled:opacity-50`}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

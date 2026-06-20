@@ -29,6 +29,8 @@ const mockCreateFabric = vi.fn();
 const mockPatchFabric = vi.fn();
 const mockDeleteFabric = vi.fn();
 const mockUpsertOverride = vi.fn();
+const mockUpsertOffered = vi.fn();
+const mockDeleteOffered = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   usePatchCatalogModel:            () => ({ mutate: vi.fn(), isPending: false }),
@@ -41,6 +43,9 @@ vi.mock("@/lib/queries", () => ({
   usePatchSofaFabric:              () => ({ mutate: mockPatchFabric, isPending: false }),
   useDeleteSofaFabric:             () => ({ mutate: mockDeleteFabric, isPending: false }),
   useUpsertModelFabricTierOverride: () => ({ mutate: mockUpsertOverride, isPending: false }),
+  // 0178 — offered-compartments panel hooks (drawer renders the panel for sofa models).
+  useUpsertModelSofaCompartment:   () => ({ mutate: mockUpsertOffered, isPending: false }),
+  useDeleteModelSofaCompartment:   () => ({ mutate: mockDeleteOffered, isPending: false }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -117,7 +122,112 @@ beforeEach(() => {
   mockPatchFabric.mockReset();
   mockDeleteFabric.mockReset();
   mockUpsertOverride.mockReset();
+  mockUpsertOffered.mockReset();
+  mockDeleteOffered.mockReset();
   vi.clearAllMocks();
+});
+
+// 0178 — Offered compartments panel (per-model offered pool compartments).
+describe("SofaCompartmentsOfferedPanel (0178)", () => {
+  const POOL_COMP = {
+    id: "comp-1",
+    code: "1A(LHF)",
+    description: "1 seat, ONE arm (left)",
+    seatCount: 1,
+    armConfig: "left",
+    iconUrl: null,
+    defaultPrice: 250,
+    sortOrder: 1,
+    active: true,
+  };
+
+  function catalogWithPool(offered: boolean): CatalogResponse {
+    return makeCatalog({
+      sofaCompartments: [POOL_COMP],
+      modelSofaCompartments: offered
+        ? [{ modelId: "m-sofa-1", compartmentId: "comp-1", priceOverride: null, sortOrder: 0 }]
+        : [],
+    });
+  }
+
+  it("renders the offered-compartments panel + a pool row for sofa models", () => {
+    render(
+      wrap(
+        <ProductModelDrawer
+          model={MODEL_SOFA}
+          skus={SKUS}
+          catalog={catalogWithPool(false)}
+          isPrincipal={true}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    expect(screen.getByText("Offered compartments")).toBeInTheDocument();
+    expect(screen.getByTestId("offered-row-1A(LHF)")).toBeInTheDocument();
+    expect((screen.getByTestId("offered-check-1A(LHF)") as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("checkbox is checked when the model already offers the compartment", () => {
+    render(
+      wrap(
+        <ProductModelDrawer
+          model={MODEL_SOFA}
+          skus={SKUS}
+          catalog={catalogWithPool(true)}
+          isPrincipal={true}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    expect((screen.getByTestId("offered-check-1A(LHF)") as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("principal toggling offer ON calls the upsert hook with model + compartment", () => {
+    render(
+      wrap(
+        <ProductModelDrawer
+          model={MODEL_SOFA}
+          skus={SKUS}
+          catalog={catalogWithPool(false)}
+          isPrincipal={true}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId("offered-check-1A(LHF)"));
+    expect(mockUpsertOffered).toHaveBeenCalledOnce();
+    expect(mockUpsertOffered.mock.calls[0][0]).toMatchObject({ modelId: "m-sofa-1", compartmentId: "comp-1" });
+  });
+
+  it("non-principal: checkbox is disabled (read-only)", () => {
+    render(
+      wrap(
+        <ProductModelDrawer
+          model={MODEL_SOFA}
+          skus={SKUS}
+          catalog={catalogWithPool(false)}
+          isPrincipal={false}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("offered-check-1A(LHF)")).toBeDisabled();
+  });
+
+  it("does NOT render the offered panel for mattress models", () => {
+    render(
+      wrap(
+        <ProductModelDrawer
+          model={MODEL_MATTRESS}
+          skus={SKUS}
+          catalog={catalogWithPool(false)}
+          isPrincipal={true}
+          onClose={() => {}}
+        />,
+      ),
+    );
+    expect(screen.queryByText("Offered compartments")).not.toBeInTheDocument();
+  });
 });
 
 describe("SofaFabricsPanel — render", () => {
