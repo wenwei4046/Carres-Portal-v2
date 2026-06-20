@@ -1,6 +1,8 @@
 # Sofa Custom-Cell / Compartment Engine — Phased Roadmap (Carres = identical 2990s sofa behaviour, minus promo)
 
 > Initiative chosen 2026-06-21 (after Phase 4 combo). Goal: reproduce the **2990s sofa engine IDENTICALLY** in Carres's stack (Tailwind+shadcn+supabase-js, NOT 2990s's CSS-modules+Drizzle — §3 copy logic not architecture). Research: `docs/superpowers/2026-06-21-sofa-engine-understand.md` (two read-only workflows, file:line-confirmed). **This is a ROADMAP — each phase gets its own detailed plan + SDD + the migrations go through the §7 gate. Bedframe deferred. Promo (PWP/GWP/Free-item) deferred to a future initiative.**
+>
+> **STATUS (2026-06-21): Phase 1 + Phase 2 SHIPPED + LIVE.** P1 = PR #29 (migration 0178, compartment pool + per-model offered + Maintenance UI). P2 = PR #31 (migration 0179, the pricing engine + `sofa_combo_pricing` + explode helper; deploy api `1b3f8bd7`/web `5bfbaa9b`). **Next = Phase 3 (visual drag builder UI, web-only, no migration).**
 
 ## Locked decisions (Loo, 2026-06-21)
 - **Scope = C-visual**: the full 2990s visual **drag plan-view room builder** (drag compartment modules, edge-snap, connected-sofa detection, arm-cap validation, auto-canonical shape, live price). NOT a structured picker.
@@ -18,7 +20,7 @@
 
 ## Phases
 
-### Phase 1 — Compartment foundation + Maintenance UI (additive migration)
+### Phase 1 — Compartment foundation + Maintenance UI (additive migration) — ✅ SHIPPED 2026-06-21 (PR #29, migration 0178)
 **Goal:** the compartment pool ("Base") + per-model offered set + per-compartment pricing + the Maintenance page Loo showed (`Products → Maintenance → Sofa Compartments`).
 - **migration (§7 gate, additive):** `sofa_compartments` (id, code UNIQUE e.g. `1A(LHF)`, label, description, seat_count int, arm_config text, sort_order, icon_url, active, timestamps, updated_by) + `model_sofa_compartments` (model_id→product_models, compartment_id→sofa_compartments, offered bool, price numeric(12,2) [per-model sell price of that compartment for that model], cost numeric(12,2) null, PK(model_id, compartment_id)). RLS: read=authenticated, ALL write=`(select public.is_principal())` (mirror 0176/0177). Principal-owns pricing (consistent with 0175). NOTE: per-compartment price is per (model, compartment) — 2990s prices modules per base_model.
 - **shared:** `SofaCompartmentRow`/`Dto`, `ModelSofaCompartment*`; zod schemas; adapters; `catalogResponseSchema.sofaCompartments?` + `.modelSofaCompartments?` (optional/additive); table constants.
@@ -26,7 +28,7 @@
 - **web:** a "Sofa Compartments" sub-page in Product & Maintenance (the pool list + edit, like the screenshot) + per-model "tick which compartments this model offers + set their price" (in ProductModelDrawer, sofa models only). Principal-gated (read-only others).
 - **Done:** green at baselines; principal can define the pool + per-model offered/priced sets.
 
-### Phase 2 — Pricing engine + sofa combo model (the money core; heavy TDD)
+### Phase 2 — Pricing engine + sofa combo model (the money core; heavy TDD) — ✅ SHIPPED 2026-06-21 (PR #31, migration 0179, deploy api `1b3f8bd7`/web `5bfbaa9b`; plan `2026-06-21-sofa-phase2-pricing.md`)
 **Goal:** the pure `computeSofaPrice` + the sofa-combo subset-matching + the explode/split helper.
 - **migration (§7 gate, additive):** `sofa_combo_pricing` (id, base_model/model_id, slots jsonb [ordered list of OR-sets of compartment codes], tier text null, price numeric(12,2) [or prices_by_height jsonb — decide; recommend single price v1, height matrix deferred], effective_from date, discontinued_at, timestamps, updated_by). RLS principal-only. (This is the 2990s sofa-combo model — richer than 0177 fixed-set.)
 - **shared (TDD):** `computeSofaPrice(build, snapshot)` — à-la-carte module sum + combo subset-match (Kuhn bipartite OR-set) override (even if pricier) + extras at full + recliner extra + fabric-tier delta. `matchSofaCombo(buildCodes, combos)` (Kuhn). `explodeSofaBuild(build, total, snapshot)` → per-module lines, residue-on-last (extend/share the combo `explodeCombo` split). Unit-test exhaustively: combo-override-even-if-pricier, extras-beyond-slots, residue-on-last Σ exact, fabric-tier, no-match→à-la-carte.
