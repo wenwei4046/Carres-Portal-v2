@@ -2,7 +2,7 @@
 
 > Initiative chosen 2026-06-21 (after Phase 4 combo). Goal: reproduce the **2990s sofa engine IDENTICALLY** in Carres's stack (Tailwind+shadcn+supabase-js, NOT 2990s's CSS-modules+Drizzle — §3 copy logic not architecture). Research: `docs/superpowers/2026-06-21-sofa-engine-understand.md` (two read-only workflows, file:line-confirmed). **This is a ROADMAP — each phase gets its own detailed plan + SDD + the migrations go through the §7 gate. Bedframe deferred. Promo (PWP/GWP/Free-item) deferred to a future initiative.**
 >
-> **STATUS (2026-06-21): Phase 1 + Phase 2 SHIPPED + LIVE.** P1 = PR #29 (migration 0178, compartment pool + per-model offered + Maintenance UI). P2 = PR #31 (migration 0179, the pricing engine + `sofa_combo_pricing` + explode helper; deploy api `1b3f8bd7`/web `5bfbaa9b`). **Next = Phase 3 (visual drag builder UI, web-only, no migration).**
+> **STATUS (2026-06-21): Phase 1 + Phase 2 + Phase 3 SHIPPED + LIVE.** P1 = PR #29 (migration 0178, compartment pool + per-model offered + Maintenance UI). P2 = PR #31 (migration 0179, the pricing engine + `sofa_combo_pricing` + explode helper). P3 = PR #33 (web-only, no migration, the visual drag builder: `sofa-geometry` + `CompartmentSilhouette` + `SofaBuildCanvas` + integration; deploy web `a267c6a1`, api unchanged). **Next = Phase 4 (Hono server-recompute + 0.5% drift-reject + explode the SofaBuildCanvas single line into per-compartment `order_lines`).** Deferred polish: group-drag/rotate, recliner per-seat.
 
 ## Locked decisions (Loo, 2026-06-21)
 - **Scope = C-visual**: the full 2990s visual **drag plan-view room builder** (drag compartment modules, edge-snap, connected-sofa detection, arm-cap validation, auto-canonical shape, live price). NOT a structured picker.
@@ -36,7 +36,7 @@
 - **web:** sofa-combo maintenance (the "Combo Pricing" tab analog for sofa shapes — slots editor).
 - **Done:** green; the pure function matches 2990s outputs on a battery of cases.
 
-### Phase 3 — Visual drag-builder UI (web-only, no migration)
+### Phase 3 — Visual drag-builder UI (web-only, no migration) — ✅ SHIPPED 2026-06-21 (PR #33, deploy web `a267c6a1`; plan `2026-06-21-sofa-phase3-builder.md`; group-drag/rotate + recliner deferred to polish)
 **Goal:** the plan-view room builder, identical UX to 2990s, in Carres's stack.
 - Port the **framework-agnostic geometry** from 2990s `sofa-build.ts` (edge-snap ~20cm, connected-component detection, arm-cap validation, auto-canonicalize) as pure TS in `packages/shared` or a web util. Do NOT copy 2990s's CSS-modules/pointer-drag DOM — rebuild the UI with Tailwind/shadcn + native pointer (or a light dnd) per §3/§10.
 - Module **silhouette assets** (the per-compartment shapes) — copy from 2990s or redraw; store under web assets or the product-model-photos bucket.
