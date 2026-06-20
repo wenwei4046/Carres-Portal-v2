@@ -12,7 +12,7 @@
  *   · onAddBuild fires with the expected payload (cells + height + fabric + total)
  */
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import type {
   ProductModelDto,
   ProductSkuDto,
@@ -206,9 +206,15 @@ describe("SofaBuildCanvas", () => {
     addModule("1A(LHF)");
     const cell = screen.getAllByTestId(/^sofa-cell-sc_/)[0]!;
     const id = cell.getAttribute("data-testid")!.replace("sofa-cell-", "");
+    // baseline: the silhouette wrapper renders at rotate(0deg)
+    expect(
+      screen.getByTestId(`sofa-cell-${id}`).querySelector('[style*="rotate(0deg)"]'),
+    ).toBeTruthy();
     fireEvent.click(screen.getByTestId(`sofa-cell-rotate-${id}`));
-    // after rotate the silhouette inner wrapper carries rotate(90deg)
+    // after rotate the inner wrapper actually carries rotate(90deg) (guards
+    // rotateCell — not just that the img still renders)
     const refreshed = screen.getByTestId(`sofa-cell-${id}`);
-    expect(within(refreshed).getByRole("img")).toBeInTheDocument();
+    expect(refreshed.querySelector('[style*="rotate(90deg)"]')).toBeTruthy();
+    expect(refreshed.querySelector('[style*="rotate(0deg)"]')).toBeFalsy();
   });
 });
