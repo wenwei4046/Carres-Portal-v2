@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { SOFA_HEIGHTS } from "../sofa-constants";
+
 /**
  * Catalog bundle — single endpoint that returns everything the wizard's product
  * picker needs in one round-trip: models + skus + sofa fabrics + addons + floor
@@ -282,6 +284,63 @@ export const modelSofaCompartmentInput = z
   .strict();
 export type ModelSofaCompartmentInput = z.infer<typeof modelSofaCompartmentInput>;
 
+// ---------------------------------------------------------------------------
+// 0179 — sofa combo pricing (sofa engine Phase 2). Principal-owned. A combo =
+// a base model + ordered SLOTS (each slot an OR-set of compartment codes)
+// priced per seat height. One schema, two consumers (§9.5).
+// ---------------------------------------------------------------------------
+
+/** One SLOT = a non-empty OR-set of compartment `code` strings. */
+const sofaComboSlotSchema = z.array(z.string().trim().min(1)).min(1);
+
+/** Ordered list of slots = a non-empty array of slots. */
+const sofaComboSlotsSchema = z.array(sofaComboSlotSchema).min(1);
+
+/**
+ * `prices_by_height` map — only the canonical `SOFA_HEIGHTS` keys are allowed;
+ * each value is a non-negative RM number or `null` (combo n/a at that height).
+ */
+const sofaComboPricesByHeightSchema = z.record(
+  z.enum(SOFA_HEIGHTS),
+  z.union([z.number().min(0), z.null()]),
+);
+
+/** A sofa combo row (mirrors the `SofaCombo` domain type, camelCased). */
+export const sofaComboSchema = z.object({
+  id: z.string().uuid(),
+  modelId: z.string().uuid(),
+  slots: z.array(z.array(z.string())),
+  tier: fabricTierSchema.nullable(),
+  pricesByHeight: z.record(z.string(), z.union([z.number(), z.null()])),
+  label: z.string().nullable(),
+  effectiveFrom: z.string(),
+  active: z.boolean(),
+  discontinuedAt: z.string().nullable(),
+});
+export type SofaComboDto = z.infer<typeof sofaComboSchema>;
+
+/**
+ * Create a sofa combo. `slots` is required (≥1 slot, each a non-empty OR-set);
+ * `pricesByHeight` keys are restricted to `SOFA_HEIGHTS`. `tier` null/omitted =
+ * applies to any fabric tier.
+ */
+export const sofaComboCreateInput = z
+  .object({
+    modelId: z.string().uuid(),
+    slots: sofaComboSlotsSchema,
+    tier: fabricTierSchema.nullable().optional(),
+    pricesByHeight: sofaComboPricesByHeightSchema.optional(),
+    label: z.string().trim().max(200).nullable().optional(),
+    effectiveFrom: z.string().optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+export type SofaComboCreateInput = z.infer<typeof sofaComboCreateInput>;
+
+/** Patch a sofa combo — every field of create is optional. */
+export const sofaComboPatchInput = sofaComboCreateInput.partial().strict();
+export type SofaComboPatchInput = z.infer<typeof sofaComboPatchInput>;
+
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
   skus: z.array(productSkuSchema),
@@ -299,6 +358,8 @@ export const catalogResponseSchema = z.object({
   // Pre-0178 clients that don't read these are wholly unaffected.
   sofaCompartments: z.array(sofaCompartmentSchema).optional(),
   modelSofaCompartments: z.array(modelSofaCompartmentSchema).optional(),
+  // 0179 — sofa combo pricing (additive, OPTIONAL). Pre-0179 clients unaffected.
+  sofaCombos: z.array(sofaComboSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 

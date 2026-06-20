@@ -188,6 +188,25 @@ export interface ModelSofaCompartment {
   sortOrder: number;
 }
 
+/**
+ * A sofa combo (migration 0179, sofa engine Phase 2). A base model + an ordered
+ * list of `slots` (each slot an OR-set of compartment `code` strings) priced per
+ * seat height in `pricesByHeight` (height-string → RM | null; a null/absent key
+ * = the combo does not apply at that height). `tier` null = applies to any
+ * fabric tier. Principal-owned; soft-deleted via active/discontinuedAt.
+ */
+export interface SofaCombo {
+  id: string;
+  modelId: string;
+  slots: string[][];
+  tier: FabricTier | null;
+  pricesByHeight: Record<string, number | null>;
+  label: string | null;
+  effectiveFrom: string;
+  active: boolean;
+  discontinuedAt: string | null;
+}
+
 export interface FloorConfig {
   id: number;
   freeUpToFloor: number;

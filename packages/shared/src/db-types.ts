@@ -272,6 +272,29 @@ export interface ModelSofaCompartmentRow {
   updated_by: string | null;
 }
 
+/**
+ * `sofa_combo_pricing` (migration 0179, sofa engine Phase 2). A sofa combo =
+ * a base model + ordered SLOTS (each slot an OR-set of compartment `code`
+ * strings) priced per seat height. `slots` is a jsonb `string[][]`;
+ * `prices_by_height` is a jsonb map height-string → numeric MYR | null (key
+ * absent / null = the combo does not apply at that height). `tier` NULL =
+ * applies to any fabric tier. Soft-delete via active/discontinued_at.
+ */
+export interface SofaComboPricingRow {
+  id: string;
+  model_id: string;
+  slots: string[][];
+  tier: string | null;
+  prices_by_height: Record<string, number | null>;
+  label: string | null;
+  effective_from: string;
+  active: boolean;
+  discontinued_at: string | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
 export interface FloorConfigRow {
   id: number;
   free_up_to_floor: number;

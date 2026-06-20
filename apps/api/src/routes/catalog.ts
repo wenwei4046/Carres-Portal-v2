@@ -30,6 +30,10 @@ import {
   modelSofaCompartmentInput,
   SOFA_COMPARTMENTS,
   MODEL_SOFA_COMPARTMENTS,
+  sofaComboCreateInput,
+  sofaComboPatchInput,
+  canonicalizeSofaSlots,
+  SOFA_COMBO_PRICING,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
@@ -155,7 +159,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -177,6 +181,11 @@ catalogRouter.get("/", async (c) => {
     // maintenance UI is the only consumer in Phase 1; returned unfiltered.
     sb.from(SOFA_COMPARTMENTS).select("*"),
     sb.from(MODEL_SOFA_COMPARTMENTS).select("*"),
+    // 0179 — sofa combo pricing rows (additive). Fetched unfiltered; the
+    // active / discontinued_at filter is applied client-side below (like the
+    // 0177 combos branch), since non-admin POS consumers must not see retired
+    // combos while the maintenance tab (admin=true) must.
+    sb.from(SOFA_COMBO_PRICING).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -188,6 +197,7 @@ catalogRouter.get("/", async (c) => {
   if (comboComponentsR.error) throw new HTTPException(500, { message: comboComponentsR.error.message });
   if (sofaCompsR.error) throw new HTTPException(500, { message: sofaCompsR.error.message });
   if (modelSofaCompsR.error) throw new HTTPException(500, { message: modelSofaCompsR.error.message });
+  if (sofaCombosR.error) throw new HTTPException(500, { message: sofaCombosR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -262,6 +272,17 @@ catalogRouter.get("/", async (c) => {
     modelSofaCompartments: (modelSofaCompsR.data ?? []).map(
       (r) => Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow),
     ),
+    // 0179 — sofa combo pricing (additive; optional). Non-admin consumers
+    // (POS / the future builder) only see live combos (active && not
+    // discontinued); admin (maintenance tab) sees ALL so it can restore them —
+    // mirrors the 0177 combos branch exactly.
+    sofaCombos: (sofaCombosR.data ?? [])
+      .filter((row) => {
+        if (adminMode) return true;
+        const r = row as DB.SofaComboPricingRow;
+        return r.active === true && r.discontinued_at == null;
+      })
+      .map((r) => Adapters.sofaComboFromRow(r as DB.SofaComboPricingRow)),
   });
 
   // 0074 — was `private, max-age=300` but the browser cache was beating
@@ -1356,6 +1377,116 @@ catalogRouter.delete("/models/:modelId/compartments/:compartmentId", async (c) =
     .eq("model_id", modelId)
     .eq("compartment_id", compartmentId);
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0179 — Sofa combo pricing (the "money core" inputs). A sofa combo = a
+// principal-owned named SLOT set for one model, priced per seat-height
+// (prices_by_height). All writes are principal-only ("Master Admin"), mirroring
+// the 0176/0177/0178 gate: early friendly 403 here, with RLS
+// (sofa_combo_pricing_write_principal) the real boundary — we forward the USER
+// JWT (userClient) so RLS runs; NEVER service_role. Slots are canonicalized
+// (sort within slot + sort slots, drop blanks) BEFORE write so equivalent
+// combos persist identically and the Phase-3 matcher reads a stable shape.
+// ---------------------------------------------------------------------------
+
+const SOFA_COMBO_PRINCIPAL_MSG = "Only the principal (Master Admin) can manage sofa combos";
+
+// POST /sofa-combos — create a sofa combo (principal-only).
+catalogRouter.post("/sofa-combos", async (c) => {
+  principalOnly(c, SOFA_COMBO_PRINCIPAL_MSG);
+  const parsed = await parseJsonBody(c, sofaComboCreateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const insert: Record<string, unknown> = {
+    model_id: parsed.data.modelId,
+    // Canonicalize so equivalent slot sets persist identically (mirrors 2990s
+    // canonicalizeComboModulesForStorage; folded into the shared pure helper).
+    slots: canonicalizeSofaSlots(parsed.data.slots),
+    tier: parsed.data.tier ?? null,
+    prices_by_height: parsed.data.pricesByHeight ?? {},
+    label: parsed.data.label ?? null,
+    active: parsed.data.active ?? true,
+    updated_at: new Date().toISOString(),
+    updated_by: c.var.auth.id,
+  };
+  // effective_from defaults to CURRENT_DATE at the DB; only set it when the
+  // caller supplies one (future-dating / tie-break authoring).
+  if (parsed.data.effectiveFrom !== undefined) insert.effective_from = parsed.data.effectiveFrom;
+
+  const { data, error } = await sb
+    .from(SOFA_COMBO_PRICING)
+    .insert(insert)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "sofa combo insert returned no row" }, 500);
+  }
+  return c.json({ sofaCombo: Adapters.sofaComboFromRow(data as DB.SofaComboPricingRow) }, 201);
+});
+
+// PATCH /sofa-combos/:id — update fields (principal-only); empty body → 422.
+catalogRouter.patch("/sofa-combos/:id", async (c) => {
+  principalOnly(c, SOFA_COMBO_PRINCIPAL_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, sofaComboPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.modelId !== undefined) patch.model_id = parsed.data.modelId;
+  // Canonicalize slots on update too (same invariant as create).
+  if (parsed.data.slots !== undefined) patch.slots = canonicalizeSofaSlots(parsed.data.slots);
+  if (parsed.data.tier !== undefined) patch.tier = parsed.data.tier;
+  if (parsed.data.pricesByHeight !== undefined) patch.prices_by_height = parsed.data.pricesByHeight;
+  if (parsed.data.label !== undefined) patch.label = parsed.data.label;
+  if (parsed.data.effectiveFrom !== undefined) patch.effective_from = parsed.data.effectiveFrom;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SOFA_COMBO_PRICING)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "sofa combo not found" }, 404);
+  }
+  return c.json({ sofaCombo: Adapters.sofaComboFromRow(data as DB.SofaComboPricingRow) });
+});
+
+// DELETE /sofa-combos/:id — soft-delete (principal-only), mirroring DELETE
+// /combos: stamp discontinued_at + flip active=false so GET / hides it from the
+// POS/builder while the maintenance tab (admin=true) can still restore it.
+catalogRouter.delete("/sofa-combos/:id", async (c) => {
+  principalOnly(c, SOFA_COMBO_PRINCIPAL_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SOFA_COMBO_PRICING)
+    .update({
+      active: false,
+      discontinued_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "sofa combo not found" }, 404);
+  }
   return c.json({ ok: true });
 });
 

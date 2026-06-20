@@ -28,6 +28,7 @@ import {
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../components/atoms";
+import SofaCombosPanel from "./SofaCombosPanel";
 
 /**
  * ProductModelDrawer — right slide-over for one model. Sections:
@@ -185,6 +186,17 @@ export default function ProductModelDrawer({
               modelId={model.id}
               pool={(catalog.sofaCompartments ?? []).filter((c) => c.active)}
               offered={(catalog.modelSofaCompartments ?? []).filter((o) => o.modelId === model.id)}
+              isPrincipal={isPrincipal ?? false}
+            />
+          )}
+
+          {/* Sofa combos panel (0179) — sofa models only */}
+          {model.category === "sofa" && catalog && (
+            <SofaCombosPanel
+              modelId={model.id}
+              pool={catalog.sofaCompartments ?? []}
+              offered={(catalog.modelSofaCompartments ?? []).filter((o) => o.modelId === model.id)}
+              combos={catalog.sofaCombos ?? []}
               isPrincipal={isPrincipal ?? false}
             />
           )}
