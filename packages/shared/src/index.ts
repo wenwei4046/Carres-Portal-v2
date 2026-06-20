@@ -121,6 +121,11 @@ export {
   fabricTierSchema,
   fabricTierConfigSchema,
   modelFabricTierOverrideSchema,
+  // 0177 — combo (套餐) schemas.
+  comboComponentSchema,
+  comboSchema,
+  comboCreateInput,
+  comboPatchInput,
   serviceSkuCodeSchema,
   sizesActiveInput,
   generateSkusInput,
@@ -158,6 +163,11 @@ export {
   type FabricTierValue,
   type FabricTierConfigDto,
   type ModelFabricTierOverrideDto,
+  // 0177 — combo (套餐) Dto types.
+  type ComboComponentDto,
+  type ComboDto,
+  type ComboCreateInput,
+  type ComboPatchInput,
 } from "./schemas/catalog";
 
 export {
@@ -422,6 +432,19 @@ export {
   type FabricTierOverride,
   type FabricTierGlobalConfig,
 } from "./fabric-tier";
+
+// Migration 0177 — combo (套餐) price-split helper + types. `explodeCombo` is
+// the pure split used by the POS (web Task 4) to fan a combo into N order lines.
+export {
+  explodeCombo,
+  type ExplodedComboLine,
+} from "./combo";
+
+// 0177 — combo domain types (camelCased). Top-level alias so consumers can
+// `import type { Combo } from "@carres/shared"` without dipping into Domain.*
+// (mirrors how CostSource is surfaced above). The zod schemas + Dto types live
+// in the schemas/catalog export block.
+export type { Combo, ComboComponent } from "./domain";
 
 // Table-name constants (prevents raw string literals in application code).
 export * from "./tables";

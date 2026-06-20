@@ -13,6 +13,8 @@ import {
   sofaFabricPatchInput,
   fabricTierConfigSchema,
   modelFabricTierOverrideSchema,
+  comboCreateInput,
+  comboPatchInput,
   sizesActiveInput,
   generateSkusInput,
   floorConfigPatchInput,
@@ -24,10 +26,6 @@ import {
   COMBOS,
   COMBO_COMPONENTS,
 } from "@carres/shared";
-// 0177 — combo CRUD schemas. These live in schemas/catalog.ts and are reached
-// via the `@carres/shared/schemas/*` subpath export (same pattern the codebase
-// uses for `@carres/shared/domain`); they are not re-exported from the barrel.
-import { comboCreateInput, comboPatchInput } from "@carres/shared/schemas/catalog";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";

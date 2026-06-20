@@ -1633,6 +1633,65 @@ describe("0177 — GET /api/catalog includes combos with components", () => {
     expect(empty.components).toEqual([]);
   });
 
+  it("two combos each get EXACTLY their own components (componentsByCombo keys on combo_id, no merge/cross-talk)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb(
+        comboBundle({
+          combos: [
+            {
+              id: COMBO_ID,
+              combo_key: "bedroom-set",
+              name: "Bedroom Set",
+              combo_price: 3000,
+              active: true,
+              effective_from: "2026-06-20T00:00:00Z",
+              discontinued_at: null,
+            },
+            {
+              id: COMBO_ID_2,
+              combo_key: "living-set",
+              name: "Living Set",
+              combo_price: 5000,
+              active: true,
+              effective_from: "2026-06-20T00:00:00Z",
+              discontinued_at: null,
+            },
+          ],
+          // Interleaved + out of order so a buggy non-keyed grouping (or a merge)
+          // would visibly leak one combo's components into the other.
+          combo_components: [
+            { combo_id: COMBO_ID_2, sku: "SOFA-3S", qty: 1, sort_order: 1 },
+            { combo_id: COMBO_ID, sku: "MAT-QUEEN", qty: 1, sort_order: 2 },
+            { combo_id: COMBO_ID_2, sku: "COFFEE-TABLE", qty: 1, sort_order: 2 },
+            { combo_id: COMBO_ID, sku: "FRAME-QUEEN", qty: 1, sort_order: 1 },
+          ],
+        }),
+      ),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ComboBody;
+    expect(body.combos).toHaveLength(2);
+
+    // Each combo carries ONLY its own two components, sorted ascending.
+    const bedroom = body.combos.find((x) => x.id === COMBO_ID)!;
+    expect(bedroom.components.map((c) => c.sku)).toEqual(["FRAME-QUEEN", "MAT-QUEEN"]);
+
+    const living = body.combos.find((x) => x.id === COMBO_ID_2)!;
+    expect(living.components.map((c) => c.sku)).toEqual(["SOFA-3S", "COFFEE-TABLE"]);
+
+    // Explicit no-cross-talk: neither combo contains the other's SKUs, and
+    // neither got the merged 4-item set.
+    expect(bedroom.components).toHaveLength(2);
+    expect(living.components).toHaveLength(2);
+    expect(bedroom.components.some((c) => c.sku === "SOFA-3S" || c.sku === "COFFEE-TABLE")).toBe(false);
+    expect(living.components.some((c) => c.sku === "FRAME-QUEEN" || c.sku === "MAT-QUEEN")).toBe(false);
+  });
+
   it("non-admin excludes active:false / discontinued combos; ?admin=true includes them", async () => {
     const combos = [
       {
@@ -1694,11 +1753,18 @@ function comboWriteSb(opts: {
   comboReturn?: Record<string, unknown> | null;
   /** When true, the combo_components insert resolves with an error. */
   componentsInsertError?: boolean;
+  /**
+   * Rows the `combo_components` READ-back (select().eq() → then) resolves with.
+   * Used by the PATCH "components omitted" path, which re-reads the existing set
+   * so the response stays complete. Defaults to [] (the pre-existing behaviour).
+   */
+  componentReadReturn?: unknown[];
   records?: ComboCall[];
 }): SbStub {
   const records = opts.records ?? [];
   const comboReturn = opts.comboReturn ?? null;
   const componentsInsertError = opts.componentsInsertError ?? false;
+  const componentReadReturn = opts.componentReadReturn ?? [];
 
   const mk = (table: string) => {
     let op: "insert" | "update" | "delete" | null = null;
@@ -1736,6 +1802,11 @@ function comboWriteSb(opts: {
       record();
       if (table === "combo_components" && op === "insert" && componentsInsertError) {
         return resolve({ data: null, error: { code: "23503", message: "fk violation" } });
+      }
+      // A pure read on combo_components (no write op) → the PATCH "components
+      // omitted" read-back. Return the scripted existing set (default []).
+      if (table === "combo_components" && op === null) {
+        return resolve({ data: componentReadReturn, error: null });
       }
       return resolve({ data: [], error: null });
     };
@@ -1897,6 +1968,32 @@ describe("0177 — POST /api/catalog/combos (principal only)", () => {
     // Fallback shape: combo-<hex>, never empty.
     expect(key).toMatch(/^combo-[0-9a-f]+$/);
   });
+
+  it("combo insert returning no row → 500 (and no components insert happens)", async () => {
+    const records: ComboCall[] = [];
+    // comboReturn:null → the combos insert .maybeSingle() yields {data:null},
+    // tripping the "combo insert returned no row" 500 branch BEFORE any
+    // combo_components write.
+    vi.mocked(userClient).mockReturnValue(comboWriteSb({ records, comboReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Ghost Set",
+          comboPrice: 999,
+          components: [{ sku: "FRAME-QUEEN", qty: 1 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/combo insert returned no row/i);
+    // The early-return means the components were never inserted.
+    expect(records.some((r) => r.table === "combo_components")).toBe(false);
+  });
 });
 
 describe("0177 — PATCH /api/catalog/combos/:id (principal only)", () => {
@@ -1971,6 +2068,67 @@ describe("0177 — PATCH /api/catalog/combos/:id (principal only)", () => {
     expect(rows.every((r) => r.combo_id === COMBO_ID)).toBe(true);
   });
 
+  it("components omitted → response reflects the read-back existing set (no component write)", async () => {
+    const records: ComboCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      comboWriteSb({
+        records,
+        comboReturn: {
+          id: COMBO_ID,
+          combo_key: "bedroom-set",
+          name: "Bedroom Set Deluxe",
+          combo_price: 3500,
+          active: true,
+          effective_from: "2026-06-20T00:00:00Z",
+          discontinued_at: null,
+        },
+        // The existing component set the read-back returns (out of sort_order to
+        // also prove the response is sorted ascending).
+        componentReadReturn: [
+          { combo_id: COMBO_ID, sku: "MAT-QUEEN", qty: 1, sort_order: 2 },
+          { combo_id: COMBO_ID, sku: "FRAME-QUEEN", qty: 1, sort_order: 1 },
+        ],
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        // Scalar-only patch (no `components` key) → existing set is preserved.
+        body: JSON.stringify({ name: "Bedroom Set Deluxe", comboPrice: 3500 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      combo: { components: { sku: string; sortOrder: number }[] };
+    };
+    // Response carries the READ-BACK existing set, sorted ascending by sortOrder.
+    expect(body.combo.components.map((c) => c.sku)).toEqual(["FRAME-QUEEN", "MAT-QUEEN"]);
+    expect(body.combo.components.map((c) => c.sortOrder)).toEqual([1, 2]);
+    // No component write of ANY kind happened (set untouched).
+    expect(records.some((r) => r.table === "combo_components")).toBe(false);
+  });
+
+  it("combo not found → 404", async () => {
+    // comboReturn:null → the combos update .maybeSingle() yields {data:null},
+    // tripping the "combo not found" 404 branch.
+    vi.mocked(userClient).mockReturnValue(comboWriteSb({ comboReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Does Not Exist" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/combo not found/i);
+  });
+
   it("non-principal → 403", async () => {
     const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
@@ -2018,6 +2176,23 @@ describe("0177 — DELETE /api/catalog/combos/:id (principal only)", () => {
     const upd = records.find((r) => r.table === "combos" && r.op === "update");
     expect(upd?.payload).toMatchObject({ active: false });
     expect((upd?.payload as { discontinued_at: string }).discontinued_at).toBeTruthy();
+  });
+
+  it("combo not found → 404", async () => {
+    // comboReturn:null → the combos update .maybeSingle() yields {data:null},
+    // tripping the "combo not found" 404 branch.
+    vi.mocked(userClient).mockReturnValue(comboWriteSb({ comboReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/combo not found/i);
   });
 
   it("non-principal → 403", async () => {
