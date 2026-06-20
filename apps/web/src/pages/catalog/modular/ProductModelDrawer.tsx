@@ -2,18 +2,25 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   AllowedOptions,
+  CatalogResponse,
   ProductCategory,
   ProductModelDto,
   ProductSkuDto,
+  SofaFabricDto,
+  FabricTierValue,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
+  useCreateSofaFabric,
   useDeleteModelPhoto,
+  useDeleteSofaFabric,
   useGenerateSkus,
   usePatchCatalogModel,
   usePatchCatalogSku,
+  usePatchSofaFabric,
   useSetModelPhoto,
   useToggleSizesActive,
+  useUpsertModelFabricTierOverride,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../components/atoms";
@@ -56,10 +63,16 @@ const AXIS_LABEL: Record<OptionAxis, string> = {
 export default function ProductModelDrawer({
   model,
   skus,
+  catalog,
+  isPrincipal,
   onClose,
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
+  /** Full catalog bundle — required to read sofaFabrics + tier overrides. */
+  catalog?: CatalogResponse;
+  /** True when the current user is principal. Gates tier/delta money knobs. */
+  isPrincipal?: boolean;
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -149,6 +162,18 @@ export default function ProductModelDrawer({
           )}
 
           <VariantSkuTable skus={skus} />
+
+          {/* Fabrics panel — sofa models only */}
+          {model.category === "sofa" && catalog && (
+            <SofaFabricsPanel
+              model={model}
+              fabrics={catalog.sofaFabrics.filter((f) => f.modelId === model.id && !f.discontinuedAt)}
+              tierOverride={
+                (catalog.modelFabricTierOverrides ?? []).find((o) => o.modelId === model.id) ?? null
+              }
+              isPrincipal={isPrincipal ?? false}
+            />
+          )}
 
           {axes.includes("sizes") && (
             <div>
@@ -577,6 +602,346 @@ function VariantSkuTable({ skus }: { skus: ProductSkuDto[] }) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sofa fabrics panel — list fabrics per model + per-model tier delta override
+// ---------------------------------------------------------------------------
+
+const TIER_LABELS: Record<FabricTierValue, string> = {
+  PRICE_1: "P1 – Base",
+  PRICE_2: "P2 – Mid",
+  PRICE_3: "P3 – Premium",
+};
+
+function SofaFabricsPanel({
+  model,
+  fabrics,
+  tierOverride,
+  isPrincipal,
+}: {
+  model: ProductModelDto;
+  fabrics: SofaFabricDto[];
+  tierOverride: { modelId: string; tier2Delta: number | null; tier3Delta: number | null } | null;
+  isPrincipal: boolean;
+}) {
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="label">Fabrics</div>
+        <button
+          type="button"
+          onClick={() => setAdding((v) => !v)}
+          className="btn-ghost text-[11px]"
+          data-testid="fabric-add-toggle"
+        >
+          {adding ? "Close" : "+ Add fabric"}
+        </button>
+      </div>
+      <p className="t-tiny text-base-500 mb-3">
+        Fabric options for this sofa model. Tier sets the price band (P1 = base, no delta).
+        {!isPrincipal && " Tier is principal-only — read-only for your role."}
+      </p>
+
+      {adding && (
+        <FabricAddForm
+          modelId={model.id}
+          isPrincipal={isPrincipal}
+          onDone={() => setAdding(false)}
+        />
+      )}
+
+      <div className="border border-base-200 rounded-[4px] overflow-hidden mb-4">
+        <div
+          className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
+          style={{ gridTemplateColumns: "minmax(120px,1fr) 100px 96px 64px" }}
+        >
+          <div className="label">Fabric name</div>
+          <div className="label">Surcharge (RM)</div>
+          <div className="label">Tier</div>
+          <div className="label" />
+        </div>
+        {fabrics.length === 0 && (
+          <div className="t-small text-base-500 px-3 py-3">No fabrics yet.</div>
+        )}
+        {fabrics.map((f) => (
+          <FabricRow key={f.id} fabric={f} isPrincipal={isPrincipal} />
+        ))}
+      </div>
+
+      <TierDeltaOverrideCard
+        model={model}
+        override={tierOverride}
+        isPrincipal={isPrincipal}
+      />
+    </div>
+  );
+}
+
+function FabricRow({
+  fabric,
+  isPrincipal,
+}: {
+  fabric: SofaFabricDto;
+  isPrincipal: boolean;
+}) {
+  const patch = usePatchSofaFabric();
+  const del = useDeleteSofaFabric();
+
+  function commitName(raw: string) {
+    const next = raw.trim();
+    if (next.length < 1 || next === fabric.fabricName) return;
+    patch.mutate(
+      { id: fabric.id, patch: { fabricName: next } },
+      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
+    );
+  }
+
+  function setTier(tier: FabricTierValue) {
+    if (tier === fabric.tier) return;
+    patch.mutate(
+      { id: fabric.id, patch: { tier } },
+      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
+    );
+  }
+
+  function remove() {
+    if (!confirm(`Remove fabric "${fabric.fabricName}"?`)) return;
+    del.mutate(fabric.id, {
+      onSuccess: () => toast.success(`${fabric.fabricName} removed`),
+      onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Remove failed"),
+    });
+  }
+
+  return (
+    <div
+      className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
+      style={{ gridTemplateColumns: "minmax(120px,1fr) 100px 96px 64px" }}
+      data-testid={`fabric-row-${fabric.id}`}
+    >
+      <input
+        defaultValue={fabric.fabricName}
+        onBlur={(e) => commitName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        aria-label={`${fabric.id} name`}
+        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[13px] outline-none bg-transparent"
+      />
+      <div className="font-mono text-[12px] text-base-700 px-2">
+        {fabric.surcharge > 0 ? `+${fabric.surcharge.toFixed(2)}` : "—"}
+      </div>
+      {isPrincipal ? (
+        <select
+          value={fabric.tier}
+          onChange={(e) => setTier(e.target.value as FabricTierValue)}
+          disabled={patch.isPending}
+          aria-label={`${fabric.id} tier`}
+          className={`${INPUT_CLS} text-[12px] py-0.5`}
+          data-testid={`fabric-tier-${fabric.id}`}
+        >
+          {(Object.keys(TIER_LABELS) as FabricTierValue[]).map((t) => (
+            <option key={t} value={t}>{TIER_LABELS[t]}</option>
+          ))}
+        </select>
+      ) : (
+        <span className="t-tiny text-base-600 px-2" data-testid={`fabric-tier-readonly-${fabric.id}`}>{TIER_LABELS[fabric.tier]}</span>
+      )}
+      <div className="text-right">
+        <button
+          type="button"
+          onClick={remove}
+          disabled={del.isPending}
+          className="btn-danger text-[11px]"
+          data-testid={`fabric-remove-${fabric.id}`}
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FabricAddForm({
+  modelId,
+  isPrincipal,
+  onDone,
+}: {
+  modelId: string;
+  isPrincipal: boolean;
+  onDone: () => void;
+}) {
+  const create = useCreateSofaFabric();
+  const [name, setName] = useState("");
+  const [surcharge, setSurcharge] = useState("0");
+  const [tier, setTier] = useState<FabricTierValue>("PRICE_1");
+
+  const surNum = Number(surcharge);
+  const valid = name.trim().length >= 1 && Number.isFinite(surNum) && surNum >= 0;
+
+  async function submit() {
+    if (!valid) return;
+    try {
+      await create.mutateAsync({
+        modelId,
+        fabricName: name.trim(),
+        surcharge: surNum,
+        tier: isPrincipal ? tier : "PRICE_1",
+      });
+      toast.success(`Added ${name.trim()}`);
+      onDone();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Add failed");
+    }
+  }
+
+  return (
+    <div className="bg-base-50 border border-base-200 rounded-[4px] p-4 mb-3 flex flex-wrap gap-3 items-end">
+      <label className="block">
+        <span className="label block mb-1">Name</span>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Cloud Linen"
+          className={`${INPUT_CLS} w-40`}
+          data-testid="fabric-add-name"
+        />
+      </label>
+      <label className="block">
+        <span className="label block mb-1">Surcharge (RM)</span>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={surcharge}
+          onChange={(e) => setSurcharge(e.target.value)}
+          className={`${INPUT_CLS} w-28`}
+          data-testid="fabric-add-surcharge"
+        />
+      </label>
+      {isPrincipal && (
+        <label className="block">
+          <span className="label block mb-1">Tier</span>
+          <select
+            value={tier}
+            onChange={(e) => setTier(e.target.value as FabricTierValue)}
+            className={`${INPUT_CLS} text-[12px]`}
+            data-testid="fabric-add-tier"
+          >
+            {(Object.keys(TIER_LABELS) as FabricTierValue[]).map((t) => (
+              <option key={t} value={t}>{TIER_LABELS[t]}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!valid || create.isPending}
+        className="btn-primary text-[12px] disabled:opacity-40"
+        data-testid="fabric-add-submit"
+      >
+        {create.isPending ? "Adding…" : "Add fabric"}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Per-model tier delta override card. Null delta = inherit from global config.
+ * Principal-gated: only principal can edit the numeric inputs.
+ */
+function TierDeltaOverrideCard({
+  model,
+  override,
+  isPrincipal,
+}: {
+  model: ProductModelDto;
+  override: { modelId: string; tier2Delta: number | null; tier3Delta: number | null } | null;
+  isPrincipal: boolean;
+}) {
+  const upsert = useUpsertModelFabricTierOverride();
+
+  const [t2, setT2] = useState(override?.tier2Delta !== null && override?.tier2Delta !== undefined ? String(override.tier2Delta) : "");
+  const [t3, setT3] = useState(override?.tier3Delta !== null && override?.tier3Delta !== undefined ? String(override.tier3Delta) : "");
+
+  // Re-sync when override changes (another session or our own save)
+  useEffect(() => {
+    setT2(override?.tier2Delta !== null && override?.tier2Delta !== undefined ? String(override.tier2Delta) : "");
+    setT3(override?.tier3Delta !== null && override?.tier3Delta !== undefined ? String(override.tier3Delta) : "");
+  }, [override?.tier2Delta, override?.tier3Delta]);
+
+  const t2Num = t2.trim() === "" ? null : Number(t2);
+  const t3Num = t3.trim() === "" ? null : Number(t3);
+  const t2Valid = t2Num === null || (Number.isFinite(t2Num) && t2Num >= 0);
+  const t3Valid = t3Num === null || (Number.isFinite(t3Num) && t3Num >= 0);
+
+  const dirty =
+    t2Num !== (override?.tier2Delta ?? null) ||
+    t3Num !== (override?.tier3Delta ?? null);
+
+  function save() {
+    if (!t2Valid || !t3Valid || !dirty) return;
+    upsert.mutate(
+      { modelId: model.id, tier2Delta: t2Num, tier3Delta: t3Num },
+      {
+        onSuccess: () => toast.success("Tier override saved"),
+        onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Save failed"),
+      },
+    );
+  }
+
+  return (
+    <div>
+      <div className="label mb-1">Tier delta override (blank = use global)</div>
+      <p className="t-tiny text-base-500 mb-2">
+        Per-model premium added to base price for P2 / P3 fabrics on this model.
+        Leave blank to inherit from global Fabric tier deltas.
+        {!isPrincipal && " Principal only — read-only for your role."}
+      </p>
+      <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-wrap gap-4 items-end">
+        <label className="block">
+          <span className="label block mb-1">P2 delta (RM)</span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={t2}
+            disabled={!isPrincipal}
+            onChange={(e) => setT2(e.target.value)}
+            placeholder="global"
+            className={`${INPUT_CLS} w-28 disabled:opacity-60`}
+            data-testid={`model-tier2-delta-${model.id}`}
+          />
+        </label>
+        <label className="block">
+          <span className="label block mb-1">P3 delta (RM)</span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={t3}
+            disabled={!isPrincipal}
+            onChange={(e) => setT3(e.target.value)}
+            placeholder="global"
+            className={`${INPUT_CLS} w-28 disabled:opacity-60`}
+            data-testid={`model-tier3-delta-${model.id}`}
+          />
+        </label>
+        {isPrincipal && (
+          <button
+            type="button"
+            onClick={save}
+            disabled={!t2Valid || !t3Valid || !dirty || upsert.isPending}
+            className="btn-primary text-[12px] disabled:opacity-40"
+            data-testid={`model-tier-override-save-${model.id}`}
+          >
+            {upsert.isPending ? "Saving…" : "Save override"}
+          </button>
+        )}
       </div>
     </div>
   );

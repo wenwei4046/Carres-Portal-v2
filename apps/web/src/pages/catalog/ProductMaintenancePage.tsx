@@ -68,7 +68,7 @@ export default function ProductMaintenancePage({
       {catalogQ.data && (
         <>
           {tab === "sku" && <SkuMasterTab catalog={catalogQ.data} />}
-          {tab === "modular" && <ModularTab catalog={catalogQ.data} />}
+          {tab === "modular" && <ModularTab catalog={catalogQ.data} isPrincipal={isPrincipal} />}
           {tab === "maintenance" && (
             <MaintenanceTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
