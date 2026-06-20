@@ -46,6 +46,10 @@ vi.mock("@/lib/queries", () => ({
   // 0178 — offered-compartments panel hooks (drawer renders the panel for sofa models).
   useUpsertModelSofaCompartment:   () => ({ mutate: mockUpsertOffered, isPending: false }),
   useDeleteModelSofaCompartment:   () => ({ mutate: mockDeleteOffered, isPending: false }),
+  // 0179 — sofa-combos panel hooks (drawer renders the panel for sofa models).
+  useCreateSofaCombo:              () => ({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+  useUpdateSofaCombo:              () => ({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+  useDeleteSofaCombo:              () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 // ---------------------------------------------------------------------------

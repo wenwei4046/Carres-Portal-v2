@@ -27,6 +27,9 @@ import {
   type ComboDto,
   type ComboCreateInput,
   type ComboPatchInput,
+  type SofaComboDto,
+  type SofaComboCreateInput,
+  type SofaComboPatchInput,
   type SofaCompartmentDto,
   type SofaCompartmentCreateInput,
   type SofaCompartmentPatchInput,
@@ -4577,6 +4580,44 @@ export function useDeleteCombo() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/combos/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0179 — sofa combos (sofa engine Phase 2). Slots = ordered OR-sets of
+// compartment codes; prices_by_height matrix per SOFA_HEIGHTS. Three CRUD
+// mutations mirroring the 0177 combo hooks: POST creates, PATCH replaces
+// fields, DELETE soft-deletes (active=false + discontinued_at). Principal-only
+// at the API/RLS layer (sofa_combo_pricing_write_principal); the UI gate in
+// ProductModelDrawer's Sofa Combos panel is a friendly read-only veneer. Each
+// invalidates the whole `['catalog']` tree so the admin bundle re-fetches (sofa
+// combos ride in the bundle — no dedicated query key needed).
+// ---------------------------------------------------------------------------
+
+export function useCreateSofaCombo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SofaComboCreateInput) =>
+      apiFetch<{ sofaCombo: SofaComboDto }>("/api/catalog/sofa-combos", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateSofaCombo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: SofaComboPatchInput }) =>
+      apiFetch<{ sofaCombo: SofaComboDto }>(`/api/catalog/sofa-combos/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteSofaCombo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/sofa-combos/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }
