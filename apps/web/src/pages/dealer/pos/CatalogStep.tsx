@@ -1,15 +1,16 @@
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { CatalogResponse, ProductCategory } from "@carres/shared";
+import type { CatalogResponse, ComboDto, ProductCategory } from "@carres/shared";
 import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import type { DraftLine, WizardDraft } from "../new-order/draft";
+import { comboToDraftLines, type DraftLine, type WizardDraft } from "../new-order/draft";
 import { lockedCategoriesFor } from "../new-order/configurators";
 import { buildCatalogIndex } from "./catalog-index";
 import { cartItemCount, cartTotalExStair, mergeLine } from "./cart";
 import CategoryRail, { type RailEntry, type RailKey } from "./CategoryRail";
 import ProductCard from "./ProductCard";
+import ComboCard from "./ComboCard";
 import ConfigureDrawer from "./ConfigureDrawer";
 import CartDrawer from "./CartDrawer";
 import AddonsPanel from "./AddonsPanel";
@@ -146,6 +147,37 @@ export default function CatalogStep({
     toast.success("Added to cart");
   }
 
+  // Explode a combo into its component DraftLines (split price) and fold ALL of
+  // them into the cart via mergeLine. attrs.combo_key keeps them grouped + lets
+  // CartDrawer offer one "Remove combo". Re-adding the same combo bumps qty via
+  // mergeLine (acceptable v1). The exploded lines carry the SELLING price from
+  // the catalog; a component SKU missing from the bundle is priced 0 by
+  // explodeCombo and the rest absorb the combo total (accepted v1 behaviour).
+  function addCombo(combo: ComboDto) {
+    const cls = comboToDraftLines(combo, (sku) => ({
+      price: index.skuPrice.get(sku) ?? NaN,
+      label: index.skuLabel.get(sku) ?? sku,
+    }));
+    let lines = draft.lines;
+    for (const l of cls) lines = mergeLine(lines, l);
+    onChange({ ...draft, lines });
+    setPulse(true);
+    window.setTimeout(() => setPulse(false), 220);
+    toast.success(`Added "${combo.name}" (${cls.length} item${cls.length === 1 ? "" : "s"})`);
+  }
+
+  // Combos shown only on the "All" rail (combos aren't a product category) and
+  // filtered by the same search box (match on name or comboKey).
+  const shownCombos =
+    activeRail === "all"
+      ? index.combos.filter(
+          (c) =>
+            !search ||
+            c.name.toLowerCase().includes(search) ||
+            c.comboKey.toLowerCase().includes(search),
+        )
+      : [];
+
   const configureModel = configureModelId
     ? index.productModels.find((m) => m.id === configureModelId) ?? null
     : null;
@@ -200,12 +232,32 @@ export default function CatalogStep({
         <div className="flex-1 overflow-auto px-5 py-5 pb-28">
           {activeRail === "addons" ? (
             <AddonsPanel addons={activeAddons} draft={draft} onChange={onChange} />
-          ) : sections.length === 0 ? (
+          ) : sections.length === 0 && shownCombos.length === 0 ? (
             <p className="t-body text-base-500 text-center py-16">
               {search ? `No products match "${rawSearch.trim()}".` : "No products in catalog."}
             </p>
           ) : (
             <div className="flex flex-col gap-8">
+              {/* Combos (套餐) — featured bundle row, "All" rail only. */}
+              {shownCombos.length > 0 && (
+                <section data-testid="pos-combos-section">
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span className="pill pill-neutral">Combos</span>
+                    <span className="font-mono text-[11px] text-base-400">
+                      {shownCombos.length} bundle{shownCombos.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <div
+                    className="grid gap-4"
+                    style={{ gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))" }}
+                  >
+                    {shownCombos.map((combo) => (
+                      <ComboCard key={combo.id} combo={combo} onAdd={() => addCombo(combo)} />
+                    ))}
+                  </div>
+                </section>
+              )}
+
               {sections.map(({ cat, models }) => (
                 <section key={cat}>
                   <div className="flex items-baseline gap-2 mb-3">

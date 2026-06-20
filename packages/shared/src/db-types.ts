@@ -200,6 +200,37 @@ export interface AddonRow {
   service_sku: string | null;
 }
 
+/**
+ * `combos` (migration 0177). A fixed-set bundle (套餐) sold at one
+ * `combo_price`. Components live in `combo_components`. `combo_key` is the
+ * stable kebab-case identifier; `active` + `discontinued_at` mirror the
+ * sell-side ON/OFF + soft-delete convention used elsewhere in the catalog.
+ */
+export interface ComboRow {
+  id: string;
+  combo_key: string;
+  name: string;
+  combo_price: number;
+  active: boolean;
+  effective_from: string;
+  discontinued_at: string | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `combo_components` (migration 0177). One component SKU of a combo. `qty` is
+ * how many of that SKU the combo bundles; `sort_order` drives the deterministic
+ * order explodeCombo() uses (last component absorbs the rounding residue).
+ */
+export interface ComboComponentRow {
+  combo_id: string;
+  sku: string;
+  qty: number;
+  sort_order: number;
+}
+
 export interface FloorConfigRow {
   id: number;
   free_up_to_floor: number;

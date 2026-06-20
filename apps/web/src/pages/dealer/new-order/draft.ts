@@ -1,3 +1,6 @@
+import type { ComboDto } from "@carres/shared";
+import { explodeCombo } from "@carres/shared";
+
 /**
  * Wizard draft state — local UI shape, not the DB row.
  *
@@ -27,6 +30,60 @@ export interface DraftLine {
   unitPrice: number;
   /** Free-text label for the LineList row, e.g. "Carres Cloud · Queen" */
   label: string;
+}
+
+/**
+ * Fresh local id for a staged line. Inlined here (NOT imported from
+ * `configurators.tsx`) so this lower-level draft module never depends on a
+ * React component file — same `crypto.randomUUID()`-with-JSDOM-guard pattern.
+ */
+function newLocalId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Explode a fixed-set combo (套餐, migration 0177) into the component
+ * `DraftLine`s the cart + submit pipeline already understand. PURE: no React,
+ * no IO — delegates the price split to shared `explodeCombo` (integer-cents,
+ * proportional to each component's selling price), then maps each exploded
+ * line into a `DraftLine` carrying `attrs.combo_key` / `attrs.combo_label` so
+ * the CartDrawer can group them under one "Remove combo".
+ *
+ * `lookup(sku)` supplies the SELLING price (for the split weight) + a human
+ * label, both from the catalog index. A component SKU absent from the
+ * (pos_active-filtered) catalog bundle returns `price: NaN`; `explodeCombo`
+ * treats a non-finite price as 0 weight, so that component is priced 0 and the
+ * remaining components absorb the combo price — the combo TOTAL still equals
+ * `comboPrice`. Accepted v1 behaviour (the controller's carry-forward); we do
+ * NOT try to fetch inactive sku prices here.
+ *
+ * `attrs` is EXACTLY `{ combo_key, combo_label }` — combo components are
+ * concrete SKUs with no configurator options in v1.
+ */
+export function comboToDraftLines(
+  combo: ComboDto,
+  lookup: (sku: string) => { price: number; label: string },
+): DraftLine[] {
+  const exploded = explodeCombo(
+    {
+      comboKey: combo.comboKey,
+      name: combo.name,
+      comboPrice: combo.comboPrice,
+      components: combo.components,
+    },
+    (sku) => lookup(sku).price,
+  );
+  return exploded.map((e) => ({
+    localId: newLocalId(),
+    sku: e.sku,
+    qty: e.qty,
+    attrs: { combo_key: e.comboKey, combo_label: e.comboLabel },
+    unitPrice: e.unitPrice,
+    label: lookup(e.sku).label || e.sku,
+  }));
 }
 
 /** Addon staged on the order. Persisted as order_addons rows on submit.

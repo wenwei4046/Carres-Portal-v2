@@ -119,6 +119,32 @@ export const floorConfigFromRow = (r: DB.FloorConfigRow): D.FloorConfig => ({
   perFloorPerItem: Number(r.per_floor_per_item),
 });
 
+/**
+ * Maps a `combo_components` row to the camelCase domain shape (migration 0177).
+ */
+export const comboComponentFromRow = (r: DB.ComboComponentRow): D.ComboComponent => ({
+  sku: r.sku,
+  qty: Number(r.qty),
+  sortOrder: Number(r.sort_order),
+});
+
+/**
+ * Maps a `combos` row to the camelCase domain shape (migration 0177).
+ * `combo_price` is Postgres numeric — `Number()` normalises the string|number
+ * PostgREST surfaces it as. `components` is NOT on the row; the caller attaches
+ * the mapped `combo_components` (via comboComponentFromRow) after fetch, so this
+ * adapter defaults it to an empty array.
+ */
+export const comboFromRow = (r: DB.ComboRow): D.Combo => ({
+  id: r.id,
+  comboKey: r.combo_key,
+  name: r.name,
+  comboPrice: Number(r.combo_price),
+  active: r.active,
+  effectiveFrom: r.effective_from,
+  components: [],
+});
+
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({
   id: r.id,
   name: r.name,

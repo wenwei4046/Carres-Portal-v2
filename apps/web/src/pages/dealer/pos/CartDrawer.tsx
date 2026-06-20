@@ -1,12 +1,26 @@
 import { useEffect } from "react";
-import { X, Trash2, Minus, Plus } from "lucide-react";
+import { X, Trash2, Minus, Plus, Package } from "lucide-react";
 import { rm } from "@/lib/format-currency";
 import {
   step2Valid,
   step2FirstDisposalIssue,
+  type DraftLine,
   type WizardDraft,
 } from "../new-order/draft";
 import { cartAddonSubtotal, cartItemCount, cartLineSubtotal } from "./cart";
+
+/** The combo key a line belongs to (set by `comboToDraftLines`), or null for a
+ *  standalone (non-combo) line. */
+function lineComboKey(l: DraftLine): string | null {
+  const k = (l.attrs as Record<string, unknown> | null)?.combo_key;
+  return typeof k === "string" ? k : null;
+}
+
+/** The display label for a combo group (the combo name, stamped on every line). */
+function lineComboLabel(l: DraftLine): string {
+  const v = (l.attrs as Record<string, unknown> | null)?.combo_label;
+  return typeof v === "string" ? v : "Combo";
+}
 
 /**
  * Right slide-in cart for the POS catalog. Lists product lines (qty bumper +
@@ -47,6 +61,30 @@ export default function CartDrawer({
   }
   function removeAddon(key: string) {
     onChange({ ...draft, addons: draft.addons.filter((a) => a.key !== key) });
+  }
+  // Drop every line belonging to a combo (its exploded component lines share
+  // one combo_key). Standalone lines + add-ons are untouched.
+  function removeCombo(comboKey: string) {
+    onChange({
+      ...draft,
+      lines: draft.lines.filter((l) => lineComboKey(l) !== comboKey),
+    });
+  }
+
+  // Partition lines into standalone (render with steppers, as today) and combo
+  // groups (header + read-only component lines + one "Remove combo"). Groups are
+  // ordered by first appearance to keep the cart stable across re-renders.
+  const standaloneLines = draft.lines.filter((l) => lineComboKey(l) === null);
+  const comboOrder: string[] = [];
+  const comboGroups = new Map<string, { label: string; lines: DraftLine[] }>();
+  for (const l of draft.lines) {
+    const key = lineComboKey(l);
+    if (key === null) continue;
+    if (!comboGroups.has(key)) {
+      comboGroups.set(key, { label: lineComboLabel(l), lines: [] });
+      comboOrder.push(key);
+    }
+    comboGroups.get(key)!.lines.push(l);
   }
 
   const lineSub = cartLineSubtotal(draft.lines);
@@ -108,7 +146,7 @@ export default function CartDrawer({
             </p>
           ) : (
             <div className="flex flex-col gap-4">
-              {draft.lines.map((l) => (
+              {standaloneLines.map((l) => (
                 <div key={l.localId} className="pos-card p-3 flex items-start gap-3">
                   {/* Product photo placeholder */}
                   <div
@@ -166,6 +204,82 @@ export default function CartDrawer({
                   </div>
                 </div>
               ))}
+
+              {/* Combo groups (套餐) — header + read-only component lines + one
+                  "Remove combo". No per-line stepper: an independent qty would
+                  break the fixed combo ratio. */}
+              {comboOrder.map((comboKey) => {
+                const group = comboGroups.get(comboKey)!;
+                const groupTotal = group.lines.reduce(
+                  (s, l) => s + l.unitPrice * l.qty,
+                  0,
+                );
+                return (
+                  <div
+                    key={comboKey}
+                    className="pos-card p-3 flex flex-col gap-3"
+                    data-testid={`pos-cart-combo-${comboKey}`}
+                  >
+                    {/* Combo header: label + group total */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="shrink-0 w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                          <Package size={15} strokeWidth={1.75} />
+                        </span>
+                        <div className="min-w-0">
+                          <span className="kicker">Combo</span>
+                          <div className="t-small font-medium text-base-900 truncate">
+                            {group.label}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="pos-price text-[16px] shrink-0">
+                        <span className="pos-price-rm">RM</span>
+                        {groupTotal.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* Read-only component lines */}
+                    <div
+                      className="flex flex-col gap-1.5 pl-9"
+                      style={{ borderTop: "1px solid hsl(var(--base-100))", paddingTop: 10 }}
+                    >
+                      {group.lines.map((l) => (
+                        <div
+                          key={l.localId}
+                          className="flex items-baseline justify-between gap-3 text-base-600"
+                        >
+                          <div className="min-w-0">
+                            <span className="t-small">
+                              {l.label}
+                              {l.qty > 1 && (
+                                <span className="text-base-500"> ×{l.qty}</span>
+                              )}
+                            </span>
+                            <span className="font-mono text-[11px] text-base-400 block">
+                              {l.sku}
+                            </span>
+                          </div>
+                          <span className="font-mono text-[12px] text-base-500 shrink-0">
+                            {(l.unitPrice * l.qty).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* One "Remove combo" for the whole group */}
+                    <button
+                      type="button"
+                      onClick={() => removeCombo(comboKey)}
+                      aria-label={`Remove combo ${group.label}`}
+                      className="self-start inline-flex items-center gap-1.5 text-[11px] text-base-500 hover:text-destructive transition-colors"
+                    >
+                      <Trash2 size={13} strokeWidth={1.75} />
+                      Remove combo
+                    </button>
+                  </div>
+                );
+              })}
 
               {/* Add-ons */}
               {draft.addons.length > 0 && (

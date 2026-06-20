@@ -134,4 +134,45 @@ describe("buildCatalogIndex", () => {
     expect(blob).toContain("kestrel-3s");
     expect(blob).toContain("velvet teal");
   });
+
+  it("builds skuPrice + skuLabel flat lookups for combo explode", () => {
+    const idx = buildCatalogIndex(catalog());
+    expect(idx.skuPrice.get("CLOUD-QUEEN")).toBe(2890);
+    expect(idx.skuPrice.get("KESTREL-3S")).toBe(5000);
+    // label = "model name · variant" when no description on the sku.
+    expect(idx.skuLabel.get("CLOUD-QUEEN")).toBe("Carres Cloud · Queen");
+    expect(idx.skuLabel.get("KESTREL-3S")).toBe("Kestrel · 3-seater");
+  });
+
+  it("skuLabel prefers a sku's description when present", () => {
+    const withDesc: CatalogResponse = {
+      ...catalog(),
+      skus: [
+        { id: "s1", modelId: "m-mat", sku: "CLOUD-QUEEN", variant: "Queen", variantKind: "size", price: 2890, cost: null, supplierId: null, description: "Cloud Mattress (Queen, firm)" },
+      ],
+    };
+    const idx = buildCatalogIndex(withDesc);
+    expect(idx.skuLabel.get("CLOUD-QUEEN")).toBe("Cloud Mattress (Queen, firm)");
+  });
+
+  it("surfaces only ACTIVE combos; empty/absent → []", () => {
+    // No combos key → empty array.
+    expect(buildCatalogIndex(catalog()).combos).toEqual([]);
+
+    const withCombos: CatalogResponse = {
+      ...catalog(),
+      combos: [
+        {
+          id: "cA", comboKey: "live-combo", name: "Live Combo", comboPrice: 5000, active: true,
+          effectiveFrom: "2026-06-20", components: [{ sku: "CLOUD-QUEEN", qty: 1, sortOrder: 0 }],
+        },
+        {
+          id: "cB", comboKey: "dead-combo", name: "Dead Combo", comboPrice: 1000, active: false,
+          effectiveFrom: "2026-06-20", components: [{ sku: "CLOUD-KING", qty: 1, sortOrder: 0 }],
+        },
+      ],
+    };
+    const idx = buildCatalogIndex(withCombos);
+    expect(idx.combos.map((c) => c.comboKey)).toEqual(["live-combo"]);
+  });
 });
