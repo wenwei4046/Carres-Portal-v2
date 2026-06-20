@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { Minus, Plus, LayoutGrid } from "lucide-react";
 import type {
   ProductCategory,
   ProductModelDto,
@@ -7,9 +8,15 @@ import type {
   SofaFabricDto,
   FabricTierGlobalConfig,
   ModelFabricTierOverrideDto,
+  SofaCompartmentDto,
+  ModelSofaCompartmentDto,
+  SofaComboDto,
+  FabricTierConfigDto,
 } from "@carres/shared";
 import { resolveFabricDelta } from "@carres/shared";
 import type { DraftLine } from "./draft";
+import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
+import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
 
 /**
  * Per-category product configurators + the sofa-mutex helper, extracted from
@@ -421,6 +428,9 @@ export function ConfiguratorForModel({
   fabrics,
   fabricTierConfig,
   modelFabricTierOverrides,
+  sofaCompartments,
+  modelSofaCompartments,
+  sofaCombos,
   onAdd,
 }: {
   model: ProductModelDto;
@@ -428,6 +438,14 @@ export function ConfiguratorForModel({
   fabrics: SofaFabricDto[];
   fabricTierConfig?: FabricTierGlobalConfig | null;
   modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
+  /** Sofa engine (0178/0179) — the global compartment pool. ADDITIVE: only
+   *  used to open the visual builder for a sofa model that offers compartments;
+   *  mattress/bedframe/no-offer-sofa paths ignore these entirely. */
+  sofaCompartments?: SofaCompartmentDto[] | null;
+  /** Per-model offered compartments (UNfiltered — filtered to model.id here). */
+  modelSofaCompartments?: ModelSofaCompartmentDto[] | null;
+  /** Sofa combos (0179) — passed through to the builder for combo pricing. */
+  sofaCombos?: SofaComboDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
   if (model.category === "mattress") {
@@ -437,6 +455,70 @@ export function ConfiguratorForModel({
     return <BedframeConfigurator model={model} skus={skus} onAdd={onAdd} />;
   }
   if (model.category === "sofa") {
+    return (
+      <SofaConfiguratorOrBuilder
+        model={model}
+        skus={skus}
+        fabrics={fabrics}
+        fabricTierConfig={fabricTierConfig}
+        modelFabricTierOverrides={modelFabricTierOverrides}
+        sofaCompartments={sofaCompartments}
+        modelSofaCompartments={modelSofaCompartments}
+        sofaCombos={sofaCombos}
+        onAdd={onAdd}
+      />
+    );
+  }
+  return null;
+}
+
+/**
+ * Sofa branch dispatcher (Phase 3, sofa engine). A sofa model that OFFERS
+ * compartments (`model_sofa_compartments` rows for this model, 0178) gets the
+ * visual drag plan-view builder; every other sofa model keeps the existing
+ * preset/part dropdown `SofaConfigurator` UNCHANGED. The builder opens as a
+ * full-screen portal overlay ON TOP of the 460px ConfigureDrawer.
+ *
+ * Dormant-in-prod by construction: prod has 0 offered compartments → the
+ * builder never appears (the plan's safety gate).
+ */
+function SofaConfiguratorOrBuilder({
+  model,
+  skus,
+  fabrics,
+  fabricTierConfig,
+  modelFabricTierOverrides,
+  sofaCompartments,
+  modelSofaCompartments,
+  sofaCombos,
+  onAdd,
+}: {
+  model: ProductModelDto;
+  skus: ProductSkuDto[];
+  fabrics: SofaFabricDto[];
+  fabricTierConfig?: FabricTierGlobalConfig | null;
+  modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
+  sofaCompartments?: SofaCompartmentDto[] | null;
+  modelSofaCompartments?: ModelSofaCompartmentDto[] | null;
+  sofaCombos?: SofaComboDto[] | null;
+  onAdd: (line: DraftLine) => void;
+}) {
+  const [builderOpen, setBuilderOpen] = useState(false);
+
+  // This model's offered compartments (filter the UNfiltered prop to model.id).
+  const offered = useMemo(
+    () => (modelSofaCompartments ?? []).filter((mc) => mc.modelId === model.id),
+    [modelSofaCompartments, model.id],
+  );
+  const hasOffered = offered.length > 0;
+
+  // The model's representative sofa sku (deterministic): first preset, else
+  // first sku. When the model has NO sku the builder can't emit a contract-safe
+  // DraftLine, so we disable "Add" with a note (the canvas itself stays usable).
+  const hasRepSku = skus.length > 0;
+
+  // No offered compartments → unchanged dropdown configurator.
+  if (!hasOffered) {
     return (
       <SofaConfigurator
         model={model}
@@ -448,7 +530,54 @@ export function ConfiguratorForModel({
       />
     );
   }
-  return null;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="rounded-xl border border-base-200 bg-base-50 p-4">
+        <p className="t-small text-base-600 mb-3">
+          This sofa is built from modules — design it on the room canvas and we price it live.
+        </p>
+        <button
+          type="button"
+          onClick={() => setBuilderOpen(true)}
+          disabled={!hasRepSku}
+          className="btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+          data-testid="sofa-open-builder"
+        >
+          <LayoutGrid size={15} strokeWidth={1.75} />
+          Build your sofa
+        </button>
+        {!hasRepSku && (
+          <p className="t-tiny text-danger mt-2" data-testid="sofa-builder-no-sku">
+            This model has no SKU yet — a build can't be added to the cart until one exists.
+          </p>
+        )}
+      </div>
+
+      {builderOpen &&
+        createPortal(
+          <SofaBuildCanvas
+            model={model}
+            skus={skus}
+            compartmentPool={sofaCompartments ?? []}
+            modelCompartments={offered}
+            sofaCombos={sofaCombos ?? []}
+            fabricTierConfig={fabricTierConfig as FabricTierConfigDto | null | undefined}
+            fabricTierOverride={
+              (modelFabricTierOverrides ?? []).find((o) => o.modelId === model.id) ?? null
+            }
+            sofaFabrics={fabrics}
+            onAddBuild={(payload) => {
+              const line = buildToDraftLine(payload, model, skus);
+              if (line) onAdd(line);
+              setBuilderOpen(false);
+            }}
+            onClose={() => setBuilderOpen(false)}
+          />,
+          document.body,
+        )}
+    </div>
+  );
 }
 
 // -----------------------------------------------------------------------------

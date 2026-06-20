@@ -7,9 +7,11 @@ import type {
   SofaFabricDto,
   FabricTierGlobalConfig,
   ModelFabricTierOverrideDto,
+  ModelSofaCompartmentDto,
+  SofaCompartmentDto,
 } from "@carres/shared";
 import type { DraftLine } from "./draft";
-import { lockedCategoriesFor } from "./configurators";
+import { lockedCategoriesFor, ConfiguratorForModel } from "./configurators";
 import { SofaConfigurator } from "./configurators";
 import ConfigureDrawer from "../pos/ConfigureDrawer";
 
@@ -241,5 +243,138 @@ describe("SofaConfigurator — fabric tier delta", () => {
     expect(attrs.fabric_id).toBeUndefined();
     expect(attrs.fabric_surcharge).toBeUndefined();
     expect(attrs.fabric_tier).toBeUndefined();
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Phase 3 builder gate (sofa engine): ConfiguratorForModel opens the visual
+// builder for a sofa model that OFFERS compartments; every other model keeps
+// the existing dropdown configurator UNCHANGED.
+// -----------------------------------------------------------------------------
+function compartment(id: string, code: string): SofaCompartmentDto {
+  return {
+    id,
+    code,
+    description: null,
+    seatCount: 1,
+    armConfig: null,
+    iconUrl: null,
+    defaultPrice: 1000,
+    sortOrder: 0,
+    active: true,
+  };
+}
+function offered(modelId: string, compartmentId: string): ModelSofaCompartmentDto {
+  return { modelId, compartmentId, priceOverride: null, sortOrder: 0 };
+}
+
+describe("ConfiguratorForModel — Phase 3 builder gate", () => {
+  it("shows the 'Build your sofa' CTA for a sofa model WITH offered compartments", () => {
+    const model = sofaModel("m-ohana", "Ohana");
+    render(
+      <ConfiguratorForModel
+        model={model}
+        skus={[presetSku("s1", "m-ohana", "3-seater", 3000)]}
+        fabrics={[]}
+        sofaCompartments={[compartment("c1", "1A(LHF)")]}
+        modelSofaCompartments={[offered("m-ohana", "c1")]}
+        sofaCombos={[]}
+        onAdd={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("sofa-open-builder")).toBeTruthy();
+    expect(screen.getByText("Build your sofa")).toBeTruthy();
+    // The legacy dropdown is NOT rendered for an offered-compartment model.
+    expect(screen.queryByText(/pick preset/i)).toBeNull();
+  });
+
+  it("shows the dropdown (no CTA) for a sofa model with NO offered compartments", () => {
+    const model = sofaModel("m-kestrel", "Kestrel");
+    render(
+      <ConfiguratorForModel
+        model={model}
+        skus={[presetSku("s1", "m-kestrel", "3-seater", 3000)]}
+        fabrics={[]}
+        sofaCompartments={[compartment("c1", "1A(LHF)")]}
+        modelSofaCompartments={[offered("m-other", "c1")]} // offered for a DIFFERENT model
+        sofaCombos={[]}
+        onAdd={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("sofa-open-builder")).toBeNull();
+    expect(screen.getByText(/pick preset/i)).toBeTruthy();
+  });
+
+  it("disables the CTA + shows a note when an offered-compartment sofa model has no sku", () => {
+    const model = sofaModel("m-ohana", "Ohana");
+    render(
+      <ConfiguratorForModel
+        model={model}
+        skus={[]} // no sku → can't emit a contract-safe DraftLine
+        fabrics={[]}
+        sofaCompartments={[compartment("c1", "1A(LHF)")]}
+        modelSofaCompartments={[offered("m-ohana", "c1")]}
+        sofaCombos={[]}
+        onAdd={vi.fn()}
+      />,
+    );
+    expect((screen.getByTestId("sofa-open-builder") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("sofa-builder-no-sku")).toBeTruthy();
+  });
+
+  it("renders the unchanged mattress configurator (no CTA, has a size dropdown)", () => {
+    const model: ProductModelDto = {
+      id: "m-mat",
+      category: "mattress",
+      modelKey: "cloud",
+      name: "Cloud",
+      blurb: null,
+      colors: null,
+      gaps: null,
+      sofaMode: null,
+    };
+    render(
+      <ConfiguratorForModel
+        model={model}
+        skus={[
+          { id: "ms1", modelId: "m-mat", sku: "MA-Q", variant: "Queen", variantKind: "size", price: 2000, cost: null, supplierId: null },
+        ]}
+        fabrics={[]}
+        sofaCompartments={[compartment("c1", "1A(LHF)")]}
+        modelSofaCompartments={[]}
+        sofaCombos={[]}
+        onAdd={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("sofa-open-builder")).toBeNull();
+    expect(screen.getByText(/pick size/i)).toBeTruthy();
+  });
+
+  it("renders the unchanged bedframe configurator (no CTA, has color/gap)", () => {
+    const model: ProductModelDto = {
+      id: "m-bf",
+      category: "bedframe",
+      modelKey: "oak",
+      name: "Oak Frame",
+      blurb: null,
+      colors: ["Walnut"],
+      gaps: ["10mm"],
+      sofaMode: null,
+    };
+    render(
+      <ConfiguratorForModel
+        model={model}
+        skus={[
+          { id: "bs1", modelId: "m-bf", sku: "BF-Q", variant: "Queen", variantKind: "size", price: 1500, cost: null, supplierId: null },
+        ]}
+        fabrics={[]}
+        sofaCompartments={[compartment("c1", "1A(LHF)")]}
+        modelSofaCompartments={[offered("m-other", "c1")]}
+        sofaCombos={[]}
+        onAdd={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("sofa-open-builder")).toBeNull();
+    expect(screen.getByText("Walnut")).toBeTruthy();
   });
 });

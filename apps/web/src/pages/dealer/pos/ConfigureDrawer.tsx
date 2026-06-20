@@ -1,6 +1,15 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import type { ProductModelDto, ProductSkuDto, SofaFabricDto, FabricTierGlobalConfig, ModelFabricTierOverrideDto } from "@carres/shared";
+import type {
+  ProductModelDto,
+  ProductSkuDto,
+  SofaFabricDto,
+  FabricTierGlobalConfig,
+  ModelFabricTierOverrideDto,
+  SofaCompartmentDto,
+  ModelSofaCompartmentDto,
+  SofaComboDto,
+} from "@carres/shared";
 import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import type { DraftLine } from "../new-order/draft";
 import { ConfiguratorForModel } from "../new-order/configurators";
@@ -21,6 +30,9 @@ export default function ConfigureDrawer({
   fabrics,
   fabricTierConfig,
   modelFabricTierOverrides,
+  sofaCompartments,
+  modelSofaCompartments,
+  sofaCombos,
   onAdd,
   onClose,
 }: {
@@ -30,6 +42,11 @@ export default function ConfigureDrawer({
   fabrics: SofaFabricDto[];
   fabricTierConfig?: FabricTierGlobalConfig | null;
   modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
+  /** Sofa engine (0178/0179) — passed through to ConfiguratorForModel so an
+   *  offered-compartment sofa model opens the visual builder. ADDITIVE. */
+  sofaCompartments?: SofaCompartmentDto[] | null;
+  modelSofaCompartments?: ModelSofaCompartmentDto[] | null;
+  sofaCombos?: SofaComboDto[] | null;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -102,6 +119,9 @@ export default function ConfigureDrawer({
             fabrics={fabrics}
             fabricTierConfig={fabricTierConfig}
             modelFabricTierOverrides={modelFabricTierOverrides}
+            sofaCompartments={sofaCompartments}
+            modelSofaCompartments={modelSofaCompartments}
+            sofaCombos={sofaCombos}
             onAdd={(line) => {
               onAdd(line);
               onClose();
