@@ -78,6 +78,9 @@ export const productSkuSchema = z.object({
   // (cost/PO side). + editable description column.
   posActive: z.boolean().optional(),
   description: z.string().nullable().optional(),
+  // 0178 (sofa engine Phase 1) — nullable link to a sofa compartment type.
+  // Additive/optional: pre-0178 serialized SKUs that don't carry it stay valid.
+  compartmentId: z.string().uuid().nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
 
@@ -207,6 +210,78 @@ export type ComboCreateInput = z.infer<typeof comboCreateInput>;
 export const comboPatchInput = comboCreateInput.partial().strict();
 export type ComboPatchInput = z.infer<typeof comboPatchInput>;
 
+// ---------------------------------------------------------------------------
+// 0178 — sofa compartment pool + per-model offered (sofa engine Phase 1).
+// Principal-owned. One schema, two consumers (§9.5): the API validates these
+// and the Maintenance UI reuses the exact same shapes.
+// ---------------------------------------------------------------------------
+
+/** One compartment type from the principal-owned pool (mirrors the domain
+ *  `SofaCompartment` / a `sofa_compartments` row, camelCased). */
+export const sofaCompartmentSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  description: z.string().nullable(),
+  seatCount: z.number().int().nullable(),
+  armConfig: z.string().nullable(),
+  iconUrl: z.string().nullable(),
+  defaultPrice: z.number(),
+  sortOrder: z.number().int(),
+  active: z.boolean(),
+});
+export type SofaCompartmentDto = z.infer<typeof sofaCompartmentSchema>;
+
+/** One per-model offered compartment (mirrors `ModelSofaCompartment` /
+ *  a `model_sofa_compartments` row). `priceOverride` NULL = inherit the pool's
+ *  `defaultPrice`. */
+export const modelSofaCompartmentSchema = z.object({
+  modelId: z.string().uuid(),
+  compartmentId: z.string().uuid(),
+  priceOverride: z.number().nullable(),
+  sortOrder: z.number().int(),
+});
+export type ModelSofaCompartmentDto = z.infer<typeof modelSofaCompartmentSchema>;
+
+/**
+ * Create a compartment in the pool. `code` is required + unique-by-convention;
+ * `defaultPrice` defaults to 0 server-side and must be >= 0 when given.
+ */
+export const sofaCompartmentCreateInput = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .min(1)
+      .max(60)
+      .regex(/^[A-Za-z0-9()\-_/. ]+$/, "code may contain letters, digits and ()-_/.  "),
+    description: z.string().trim().max(200).nullable().optional(),
+    seatCount: z.number().int().nonnegative().nullable().optional(),
+    armConfig: z.string().trim().max(60).nullable().optional(),
+    iconUrl: z.string().trim().max(500).nullable().optional(),
+    defaultPrice: z.number().nonnegative().optional(),
+    sortOrder: z.number().int().optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+export type SofaCompartmentCreateInput = z.infer<typeof sofaCompartmentCreateInput>;
+
+/** Patch a compartment — every field of create is optional. */
+export const sofaCompartmentPatchInput = sofaCompartmentCreateInput.partial().strict();
+export type SofaCompartmentPatchInput = z.infer<typeof sofaCompartmentPatchInput>;
+
+/**
+ * Upsert a per-model offered compartment (the PUT body for
+ * /models/:id/compartments/:compartmentId). `priceOverride` nullable (NULL =
+ * inherit the pool default); when given it must be >= 0.
+ */
+export const modelSofaCompartmentInput = z
+  .object({
+    priceOverride: z.number().nonnegative().nullable().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type ModelSofaCompartmentInput = z.infer<typeof modelSofaCompartmentInput>;
+
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
   skus: z.array(productSkuSchema),
@@ -220,6 +295,10 @@ export const catalogResponseSchema = z.object({
   // 0177 — fixed-set combos (additive, backward-compatible / OPTIONAL).
   // Pre-0177 clients that don't read `combos` are wholly unaffected.
   combos: z.array(comboSchema).optional(),
+  // 0178 — sofa compartment pool + per-model offered (additive, OPTIONAL).
+  // Pre-0178 clients that don't read these are wholly unaffected.
+  sofaCompartments: z.array(sofaCompartmentSchema).optional(),
+  modelSofaCompartments: z.array(modelSofaCompartmentSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 

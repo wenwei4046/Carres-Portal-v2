@@ -44,6 +44,11 @@ export const MODEL_FABRIC_TIER_OVERRIDES = "model_fabric_tier_overrides" as cons
 export const COMBOS           = "combos" as const;
 export const COMBO_COMPONENTS = "combo_components" as const;
 
+// 0178 — sofa engine Phase 1: principal-owned compartment pool + per-model
+// offered (which compartments a sofa model offers, with optional price override).
+export const SOFA_COMPARTMENTS       = "sofa_compartments" as const;
+export const MODEL_SOFA_COMPARTMENTS = "model_sofa_compartments" as const;
+
 // ---------------------------------------------------------------------------
 // People / org tables
 // ---------------------------------------------------------------------------

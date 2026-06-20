@@ -85,6 +85,10 @@ export interface ProductSku {
   // editable sell-side description.
   posActive?: boolean;
   description?: string | null;
+  // 0178 (sofa engine Phase 1) — additive, nullable link to a sofa_compartments
+  // type. NULL for every existing SKU; only future generated compartment SKUs
+  // carry it.
+  compartmentId?: string | null;
 }
 
 export interface SofaFabric {
@@ -153,6 +157,35 @@ export interface Combo {
   active: boolean;
   effectiveFrom: string;
   components: ComboComponent[];
+}
+
+/**
+ * A sofa compartment type from the principal-owned pool (migration 0178, sofa
+ * engine Phase 1). `defaultPrice` is the pool RM price; a model may override it
+ * per compartment via `ModelSofaCompartment`. `code` is the stable unique key.
+ */
+export interface SofaCompartment {
+  id: string;
+  code: string;
+  description: string | null;
+  seatCount: number | null;
+  armConfig: string | null;
+  iconUrl: string | null;
+  defaultPrice: number;
+  sortOrder: number;
+  active: boolean;
+}
+
+/**
+ * A per-model offered compartment (migration 0178). Row present = the model
+ * offers this compartment. `priceOverride` NULL = use the pool's `defaultPrice`;
+ * a value (>= 0) supersedes it for this model.
+ */
+export interface ModelSofaCompartment {
+  modelId: string;
+  compartmentId: string;
+  priceOverride: number | null;
+  sortOrder: number;
 }
 
 export interface FloorConfig {
