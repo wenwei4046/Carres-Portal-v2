@@ -138,6 +138,21 @@ describe("CombosTab — principal-gating", () => {
     expect(screen.getByTestId("combo-edit-combo-1")).toBeInTheDocument();
     expect(screen.getByTestId("combo-delete-combo-1")).toBeInTheDocument();
   });
+
+  it("non-principal: editor modal cannot be opened (no controls to set editing)", () => {
+    render(
+      wrap(
+        <CombosTab catalog={makeCatalog({ combos: [sampleCombo] })} isPrincipal={false} />,
+      ),
+    );
+    // The editor is gated by `isPrincipal && editing !== null`; with no Add/Edit
+    // control rendered, a non-principal has no way to set `editing`, so none of
+    // the editor's form fields are ever mounted.
+    expect(screen.queryByTestId("combo-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("combo-price")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("combo-save")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("combo-comp-sku-0")).not.toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -238,6 +253,21 @@ describe("CombosTab — implied discount", () => {
     expect(readout.textContent).toContain("4,000.00");
     expect(readout.textContent).toContain("400.00");
   });
+
+  it("combo price ABOVE component total → renders the 'Marked up' branch (not 'Saves')", () => {
+    render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("combos-add"));
+    // SOFA-A (2000) ×1 = 2,000 components total
+    fireEvent.change(screen.getByTestId("combo-comp-sku-0"), { target: { value: "SOFA-A" } });
+    // combo priced ABOVE the component total → negative "saves" → markup branch
+    fireEvent.change(screen.getByTestId("combo-price"), { target: { value: "2500" } });
+
+    const readout = screen.getByTestId("combo-discount-readout");
+    expect(readout.textContent).toContain("Marked up");
+    expect(readout.textContent).not.toContain("Saves");
+    // markup amount = 2,500 − 2,000 = 500.00
+    expect(readout.textContent).toContain("500.00");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -270,6 +300,30 @@ describe("CombosTab — edit", () => {
       { sku: "SOFA-A", qty: 1, sortOrder: 0 },
       { sku: "MATT-A", qty: 1, sortOrder: 1 },
     ]);
+  });
+
+  it("reactivate: edit an inactive combo, toggle Active ON, Save → patch carries active:true", async () => {
+    render(
+      wrap(
+        <CombosTab
+          catalog={makeCatalog({ combos: [{ ...sampleCombo, active: false }] })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId("combo-edit-combo-1"));
+
+    const activeToggle = screen.getByTestId("combo-active") as HTMLInputElement;
+    expect(activeToggle.checked).toBe(false); // pre-filled from the inactive combo
+    fireEvent.click(activeToggle); // toggle ON
+    expect(activeToggle.checked).toBe(true);
+
+    fireEvent.click(screen.getByTestId("combo-save"));
+
+    await waitFor(() => expect(mockUpdateMutateAsync).toHaveBeenCalledOnce());
+    const arg = mockUpdateMutateAsync.mock.calls[0][0];
+    expect(arg.id).toBe("combo-1");
+    expect(arg.patch.active).toBe(true);
   });
 
   it("inactive combos render faded in the list", () => {
