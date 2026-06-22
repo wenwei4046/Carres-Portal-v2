@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { STOCK_LOCATIONS } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { renderDoPdf } from "@/lib/pdf/render";
 import type { DoTemplateData } from "@/lib/pdf/types";
@@ -620,10 +621,9 @@ function DrawerBody({
           </div>
         </DrawerSection>
 
-        {/* Items & stock + Delivery sit 2-up to cut vertical scroll. */}
-        <div className="grid grid-cols-2 gap-2 items-start">
-
-        {/* 2 · Items & stock */}
+        {/* 2 · Items & stock — full-width, directly after the address (Jess:
+            "item listing put after address"). Each line carries its own stock
+            location since products can sit in different warehouses. */}
         <DrawerSection
           icon={<Package className="w-4 h-4" />}
           title="Items & stock"
@@ -645,17 +645,23 @@ function DrawerBody({
                     On hand
                   </th>
                 )}
+                <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-44">
+                  Location
+                </th>
               </tr>
             </thead>
             <tbody>
-              {lines.map((l) => {
+              {lines.map((l, i) => {
                 const bal = stockBalances.find((b) => b.sku === l.sku);
                 const have = bal
                   ? Math.max(0, Number(bal.qty) - Number(bal.reserved))
                   : 0;
                 const ok = have >= l.qty;
+                // Row identity uses the index — duplicate-SKU lines are legal
+                // (same protector ×2). The per-line location still keys on SKU
+                // (duplicate SKUs intentionally share a location, migration 0168).
                 return (
-                  <tr key={l.sku}>
+                  <tr key={`${l.sku}-${i}`}>
                     <td className="border border-base-200 px-2 py-1 font-mono text-[11px] align-top break-all">
                       {l.sku}
                     </td>
@@ -669,6 +675,25 @@ function DrawerBody({
                         {have}
                       </td>
                     )}
+                    <td className="border border-base-200 px-1 py-0.5 align-top">
+                      <select
+                        value={form.draft.line_locations[l.sku]?.[0] ?? ""}
+                        onChange={(e) =>
+                          form.setLineLocation(
+                            l.sku,
+                            e.target.value ? [e.target.value] : [],
+                          )
+                        }
+                        className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                      >
+                        <option value="">—</option>
+                        {STOCK_LOCATIONS.map((locOpt) => (
+                          <option key={locOpt} value={locOpt}>
+                            {locOpt}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                   </tr>
                 );
               })}
@@ -748,7 +773,6 @@ function DrawerBody({
             </div>
           </details>
         </DrawerSection>
-        </div>
 
         {/* 4 · Payment — every money fact in one place (collapsed by default) */}
         <DrawerSection
