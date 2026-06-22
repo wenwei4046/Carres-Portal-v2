@@ -283,21 +283,8 @@ export function RoutingFields({
   return (
     <>
       <FieldRow label="Region">
-        <div className="flex items-center gap-2 flex-wrap px-2 py-1.5">
+        <div className="px-2 py-1.5">
           <AreaBadge area={area} />
-          {suggestion ? (
-            <span className="text-[11px] text-base-600">
-              suggest{" "}
-              <span className="font-semibold text-base-900">
-                {suggestion.partner}
-              </span>
-              {suggestion.alt ? (
-                <span className="text-base-500"> / {suggestion.alt}</span>
-              ) : null}
-            </span>
-          ) : (
-            <span className="text-[11px] text-base-400">no suggestion</span>
-          )}
         </div>
       </FieldRow>
 

@@ -963,7 +963,7 @@ function ActionsMenu({
               title="Issues module coming — needs the ops_issues table"
             />
             <div className="border-t border-base-100 px-3 py-2 flex flex-col gap-1.5">
-              {role && stage !== "dispatched" && stage !== "delivered" && (
+              {role && (
                 <DownloadSalesOrderButton
                   orderId={order.id}
                   so={order.so}
