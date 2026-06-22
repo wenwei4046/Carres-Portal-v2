@@ -29,7 +29,12 @@ import {
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { locationForAddress } from "@/lib/region";
-import { lineCategory, lineKind, defaultLineLocation } from "@/lib/line-category";
+import {
+  lineCategory,
+  lineKind,
+  lineSortRank,
+  defaultLineLocation,
+} from "@/lib/line-category";
 import { useAuth } from "@/lib/auth";
 import AnnotationTimeline from "./AnnotationTimeline";
 import DeliveryChain from "./DeliveryChain";
@@ -498,6 +503,10 @@ function DrawerBody({
   const loc = locationForAddress(order.customer_address ?? null);
 
   const form = useOrderControlForm(order.id);
+  // Always list items mattress → bedframe → sofa → pillow → M.P → service (Jess).
+  const orderedLines = [...lines].sort(
+    (a, b) => lineSortRank(a.sku) - lineSortRank(b.sku),
+  );
   const hasMsbf = lines.some((l) => {
     const c = lineCategory(l.sku);
     return c === "mattress" || c === "bedframe";
@@ -627,7 +636,7 @@ function DrawerBody({
               </tr>
             </thead>
             <tbody>
-              {lines.map((l, i) => {
+              {orderedLines.map((l, i) => {
                 const bal = stockBalances.find((b) => b.sku === l.sku);
                 const have = bal
                   ? Math.max(0, Number(bal.qty) - Number(bal.reserved))

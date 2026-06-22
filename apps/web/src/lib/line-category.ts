@@ -87,6 +87,24 @@ export function lineKind(sku: string): ItemKind {
 }
 
 /**
+ * Display sequence rank for an order line (Jess 2026-06-22): always list in the
+ * order mattress → bedframe → sofa → pillow → M.P → service / others. Lower
+ * sorts first; ties keep their original order (Array.sort is stable). Use as
+ * `lines.sort((a, b) => lineSortRank(a.sku) - lineSortRank(b.sku))`.
+ */
+export function lineSortRank(sku: string): number {
+  const cat = lineCategory(sku);
+  if (cat === "mattress") return 0;
+  if (cat === "bedframe") return 1;
+  if (cat === "sofa") return 2;
+  const name = accShort(sku);
+  if (name === "Pillow") return 3;
+  if (name === "M.P") return 4;
+  if (name === "Disposal" || name === "Service") return 6; // service last
+  return 5; // other accessories (Topper / Footrest / …) before service
+}
+
+/**
  * Suggested default stock location for a line (Jess 2026-06-22):
  *   • accessory goods (Pillow / M.P / Topper / Footrest) → "Carres Klang" — these
  *     are kept as ready warehouse stock.

@@ -345,8 +345,14 @@ function itemTags(
       cat !== "sofa" && e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
     out.push({ kind: "core", qty: e.qty, name: `${CORE_LABEL[cat]}${sizes}` });
   }
+  // Accessories ordered pillow → M.P → others, then service last (Jess: fixed
+  // item sequence). Core already ordered via CORE_ORDER above.
+  const accRank = (name: string) => (name === "Pillow" ? 0 : name === "M.P" ? 1 : 2);
+  const restSorted = [...rest.entries()].sort(
+    (a, b) => accRank(a[0]) - accRank(b[0]),
+  );
   for (const wanted of ["acc", "service"] as const)
-    for (const [name, e] of rest.entries())
+    for (const [name, e] of restSorted)
       if (e.kind === wanted) out.push({ kind: e.kind, qty: e.qty, name });
   return out;
 }
