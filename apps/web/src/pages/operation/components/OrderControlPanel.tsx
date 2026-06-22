@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   computeStorageFee,
+  STORAGE_RATES,
   DELIVERY_TIME_SLOTS,
   PAYMENT_STATUSES,
   STOCK_LOCATIONS,
@@ -503,6 +504,12 @@ export function StorageControlFields({
     hasMsbf,
     hasSof,
   });
+  // Commenced periods since the From date — MS/BF bills per month, Sofa per
+  // 2 weeks (Jess). Shown so the operator sees HOW the auto fee was reached.
+  const msbfPeriods =
+    storage.days > 0 ? Math.ceil(storage.days / STORAGE_RATES.msbf.periodDays) : 0;
+  const sofPeriods =
+    storage.days > 0 ? Math.ceil(storage.days / STORAGE_RATES.sof.periodDays) : 0;
   const incurred = draft.storage_from.trim() !== "";
   return (
     <>
@@ -533,13 +540,39 @@ export function StorageControlFields({
               className={CELL}
             />
           </FieldRow>
-          <FieldRow label="Fee">
+          {/* Auto breakdown — separate MS/BF (per month) and Sofa (per 2 weeks)
+              lines (Jess), each = rate × commenced periods since the From date. */}
+          {hasMsbf && (
+            <FieldRow label="MS / BF">
+              <div className="px-2 py-1.5 text-[12px] font-semibold text-base-900">
+                RM {storage.msbf.toLocaleString()}
+                <span className="ml-1 text-[11px] font-normal text-base-500">
+                  · {msbfPeriods} mth × RM150
+                </span>
+              </div>
+            </FieldRow>
+          )}
+          {hasSof && (
+            <FieldRow label="Sofa">
+              <div className="px-2 py-1.5 text-[12px] font-semibold text-base-900">
+                RM {storage.sof.toLocaleString()}
+                <span className="ml-1 text-[11px] font-normal text-base-500">
+                  · {sofPeriods} × 2wk × RM200
+                </span>
+              </div>
+            </FieldRow>
+          )}
+          <FieldRow label="Charge">
             <input
               type="number"
               min={0}
               value={draft.storage_fee_override}
               onChange={(e) => set("storage_fee_override", e.target.value)}
-              placeholder={storage.total > 0 ? `auto ${storage.total}` : "auto"}
+              placeholder={
+                storage.total > 0
+                  ? `auto RM ${storage.total.toLocaleString()} (${storage.days}d)`
+                  : "override auto"
+              }
               className={CELL}
             />
           </FieldRow>
@@ -553,11 +586,6 @@ export function StorageControlFields({
               <option value="Unpaid">Unpaid</option>
               <option value="Paid">Paid</option>
             </select>
-          </FieldRow>
-          <FieldRow label="Rate">
-            <div className="px-2 py-1.5 text-[11px] text-base-500">
-              MS/BF RM150/mo · Sofa RM200/2wk
-            </div>
           </FieldRow>
         </>
       )}

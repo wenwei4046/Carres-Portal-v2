@@ -11,6 +11,14 @@ import {
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { cjkClassName } from "@/lib/cjk";
 import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
+import {
+  type CoreCat,
+  type ItemKind,
+  lineCategory,
+  lineSize,
+  accShort,
+  lineKind,
+} from "@/lib/line-category";
 import { apiFetch } from "@/lib/api";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import type { OperationStage } from "./components/StageChip";
@@ -254,7 +262,6 @@ function regionBucket(address: string | null): string {
  *  carry a `mattress:` / `bedframe:` / `sofa:` prefix; AutoCount free-text SKUs
  *  use the `MS## / BF## / SF##|SOF##` item codes. A trailing `-K/-Q/-S` is the
  *  size (King/Queen/Single). */
-type CoreCat = "mattress" | "bedframe" | "sofa";
 /** Master-Sheet short codes (Jess 2026-06-12): MS / BF / SOF — the vocabulary
  *  the team already speaks (the sheet's MS/BF/SOF columns + AutoCount item
  *  codes). Accessories keep full names. */
@@ -265,80 +272,15 @@ const CORE_LABEL: Record<CoreCat, string> = {
 };
 const CORE_ORDER: CoreCat[] = ["mattress", "bedframe", "sofa"];
 
-function lineCategory(sku: string): CoreCat | "acc" {
-  const s = sku.trim();
-  // Native canonical SKUs carry a `mattress:` / `bedframe:` / `sofa:` prefix.
-  // Match ONLY that exact head — an AutoCount SKU often embeds a `COL:` colour
-  // code (".../COL:KN390-15"), and the old `includes(":")` shoved every coloured
-  // SKU into "acc", so sofas/bedframes leaked into the row as raw model names.
-  const head = s.split(":")[0].trim().toLowerCase();
-  if (head === "mattress" || head === "bedframe" || head === "sofa")
-    return head as CoreCat;
-
-  // AutoCount free-text + canonical item codes — keyword classifier mirrored
-  // VERBATIM from the server's resolve_demand_category (migration 0148), so the
-  // MS/BF/SOF it yields speaks the exact vocabulary the supplier forecast uses.
-  // Add new model families to BOTH places. Accessory / service keywords are
-  // tested FIRST so "Mattress Protector" stays an accessory, not a mattress.
-  const n = s.toLowerCase();
-  if (/disposal|transport fee|no lift|per floor|memory pillow|protector|microfiber/.test(n))
-    return "acc";
-  if (/jager|cody|trion|hilton|fenrir|ricardo|regal|divan|\/fab[0-9]/.test(n)) return "bedframe";
-  if (/hk55|dsl90|dsl80|am90|th50|th51|glano|muro|nuvio|lunor|modulo|seater|incliner|eleganz/.test(n))
-    return "sofa";
-  if (/firmcare|softcloud|breeze|lumi|forte|sonic|haven|solace|meridian|b120|l120|h140|m140|s160/.test(n))
-    return "mattress";
-  if (/^ms[0-9]/.test(n)) return "mattress";
-  if (/^bf[0-9]/.test(n)) return "bedframe";
-  if (/^sf[0-9]/.test(n)) return "sofa";
-  return "acc";
-}
-
-function lineSize(sku: string): string | null {
-  const s = sku.toLowerCase();
-  // Bedframes/mattresses write the size as a WORD mid-SKU ("Fab3-King",
-  // "Fab2-Queen") as well as the canonical `-K/-Q/-S` suffix. Queen is tested
-  // before King so "super king" still reads K, not a false Q.
-  if (/\bqueen\b/.test(s)) return "Q";
-  if (/\bking\b/.test(s)) return "K";
-  if (/\b(?:super\s*)?single\b/.test(s)) return "S";
-  const m = sku.match(/-([kqs])(?=$|[/\s)])/i);
-  return m ? m[1].toUpperCase() : null;
-}
-
-/** Short proper TYPE name for a non-core line — the list shows these instead of
- *  a generic "accessories" (Loo: show Pillow / M.P / Disposal by name). The
- *  drawer shows the full original name; this is the list-only short form. */
-function accShort(sku: string): string {
-  const s = sku.toLowerCase();
-  if (/pillow/.test(s)) return "Pillow";
-  if (/protector|protect|\bm\.?p\b/.test(s)) return "M.P";
-  if (/disposal|dispose/.test(s)) return "Disposal";
-  if (/floor|lift|stair|transport|delivery|charge|install/.test(s)) return "Service";
-  if (/topper/.test(s)) return "Topper";
-  // "Carress Footrest-K/-Q" is a sofa footrest add-on — the TYPE is Footrest;
-  // the bare first-word fallback would grab the brand ("Carress") instead.
-  if (/footrest|foot rest|ottoman/.test(s)) return "Footrest";
-  const w = sku.trim().split(/[\s/]+/)[0] ?? sku;
-  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-}
-
 /** Item TIER chips — MONOCHROME (Jess: row was too colourful; colour stays
  *  reserved for status signals). All three tiers keep the box (avoids
  *  misreading) but tier = ink depth, not hue: core furniture darkest +
  *  semibold · accessory goods mid-grey · service charges lightest. */
-type ItemKind = "core" | "acc" | "service";
 const ITEM_TAG: Record<ItemKind, string> = {
   core: "bg-base-100 text-base-900",
   acc: "bg-base-100 text-base-600 font-medium",
   service: "bg-base-50 text-base-400 font-medium",
 };
-
-function lineKind(sku: string): ItemKind {
-  if (lineCategory(sku) !== "acc") return "core";
-  const name = accShort(sku);
-  return name === "Disposal" || name === "Service" ? "service" : "acc";
-}
 
 /** Physical-goods unit total — core + accessories. Service lines (Disposal,
  *  floor charge…) are NOT units, so they don't count (matches the Master

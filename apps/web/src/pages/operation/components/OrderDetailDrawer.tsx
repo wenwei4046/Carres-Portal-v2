@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Banknote,
   ChevronDown,
+  ChevronRight,
   ClipboardList,
   Download,
   FileText,
@@ -28,6 +29,7 @@ import {
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { locationForAddress } from "@/lib/region";
+import { lineCategory, lineKind, defaultLineLocation } from "@/lib/line-category";
 import { useAuth } from "@/lib/auth";
 import AnnotationTimeline from "./AnnotationTimeline";
 import DeliveryChain from "./DeliveryChain";
@@ -496,8 +498,11 @@ function DrawerBody({
   const loc = locationForAddress(order.customer_address ?? null);
 
   const form = useOrderControlForm(order.id);
-  const hasMsbf = lines.some((l) => catOf(l.sku) === "msbf");
-  const hasSof = lines.some((l) => catOf(l.sku) === "sof");
+  const hasMsbf = lines.some((l) => {
+    const c = lineCategory(l.sku);
+    return c === "mattress" || c === "bedframe";
+  });
+  const hasSof = lines.some((l) => lineCategory(l.sku) === "sofa");
   const deadlineSummary = order.delivery_date_tbd
     ? "TBD"
     : order.delivery_date
@@ -581,21 +586,6 @@ function DrawerBody({
                 </Vc>
               </tr>
               <tr>
-                <Kc>Location</Kc>
-                <Vc colSpan={3}>
-                  {loc.label ? (
-                    <span
-                      className={loc.area === "Outstation" ? "text-warning font-medium" : ""}
-                    >
-                      {loc.label}
-                      {loc.area === "Outstation" ? " · call first" : ""}
-                    </span>
-                  ) : (
-                    <em className="text-base-500">—</em>
-                  )}
-                </Vc>
-              </tr>
-              <tr>
                 <Kc>Address</Kc>
                 <Vc colSpan={3}>
                   {order.customer_address ?? (
@@ -605,20 +595,6 @@ function DrawerBody({
               </tr>
             </tbody>
           </table>
-          <div className="mt-2.5 space-y-2.5">
-            <RemarkControlField
-              form={form}
-              field="customer_request"
-              label="Customer request"
-              placeholder="e.g. postponed to end of May"
-            />
-            <RemarkControlField
-              form={form}
-              field="carres_remark"
-              label="Carres remark"
-              placeholder="Internal note"
-            />
-          </div>
         </DrawerSection>
 
         {/* 2 · Items & stock — full-width, directly after the address (Jess:
@@ -657,6 +633,17 @@ function DrawerBody({
                   ? Math.max(0, Number(bal.qty) - Number(bal.reserved))
                   : 0;
                 const ok = have >= l.qty;
+                // Per-item stock location (migration 0168): service charges
+                // (No Lift / Disposal) carry none; goods default by category
+                // (accessories → warehouse, core → supplier) and are overridable.
+                // savedLoc===undefined → never touched → show the default; an
+                // explicit [] (operator picked "—") shows blank, not the default.
+                const isService = lineKind(l.sku) === "service";
+                const savedLoc = form.draft.line_locations[l.sku];
+                const locValue =
+                  savedLoc !== undefined
+                    ? (savedLoc[0] ?? "")
+                    : (defaultLineLocation(l.sku) ?? "");
                 // Row identity uses the index — duplicate-SKU lines are legal
                 // (same protector ×2). The per-line location still keys on SKU
                 // (duplicate SKUs intentionally share a location, migration 0168).
@@ -675,25 +662,31 @@ function DrawerBody({
                         {have}
                       </td>
                     )}
-                    <td className="border border-base-200 px-1 py-0.5 align-top">
-                      <select
-                        value={form.draft.line_locations[l.sku]?.[0] ?? ""}
-                        onChange={(e) =>
-                          form.setLineLocation(
-                            l.sku,
-                            e.target.value ? [e.target.value] : [],
-                          )
-                        }
-                        className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-                      >
-                        <option value="">—</option>
-                        {STOCK_LOCATIONS.map((locOpt) => (
-                          <option key={locOpt} value={locOpt}>
-                            {locOpt}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+                    {isService ? (
+                      <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
+                        N/A
+                      </td>
+                    ) : (
+                      <td className="border border-base-200 px-1 py-0.5 align-top">
+                        <select
+                          value={locValue}
+                          onChange={(e) =>
+                            form.setLineLocation(
+                              l.sku,
+                              e.target.value ? [e.target.value] : [],
+                            )
+                          }
+                          className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                        >
+                          <option value="">—</option>
+                          {STOCK_LOCATIONS.map((locOpt) => (
+                            <option key={locOpt} value={locOpt}>
+                              {locOpt}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -752,9 +745,21 @@ function DrawerBody({
             <DeliveryTimeSlotField form={form} />
             <RemarkControlField
               form={form}
+              field="customer_request"
+              label="Customer request"
+              placeholder="e.g. postponed to end of May"
+            />
+            <RemarkControlField
+              form={form}
               field="action_for_logistic"
               label="Action for logistic"
               placeholder="e.g. call customer before delivery"
+            />
+            <RemarkControlField
+              form={form}
+              field="carres_remark"
+              label="Carres remark"
+              placeholder="Internal note"
             />
           </FieldGrid>
           <details className="mt-2.5" open={(order.delivery_stops?.length ?? 0) > 0}>
@@ -872,19 +877,6 @@ function Vc({
   );
 }
 /** Storage-scope category (mirrors OperationPayments.catOf): MS/BF vs SOF. */
-function catOf(sku: string): "msbf" | "sof" | "other" {
-  const s = sku.trim().toLowerCase();
-  if (
-    s.startsWith("mattress:") ||
-    s.startsWith("bedframe:") ||
-    /^ms\d/.test(s) ||
-    /^bf\d/.test(s)
-  )
-    return "msbf";
-  if (s.startsWith("sofa:") || /^(sof|sf)\d/.test(s)) return "sof";
-  return "other";
-}
-
 /** Client-side CSV (opens in Excel) of the order — the ⋮ Download Excel item. */
 function downloadOrderCsv(
   order: DrawerBodyProps["data"]["order"],
@@ -954,25 +946,33 @@ function ActionsMenu({
 }) {
   const role = useAuth((s) => s.role);
   const [open, setOpen] = useState(false);
+  const [dlOpen, setDlOpen] = useState(false);
+  const close = () => {
+    setOpen(false);
+    setDlOpen(false);
+  };
   return (
     <div className="relative shrink-0">
       <button
         type="button"
         aria-label="More actions"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setOpen((o) => !o);
+          setDlOpen(false);
+        }}
         className="p-1 text-base-600 hover:text-base-900 leading-none"
       >
         <MoreVertical className="w-5 h-5" />
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-1 w-52 z-20 bg-white border border-base-200 rounded-[6px] shadow-lg overflow-hidden">
+          <div className="fixed inset-0 z-10" onClick={close} />
+          <div className="absolute right-0 mt-1 w-52 z-20 bg-white border border-base-200 rounded-[6px] shadow-lg">
             <MenuItem
               icon={<FileText className="w-4 h-4" />}
               label="Service note"
               onClick={() => {
-                setOpen(false);
+                close();
                 onServiceNoteClick();
               }}
             />
@@ -989,38 +989,67 @@ function ActionsMenu({
               title="Issues module coming — needs the ops_issues table"
             />
             <div className="border-t border-base-100 my-0.5" />
-            <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-base-400">
-              Documents
-            </div>
-            {role && (
-              <DownloadSalesOrderButton
-                orderId={order.id}
-                so={order.so}
-                role={role}
-                variant="menuitem"
-              />
-            )}
-            {role &&
-              (stage === "dispatched" || stage === "delivered") &&
-              order.invoice_no && (
-                <DownloadInvoiceButton
-                  orderId={order.id}
-                  so={order.so}
-                  role={role}
-                  variant="menuitem"
-                />
+            {/* Download ▶ flyout (Google-Sheets style): one parent row that
+                opens a submenu of formats. Opens LEFT (right-full) since the
+                menu hugs the screen's right edge. Driven by JS state (not CSS
+                :hover) so it stays accessible + testable. */}
+            <div
+              className="relative"
+              onMouseEnter={() => setDlOpen(true)}
+              onMouseLeave={() => setDlOpen(false)}
+            >
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={dlOpen}
+                onClick={() => setDlOpen((o) => !o)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 text-base-900"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="text-base-500 shrink-0">
+                    <Download className="w-4 h-4" />
+                  </span>
+                  Download
+                </span>
+                <ChevronRight className="w-3.5 h-3.5 text-base-400" />
+              </button>
+              {dlOpen && (
+                <div className="absolute right-full top-0 w-44 z-30 bg-white border border-base-200 rounded-[6px] shadow-lg overflow-hidden">
+                  {role && (
+                    <DownloadSalesOrderButton
+                      orderId={order.id}
+                      so={order.so}
+                      role={role}
+                      variant="menuitem"
+                    />
+                  )}
+                  {role &&
+                    (stage === "dispatched" || stage === "delivered") &&
+                    order.invoice_no && (
+                      <DownloadInvoiceButton
+                        orderId={order.id}
+                        so={order.so}
+                        role={role}
+                        variant="menuitem"
+                      />
+                    )}
+                  {order.do_number && (
+                    <PrintDoButton
+                      orderId={order.id}
+                      doNumber={order.do_number}
+                    />
+                  )}
+                  <MenuItem
+                    icon={<Download className="w-4 h-4" />}
+                    label="Excel (CSV)"
+                    onClick={() => {
+                      close();
+                      downloadOrderCsv(order, lines);
+                    }}
+                  />
+                </div>
               )}
-            {order.do_number && (
-              <PrintDoButton orderId={order.id} doNumber={order.do_number} />
-            )}
-            <MenuItem
-              icon={<Download className="w-4 h-4" />}
-              label="Download Excel"
-              onClick={() => {
-                setOpen(false);
-                downloadOrderCsv(order, lines);
-              }}
-            />
+            </div>
           </div>
         </>
       )}
