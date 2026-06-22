@@ -22,7 +22,7 @@ import { z } from "zod";
  *  known set the UI offers first. */
 export const STOCK_LOCATIONS = [
   "Carres Klang",
-  "HOUZS Balakong",
+  "Houzs Balakong",
   "at-supplier",
 ] as const;
 
