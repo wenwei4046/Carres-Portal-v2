@@ -1336,7 +1336,7 @@ function shortSku(sku: string): string {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 text-left">
+    <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-base-700 text-left">
       {children}
     </th>
   );
