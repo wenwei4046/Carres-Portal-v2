@@ -43,6 +43,11 @@ interface Draft {
   storage_from: string;
   storage_fee_override: string;
   balance: string;
+  logistic_eta: string;
+  paid_amount: string;
+  storage_paid: string;
+  line_locations: Record<string, string[]>;
+  called_customer: boolean;
 }
 
 const EMPTY: Draft = {
@@ -57,6 +62,11 @@ const EMPTY: Draft = {
   storage_from: "",
   storage_fee_override: "",
   balance: "",
+  logistic_eta: "",
+  paid_amount: "",
+  storage_paid: "",
+  line_locations: {},
+  called_customer: false,
 };
 
 const RM = (n: number) => `RM ${Math.round(Number(n) || 0).toLocaleString()}`;
@@ -111,6 +121,8 @@ export interface OrderControlForm {
   reset: () => void;
   /** Count of filled remark fields — drives the Notes section summary. */
   remarkCount: number;
+  /** Set the stock location(s) for one order line (per-SKU; migration 0168). */
+  setLineLocation: (sku: string, locs: string[]) => void;
   /** Storage-fee inputs from the control overlay (migration 0165). */
   storageFrom: string | null;
   storageOverride: number | null;
@@ -139,6 +151,11 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       storage_fee_override:
         c.storage_fee_override != null ? String(c.storage_fee_override) : "",
       balance: c.balance != null ? String(c.balance) : "",
+      logistic_eta: c.logistic_eta ?? "",
+      paid_amount: c.paid_amount != null ? String(c.paid_amount) : "",
+      storage_paid: c.storage_paid ?? "",
+      line_locations: c.line_locations ?? {},
+      called_customer: c.called_customer ?? false,
     };
   }, [data]);
 
@@ -176,6 +193,14 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
         ? Number(draft.storage_fee_override)
         : null,
       balance: draft.balance.trim() ? Number(draft.balance) : null,
+      logistic_eta: draft.logistic_eta.trim() ? draft.logistic_eta.trim() : null,
+      paid_amount: draft.paid_amount.trim() ? Number(draft.paid_amount) : null,
+      storage_paid: draft.storage_paid.trim() ? draft.storage_paid.trim() : null,
+      line_locations:
+        Object.keys(draft.line_locations).length > 0
+          ? draft.line_locations
+          : null,
+      called_customer: draft.called_customer,
     };
     save.mutate(payload);
   }
@@ -197,6 +222,11 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
     submit,
     reset: () => setDraft(loaded),
     remarkCount,
+    setLineLocation: (sku, locs) =>
+      setDraft((d) => ({
+        ...d,
+        line_locations: { ...d.line_locations, [sku]: locs },
+      })),
     storageFrom: draft.storage_from.trim() ? draft.storage_from : null,
     storageOverride: draft.storage_fee_override.trim()
       ? Number(draft.storage_fee_override)
@@ -251,11 +281,13 @@ export function RoutingFields({
   customerAddress,
   deliveryDate,
   opsAssignedLogistic,
+  form,
 }: {
   orderId: string;
   customerAddress: string | null;
   deliveryDate: string | null;
   opsAssignedLogistic: string | null;
+  form: OrderControlForm;
 }) {
   const { data: partnersData } = useDeliveryPartners();
   const partners = useMemo(
@@ -335,6 +367,28 @@ export function RoutingFields({
           className={CELL}
         />
       </FieldRow>
+      <FieldRow label="Logistic ETA">
+        <input
+          type="date"
+          value={form.draft.logistic_eta}
+          onChange={(e) => form.set("logistic_eta", e.target.value)}
+          className={CELL}
+        />
+      </FieldRow>
+      {area === "Outstation" && (
+        <FieldRow label="Called?">
+          <select
+            value={form.draft.called_customer ? "yes" : "no"}
+            onChange={(e) =>
+              form.set("called_customer", e.target.value === "yes")
+            }
+            className={CELL}
+          >
+            <option value="no">No — call before proceed</option>
+            <option value="yes">Yes — called</option>
+          </select>
+        </FieldRow>
+      )}
     </>
   );
 }
@@ -372,10 +426,12 @@ export function PaymentControlFields({
 }) {
   const { draft, set } = form;
   // Bill = operator-keyed invoice / owing amount (balance); falls back to the
-  // computed line total for native orders. Outstanding = Bill − Paid.
+  // computed line total for native orders. Paid = keyed paid_amount (partial
+  // support) or the order deposit. Outstanding = Bill − Paid.
   const bill = draft.balance.trim() ? Number(draft.balance) : total;
+  const effPaid = draft.paid_amount.trim() ? Number(draft.paid_amount) : paid;
   const hasBill = bill > 0;
-  const outstanding = Math.max(0, bill - paid);
+  const outstanding = Math.max(0, bill - effPaid);
   const settled = hasBill && outstanding <= 0;
   return (
     <div data-testid="payment-summary">
@@ -390,9 +446,14 @@ export function PaymentControlFields({
         />
       </FieldRow>
       <FieldRow label="Paid">
-        <div className="px-2 py-1.5 font-mono text-[12px] font-semibold text-base-900">
-          {RM(paid)}
-        </div>
+        <input
+          type="number"
+          min={0}
+          value={draft.paid_amount}
+          onChange={(e) => set("paid_amount", e.target.value)}
+          placeholder={paid > 0 ? `${paid} (deposit)` : "key amount paid"}
+          className={CELL}
+        />
       </FieldRow>
       <FieldRow label="Outstanding">
         <div
@@ -481,6 +542,17 @@ export function StorageControlFields({
               placeholder={storage.total > 0 ? `auto ${storage.total}` : "auto"}
               className={CELL}
             />
+          </FieldRow>
+          <FieldRow label="Paid?">
+            <select
+              value={draft.storage_paid ?? ""}
+              onChange={(e) => set("storage_paid", e.target.value)}
+              className={CELL}
+            >
+              <option value="">—</option>
+              <option value="Unpaid">Unpaid</option>
+              <option value="Paid">Paid</option>
+            </select>
           </FieldRow>
           <FieldRow label="Rate">
             <div className="px-2 py-1.5 text-[11px] text-base-500">

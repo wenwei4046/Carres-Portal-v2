@@ -722,6 +722,7 @@ function DrawerBody({
               customerAddress={order.customer_address ?? null}
               deliveryDate={order.delivery_date}
               opsAssignedLogistic={order.ops_assigned_logistic ?? null}
+              form={form}
             />
             <DeliveryTimeSlotField form={form} />
             <RemarkControlField
@@ -804,6 +805,7 @@ function DrawerBody({
           onConfirmProceedClick={onConfirmProceedClick}
           onTransferReadyClick={onTransferReadyClick}
           onTopUpClick={onTopUpClick}
+          proceedBlocked={loc.area === "Outstation" && !form.draft.called_customer}
         />
         <OrderControlSaveBar form={form} />
       </div>
@@ -1017,6 +1019,7 @@ interface ActionBarProps {
   onConfirmProceedClick: () => void;
   onTransferReadyClick: () => void;
   onTopUpClick: () => void;
+  proceedBlocked?: boolean;
 }
 
 function ActionBar({
@@ -1032,6 +1035,7 @@ function ActionBar({
   onConfirmProceedClick,
   onTransferReadyClick,
   onTopUpClick,
+  proceedBlocked,
 }: ActionBarProps) {
   const recheck = useRecheckStockMutation(orderId);
 
@@ -1052,11 +1056,21 @@ function ActionBar({
           Dealer pushed this order. Confirm to triage — system will reserve
           stock or queue a PO based on availability.
         </div>
+        {proceedBlocked && (
+          <div className="text-[11px] text-warning mb-2 font-medium">
+            Outstation — call the customer first, then tick Called? (Delivery)
+            before you can proceed.
+          </div>
+        )}
         <div className="flex gap-2 flex-wrap">
           <button
             type="button"
-            className="btn-primary text-[12px]"
+            className="btn-primary text-[12px] disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onConfirmProceedClick}
+            disabled={proceedBlocked}
+            title={
+              proceedBlocked ? "Call the customer first (outstation)" : undefined
+            }
           >
             Confirm proceed
           </button>

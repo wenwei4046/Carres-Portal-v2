@@ -79,6 +79,10 @@ export const opsOrderControlSchema = z.object({
   logistic_eta: isoDate.nullable(),
   paid_amount: dbNumeric,
   storage_paid: z.string().nullable(),
+  /** Per-line stock location { <sku>: string[] } + a call-first gate
+   *  (migration 0168). */
+  line_locations: z.record(z.string(), z.array(z.string())).nullable(),
+  called_customer: z.boolean().default(false),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
 });
@@ -145,6 +149,8 @@ export const updateOpsOrderControlInput = z
     logistic_eta: isoDate.nullable(),
     paid_amount: z.number().min(0).max(99_999_999).nullable(),
     storage_paid: z.string().max(100).nullable(),
+    line_locations: z.record(z.string(), z.array(z.string())).nullable(),
+    called_customer: z.boolean(),
   })
   .partial()
   .strict();
