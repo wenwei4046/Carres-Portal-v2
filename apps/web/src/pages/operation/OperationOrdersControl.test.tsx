@@ -484,6 +484,22 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).queryByText(/jager|hk55|glano|breeze|lumi/i)).toBeNull();
   });
 
+  it("names a Carress Footrest line by its TYPE (Footrest), not the brand first-word (P7)", () => {
+    oneRow({
+      id: "fr1",
+      so: 3100,
+      order_lines: [
+        { sku: "Carress Footrest-K", qty: 6 },
+        { sku: "Carress Footrest-Q", qty: 4 },
+      ],
+    });
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    // Both sizes roll up by TYPE → "10× Footrest"; the brand never shows.
+    expect(within(row).getByText("10× Footrest")).toBeInTheDocument();
+    expect(within(row).queryByText(/carress/i)).toBeNull();
+  });
+
   it("always shows qty on accessory/service tags — even a lone qty-1 accessory (P1)", () => {
     oneRow({
       id: "p1",

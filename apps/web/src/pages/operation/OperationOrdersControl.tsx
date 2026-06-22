@@ -316,6 +316,9 @@ function accShort(sku: string): string {
   if (/disposal|dispose/.test(s)) return "Disposal";
   if (/floor|lift|stair|transport|delivery|charge|install/.test(s)) return "Service";
   if (/topper/.test(s)) return "Topper";
+  // "Carress Footrest-K/-Q" is a sofa footrest add-on — the TYPE is Footrest;
+  // the bare first-word fallback would grab the brand ("Carress") instead.
+  if (/footrest|foot rest|ottoman/.test(s)) return "Footrest";
   const w = sku.trim().split(/[\s/]+/)[0] ?? sku;
   return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 }
