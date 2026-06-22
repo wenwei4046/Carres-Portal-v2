@@ -15,7 +15,6 @@ import {
   useSetOpsAssignedLogistic,
 } from "@/lib/queries";
 import { areaForAddress, suggestCarrier } from "@/lib/region";
-import { fmtDate } from "@/lib/fmt-date";
 
 /**
  * Order-control form pieces — the editable "Master Sheet, live" overlay
@@ -43,6 +42,7 @@ interface Draft {
   payment_status: string;
   storage_from: string;
   storage_fee_override: string;
+  balance: string;
 }
 
 const EMPTY: Draft = {
@@ -56,6 +56,7 @@ const EMPTY: Draft = {
   payment_status: "",
   storage_from: "",
   storage_fee_override: "",
+  balance: "",
 };
 
 const RM = (n: number) => `RM ${Math.round(Number(n) || 0).toLocaleString()}`;
@@ -135,6 +136,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       storage_from: c.storage_from ?? "",
       storage_fee_override:
         c.storage_fee_override != null ? String(c.storage_fee_override) : "",
+      balance: c.balance != null ? String(c.balance) : "",
     };
   }, [data]);
 
@@ -171,6 +173,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       storage_fee_override: draft.storage_fee_override.trim()
         ? Number(draft.storage_fee_override)
         : null,
+      balance: draft.balance.trim() ? Number(draft.balance) : null,
     };
     save.mutate(payload);
   }
@@ -238,25 +241,19 @@ export function StockControlFields({ form }: { form: OrderControlForm }) {
   );
 }
 
-/** Region-suggested carrier + logistic select + delivery date → the Delivery
- *  section. Writes straight to `orders` (own mutations), independent of the
- *  shared draft; inline-editable only on status='place'. */
+/** Region + logistic select + delivery date → the Delivery grid. Writes
+ *  straight to `orders` (own mutations). Always editable so the operator can
+ *  fix or (re)assign the carrier / date at any stage (Jess: every cell edits). */
 export function RoutingFields({
   orderId: _orderId,
   customerAddress,
-  status,
   deliveryDate,
-  deliveryDateTbd,
   opsAssignedLogistic,
-  deliveryPartnerId,
 }: {
   orderId: string;
   customerAddress: string | null;
-  status: string;
   deliveryDate: string | null;
-  deliveryDateTbd: boolean;
   opsAssignedLogistic: string | null;
-  deliveryPartnerId?: string | null;
 }) {
   const { data: partnersData } = useDeliveryPartners();
   const partners = useMemo(
@@ -280,24 +277,21 @@ export function RoutingFields({
   const suggestedPartner = suggestion
     ? partners.find((p) => p.name === suggestion.partner)
     : undefined;
-  const editableRouting = status === "place";
-  const assignedName =
-    partners.find((p) => p.id === deliveryPartnerId)?.name ?? null;
-  const plannedName =
-    partners.find((p) => p.id === opsAssignedLogistic)?.name ?? null;
 
   return (
     <>
-      <FieldRow label="Carrier">
+      <FieldRow label="Region">
         <div className="flex items-center gap-2 flex-wrap px-2 py-1.5">
           <AreaBadge area={area} />
           {suggestion ? (
-            <span className="text-[11px] text-base-700">
-              {suggestion.partner}
+            <span className="text-[11px] text-base-600">
+              suggest{" "}
+              <span className="font-semibold text-base-900">
+                {suggestion.partner}
+              </span>
               {suggestion.alt ? (
                 <span className="text-base-500"> / {suggestion.alt}</span>
               ) : null}
-              <span className="text-base-400"> · {suggestion.region}</span>
             </span>
           ) : (
             <span className="text-[11px] text-base-400">no suggestion</span>
@@ -306,72 +300,51 @@ export function RoutingFields({
       </FieldRow>
 
       <FieldRow label="Logistic">
-        {editableRouting ? (
-          <div className="flex items-center gap-2 flex-wrap w-full px-1">
-            <select
-              value={opsAssignedLogistic ?? ""}
+        <div className="flex items-center gap-2 flex-wrap w-full px-1">
+          <select
+            value={opsAssignedLogistic ?? ""}
+            disabled={setLogistic.isPending}
+            onChange={(e) =>
+              setLogistic.mutate({ deliveryPartnerId: e.target.value || null })
+            }
+            className="flex-1 min-w-[110px] border-0 bg-transparent text-[12px] py-1 outline-none disabled:opacity-50"
+          >
+            <option value="">— pick carrier —</option>
+            {partners.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+                {p.zones ? ` · ${p.zones}` : ""}
+              </option>
+            ))}
+          </select>
+          {!opsAssignedLogistic && suggestedPartner && (
+            <button
+              type="button"
               disabled={setLogistic.isPending}
-              onChange={(e) =>
-                setLogistic.mutate({ deliveryPartnerId: e.target.value || null })
+              onClick={() =>
+                setLogistic.mutate({ deliveryPartnerId: suggestedPartner.id })
               }
-              className="flex-1 min-w-[110px] border-0 bg-transparent text-[12px] py-1 outline-none disabled:opacity-50"
+              className="text-[11px] px-2 py-0.5 rounded border border-primary text-primary font-medium hover:bg-primary/5 disabled:opacity-50 whitespace-nowrap"
             >
-              <option value="">— pick carrier —</option>
-              {partners.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.zones ? ` · ${p.zones}` : ""}
-                </option>
-              ))}
-            </select>
-            {!opsAssignedLogistic && suggestedPartner && (
-              <button
-                type="button"
-                disabled={setLogistic.isPending}
-                onClick={() =>
-                  setLogistic.mutate({ deliveryPartnerId: suggestedPartner.id })
-                }
-                className="text-[11px] px-2 py-0.5 rounded border border-primary text-primary font-medium hover:bg-primary/5 disabled:opacity-50 whitespace-nowrap"
-              >
-                Apply {suggestedPartner.name}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="px-2 py-1.5 text-[12px] text-base-900">
-            {assignedName ?? plannedName ?? (
-              <span className="text-base-400">—</span>
-            )}
-            <span className="text-[10px] text-base-500 ml-1">(dispatch flow)</span>
-          </div>
-        )}
+              Apply {suggestedPartner.name}
+            </button>
+          )}
+        </div>
       </FieldRow>
 
       <FieldRow label="Delivery date">
-        {editableRouting ? (
-          <input
-            type="date"
-            defaultValue={deliveryDate ?? ""}
-            disabled={setDate.isPending}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (ISO_DATE.test(v) && v !== deliveryDate) {
-                setDate.mutate({ date: v });
-              }
-            }}
-            className={CELL}
-          />
-        ) : (
-          <div className="px-2 py-1.5 text-[12px] text-base-900">
-            {deliveryDateTbd ? (
-              <span className="text-warning">TBD</span>
-            ) : deliveryDate ? (
-              fmtDate(deliveryDate)
-            ) : (
-              <span className="text-base-400">—</span>
-            )}
-          </div>
-        )}
+        <input
+          type="date"
+          defaultValue={deliveryDate ?? ""}
+          disabled={setDate.isPending}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (ISO_DATE.test(v) && v !== deliveryDate) {
+              setDate.mutate({ date: v });
+            }
+          }}
+          className={CELL}
+        />
       </FieldRow>
     </>
   );
@@ -439,6 +412,16 @@ export function PaymentControlFields({
           </div>
         </FieldRow>
       </div>
+      <FieldRow label="Balance">
+        <input
+          type="number"
+          min={0}
+          value={draft.balance}
+          onChange={(e) => set("balance", e.target.value)}
+          placeholder="key owing (from invoice)"
+          className={CELL}
+        />
+      </FieldRow>
       <FieldRow label="Pay status">
         <select
           value={draft.payment_status}
@@ -480,6 +463,11 @@ export function StorageControlFields({
   });
   return (
     <>
+      <FieldRow label="Rate">
+        <div className="px-2 py-1.5 text-[11px] text-base-500">
+          MS/BF RM150/mo · Sofa RM200/2wk
+        </div>
+      </FieldRow>
       <FieldRow label="Storage from">
         <input
           type="date"
@@ -601,9 +589,13 @@ function AreaBadge({ area }: { area: "KV" | "Outstation" | "Unknown" }) {
         : "text-base-400 border-base-200";
   return (
     <span
-      className={`inline-block text-[9px] font-bold uppercase tracking-[0.12em] py-[3px] px-[7px] border rounded-[3px] ${tone}`}
+      className={`inline-block text-[9px] font-bold uppercase tracking-[0.04em] py-[3px] px-[7px] border rounded-[3px] ${tone}`}
     >
-      {area === "Unknown" ? "Area —" : area}
+      {area === "KV"
+        ? "Klang Valley"
+        : area === "Outstation"
+          ? "Outstation"
+          : "Area —"}
     </span>
   );
 }

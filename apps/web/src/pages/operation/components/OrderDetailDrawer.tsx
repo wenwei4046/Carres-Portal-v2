@@ -717,11 +717,8 @@ function DrawerBody({
             <RoutingFields
               orderId={order.id}
               customerAddress={order.customer_address ?? null}
-              status={order.status}
               deliveryDate={order.delivery_date}
-              deliveryDateTbd={order.delivery_date_tbd}
               opsAssignedLogistic={order.ops_assigned_logistic ?? null}
-              deliveryPartnerId={order.delivery_partner_id}
             />
             <DeliveryTimeSlotField form={form} />
             <RemarkControlField
