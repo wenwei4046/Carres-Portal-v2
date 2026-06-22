@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   computeStorageFee,
@@ -41,6 +41,8 @@ interface Draft {
   carres_remark: string;
   warehouse_remark: string;
   payment_status: string;
+  storage_from: string;
+  storage_fee_override: string;
 }
 
 const EMPTY: Draft = {
@@ -52,14 +54,46 @@ const EMPTY: Draft = {
   carres_remark: "",
   warehouse_remark: "",
   payment_status: "",
+  storage_from: "",
+  storage_fee_override: "",
 };
 
 const RM = (n: number) => `RM ${Math.round(Number(n) || 0).toLocaleString()}`;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-const INPUT =
-  "w-full px-2 py-1.5 border border-base-200 rounded text-[12px] bg-white outline-none focus:border-base-700";
+/** Borderless control that fills a grid cell (the cell supplies the border). */
+const CELL =
+  "w-full border-0 bg-transparent px-2 py-1.5 text-[12px] text-base-900 outline-none focus:bg-base-50";
+
+/** One spreadsheet row — label cell + value/control cell, fully bordered.
+ *  Field groups render FieldRows; the panel wraps them in a FieldGrid so every
+ *  panel reads as one consistent Master-Sheet grid (Jess). */
+export function FieldRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[110px_1fr] border-b border-base-200 last:border-b-0">
+      <div className="bg-base-50 text-base-700 text-[10px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 border-r border-base-200">
+        {label}
+      </div>
+      <div className="min-w-0 flex items-center">{children}</div>
+    </div>
+  );
+}
+
+/** Bordered wrapper turning a set of FieldRows into one grid block. */
+export function FieldGrid({ children }: { children: ReactNode }) {
+  return (
+    <div className="border border-base-200 rounded-[3px] overflow-hidden">
+      {children}
+    </div>
+  );
+}
 
 /** Shared ops_order_control form state — call ONCE in the drawer, then hand the
  *  returned `form` to each per-category field group. One draft, one Save. */
@@ -98,6 +132,9 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       carres_remark: c.carres_remark ?? "",
       warehouse_remark: c.warehouse_remark ?? "",
       payment_status: c.payment_status ?? "",
+      storage_from: c.storage_from ?? "",
+      storage_fee_override:
+        c.storage_fee_override != null ? String(c.storage_fee_override) : "",
     };
   }, [data]);
 
@@ -130,6 +167,10 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       carres_remark: draft.carres_remark.trim() || null,
       warehouse_remark: draft.warehouse_remark.trim() || null,
       payment_status: draft.payment_status.trim() || null,
+      storage_from: draft.storage_from.trim() ? draft.storage_from.trim() : null,
+      storage_fee_override: draft.storage_fee_override.trim()
+        ? Number(draft.storage_fee_override)
+        : null,
     };
     save.mutate(payload);
   }
@@ -151,11 +192,10 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
     submit,
     reset: () => setDraft(loaded),
     remarkCount,
-    storageFrom: data?.control?.storage_from ?? null,
-    storageOverride:
-      data?.control?.storage_fee_override != null
-        ? Number(data.control.storage_fee_override)
-        : null,
+    storageFrom: draft.storage_from.trim() ? draft.storage_from : null,
+    storageOverride: draft.storage_fee_override.trim()
+      ? Number(draft.storage_fee_override)
+      : null,
   };
 }
 
@@ -163,10 +203,9 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
 export function StockControlFields({ form }: { form: OrderControlForm }) {
   const { draft, toggleLoc, set } = form;
   return (
-    <div className="space-y-2.5">
-      <div>
-        <div className="label mb-1">Stock location</div>
-        <div className="flex flex-wrap gap-1.5">
+    <>
+      <FieldRow label="Stock location">
+        <div className="flex flex-wrap gap-1 px-2 py-1.5">
           {STOCK_LOCATIONS.map((loc) => {
             const on = draft.stock_location.includes(loc);
             return (
@@ -175,7 +214,7 @@ export function StockControlFields({ form }: { form: OrderControlForm }) {
                 type="button"
                 onClick={() => toggleLoc(loc)}
                 aria-pressed={on}
-                className={`text-[11px] px-2 py-1 rounded border ${
+                className={`text-[11px] px-2 py-0.5 rounded border ${
                   on
                     ? "bg-primary/10 border-primary text-primary font-medium"
                     : "bg-white border-base-200 text-base-600 hover:border-base-400"
@@ -186,17 +225,16 @@ export function StockControlFields({ form }: { form: OrderControlForm }) {
             );
           })}
         </div>
-      </div>
-      <div>
-        <div className="label mb-1">Stock ETA</div>
+      </FieldRow>
+      <FieldRow label="Stock ETA">
         <input
           type="date"
           value={draft.stock_eta}
           onChange={(e) => set("stock_eta", e.target.value)}
-          className={INPUT}
+          className={CELL}
         />
-      </div>
-    </div>
+      </FieldRow>
+    </>
   );
 }
 
@@ -249,38 +287,34 @@ export function RoutingFields({
     partners.find((p) => p.id === opsAssignedLogistic)?.name ?? null;
 
   return (
-    <div className="space-y-2.5">
-      <div className="flex items-center gap-2 flex-wrap">
-        <AreaBadge area={area} />
-        {suggestion ? (
-          <span className="text-[12px] text-base-700">
-            Suggested carrier{" "}
-            <span className="font-semibold text-base-900">
+    <>
+      <FieldRow label="Carrier">
+        <div className="flex items-center gap-2 flex-wrap px-2 py-1.5">
+          <AreaBadge area={area} />
+          {suggestion ? (
+            <span className="text-[11px] text-base-700">
               {suggestion.partner}
+              {suggestion.alt ? (
+                <span className="text-base-500"> / {suggestion.alt}</span>
+              ) : null}
+              <span className="text-base-400"> · {suggestion.region}</span>
             </span>
-            {suggestion.alt ? (
-              <span className="text-base-500"> / {suggestion.alt}</span>
-            ) : null}
-            <span className="text-base-400"> · {suggestion.region}</span>
-          </span>
-        ) : (
-          <span className="text-[12px] text-base-500">
-            No carrier suggestion — address region unclear
-          </span>
-        )}
-      </div>
+          ) : (
+            <span className="text-[11px] text-base-400">no suggestion</span>
+          )}
+        </div>
+      </FieldRow>
 
-      <div>
-        <div className="label mb-1">Logistic</div>
+      <FieldRow label="Logistic">
         {editableRouting ? (
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap w-full px-1">
             <select
               value={opsAssignedLogistic ?? ""}
               disabled={setLogistic.isPending}
               onChange={(e) =>
                 setLogistic.mutate({ deliveryPartnerId: e.target.value || null })
               }
-              className="flex-1 min-w-[140px] px-2 py-1.5 border border-base-200 rounded text-[12px] bg-white outline-none focus:border-base-700 disabled:bg-base-100"
+              className="flex-1 min-w-[110px] border-0 bg-transparent text-[12px] py-1 outline-none disabled:opacity-50"
             >
               <option value="">— pick carrier —</option>
               {partners.map((p) => (
@@ -297,26 +331,23 @@ export function RoutingFields({
                 onClick={() =>
                   setLogistic.mutate({ deliveryPartnerId: suggestedPartner.id })
                 }
-                className="text-[11px] px-2 py-1.5 rounded border border-primary text-primary font-medium hover:bg-primary/5 disabled:opacity-50 whitespace-nowrap"
+                className="text-[11px] px-2 py-0.5 rounded border border-primary text-primary font-medium hover:bg-primary/5 disabled:opacity-50 whitespace-nowrap"
               >
                 Apply {suggestedPartner.name}
               </button>
             )}
           </div>
         ) : (
-          <div className="text-[13px] text-base-900">
+          <div className="px-2 py-1.5 text-[12px] text-base-900">
             {assignedName ?? plannedName ?? (
               <span className="text-base-400">—</span>
             )}
-            <span className="text-[11px] text-base-500 ml-2">
-              (managed in the dispatch flow)
-            </span>
+            <span className="text-[10px] text-base-500 ml-1">(dispatch flow)</span>
           </div>
         )}
-      </div>
+      </FieldRow>
 
-      <div>
-        <div className="label mb-1">Delivery date</div>
+      <FieldRow label="Delivery date">
         {editableRouting ? (
           <input
             type="date"
@@ -328,10 +359,10 @@ export function RoutingFields({
                 setDate.mutate({ date: v });
               }
             }}
-            className={INPUT + " disabled:bg-base-100"}
+            className={CELL}
           />
         ) : (
-          <div className="text-[13px] text-base-900">
+          <div className="px-2 py-1.5 text-[12px] text-base-900">
             {deliveryDateTbd ? (
               <span className="text-warning">TBD</span>
             ) : deliveryDate ? (
@@ -341,8 +372,8 @@ export function RoutingFields({
             )}
           </div>
         )}
-      </div>
-    </div>
+      </FieldRow>
+    </>
   );
 }
 
@@ -350,12 +381,11 @@ export function RoutingFields({
 export function DeliveryTimeSlotField({ form }: { form: OrderControlForm }) {
   const { draft, set } = form;
   return (
-    <div>
-      <div className="label mb-1">Delivery time slot</div>
+    <FieldRow label="Time slot">
       <select
         value={draft.delivery_time_slot}
         onChange={(e) => set("delivery_time_slot", e.target.value)}
-        className={INPUT}
+        className={CELL}
       >
         <option value="">—</option>
         {DELIVERY_TIME_SLOTS.map((s) => (
@@ -364,7 +394,7 @@ export function DeliveryTimeSlotField({ form }: { form: OrderControlForm }) {
           </option>
         ))}
       </select>
-    </div>
+    </FieldRow>
   );
 }
 
@@ -384,35 +414,66 @@ export function PaymentControlFields({
 }) {
   const { draft, set } = form;
   const today = new Date().toISOString().slice(0, 10);
+  const hasTotal = total > 0;
+  const outstanding = Math.max(0, total - paid);
+  const settled = hasTotal && outstanding <= 0;
   const storage = computeStorageFee({
     startDate: form.storageFrom,
     asOf: today,
     hasMsbf,
     hasSof,
   });
-  const storageVal =
-    form.storageOverride != null ? form.storageOverride : storage.total;
-  const showStorage = form.storageFrom != null || form.storageOverride != null;
   return (
-    <div>
-      <PaymentSummary paid={paid} total={total} />
-      {showStorage && (
-        <div className="flex items-baseline justify-between gap-3 py-1 border-b border-base-100">
-          <span className="text-[10px] uppercase tracking-[0.04em] text-base-500">
-            Storage fee{form.storageOverride != null ? " (set)" : ""}
-          </span>
-          <span className="font-mono text-[12px] font-semibold text-base-900">
-            {storageVal > 0 ? RM(storageVal) : "—"}
-          </span>
-        </div>
-      )}
-      <div className="mt-2.5">
-        <div className="label mb-1">Follow-up status</div>
+    <>
+      <div data-testid="payment-summary">
+        <FieldRow label="Total">
+          <div className="px-2 py-1.5 font-mono text-[12px] font-semibold text-base-900">
+            {hasTotal ? RM(total) : "—"}
+          </div>
+        </FieldRow>
+        <FieldRow label="Paid">
+          <div className="px-2 py-1.5 font-mono text-[12px] font-semibold text-base-900">
+            {RM(paid)}
+          </div>
+        </FieldRow>
+        <FieldRow label="Outstanding">
+          <div
+            className={`px-2 py-1.5 font-mono text-[12px] font-semibold ${
+              !hasTotal
+                ? "text-base-400"
+                : settled
+                  ? "text-success"
+                  : "text-primary"
+            }`}
+          >
+            {!hasTotal ? "—" : settled ? "Settled" : RM(outstanding)}
+          </div>
+        </FieldRow>
+      </div>
+      <FieldRow label="Storage from">
+        <input
+          type="date"
+          value={draft.storage_from}
+          onChange={(e) => set("storage_from", e.target.value)}
+          className={CELL}
+        />
+      </FieldRow>
+      <FieldRow label="Storage fee">
+        <input
+          type="number"
+          min={0}
+          value={draft.storage_fee_override}
+          onChange={(e) => set("storage_fee_override", e.target.value)}
+          placeholder={storage.total > 0 ? `auto ${storage.total}` : "auto"}
+          className={CELL}
+        />
+      </FieldRow>
+      <FieldRow label="Pay status">
         <select
           value={draft.payment_status}
           onChange={(e) => set("payment_status", e.target.value)}
           aria-label="Payment follow-up status"
-          className={INPUT}
+          className={CELL}
         >
           <option value="">—</option>
           {PAYMENT_STATUSES.map((s) => (
@@ -421,8 +482,8 @@ export function PaymentControlFields({
             </option>
           ))}
         </select>
-      </div>
-    </div>
+      </FieldRow>
+    </>
   );
 }
 
@@ -478,12 +539,15 @@ export function RemarkControlField({
   placeholder?: string;
 }) {
   return (
-    <RemarkField
-      label={label}
-      value={form.draft[field]}
-      onChange={(v) => form.set(field, v)}
-      placeholder={placeholder}
-    />
+    <FieldRow label={label}>
+      <textarea
+        rows={2}
+        value={form.draft[field]}
+        onChange={(e) => form.set(field, e.target.value)}
+        placeholder={placeholder}
+        className={CELL + " resize-y block py-1"}
+      />
+    </FieldRow>
   );
 }
 

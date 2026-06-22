@@ -38,6 +38,8 @@ import {
   PaymentControlFields,
   RemarkControlField,
   OrderControlSaveBar,
+  FieldGrid,
+  FieldRow,
 } from "./OrderControlPanel";
 import ServiceNoteModal from "./ServiceNoteModal";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
@@ -506,12 +508,7 @@ function DrawerBody({
     <div className="flex flex-col h-full min-h-0">
       {/* Header — slim title bar: SO · name · status, a ⋮ actions menu, close.
           (Service/export actions + doc reprints all live in the ⋮ menu now.) */}
-      <div className="px-5 pt-3.5 pb-3 border-b border-base-100 shrink-0 flex items-center gap-2">
-        <span
-          className={`${cjkClassName(order.customer_name)} text-[15px] font-semibold tracking-[-0.01em] text-base-900 truncate flex-1 min-w-0`}
-        >
-          {order.customer_name}
-        </span>
+      <div className="px-5 pt-3 pb-2.5 border-b border-base-100 shrink-0 flex items-center justify-end gap-1">
         <ActionsMenu
           order={order}
           lines={lines}
@@ -568,7 +565,11 @@ function DrawerBody({
               </tr>
               <tr>
                 <Kc>Customer</Kc>
-                <Vc>{order.customer_name}</Vc>
+                <Vc>
+                  <span className={cjkClassName(order.customer_name)}>
+                    {order.customer_name}
+                  </span>
+                </Vc>
                 <Kc>Phone</Kc>
                 <Vc>
                   {order.customer_phone ?? <em className="text-base-500">—</em>}
@@ -670,23 +671,20 @@ function DrawerBody({
             </tbody>
           </table>
           <div className="mt-2">
-            <Grid>
-              <KV
-                label="Warehouse"
-                value={warehouse?.name ?? <em className="text-base-500">—</em>}
+            <FieldGrid>
+              <FieldRow label="Warehouse">
+                <div className="px-2 py-1.5 text-[12px] text-base-900">
+                  {warehouse?.name ?? <em className="text-base-500">—</em>}
+                </div>
+              </FieldRow>
+              <StockControlFields form={form} />
+              <RemarkControlField
+                form={form}
+                field="warehouse_remark"
+                label="Warehouse remark"
+                placeholder="Note for the warehouse team"
               />
-            </Grid>
-          </div>
-          <div className="mt-2.5">
-            <StockControlFields form={form} />
-          </div>
-          <div className="mt-2.5">
-            <RemarkControlField
-              form={form}
-              field="warehouse_remark"
-              label="Warehouse remark"
-              placeholder="Note for the warehouse team"
-            />
+            </FieldGrid>
           </div>
           {pos.length > 0 && (
             <div className="mt-2.5">
@@ -714,26 +712,24 @@ function DrawerBody({
           }
           defaultOpen
         >
-          <RoutingFields
-            orderId={order.id}
-            customerAddress={order.customer_address ?? null}
-            status={order.status}
-            deliveryDate={order.delivery_date}
-            deliveryDateTbd={order.delivery_date_tbd}
-            opsAssignedLogistic={order.ops_assigned_logistic ?? null}
-            deliveryPartnerId={order.delivery_partner_id}
-          />
-          <div className="mt-2.5">
+          <FieldGrid>
+            <RoutingFields
+              orderId={order.id}
+              customerAddress={order.customer_address ?? null}
+              status={order.status}
+              deliveryDate={order.delivery_date}
+              deliveryDateTbd={order.delivery_date_tbd}
+              opsAssignedLogistic={order.ops_assigned_logistic ?? null}
+              deliveryPartnerId={order.delivery_partner_id}
+            />
             <DeliveryTimeSlotField form={form} />
-          </div>
-          <div className="mt-2.5">
             <RemarkControlField
               form={form}
               field="action_for_logistic"
               label="Action for logistic"
               placeholder="e.g. call customer before delivery"
             />
-          </div>
+          </FieldGrid>
           <details className="mt-2.5" open={(order.delivery_stops?.length ?? 0) > 0}>
             <summary className="label cursor-pointer select-none">
               Advanced · multi-leg route{" "}
@@ -759,13 +755,15 @@ function DrawerBody({
           accent="info"
           summary={paymentSummary}
         >
-          <PaymentControlFields
-            form={form}
-            paid={Number(order.paid || 0)}
-            total={grandTotal}
-            hasMsbf={hasMsbf}
-            hasSof={hasSof}
-          />
+          <FieldGrid>
+            <PaymentControlFields
+              form={form}
+              paid={Number(order.paid || 0)}
+              total={grandTotal}
+              hasMsbf={hasMsbf}
+              hasSof={hasSof}
+            />
+          </FieldGrid>
         </DrawerSection>
 
         {/* 5 · Activity — last, expandable to see the full history. */}
@@ -839,24 +837,6 @@ function Vc({
     </td>
   );
 }
-function KV({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <tr>
-      <Kc>{label}</Kc>
-      <Vc>{value}</Vc>
-    </tr>
-  );
-}
-
-/** Bordered grid wrapper for KV rows. */
-function Grid({ children }: { children: ReactNode }) {
-  return (
-    <table className="w-full border-collapse">
-      <tbody>{children}</tbody>
-    </table>
-  );
-}
-
 /** Storage-scope category (mirrors OperationPayments.catOf): MS/BF vs SOF. */
 function catOf(sku: string): "msbf" | "sof" | "other" {
   const s = sku.trim().toLowerCase();
