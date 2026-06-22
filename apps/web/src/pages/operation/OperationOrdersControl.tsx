@@ -203,6 +203,21 @@ function stockReadiness(
     : { state: "need_po", need, have, short };
 }
 
+/** Three-state stock bucket for the header filter — collapses the 5 internal
+ *  StockStates into the same Ready / Waiting / Not set the Stock column shows
+ *  (Jess: filter the list by stock too, not just status + region). */
+const STOCK_BUCKETS = ["Ready", "Waiting", "Not set"] as const;
+type StockBucket = (typeof STOCK_BUCKETS)[number];
+function stockBucketOf(
+  o: operationOrderListRow,
+  availableBySku?: Map<string, number>,
+): StockBucket {
+  const s = stockReadiness(o, availableBySku).state;
+  if (s === "ready" || s === "in_stock") return "Ready";
+  if (s === "need_po" || s === "awaiting") return "Waiting";
+  return "Not set";
+}
+
 /** Countdown from today to the deadline (customer's requested delivery date)
  *  → short label + tone, encoding Jess's prep SOP off the deadline:
  *    • ≤7 days  ⚠  stock must be at the warehouse (the "Before 7 Days" flag —
@@ -397,6 +412,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Urgent chip + state-region pills — both stack on top of the status tab.
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
+  const [stockFilter, setStockFilter] = useState<StockBucket | null>(null);
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -483,13 +499,25 @@ export default function OperationOrdersControl({ onImport }: Props) {
     });
     return keys.map((k) => ({ region: k, count: m.get(k) ?? 0 }));
   }, [tabFiltered]);
+  const stockEntries = useMemo(() => {
+    const m = new Map<StockBucket, number>();
+    for (const o of tabFiltered) {
+      const b = stockBucketOf(o, availableBySku);
+      m.set(b, (m.get(b) ?? 0) + 1);
+    }
+    return STOCK_BUCKETS.filter((b) => m.has(b)).map((b) => ({
+      bucket: b,
+      count: m.get(b) ?? 0,
+    }));
+  }, [tabFiltered, availableBySku]);
 
   const visible = useMemo(() => {
     let r = tabFiltered;
     if (urgentOnly) r = r.filter(isUrgentOrder);
     if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
+    if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
     return [...r].sort(compareByDeadline);
-  }, [tabFiltered, urgentOnly, regionFilter]);
+  }, [tabFiltered, urgentOnly, regionFilter, stockFilter, availableBySku]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -499,7 +527,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
   }, [orders]);
 
   // Reset to the first page whenever the filtered set changes.
-  useEffect(() => setPage(0), [tab, search, pageSize, urgentOnly, regionFilter]);
+  useEffect(
+    () => setPage(0),
+    [tab, search, pageSize, urgentOnly, regionFilter, stockFilter],
+  );
 
   const total = visible.length;
   const pageCount =
@@ -735,7 +766,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
       {/* State-region filter pills (Jess: pick a state → select-all → assign
           logistic). Stacks with the status tab + Urgent chip above. */}
-      <div className="flex items-center gap-1.5 mb-3.5 flex-wrap">
+      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
         <span className="text-[11px] font-medium text-base-400 mr-0.5">Region</span>
         <RegionChip
           label="All"
@@ -750,6 +781,30 @@ export default function OperationOrdersControl({ onImport }: Props) {
             count={e.count}
             active={regionFilter === e.region}
             onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+          />
+        ))}
+      </div>
+
+      {/* Stock-status filter pills (Jess: header should filter by stock too —
+          Ready / Waiting / Not set, the same three states as the Stock column).
+          Stacks on top of the status tab + region above. */}
+      <div className="flex items-center gap-1.5 mb-3.5 flex-wrap">
+        <span className="text-[11px] font-medium text-base-400 mr-0.5">Stock</span>
+        <RegionChip
+          label="All"
+          count={tabFiltered.length}
+          active={stockFilter === null}
+          onClick={() => setStockFilter(null)}
+        />
+        {stockEntries.map((e) => (
+          <RegionChip
+            key={e.bucket}
+            label={e.bucket}
+            count={e.count}
+            active={stockFilter === e.bucket}
+            onClick={() =>
+              setStockFilter((r) => (r === e.bucket ? null : e.bucket))
+            }
           />
         ))}
       </div>
