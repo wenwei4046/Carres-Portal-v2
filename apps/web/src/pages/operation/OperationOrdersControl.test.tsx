@@ -476,9 +476,12 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Master-Sheet codes, NOT the raw model name; sizes rolled up per category.
-    expect(within(row).getByText("3× MS(K,Q)")).toBeInTheDocument();
-    expect(within(row).getByText("3× BF(K,Q)")).toBeInTheDocument();
+    // Master-Sheet codes, NOT the raw model name; each size shows its own qty
+    // (Jess: "1× MS(K)" + "2× MS(Q)", never a lazy "3× MS(K,Q)").
+    expect(within(row).getByText("1× MS(K)")).toBeInTheDocument();
+    expect(within(row).getByText("2× MS(Q)")).toBeInTheDocument();
+    expect(within(row).getByText("1× BF(K)")).toBeInTheDocument();
+    expect(within(row).getByText("2× BF(Q)")).toBeInTheDocument();
     expect(within(row).getByText("2× SOF")).toBeInTheDocument();
     // The raw model names no longer leak into the row as accessory tags.
     expect(within(row).queryByText(/jager|hk55|glano|breeze|lumi/i)).toBeNull();

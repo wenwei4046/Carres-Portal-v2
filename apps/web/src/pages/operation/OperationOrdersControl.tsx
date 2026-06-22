@@ -316,7 +316,10 @@ function unitTotal(lines: { sku: string; qty: number }[]): number {
 function itemTags(
   lines: { sku: string; qty: number }[],
 ): { kind: ItemKind; qty: number; name: string }[] {
-  const core = new Map<CoreCat, { qty: number; sizes: Set<string> }>();
+  // Core grouped by (category, size) so each size carries its OWN qty (Jess:
+  // "1× MS(K)" + "2× MS(Q)", never a lazy "3× MS(K,Q)"). Sofas have no K/Q/S
+  // size (sized by seater) → one group; unknown size → bare "MS".
+  const core = new Map<string, { cat: CoreCat; size: string; qty: number }>();
   const rest = new Map<string, { qty: number; kind: ItemKind }>();
   for (const l of lines) {
     const q = Number(l.qty || 0);
@@ -329,21 +332,23 @@ function itemTags(
       rest.set(name, e);
       continue;
     }
-    const e = core.get(cat) ?? { qty: 0, sizes: new Set<string>() };
+    const size = cat === "sofa" ? "" : (lineSize(l.sku) ?? "");
+    const key = `${cat}|${size}`;
+    const e = core.get(key) ?? { cat, size, qty: 0 };
     e.qty += q;
-    const sz = lineSize(l.sku);
-    if (sz) e.sizes.add(sz);
-    core.set(cat, e);
+    core.set(key, e);
   }
   const out: { kind: ItemKind; qty: number; name: string }[] = [];
   for (const cat of CORE_ORDER) {
-    const e = core.get(cat);
-    if (!e) continue;
-    // Sofas are sized by seater config (2/3 Seater, L-shape), NOT K/Q/S — Jess:
-    // show SOF alone; the seater lives in the drawer + items tooltip.
-    const sizes =
-      cat !== "sofa" && e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
-    out.push({ kind: "core", qty: e.qty, name: `${CORE_LABEL[cat]}${sizes}` });
+    const entries = [...core.values()]
+      .filter((e) => e.cat === cat)
+      .sort((a, b) => a.size.localeCompare(b.size)); // K, Q, S, then ""
+    for (const e of entries)
+      out.push({
+        kind: "core",
+        qty: e.qty,
+        name: `${CORE_LABEL[cat]}${e.size ? `(${e.size})` : ""}`,
+      });
   }
   // Accessories ordered pillow → M.P → others, then service last (Jess: fixed
   // item sequence). Core already ordered via CORE_ORDER above.

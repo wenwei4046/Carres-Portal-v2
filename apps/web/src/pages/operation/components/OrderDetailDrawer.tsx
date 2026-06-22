@@ -503,10 +503,16 @@ function DrawerBody({
   const loc = locationForAddress(order.customer_address ?? null);
 
   const form = useOrderControlForm(order.id);
-  // Always list items mattress → bedframe → sofa → pillow → M.P → service (Jess).
-  const orderedLines = [...lines].sort(
-    (a, b) => lineSortRank(a.sku) - lineSortRank(b.sku),
-  );
+  // Combine duplicate-SKU lines into ONE row (Jess: don't repeat the same item),
+  // then list mattress → bedframe → sofa → pillow → M.P → service.
+  const orderedLines = Object.values(
+    lines.reduce<Record<string, { sku: string; qty: number }>>((acc, l) => {
+      const e = acc[l.sku] ?? { sku: l.sku, qty: 0 };
+      e.qty += Number(l.qty || 0);
+      acc[l.sku] = e;
+      return acc;
+    }, {}),
+  ).sort((a, b) => lineSortRank(a.sku) - lineSortRank(b.sku));
   const hasMsbf = lines.some((l) => {
     const c = lineCategory(l.sku);
     return c === "mattress" || c === "bedframe";
@@ -636,7 +642,7 @@ function DrawerBody({
               </tr>
             </thead>
             <tbody>
-              {orderedLines.map((l, i) => {
+              {orderedLines.map((l) => {
                 const bal = stockBalances.find((b) => b.sku === l.sku);
                 const have = bal
                   ? Math.max(0, Number(bal.qty) - Number(bal.reserved))
@@ -653,11 +659,9 @@ function DrawerBody({
                   savedLoc !== undefined
                     ? (savedLoc[0] ?? "")
                     : (defaultLineLocation(l.sku) ?? "");
-                // Row identity uses the index — duplicate-SKU lines are legal
-                // (same protector ×2). The per-line location still keys on SKU
-                // (duplicate SKUs intentionally share a location, migration 0168).
+                // One row per SKU (duplicate lines combined above) → key on SKU.
                 return (
-                  <tr key={`${l.sku}-${i}`}>
+                  <tr key={l.sku}>
                     <td className="border border-base-200 px-2 py-1 font-mono text-[11px] align-top break-all">
                       {l.sku}
                     </td>
