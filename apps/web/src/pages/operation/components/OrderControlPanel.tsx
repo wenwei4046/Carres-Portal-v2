@@ -403,26 +403,15 @@ export function PaymentControlFields({
   form,
   paid,
   total,
-  hasMsbf = false,
-  hasSof = false,
 }: {
   form: OrderControlForm;
   paid: number;
   total: number;
-  hasMsbf?: boolean;
-  hasSof?: boolean;
 }) {
   const { draft, set } = form;
-  const today = new Date().toISOString().slice(0, 10);
   const hasTotal = total > 0;
   const outstanding = Math.max(0, total - paid);
   const settled = hasTotal && outstanding <= 0;
-  const storage = computeStorageFee({
-    startDate: form.storageFrom,
-    asOf: today,
-    hasMsbf,
-    hasSof,
-  });
   return (
     <>
       <div data-testid="payment-summary">
@@ -450,6 +439,47 @@ export function PaymentControlFields({
           </div>
         </FieldRow>
       </div>
+      <FieldRow label="Pay status">
+        <select
+          value={draft.payment_status}
+          onChange={(e) => set("payment_status", e.target.value)}
+          aria-label="Payment follow-up status"
+          className={CELL}
+        >
+          <option value="">—</option>
+          {PAYMENT_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </FieldRow>
+    </>
+  );
+}
+
+/** Storage block → the RIGHT column of the Payment panel (Jess): accrues from
+ *  the ETA per the locked rule; leave the fee blank for the auto amount
+ *  (shown as the placeholder) or key a number to override. */
+export function StorageControlFields({
+  form,
+  hasMsbf = false,
+  hasSof = false,
+}: {
+  form: OrderControlForm;
+  hasMsbf?: boolean;
+  hasSof?: boolean;
+}) {
+  const { draft, set } = form;
+  const today = new Date().toISOString().slice(0, 10);
+  const storage = computeStorageFee({
+    startDate: form.storageFrom,
+    asOf: today,
+    hasMsbf,
+    hasSof,
+  });
+  return (
+    <>
       <FieldRow label="Storage from">
         <input
           type="date"
@@ -467,21 +497,6 @@ export function PaymentControlFields({
           placeholder={storage.total > 0 ? `auto ${storage.total}` : "auto"}
           className={CELL}
         />
-      </FieldRow>
-      <FieldRow label="Pay status">
-        <select
-          value={draft.payment_status}
-          onChange={(e) => set("payment_status", e.target.value)}
-          aria-label="Payment follow-up status"
-          className={CELL}
-        >
-          <option value="">—</option>
-          {PAYMENT_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
       </FieldRow>
     </>
   );

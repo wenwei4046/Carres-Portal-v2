@@ -36,6 +36,7 @@ import {
   StockControlFields,
   DeliveryTimeSlotField,
   PaymentControlFields,
+  StorageControlFields,
   RemarkControlField,
   OrderControlSaveBar,
   FieldGrid,
@@ -755,15 +756,22 @@ function DrawerBody({
           accent="info"
           summary={paymentSummary}
         >
-          <FieldGrid>
-            <PaymentControlFields
-              form={form}
-              paid={Number(order.paid || 0)}
-              total={grandTotal}
-              hasMsbf={hasMsbf}
-              hasSof={hasSof}
-            />
-          </FieldGrid>
+          <div className="grid grid-cols-2 gap-2 items-start">
+            <FieldGrid>
+              <PaymentControlFields
+                form={form}
+                paid={Number(order.paid || 0)}
+                total={grandTotal}
+              />
+            </FieldGrid>
+            <FieldGrid>
+              <StorageControlFields
+                form={form}
+                hasMsbf={hasMsbf}
+                hasSof={hasSof}
+              />
+            </FieldGrid>
+          </div>
         </DrawerSection>
 
         {/* 5 · Activity — last, expandable to see the full history. */}
