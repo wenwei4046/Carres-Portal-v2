@@ -154,9 +154,9 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
 export function StockControlFields({ form }: { form: OrderControlForm }) {
   const { draft, toggleLoc, set } = form;
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-2.5">
       <div>
-        <div className="label mb-1.5">Stock location</div>
+        <div className="label mb-1">Stock location</div>
         <div className="flex flex-wrap gap-1.5">
           {STOCK_LOCATIONS.map((loc) => {
             const on = draft.stock_location.includes(loc);
@@ -179,7 +179,7 @@ export function StockControlFields({ form }: { form: OrderControlForm }) {
         </div>
       </div>
       <div>
-        <div className="label mb-1.5">Stock ETA</div>
+        <div className="label mb-1">Stock ETA</div>
         <input
           type="date"
           value={draft.stock_eta}
@@ -240,7 +240,7 @@ export function RoutingFields({
     partners.find((p) => p.id === opsAssignedLogistic)?.name ?? null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <div className="flex items-center gap-2 flex-wrap">
         <AreaBadge area={area} />
         {suggestion ? (
@@ -262,7 +262,7 @@ export function RoutingFields({
       </div>
 
       <div>
-        <div className="label mb-1.5">Logistic</div>
+        <div className="label mb-1">Logistic</div>
         {editableRouting ? (
           <div className="flex items-center gap-2 flex-wrap">
             <select
@@ -307,7 +307,7 @@ export function RoutingFields({
       </div>
 
       <div>
-        <div className="label mb-1.5">Delivery date</div>
+        <div className="label mb-1">Delivery date</div>
         {editableRouting ? (
           <input
             type="date"
@@ -342,7 +342,7 @@ export function DeliveryTimeSlotField({ form }: { form: OrderControlForm }) {
   const { draft, set } = form;
   return (
     <div>
-      <div className="label mb-1.5">Delivery time slot</div>
+      <div className="label mb-1">Delivery time slot</div>
       <select
         value={draft.delivery_time_slot}
         onChange={(e) => set("delivery_time_slot", e.target.value)}
@@ -397,7 +397,7 @@ export function PaymentControlFields({
 export function RemarkControlFields({ form }: { form: OrderControlForm }) {
   const { draft, set } = form;
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-2.5">
       <RemarkField
         label="Customer request"
         value={draft.customer_request}
@@ -480,39 +480,34 @@ export function PaymentSummary({ paid, total }: { paid: number; total: number })
   const hasTotal = total > 0;
   const outstanding = Math.max(0, total - paid);
   const settled = hasTotal && outstanding <= 0;
+  const rows: { label: string; value: string; tone: string }[] = [
+    { label: "Total", value: hasTotal ? RM(total) : "—", tone: "text-base-900" },
+    { label: "Paid", value: RM(paid), tone: "text-base-900" },
+    {
+      label: "Outstanding",
+      value: !hasTotal ? "—" : settled ? "Settled" : RM(outstanding),
+      tone: !hasTotal
+        ? "text-base-400"
+        : settled
+          ? "text-success"
+          : "text-primary",
+    },
+  ];
   return (
-    <div
-      className="grid grid-cols-3 gap-2 text-center"
-      data-testid="payment-summary"
-    >
-      <SummaryCell label="Total" value={hasTotal ? RM(total) : "—"} />
-      <SummaryCell label="Paid" value={RM(paid)} />
-      <SummaryCell
-        label="Outstanding"
-        value={!hasTotal ? "—" : settled ? "Settled" : RM(outstanding)}
-        tone={!hasTotal ? "text-base-400" : settled ? "text-success" : "text-primary"}
-      />
-    </div>
-  );
-}
-
-function SummaryCell({
-  label,
-  value,
-  tone = "text-base-900",
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-}) {
-  return (
-    <div className="bg-base-50 border border-base-100 rounded-[4px] py-2 px-1">
-      <div className="text-[9px] uppercase tracking-[0.08em] text-base-500">
-        {label}
-      </div>
-      <div className={`font-mono text-[13px] font-semibold mt-0.5 ${tone}`}>
-        {value}
-      </div>
+    <div data-testid="payment-summary">
+      {rows.map((r) => (
+        <div
+          key={r.label}
+          className="flex items-baseline justify-between gap-3 py-1 border-b border-base-100 last:border-0"
+        >
+          <span className="text-[10px] uppercase tracking-[0.04em] text-base-500">
+            {r.label}
+          </span>
+          <span className={`font-mono text-[12px] font-semibold ${r.tone}`}>
+            {r.value}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -530,7 +525,7 @@ function RemarkField({
 }) {
   return (
     <div>
-      <div className="label mb-1.5">{label}</div>
+      <div className="label mb-1">{label}</div>
       <textarea
         rows={2}
         value={value}

@@ -400,12 +400,12 @@ function DrawerSection({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-base-200 rounded-[4px] bg-white mb-3 overflow-hidden">
+    <div className="border border-base-200 rounded-[4px] bg-white mb-2 overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-base-50"
+        className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-base-50"
       >
         <span className="flex items-center gap-2 min-w-0">
           <span className="text-base-400 shrink-0">{icon}</span>
@@ -423,7 +423,7 @@ function DrawerSection({
         </span>
       </button>
       {open && (
-        <div className="px-3.5 pb-3.5 pt-1 border-t border-base-100">
+        <div className="px-3 pb-2.5 pt-1.5 border-t border-base-100">
           {children}
         </div>
       )}
@@ -492,7 +492,7 @@ function DrawerBody({
     <div className="flex flex-col h-full min-h-0">
       {/* Header — SO + stage + name + an outstanding glance + close, plus the
           stage-gated doc reprints. Fixed; the section stack scrolls below. */}
-      <div className="px-7 pt-5 pb-3.5 border-b border-base-100 shrink-0">
+      <div className="px-5 pt-4 pb-3 border-b border-base-100 shrink-0">
         <div className="flex justify-between items-center gap-3">
           <div className="flex gap-2.5 items-center min-w-0">
             <span className="font-mono text-[12px] text-base-500">#{order.so}</span>
@@ -541,7 +541,7 @@ function DrawerBody({
       </div>
 
       {/* Scrolling section stack — 5 sections, one category each (P5). */}
-      <div className="flex-1 min-h-0 overflow-auto px-7 py-5">
+      <div className="flex-1 min-h-0 overflow-auto px-5 py-4">
         {/* 1 · Order — identity + location + status */}
         <DrawerSection
           icon={<ClipboardList className="w-4 h-4" />}
@@ -549,33 +549,30 @@ function DrawerBody({
           summary={loc.label || order.customer_phone || "—"}
           defaultOpen
         >
-          <div className="grid grid-cols-2 gap-3">
-            <KV
-              label="Phone"
-              value={order.customer_phone ?? <em className="text-base-500">—</em>}
-            />
-            <KV
-              label="Location"
-              value={
-                loc.label ? (
-                  <span
-                    className={loc.area === "Outstation" ? "text-warning font-medium" : ""}
-                  >
-                    {loc.label}
-                    {loc.area === "Outstation" ? " · call first" : ""}
-                  </span>
-                ) : (
-                  <em className="text-base-500">—</em>
-                )
-              }
-            />
-            <KV label="Status" value={order.status} />
-          </div>
-          {order.customer_address && (
-            <div className="text-[11px] text-base-500 mt-3 leading-snug">
-              {order.customer_address}
-            </div>
-          )}
+          <KV
+            label="Phone"
+            value={order.customer_phone ?? <em className="text-base-500">—</em>}
+          />
+          <KV
+            label="Location"
+            value={
+              loc.label ? (
+                <span
+                  className={loc.area === "Outstation" ? "text-warning font-medium" : ""}
+                >
+                  {loc.label}
+                  {loc.area === "Outstation" ? " · call first" : ""}
+                </span>
+              ) : (
+                <em className="text-base-500">—</em>
+              )
+            }
+          />
+          <KV
+            label="Address"
+            value={order.customer_address ?? <em className="text-base-500">—</em>}
+          />
+          <KV label="Status" value={order.status} />
         </DrawerSection>
 
         {/* 2 · Items & stock — every stock fact in one place */}
@@ -585,48 +582,54 @@ function DrawerBody({
           summary={`${totalItems(lines)} item${totalItems(lines) === 1 ? "" : "s"}${shortages.length ? ` · ${shortages.length} short` : ""}`}
           defaultOpen
         >
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <KV
-              label="Source warehouse"
-              value={warehouse?.name ?? <em className="text-base-500">—</em>}
-            />
-            <KV label="Total items" value={String(totalItems(lines))} />
+          <KV
+            label="Source WH"
+            value={warehouse?.name ?? <em className="text-base-500">—</em>}
+          />
+          {/* Line items as a compact sheet: Item · Qty · On hand. On-hand is
+              dropped once Delivered (goods already left this warehouse). */}
+          <table className="w-full text-[12px] mt-2">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-[0.04em] text-base-500 border-b border-base-200">
+                <th className="text-left font-medium py-1">Item</th>
+                <th className="text-right font-medium py-1 w-10">Qty</th>
+                {stage !== "delivered" && (
+                  <th className="text-right font-medium py-1 w-20">On hand</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l) => {
+                const bal = stockBalances.find((b) => b.sku === l.sku);
+                const have = bal
+                  ? Math.max(0, Number(bal.qty) - Number(bal.reserved))
+                  : 0;
+                const ok = have >= l.qty;
+                return (
+                  <tr
+                    key={l.sku}
+                    className="border-b border-base-100 last:border-0 align-top"
+                  >
+                    <td className="py-1 pr-2 font-mono break-all">{l.sku}</td>
+                    <td className="py-1 text-right tabular-nums">{l.qty}</td>
+                    {stage !== "delivered" && (
+                      <td
+                        className={`py-1 text-right font-mono ${ok ? "text-success" : "text-warning"}`}
+                      >
+                        {have}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="mt-3">
+            <StockControlFields form={form} />
           </div>
-          <div className="border border-base-100 rounded-[4px] p-2.5 mb-3.5">
-            {lines.map((l, i) => {
-              const bal = stockBalances.find((b) => b.sku === l.sku);
-              const have = bal ? Math.max(0, Number(bal.qty) - Number(bal.reserved)) : 0;
-              const ok = have >= l.qty;
-              // Once Delivered the on-hand check stops being meaningful (goods
-              // gone from this warehouse), so collapse to just SKU × qty.
-              const showStock = stage !== "delivered";
-              return (
-                <div
-                  key={l.sku}
-                  className={`grid ${showStock ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr]"} gap-3 py-2 items-center ${i ? "border-t border-dashed border-base-100" : ""}`}
-                >
-                  <div className="text-[12px] font-body">
-                    <span className="font-mono">{l.sku}</span> ×{l.qty}
-                  </div>
-                  {showStock && (
-                    <>
-                      <div className={`font-mono text-[11px] ${ok ? "text-success" : "text-warning"}`}>
-                        {have} on hand
-                      </div>
-                      <div
-                        className={`w-[14px] h-[14px] rounded-full ${ok ? "bg-success" : "bg-warning"}`}
-                        aria-label={ok ? "in stock" : "shortage"}
-                      />
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <StockControlFields form={form} />
           {pos.length > 0 && (
-            <div className="mt-3.5">
-              <div className="label mb-1.5">Linked purchase orders</div>
+            <div className="mt-3">
+              <div className="label mb-1">Linked purchase orders</div>
               <div className="border border-base-100 rounded-[4px]">
                 {pos.map((po, i) => (
                   <PoRow key={po.id} po={po} divider={i > 0} />
@@ -685,12 +688,6 @@ function DrawerBody({
             paid={Number(order.paid || 0)}
             total={grandTotal}
           />
-          <div className="flex justify-between mt-3.5 pt-3 border-t border-base-200">
-            <span className="text-[13px] text-base-600">Order total</span>
-            <span className="font-mono text-[16px] font-semibold text-base-900">
-              {RM(grandTotal)}
-            </span>
-          </div>
         </DrawerSection>
 
         {/* 5 · Notes & actions — remarks + case shortcuts + activity (collapsed) */}
@@ -738,7 +735,7 @@ function DrawerBody({
 
       {/* Pinned action bar — stage actions + the control-draft Save, always
           reachable at the drawer bottom (P5). */}
-      <div className="px-7 py-3.5 bg-base-50 border-t border-base-100 shrink-0 flex items-center justify-between gap-3">
+      <div className="px-5 py-3 bg-base-50 border-t border-base-100 shrink-0 flex items-center justify-between gap-3">
         <ActionBar
           stage={stage}
           orderId={order.id}
@@ -802,9 +799,13 @@ function KV({
   value: React.ReactNode;
 }) {
   return (
-    <div>
-      <div className="label mb-1">{label}</div>
-      <div className="text-[13px] text-base-900 font-body">{value}</div>
+    <div className="flex items-baseline gap-3 py-1 border-b border-base-100 last:border-0">
+      <span className="w-24 shrink-0 text-[10px] uppercase tracking-[0.04em] text-base-500">
+        {label}
+      </span>
+      <span className="flex-1 min-w-0 text-[12px] text-base-900 font-body">
+        {value}
+      </span>
     </div>
   );
 }
