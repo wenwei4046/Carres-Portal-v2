@@ -36,7 +36,7 @@ import {
   StockControlFields,
   DeliveryTimeSlotField,
   PaymentControlFields,
-  RemarkControlFields,
+  RemarkControlField,
   OrderControlSaveBar,
 } from "./OrderControlPanel";
 import ServiceNoteModal from "./ServiceNoteModal";
@@ -489,6 +489,8 @@ function DrawerBody({
   const loc = locationForAddress(order.customer_address ?? null);
 
   const form = useOrderControlForm(order.id);
+  const hasMsbf = lines.some((l) => catOf(l.sku) === "msbf");
+  const hasSof = lines.some((l) => catOf(l.sku) === "sof");
   const deadlineSummary = order.delivery_date_tbd
     ? "TBD"
     : order.delivery_date
@@ -505,17 +507,11 @@ function DrawerBody({
       {/* Header — slim title bar: SO · name · status, a ⋮ actions menu, close.
           (Service/export actions + doc reprints all live in the ⋮ menu now.) */}
       <div className="px-5 pt-3.5 pb-3 border-b border-base-100 shrink-0 flex items-center gap-2">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <span className="font-mono text-[12px] text-base-500 shrink-0">
-            #{order.so}
-          </span>
-          <span
-            className={`${cjkClassName(order.customer_name)} text-[15px] font-semibold tracking-[-0.01em] text-base-900 truncate`}
-          >
-            {order.customer_name}
-          </span>
-          <StageChip stage={stage} />
-        </div>
+        <span
+          className={`${cjkClassName(order.customer_name)} text-[15px] font-semibold tracking-[-0.01em] text-base-900 truncate flex-1 min-w-0`}
+        >
+          {order.customer_name}
+        </span>
         <ActionsMenu
           order={order}
           lines={lines}
@@ -534,6 +530,22 @@ function DrawerBody({
 
       {/* Scrolling section stack — 5 sections, one category each (P5). */}
       <div className="flex-1 min-h-0 overflow-auto px-5 py-4">
+        {/* Needs-action banner — the "action for logistic" note surfaced at the
+            top so it can't be missed (Jess). */}
+        {form.draft.action_for_logistic.trim() && (
+          <div className="mb-2 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">
+            <AlertCircle
+              className="w-4 h-4 shrink-0 mt-0.5 text-warning"
+              aria-hidden="true"
+            />
+            <span className="text-base-900">
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.06em] text-warning">
+                Action needed
+              </span>
+              {form.draft.action_for_logistic}
+            </span>
+          </div>
+        )}
         {/* 1 · Order — the full order record as a grid */}
         <DrawerSection
           icon={<ClipboardList className="w-4 h-4" />}
@@ -542,37 +554,65 @@ function DrawerBody({
           summary={order.customer_name}
           defaultOpen
         >
-          <Grid>
-            <KV
-              label="Order ID"
-              value={<span className="font-mono">#{order.so}</span>}
+          <table className="w-full border-collapse">
+            <tbody>
+              <tr>
+                <Kc>Order ID</Kc>
+                <Vc>
+                  <span className="font-mono">#{order.so}</span>
+                </Vc>
+                <Kc>Status</Kc>
+                <Vc>
+                  <StageChip stage={stage} />
+                </Vc>
+              </tr>
+              <tr>
+                <Kc>Customer</Kc>
+                <Vc>{order.customer_name}</Vc>
+                <Kc>Phone</Kc>
+                <Vc>
+                  {order.customer_phone ?? <em className="text-base-500">—</em>}
+                </Vc>
+              </tr>
+              <tr>
+                <Kc>Location</Kc>
+                <Vc colSpan={3}>
+                  {loc.label ? (
+                    <span
+                      className={loc.area === "Outstation" ? "text-warning font-medium" : ""}
+                    >
+                      {loc.label}
+                      {loc.area === "Outstation" ? " · call first" : ""}
+                    </span>
+                  ) : (
+                    <em className="text-base-500">—</em>
+                  )}
+                </Vc>
+              </tr>
+              <tr>
+                <Kc>Address</Kc>
+                <Vc colSpan={3}>
+                  {order.customer_address ?? (
+                    <em className="text-base-500">—</em>
+                  )}
+                </Vc>
+              </tr>
+            </tbody>
+          </table>
+          <div className="mt-2.5 space-y-2.5">
+            <RemarkControlField
+              form={form}
+              field="customer_request"
+              label="Customer request"
+              placeholder="e.g. postponed to end of May"
             />
-            <KV label="Status" value={order.status} />
-            <KV label="Customer" value={order.customer_name} />
-            <KV
-              label="Phone"
-              value={order.customer_phone ?? <em className="text-base-500">—</em>}
+            <RemarkControlField
+              form={form}
+              field="carres_remark"
+              label="Carres remark"
+              placeholder="Internal note"
             />
-            <KV
-              label="Location"
-              value={
-                loc.label ? (
-                  <span
-                    className={loc.area === "Outstation" ? "text-warning font-medium" : ""}
-                  >
-                    {loc.label}
-                    {loc.area === "Outstation" ? " · call first" : ""}
-                  </span>
-                ) : (
-                  <em className="text-base-500">—</em>
-                )
-              }
-            />
-            <KV
-              label="Address"
-              value={order.customer_address ?? <em className="text-base-500">—</em>}
-            />
-          </Grid>
+          </div>
         </DrawerSection>
 
         {/* Items & stock + Delivery sit 2-up to cut vertical scroll. */}
@@ -589,14 +629,14 @@ function DrawerBody({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-500 px-2 py-1">
+                <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1">
                   Item
                 </th>
-                <th className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-500 px-2 py-1 w-10">
+                <th className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-10">
                   Qty
                 </th>
                 {stage !== "delivered" && (
-                  <th className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-500 px-2 py-1 w-16">
+                  <th className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-16">
                     On hand
                   </th>
                 )}
@@ -640,6 +680,14 @@ function DrawerBody({
           <div className="mt-2.5">
             <StockControlFields form={form} />
           </div>
+          <div className="mt-2.5">
+            <RemarkControlField
+              form={form}
+              field="warehouse_remark"
+              label="Warehouse remark"
+              placeholder="Note for the warehouse team"
+            />
+          </div>
           {pos.length > 0 && (
             <div className="mt-2.5">
               <div className="label mb-1">Linked POs</div>
@@ -679,7 +727,12 @@ function DrawerBody({
             <DeliveryTimeSlotField form={form} />
           </div>
           <div className="mt-2.5">
-            <RemarkControlFields form={form} />
+            <RemarkControlField
+              form={form}
+              field="action_for_logistic"
+              label="Action for logistic"
+              placeholder="e.g. call customer before delivery"
+            />
           </div>
           <details className="mt-2.5" open={(order.delivery_stops?.length ?? 0) > 0}>
             <summary className="label cursor-pointer select-none">
@@ -710,6 +763,8 @@ function DrawerBody({
             form={form}
             paid={Number(order.paid || 0)}
             total={grandTotal}
+            hasMsbf={hasMsbf}
+            hasSof={hasSof}
           />
         </DrawerSection>
 
@@ -759,23 +814,36 @@ function addonsSum(
   );
 }
 
-/** One grid row inside a <Grid> — label cell + value cell with full cell
- *  borders (the spreadsheet look). */
-function KV({
-  label,
-  value,
+/** Grid cells (spreadsheet look) — label cell (darker for readability) + value
+ *  cell, both fully bordered. Kc/Vc compose into 1- or 2-up grid rows. */
+function Kc({ children }: { children: ReactNode }) {
+  return (
+    <td className="border border-base-200 bg-base-50 text-base-700 text-[10px] font-semibold uppercase tracking-[0.04em] px-2 py-1 align-top whitespace-nowrap">
+      {children}
+    </td>
+  );
+}
+function Vc({
+  children,
+  colSpan,
 }: {
-  label: string;
-  value: React.ReactNode;
+  children: ReactNode;
+  colSpan?: number;
 }) {
   return (
+    <td
+      colSpan={colSpan}
+      className="border border-base-200 text-[12px] text-base-900 font-body px-2 py-1 align-top break-words"
+    >
+      {children}
+    </td>
+  );
+}
+function KV({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
     <tr>
-      <td className="border border-base-200 bg-base-50 text-base-500 text-[10px] uppercase tracking-[0.04em] px-2 py-1 align-top whitespace-nowrap w-[34%]">
-        {label}
-      </td>
-      <td className="border border-base-200 text-[12px] text-base-900 font-body px-2 py-1 align-top break-words">
-        {value}
-      </td>
+      <Kc>{label}</Kc>
+      <Vc>{value}</Vc>
     </tr>
   );
 }
@@ -787,6 +855,20 @@ function Grid({ children }: { children: ReactNode }) {
       <tbody>{children}</tbody>
     </table>
   );
+}
+
+/** Storage-scope category (mirrors OperationPayments.catOf): MS/BF vs SOF. */
+function catOf(sku: string): "msbf" | "sof" | "other" {
+  const s = sku.trim().toLowerCase();
+  if (
+    s.startsWith("mattress:") ||
+    s.startsWith("bedframe:") ||
+    /^ms\d/.test(s) ||
+    /^bf\d/.test(s)
+  )
+    return "msbf";
+  if (s.startsWith("sofa:") || /^(sof|sf)\d/.test(s)) return "sof";
+  return "other";
 }
 
 /** Client-side CSV (opens in Excel) of the order — the ⋮ Download Excel item. */

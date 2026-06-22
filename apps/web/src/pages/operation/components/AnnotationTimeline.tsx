@@ -158,7 +158,7 @@ function AddAnnotationForm({ orderId }: { orderId: string }) {
           onChange={(e) => setTag(e.target.value as AnnotationTag | "")}
           className="text-[11px] border border-base-200 rounded-[4px] px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-accent"
         >
-          <option value="">No tag</option>
+          <option value="">General note · no action</option>
           <option value="follow_up">🔔 Follow up</option>
           <option value="escalate">🚨 Escalate to Jess</option>
           <option value="resolved">✅ Resolved</option>

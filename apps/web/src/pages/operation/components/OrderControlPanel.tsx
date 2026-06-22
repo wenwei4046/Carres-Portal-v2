@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  computeStorageFee,
   DELIVERY_TIME_SLOTS,
   PAYMENT_STATUSES,
   STOCK_LOCATIONS,
@@ -73,6 +74,9 @@ export interface OrderControlForm {
   reset: () => void;
   /** Count of filled remark fields — drives the Notes section summary. */
   remarkCount: number;
+  /** Storage-fee inputs from the control overlay (migration 0165). */
+  storageFrom: string | null;
+  storageOverride: number | null;
 }
 
 export function useOrderControlForm(orderId: string): OrderControlForm {
@@ -147,6 +151,11 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
     submit,
     reset: () => setDraft(loaded),
     remarkCount,
+    storageFrom: data?.control?.storage_from ?? null,
+    storageOverride:
+      data?.control?.storage_fee_override != null
+        ? Number(data.control.storage_fee_override)
+        : null,
   };
 }
 
@@ -364,15 +373,39 @@ export function PaymentControlFields({
   form,
   paid,
   total,
+  hasMsbf = false,
+  hasSof = false,
 }: {
   form: OrderControlForm;
   paid: number;
   total: number;
+  hasMsbf?: boolean;
+  hasSof?: boolean;
 }) {
   const { draft, set } = form;
+  const today = new Date().toISOString().slice(0, 10);
+  const storage = computeStorageFee({
+    startDate: form.storageFrom,
+    asOf: today,
+    hasMsbf,
+    hasSof,
+  });
+  const storageVal =
+    form.storageOverride != null ? form.storageOverride : storage.total;
+  const showStorage = form.storageFrom != null || form.storageOverride != null;
   return (
     <div>
       <PaymentSummary paid={paid} total={total} />
+      {showStorage && (
+        <div className="flex items-baseline justify-between gap-3 py-1 border-b border-base-100">
+          <span className="text-[10px] uppercase tracking-[0.04em] text-base-500">
+            Storage fee{form.storageOverride != null ? " (set)" : ""}
+          </span>
+          <span className="font-mono text-[12px] font-semibold text-base-900">
+            {storageVal > 0 ? RM(storageVal) : "—"}
+          </span>
+        </div>
+      )}
       <div className="mt-2.5">
         <div className="label mb-1">Follow-up status</div>
         <select
@@ -423,6 +456,34 @@ export function RemarkControlFields({ form }: { form: OrderControlForm }) {
         placeholder="Note for the warehouse team"
       />
     </div>
+  );
+}
+
+/** A single remark field, placed in its own related panel (P5 v3): customer
+ *  request → Order · action for logistic → Delivery · warehouse remark →
+ *  Items & stock. All share the one form draft + one Save. */
+export function RemarkControlField({
+  form,
+  field,
+  label,
+  placeholder,
+}: {
+  form: OrderControlForm;
+  field:
+    | "customer_request"
+    | "action_for_logistic"
+    | "carres_remark"
+    | "warehouse_remark";
+  label: string;
+  placeholder?: string;
+}) {
+  return (
+    <RemarkField
+      label={label}
+      value={form.draft[field]}
+      onChange={(v) => form.set(field, v)}
+      placeholder={placeholder}
+    />
   );
 }
 

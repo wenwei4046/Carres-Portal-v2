@@ -156,7 +156,7 @@
     @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-primary;
   }
   .label {
-    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-base-500;
+    @apply text-[11px] font-semibold uppercase tracking-[0.1em] text-base-700;
   }
 
   /* Proto card surface — white fill + thin warm-grey hairline + 6px radius
