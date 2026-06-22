@@ -1,4 +1,12 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
+import {
+  Banknote,
+  ChevronDown,
+  ClipboardList,
+  Package,
+  StickyNote,
+  Truck,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -17,7 +25,15 @@ import { locationForAddress } from "@/lib/region";
 import { useAuth } from "@/lib/auth";
 import AnnotationTimeline from "./AnnotationTimeline";
 import DeliveryChain from "./DeliveryChain";
-import OrderControlPanel from "./OrderControlPanel";
+import {
+  useOrderControlForm,
+  RoutingFields,
+  StockControlFields,
+  DeliveryTimeSlotField,
+  PaymentControlFields,
+  RemarkControlFields,
+  OrderControlSaveBar,
+} from "./OrderControlPanel";
 import ServiceNoteModal from "./ServiceNoteModal";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
@@ -28,7 +44,6 @@ import AbandonOrderModal from "./AbandonOrderModal";
 import ConfirmProceedDialog from "./ConfirmProceedDialog";
 import TransferReadyDialog from "./TransferReadyDialog";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
-import { SectionHead } from "./Modal";
 
 /**
  * OrderDetailDrawer — slide-in panel from the right edge that shows full
@@ -194,7 +209,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label="Order detail"
-        className="bg-card text-card-foreground border border-base-200 rounded-none overflow-auto h-screen"
+        className="bg-card text-card-foreground border border-base-200 rounded-none flex flex-col h-screen"
         style={{ width: 560, maxWidth: "100vw" }}
         data-testid="order-detail-drawer"
       >
@@ -368,6 +383,54 @@ interface DrawerBodyProps {
   onTopUpClick: () => void;
 }
 
+/** Collapsible drawer section — title + leading icon + a summary value that
+ *  shows when collapsed, so a folded section still reads at a glance (P5). */
+function DrawerSection({
+  icon,
+  title,
+  summary,
+  defaultOpen = false,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  summary?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border border-base-200 rounded-[4px] bg-white mb-3 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-base-50"
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="text-base-400 shrink-0">{icon}</span>
+          <span className="t-h4 text-base-900">{title}</span>
+        </span>
+        <span className="flex items-center gap-2 shrink-0">
+          {!open && summary != null && (
+            <span className="text-[11px] text-base-500 truncate max-w-[180px]">
+              {summary}
+            </span>
+          )}
+          <ChevronDown
+            className={`w-4 h-4 text-base-400 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </span>
+      </button>
+      {open && (
+        <div className="px-3.5 pb-3.5 pt-1 border-t border-base-100">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DrawerBody({
   data,
   onClose,
@@ -413,13 +476,23 @@ function DrawerBody({
   const hasTotal = grandTotal > 0;
   const loc = locationForAddress(order.customer_address ?? null);
 
+  const form = useOrderControlForm(order.id);
+  const deadlineSummary = order.delivery_date_tbd
+    ? "TBD"
+    : order.delivery_date
+      ? fmtDate(order.delivery_date)
+      : "no date";
+  const paymentSummary = !hasTotal
+    ? `${RM(Number(order.paid || 0))} paid`
+    : outstanding <= 0
+      ? "Settled"
+      : `${RM(outstanding)} owing`;
+
   return (
-    <>
-      {/* Header — SO + stage, customer, and the OUTSTANDING balance pill up top
-          (Loo) so "who owes" is the first thing you see. Phone / location /
-          deadline / address live here now; the old separate Delivery section is
-          gone (dedupe). Stage-gated doc reprints sit in their own row below. */}
-      <div className="px-7 pt-5 pb-3.5 border-b border-base-100">
+    <div className="flex flex-col h-full min-h-0">
+      {/* Header — SO + stage + name + an outstanding glance + close, plus the
+          stage-gated doc reprints. Fixed; the section stack scrolls below. */}
+      <div className="px-7 pt-5 pb-3.5 border-b border-base-100 shrink-0">
         <div className="flex justify-between items-center gap-3">
           <div className="flex gap-2.5 items-center min-w-0">
             <span className="font-mono text-[12px] text-base-500">#{order.so}</span>
@@ -436,36 +509,10 @@ function DrawerBody({
         </div>
 
         <div className="flex items-start justify-between gap-3 mt-1.5">
-          <div className="min-w-0">
-            <div
-              className={`${cjkClassName(order.customer_name)} text-[20px] font-semibold tracking-[-0.02em] text-base-900`}
-            >
-              {order.customer_name}
-            </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[12px] text-base-600">
-              {order.customer_phone && <span>{order.customer_phone}</span>}
-              {loc.label && (
-                <span
-                  className={
-                    loc.area === "Outstation" ? "text-warning font-medium" : ""
-                  }
-                >
-                  {loc.label}
-                  {loc.area === "Outstation" ? " · call first" : ""}
-                </span>
-              )}
-              <span>
-                Deadline{" "}
-                <span className="font-medium text-base-900">
-                  {order.delivery_date_tbd ? "TBD" : fmtDate(order.delivery_date)}
-                </span>
-              </span>
-            </div>
-            {order.customer_address && (
-              <div className="text-[11px] text-base-500 mt-1 leading-snug">
-                {order.customer_address}
-              </div>
-            )}
+          <div
+            className={`${cjkClassName(order.customer_name)} text-[20px] font-semibold tracking-[-0.02em] text-base-900 min-w-0 truncate`}
+          >
+            {order.customer_name}
           </div>
           <BalancePill outstanding={outstanding} hasTotal={hasTotal} />
         </div>
@@ -493,40 +540,65 @@ function DrawerBody({
         </div>
       </div>
 
-      {/* Action bar — depends on stage */}
-      <div className="px-7 py-4 bg-base-50 border-b border-base-100">
-        <ActionBar
-          stage={stage}
-          orderId={order.id}
-          so={order.so}
-          warehouseName={warehouse?.name ?? null}
-          shortageCount={shortages.length}
-          partnerAssigned={anyThreadPartnerAssigned}
-          doNumber={order.do_number}
-          onDispatchClick={onDispatchClick}
-          onDOClick={onDOClick}
-          onIssuePOsClick={onIssuePOsClick}
-          onAbandonClick={onAbandonClick}
-          onConfirmProceedClick={onConfirmProceedClick}
-          onTransferReadyClick={onTransferReadyClick}
-          onTopUpClick={onTopUpClick}
-        />
-      </div>
+      {/* Scrolling section stack — 5 sections, one category each (P5). */}
+      <div className="flex-1 min-h-0 overflow-auto px-7 py-5">
+        {/* 1 · Order — identity + location + status */}
+        <DrawerSection
+          icon={<ClipboardList className="w-4 h-4" />}
+          title="Order"
+          summary={loc.label || order.customer_phone || "—"}
+          defaultOpen
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <KV
+              label="Phone"
+              value={order.customer_phone ?? <em className="text-base-500">—</em>}
+            />
+            <KV
+              label="Location"
+              value={
+                loc.label ? (
+                  <span
+                    className={loc.area === "Outstation" ? "text-warning font-medium" : ""}
+                  >
+                    {loc.label}
+                    {loc.area === "Outstation" ? " · call first" : ""}
+                  </span>
+                ) : (
+                  <em className="text-base-500">—</em>
+                )
+              }
+            />
+            <KV label="Status" value={order.status} />
+          </div>
+          {order.customer_address && (
+            <div className="text-[11px] text-base-500 mt-3 leading-snug">
+              {order.customer_address}
+            </div>
+          )}
+        </DrawerSection>
 
-      <div className="p-7">
-        {/* Stock & warehouse */}
-        <SectionHead>Stock &amp; warehouse</SectionHead>
-        <div className="bg-white border border-base-200 rounded-[4px] p-3.5 mb-4 grid grid-cols-2 gap-3">
-          <KV label="Source warehouse" value={warehouse?.name ?? <em className="text-base-500">—</em>} />
-          <KV label="Total items" value={String(totalItems(lines))} />
-          <div className="col-span-2">
+        {/* 2 · Items & stock — every stock fact in one place */}
+        <DrawerSection
+          icon={<Package className="w-4 h-4" />}
+          title="Items & stock"
+          summary={`${totalItems(lines)} item${totalItems(lines) === 1 ? "" : "s"}${shortages.length ? ` · ${shortages.length} short` : ""}`}
+          defaultOpen
+        >
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <KV
+              label="Source warehouse"
+              value={warehouse?.name ?? <em className="text-base-500">—</em>}
+            />
+            <KV label="Total items" value={String(totalItems(lines))} />
+          </div>
+          <div className="border border-base-100 rounded-[4px] p-2.5 mb-3.5">
             {lines.map((l, i) => {
               const bal = stockBalances.find((b) => b.sku === l.sku);
               const have = bal ? Math.max(0, Number(bal.qty) - Number(bal.reserved)) : 0;
               const ok = have >= l.qty;
-              // Once the order is Delivered the on-hand check stops being
-              // meaningful (goods are gone from this warehouse already), so
-              // collapse the line row to just SKU × qty.
+              // Once Delivered the on-hand check stops being meaningful (goods
+              // gone from this warehouse), so collapse to just SKU × qty.
               const showStock = stage !== "delivered";
               return (
                 <div
@@ -551,47 +623,27 @@ function DrawerBody({
               );
             })}
           </div>
-        </div>
-
-        {/* Linked POs */}
-        {pos.length > 0 && (
-          <>
-            <SectionHead>Linked purchase orders</SectionHead>
-            <div className="bg-white border border-base-200 rounded-[4px] mb-4">
-              {pos.map((po, i) => (
-                <PoRow key={po.id} po={po} divider={i > 0} />
-              ))}
+          <StockControlFields form={form} />
+          {pos.length > 0 && (
+            <div className="mt-3.5">
+              <div className="label mb-1.5">Linked purchase orders</div>
+              <div className="border border-base-100 rounded-[4px]">
+                {pos.map((po, i) => (
+                  <PoRow key={po.id} po={po} divider={i > 0} />
+                ))}
+              </div>
             </div>
-          </>
-        )}
+          )}
+        </DrawerSection>
 
-        {/* Multi-leg delivery chain (γ architecture · migration 0156) — a rare
-            cross-state / cross-border handoff feature (KL→JB→SG). Collapsed by
-            default so it stops cluttering the common single-leg flow + stops the
-            "Set up shows nothing" confusion on partner-less orders; auto-opens
-            only when an order actually has legs set. */}
-        <details className="mb-4" open={(order.delivery_stops?.length ?? 0) > 0}>
-          <summary className="label cursor-pointer select-none">
-            Advanced · multi-leg route{" "}
-            <span className="text-[10px] font-normal normal-case tracking-normal text-base-400">
-              (cross-state / cross-border only)
-            </span>
-          </summary>
-          <div className="mt-2">
-            <DeliveryChain
-              orderId={order.id}
-              stops={order.delivery_stops}
-              fallbackPartnerId={order.delivery_partner_id}
-            />
-          </div>
-        </details>
-
-        {/* Editable control overlay — the "Master Sheet, live" fields (P2 ·
-            migration 0159). Stock location/ETA + 4 remark fields + payment
-            status, plus a region-derived carrier suggestion. */}
-        <SectionHead>Order control</SectionHead>
-        <div className="mb-4">
-          <OrderControlPanel
+        {/* 3 · Delivery — carrier + date + slot + the nested multi-leg route */}
+        <DrawerSection
+          icon={<Truck className="w-4 h-4" />}
+          title="Delivery"
+          summary={deadlineSummary}
+          defaultOpen
+        >
+          <RoutingFields
             orderId={order.id}
             customerAddress={order.customer_address ?? null}
             status={order.status}
@@ -599,57 +651,113 @@ function DrawerBody({
             deliveryDateTbd={order.delivery_date_tbd}
             opsAssignedLogistic={order.ops_assigned_logistic ?? null}
             deliveryPartnerId={order.delivery_partner_id}
-            paid={order.paid}
-            orderTotal={total + addonsSum(addons)}
           />
-        </div>
+          <div className="mt-3">
+            <DeliveryTimeSlotField form={form} />
+          </div>
+          {/* Multi-leg chain (γ · migration 0156) — nested under Delivery where
+              it belongs; collapsed unless the order actually has legs set. */}
+          <details className="mt-3.5" open={(order.delivery_stops?.length ?? 0) > 0}>
+            <summary className="label cursor-pointer select-none">
+              Advanced · multi-leg route{" "}
+              <span className="text-[10px] font-normal normal-case tracking-normal text-base-400">
+                (cross-state / cross-border only)
+              </span>
+            </summary>
+            <div className="mt-2">
+              <DeliveryChain
+                orderId={order.id}
+                stops={order.delivery_stops}
+                fallbackPartnerId={order.delivery_partner_id}
+              />
+            </div>
+          </details>
+        </DrawerSection>
 
-        {/* Cases — quick-create linked to this order by SO# (P2). Service Note
-            is operation-owned + auto-fills from the order; Refund lives in
-            Finance; Issue needs the ops_issues table (not built yet). */}
-        <SectionHead>Cases</SectionHead>
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            type="button"
-            onClick={onServiceNoteClick}
-            className="btn-secondary text-[12px]"
-          >
-            + Service Note
-          </button>
-          <button
-            type="button"
-            disabled
-            title="Refunds are created in Finance → Refunds"
-            className="btn-secondary text-[12px] opacity-50 cursor-not-allowed"
-          >
-            + Refund
-          </button>
-          <button
-            type="button"
-            disabled
-            title="Issues module coming — needs the ops_issues table"
-            className="btn-secondary text-[12px] opacity-50 cursor-not-allowed"
-          >
-            + Issue
-          </button>
-        </div>
+        {/* 4 · Payment — every money fact in one place (collapsed by default) */}
+        <DrawerSection
+          icon={<Banknote className="w-4 h-4" />}
+          title="Payment"
+          summary={paymentSummary}
+        >
+          <PaymentControlFields
+            form={form}
+            paid={Number(order.paid || 0)}
+            total={grandTotal}
+          />
+          <div className="flex justify-between mt-3.5 pt-3 border-t border-base-200">
+            <span className="text-[13px] text-base-600">Order total</span>
+            <span className="font-mono text-[16px] font-semibold text-base-900">
+              {RM(grandTotal)}
+            </span>
+          </div>
+        </DrawerSection>
 
-        {/* Annotations + activity timeline (Phase B) — capped + scrollable so a
-            long history doesn't stretch the drawer to the floor (Loo). */}
-        <SectionHead>Notes &amp; activity</SectionHead>
-        <div className="max-h-[300px] overflow-auto pr-1 -mr-1">
-          <AnnotationTimeline orderId={order.id} />
-        </div>
-
-        {/* Total */}
-        <div className="flex justify-between mt-4 py-3.5 border-t border-base-200">
-          <span className="text-[13px] text-base-600">Order total</span>
-          <span className="font-mono text-[18px] font-semibold text-base-900">
-            {RM(total + addonsSum(addons))}
-          </span>
-        </div>
+        {/* 5 · Notes & actions — remarks + case shortcuts + activity (collapsed) */}
+        <DrawerSection
+          icon={<StickyNote className="w-4 h-4" />}
+          title="Notes & actions"
+          summary={
+            form.remarkCount
+              ? `${form.remarkCount} remark${form.remarkCount === 1 ? "" : "s"}`
+              : "—"
+          }
+        >
+          <RemarkControlFields form={form} />
+          <div className="flex flex-wrap gap-2 mt-3.5">
+            <button
+              type="button"
+              onClick={onServiceNoteClick}
+              className="btn-secondary text-[12px]"
+            >
+              + Service Note
+            </button>
+            <button
+              type="button"
+              disabled
+              title="Refunds are created in Finance → Refunds"
+              className="btn-secondary text-[12px] opacity-50 cursor-not-allowed"
+            >
+              + Refund
+            </button>
+            <button
+              type="button"
+              disabled
+              title="Issues module coming — needs the ops_issues table"
+              className="btn-secondary text-[12px] opacity-50 cursor-not-allowed"
+            >
+              + Issue
+            </button>
+          </div>
+          <div className="label mt-4 mb-1.5">Activity</div>
+          <div className="max-h-[280px] overflow-auto pr-1 -mr-1">
+            <AnnotationTimeline orderId={order.id} />
+          </div>
+        </DrawerSection>
       </div>
-    </>
+
+      {/* Pinned action bar — stage actions + the control-draft Save, always
+          reachable at the drawer bottom (P5). */}
+      <div className="px-7 py-3.5 bg-base-50 border-t border-base-100 shrink-0 flex items-center justify-between gap-3">
+        <ActionBar
+          stage={stage}
+          orderId={order.id}
+          so={order.so}
+          warehouseName={warehouse?.name ?? null}
+          shortageCount={shortages.length}
+          partnerAssigned={anyThreadPartnerAssigned}
+          doNumber={order.do_number}
+          onDispatchClick={onDispatchClick}
+          onDOClick={onDOClick}
+          onIssuePOsClick={onIssuePOsClick}
+          onAbandonClick={onAbandonClick}
+          onConfirmProceedClick={onConfirmProceedClick}
+          onTransferReadyClick={onTransferReadyClick}
+          onTopUpClick={onTopUpClick}
+        />
+        <OrderControlSaveBar form={form} />
+      </div>
+    </div>
   );
 }
 
