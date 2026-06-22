@@ -1159,7 +1159,7 @@ function OrderRow({
       >
         <div className="font-mono font-semibold text-base-900">SO-{o.so}</div>
         <div
-          className={`${cjkClassName(o.customer_name)} text-[12px] font-medium text-base-700 max-w-[200px] truncate mt-0.5`}
+          className={`${cjkClassName(o.customer_name)} text-[11px] font-medium text-base-700 max-w-[200px] truncate mt-0.5`}
         >
           {o.customer_name || "—"}
         </div>
