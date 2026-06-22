@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FileText } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/pdf/render";
@@ -46,7 +47,7 @@ interface Props {
   orderId: string;
   so: number;
   role: Role;
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "menuitem";
   className?: string;
 }
 
@@ -78,6 +79,24 @@ export default function DownloadInvoiceButton({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Google-Sheets-style menu row (uniform with the other ⋮ actions).
+  if (variant === "menuitem") {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={busy}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 disabled:opacity-40 text-base-900"
+        data-testid={`download-invoice-${so}`}
+      >
+        <span className="text-base-500 shrink-0">
+          <FileText className="w-4 h-4" />
+        </span>
+        {busy ? "Opening…" : "Invoice PDF"}
+      </button>
+    );
   }
 
   const baseCls =

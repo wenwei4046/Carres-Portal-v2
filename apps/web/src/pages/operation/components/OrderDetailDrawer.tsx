@@ -988,39 +988,39 @@ function ActionsMenu({
               disabled
               title="Issues module coming — needs the ops_issues table"
             />
-            <div className="border-t border-base-100 px-3 py-2 flex flex-col gap-1.5">
-              {role && (
-                <DownloadSalesOrderButton
+            <div className="border-t border-base-100 my-0.5" />
+            <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-base-400">
+              Documents
+            </div>
+            {role && (
+              <DownloadSalesOrderButton
+                orderId={order.id}
+                so={order.so}
+                role={role}
+                variant="menuitem"
+              />
+            )}
+            {role &&
+              (stage === "dispatched" || stage === "delivered") &&
+              order.invoice_no && (
+                <DownloadInvoiceButton
                   orderId={order.id}
                   so={order.so}
                   role={role}
-                  variant="secondary"
+                  variant="menuitem"
                 />
               )}
-              {role &&
-                (stage === "dispatched" || stage === "delivered") &&
-                order.invoice_no && (
-                  <DownloadInvoiceButton
-                    orderId={order.id}
-                    so={order.so}
-                    role={role}
-                    variant="secondary"
-                  />
-                )}
-              {order.do_number && (
-                <PrintDoButton orderId={order.id} doNumber={order.do_number} />
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  downloadOrderCsv(order, lines);
-                }}
-                className="btn-secondary text-[12px] flex items-center justify-center gap-1.5"
-              >
-                <Download className="w-3.5 h-3.5" /> Download Excel
-              </button>
-            </div>
+            {order.do_number && (
+              <PrintDoButton orderId={order.id} doNumber={order.do_number} />
+            )}
+            <MenuItem
+              icon={<Download className="w-4 h-4" />}
+              label="Download Excel"
+              onClick={() => {
+                setOpen(false);
+                downloadOrderCsv(order, lines);
+              }}
+            />
           </div>
         </>
       )}
@@ -1311,8 +1311,11 @@ function PrintDoButton({
       type="button"
       onClick={open}
       disabled={pending}
-      className="btn-secondary text-[11px] py-1.5 px-3 disabled:opacity-50"
+      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 disabled:opacity-40 text-base-900"
     >
+      <span className="text-base-500 shrink-0">
+        <FileText className="w-4 h-4" />
+      </span>
       {pending ? "Opening…" : "Print DO"}
     </button>
   );
