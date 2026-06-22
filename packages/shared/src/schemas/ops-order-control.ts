@@ -73,6 +73,12 @@ export const opsOrderControlSchema = z.object({
   balance: dbNumeric,
   storage_from: isoDate.nullable(),
   storage_fee_override: dbNumeric,
+  /** Drawer Master-Sheet redesign (migration 0167): the logistic's committed
+   *  delivery date (vs orders.delivery_date = customer deadline), the keyed
+   *  amount paid (partial-payment support), and a storage-fee paid status. */
+  logistic_eta: isoDate.nullable(),
+  paid_amount: dbNumeric,
+  storage_paid: z.string().nullable(),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
 });
@@ -136,6 +142,9 @@ export const updateOpsOrderControlInput = z
     balance: z.number().min(0).max(99_999_999).nullable(),
     storage_from: isoDate.nullable(),
     storage_fee_override: z.number().min(0).max(99_999_999).nullable(),
+    logistic_eta: isoDate.nullable(),
+    paid_amount: z.number().min(0).max(99_999_999).nullable(),
+    storage_paid: z.string().max(100).nullable(),
   })
   .partial()
   .strict();

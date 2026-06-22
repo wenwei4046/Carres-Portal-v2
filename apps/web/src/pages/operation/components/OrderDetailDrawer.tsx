@@ -393,11 +393,14 @@ interface DrawerBodyProps {
 
 /** Collapsible drawer section — title + leading icon + a summary value that
  *  shows when collapsed, so a folded section still reads at a glance (P5). */
-const SECTION_ACCENT: Record<string, { bar: string; icon: string }> = {
-  neutral: { bar: "border-l-base-300", icon: "text-base-400" },
-  warning: { bar: "border-l-warning", icon: "text-warning" },
-  success: { bar: "border-l-success", icon: "text-success" },
-  info: { bar: "border-l-info", icon: "text-info" },
+const SECTION_ACCENT: Record<
+  string,
+  { bar: string; icon: string; head: string }
+> = {
+  neutral: { bar: "border-l-base-300", icon: "text-base-400", head: "bg-base-50" },
+  warning: { bar: "border-l-warning", icon: "text-warning", head: "bg-warning/10" },
+  success: { bar: "border-l-success", icon: "text-success", head: "bg-success/10" },
+  info: { bar: "border-l-info", icon: "text-info", head: "bg-info/10" },
 };
 
 function DrawerSection({
@@ -425,7 +428,7 @@ function DrawerSection({
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-base-50"
+        className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-left ${a.head} hover:brightness-[0.97]`}
       >
         <span className="flex items-center gap-2 min-w-0">
           <span className={`${a.icon} shrink-0`}>{icon}</span>

@@ -69,8 +69,7 @@ describe("Order-control form pieces — split field groups", () => {
   it("shows Total / Paid / Outstanding from real order money while owing", () => {
     renderPieces({ paid: 500, total: 2000 });
     const summary = screen.getByTestId("payment-summary");
-    expect(within(summary).getByText("Total")).toBeInTheDocument();
-    expect(within(summary).getByText("RM 2,000")).toBeInTheDocument();
+    expect(within(summary).getByText("Bill")).toBeInTheDocument();
     expect(within(summary).getByText("RM 500")).toBeInTheDocument();
     // Outstanding = 2000 - 500 = 1500, still owing.
     expect(within(summary).getByText("RM 1,500")).toBeInTheDocument();

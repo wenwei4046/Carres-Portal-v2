@@ -63,9 +63,11 @@ const RM = (n: number) => `RM ${Math.round(Number(n) || 0).toLocaleString()}`;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Borderless control that fills a grid cell (the cell supplies the border). */
+/** Editable control inside a grid cell — a visible bordered box so the operator
+ *  can tell at a glance the cell is editable (Jess: every cell should look
+ *  editable). Selects keep their native arrow. */
 const CELL =
-  "w-full border-0 bg-transparent px-2 py-1.5 text-[12px] text-base-900 outline-none focus:bg-base-50";
+  "w-full border border-base-300 rounded-[3px] bg-white px-2 py-1 text-[12px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20";
 
 /** One spreadsheet row — label cell + value/control cell, fully bordered.
  *  Field groups render FieldRows; the panel wraps them in a FieldGrid so every
@@ -307,7 +309,7 @@ export function RoutingFields({
             onChange={(e) =>
               setLogistic.mutate({ deliveryPartnerId: e.target.value || null })
             }
-            className="flex-1 min-w-[110px] border-0 bg-transparent text-[12px] py-1 outline-none disabled:opacity-50"
+            className={`${CELL} flex-1 min-w-[110px] disabled:opacity-50`}
           >
             <option value="">— pick carrier —</option>
             {partners.map((p) => (
@@ -332,7 +334,7 @@ export function RoutingFields({
         </div>
       </FieldRow>
 
-      <FieldRow label="Delivery date">
+      <FieldRow label="Deadline">
         <input
           type="date"
           defaultValue={deliveryDate ?? ""}
@@ -382,45 +384,37 @@ export function PaymentControlFields({
   total: number;
 }) {
   const { draft, set } = form;
-  const hasTotal = total > 0;
-  const outstanding = Math.max(0, total - paid);
-  const settled = hasTotal && outstanding <= 0;
+  // Bill = operator-keyed invoice / owing amount (balance); falls back to the
+  // computed line total for native orders. Outstanding = Bill − Paid.
+  const bill = draft.balance.trim() ? Number(draft.balance) : total;
+  const hasBill = bill > 0;
+  const outstanding = Math.max(0, bill - paid);
+  const settled = hasBill && outstanding <= 0;
   return (
-    <>
-      <div data-testid="payment-summary">
-        <FieldRow label="Total">
-          <div className="px-2 py-1.5 font-mono text-[12px] font-semibold text-base-900">
-            {hasTotal ? RM(total) : "—"}
-          </div>
-        </FieldRow>
-        <FieldRow label="Paid">
-          <div className="px-2 py-1.5 font-mono text-[12px] font-semibold text-base-900">
-            {RM(paid)}
-          </div>
-        </FieldRow>
-        <FieldRow label="Outstanding">
-          <div
-            className={`px-2 py-1.5 font-mono text-[12px] font-semibold ${
-              !hasTotal
-                ? "text-base-400"
-                : settled
-                  ? "text-success"
-                  : "text-primary"
-            }`}
-          >
-            {!hasTotal ? "—" : settled ? "Settled" : RM(outstanding)}
-          </div>
-        </FieldRow>
-      </div>
-      <FieldRow label="Balance">
+    <div data-testid="payment-summary">
+      <FieldRow label="Bill">
         <input
           type="number"
           min={0}
           value={draft.balance}
           onChange={(e) => set("balance", e.target.value)}
-          placeholder="key owing (from invoice)"
+          placeholder={total > 0 ? `${total} (from items)` : "key invoice total"}
           className={CELL}
         />
+      </FieldRow>
+      <FieldRow label="Paid">
+        <div className="px-2 py-1.5 font-mono text-[12px] font-semibold text-base-900">
+          {RM(paid)}
+        </div>
+      </FieldRow>
+      <FieldRow label="Outstanding">
+        <div
+          className={`px-2 py-1.5 font-mono text-[12px] font-semibold ${
+            !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
+          }`}
+        >
+          {!hasBill ? "—" : settled ? "Settled" : RM(outstanding)}
+        </div>
       </FieldRow>
       <FieldRow label="Pay status">
         <select
@@ -437,7 +431,7 @@ export function PaymentControlFields({
           ))}
         </select>
       </FieldRow>
-    </>
+    </div>
   );
 }
 
@@ -461,31 +455,53 @@ export function StorageControlFields({
     hasMsbf,
     hasSof,
   });
+  const incurred = draft.storage_from.trim() !== "";
   return (
     <>
-      <FieldRow label="Rate">
-        <div className="px-2 py-1.5 text-[11px] text-base-500">
-          MS/BF RM150/mo · Sofa RM200/2wk
-        </div>
-      </FieldRow>
-      <FieldRow label="Storage from">
-        <input
-          type="date"
-          value={draft.storage_from}
-          onChange={(e) => set("storage_from", e.target.value)}
+      <FieldRow label="Storage?">
+        <select
+          value={incurred ? "yes" : "no"}
+          onChange={(e) => {
+            if (e.target.value === "yes") {
+              if (!draft.storage_from.trim()) set("storage_from", today);
+            } else {
+              set("storage_from", "");
+              set("storage_fee_override", "");
+            }
+          }}
           className={CELL}
-        />
+        >
+          <option value="no">No</option>
+          <option value="yes">Yes — incurred</option>
+        </select>
       </FieldRow>
-      <FieldRow label="Storage fee">
-        <input
-          type="number"
-          min={0}
-          value={draft.storage_fee_override}
-          onChange={(e) => set("storage_fee_override", e.target.value)}
-          placeholder={storage.total > 0 ? `auto ${storage.total}` : "auto"}
-          className={CELL}
-        />
-      </FieldRow>
+      {incurred && (
+        <>
+          <FieldRow label="From">
+            <input
+              type="date"
+              value={draft.storage_from}
+              onChange={(e) => set("storage_from", e.target.value)}
+              className={CELL}
+            />
+          </FieldRow>
+          <FieldRow label="Fee">
+            <input
+              type="number"
+              min={0}
+              value={draft.storage_fee_override}
+              onChange={(e) => set("storage_fee_override", e.target.value)}
+              placeholder={storage.total > 0 ? `auto ${storage.total}` : "auto"}
+              className={CELL}
+            />
+          </FieldRow>
+          <FieldRow label="Rate">
+            <div className="px-2 py-1.5 text-[11px] text-base-500">
+              MS/BF RM150/mo · Sofa RM200/2wk
+            </div>
+          </FieldRow>
+        </>
+      )}
     </>
   );
 }
