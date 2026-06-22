@@ -43,6 +43,7 @@ import {
   RoutingFields,
   StockControlFields,
   DeliveryTimeSlotField,
+  LogisticEtaField,
   PaymentControlFields,
   StorageControlFields,
   RemarkControlField,
@@ -747,34 +748,52 @@ function DrawerBody({
           }
           defaultOpen
         >
-          <FieldGrid>
-            <RoutingFields
-              orderId={order.id}
-              customerAddress={order.customer_address ?? null}
-              deliveryDate={order.delivery_date}
-              opsAssignedLogistic={order.ops_assigned_logistic ?? null}
-              form={form}
-            />
-            <DeliveryTimeSlotField form={form} />
-            <RemarkControlField
-              form={form}
-              field="customer_request"
-              label="Customer request"
-              placeholder="e.g. postponed to end of May"
-            />
-            <RemarkControlField
-              form={form}
-              field="action_for_logistic"
-              label="Action for logistic"
-              placeholder="e.g. call customer before delivery"
-            />
-            <RemarkControlField
-              form={form}
-              field="carres_remark"
-              label="Carres remark"
-              placeholder="Internal note"
-            />
-          </FieldGrid>
+          {/* 2-col compact (Jess): LEFT = what operation sets (region / carrier /
+              deadline / call gate); RIGHT = what the logistic updates back
+              (their committed ETA + time slot). Remarks span full width below. */}
+          <div className="grid grid-cols-2 gap-2 items-start">
+            <div>
+              <div className="label mb-1">Operation</div>
+              <FieldGrid>
+                <RoutingFields
+                  orderId={order.id}
+                  customerAddress={order.customer_address ?? null}
+                  deliveryDate={order.delivery_date}
+                  opsAssignedLogistic={order.ops_assigned_logistic ?? null}
+                  form={form}
+                />
+              </FieldGrid>
+            </div>
+            <div>
+              <div className="label mb-1">Logistic updates</div>
+              <FieldGrid>
+                <LogisticEtaField form={form} />
+                <DeliveryTimeSlotField form={form} />
+              </FieldGrid>
+            </div>
+          </div>
+          <div className="mt-2">
+            <FieldGrid>
+              <RemarkControlField
+                form={form}
+                field="customer_request"
+                label="Customer request"
+                placeholder="e.g. postponed to end of May"
+              />
+              <RemarkControlField
+                form={form}
+                field="action_for_logistic"
+                label="Action for logistic"
+                placeholder="e.g. call customer before delivery"
+              />
+              <RemarkControlField
+                form={form}
+                field="carres_remark"
+                label="Carres remark"
+                placeholder="Internal note"
+              />
+            </FieldGrid>
+          </div>
           <details className="mt-2.5" open={(order.delivery_stops?.length ?? 0) > 0}>
             <summary className="label cursor-pointer select-none">
               Advanced · multi-leg route{" "}

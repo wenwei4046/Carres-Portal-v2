@@ -1159,8 +1159,8 @@ function OrderRow({
           {TAB_LABEL[ct]}
         </span>
       </td>
-      {/* Order ID — SO number with the customer name UNDER it (P2: Customer
-          column folded in; TCF/CR ref + phone live in the tooltip + drawer). */}
+      {/* Order ID — SO number, customer name + TCF/CR ref no UNDER it (Jess:
+          keep the ref no visible, not just in the tooltip). Phone stays tooltip. */}
       <td
         className="px-4 py-2.5 whitespace-nowrap"
         title={[ref.join(" + "), o.customer_phone].filter(Boolean).join(" · ") || undefined}
@@ -1171,6 +1171,11 @@ function OrderRow({
         >
           {o.customer_name || "—"}
         </div>
+        {ref.length > 0 && (
+          <div className="font-mono text-[10px] text-base-400 max-w-[200px] truncate mt-0.5">
+            {ref.join(" · ")}
+          </div>
+        )}
       </td>
       {/* Deadline — customer's requested delivery date + prep-milestone countdown.
           Tooltip spells out the SOP: stock at WH 7 days before, logistic

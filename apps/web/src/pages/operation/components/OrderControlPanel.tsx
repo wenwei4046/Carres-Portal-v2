@@ -5,7 +5,6 @@ import {
   STORAGE_RATES,
   DELIVERY_TIME_SLOTS,
   PAYMENT_STATUSES,
-  STOCK_LOCATIONS,
   type UpdateOpsOrderControlInput,
 } from "@carres/shared";
 import {
@@ -42,6 +41,7 @@ interface Draft {
   warehouse_remark: string;
   payment_status: string;
   storage_from: string;
+  storage_to: string;
   storage_fee_override: string;
   balance: string;
   logistic_eta: string;
@@ -61,6 +61,7 @@ const EMPTY: Draft = {
   warehouse_remark: "",
   payment_status: "",
   storage_from: "",
+  storage_to: "",
   storage_fee_override: "",
   balance: "",
   logistic_eta: "",
@@ -149,6 +150,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       warehouse_remark: c.warehouse_remark ?? "",
       payment_status: c.payment_status ?? "",
       storage_from: c.storage_from ?? "",
+      storage_to: c.storage_to ?? "",
       storage_fee_override:
         c.storage_fee_override != null ? String(c.storage_fee_override) : "",
       balance: c.balance != null ? String(c.balance) : "",
@@ -190,6 +192,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       warehouse_remark: draft.warehouse_remark.trim() || null,
       payment_status: draft.payment_status.trim() || null,
       storage_from: draft.storage_from.trim() ? draft.storage_from.trim() : null,
+      storage_to: draft.storage_to.trim() ? draft.storage_to.trim() : null,
       storage_fee_override: draft.storage_fee_override.trim()
         ? Number(draft.storage_fee_override)
         : null,
@@ -235,42 +238,20 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
   };
 }
 
-/** Stock location chips + stock ETA → the Items & stock section. */
+/** Stock ETA → the Items & stock section. One ETA for the whole order ("applies
+ *  to every stock product", Jess). The old order-level location chips were
+ *  removed — each item now carries its own Location in the items table. */
 export function StockControlFields({ form }: { form: OrderControlForm }) {
-  const { draft, toggleLoc, set } = form;
+  const { draft, set } = form;
   return (
-    <>
-      <FieldRow label="Stock location">
-        <div className="flex flex-wrap gap-1 px-2 py-1.5">
-          {STOCK_LOCATIONS.map((loc) => {
-            const on = draft.stock_location.includes(loc);
-            return (
-              <button
-                key={loc}
-                type="button"
-                onClick={() => toggleLoc(loc)}
-                aria-pressed={on}
-                className={`text-[11px] px-2 py-0.5 rounded border ${
-                  on
-                    ? "bg-primary/10 border-primary text-primary font-medium"
-                    : "bg-white border-base-200 text-base-600 hover:border-base-400"
-                }`}
-              >
-                {loc}
-              </button>
-            );
-          })}
-        </div>
-      </FieldRow>
-      <FieldRow label="Stock ETA">
-        <input
-          type="date"
-          value={draft.stock_eta}
-          onChange={(e) => set("stock_eta", e.target.value)}
-          className={CELL}
-        />
-      </FieldRow>
-    </>
+    <FieldRow label="Stock ETA">
+      <input
+        type="date"
+        value={draft.stock_eta}
+        onChange={(e) => set("stock_eta", e.target.value)}
+        className={CELL}
+      />
+    </FieldRow>
   );
 }
 
@@ -368,14 +349,6 @@ export function RoutingFields({
           className={CELL}
         />
       </FieldRow>
-      <FieldRow label="Logistic ETA">
-        <input
-          type="date"
-          value={form.draft.logistic_eta}
-          onChange={(e) => form.set("logistic_eta", e.target.value)}
-          className={CELL}
-        />
-      </FieldRow>
       {area === "Outstation" && (
         <FieldRow label="Called?">
           <select
@@ -391,6 +364,22 @@ export function RoutingFields({
         </FieldRow>
       )}
     </>
+  );
+}
+
+/** Logistic ETA (the carrier's committed delivery date) → the Delivery section's
+ *  RIGHT column. Distinct from Deadline (the customer's requested date); this is
+ *  what the logistic partner updates. */
+export function LogisticEtaField({ form }: { form: OrderControlForm }) {
+  return (
+    <FieldRow label="Logistic ETA">
+      <input
+        type="date"
+        value={form.draft.logistic_eta}
+        onChange={(e) => form.set("logistic_eta", e.target.value)}
+        className={CELL}
+      />
+    </FieldRow>
   );
 }
 
@@ -498,9 +487,13 @@ export function StorageControlFields({
 }) {
   const { draft, set } = form;
   const today = new Date().toISOString().slice(0, 10);
+  // End of the storage window (Jess): explicit storage_to, else the logistic's
+  // committed ETA (when it'll leave), else today (still accruing). Auto-shown but
+  // editable — set it to freeze the fee on the actual collection/delivery date.
+  const endEff = draft.storage_to.trim() || draft.logistic_eta.trim() || today;
   const storage = computeStorageFee({
     startDate: form.storageFrom,
-    asOf: today,
+    asOf: endEff,
     hasMsbf,
     hasSof,
   });
@@ -540,8 +533,16 @@ export function StorageControlFields({
               className={CELL}
             />
           </FieldRow>
+          <FieldRow label="To (end)">
+            <input
+              type="date"
+              value={endEff}
+              onChange={(e) => set("storage_to", e.target.value)}
+              className={CELL}
+            />
+          </FieldRow>
           {/* Auto breakdown — separate MS/BF (per month) and Sofa (per 2 weeks)
-              lines (Jess), each = rate × commenced periods since the From date. */}
+              lines (Jess), each = rate × commenced periods between From and To. */}
           {hasMsbf && (
             <FieldRow label="MS / BF">
               <div className="px-2 py-1.5 text-[12px] font-semibold text-base-900">

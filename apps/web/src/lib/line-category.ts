@@ -106,19 +106,20 @@ export function lineSortRank(sku: string): number {
 
 /**
  * Suggested default stock location for a line (Jess 2026-06-22):
- *   • accessory goods (Pillow / M.P / Topper / Footrest) → "Carres Klang" — these
- *     are kept as ready warehouse stock.
- *   • core furniture (Mattress / Bedframe / Sofa) → "at-supplier" — made to order,
- *     it sits at the supplier until received. (Showing the SPECIFIC supplier name
- *     is pending Jess's model→supplier map — see CF.)
+ *   • core furniture (Mattress / Bedframe / Sofa) → its SUPPLIER name — it's made
+ *     to order and sits at the supplier until received. Current core suppliers:
+ *     mattress = Nice Future, bedframe + sofa = Ohana ([[supplier-core-mapping]]).
+ *   • accessory goods (Pillow / M.P / Topper / Footrest) → "Carres Klang" — kept
+ *     as ready warehouse stock.
  *   • service charges (No Lift / Disposal / floor) → null — no physical location.
  * It's only a DEFAULT — the drawer dropdown lets the operator override per line.
  */
 export function defaultLineLocation(sku: string): string | null {
-  const kind = lineKind(sku);
-  if (kind === "service") return null;
-  if (kind === "acc") return "Carres Klang";
-  return "at-supplier";
+  const cat = lineCategory(sku);
+  if (cat === "mattress") return "Nice Future";
+  if (cat === "bedframe" || cat === "sofa") return "Ohana";
+  if (lineKind(sku) === "service") return null;
+  return "Carres Klang"; // accessories
 }
 
 /** The location options the drawer offers (the shared known set). */

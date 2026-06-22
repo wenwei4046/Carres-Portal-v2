@@ -23,6 +23,8 @@ import { z } from "zod";
 export const STOCK_LOCATIONS = [
   "Carres Klang",
   "Houzs Balakong",
+  "Nice Future",
+  "Ohana",
   "at-supplier",
 ] as const;
 
@@ -72,6 +74,9 @@ export const opsOrderControlSchema = z.object({
    *  of the auto-computed storage fee. */
   balance: dbNumeric,
   storage_from: isoDate.nullable(),
+  /** Storage END date (migration 0169). null = still in storage → fee accrues to
+   *  the logistic ETA (else today); set = freeze the window at that date. */
+  storage_to: isoDate.nullable(),
   storage_fee_override: dbNumeric,
   /** Drawer Master-Sheet redesign (migration 0167): the logistic's committed
    *  delivery date (vs orders.delivery_date = customer deadline), the keyed
@@ -145,6 +150,7 @@ export const updateOpsOrderControlInput = z
     // Payments panel (migration 0165).
     balance: z.number().min(0).max(99_999_999).nullable(),
     storage_from: isoDate.nullable(),
+    storage_to: isoDate.nullable(),
     storage_fee_override: z.number().min(0).max(99_999_999).nullable(),
     logistic_eta: isoDate.nullable(),
     paid_amount: z.number().min(0).max(99_999_999).nullable(),

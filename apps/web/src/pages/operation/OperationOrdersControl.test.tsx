@@ -555,9 +555,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const row = screen.getByTestId("order-row");
     const idCell = within(row).getByText("SO-3012").closest("td")!;
     expect(within(idCell as HTMLElement).getByText("Tan Ah Kow")).toBeInTheDocument();
-    // TCF ref + phone live in the cell tooltip, not as visible row text.
+    // TCF ref shows UNDER the customer name (Jess: keep the ref no visible);
+    // phone stays in the tooltip alongside the ref.
     expect(idCell).toHaveAttribute("title", "TCF2024/06-461 · 012-3456789");
-    expect(within(row).queryByText("TCF2024/06-461")).not.toBeInTheDocument();
+    expect(within(idCell as HTMLElement).getByText("TCF2024/06-461")).toBeInTheDocument();
   });
 
   it("sorts by deadline ascending — overdue/earliest first, TBD + undated last (P3)", () => {
