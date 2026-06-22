@@ -1,9 +1,14 @@
 import { type ReactNode, useEffect, useState } from "react";
 import {
+  AlertCircle,
   Banknote,
   ChevronDown,
   ClipboardList,
+  Download,
+  FileText,
+  MoreVertical,
   Package,
+  RotateCcw,
   StickyNote,
   Truck,
 } from "lucide-react";
@@ -210,7 +215,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
         aria-modal="true"
         aria-label="Order detail"
         className="bg-card text-card-foreground border border-base-200 rounded-none flex flex-col h-screen"
-        style={{ width: 560, maxWidth: "100vw" }}
+        style={{ width: 780, maxWidth: "100vw" }}
         data-testid="order-detail-drawer"
       >
         {isLoading && <DrawerSkeleton onClose={onClose} />}
@@ -385,22 +390,34 @@ interface DrawerBodyProps {
 
 /** Collapsible drawer section — title + leading icon + a summary value that
  *  shows when collapsed, so a folded section still reads at a glance (P5). */
+const SECTION_ACCENT: Record<string, { bar: string; icon: string }> = {
+  neutral: { bar: "border-l-base-300", icon: "text-base-400" },
+  warning: { bar: "border-l-warning", icon: "text-warning" },
+  success: { bar: "border-l-success", icon: "text-success" },
+  info: { bar: "border-l-info", icon: "text-info" },
+};
+
 function DrawerSection({
   icon,
   title,
   summary,
+  accent = "neutral",
   defaultOpen = false,
   children,
 }: {
   icon: ReactNode;
   title: string;
   summary?: ReactNode;
+  accent?: keyof typeof SECTION_ACCENT;
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const a = SECTION_ACCENT[accent];
   return (
-    <div className="border border-base-200 rounded-[4px] bg-white mb-2 overflow-hidden">
+    <div
+      className={`border border-base-200 border-l-[3px] ${a.bar} rounded-[4px] bg-white mb-2 overflow-hidden`}
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -408,7 +425,7 @@ function DrawerSection({
         className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-base-50"
       >
         <span className="flex items-center gap-2 min-w-0">
-          <span className="text-base-400 shrink-0">{icon}</span>
+          <span className={`${a.icon} shrink-0`}>{icon}</span>
           <span className="t-h4 text-base-900">{title}</span>
         </span>
         <span className="flex items-center gap-2 shrink-0">
@@ -444,11 +461,6 @@ function DrawerBody({
   onServiceNoteClick,
 }: DrawerBodyProps) {
   const { order, lines, addons, total, warehouse, stockBalances, pos, threads } = data;
-  // Loo 2026-05-12 — surface the SO PDF reprint button in the header. Hook
-  // lives in DrawerBody (not the parent OrderDetailDrawer) because the
-  // button JSX renders here; pulling `role` from the parent scope would
-  // ReferenceError at runtime.
-  const role = useAuth((s) => s.role);
   // Phase 4.5 Chunk 2 (T9) — partner-assignment hint sourced from threads
   // (`order_supplier_threads.delivery_partner_id`) rather than the order-level
   // column, per design spec §CQ1 option (b). True when ANY thread has a
@@ -490,111 +502,103 @@ function DrawerBody({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header — SO + stage + name + an outstanding glance + close, plus the
-          stage-gated doc reprints. Fixed; the section stack scrolls below. */}
-      <div className="px-5 pt-4 pb-3 border-b border-base-100 shrink-0">
-        <div className="flex justify-between items-center gap-3">
-          <div className="flex gap-2.5 items-center min-w-0">
-            <span className="font-mono text-[12px] text-base-500">#{order.so}</span>
-            <StageChip stage={stage} />
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close drawer"
-            className="p-1 text-[20px] text-base-700 hover:text-base-900 leading-none shrink-0"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="flex items-start justify-between gap-3 mt-1.5">
-          <div
-            className={`${cjkClassName(order.customer_name)} text-[20px] font-semibold tracking-[-0.02em] text-base-900 min-w-0 truncate`}
+      {/* Header — slim title bar: SO · name · status, a ⋮ actions menu, close.
+          (Service/export actions + doc reprints all live in the ⋮ menu now.) */}
+      <div className="px-5 pt-3.5 pb-3 border-b border-base-100 shrink-0 flex items-center gap-2">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <span className="font-mono text-[12px] text-base-500 shrink-0">
+            #{order.so}
+          </span>
+          <span
+            className={`${cjkClassName(order.customer_name)} text-[15px] font-semibold tracking-[-0.01em] text-base-900 truncate`}
           >
             {order.customer_name}
-          </div>
-          <BalancePill outstanding={outstanding} hasTotal={hasTotal} />
+          </span>
+          <StageChip stage={stage} />
         </div>
-
-        <div className="flex items-center gap-2 mt-2.5 empty:hidden">
-          {role && stage !== "dispatched" && stage !== "delivered" && (
-            <DownloadSalesOrderButton
-              orderId={order.id}
-              so={order.so}
-              role={role}
-              variant="secondary"
-            />
-          )}
-          {role && (stage === "dispatched" || stage === "delivered") && order.invoice_no && (
-            <DownloadInvoiceButton
-              orderId={order.id}
-              so={order.so}
-              role={role}
-              variant="secondary"
-            />
-          )}
-          {order.do_number && (
-            <PrintDoButton orderId={order.id} doNumber={order.do_number} />
-          )}
-        </div>
+        <ActionsMenu
+          order={order}
+          lines={lines}
+          stage={stage}
+          onServiceNoteClick={onServiceNoteClick}
+        />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close drawer"
+          className="p-1 text-[20px] text-base-700 hover:text-base-900 leading-none shrink-0"
+        >
+          ×
+        </button>
       </div>
 
       {/* Scrolling section stack — 5 sections, one category each (P5). */}
       <div className="flex-1 min-h-0 overflow-auto px-5 py-4">
-        {/* 1 · Order — identity + location + status */}
+        {/* 1 · Order — the full order record as a grid */}
         <DrawerSection
           icon={<ClipboardList className="w-4 h-4" />}
           title="Order"
-          summary={loc.label || order.customer_phone || "—"}
+          accent="neutral"
+          summary={order.customer_name}
           defaultOpen
         >
-          <KV
-            label="Phone"
-            value={order.customer_phone ?? <em className="text-base-500">—</em>}
-          />
-          <KV
-            label="Location"
-            value={
-              loc.label ? (
-                <span
-                  className={loc.area === "Outstation" ? "text-warning font-medium" : ""}
-                >
-                  {loc.label}
-                  {loc.area === "Outstation" ? " · call first" : ""}
-                </span>
-              ) : (
-                <em className="text-base-500">—</em>
-              )
-            }
-          />
-          <KV
-            label="Address"
-            value={order.customer_address ?? <em className="text-base-500">—</em>}
-          />
-          <KV label="Status" value={order.status} />
+          <Grid>
+            <KV
+              label="Order ID"
+              value={<span className="font-mono">#{order.so}</span>}
+            />
+            <KV label="Status" value={order.status} />
+            <KV label="Customer" value={order.customer_name} />
+            <KV
+              label="Phone"
+              value={order.customer_phone ?? <em className="text-base-500">—</em>}
+            />
+            <KV
+              label="Location"
+              value={
+                loc.label ? (
+                  <span
+                    className={loc.area === "Outstation" ? "text-warning font-medium" : ""}
+                  >
+                    {loc.label}
+                    {loc.area === "Outstation" ? " · call first" : ""}
+                  </span>
+                ) : (
+                  <em className="text-base-500">—</em>
+                )
+              }
+            />
+            <KV
+              label="Address"
+              value={order.customer_address ?? <em className="text-base-500">—</em>}
+            />
+          </Grid>
         </DrawerSection>
 
-        {/* 2 · Items & stock — every stock fact in one place */}
+        {/* Items & stock + Delivery sit 2-up to cut vertical scroll. */}
+        <div className="grid grid-cols-2 gap-2 items-start">
+
+        {/* 2 · Items & stock */}
         <DrawerSection
           icon={<Package className="w-4 h-4" />}
           title="Items & stock"
+          accent="warning"
           summary={`${totalItems(lines)} item${totalItems(lines) === 1 ? "" : "s"}${shortages.length ? ` · ${shortages.length} short` : ""}`}
           defaultOpen
         >
-          <KV
-            label="Source WH"
-            value={warehouse?.name ?? <em className="text-base-500">—</em>}
-          />
-          {/* Line items as a compact sheet: Item · Qty · On hand. On-hand is
-              dropped once Delivered (goods already left this warehouse). */}
-          <table className="w-full text-[12px] mt-2">
+          <table className="w-full border-collapse">
             <thead>
-              <tr className="text-[10px] uppercase tracking-[0.04em] text-base-500 border-b border-base-200">
-                <th className="text-left font-medium py-1">Item</th>
-                <th className="text-right font-medium py-1 w-10">Qty</th>
+              <tr>
+                <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-500 px-2 py-1">
+                  Item
+                </th>
+                <th className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-500 px-2 py-1 w-10">
+                  Qty
+                </th>
                 {stage !== "delivered" && (
-                  <th className="text-right font-medium py-1 w-20">On hand</th>
+                  <th className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-500 px-2 py-1 w-16">
+                    On hand
+                  </th>
                 )}
               </tr>
             </thead>
@@ -606,15 +610,16 @@ function DrawerBody({
                   : 0;
                 const ok = have >= l.qty;
                 return (
-                  <tr
-                    key={l.sku}
-                    className="border-b border-base-100 last:border-0 align-top"
-                  >
-                    <td className="py-1 pr-2 font-mono break-all">{l.sku}</td>
-                    <td className="py-1 text-right tabular-nums">{l.qty}</td>
+                  <tr key={l.sku}>
+                    <td className="border border-base-200 px-2 py-1 font-mono text-[11px] align-top break-all">
+                      {l.sku}
+                    </td>
+                    <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
+                      {l.qty}
+                    </td>
                     {stage !== "delivered" && (
                       <td
-                        className={`py-1 text-right font-mono ${ok ? "text-success" : "text-warning"}`}
+                        className={`border border-base-200 px-2 py-1 text-right font-mono text-[11px] align-top ${ok ? "text-success" : "text-warning"}`}
                       >
                         {have}
                       </td>
@@ -624,12 +629,20 @@ function DrawerBody({
               })}
             </tbody>
           </table>
-          <div className="mt-3">
+          <div className="mt-2">
+            <Grid>
+              <KV
+                label="Warehouse"
+                value={warehouse?.name ?? <em className="text-base-500">—</em>}
+              />
+            </Grid>
+          </div>
+          <div className="mt-2.5">
             <StockControlFields form={form} />
           </div>
           {pos.length > 0 && (
-            <div className="mt-3">
-              <div className="label mb-1">Linked purchase orders</div>
+            <div className="mt-2.5">
+              <div className="label mb-1">Linked POs</div>
               <div className="border border-base-100 rounded-[4px]">
                 {pos.map((po, i) => (
                   <PoRow key={po.id} po={po} divider={i > 0} />
@@ -639,11 +652,18 @@ function DrawerBody({
           )}
         </DrawerSection>
 
-        {/* 3 · Delivery — carrier + date + slot + the nested multi-leg route */}
+        {/* 3 · Delivery & control — carrier/date/slot + control remarks +
+            multi-leg (Jess: all control lives with delivery). */}
         <DrawerSection
           icon={<Truck className="w-4 h-4" />}
-          title="Delivery"
-          summary={deadlineSummary}
+          title="Delivery & control"
+          accent="success"
+          summary={
+            deadlineSummary +
+            (form.remarkCount
+              ? ` · ${form.remarkCount} note${form.remarkCount === 1 ? "" : "s"}`
+              : "")
+          }
           defaultOpen
         >
           <RoutingFields
@@ -655,12 +675,13 @@ function DrawerBody({
             opsAssignedLogistic={order.ops_assigned_logistic ?? null}
             deliveryPartnerId={order.delivery_partner_id}
           />
-          <div className="mt-3">
+          <div className="mt-2.5">
             <DeliveryTimeSlotField form={form} />
           </div>
-          {/* Multi-leg chain (γ · migration 0156) — nested under Delivery where
-              it belongs; collapsed unless the order actually has legs set. */}
-          <details className="mt-3.5" open={(order.delivery_stops?.length ?? 0) > 0}>
+          <div className="mt-2.5">
+            <RemarkControlFields form={form} />
+          </div>
+          <details className="mt-2.5" open={(order.delivery_stops?.length ?? 0) > 0}>
             <summary className="label cursor-pointer select-none">
               Advanced · multi-leg route{" "}
               <span className="text-[10px] font-normal normal-case tracking-normal text-base-400">
@@ -676,11 +697,13 @@ function DrawerBody({
             </div>
           </details>
         </DrawerSection>
+        </div>
 
         {/* 4 · Payment — every money fact in one place (collapsed by default) */}
         <DrawerSection
           icon={<Banknote className="w-4 h-4" />}
           title="Payment"
+          accent="info"
           summary={paymentSummary}
         >
           <PaymentControlFields
@@ -690,44 +713,13 @@ function DrawerBody({
           />
         </DrawerSection>
 
-        {/* 5 · Notes & actions — remarks + case shortcuts + activity (collapsed) */}
+        {/* 5 · Activity — last, expandable to see the full history. */}
         <DrawerSection
           icon={<StickyNote className="w-4 h-4" />}
-          title="Notes & actions"
-          summary={
-            form.remarkCount
-              ? `${form.remarkCount} remark${form.remarkCount === 1 ? "" : "s"}`
-              : "—"
-          }
+          title="Activity"
+          accent="neutral"
         >
-          <RemarkControlFields form={form} />
-          <div className="flex flex-wrap gap-2 mt-3.5">
-            <button
-              type="button"
-              onClick={onServiceNoteClick}
-              className="btn-secondary text-[12px]"
-            >
-              + Service Note
-            </button>
-            <button
-              type="button"
-              disabled
-              title="Refunds are created in Finance → Refunds"
-              className="btn-secondary text-[12px] opacity-50 cursor-not-allowed"
-            >
-              + Refund
-            </button>
-            <button
-              type="button"
-              disabled
-              title="Issues module coming — needs the ops_issues table"
-              className="btn-secondary text-[12px] opacity-50 cursor-not-allowed"
-            >
-              + Issue
-            </button>
-          </div>
-          <div className="label mt-4 mb-1.5">Activity</div>
-          <div className="max-h-[280px] overflow-auto pr-1 -mr-1">
+          <div className="max-h-[360px] overflow-auto pr-1 -mr-1">
             <AnnotationTimeline orderId={order.id} />
           </div>
         </DrawerSection>
@@ -767,30 +759,8 @@ function addonsSum(
   );
 }
 
-/** Outstanding-balance pill for the drawer header — terracotta while the
- *  customer still owes, green "Settled" once covered. Hidden when the order has
- *  no computable total (AutoCount no-price imports) so it never shows a fake 0. */
-function BalancePill({
-  outstanding,
-  hasTotal,
-}: {
-  outstanding: number;
-  hasTotal: boolean;
-}) {
-  if (!hasTotal) return null;
-  if (outstanding <= 0)
-    return (
-      <span className="shrink-0 whitespace-nowrap text-[12px] font-medium text-success bg-success/10 px-2.5 py-1 rounded-full">
-        Settled
-      </span>
-    );
-  return (
-    <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-      Outstanding {RM(outstanding)}
-    </span>
-  );
-}
-
+/** One grid row inside a <Grid> — label cell + value cell with full cell
+ *  borders (the spreadsheet look). */
 function KV({
   label,
   value,
@@ -799,13 +769,165 @@ function KV({
   value: React.ReactNode;
 }) {
   return (
-    <div className="flex items-baseline gap-3 py-1 border-b border-base-100 last:border-0">
-      <span className="w-24 shrink-0 text-[10px] uppercase tracking-[0.04em] text-base-500">
+    <tr>
+      <td className="border border-base-200 bg-base-50 text-base-500 text-[10px] uppercase tracking-[0.04em] px-2 py-1 align-top whitespace-nowrap w-[34%]">
         {label}
-      </span>
-      <span className="flex-1 min-w-0 text-[12px] text-base-900 font-body">
+      </td>
+      <td className="border border-base-200 text-[12px] text-base-900 font-body px-2 py-1 align-top break-words">
         {value}
-      </span>
+      </td>
+    </tr>
+  );
+}
+
+/** Bordered grid wrapper for KV rows. */
+function Grid({ children }: { children: ReactNode }) {
+  return (
+    <table className="w-full border-collapse">
+      <tbody>{children}</tbody>
+    </table>
+  );
+}
+
+/** Client-side CSV (opens in Excel) of the order — the ⋮ Download Excel item. */
+function downloadOrderCsv(
+  order: DrawerBodyProps["data"]["order"],
+  lines: operationOrderDetailLine[],
+) {
+  const rows: string[][] = [
+    ["SO", `SO-${order.so}`],
+    ["Customer", order.customer_name],
+    ["Phone", order.customer_phone ?? ""],
+    ["Address", order.customer_address ?? ""],
+    ["Status", order.status],
+    [],
+    ["Item", "Qty"],
+    ...lines.map((l) => [l.sku, String(l.qty)]),
+  ];
+  const csv = rows
+    .map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","))
+    .join("\r\n");
+  const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `SO-${order.so}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function MenuItem({
+  icon,
+  label,
+  onClick,
+  disabled,
+  title,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 ${disabled ? "opacity-40 cursor-not-allowed" : "text-base-900"}`}
+    >
+      <span className="text-base-500 shrink-0">{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+/** ⋮ header menu — additional service (Service note / Refund / Issue) + the
+ *  document exports (PDF + Excel), per Jess. */
+function ActionsMenu({
+  order,
+  lines,
+  stage,
+  onServiceNoteClick,
+}: {
+  order: DrawerBodyProps["data"]["order"];
+  lines: operationOrderDetailLine[];
+  stage: OperationStage;
+  onServiceNoteClick: () => void;
+}) {
+  const role = useAuth((s) => s.role);
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        aria-label="More actions"
+        onClick={() => setOpen((o) => !o)}
+        className="p-1 text-base-600 hover:text-base-900 leading-none"
+      >
+        <MoreVertical className="w-5 h-5" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 w-52 z-20 bg-white border border-base-200 rounded-[6px] shadow-lg overflow-hidden">
+            <MenuItem
+              icon={<FileText className="w-4 h-4" />}
+              label="Service note"
+              onClick={() => {
+                setOpen(false);
+                onServiceNoteClick();
+              }}
+            />
+            <MenuItem
+              icon={<RotateCcw className="w-4 h-4" />}
+              label="Refund"
+              disabled
+              title="Refunds are created in Finance → Refunds"
+            />
+            <MenuItem
+              icon={<AlertCircle className="w-4 h-4" />}
+              label="Issue"
+              disabled
+              title="Issues module coming — needs the ops_issues table"
+            />
+            <div className="border-t border-base-100 px-3 py-2 flex flex-col gap-1.5">
+              {role && stage !== "dispatched" && stage !== "delivered" && (
+                <DownloadSalesOrderButton
+                  orderId={order.id}
+                  so={order.so}
+                  role={role}
+                  variant="secondary"
+                />
+              )}
+              {role &&
+                (stage === "dispatched" || stage === "delivered") &&
+                order.invoice_no && (
+                  <DownloadInvoiceButton
+                    orderId={order.id}
+                    so={order.so}
+                    role={role}
+                    variant="secondary"
+                  />
+                )}
+              {order.do_number && (
+                <PrintDoButton orderId={order.id} doNumber={order.do_number} />
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  downloadOrderCsv(order, lines);
+                }}
+                className="btn-secondary text-[12px] flex items-center justify-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" /> Download Excel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

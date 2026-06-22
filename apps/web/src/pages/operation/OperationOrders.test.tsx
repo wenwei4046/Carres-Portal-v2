@@ -494,6 +494,8 @@ describe("OperationOrders — kanban", () => {
     };
     render(wrap(<OperationOrders />));
     fireEvent.click(screen.getByText("Alice"));
+    // Doc reprints (incl. Print DO) moved into the ⋮ actions menu — open it.
+    fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
     expect(screen.getByRole("button", { name: /Print DO/ })).toBeInTheDocument();
   });
 
