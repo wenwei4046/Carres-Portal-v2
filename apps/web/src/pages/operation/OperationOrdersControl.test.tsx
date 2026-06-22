@@ -456,6 +456,34 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     );
   });
 
+  it("classifies real AutoCount free-text SKUs into MS/BF/SOF — even with COL: colour codes and non-MS/BF/SF model families (P1 classifier fix)", () => {
+    oneRow({
+      id: "ac1",
+      so: 3099,
+      order_lines: [
+        // The COL: colour code used to shove this whole row into "acc" → leaked
+        // the raw model name. Now classifies as sofa (no K/Q/S size on sofas).
+        { sku: 'SF03-HK5535/30"(L+2 SEATER)/COL:KN390-15 DEEP GREY', qty: 1 },
+        // Bedframe family "Jager", size written as a WORD mid-SKU + COL: code.
+        { sku: "1013Jager/Fab3-King/COL:PC151-02", qty: 1 },
+        { sku: "1013Jager/Fab3-Queen/COL:PC151-02", qty: 2 },
+        // Mattress families, size in the canonical -K/-Q suffix.
+        { sku: "Breeze FirmCare-B1201F-K", qty: 1 },
+        { sku: "Lumi FirmCare-L1201F-Q", qty: 2 },
+        // Sofa family "Glano" — no MS/BF/SF prefix at all.
+        { sku: 'Glano TH5090/30"(2 Seater)/KN390-14 Metal', qty: 1 },
+      ],
+    });
+    wrap(<OperationOrdersControl />);
+    const row = screen.getByTestId("order-row");
+    // Master-Sheet codes, NOT the raw model name; sizes rolled up per category.
+    expect(within(row).getByText("3× MS(K,Q)")).toBeInTheDocument();
+    expect(within(row).getByText("3× BF(K,Q)")).toBeInTheDocument();
+    expect(within(row).getByText("2× SOF")).toBeInTheDocument();
+    // The raw model names no longer leak into the row as accessory tags.
+    expect(within(row).queryByText(/jager|hk55|glano|breeze|lumi/i)).toBeNull();
+  });
+
   it("always shows qty on accessory/service tags — even a lone qty-1 accessory (P1)", () => {
     oneRow({
       id: "p1",

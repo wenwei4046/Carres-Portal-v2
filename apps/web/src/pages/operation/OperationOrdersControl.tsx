@@ -267,18 +267,42 @@ const CORE_ORDER: CoreCat[] = ["mattress", "bedframe", "sofa"];
 
 function lineCategory(sku: string): CoreCat | "acc" {
   const s = sku.trim();
-  if (s.includes(":")) {
-    const p = s.split(":")[0].toLowerCase();
-    return p === "mattress" || p === "bedframe" || p === "sofa" ? p : "acc";
-  }
-  if (/^ms\d/i.test(s)) return "mattress";
-  if (/^bf\d/i.test(s)) return "bedframe";
-  if (/^(sof|sf)\d/i.test(s)) return "sofa";
+  // Native canonical SKUs carry a `mattress:` / `bedframe:` / `sofa:` prefix.
+  // Match ONLY that exact head — an AutoCount SKU often embeds a `COL:` colour
+  // code (".../COL:KN390-15"), and the old `includes(":")` shoved every coloured
+  // SKU into "acc", so sofas/bedframes leaked into the row as raw model names.
+  const head = s.split(":")[0].trim().toLowerCase();
+  if (head === "mattress" || head === "bedframe" || head === "sofa")
+    return head as CoreCat;
+
+  // AutoCount free-text + canonical item codes — keyword classifier mirrored
+  // VERBATIM from the server's resolve_demand_category (migration 0148), so the
+  // MS/BF/SOF it yields speaks the exact vocabulary the supplier forecast uses.
+  // Add new model families to BOTH places. Accessory / service keywords are
+  // tested FIRST so "Mattress Protector" stays an accessory, not a mattress.
+  const n = s.toLowerCase();
+  if (/disposal|transport fee|no lift|per floor|memory pillow|protector|microfiber/.test(n))
+    return "acc";
+  if (/jager|cody|trion|hilton|fenrir|ricardo|regal|divan|\/fab[0-9]/.test(n)) return "bedframe";
+  if (/hk55|dsl90|dsl80|am90|th50|th51|glano|muro|nuvio|lunor|modulo|seater|incliner|eleganz/.test(n))
+    return "sofa";
+  if (/firmcare|softcloud|breeze|lumi|forte|sonic|haven|solace|meridian|b120|l120|h140|m140|s160/.test(n))
+    return "mattress";
+  if (/^ms[0-9]/.test(n)) return "mattress";
+  if (/^bf[0-9]/.test(n)) return "bedframe";
+  if (/^sf[0-9]/.test(n)) return "sofa";
   return "acc";
 }
 
 function lineSize(sku: string): string | null {
-  const m = sku.trim().match(/-([KQS])$/i);
+  const s = sku.toLowerCase();
+  // Bedframes/mattresses write the size as a WORD mid-SKU ("Fab3-King",
+  // "Fab2-Queen") as well as the canonical `-K/-Q/-S` suffix. Queen is tested
+  // before King so "super king" still reads K, not a false Q.
+  if (/\bqueen\b/.test(s)) return "Q";
+  if (/\bking\b/.test(s)) return "K";
+  if (/\b(?:super\s*)?single\b/.test(s)) return "S";
+  const m = sku.match(/-([kqs])(?=$|[/\s)])/i);
   return m ? m[1].toUpperCase() : null;
 }
 
@@ -355,7 +379,10 @@ function itemTags(
   for (const cat of CORE_ORDER) {
     const e = core.get(cat);
     if (!e) continue;
-    const sizes = e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
+    // Sofas are sized by seater config (2/3 Seater, L-shape), NOT K/Q/S — Jess:
+    // show SOF alone; the seater lives in the drawer + items tooltip.
+    const sizes =
+      cat !== "sofa" && e.sizes.size ? `(${[...e.sizes].sort().join(",")})` : "";
     out.push({ kind: "core", qty: e.qty, name: `${CORE_LABEL[cat]}${sizes}` });
   }
   for (const wanted of ["acc", "service"] as const)
