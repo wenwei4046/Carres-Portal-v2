@@ -6,9 +6,35 @@ Handoff for a new chat. The redesign was built in worktree `orders-column`
 
 ---
 
-## 0. ⚠️ GIT STATE — READ THIS FIRST (don't blind `git pull`)
+## 0. ✅ GIT STATE — RECONCILE DONE (2026-06-23)
 
-After the merge, local `main` and `origin/main` have **DIVERGED**:
+**Reconciled 2026-06-23** — the work now lives in worktree
+`C:/Users/User/carres-worktrees/orders-drawer` on branch **`feat/orders-drawer-redesign`**
+(merge `da5dba8` + reconcile-fix `fc24777`). Main repo `main` = `origin/main`
+(`3d69fc2`), clean + deployable; the 32 commits were NOT lost. Safety nets:
+`backup/orders-drawer-2026-06-23` + reflog `69d7d1d`. **NOT pushed / NOT deployed** —
+awaiting `push` / `上线`. What the reconcile did:
+- migrations **0167–0170 → 0180–0183** (origin reached 0179; pure `ALTER TABLE
+  ops_order_control ADD COLUMN`, renamed only). **Still NOT applied to prod.**
+- OperationOrdersControl: kept the orders-drawer layout; phase 11's **Process**
+  (`proceed_date`) column auto-merged in → table is now 9 cols (colSpan 9).
+- OrderControlPanel: kept the field-group refactor (the `OrderControlPanel` default
+  export is GONE); phase 11's `proceedDate` sewn into `RoutingFields` (set_order_date
+  now requires `proceedDate <= delivery date`).
+- OrderDetailDrawer: kept the redesigned body; phase 11's enum rename
+  (`proceed_request→confirmed`, `awaiting_operation_action→in_production`) auto-merged
+  into stage derivation + ActionBar.
+- CLAUDE.md §17.1 → took origin's status table (through 0179).
+- The DECISION below resolved itself: phase 11 touched these files only ~40 lines
+  (enum + proceedDate) vs the redesign's 1528 → orders-drawer is the body, phase 11 a graft.
+- **Verified**: tsc shared/api/web clean · web 725 pass / 5 fail + api 805 pass / 3 fail
+  (all §17.7 pre-existing) · shared 344/344 · vite build OK.
+- **To ship** (after go): apply 0180–0183 to prod (project `kfprgpjpaffedghytstl`) →
+  merge `feat/orders-drawer-redesign` → `main` → push → deploy api+web (§4, new numbers).
+
+<details><summary>Original divergence analysis + reconcile plan (now executed)</summary>
+
+After the merge, local `main` and `origin/main` had **DIVERGED**:
 - **local `main` is ~32 commits ahead of origin** = this whole redesign (incl.
   migrations **0167–0170**) + a few earlier unpushed docs commits. **Unpushed + precious.**
 - **`origin/main` is ~104 commits ahead** (Jess/wenwei **phase 11 state-redesign**,
@@ -40,12 +66,14 @@ de-registered (`git worktree list` shows only main) but the physical dirs couldn
 deleted (OneDrive/long-path lock — that's the `git worktree prune` Permission-denied).
 Harmless; delete manually or on reboot.
 
+</details>
+
 ---
 
 ## 1. State at checkpoint
 
 - Branch `phase/10-orders-column`, 29 commits ahead of `main` (`git log main..HEAD`).
-- **New migrations (NOT applied to prod DB yet):** `0167`–`0170` on `ops_order_control`:
+- **New migrations (NOT applied to prod DB yet; renumbered to `0180`–`0183` in the 2026-06-23 reconcile — see §0):** `0167`–`0170` (now `0180`–`0183`) on `ops_order_control`:
   - 0167 — `logistic_eta`, `paid_amount`, `storage_paid`
   - 0168 — `line_locations` jsonb, `called_customer` bool
   - 0169 — `storage_to` date
@@ -110,7 +138,7 @@ receiving handling). V1 today = manual (set Location=at-supplier + a Task).
 - On `bulk`/list visibility of storage owing if wanted later.
 
 ## 4. To deploy this session (上线) — exact steps
-1. Apply migrations **0167, 0168, 0169, 0170** to prod DB (Supabase MCP `apply_migration`,
+1. Apply migrations **0180, 0181, 0182, 0183** to prod DB (Supabase MCP `apply_migration`,
    project `kfprgpjpaffedghytstl`). All additive/nullable → zero-downtime.
 2. `git checkout main` (main repo) → merge `phase/10-orders-column` → push.
 3. Build + deploy **api** (wrangler) + **web** (`wrangler pages deploy --branch=main`,
@@ -130,4 +158,4 @@ receiving handling). V1 today = manual (set Location=at-supplier + a Task).
   STORAGE_RATES + computeStorageFee.
 - `apps/api/src/routes/operation/order-control.ts` — GET/PUT overlay (select lists carry
   all the new cols).
-- `supabase/migrations/0167–0170` — the overlay columns.
+- `supabase/migrations/0180–0183` — the overlay columns (renumbered from 0167–0170 in the 2026-06-23 reconcile).
