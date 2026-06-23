@@ -48,6 +48,7 @@ interface Draft {
   paid_amount: string;
   storage_paid: string;
   line_locations: Record<string, string[]>;
+  line_etas: Record<string, string>;
   called_customer: boolean;
 }
 
@@ -68,6 +69,7 @@ const EMPTY: Draft = {
   paid_amount: "",
   storage_paid: "",
   line_locations: {},
+  line_etas: {},
   called_customer: false,
 };
 
@@ -125,6 +127,9 @@ export interface OrderControlForm {
   remarkCount: number;
   /** Set the stock location(s) for one order line (per-SKU; migration 0168). */
   setLineLocation: (sku: string, locs: string[]) => void;
+  /** Set the stock ETA for one order line (per-SKU; migration 0170 — products
+   *  don't all arrive on the same date, Jess). */
+  setLineEta: (sku: string, eta: string) => void;
   /** Storage-fee inputs from the control overlay (migration 0165). */
   storageFrom: string | null;
   storageOverride: number | null;
@@ -158,6 +163,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       paid_amount: c.paid_amount != null ? String(c.paid_amount) : "",
       storage_paid: c.storage_paid ?? "",
       line_locations: c.line_locations ?? {},
+      line_etas: c.line_etas ?? {},
       called_customer: c.called_customer ?? false,
     };
   }, [data]);
@@ -204,6 +210,8 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
         Object.keys(draft.line_locations).length > 0
           ? draft.line_locations
           : null,
+      line_etas:
+        Object.keys(draft.line_etas).length > 0 ? draft.line_etas : null,
       called_customer: draft.called_customer,
     };
     save.mutate(payload);
@@ -231,28 +239,16 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
         ...d,
         line_locations: { ...d.line_locations, [sku]: locs },
       })),
+    setLineEta: (sku, eta) =>
+      setDraft((d) => ({
+        ...d,
+        line_etas: { ...d.line_etas, [sku]: eta },
+      })),
     storageFrom: draft.storage_from.trim() ? draft.storage_from : null,
     storageOverride: draft.storage_fee_override.trim()
       ? Number(draft.storage_fee_override)
       : null,
   };
-}
-
-/** Stock ETA → the Items & stock section. One ETA for the whole order ("applies
- *  to every stock product", Jess). The old order-level location chips were
- *  removed — each item now carries its own Location in the items table. */
-export function StockControlFields({ form }: { form: OrderControlForm }) {
-  const { draft, set } = form;
-  return (
-    <FieldRow label="Stock ETA">
-      <input
-        type="date"
-        value={draft.stock_eta}
-        onChange={(e) => set("stock_eta", e.target.value)}
-        className={CELL}
-      />
-    </FieldRow>
-  );
 }
 
 /** Region + logistic select + delivery date → the Delivery grid. Writes

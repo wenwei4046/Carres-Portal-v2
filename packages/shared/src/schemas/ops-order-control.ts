@@ -87,6 +87,9 @@ export const opsOrderControlSchema = z.object({
   /** Per-line stock location { <sku>: string[] } + a call-first gate
    *  (migration 0168). */
   line_locations: z.record(z.string(), z.array(z.string())).nullable(),
+  /** Per-line stock ETA { <sku>: "yyyy-mm-dd" } — products don't all arrive on
+   *  the same date (migration 0170, Jess). */
+  line_etas: z.record(z.string(), z.string()).nullable(),
   called_customer: z.boolean().default(false),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
@@ -156,6 +159,7 @@ export const updateOpsOrderControlInput = z
     paid_amount: z.number().min(0).max(99_999_999).nullable(),
     storage_paid: z.string().max(100).nullable(),
     line_locations: z.record(z.string(), z.array(z.string())).nullable(),
+    line_etas: z.record(z.string(), z.string()).nullable(),
     called_customer: z.boolean(),
   })
   .partial()

@@ -41,7 +41,6 @@ import DeliveryChain from "./DeliveryChain";
 import {
   useOrderControlForm,
   RoutingFields,
-  StockControlFields,
   DeliveryTimeSlotField,
   LogisticEtaField,
   PaymentControlFields,
@@ -637,8 +636,11 @@ function DrawerBody({
                     On hand
                   </th>
                 )}
-                <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-44">
+                <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-36">
                   Location
+                </th>
+                <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-32">
+                  ETA
                 </th>
               </tr>
             </thead>
@@ -660,6 +662,9 @@ function DrawerBody({
                   savedLoc !== undefined
                     ? (savedLoc[0] ?? "")
                     : (defaultLineLocation(l.sku) ?? "");
+                // Per-item stock ETA (migration 0170) — products don't all arrive
+                // on the same date, so each line carries its own ETA.
+                const etaValue = form.draft.line_etas[l.sku] ?? "";
                 // One row per SKU (duplicate lines combined above) → key on SKU.
                 return (
                   <tr key={l.sku}>
@@ -701,6 +706,20 @@ function DrawerBody({
                         </select>
                       </td>
                     )}
+                    {isService ? (
+                      <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
+                        N/A
+                      </td>
+                    ) : (
+                      <td className="border border-base-200 px-1 py-0.5 align-top">
+                        <input
+                          type="date"
+                          value={etaValue}
+                          onChange={(e) => form.setLineEta(l.sku, e.target.value)}
+                          className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                        />
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -713,7 +732,6 @@ function DrawerBody({
                   {warehouse?.name ?? <em className="text-base-500">—</em>}
                 </div>
               </FieldRow>
-              <StockControlFields form={form} />
               <RemarkControlField
                 form={form}
                 field="warehouse_remark"
