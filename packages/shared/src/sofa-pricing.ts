@@ -576,3 +576,78 @@ export function explodeSofaBuild(
     cellIndex: i,
   }));
 }
+
+/* ─── explodeSofaBuildToOrderLines (Phase 5 — the order-line shape) ─────── */
+
+/**
+ * One exploded per-cell line, ready to become an `order_line` (Phase 5, sofa
+ * engine). The analog of `ExplodedComboLine` for sofa builds.
+ *
+ * `sku === null` means the cell's compartment has NO synced `product_skus` row
+ * (it was never offered on this model, so 5A never minted its sku). The caller
+ * (the Hono explode in `apps/api`) MUST fail CLOSED on a null sku — never drop
+ * the line silently, or the order total would no longer sum to the build price
+ * and a compartment would ship untracked. In normal flow this never happens:
+ * every offered compartment is synced to a real sku before any build can use it.
+ */
+export interface ExplodedSofaOrderLine {
+  /** The real `{MODEL}-{code}` `product_skus.sku`, or `null` when unmapped. */
+  sku: string | null;
+  /** The compartment code this cell was built from (for the null-sku error). */
+  moduleCode: string;
+  qty: number;
+  unitPrice: number;
+  cellIndex: number;
+  /** `order_lines.attrs`: regroup key + cell geometry + fabric (on EVERY line). */
+  attrs: Record<string, unknown>;
+}
+
+export interface ExplodeSofaToLinesOpts {
+  /** À-la-carte weight per compartment code for the proportional split — the
+   *  SAME lookup `computeSofaPrice` uses (so the split tracks the price basis). */
+  priceLookup: (code: string) => number;
+  /** The model's `compartment code → real product_skus.sku` map; `null` when a
+   *  code has no synced sku (caller fails closed). */
+  codeToSku: (code: string) => string | null;
+  /** Fabric attrs stamped on EVERY exploded line — each compartment is made in
+   *  the same fabric, and the operation `CreatePOModal` cascade keys off these
+   *  per line (`fabric_id` / `fabric_name` / `fabric_surcharge` / `fabric_tier`). */
+  fabricAttrs?: Record<string, unknown>;
+}
+
+/**
+ * Explode a sofa build into per-compartment order lines (Phase 5). Delegates the
+ * Σ-exact price split to `explodeSofaBuild` (residue-on-last), then joins each
+ * cell to its real sku + stamps `order_lines.attrs`:
+ *   `{ ...fabricAttrs, sofa_build_key, cell_index, x, y, rot }`
+ * Structural keys are spread LAST so a stray fabric key can never clobber them.
+ * Fabric rides on every line; there are no build-level extras in v1
+ * (reclinerExtra is a stub). Pure — no IO; the caller supplies both lookups.
+ */
+export function explodeSofaBuildToOrderLines(
+  build: SofaBuild,
+  totalMyr: number,
+  opts: ExplodeSofaToLinesOpts,
+): ExplodedSofaOrderLine[] {
+  const split = explodeSofaBuild(build, totalMyr, opts.priceLookup);
+  const fabric = opts.fabricAttrs ?? {};
+  return split.map((line) => {
+    const cell = build.cells[line.cellIndex];
+    return {
+      sku: opts.codeToSku(line.moduleCode),
+      moduleCode: line.moduleCode,
+      qty: line.qty,
+      unitPrice: line.unitPrice,
+      cellIndex: line.cellIndex,
+      attrs: {
+        ...fabric,
+        sofa_build_key: line.buildKey,
+        cell_index: line.cellIndex,
+        module_code: line.moduleCode,
+        x: cell?.x ?? null,
+        y: cell?.y ?? null,
+        rot: cell?.rot ?? null,
+      },
+    };
+  });
+}

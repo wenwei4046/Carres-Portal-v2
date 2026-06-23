@@ -493,6 +493,7 @@ export {
   pickSofaCombo,
   computeSofaPrice,
   explodeSofaBuild,
+  explodeSofaBuildToOrderLines,
   sofaPriceWithinTolerance,
   SOFA_PRICE_DRIFT_TOLERANCE,
   type SofaComboLike,
@@ -504,7 +505,13 @@ export {
   type SofaPriceBasis,
   type SofaPriceResult,
   type ExplodedSofaLine,
+  type ExplodedSofaOrderLine,
+  type ExplodeSofaToLinesOpts,
 } from "./sofa-pricing";
+
+// The one derived-sku formula ({MODEL_KEY}-{variant}) shared by the api mint +
+// generate-skus + the web maintenance read-back (no triplicated copies).
+export { deriveSkuCode } from "./sku-code";
 
 // Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /
 // arm-cap closure). No DOM/React; cm-space math reused by the web builder + P4

@@ -11,6 +11,7 @@ import type {
   ModelSofaCompartmentDto,
   FabricTierValue,
 } from "@carres/shared";
+import { deriveSkuCode } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
   useCreateSofaFabric,
@@ -184,6 +185,7 @@ export default function ProductModelDrawer({
           {model.category === "sofa" && catalog && (
             <SofaCompartmentsOfferedPanel
               modelId={model.id}
+              modelKey={model.modelKey}
               pool={(catalog.sofaCompartments ?? []).filter((c) => c.active)}
               offered={(catalog.modelSofaCompartments ?? []).filter((o) => o.modelId === model.id)}
               isPrincipal={isPrincipal ?? false}
@@ -718,11 +720,13 @@ function SofaFabricsPanel({
 
 function SofaCompartmentsOfferedPanel({
   modelId,
+  modelKey,
   pool,
   offered,
   isPrincipal,
 }: {
   modelId: string;
+  modelKey: string;
   pool: SofaCompartmentDto[];
   offered: ModelSofaCompartmentDto[];
   isPrincipal: boolean;
@@ -730,6 +734,13 @@ function SofaCompartmentsOfferedPanel({
   const upsert = useUpsertModelSofaCompartment();
   const del = useDeleteModelSofaCompartment();
   const offeredById = new Map(offered.map((o) => [o.compartmentId, o]));
+
+  // Phase 5 — offering a compartment auto-syncs a real product_skus row whose
+  // sku is the shared `deriveSkuCode(modelKey, code)` (one formula, no drift with
+  // the api mint). It is always pos_active=false, so it never shows in the flat
+  // POS grid. Derived client-side for a read-back so the principal sees the sync
+  // landed — no API round-trip needed.
+  const syncedSku = (code: string) => deriveSkuCode(modelKey, code);
 
   function toggle(comp: SofaCompartmentDto, on: boolean) {
     const opts = {
@@ -798,7 +809,18 @@ function SofaCompartmentsOfferedPanel({
                 data-testid={`offered-check-${comp.code}`}
               />
               <CodeChip>{comp.code}</CodeChip>
-              <span className="t-small text-base-600 truncate">{comp.description ?? "—"}</span>
+              <div className="min-w-0">
+                <span className="t-small text-base-600 truncate block">{comp.description ?? "—"}</span>
+                {isOffered && (
+                  <span
+                    className="font-mono text-[10px] text-base-400 truncate block"
+                    title="Auto-synced catalog SKU (hidden from the POS grid)"
+                    data-testid={`synced-sku-${comp.code}`}
+                  >
+                    → {syncedSku(comp.code)} · pos off
+                  </span>
+                )}
+              </div>
               <input
                 key={`po-${comp.id}-${row?.priceOverride ?? "x"}-${isOffered}`}
                 type="number"

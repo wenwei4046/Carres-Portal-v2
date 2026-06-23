@@ -420,6 +420,17 @@ function buildWriteSb(opts: {
     // Tests stub the row(s) directly, so we just no-op the filter — the
     // arrange step is responsible for seeding the right row.
     chain.contains = (_col: string, _val: unknown) => chain;
+    // Phase 5 — `.not(col, "is", null)` for the compartment-sku supplier inherit
+    // (product_skus where supplier_id is not null). Filters in read mode only.
+    chain.not = (col: string, op: string, val: unknown) => {
+      if (mode === "read" && op === "is" && val === null) {
+        rows = rows.filter((r) => {
+          const v = (r as Record<string, unknown>)[col];
+          return v !== null && v !== undefined;
+        });
+      }
+      return chain;
+    };
     chain.limit = (_n: number) => chain;
     chain.maybeSingle = async () => {
       if (mode === "write") return { data: writeReturn, error: null };
@@ -1645,11 +1656,18 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     expect((upd?.payload as { active: boolean }).active).toBe(false);
   });
 
-  it("PUT /models/:id/compartments/:cid — principal upserts offered → 200", async () => {
+  it("PUT /models/:id/compartments/:cid — principal upserts offered → 200 + syncs the compartment sku", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(
       buildWriteSb({
         recorded,
+        // Phase 5 — the auto-sync reads the model (sku prefix + category), the
+        // pool compartment, and the model's own supplier before the upsert.
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa" }],
+          sofa_compartments: [COMP_ROW],
+          product_skus: [{ model_id: MODEL_ID_LIVE, supplier_id: "sup-ohana" }],
+        },
         writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: 280, sort_order: 0 },
       }),
     );
@@ -1663,12 +1681,114 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       env,
     );
     expect(res.status).toBe(200);
-    const ups = recorded.find((r) => r.op === "upsert");
-    expect((ups?.payload as { compartment_id: string }).compartment_id).toBe(COMP_ID);
+
+    // The synced compartment sku: real product_skus row, pos_active OFF (never in
+    // the flat POS grid), variant_kind 'part', deterministic {MODEL_KEY}-{code}
+    // sku, inherited supplier, the override price, compartment_id linked.
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    expect(skuUpsert?.payload).toMatchObject({
+      sku: "OHANA-1A(LHF)",
+      model_id: MODEL_ID_LIVE,
+      compartment_id: COMP_ID,
+      variant: "1A(LHF)",
+      variant_kind: "part",
+      price: 280,
+      supplier_id: "sup-ohana",
+      pos_active: false,
+      discontinued_at: null,
+    });
+    // cost is OMITTED so a manually-set cost survives a re-sync.
+    expect(skuUpsert?.payload).not.toHaveProperty("cost");
+
+    // The offered row still upserts.
+    const offered = recorded.find((r) => r.op === "upsert" && r.table === "model_sofa_compartments");
+    expect((offered?.payload as { compartment_id: string }).compartment_id).toBe(COMP_ID);
     const body = (await res.json()) as {
       modelSofaCompartment: { modelId: string; compartmentId: string; priceOverride: number };
     };
     expect(body.modelSofaCompartment).toMatchObject({ modelId: MODEL_ID_LIVE, compartmentId: COMP_ID, priceOverride: 280 });
+  });
+
+  it("PUT — no model-own supplier → falls back to the category cover; sku still synced", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa" }],
+          sofa_compartments: [COMP_ROW],
+          product_skus: [], // model has no existing sku → no own supplier
+          suppliers: [{ id: "sup-covers-sofa" }],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    // priceOverride null → falls back to the pool default_price (250).
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-covers-sofa", price: 250, pos_active: false });
+  });
+
+  it("PUT — unknown model → 404 fail-closed (no offered row written)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, reads: { product_models: [] }, writeReturn: null }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: 280 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    // sync ran first + failed → the offered row was NEVER upserted.
+    expect(recorded.find((r) => r.table === "model_sofa_compartments")).toBeUndefined();
+  });
+
+  it("PUT — derived sku collides with an existing FLAT product → 422 sku_collision (never clobbers it)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa" }],
+          sofa_compartments: [COMP_ROW],
+          // The model's own supplier read + the collision read both hit
+          // product_skus. The colliding flat row has compartment_id NULL.
+          product_skus: [
+            { model_id: MODEL_ID_LIVE, supplier_id: "sup-ohana" },
+            { sku: "OHANA-1A(LHF)", compartment_id: null },
+          ],
+        },
+        writeReturn: null,
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: 280 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("sku_collision");
+    // Never upserted product_skus (no clobber) and never wrote the offered row.
+    expect(recorded.find((r) => r.op === "upsert" && r.table === "product_skus")).toBeUndefined();
+    expect(recorded.find((r) => r.table === "model_sofa_compartments")).toBeUndefined();
   });
 
   it("PUT /models/:id/compartments/:cid — non-principal → 403", async () => {
@@ -1685,7 +1805,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
   });
 
-  it("DELETE /models/:id/compartments/:cid — un-offer → 200 (delete recorded)", async () => {
+  it("DELETE /models/:id/compartments/:cid — un-offer → 200 (delete offered + discontinue sku, never delete sku)", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: null }));
     const jwt = await makeJwt("principal", null);
@@ -1697,7 +1817,14 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       env,
     );
     expect(res.status).toBe(200);
+    // The OFFERED row is hard-deleted...
     expect(recorded.find((r) => r.op === "delete")?.table).toBe("model_sofa_compartments");
+    // ...but the compartment's sku is only SOFT-discontinued (historical
+    // order_lines may FK it) — an update, never a product_skus delete.
+    const disc = recorded.find((r) => r.op === "update" && r.table === "product_skus");
+    expect((disc?.payload as { pos_active: boolean }).pos_active).toBe(false);
+    expect((disc?.payload as { discontinued_at: string | null }).discontinued_at).toBeTruthy();
+    expect(recorded.find((r) => r.op === "delete" && r.table === "product_skus")).toBeUndefined();
   });
 });
 

@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { proceedBlockers } from "@/lib/order-blockers";
 import { useCatalog, useOrder, useProceedOrder } from "@/lib/queries";
 import { orderTotal, lineSubtotal, addonSubtotal, floorSurcharge } from "@/lib/order-totals";
+import { groupSofaBuildLines } from "@/lib/sofa-build-display";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import AddAddressModal from "./order-actions/AddAddressModal";
 import CancelOrderDialog from "./order-actions/CancelOrderDialog";
@@ -184,15 +185,26 @@ function OrderBody({
         <KV label="Proceed" value={order.delivery.dateTbd ? "TBD" : (order.delivery.proceedDate ?? "—")} />
       </div>
 
-      {/* Items */}
+      {/* Items — exploded sofa-build lines (sharing a sofa_build_key) collapse
+       *  into one "Sofa" row for the customer view; every flat line renders
+       *  exactly as before (groupSofaBuildLines is a no-op for keyless lines). */}
       <p className="label mb-2">Items</p>
       <div className="rounded border border-base-900/10 mb-4 overflow-hidden">
-        {(order.lines ?? []).map((l, i) => (
-          <div key={l.id} className={`flex justify-between px-3.5 py-2.5 text-sm ${i ? "border-t border-base-100" : ""}`}>
-            <span className="font-mono">{l.sku} × {l.qty}</span>
-            <span className="font-mono">RM {(l.unitPrice * l.qty).toLocaleString()}</span>
-          </div>
-        ))}
+        {groupSofaBuildLines(order.lines ?? []).map((row, i) =>
+          row.kind === "sofa_build" ? (
+            <div key={row.buildKey} className={`flex justify-between px-3.5 py-2.5 text-sm ${i ? "border-t border-base-100" : ""}`}>
+              <span className="font-mono">
+                Sofa · {row.summary} × {row.qty}
+              </span>
+              <span className="font-mono">RM {row.totalPrice.toLocaleString()}</span>
+            </div>
+          ) : (
+            <div key={row.line.id} className={`flex justify-between px-3.5 py-2.5 text-sm ${i ? "border-t border-base-100" : ""}`}>
+              <span className="font-mono">{row.line.sku} × {row.line.qty}</span>
+              <span className="font-mono">RM {(row.line.unitPrice * row.line.qty).toLocaleString()}</span>
+            </div>
+          ),
+        )}
         {(order.addons ?? []).map((a, i) => {
           // 2026-05-19 (migration 0133) — disposal addons carry an attrs.size
           // tag set by the wizard. Render it next to the addon key so the
