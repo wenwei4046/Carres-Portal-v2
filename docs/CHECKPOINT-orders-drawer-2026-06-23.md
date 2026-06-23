@@ -1,5 +1,59 @@
 # CHECKPOINT — Operation order-drawer redesign (2026-06-23)
 
+## ▶ RESUME AT HOME (session 2 — READ THIS FIRST)
+
+**Where the work is:** branch **`feat/orders-drawer-redesign`**, **pushed to origin**.
+At home, in the Carres-Portal-v2 repo: `git fetch origin && git checkout
+feat/orders-drawer-redesign`. HEAD = `1f040dc` (or later). Main repo `main` =
+`origin/main` (clean). **NOT merged to main, NOT deployed** — await `上线`.
+
+**Done this session (all committed on feat):**
+- ✅ **RECONCILE** with origin/main (Jess phase 11 + sofa engine, +104 commits) — see §0.
+  Migrations renumbered **0167-0170 → 0180-0183** (NOT yet applied to prod). Verified
+  tsc + tests + build, zero new regressions.
+- ✅ **UI tweaks** (`1f040dc`): order **#SO in drawer header → 20px bold**; outstation
+  call-first gate reworded to **"Call before PO"** (list badge + drawer field + proceed
+  gate msg; full sentence "Call customer to confirm final ETA before ordering stock"
+  in the hover tooltip).
+- Answered Jess (no code): the ⋮ Download "missing Excel/PDF" = Invoice/DO PDFs are
+  conditional (only after that doc exists) + "Excel" is a CSV export. "General note" =
+  the AnnotationTimeline note + tags (Follow up / Escalate to Jess / Resolved).
+
+**NEXT — decided this session, NOT started:**
+1. **STORAGE-FEE COLLECTION — APPROVED, build next.** Workflow: storage fee accrues
+   from ETA (**MS/BF RM150/mo, Sofa RM200/2wk**, auto + editable); operation **collects
+   it BEFORE delivery** → issues a **receipt** (PDF, opened from the ⋮ menu) → **delivery
+   is GATED** until collected → if customer won't pay, operation requests a **waiver that
+   needs principal (Jess) approval**. Build plan (also tasks #7-#10, office-only):
+   (a) migration **0184** — add `storage_paid_amount` / `storage_collected_at` /
+   `storage_receipt_no` to `ops_order_control` + `storage_waiver` value to the
+   `approval_kind` enum; (b) shared storage-owing calc + zod; API `collect-storage` /
+   `request-waiver` (creates an `approvals` row) / `storage-receipt-data` + a
+   **storage-unpaid GUARD** on the dispatch RPC; (c) drawer Storage section Collect +
+   Request-waiver buttons + **rebuild the ⋮ Download submenu Google-Sheets style**
+   (Excel / PDF / CSV always-on + SO / Invoice / DO / **Receipt**) + a storage-receipt
+   PDF template; (d) extend `approval_decide` for `storage_waiver` + show it in the
+   principal Approvals list. Mirror: `approval_decide` (migrations 0001/0014 + apps/api
+   principal/approvals.ts + apps/web ApprovalDrawer.tsx); invoice/DO PDF
+   (apps/web/src/lib/pdf/{invoice,do}-template.tsx, JSON-from-API → browser @react-pdf);
+   dispatch RPCs `operation_attach_do_and_deliver` (0128) + `operation_confirm_proceed_request_v3`.
+2. **STAR / follow-up flag (multi-operator handoff) — PROPOSED, Jess leaning yes; confirm
+   before building.** Operation is run by MULTIPLE people with mid-order handoffs. Plan
+   (my rec, Jess liked it): a Gmail-style **⭐ Star in the drawer header** → shows in the
+   Orders list + a **"⭐ Follow-up" filter chip** (next to the Urgent chip) → filter to
+   flagged orders. The "why / what's left for the next person" reuses the existing
+   AnnotationTimeline note (records who/when/what). Unify with the existing
+   list-invisible `🔔 Follow up` annotation tag. Small: 1 boolean on `ops_order_control`
+   + header star + list icon + filter chip.
+
+**Still pending from before:** Q2 (GRN two-way sync + stock reserve), Q5 (courier-when-received).
+
+> Preview note (office machine only, ignore at home): ran from the worktree at
+> localhost:5173 (operation@carres.com, live prod). The office main repo's
+> `.claude/launch.json` `web` was repointed at the worktree — uncommitted, local-only.
+
+---
+
 Handoff for a new chat. The redesign was built in worktree `orders-column`
 (branch `phase/10-orders-column`), then **fast-forward merged into LOCAL `main`**
 (HEAD `14d43a3`); the branch + worktree were removed. **It was NOT pushed to origin.**
