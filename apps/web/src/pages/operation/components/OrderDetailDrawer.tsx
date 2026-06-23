@@ -637,11 +637,12 @@ function DrawerBody({
                 <th className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-10">
                   Qty
                 </th>
-                {stage !== "delivered" && (
-                  <th className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-16">
-                    On hand
-                  </th>
-                )}
+                <th
+                  className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-16"
+                  title="Free ready stock at the warehouse for this item — pick Carres Klang in Location to fulfil from it"
+                >
+                  Ready
+                </th>
                 <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-36">
                   Location
                 </th>
@@ -682,13 +683,11 @@ function DrawerBody({
                     <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
                       {l.qty}
                     </td>
-                    {stage !== "delivered" && (
-                      <td
-                        className={`border border-base-200 px-2 py-1 text-right font-mono text-[11px] align-top ${ok ? "text-success" : "text-warning"}`}
-                      >
-                        {have}
-                      </td>
-                    )}
+                    <td
+                      className={`border border-base-200 px-2 py-1 text-right font-mono text-[11px] align-top ${stage === "delivered" ? "text-base-400" : ok ? "text-success" : "text-warning"}`}
+                    >
+                      {isService ? <span className="text-base-300">—</span> : have}
+                    </td>
                     {isService ? (
                       <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
                         N/A
