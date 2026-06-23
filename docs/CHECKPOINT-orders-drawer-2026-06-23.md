@@ -1,8 +1,44 @@
 # CHECKPOINT — Operation order-drawer redesign (2026-06-23)
 
-Handoff for a **new chat to continue after this session is merged**. Work lives on
-branch **`phase/10-orders-column`** (worktree `.claude/worktrees/orders-column`),
-**29 commits ahead of main, NOT pushed/deployed**.
+Handoff for a new chat. The redesign was built in worktree `orders-column`
+(branch `phase/10-orders-column`), then **fast-forward merged into LOCAL `main`**
+(HEAD `14d43a3`); the branch + worktree were removed. **It was NOT pushed to origin.**
+
+---
+
+## 0. ⚠️ GIT STATE — READ THIS FIRST (don't blind `git pull`)
+
+After the merge, local `main` and `origin/main` have **DIVERGED**:
+- **local `main` is ~32 commits ahead of origin** = this whole redesign (incl.
+  migrations **0167–0170**) + a few earlier unpushed docs commits. **Unpushed + precious.**
+- **`origin/main` is ~104 commits ahead** (Jess/wenwei **phase 11 state-redesign**,
+  sofa phases, product catalog…). Common ancestor ~`750681f`.
+- A plain `git pull` merges 104+32 → **conflicts** in migrations (number collision) and
+  the operation pages (Jess redesigned the SAME files). **Never reset/force the 32 away.**
+
+**Safe reconcile (no `reset --hard`):**
+```bash
+git fetch origin
+git branch backup/orders-drawer-2026-06-23 main      # 1. double safety (also in reflog)
+git branch feat/orders-drawer-redesign main           # 2. park the work
+git checkout feat/orders-drawer-redesign
+git branch -f main origin/main                         # 3. align main to origin (main not
+                                                        #    checked out → moving ref is safe)
+# 4. on feat branch: rebase/merge onto new main + resolve. KEY:
+#    - renumber migrations 0167–0170 to after origin's highest (`ls supabase/migrations | tail`);
+#      they're independent `ALTER TABLE ops_order_control ADD COLUMN IF NOT EXISTS` → rename only.
+#    - operation pages conflict with Jess's phase 11 → see DECISION below.
+# 5. push + deploy after clean.
+```
+**DECISION needed from Loo:** Jess's phase 11 redesigned the operation pages
+(`OrderDetailDrawer` / `OperationOrdersControl` / `OrderControlPanel`) — confirm whether
+the orders-drawer redesign re-applies on top of phase 11 or is partly superseded, before
+resolving those file conflicts.
+
+**Leftover clutter:** `.claude/worktrees/orders-column` (+ old `order-panel`) folders are
+de-registered (`git worktree list` shows only main) but the physical dirs couldn't be
+deleted (OneDrive/long-path lock — that's the `git worktree prune` Permission-denied).
+Harmless; delete manually or on reboot.
 
 ---
 
