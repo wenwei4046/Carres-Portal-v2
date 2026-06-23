@@ -413,6 +413,8 @@ const SECTION_ACCENT: Record<
 function DrawerSection({
   icon,
   title,
+  titleExtra,
+  headerRight,
   summary,
   accent = "neutral",
   defaultOpen = false,
@@ -420,6 +422,10 @@ function DrawerSection({
 }: {
   icon: ReactNode;
   title: string;
+  /** Rendered right after the title (e.g. the SO number in the Order header). */
+  titleExtra?: ReactNode;
+  /** Pinned to the header's right edge, ALWAYS visible (e.g. the status chip). */
+  headerRight?: ReactNode;
   summary?: ReactNode;
   accent?: keyof typeof SECTION_ACCENT;
   defaultOpen?: boolean;
@@ -440,8 +446,10 @@ function DrawerSection({
         <span className="flex items-center gap-2 min-w-0">
           <span className={`${a.icon} shrink-0`}>{icon}</span>
           <span className="t-h4 text-base-900">{title}</span>
+          {titleExtra}
         </span>
         <span className="flex items-center gap-2 shrink-0">
+          {headerRight}
           {!open && summary != null && (
             <span className="text-[11px] text-base-500 truncate max-w-[180px]">
               {summary}
@@ -574,26 +582,23 @@ function DrawerBody({
             </span>
           </div>
         )}
-        {/* 1 · Order — the full order record as a grid */}
+        {/* 1 · Order — SO# + status live in the header (Jess: save a row, more
+            obvious); the grid holds customer / phone / address. */}
         <DrawerSection
           icon={<ClipboardList className="w-4 h-4" />}
           title="Order"
+          titleExtra={
+            <span className="font-mono text-[13px] font-semibold text-base-700">
+              #{order.so}
+            </span>
+          }
+          headerRight={<StageChip stage={stage} />}
           accent="neutral"
           summary={order.customer_name}
           defaultOpen
         >
           <table className="w-full border-collapse">
             <tbody>
-              <tr>
-                <Kc>Order ID</Kc>
-                <Vc>
-                  <span className="font-mono">#{order.so}</span>
-                </Vc>
-                <Kc>Status</Kc>
-                <Vc>
-                  <StageChip stage={stage} />
-                </Vc>
-              </tr>
               <tr>
                 <Kc>Customer</Kc>
                 <Vc>
