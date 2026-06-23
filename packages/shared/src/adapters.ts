@@ -44,6 +44,9 @@ export const productModelFromRow = (r: DB.ProductModelRow): D.ProductModel => ({
   gaps: r.gaps,
   sofaMode: r.sofa_mode,
   discontinuedAt: r.discontinued_at,
+  // 0171 — photo + option pool (default to an empty pool when absent).
+  photoUrl: r.photo_url ?? null,
+  allowedOptions: r.allowed_options ?? {},
 });
 
 export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
@@ -59,6 +62,13 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   // 2026-05-17 — pass through SKU-level supplier ownership.
   supplierId: r.supplier_id,
   discontinuedAt: r.discontinued_at,
+  // 0170 — sell-side flag (default true to match the column default when a
+  // legacy query didn't select it) + editable description.
+  posActive: r.pos_active ?? true,
+  description: r.description ?? null,
+  // 0178 — nullable link to a sofa compartment type (additive, null on every
+  // existing SKU).
+  compartmentId: r.compartment_id ?? null,
 });
 
 export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
@@ -68,6 +78,33 @@ export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
   surcharge: Number(r.surcharge),
   colors: r.colors,
   discontinuedAt: r.discontinued_at,
+  // 0176 — default to PRICE_1 if the column is absent on a legacy row fetched
+  // before the migration applied (belt-and-suspenders; the DB default also
+  // sets PRICE_1 for all pre-existing rows).
+  tier: (r.tier ?? "PRICE_1") as D.FabricTier,
+});
+
+/**
+ * Maps a `fabric_tier_addon_config` row to the camelCase domain shape.
+ * Postgres numeric(12,2) columns surface as strings or numbers depending on
+ * the PostgREST version; `Number()` normalises both.
+ */
+export const fabricTierConfigFromRow = (r: DB.FabricTierAddonConfigRow): D.FabricTierConfig => ({
+  sofaTier2Delta: Number(r.sofa_tier2_delta),
+  sofaTier3Delta: Number(r.sofa_tier3_delta),
+});
+
+/**
+ * Maps a `model_fabric_tier_overrides` row to the camelCase domain shape.
+ * Nullable deltas: `null` means "inherit from global" and must stay null
+ * (not coerced to 0) so callers can distinguish "set to zero" from "unset".
+ */
+export const modelFabricTierOverrideFromRow = (
+  r: DB.ModelFabricTierOverrideRow,
+): D.ModelFabricTierOverride => ({
+  modelId: r.model_id,
+  tier2Delta: r.tier2_delta == null ? null : Number(r.tier2_delta),
+  tier3Delta: r.tier3_delta == null ? null : Number(r.tier3_delta),
 });
 
 export const addonFromRow = (r: DB.AddonRow): D.Addon => ({
@@ -75,6 +112,8 @@ export const addonFromRow = (r: DB.AddonRow): D.Addon => ({
   name: r.name,
   price: Number(r.price),
   active: r.active,
+  // 0172 — link to the Service-category SKU (bare SVC- code).
+  serviceSku: r.service_sku ?? null,
 });
 
 export const floorConfigFromRow = (r: DB.FloorConfigRow): D.FloorConfig => ({
@@ -82,6 +121,91 @@ export const floorConfigFromRow = (r: DB.FloorConfigRow): D.FloorConfig => ({
   freeUpToFloor: r.free_up_to_floor,
   perFloorPerItem: Number(r.per_floor_per_item),
 });
+
+/**
+ * Maps a `combo_components` row to the camelCase domain shape (migration 0177).
+ */
+export const comboComponentFromRow = (r: DB.ComboComponentRow): D.ComboComponent => ({
+  sku: r.sku,
+  qty: Number(r.qty),
+  sortOrder: Number(r.sort_order),
+});
+
+/**
+ * Maps a `combos` row to the camelCase domain shape (migration 0177).
+ * `combo_price` is Postgres numeric — `Number()` normalises the string|number
+ * PostgREST surfaces it as. `components` is NOT on the row; the caller attaches
+ * the mapped `combo_components` (via comboComponentFromRow) after fetch, so this
+ * adapter defaults it to an empty array.
+ */
+export const comboFromRow = (r: DB.ComboRow): D.Combo => ({
+  id: r.id,
+  comboKey: r.combo_key,
+  name: r.name,
+  comboPrice: Number(r.combo_price),
+  active: r.active,
+  effectiveFrom: r.effective_from,
+  components: [],
+});
+
+/**
+ * Maps a `sofa_compartments` row to the camelCase domain shape (migration 0178).
+ * `default_price` is Postgres numeric(12,2) — `Number()` normalises the
+ * string|number PostgREST surfaces it as. `seat_count` is nullable and stays
+ * null (not coerced to 0) so "unspecified" is distinct from "zero seats".
+ */
+export const sofaCompartmentFromRow = (r: DB.SofaCompartmentRow): D.SofaCompartment => ({
+  id: r.id,
+  code: r.code,
+  description: r.description ?? null,
+  seatCount: r.seat_count == null ? null : Number(r.seat_count),
+  armConfig: r.arm_config ?? null,
+  iconUrl: r.icon_url ?? null,
+  defaultPrice: Number(r.default_price),
+  sortOrder: Number(r.sort_order),
+  active: r.active,
+});
+
+/**
+ * Maps a `model_sofa_compartments` row to the camelCase domain shape (0178).
+ * `price_override` is nullable: `null` means "inherit the pool default_price"
+ * and must stay null (not coerced to 0) so callers can distinguish "no override"
+ * from "override set to zero".
+ */
+export const modelSofaCompartmentFromRow = (
+  r: DB.ModelSofaCompartmentRow,
+): D.ModelSofaCompartment => ({
+  modelId: r.model_id,
+  compartmentId: r.compartment_id,
+  priceOverride: r.price_override == null ? null : Number(r.price_override),
+  sortOrder: Number(r.sort_order),
+});
+
+/**
+ * Maps a `sofa_combo_pricing` row to the camelCase `SofaCombo` (0179).
+ * `slots` defaults to `[]` and `prices_by_height` to `{}` when the DB sends
+ * null. Every numeric price inside `prices_by_height` is `Number()`-coerced
+ * (PostgREST may serialize jsonb numerics as strings) while a `null` price is
+ * preserved (null = the combo does not apply at that height).
+ */
+export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
+  const rawPrices = r.prices_by_height ?? {};
+  const pricesByHeight: Record<string, number | null> = {};
+  for (const [height, price] of Object.entries(rawPrices)) {
+    pricesByHeight[height] = price == null ? null : Number(price);
+  }
+  return {
+    id: r.id,
+    modelId: r.model_id,
+    slots: r.slots ?? [],
+    tier: (r.tier ?? null) as D.SofaCombo["tier"],
+    pricesByHeight,
+    label: r.label ?? null,
+    effectiveFrom: r.effective_from,
+    active: r.active,
+    discontinuedAt: r.discontinued_at ?? null,
+  };
+};
 
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({
   id: r.id,
@@ -192,6 +316,9 @@ export const orderFromRow = (
   },
   delivery: {
     date: r.delivery_date,
+    // Phase 11.1 — `?? null` so rows fetched before migration 0165 (which added
+    // the column) surface as null rather than tripping zod's nullable check.
+    proceedDate: r.proceed_date ?? null,
     dateTbd: r.delivery_date_tbd,
     floor: r.delivery_floor,
     hasLift: r.delivery_has_lift,
@@ -386,6 +513,8 @@ export const orderInputToRpcPayload = (
   customer_billing_same: input.customer.billingSame,
   customer_emergency: input.customer.emergency,
   delivery_date: input.delivery.dateTbd ? null : input.delivery.date,
+  // Phase 11.1 — proceed date pairs with delivery date; both nulled when TBD.
+  proceed_date: input.delivery.dateTbd ? null : input.delivery.proceedDate,
   delivery_date_tbd: input.delivery.dateTbd,
   delivery_floor: input.delivery.floor,
   delivery_has_lift: input.delivery.hasLift,

@@ -22,18 +22,18 @@ import { cjkClassName } from "@/lib/cjk";
  *
  * Stage → accent token map mirrors proto lines 203:
  *   placed            → base-500 (muted — read-only, not yet proceeded)
- *   proceed_request   → warning  (honey, action-needed)
- *   awaiting_operation_action    → warning  (honey)
+ *   confirmed   → warning  (honey, action-needed)
+ *   in_production    → warning  (honey)
  *   ready_to_dispatch → info     (slate blue)
  *   dispatched        → success  (olive)
  *
- * Pipeline v2 (C3): added `placed` + `proceed_request` to mirror the kanban's
+ * Pipeline v2 (C3): added `placed` + `confirmed` to mirror the kanban's
  * 6-column shape on the dashboard's at-a-glance row.
  */
 export type PipelineStage =
   | "placed"
-  | "proceed_request"
-  | "awaiting_operation_action"
+  | "confirmed"
+  | "in_production"
   | "ready_to_dispatch"
   | "dispatched";
 
@@ -48,8 +48,8 @@ interface Props {
 
 const stageToText: Record<PipelineStage, string> = {
   placed: "text-base-500",
-  proceed_request: "text-warning",
-  awaiting_operation_action: "text-warning",
+  confirmed: "text-warning",
+  in_production: "text-warning",
   ready_to_dispatch: "text-info",
   dispatched: "text-success",
 };
@@ -62,9 +62,14 @@ const MAX_ORDERS = 5;
  *  sync with the kanban guarantees the dashboard's at-a-glance counts match
  *  what the user sees when they click through. */
 function derivePipelineStage(o: operationOrderListRow): PipelineStage | null {
-  if (o.status === "place") return "placed";
+  if (o.status === "place") {
+    // AutoCount-imported orders are already-confirmed sales (not awaiting a
+    // proceed request) → Confirmed column, matching the Orders grid's
+    // controlTabOf rule. Only native place orders sit in Placed.
+    return o.source_system === "autocount" ? "confirmed" : "placed";
+  }
   const s = o.operation_stage;
-  if (s === "proceed_request" || s === "awaiting_operation_action" || s === "ready_to_dispatch" || s === "dispatched") {
+  if (s === "confirmed" || s === "in_production" || s === "ready_to_dispatch" || s === "dispatched") {
     return s;
   }
   return null;

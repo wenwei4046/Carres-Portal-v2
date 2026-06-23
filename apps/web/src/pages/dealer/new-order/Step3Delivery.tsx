@@ -39,6 +39,9 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
   // it natively on most browsers; the wizard footer ALSO validates via
   // step3DateValid for browsers that ignore the min attribute (Safari old).
   const minDate = useMemo(() => minDeliveryDateISO(minLeadDays), [minLeadDays]);
+  // Phase 11.1 — proceed (production-start) date floor = today; ceiling = the
+  // delivery date. minDeliveryDateISO(0) is today in the same TZ as minDate.
+  const todayIso = useMemo(() => minDeliveryDateISO(0), []);
   // 2026-05-22 (Loo) — ASAP pill snaps exactly to the cart's lead time
   // (mattress 14 / sofa 21). Fallback to 1 day when the cart has no gated
   // categories so the pill doesn't show "0 days". The old Math.max(..,20)
@@ -91,10 +94,39 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
               label="Confirm later"
               checked={d.dateTbd}
               onChange={(v) =>
-                setD({ dateTbd: v, date: v ? "" : d.date, asap: v ? false : d.asap })
+                // Phase 11.1 — TBD covers BOTH dates (clear proceed date too).
+                setD({
+                  dateTbd: v,
+                  date: v ? "" : d.date,
+                  proceedDate: v ? "" : d.proceedDate,
+                  asap: v ? false : d.asap,
+                })
               }
             />
           </div>
+        </div>
+
+        {/* Phase 11.1 (Loo) — Proceed date = the day production should START.
+            Picked deliberately so we don't pull stock too early for a far-out
+            delivery. Bounded today..deliveryDate. Hidden value when TBD. */}
+        <div className="mt-3.5">
+          <Field label={d.dateTbd ? "Proceed date · production start (TBD)" : "Proceed date · production start *"}>
+            <input
+              type="date"
+              value={d.proceedDate}
+              min={todayIso}
+              max={d.date || undefined}
+              disabled={d.dateTbd}
+              onChange={(e) => setD({ proceedDate: e.target.value, asap: false })}
+              className={inputClass({ disabled: d.dateTbd })}
+              data-testid="proceed-date-input"
+            />
+          </Field>
+          <p className="text-[11px] text-base-500 mt-1.5">
+            When production should start — pick it deliberately (e.g. ~a month
+            before delivery) so we don't reserve stock too early. Must be on or
+            before the delivery date.
+          </p>
         </div>
 
         {/* "As Fast As Possible" pill — same auto-Proceed semantics as
@@ -105,7 +137,8 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
             type="button"
             onClick={() => {
               const iso = minDeliveryDateISO(asapDays);
-              setD({ date: iso, dateTbd: false, asap: true });
+              // Phase 11.1 — ASAP = start production now, so proceed date = today.
+              setD({ date: iso, proceedDate: todayIso, dateTbd: false, asap: true });
             }}
             disabled={d.dateTbd}
             className={`px-3 py-1.5 rounded text-[12px] font-semibold transition-colors ${
@@ -150,7 +183,7 @@ function Section({
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="font-display text-base font-semibold tracking-[-0.01em]">{title}</h3>
+        <h3 className="kicker">{title}</h3>
         {hint && <p className="text-[11px] text-base-500">{hint}</p>}
       </div>
       {children}
@@ -190,7 +223,10 @@ function InlineCheckbox({
 }
 
 function inputClass({ disabled }: { disabled?: boolean } = {}) {
-  return `w-full px-3 py-2.5 border border-base-300 rounded text-sm outline-none focus:border-primary ${
-    disabled ? "bg-base-50 text-base-500 cursor-not-allowed" : "bg-white"
+  // 2990s re-skin: rounded-xl, 1.5px border, flame focus ring.
+  return `w-full px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl text-sm outline-none transition-colors ${
+    disabled
+      ? "bg-base-50 text-base-500 cursor-not-allowed border-base-300"
+      : "bg-white focus:border-primary focus:ring-2 focus:ring-primary/10"
   }`;
 }

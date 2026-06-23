@@ -22,7 +22,7 @@ import { INPUT_CLS, Modal, ModalActions } from "./Modal";
  * orders.request_for_delivery_at, putting the order into the LP's "Incoming"
  * queue. The RPC ALSO auto-picks an `own` warehouse internally — covered
  * SKUs become reserved + the order flips to `ready_to_dispatch`; otherwise
- * the order goes to `awaiting_operation_action` and Operation issues POs
+ * the order goes to `in_production` and Operation issues POs
  * next. No warehouse choice from the dialog any more.
  *
  * Operation-side soft-lock (2026-05-22 Loo, commit 2d608c4) preserved: if
@@ -161,7 +161,7 @@ export default function ConfirmProceedDialog({
         order in their <strong>Incoming</strong> queue to accept or reject.
         The system auto-picks the source warehouse based on stock coverage —
         order goes to <strong>Ready to dispatch</strong> if covered, otherwise
-        to <strong>Awaiting operation action</strong> for PO issuance.
+        to <strong>In Production</strong> for PO issuance.
       </div>
 
       <div

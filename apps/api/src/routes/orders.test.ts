@@ -193,7 +193,7 @@ function validCreateBody(over: Record<string, unknown> = {}) {
       billingSame: true,
       emergency: "Tan Junior · 012-9988776 · Spouse",
     },
-    delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false },
+    delivery: { date: "2026-06-01", proceedDate: "2026-05-15", dateTbd: false, floor: 1, hasLift: false },
     lines: [
       {
         sku: "mattress:carres-classic:queen",
@@ -849,7 +849,7 @@ describe("POST /api/orders", () => {
           method: "POST",
           headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
           body: JSON.stringify(
-            validCreateBody({ delivery: { date: tooSoonIso, dateTbd: false, floor: 1, hasLift: false } }),
+            validCreateBody({ delivery: { date: tooSoonIso, proceedDate: tooSoonIso, dateTbd: false, floor: 1, hasLift: false } }),
           ),
         }),
         env,
@@ -878,7 +878,7 @@ describe("POST /api/orders", () => {
           method: "POST",
           headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
           body: JSON.stringify(
-            validCreateBody({ delivery: { date: tooSoonIso, dateTbd: false, floor: 1, hasLift: false } }),
+            validCreateBody({ delivery: { date: tooSoonIso, proceedDate: tooSoonIso, dateTbd: false, floor: 1, hasLift: false } }),
           ),
         }),
         env,
@@ -912,7 +912,7 @@ describe("POST /api/orders", () => {
           method: "POST",
           headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
           body: JSON.stringify(
-            validCreateBody({ delivery: { date: okIso, dateTbd: false, floor: 1, hasLift: false } }),
+            validCreateBody({ delivery: { date: okIso, proceedDate: okIso, dateTbd: false, floor: 1, hasLift: false } }),
           ),
         }),
         env,
@@ -943,7 +943,7 @@ describe("POST /api/orders", () => {
           method: "POST",
           headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
           body: JSON.stringify(
-            validCreateBody({ delivery: { date: null, dateTbd: true, floor: 1, hasLift: false } }),
+            validCreateBody({ delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false } }),
           ),
         }),
         env,
@@ -1373,13 +1373,14 @@ describe("POST /api/orders/:id/date", () => {
       new Request(dateUrl, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ date: "2026-06-15" }),
+        body: JSON.stringify({ date: "2026-06-15", proceedDate: "2026-06-01" }),
       }),
       env,
     );
     expect(res.status).toBe(200);
     expect(sb._rpcCalls[0].name).toBe("set_order_date");
     expect((sb._rpcCalls[0].args as Record<string, unknown>).p_date).toBe("2026-06-15");
+    expect((sb._rpcCalls[0].args as Record<string, unknown>).p_proceed_date).toBe("2026-06-01");
   });
 
   it("400 when date string is malformed", async () => {
@@ -1390,7 +1391,7 @@ describe("POST /api/orders/:id/date", () => {
       new Request(dateUrl, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ date: "not-a-date" }),
+        body: JSON.stringify({ date: "not-a-date", proceedDate: "2026-06-01" }),
       }),
       env,
     );
@@ -1413,7 +1414,7 @@ describe("POST /api/orders/:id/date", () => {
       new Request(dateUrl, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ date: tooSoonIso }),
+        body: JSON.stringify({ date: tooSoonIso, proceedDate: tooSoonIso }),
       }),
       env,
     );

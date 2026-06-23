@@ -79,8 +79,8 @@ const baseSummary: operationDashboardResponse = {
   },
   pipeline: {
     placed: 5,
-    proceed_request: 3,
-    awaiting_operation_action: 4,
+    confirmed: 3,
+    in_production: 4,
     ready_to_dispatch: 2,
     dispatched: 1,
   },
@@ -124,7 +124,7 @@ function makeOrder(
     id: "ord-" + Math.random().toString(36).slice(2, 10),
     so: 9000 + Math.floor(Math.random() * 999),
     status: "proceed_order",
-    operation_stage: "awaiting_operation_action",
+    operation_stage: "in_production",
     warehouse_id: "wh-1",
     customer_name: "Alice Tan",
     placed_at: "2026-04-28T08:00:00Z",
@@ -205,13 +205,13 @@ describe("OperationDashboard", () => {
   });
 
   it("pipeline column renders top 5 most recent orders, slicing the rest", () => {
-    // Make 7 awaiting_operation_action orders — only 5 should render.
+    // Make 7 in_production orders — only 5 should render.
     const orders = Array.from({ length: 7 }, (_, i) =>
       makeOrder({
         id: `ord-${i}`,
         so: 9100 + i,
         customer_name: `Customer ${i}`,
-        operation_stage: "awaiting_operation_action",
+        operation_stage: "in_production",
       }),
     );
     setLoaded(baseSummary, orders);
@@ -231,7 +231,7 @@ describe("OperationDashboard", () => {
       makeOrder({
         id: "ord-cjk",
         customer_name: "王小明",
-        operation_stage: "awaiting_operation_action",
+        operation_stage: "in_production",
       }),
     ];
     setLoaded(baseSummary, orders);
@@ -247,8 +247,8 @@ describe("OperationDashboard", () => {
         ...baseSummary,
         pipeline: {
           placed: 0,
-          proceed_request: 0,
-          awaiting_operation_action: 0,
+          confirmed: 0,
+          in_production: 0,
           ready_to_dispatch: 0,
           dispatched: 0,
         },
@@ -348,8 +348,8 @@ describe("OperationDashboard", () => {
     // All 5 column labels render. Use exact-match to avoid colliding with the
     // hero strap line ("ready to ship") or KPI hints.
     expect(screen.getByText("Placed")).toBeInTheDocument();
-    expect(screen.getByText("Proceed Request")).toBeInTheDocument();
-    expect(screen.getByText("Awaiting operation action")).toBeInTheDocument();
+    expect(screen.getByText("Confirmed")).toBeInTheDocument();
+    expect(screen.getByText("In Production")).toBeInTheDocument();
     expect(screen.getByText("Ready to dispatch")).toBeInTheDocument();
     expect(screen.getByText("Dispatched")).toBeInTheDocument();
   });
@@ -368,7 +368,7 @@ describe("OperationDashboard", () => {
         id: "ord-pr-1",
         customer_name: "Proceed Person",
         status: "proceed_order",
-        operation_stage: "proceed_request",
+        operation_stage: "confirmed",
       }),
     ];
     setLoaded(baseSummary, orders);

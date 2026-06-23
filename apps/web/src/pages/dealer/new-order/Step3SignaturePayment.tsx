@@ -194,8 +194,11 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
             {addonSub > 0 && <Row label="Add-ons" value={`RM ${addonSub.toLocaleString()}`} />}
             {stair > 0 && <Row label="Stair carry" value={`RM ${stair.toLocaleString()}`} />}
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-200">
-              <span className="text-sm font-semibold">Total</span>
-              <span className="font-mono text-base font-bold">RM {total.toLocaleString()}</span>
+              <span className="text-sm font-semibold text-base-700">Total</span>
+              <span className="pos-price" style={{ fontSize: "36px", lineHeight: 1 }}>
+                <span className="pos-price-rm">RM</span>
+                {total.toLocaleString()}
+              </span>
             </div>
           </div>
         </div>
@@ -221,13 +224,12 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               <button
                 key={p.label}
                 type="button"
+                aria-pressed={active}
                 onClick={() => {
                   if (p.pct === 50) onChange({ ...draft, paid: minDeposit });
                   else if (p.pct === 100) onChange({ ...draft, paid: total });
                 }}
-                className={`px-3 py-3 rounded border-[1.5px] text-center ${
-                  active ? "border-primary bg-signature-50" : "border-base-200 bg-white"
-                }`}
+                className={`pos-pay-card text-center${active ? " pos-selected" : ""}`}
               >
                 <div className="text-[13px] font-semibold">{p.label}</div>
                 <div className="font-mono text-[11px] text-base-500 mt-0.5">{p.sub}</div>
@@ -249,7 +251,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
                 paid: Math.min(total, Math.max(0, parseFloat(e.target.value) || 0)),
               })
             }
-            className="flex-1 px-3 py-2.5 border border-base-300 rounded font-mono text-sm bg-white outline-none focus:border-primary"
+            className="flex-1 px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl font-mono text-sm bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
             aria-label="Amount received"
           />
           <span
@@ -298,10 +300,9 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               <button
                 key={m.id}
                 type="button"
+                aria-pressed={active}
                 onClick={() => setPay({ method: m.id })}
-                className={`px-3 py-3 rounded border-[1.5px] text-center ${
-                  active ? "border-primary bg-signature-50" : "border-base-200 bg-white"
-                }`}
+                className={`pos-pay-card text-center${active ? " pos-selected" : ""}`}
               >
                 <div className="text-[13px] font-semibold">{m.label}</div>
                 <div className="text-[11px] text-base-500 mt-0.5">{m.sub}</div>
@@ -366,10 +367,9 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
                     <button
                       key={m}
                       type="button"
+                      aria-pressed={active}
                       onClick={() => setPay({ installmentMonths: m })}
-                      className={`px-3 py-3 rounded border-[1.5px] text-center ${
-                        active ? "border-primary bg-signature-50" : "border-base-200 bg-white"
-                      }`}
+                      className={`pos-pay-card text-center${active ? " pos-selected" : ""}`}
                     >
                       <div className="text-[13px] font-semibold">{m} months</div>
                       <div className="font-mono text-[11px] text-base-500 mt-0.5">
@@ -480,7 +480,7 @@ function Section({
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="font-display text-base font-semibold tracking-[-0.01em]">{title}</h3>
+        <h3 className="kicker">{title}</h3>
         {hint && <p className="text-[11px] text-base-500">{hint}</p>}
       </div>
       {children}
@@ -542,7 +542,7 @@ function ApprovalCodeField({
         placeholder={placeholder}
         maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2.5 border border-base-300 rounded font-mono text-sm tracking-wider bg-white outline-none focus:border-primary"
+        className="w-full px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl font-mono text-sm tracking-wider bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
       />
       <div className="text-[11px] text-base-500 mt-1.5">{hint}</div>
     </FieldLabel>

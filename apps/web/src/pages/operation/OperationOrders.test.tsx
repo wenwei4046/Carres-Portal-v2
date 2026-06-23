@@ -107,7 +107,7 @@ function makeOrder(overrides: Partial<operationOrderListRow> = {}): operationOrd
     id: "ord-" + Math.random().toString(36).slice(2, 10),
     so: 9000 + Math.floor(Math.random() * 999),
     status: "proceed_order",
-    operation_stage: "awaiting_operation_action",
+    operation_stage: "in_production",
     warehouse_id: "wh-1",
     customer_name: "Alice Tan",
     placed_at: "2026-04-28T08:00:00Z",
@@ -221,9 +221,9 @@ beforeEach(() => {
 });
 
 describe("OperationOrders — kanban", () => {
-  it("1. renders all 6 Pipeline v2 stage columns including Placed and Proceed Request", () => {
+  it("1. renders all 6 Pipeline v2 stage columns including Placed and Confirmed", () => {
     setLoaded([
-      makeOrder({ id: "a", operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", operation_stage: "in_production" }),
       makeOrder({ id: "b", operation_stage: "ready_to_dispatch" }),
       makeOrder({ id: "c", operation_stage: "dispatched" }),
       makeOrder({ id: "d", operation_stage: "delivered" }),
@@ -231,8 +231,8 @@ describe("OperationOrders — kanban", () => {
     render(wrap(<OperationOrders />));
 
     expect(screen.getByTestId("stage-column-placed")).toBeInTheDocument();
-    expect(screen.getByTestId("stage-column-proceed_request")).toBeInTheDocument();
-    expect(screen.getByTestId("stage-column-awaiting_operation_action")).toBeInTheDocument();
+    expect(screen.getByTestId("stage-column-confirmed")).toBeInTheDocument();
+    expect(screen.getByTestId("stage-column-in_production")).toBeInTheDocument();
     expect(screen.getByTestId("stage-column-ready_to_dispatch")).toBeInTheDocument();
     expect(screen.getByTestId("stage-column-dispatched")).toBeInTheDocument();
     expect(screen.getByTestId("stage-column-delivered")).toBeInTheDocument();
@@ -240,7 +240,7 @@ describe("OperationOrders — kanban", () => {
 
   it("2. clicking a pipeline chip navigates to the per-stage page (URL + view both update)", () => {
     setLoaded([
-      makeOrder({ id: "a", so: 1, operation_stage: "awaiting_operation_action", customer_name: "Awaiting" }),
+      makeOrder({ id: "a", so: 1, operation_stage: "in_production", customer_name: "Awaiting" }),
       makeOrder({ id: "b", so: 2, operation_stage: "ready_to_dispatch", customer_name: "Ready" }),
     ]);
     render(wrap(<OperationOrders />));
@@ -261,22 +261,22 @@ describe("OperationOrders — kanban", () => {
 
   it("3. pipeline header renders all 7 chips (Overall + 6 stages) with correct counts", () => {
     setLoaded([
-      makeOrder({ id: "a", operation_stage: "awaiting_operation_action" }),
-      makeOrder({ id: "b", operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", operation_stage: "in_production" }),
+      makeOrder({ id: "b", operation_stage: "in_production" }),
       makeOrder({ id: "c", operation_stage: "delivered" }),
     ]);
     render(wrap(<OperationOrders />));
     // All 7 chips present.
     expect(screen.getByTestId("pipeline-chip-overall")).toBeInTheDocument();
     expect(screen.getByTestId("pipeline-chip-placed")).toBeInTheDocument();
-    expect(screen.getByTestId("pipeline-chip-proceed_request")).toBeInTheDocument();
-    expect(screen.getByTestId("pipeline-chip-awaiting_operation_action")).toBeInTheDocument();
+    expect(screen.getByTestId("pipeline-chip-confirmed")).toBeInTheDocument();
+    expect(screen.getByTestId("pipeline-chip-in_production")).toBeInTheDocument();
     expect(screen.getByTestId("pipeline-chip-ready_to_dispatch")).toBeInTheDocument();
     expect(screen.getByTestId("pipeline-chip-dispatched")).toBeInTheDocument();
     expect(screen.getByTestId("pipeline-chip-delivered")).toBeInTheDocument();
     // Counts reflect the loaded orders.
     expect(
-      screen.getByTestId("pipeline-chip-awaiting_operation_action").textContent,
+      screen.getByTestId("pipeline-chip-in_production").textContent,
     ).toMatch(/2/);
     expect(screen.getByTestId("pipeline-chip-delivered").textContent).toMatch(/1/);
     // Overall sums to 3.
@@ -297,7 +297,7 @@ describe("OperationOrders — kanban", () => {
   it("4b. landing on /operation/orders/:stage directly renders the stage page (deep-link)", () => {
     setLoaded([
       makeOrder({ id: "a", operation_stage: "delivered", customer_name: "DeepLink" }),
-      makeOrder({ id: "b", operation_stage: "awaiting_operation_action", customer_name: "OtherStage" }),
+      makeOrder({ id: "b", operation_stage: "in_production", customer_name: "OtherStage" }),
     ]);
     render(wrap(<OperationOrders />, "/operation/orders/delivered"));
     expect(screen.getByTestId("stage-page-delivered")).toBeInTheDocument();
@@ -312,7 +312,7 @@ describe("OperationOrders — kanban", () => {
 
   it("4c. stage page with no matching orders shows the empty state", () => {
     setLoaded([
-      makeOrder({ id: "a", operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", operation_stage: "in_production" }),
     ]);
     render(wrap(<OperationOrders />, "/operation/orders/dispatched"));
     expect(screen.getByTestId("stage-empty-state")).toBeInTheDocument();
@@ -342,17 +342,17 @@ describe("OperationOrders — kanban", () => {
     ).toBeInTheDocument();
   });
 
-  it("7. multi-select awaiting_operation_action orders → bundle sheet appears", () => {
+  it("7. multi-select in_production orders → bundle sheet appears", () => {
     setLoaded([
-      makeOrder({ id: "a", so: 1, operation_stage: "awaiting_operation_action" }),
-      makeOrder({ id: "b", so: 2, operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", so: 1, operation_stage: "in_production" }),
+      makeOrder({ id: "b", so: 2, operation_stage: "in_production" }),
     ]);
     render(wrap(<OperationOrders />));
     expect(screen.queryByTestId("cross-order-bundle-sheet")).not.toBeInTheDocument();
 
     // Find the two checkboxes (filter for the order-card ones — the column
     // also has a "select all" checkbox).
-    const awaitingCol = screen.getByTestId("stage-column-awaiting_operation_action");
+    const awaitingCol = screen.getByTestId("stage-column-in_production");
     const checkboxes = awaitingCol.querySelectorAll('input[type="checkbox"]');
     // [select-all, card1, card2]
     expect(checkboxes).toHaveLength(3);
@@ -364,10 +364,10 @@ describe("OperationOrders — kanban", () => {
 
   it("8. Bundle 'Clear' resets the selection and hides the sheet", () => {
     setLoaded([
-      makeOrder({ id: "a", so: 1, operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", so: 1, operation_stage: "in_production" }),
     ]);
     render(wrap(<OperationOrders />));
-    const awaitingCol = screen.getByTestId("stage-column-awaiting_operation_action");
+    const awaitingCol = screen.getByTestId("stage-column-in_production");
     const checkboxes = awaitingCol.querySelectorAll('input[type="checkbox"]');
     fireEvent.click(checkboxes[1].parentElement!);
     expect(screen.getByTestId("cross-order-bundle-sheet")).toBeInTheDocument();
@@ -375,15 +375,15 @@ describe("OperationOrders — kanban", () => {
     expect(screen.queryByTestId("cross-order-bundle-sheet")).not.toBeInTheDocument();
   });
 
-  it("9. checkbox is rendered ONLY on awaiting_operation_action cards", () => {
+  it("9. checkbox is rendered ONLY on in_production cards", () => {
     setLoaded([
-      makeOrder({ id: "a", so: 1, operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", so: 1, operation_stage: "in_production" }),
       makeOrder({ id: "b", so: 2, operation_stage: "ready_to_dispatch" }),
       makeOrder({ id: "c", so: 3, operation_stage: "dispatched" }),
       makeOrder({ id: "d", so: 4, operation_stage: "delivered" }),
     ]);
     render(wrap(<OperationOrders />));
-    const awaitingCol = screen.getByTestId("stage-column-awaiting_operation_action");
+    const awaitingCol = screen.getByTestId("stage-column-in_production");
     const readyCol = screen.getByTestId("stage-column-ready_to_dispatch");
     const dispatchedCol = screen.getByTestId("stage-column-dispatched");
     const deliveredCol = screen.getByTestId("stage-column-delivered");
@@ -398,7 +398,7 @@ describe("OperationOrders — kanban", () => {
 
   it("10. CJK customer name receives font-cjk class on the card", () => {
     setLoaded([
-      makeOrder({ id: "a", so: 1, customer_name: "王小明", operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", so: 1, customer_name: "王小明", operation_stage: "in_production" }),
     ]);
     render(wrap(<OperationOrders />));
     const node = screen.getByText("王小明");
@@ -501,9 +501,9 @@ describe("OperationOrders — kanban", () => {
     expect(screen.getByRole("button", { name: /Print DO/ })).toBeInTheDocument();
   });
 
-  it("16. drawer awaiting_operation_action action bar shows Re-check stock + Issue POs + Abandon", () => {
+  it("16. drawer in_production action bar shows Re-check stock + Issue POs + Abandon", () => {
     setLoaded([
-      makeOrder({ id: "ord-1", so: 9001, customer_name: "Alice", operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "ord-1", so: 9001, customer_name: "Alice", operation_stage: "in_production" }),
     ]);
     detailHookState = {
       ...detailHookState,
@@ -511,7 +511,7 @@ describe("OperationOrders — kanban", () => {
         ...makeDetail(),
         order: {
           ...makeDetail().order,
-          operation_stage: "awaiting_operation_action",
+          operation_stage: "in_production",
         },
         // Force a shortage so "Issue POs" surfaces.
         stockBalances: [
@@ -575,18 +575,18 @@ describe("OperationOrders — kanban", () => {
     expect(placedCol).toContainElement(screen.getByText("Pending Push"));
     // Sanity: not in any other column.
     expect(
-      screen.getByTestId("stage-column-awaiting_operation_action"),
+      screen.getByTestId("stage-column-in_production"),
     ).not.toContainElement(screen.queryByText("Pending Push"));
   });
 
-  it("19. drawer ActionBar shows Confirm proceed when stage is proceed_request", () => {
+  it("19. drawer ActionBar shows Confirm proceed when stage is confirmed", () => {
     setLoaded([
       makeOrder({
         id: "ord-1",
         so: 9001,
         customer_name: "Alice",
         status: "proceed_order",
-        operation_stage: "proceed_request",
+        operation_stage: "confirmed",
       }),
     ]);
     detailHookState = {
@@ -596,7 +596,7 @@ describe("OperationOrders — kanban", () => {
         order: {
           ...makeDetail().order,
           status: "proceed_order",
-          operation_stage: "proceed_request",
+          operation_stage: "confirmed",
         },
       },
     };
@@ -605,7 +605,7 @@ describe("OperationOrders — kanban", () => {
     expect(
       screen.getByRole("button", { name: /Confirm proceed/ }),
     ).toBeInTheDocument();
-    // Abandon is the second action on proceed_request — keep it visible so
+    // Abandon is the second action on confirmed — keep it visible so
     // operation can reject without a stage trip first.
     expect(
       screen.getByRole("button", { name: /Abandon/ }),
@@ -645,12 +645,12 @@ describe("OperationOrders — kanban", () => {
 
   it("21. clicking a column header toggles its expanded state", () => {
     setLoaded([
-      makeOrder({ id: "a", operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", operation_stage: "in_production" }),
       makeOrder({ id: "b", operation_stage: "ready_to_dispatch" }),
     ]);
     render(wrap(<OperationOrders />));
 
-    const awaitingCol = screen.getByTestId("stage-column-awaiting_operation_action");
+    const awaitingCol = screen.getByTestId("stage-column-in_production");
     expect(awaitingCol).toHaveAttribute("data-expanded", "false");
 
     // Header is the column-toggle button (first button inside the column wrapper).
@@ -666,12 +666,12 @@ describe("OperationOrders — kanban", () => {
 
   it("22. clicking a different column header transfers expansion focus instantly", () => {
     setLoaded([
-      makeOrder({ id: "a", operation_stage: "awaiting_operation_action" }),
+      makeOrder({ id: "a", operation_stage: "in_production" }),
       makeOrder({ id: "b", operation_stage: "ready_to_dispatch" }),
     ]);
     render(wrap(<OperationOrders />));
 
-    const awaitingCol = screen.getByTestId("stage-column-awaiting_operation_action");
+    const awaitingCol = screen.getByTestId("stage-column-in_production");
     const readyCol = screen.getByTestId("stage-column-ready_to_dispatch");
     const awaitingHeader = awaitingCol.querySelector("button[aria-expanded]") as HTMLElement;
     const readyHeader = readyCol.querySelector("button[aria-expanded]") as HTMLElement;
@@ -686,13 +686,13 @@ describe("OperationOrders — kanban", () => {
     expect(readyCol).toHaveAttribute("data-expanded", "true");
   });
 
-  it("23. drawer awaiting_operation_action action bar exposes Transfer to ready (stock on-hand)", () => {
+  it("23. drawer in_production action bar exposes Transfer to ready (stock on-hand)", () => {
     setLoaded([
       makeOrder({
         id: "ord-1",
         so: 9001,
         customer_name: "Alice",
-        operation_stage: "awaiting_operation_action",
+        operation_stage: "in_production",
       }),
     ]);
     detailHookState = {
@@ -701,7 +701,7 @@ describe("OperationOrders — kanban", () => {
         ...makeDetail(),
         order: {
           ...makeDetail().order,
-          operation_stage: "awaiting_operation_action",
+          operation_stage: "in_production",
         },
       },
     };
@@ -718,7 +718,7 @@ describe("OperationOrders — kanban", () => {
         id: "ord-1",
         so: 9001,
         customer_name: "Alice",
-        operation_stage: "awaiting_operation_action",
+        operation_stage: "in_production",
       }),
     ]);
     detailHookState = {
@@ -727,7 +727,7 @@ describe("OperationOrders — kanban", () => {
         ...makeDetail(),
         order: {
           ...makeDetail().order,
-          operation_stage: "awaiting_operation_action",
+          operation_stage: "in_production",
         },
         // Drawer-side shortage list also needs to be empty so calcShortages
         // doesn't surface "Issue POs" only — but the dialog itself reads from
@@ -963,14 +963,14 @@ describe("OperationOrders — kanban", () => {
         id: "ord-threads-no-lp",
         so: 9103,
         customer_name: "Pending Priya",
-        operation_stage: "awaiting_operation_action",
+        operation_stage: "in_production",
         delivery_partner_id: null,
         order_supplier_threads: [
           {
             id: "thread-X",
             supplier_id: "sup-1",
             category: "mattress",
-            operation_stage: "awaiting_operation_action",
+            operation_stage: "in_production",
             po_id: "PO-X",
             delivery_partner_id: null,
             delivery_partners: null,
@@ -983,7 +983,7 @@ describe("OperationOrders — kanban", () => {
             id: "thread-Y",
             supplier_id: "sup-2",
             category: "bed_frame",
-            operation_stage: "awaiting_operation_action",
+            operation_stage: "in_production",
             po_id: "PO-Y",
             delivery_partner_id: null,
             delivery_partners: null,

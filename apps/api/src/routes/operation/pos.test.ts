@@ -1153,12 +1153,12 @@ describe("POST /api/operation/pos/:id/reassign-warehouse", () => {
 // ---------------------------------------------------------------------------
 // Mock matrix (4 tables touched by the dual-path route):
 //   - order_supplier_threads (v3-S4.6 PRIMARY): rows where
-//     operation_stage='awaiting_operation_action' AND po_id IS NULL identify
+//     operation_stage='in_production' AND po_id IS NULL identify
 //     not-yet-procured slices. The mock returns ALL thread rows; the route
 //     narrows in TS so tests can supply a mix of stages / po_id values.
-//   - orders (v3-S4.6 LEGACY fallback): orders in awaiting_operation_action
+//   - orders (v3-S4.6 LEGACY fallback): orders in in_production
 //     that have NO thread row (pre-v3 / unsplit). The mock resolves on
-//     .eq("operation_stage", "awaiting_operation_action") (T5 collapsed the
+//     .eq("operation_stage", "in_production") (T5 collapsed the
 //     prior IN-list filter to a single-value .eq()).
 //   - purchase_orders (v2-style coverage filter on legacy fallback): only
 //     open POs gate orders. Received/cancelled don't count.
@@ -1295,7 +1295,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     expect(from).not.toHaveBeenCalled();
   });
 
-  it("returns {shortage: []} when no awaiting_operation_action orders exist", async () => {
+  it("returns {shortage: []} when no in_production orders exist", async () => {
     mockShortageQueries({ awaitingOrders: [] });
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -1310,7 +1310,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   });
 
   it("returns aggregated shortage when avail < need (3 orders, 2 SKUs, 1 in shortage)", async () => {
-    // Three awaiting_operation_action orders. Two SKUs hit. avail < need on MAT only.
+    // Three in_production orders. Two SKUs hit. avail < need on MAT only.
     mockShortageQueries({
       awaitingOrders: [
         { id: "00000000-0000-0000-0000-000000000a01" },
@@ -1416,8 +1416,8 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   // -------------------------------------------------------------------------
   // v3-S2.1 — exclude orders already covered by an open PO (Bug 7 partial fix)
   // -------------------------------------------------------------------------
-  it("filters out awaiting_operation_action orders covered by open POs via so", async () => {
-    // Two awaiting_operation_action orders. Order A (so=4001) is covered by an open PO
+  it("filters out in_production orders covered by open POs via so", async () => {
+    // Two in_production orders. Order A (so=4001) is covered by an open PO
     // that targets so=4001 directly → its lines must NOT contribute to
     // shortage. Order B (so=4002) is uncovered → its lines DO contribute.
     // Lines for BOTH orders are supplied to the mock; the mock filters by
@@ -1461,7 +1461,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     ]);
   });
 
-  it("filters out awaiting_operation_action orders covered by open POs via so_refs array", async () => {
+  it("filters out in_production orders covered by open POs via so_refs array", async () => {
     // Order A (so=4001) and Order B (so=4002) are both covered by ONE batch
     // PO with so=null and so_refs=[4001, 4002]. Order C (so=4003) is not.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
@@ -1505,7 +1505,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
 
   it("received POs do NOT exclude orders (only open POs count)", async () => {
     // Order A's PO is `received` — the PO is done, but the order is still
-    // in awaiting_operation_action somehow (e.g. PO partially received and a new
+    // in in_production somehow (e.g. PO partially received and a new
     // shortage emerged). The route must NOT exclude this order on the
     // basis of the received PO. The mock applies the route's
     // `.eq("status", "open")` filter, so a received row returns []
@@ -1546,7 +1546,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
 
   it("cancelled POs do NOT exclude orders (only open POs count)", async () => {
     // Same shape as the received case — a cancelled PO is a dead PO; the
-    // order is back in play if it's still in awaiting_operation_action.
+    // order is back in play if it's still in in_production.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     mockShortageQueries({
       awaitingOrders: [
@@ -1583,20 +1583,20 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   //
   // After v3-S4 (migration 0033) every confirmed order is split into per-
   // (supplier, category) threads. A thread with operation_stage =
-  // 'awaiting_operation_action' AND po_id IS NULL is the "not yet covered by
+  // 'in_production' AND po_id IS NULL is the "not yet covered by
   // a PO" auto-fill target. The so/so_refs join from v3-S2.1 is now the
   // SECONDARY (legacy) path for orders that exist but have no thread rows
   // (pre-v3 data, or confirm_proceed_request_v3 not yet called).
   // -------------------------------------------------------------------------
   it("v3 primary: thread with po_id NULL contributes its order's lines to shortage", async () => {
-    // Order A has been split into a thread at awaiting_operation_action with
+    // Order A has been split into a thread at in_production with
     // po_id NULL → its lines must surface. The order itself does NOT need to
     // be in `awaitingOrders` because the primary path keys off threads, not
     // the orders.operation_stage column.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     mockShortageQueries({
       threads: [
-        { order_id: ID_A, operation_stage: "awaiting_operation_action", po_id: null },
+        { order_id: ID_A, operation_stage: "in_production", po_id: null },
       ],
       // No row in awaitingOrders — proves the primary path is doing the work.
       awaitingOrders: [],
@@ -1627,12 +1627,12 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   it("v3 primary: thread with po_id NOT NULL is excluded (already covered)", async () => {
     // Order A has a thread already pointing at PO-2050. It must NOT surface in
     // the auto-fill list — even though operation_stage on the thread is still
-    // 'awaiting_operation_action' (which can happen briefly between PO insert
+    // 'in_production' (which can happen briefly between PO insert
     // and stage advance). The po_id IS NULL gate is the discriminator.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     mockShortageQueries({
       threads: [
-        { order_id: ID_A, operation_stage: "awaiting_operation_action", po_id: "PO-2050" },
+        { order_id: ID_A, operation_stage: "in_production", po_id: "PO-2050" },
       ],
       awaitingOrders: [],
       orderLines: [
@@ -1653,8 +1653,8 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     expect(body.shortage).toEqual([]);
   });
 
-  it("v3 primary: thread with operation_stage past awaiting_operation_action is excluded", async () => {
-    // Even with po_id NULL, a thread that has moved past awaiting_operation_action
+  it("v3 primary: thread with operation_stage past in_production is excluded", async () => {
+    // Even with po_id NULL, a thread that has moved past in_production
     // is no longer a procurement target — the stage filter narrows to that
     // exact value. (po_id NULL + stage='dispatched' wouldn't normally happen
     // — the schema can't easily express it — but we test the stage filter is
@@ -1683,8 +1683,8 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     expect(body.shortage).toEqual([]);
   });
 
-  it("v3 legacy fallback: order in awaiting_operation_action with no thread + no covering open PO contributes lines", async () => {
-    // Order A is pre-v3 / unsplit data: orders.operation_stage='awaiting_operation_action'
+  it("v3 legacy fallback: order in in_production with no thread + no covering open PO contributes lines", async () => {
+    // Order A is pre-v3 / unsplit data: orders.operation_stage='in_production'
     // but no row exists in order_supplier_threads. The so/so_refs filter
     // against open POs runs as v2 did and leaves the order in play.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
@@ -1717,14 +1717,14 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     // Order A has a thread (in dispatched stage, no po_id yet — unusual but
     // possible mid-pipeline). The fact that it has ANY thread means it has
     // been split, so the legacy path should NOT pick it up by orders.so.
-    // The primary path won't pick it up either (stage != awaiting_operation_action).
+    // The primary path won't pick it up either (stage != in_production).
     // Net: order A contributes nothing — it's mid-pipeline, not a procurement target.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     mockShortageQueries({
       threads: [
         { order_id: ID_A, operation_stage: "dispatched", po_id: null },
       ],
-      awaitingOrders: [{ id: ID_A, so: 4001 }], // orders.operation_stage rolled up to awaiting_operation_action
+      awaitingOrders: [{ id: ID_A, so: 4001 }], // orders.operation_stage rolled up to in_production
       orderLines: [
         { order_id: ID_A, sku: "sofa:nordic:3s", qty: 2 },
       ],
@@ -1745,15 +1745,15 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
 
   it("v3 union: same order surfaced by both paths is counted once (no double-aggregation)", async () => {
     // Pathological / migration overlap case: a thread at
-    // awaiting_operation_action + po_id NULL exists (primary), AND the orders
-    // row is in awaiting_operation_action (legacy fallback would also pick it
+    // in_production + po_id NULL exists (primary), AND the orders
+    // row is in in_production (legacy fallback would also pick it
     // up if not for the "has any thread" gate). Even if the gate were
     // bypassed, the route must dedupe order_ids before aggregating order_lines
     // — order A's lines should contribute exactly once to `need`.
     const ID_A = "00000000-0000-0000-0000-000000000a01";
     mockShortageQueries({
       threads: [
-        { order_id: ID_A, operation_stage: "awaiting_operation_action", po_id: null },
+        { order_id: ID_A, operation_stage: "in_production", po_id: null },
       ],
       awaitingOrders: [{ id: ID_A, so: 4001 }],
       orderLines: [
@@ -1788,7 +1788,7 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     const ID_B = "00000000-0000-0000-0000-000000000a02";
     mockShortageQueries({
       threads: [
-        { order_id: ID_A, operation_stage: "awaiting_operation_action", po_id: null },
+        { order_id: ID_A, operation_stage: "in_production", po_id: null },
       ],
       awaitingOrders: [{ id: ID_B, so: 4002 }],
       orderLines: [
@@ -1886,8 +1886,8 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     const ID_OUT = "00000000-0000-0000-0000-000000000b02"; // so=5099 (NOT in scope)
     mockShortageQueries({
       threads: [
-        { order_id: ID_IN, operation_stage: "awaiting_operation_action", po_id: null },
-        { order_id: ID_OUT, operation_stage: "awaiting_operation_action", po_id: null },
+        { order_id: ID_IN, operation_stage: "in_production", po_id: null },
+        { order_id: ID_OUT, operation_stage: "in_production", po_id: null },
       ],
       awaitingOrders: [
         { id: ID_IN, so: 5001 },

@@ -13,7 +13,7 @@ import type { OperationStage } from "./StageChip";
  * card inside `OrderColumn`):
  *   - White card, 1px base-100 border, 4px radius, 6px bottom margin
  *   - Hover: border swaps to terracotta
- *   - Selected (awaiting_operation_action + checkbox checked): peach signature-50 fill
+ *   - Selected (in_production + checkbox checked): peach signature-50 fill
  *     + terracotta border
  *   - Top row: `#SO` (mono 11px bold) and placed-at date (mono 10px base-500)
  *   - Customer name (CJK detect, 13px)
@@ -33,7 +33,7 @@ import type { OperationStage } from "./StageChip";
  * The order-level `delivery_partner_id` is still populated for legacy callers
  * (print-DO, etc.) but no longer drives the kanban presentation.
  *
- * Selectable: only awaiting_operation_action orders surface a checkbox. The whole card
+ * Selectable: only in_production orders surface a checkbox. The whole card
  * is the click target for opening the drawer; the checkbox region uses
  * stopPropagation so toggling doesn't accidentally open the drawer.
  */
@@ -75,7 +75,7 @@ function summariseThreadLps(
 
 interface Props {
   order: operationOrderListRow;
-  /** When true, render the leading checkbox column (awaiting_operation_action only). */
+  /** When true, render the leading checkbox column (in_production only). */
   selectable: boolean;
   selected: boolean;
   onToggleSelect: () => void;
@@ -87,7 +87,7 @@ interface Props {
    *  name to stay scannable. */
   compact?: boolean;
   /** 2026-05-12 (Loo) — current kanban stage. When set to a revertible stage
-   *  (`proceed_request` or `dispatched`) the card surfaces a small `↶ Revert`
+   *  (`confirmed` or `dispatched`) the card surfaces a small `↶ Revert`
    *  link that fires `onRevert(kind)` instead of opening the drawer. */
   stage?: OperationStage;
   onRevert?: (kind: "proceed" | "dispatch") => void;
@@ -114,7 +114,7 @@ export default function OrderCard({
   const lpRejected =
     order.partner_rejected_at !== null && order.partner_accepted_at === null;
   const revertKind: "proceed" | "dispatch" | null =
-    stage === "proceed_request"
+    stage === "confirmed"
       ? "proceed"
       : stage === "dispatched"
         ? "dispatch"

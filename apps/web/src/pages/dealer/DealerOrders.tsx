@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { type Order, type OrderStatus } from "@carres/shared";
 import { useOrders } from "@/lib/queries";
 import { proceedBlockers } from "@/lib/order-blockers";
@@ -18,7 +18,6 @@ export default function DealerOrders() {
   const [tab, setTab] = useState<OrderStatus>("place");
   const [searchParams, setSearchParams] = useSearchParams();
   const openId = searchParams.get("open");
-  const loc = useLocation();
   const ordersQ = useOrders(); // single fetch — filter client-side per tab
 
   // Keep ?open in sync with the modal lifecycle.
@@ -63,6 +62,16 @@ export default function DealerOrders() {
   };
   const list = buckets[tab];
 
+  // KPIs relocated from the old DealerDashboard hero — surfaced here now that
+  // the dealer landing page is the POS catalog.
+  const inFlight = buckets.place.length + buckets.proceed_order.length;
+  const readyToProceed = buckets.place.filter((o) => proceedBlockers(o).length === 0).length;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const monthValue = allOrders
+    .filter((o) => o.placedAt >= monthStart)
+    .reduce((s, o) => s + (o.totalAmount ?? 0), 0);
+
   return (
     <div className="p-9">
       <header className="flex items-start justify-between mb-6 gap-4">
@@ -73,10 +82,35 @@ export default function DealerOrders() {
             <span className="font-mono font-semibold text-foreground">{allOrders.length}</span> total · click any row for detail
           </p>
         </div>
-        <Link to={`${loc.pathname}?new=1`} className="btn-primary whitespace-nowrap">
+        <Link to="/dealer" className="btn-hero whitespace-nowrap">
           + New order
         </Link>
       </header>
+
+      {/* KPI strip — in-flight · this month · ready to proceed (from old dashboard) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <Stat label="In flight" value={String(inFlight)} hint="Place + Proceed" />
+        <Stat label="This month" value={RM(monthValue)} hint="Orders placed this month" mono />
+        <button
+          type="button"
+          onClick={() => setTab("place")}
+          className={`card text-left px-4 py-3 hover:border-primary transition-colors border-l-[3px] ${
+            readyToProceed > 0 ? "border-l-success" : "border-l-base-200"
+          }`}
+        >
+          <div
+            className={`label ${readyToProceed > 0 ? "text-success" : "text-base-500"}`}
+          >
+            Ready to proceed
+          </div>
+          <div className="font-display text-[26px] font-bold mt-0.5 leading-none">
+            {readyToProceed}
+          </div>
+          <div className="t-tiny text-base-500 mt-1">
+            {readyToProceed === 0 ? "all in-flight need more info" : "ready to push to operation"}
+          </div>
+        </button>
+      </div>
 
       <div className="flex gap-1 border-b border-base-200 mb-4">
         {TABS.map((t) => {
@@ -166,6 +200,30 @@ function OrderRow({ order, onClick }: { order: Order; onClick: () => void }) {
         <div className="text-[10px] text-base-500 mt-1.5">{new Date(order.placedAt).toLocaleDateString()}</div>
       </div>
     </button>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  hint,
+  mono,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="card px-4 py-3">
+      <div className="label text-base-500">{label}</div>
+      <div
+        className={`text-[26px] font-bold mt-0.5 leading-none ${mono ? "font-mono" : "font-display"}`}
+      >
+        {value}
+      </div>
+      <div className="t-tiny text-base-500 mt-1">{hint}</div>
+    </div>
   );
 }
 

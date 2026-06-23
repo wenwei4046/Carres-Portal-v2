@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { orderInputToRpcPayload, orderSupplierThreadFromRow } from "./adapters";
-import type { OrderSupplierThreadRow } from "./db-types";
+import {
+  modelSofaCompartmentFromRow,
+  orderInputToRpcPayload,
+  orderSupplierThreadFromRow,
+  productSkuFromRow,
+  sofaComboFromRow,
+  sofaCompartmentFromRow,
+} from "./adapters";
+import type {
+  ModelSofaCompartmentRow,
+  OrderSupplierThreadRow,
+  ProductSkuRow,
+  SofaComboPricingRow,
+  SofaCompartmentRow,
+} from "./db-types";
 import type { CreateOrderInput } from "./schemas/orders";
 
 const DEALER_ID = "00000000-0000-0000-0000-000000000d01";
@@ -18,7 +31,7 @@ function baseInput(over: Partial<CreateOrderInput> = {}): CreateOrderInput {
       billingSame: true,
       emergency: "Tan Junior · 012-9988776 · Spouse",
     },
-    delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false },
+    delivery: { date: "2026-06-01", proceedDate: "2026-05-15", dateTbd: false, floor: 1, hasLift: false },
     lines: [
       {
         sku: "mattress:carres-classic:queen",
@@ -50,6 +63,7 @@ describe("orderInputToRpcPayload", () => {
     expect(out.customer_phone).toBe("012-3456789");
     expect(out.customer_emergency).toBe("Tan Junior · 012-9988776 · Spouse");
     expect(out.delivery_date).toBe("2026-06-01");
+    expect(out.proceed_date).toBe("2026-05-15");
     expect(out.delivery_date_tbd).toBe(false);
     expect(out.delivery_floor).toBe(1);
     expect(out.delivery_has_lift).toBe(false);
@@ -94,11 +108,13 @@ describe("orderInputToRpcPayload", () => {
   it("nulls delivery_date when dateTbd is true", () => {
     const out = orderInputToRpcPayload(
       baseInput({
-        delivery: { date: null, dateTbd: true, floor: 1, hasLift: false },
+        delivery: { date: null, proceedDate: "2026-05-15", dateTbd: true, floor: 1, hasLift: false },
       }),
       DEALER_ID,
     );
     expect(out.delivery_date).toBeNull();
+    // Phase 11.1 — proceed date is also nulled when the order is TBD.
+    expect(out.proceed_date).toBeNull();
     expect(out.delivery_date_tbd).toBe(true);
   });
 
@@ -287,5 +303,187 @@ describe("orderSupplierThreadFromRow", () => {
     expect(out.requestForDeliveryAt).toBeNull();
     expect(out.partnerAcceptedAt).toBeNull();
     expect(out.partnerRejectedAt).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0178 — sofa engine Phase 1: compartment pool + per-model offered.
+// ---------------------------------------------------------------------------
+
+describe("sofaCompartmentFromRow", () => {
+  function baseRow(over: Partial<SofaCompartmentRow> = {}): SofaCompartmentRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000c0001",
+      code: "1A(LHF)",
+      description: "Single seat, left-hand facing",
+      seat_count: 1,
+      arm_config: "left",
+      icon_url: "https://cdn.example/1a-lhf.svg",
+      // Postgres numeric(12,2) often arrives as a string over PostgREST.
+      default_price: "850.00" as unknown as number,
+      sort_order: 3,
+      active: true,
+      created_at: "2026-06-21T08:00:00.000Z",
+      updated_at: "2026-06-21T08:00:00.000Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("snake->camel + coerces numeric default_price / seat_count / sort_order", () => {
+    const out = sofaCompartmentFromRow(baseRow());
+    expect(out.id).toBe("00000000-0000-0000-0000-0000000c0001");
+    expect(out.code).toBe("1A(LHF)");
+    expect(out.description).toBe("Single seat, left-hand facing");
+    expect(out.seatCount).toBe(1);
+    expect(out.armConfig).toBe("left");
+    expect(out.iconUrl).toBe("https://cdn.example/1a-lhf.svg");
+    expect(out.defaultPrice).toBe(850);
+    expect(typeof out.defaultPrice).toBe("number");
+    expect(out.sortOrder).toBe(3);
+    expect(out.active).toBe(true);
+  });
+
+  it("preserves null seatCount/description/armConfig/iconUrl (not coerced to 0/empty)", () => {
+    const out = sofaCompartmentFromRow(
+      baseRow({
+        description: null,
+        seat_count: null,
+        arm_config: null,
+        icon_url: null,
+        default_price: 0,
+      }),
+    );
+    expect(out.description).toBeNull();
+    expect(out.seatCount).toBeNull();
+    expect(out.armConfig).toBeNull();
+    expect(out.iconUrl).toBeNull();
+    expect(out.defaultPrice).toBe(0);
+  });
+});
+
+describe("modelSofaCompartmentFromRow", () => {
+  function baseRow(over: Partial<ModelSofaCompartmentRow> = {}): ModelSofaCompartmentRow {
+    return {
+      model_id: "00000000-0000-0000-0000-0000000d0001",
+      compartment_id: "00000000-0000-0000-0000-0000000c0001",
+      price_override: "900.00" as unknown as number,
+      sort_order: 2,
+      created_at: "2026-06-21T08:00:00.000Z",
+      updated_at: "2026-06-21T08:00:00.000Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("snake->camel + coerces numeric price_override / sort_order", () => {
+    const out = modelSofaCompartmentFromRow(baseRow());
+    expect(out.modelId).toBe("00000000-0000-0000-0000-0000000d0001");
+    expect(out.compartmentId).toBe("00000000-0000-0000-0000-0000000c0001");
+    expect(out.priceOverride).toBe(900);
+    expect(typeof out.priceOverride).toBe("number");
+    expect(out.sortOrder).toBe(2);
+  });
+
+  it("keeps priceOverride null (inherit pool default) — not coerced to 0", () => {
+    const out = modelSofaCompartmentFromRow(baseRow({ price_override: null }));
+    expect(out.priceOverride).toBeNull();
+  });
+
+  it("distinguishes an explicit zero override from null", () => {
+    const out = modelSofaCompartmentFromRow(baseRow({ price_override: 0 }));
+    expect(out.priceOverride).toBe(0);
+  });
+});
+
+describe("sofaComboFromRow", () => {
+  function baseRow(over: Partial<SofaComboPricingRow> = {}): SofaComboPricingRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000f0001",
+      model_id: "00000000-0000-0000-0000-0000000d0001",
+      slots: [
+        ["2A(LHF)", "2A(RHF)"],
+        ["L(LHF)", "L(RHF)"],
+      ],
+      tier: "PRICE_1",
+      // Postgres jsonb numerics can arrive as strings over PostgREST.
+      prices_by_height: {
+        "24": "2640.00" as unknown as number,
+        "28": 2750,
+        "30": null,
+      },
+      label: "Oslo L-shape",
+      effective_from: "2026-06-21",
+      active: true,
+      discontinued_at: null,
+      created_at: "2026-06-21T08:00:00.000Z",
+      updated_at: "2026-06-21T08:00:00.000Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("round-trips snake->camel + coerces numeric prices, preserves null prices", () => {
+    const out = sofaComboFromRow(baseRow());
+    expect(out.id).toBe("00000000-0000-0000-0000-0000000f0001");
+    expect(out.modelId).toBe("00000000-0000-0000-0000-0000000d0001");
+    expect(out.slots).toEqual([
+      ["2A(LHF)", "2A(RHF)"],
+      ["L(LHF)", "L(RHF)"],
+    ]);
+    expect(out.tier).toBe("PRICE_1");
+    expect(out.pricesByHeight["24"]).toBe(2640);
+    expect(typeof out.pricesByHeight["24"]).toBe("number");
+    expect(out.pricesByHeight["28"]).toBe(2750);
+    expect(out.pricesByHeight["30"]).toBeNull();
+    expect(out.label).toBe("Oslo L-shape");
+    expect(out.effectiveFrom).toBe("2026-06-21");
+    expect(out.active).toBe(true);
+    expect(out.discontinuedAt).toBeNull();
+  });
+
+  it("defaults slots=[] and pricesByHeight={} when the DB sends null", () => {
+    const out = sofaComboFromRow(
+      baseRow({
+        slots: null as unknown as string[][],
+        prices_by_height: null as unknown as Record<string, number | null>,
+        tier: null,
+        label: null,
+      }),
+    );
+    expect(out.slots).toEqual([]);
+    expect(out.pricesByHeight).toEqual({});
+    expect(out.tier).toBeNull();
+    expect(out.label).toBeNull();
+  });
+});
+
+describe("productSkuFromRow — 0178 compartmentId", () => {
+  function baseSkuRow(over: Partial<ProductSkuRow> = {}): ProductSkuRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000e0001",
+      model_id: "00000000-0000-0000-0000-0000000d0001",
+      sku: "SOFA-OSLO-1A",
+      variant: "1A(LHF)",
+      variant_kind: "part",
+      price: "1200.00" as unknown as number,
+      supplier_id: "00000000-0000-0000-0000-0000000f0001",
+      cost: null,
+      discontinued_at: null,
+      pos_active: true,
+      description: null,
+      compartment_id: "00000000-0000-0000-0000-0000000c0001",
+      ...over,
+    };
+  }
+
+  it("maps compartment_id -> compartmentId", () => {
+    const out = productSkuFromRow(baseSkuRow());
+    expect(out.compartmentId).toBe("00000000-0000-0000-0000-0000000c0001");
+  });
+
+  it("nulls compartmentId for a non-compartment SKU", () => {
+    const out = productSkuFromRow(baseSkuRow({ compartment_id: null }));
+    expect(out.compartmentId).toBeNull();
   });
 });

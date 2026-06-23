@@ -39,6 +39,8 @@ export default function EditOrderModal({ order, onClose }: Props) {
   const [billingSame, setBillingSame] = useState(order.customer.billingSame);
   const [billing, setBilling] = useState(order.customer.billing ?? "");
   const [deliveryDate, setDeliveryDate] = useState(order.delivery.date ?? "");
+  // Phase 11.1 — proceed (production-start) date, paired with the delivery date.
+  const [proceedDate, setProceedDate] = useState(order.delivery.proceedDate ?? "");
   const [dateTbd, setDateTbd] = useState(order.delivery.dateTbd);
   const [floor, setFloor] = useState(order.delivery.floor);
   const [hasLift, setHasLift] = useState(order.delivery.hasLift);
@@ -95,6 +97,7 @@ export default function EditOrderModal({ order, onClose }: Props) {
     if (billing !== (order.customer.billing ?? "")) customer.billing = billing.trim() || null;
     if (emergency !== (order.customer.emergency ?? "")) customer.emergency = emergency.trim();
     if (deliveryDate !== (order.delivery.date ?? "")) delivery.date = deliveryDate || null;
+    if (proceedDate !== (order.delivery.proceedDate ?? "")) delivery.proceedDate = proceedDate || null;
     if (dateTbd !== order.delivery.dateTbd) delivery.dateTbd = dateTbd;
     if (floor !== order.delivery.floor) delivery.floor = floor;
     if (hasLift !== order.delivery.hasLift) delivery.hasLift = hasLift;
@@ -117,8 +120,11 @@ export default function EditOrderModal({ order, onClose }: Props) {
   // closes the Edit-modal bypass.
   const dateLeadOk = dateTbd || !deliveryDate || (minLeadDays === 0 || deliveryDate >= minDate);
   const dateValid = (dateTbd || !!deliveryDate) && dateLeadOk;
+  // Phase 11.1 — proceed date pairs with delivery: required when not TBD and
+  // on/before the delivery date.
+  const proceedValid = dateTbd || (!!proceedDate && (!deliveryDate || proceedDate <= deliveryDate));
   const canSubmit =
-    nameValid && phoneValid && billingValid && dateValid && hasChanges && !updateMut.isPending;
+    nameValid && phoneValid && billingValid && dateValid && proceedValid && hasChanges && !updateMut.isPending;
 
   function handleSubmit() {
     if (!canSubmit) return;
@@ -260,7 +266,10 @@ export default function EditOrderModal({ order, onClose }: Props) {
                   checked={dateTbd}
                   onChange={(e) => {
                     setDateTbd(e.target.checked);
-                    if (e.target.checked) setDeliveryDate("");
+                    if (e.target.checked) {
+                      setDeliveryDate("");
+                      setProceedDate("");
+                    }
                   }}
                   className="w-3.5 h-3.5"
                 />
@@ -268,6 +277,26 @@ export default function EditOrderModal({ order, onClose }: Props) {
               </label>
             </div>
           </div>
+
+          {/* Phase 11.1 — proceed (production-start) date */}
+          <label className="block mt-3">
+            <span className="label block mb-1.5">
+              Proceed date · production start {dateTbd && "(TBD)"}
+            </span>
+            <input
+              type="date"
+              value={proceedDate}
+              disabled={dateTbd}
+              max={deliveryDate || undefined}
+              onChange={(e) => setProceedDate(e.target.value)}
+              className={`w-full px-3 py-2.5 border border-base-300 rounded text-sm outline-none focus:border-primary ${
+                dateTbd ? "bg-base-50 text-base-500 cursor-not-allowed" : "bg-white"
+              }`}
+            />
+            <span className="text-[11px] text-base-500 block mt-1">
+              When production should start (on or before the delivery date).
+            </span>
+          </label>
 
           <div className="grid grid-cols-2 gap-3 mt-3">
             <label className="block">
@@ -338,6 +367,11 @@ export default function EditOrderModal({ order, onClose }: Props) {
         {!dateLeadOk && (
           <p className="text-[11px] text-destructive">
             Earliest delivery date is {minDate} ({minLeadDays}-day production lead time for this category).
+          </p>
+        )}
+        {!proceedValid && !dateTbd && (
+          <p className="text-[11px] text-destructive">
+            Proceed date is required and must be on or before the delivery date.
           </p>
         )}
       </div>

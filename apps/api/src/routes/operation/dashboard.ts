@@ -13,8 +13,8 @@ import type { AppEnv } from "../../types";
  * same-role check here for fast 403s without a Supabase round-trip.
  *
  * Pipeline v2 augmentation (C3): the 0019 RPC's `pipeline` only contains
- * counts for awaiting_operation_action / ready_to_dispatch / dispatched. The
- * kanban also needs `placed` (status='place') and `proceed_request` columns,
+ * counts for in_production / ready_to_dispatch / dispatched. The
+ * kanban also needs `placed` (status='place') and `confirmed` columns,
  * so the route layers two thin count queries over the RPC output. Done at the
  * API layer because migration 0019 is frozen — see CLAUDE.md §7.
  *
@@ -38,9 +38,18 @@ operationDashboardRouter.get("/", async (c) => {
 
   // Pipeline v2 extra counts. PostgREST's `head: true, count: 'exact'` returns
   // the count via response metadata without fetching rows.
+  //
+  // AutoCount-aware bucketing — mirrors the Orders grid's controlTabOf so the
+  // dashboard and the Orders table agree: an AutoCount-imported `status='place'`
+  // order is an already-confirmed sale, so it counts as Confirmed, NOT Placed.
+  // Only native place orders (dealer hasn't proceeded) stay in Placed.
   const [placedRes, proceedReqRes] = await Promise.all([
-    sb.from("orders").select("id", { count: "exact", head: true }).eq("status", "place"),
-    sb.from("orders").select("id", { count: "exact", head: true }).eq("operation_stage", "proceed_request"),
+    // Placed = native place orders only (source null or non-autocount).
+    sb.from("orders").select("id", { count: "exact", head: true })
+      .eq("status", "place").or("source_system.is.null,source_system.neq.autocount"),
+    // Confirmed = confirmed-stage orders + AutoCount-imported place orders.
+    sb.from("orders").select("id", { count: "exact", head: true })
+      .or("operation_stage.eq.confirmed,and(status.eq.place,source_system.eq.autocount)"),
   ]);
   if (placedRes.error) {
     const m = mapPgError(placedRes.error);
@@ -52,19 +61,19 @@ operationDashboardRouter.get("/", async (c) => {
   }
 
   // Merge into the RPC's `pipeline` object. Spread the RPC payload first so
-  // any future RPC-side addition wins; placed/proceed_request only ever come
+  // any future RPC-side addition wins; placed/confirmed only ever come
   // from this route while the RPC is frozen.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const summary = (data ?? {}) as Record<string, any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pipeline = (summary.pipeline ?? {}) as Record<string, any>;
-  // RPC's pipeline keys win on collision; if 0019 RPC ever adds placed/proceed_request,
+  // RPC's pipeline keys win on collision; if 0019 RPC ever adds placed/confirmed,
   // the route-side count queries become redundant and can be removed.
   const merged = {
     ...summary,
     pipeline: {
       placed: placedRes.count ?? 0,
-      proceed_request: proceedReqRes.count ?? 0,
+      confirmed: proceedReqRes.count ?? 0,
       ...pipeline,
     },
   };

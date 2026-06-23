@@ -115,6 +115,9 @@ export default {
         // `font-display` (DM Sans) per CLAUDE.md §10.
         editorial: ['"Cera Pro"', "Mulish", "DM Sans", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+        // POS price hero — Archivo Black (2990s-style), condensed via
+        // font-stretch in CSS. Falls back to Inter / system-ui.
+        price: ["Archivo", "Inter", "system-ui", "sans-serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

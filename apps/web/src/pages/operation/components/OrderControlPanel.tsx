@@ -259,12 +259,17 @@ export function RoutingFields({
   orderId: _orderId,
   customerAddress,
   deliveryDate,
+  proceedDate,
   opsAssignedLogistic,
   form,
 }: {
   orderId: string;
   customerAddress: string | null;
   deliveryDate: string | null;
+  /** orders.proceed_date — Phase 11.1: set_order_date now requires a proceed
+   *  date <= the delivery date. Carried so an inline Deadline edit can re-send
+   *  it (keep the existing one when still valid, else default to the new date). */
+  proceedDate: string | null;
   opsAssignedLogistic: string | null;
   form: OrderControlForm;
 }) {
@@ -340,7 +345,11 @@ export function RoutingFields({
           onChange={(e) => {
             const v = e.target.value;
             if (ISO_DATE.test(v) && v !== deliveryDate) {
-              setDate.mutate({ date: v });
+              // Phase 11.1: set_order_date requires a proceed date <= the
+              // delivery date. Keep the existing proceed date when still valid;
+              // otherwise default it to the new delivery date.
+              const pd = proceedDate && proceedDate <= v ? proceedDate : v;
+              setDate.mutate({ date: v, proceedDate: pd });
             }
           }}
           className={CELL}

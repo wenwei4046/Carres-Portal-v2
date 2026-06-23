@@ -54,7 +54,7 @@ describe("RevertConfirmDialog", () => {
     );
 
     expect(
-      screen.getByText(/Revert order #1001 from Proceed Request to Placed\?/),
+      screen.getByText(/Revert order #1001 from Confirmed to Placed\?/),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("revert-confirm-button"));

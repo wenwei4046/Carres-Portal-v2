@@ -137,7 +137,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // 2026-06-09 (Jess P2, project-orders-control-spec) — customer_address
       // added so the control table can tag each row KV / Outstation + suggest a
       // default carrier (apps/web/src/lib/region.ts) without opening the drawer.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, placed_at, delivery_date, delivery_date_tbd, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, dispatched_at, delivered_at, outlet_id, dealer_id, dealers(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(sku, qty), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at), order_annotations(content, tag, created_at)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -185,7 +185,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
       // 2026-06-09 (Jess P2) — ops_assigned_logistic surfaced so the drawer's
       // OrderControlPanel can show + inline-edit the planned carrier (region
       // default, overridable) on status='place' orders.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, proceed_date, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -551,7 +551,7 @@ operationOrdersRouter.post("/:id/reselect-partner", requireOperation, async (c) 
 
 // ----- POST /:id/transfer-ready -----
 // Pipeline v2 (C2 / migration 0024). Wraps `operation_warehouse_pick` whose
-// source-stage guard now permits IN ('proceed_request', 'awaiting_operation_action').
+// source-stage guard now permits IN ('confirmed', 'in_production').
 // Same error contract as /confirm-proceed. Note: warehouseId is REQUIRED here
 // (the RPC raises 22023 `warehouse_required` on NULL). confirm-proceed
 // accepts NULL via a different RPC; do not conflate.
@@ -609,7 +609,7 @@ operationOrdersRouter.post("/:id/issue-pos", requireOperation, async (c) => {
 });
 
 // ----- POST /:id/revert-proceed -----
-// 2026-05-12 (Loo) — back-arrow from Proceed Request column → Placed column.
+// 2026-05-12 (Loo) — back-arrow from Confirmed column → Placed column.
 // No body; just the order id in the path. Both operation and principal can
 // trigger. Maps RPC's 22023 wrong_stage into a 422 invalid_param.
 operationOrdersRouter.post(

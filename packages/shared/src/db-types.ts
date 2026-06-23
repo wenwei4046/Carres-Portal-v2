@@ -8,15 +8,15 @@ export type Role =
   | "operation" | "supplier" | "partner" | "finance" | "bd";
 
 export type OrderStatus       = "place" | "proceed_order" | "delivered" | "cancelled";
-// `awaiting_operation_action` and `waiting` added in migration 0028 (v3-S3).
+// `in_production` and `waiting` added in migration 0028 (v3-S3).
 // Phase 4.5a T5 (2026-05-05): legacy `awaiting_stock` alias removed from FE
 // vocabulary in lockstep with migrations 0038/0038b/0039 (RPC body sweep).
 // Phase 4.5a T6 (2026-05-05): migration 0040 dropped `awaiting_stock` from the
 // DB-side enum via DROP TYPE … CASCADE recreate. DB and FE vocabularies are
 // now back in sync. Tuple matches Supabase-generated types verbatim.
 export type OperationStage    =
-  | "placed" | "proceed_request"
-  | "awaiting_operation_action"
+  | "placed" | "confirmed"
+  | "in_production"
   | "ready_to_dispatch" | "dispatched"
   | "waiting" | "delivered";
 export type PartnerStage      = "assigned" | "picked_from_wh" | "en_route" | "delivered";
@@ -45,7 +45,7 @@ export type ApprovalKind      = "refund" | "discount" | "new_dealer" | "top_up" 
 export type ApprovalStatus    = "pending" | "approved" | "rejected";
 export type InquiryKind       = "new_dealer" | "expansion" | "product";
 export type InquiryStage      = "new" | "contacted" | "qualified" | "converted" | "lost";
-export type ProductCategory   = "mattress" | "bedframe" | "sofa";
+export type ProductCategory   = "mattress" | "bedframe" | "sofa" | "accessory" | "service"; // 0169
 export type VariantKind       = "size" | "preset" | "part";
 export type StockMovementKind = "in" | "out" | "adjust";
 // Migration 0027 (v3-S3). 'own' = HQ-controlled warehouse (default for legacy
@@ -121,6 +121,9 @@ export interface ProductModelRow {
   gaps: string[] | null;
   sofa_mode: "preset" | "custom" | "both" | null;
   discontinued_at: string | null;
+  // 0171 — model photo (public URL) + generate-skus option pool.
+  photo_url: string | null;
+  allowed_options: Record<string, string[] | undefined>;
 }
 
 export interface ProductSkuRow {
@@ -141,6 +144,13 @@ export interface ProductSkuRow {
   cost: number | null;
   // 0074 — soft-delete flag for the catalog admin UI.
   discontinued_at: string | null;
+  // 0170 — sell-side ON/OFF (DISTINCT from discontinued_at) + editable description.
+  pos_active: boolean;
+  description: string | null;
+  // 0178 (sofa engine Phase 1) — additive, nullable FK to sofa_compartments.
+  // Only future generated compartment SKUs set it; links a compartment SKU to
+  // its pool type. NULL for every existing (non-compartment) SKU.
+  compartment_id: string | null;
 }
 
 export interface SofaFabricRow {
@@ -154,6 +164,35 @@ export interface SofaFabricRow {
   colors: string[] | null;
   // 0074 — soft-delete flag for the catalog admin UI.
   discontinued_at: string | null;
+  // 0176 — price tier (PRICE_1|PRICE_2|PRICE_3). DEFAULT 'PRICE_1' in DB;
+  // the adapter falls back to 'PRICE_1' if absent for safety.
+  tier: string;
+}
+
+/**
+ * `fabric_tier_addon_config` (migration 0176). Singleton row (id=1) that holds
+ * the global tier price delta for mid and premium sofa fabrics. `updated_at` +
+ * `updated_by` track who last changed the config in the Catalog admin UI.
+ */
+export interface FabricTierAddonConfigRow {
+  id: number;
+  sofa_tier2_delta: number;
+  sofa_tier3_delta: number;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `model_fabric_tier_overrides` (migration 0176). Optional per-model tier delta
+ * override keyed by `model_id` (PK). `tier2_delta` / `tier3_delta` are nullable —
+ * NULL means "inherit from global config"; 0 means "explicitly no premium".
+ */
+export interface ModelFabricTierOverrideRow {
+  model_id: string;
+  tier2_delta: number | null;
+  tier3_delta: number | null;
+  updated_at: string;
+  updated_by: string | null;
 }
 
 export interface AddonRow {
@@ -161,6 +200,99 @@ export interface AddonRow {
   name: string;
   price: number;
   active: boolean;
+  // 0172 — links the add-on to a real Service-category SKU (bare SVC- code).
+  service_sku: string | null;
+}
+
+/**
+ * `combos` (migration 0177). A fixed-set bundle (套餐) sold at one
+ * `combo_price`. Components live in `combo_components`. `combo_key` is the
+ * stable kebab-case identifier; `active` + `discontinued_at` mirror the
+ * sell-side ON/OFF + soft-delete convention used elsewhere in the catalog.
+ */
+export interface ComboRow {
+  id: string;
+  combo_key: string;
+  name: string;
+  combo_price: number;
+  active: boolean;
+  effective_from: string;
+  discontinued_at: string | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `combo_components` (migration 0177). One component SKU of a combo. `qty` is
+ * how many of that SKU the combo bundles; `sort_order` drives the deterministic
+ * order explodeCombo() uses (last component absorbs the rounding residue).
+ */
+export interface ComboComponentRow {
+  combo_id: string;
+  sku: string;
+  qty: number;
+  sort_order: number;
+}
+
+/**
+ * `sofa_compartments` (migration 0178, sofa engine Phase 1). The principal-owned
+ * compartment pool / type catalog — every sofa segment type (e.g. `1A(LHF)`,
+ * `1NA`, `2A(RHF)`) with a description + default price. A model declares which
+ * of these it offers via `model_sofa_compartments`. `default_price` is the pool
+ * RM price; a per-model `price_override` may supersede it. `code` is unique.
+ */
+export interface SofaCompartmentRow {
+  id: string;
+  code: string;
+  description: string | null;
+  seat_count: number | null;
+  arm_config: string | null;
+  icon_url: string | null;
+  default_price: number;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `model_sofa_compartments` (migration 0178). One row = the model offers this
+ * compartment. PK is (model_id, compartment_id). `price_override` NULL means
+ * "use the pool's default_price"; a value (>= 0) supersedes it for this model.
+ */
+export interface ModelSofaCompartmentRow {
+  model_id: string;
+  compartment_id: string;
+  price_override: number | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `sofa_combo_pricing` (migration 0179, sofa engine Phase 2). A sofa combo =
+ * a base model + ordered SLOTS (each slot an OR-set of compartment `code`
+ * strings) priced per seat height. `slots` is a jsonb `string[][]`;
+ * `prices_by_height` is a jsonb map height-string → numeric MYR | null (key
+ * absent / null = the combo does not apply at that height). `tier` NULL =
+ * applies to any fabric tier. Soft-delete via active/discontinued_at.
+ */
+export interface SofaComboPricingRow {
+  id: string;
+  model_id: string;
+  slots: string[][];
+  tier: string | null;
+  prices_by_height: Record<string, number | null>;
+  label: string | null;
+  effective_from: string;
+  active: boolean;
+  discontinued_at: string | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
 }
 
 export interface FloorConfigRow {
@@ -263,6 +395,10 @@ export interface OrderRow {
   customer_emergency: string | null;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
+  // Phase 11.1 (migration 0165) — salesperson-entered planned production-start
+  // ("Proceed") date. Pairs with delivery_date via delivery_date_tbd
+  // (both-or-neither). NULL when TBD. Must be <= delivery_date.
+  proceed_date: string | null;
   delivery_floor: number;
   delivery_has_lift: boolean;
   delivery_stair_items: number | null;

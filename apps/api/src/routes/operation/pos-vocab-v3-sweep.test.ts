@@ -6,7 +6,7 @@
 //
 // Why this test exists:
 //   Migration 0038 CREATE OR REPLACEs five v2 RPCs to swap every
-//   'awaiting_stock' literal write/guard with 'awaiting_operation_action'.
+//   'awaiting_stock' literal write/guard with 'in_production'.
 //   The five RPCs are:
 //     _operation_create_po_inner (helper)
 //     operation_create_po
@@ -23,7 +23,7 @@
 //   This test mocks the Supabase RPC error path the route would surface when
 //   a operation user clicks "Issue POs" on an order that is NOT in the
 //   awaiting state. After 0038, the message text MUST mention
-//   'awaiting_operation_action' (not 'awaiting_stock'). That asserts the
+//   'in_production' (not 'awaiting_stock'). That asserts the
 //   v3-vocabulary swap landed in the RPC body.
 //
 //   The other four RPCs are exercised structurally via existing tests
@@ -97,16 +97,16 @@ describe("Phase 4.5a T2 — v2 RPC v3-vocabulary sweep (migration 0038)", () => 
   // operation_issue_pos_for_order — the only RPC of the five whose body
   // raises a stage error message that contains the literal vocabulary. Pre-
   // 0038 the message reads "order is not in awaiting_stock state"; post-
-  // 0038 it reads "order is not in awaiting_operation_action state".
+  // 0038 it reads "order is not in in_production state".
   it("operation_issue_pos_for_order surfaces v3 vocabulary in 22023 wrong_stage error", async () => {
     // Simulate the post-0038 RPC error: stage guard says current stage is not
-    // 'awaiting_operation_action'. The route's mapPgError relays the message
+    // 'in_production'. The route's mapPgError relays the message
     // verbatim into the response body.
     const rpc = vi.fn().mockResolvedValue({
       data: null,
       error: {
         code: "22023",
-        message: "order is not in awaiting_operation_action state",
+        message: "order is not in in_production state",
         details: "wrong_stage",
       },
     });
@@ -134,14 +134,14 @@ describe("Phase 4.5a T2 — v2 RPC v3-vocabulary sweep (migration 0038)", () => 
     // RPC-emitted `message` text, which the route relays verbatim.
     expect(body.code).toBe("invalid_param");
     // The proof of the sweep: the message body must mention v3 vocabulary.
-    expect(body.message).toContain("awaiting_operation_action");
+    expect(body.message).toContain("in_production");
     // Belt-and-braces: must NOT mention the v2 vocab (so a partial revert
     // would also fail this assertion).
     expect(body.message).not.toContain("awaiting_stock");
   });
 
   // Migration-file static check. The RPC bodies in 0038 + 0038b must contain
-  // 'awaiting_operation_action' and must NOT contain a writable
+  // 'in_production' and must NOT contain a writable
   // 'awaiting_stock' enum literal. We do a coarse text grep -- comments
   // containing "awaiting_stock" inside `--` lines are tolerated, but any
   // quoted literal in code position is not (those are stage-write targets).
@@ -151,7 +151,7 @@ describe("Phase 4.5a T2 — v2 RPC v3-vocabulary sweep (migration 0038)", () => 
   // jsonb_build_object call -- that was a payload key the FE consumers
   // depended on, scheduled for rename in T5 alongside the matching FE update.
   // Migration 0039b (Phase 4.5a T5) re-emits operation_dashboard_summary with
-  // the JSON key renamed to 'awaiting_operation_action'. CLAUDE.md §14 #6
+  // the JSON key renamed to 'in_production'. CLAUDE.md §14 #6
   // forbids editing committed migration history (so 0038b still contains the
   // old key); the allowlist stays in place so the static-grep assertion
   // against the immutable 0038b file body still passes after T5.
@@ -199,7 +199,7 @@ describe("Phase 4.5a T2 — v2 RPC v3-vocabulary sweep (migration 0038)", () => 
     // Must contain v3 vocabulary somewhere in body.
     // Historical migration files are frozen (§14 #6); they still contain the
     // pre-rename `awaiting_logistics_action` literal even after migration 0121
-    // renamed the live enum value to `awaiting_operation_action`.
+    // renamed the live enum value to `in_production`.
     expect(text).toContain("awaiting_logistics_action");
 
     // Must NOT contain the quoted-literal v2 vocabulary in any non-comment
@@ -215,7 +215,7 @@ describe("Phase 4.5a T2 — v2 RPC v3-vocabulary sweep (migration 0038)", () => 
     // Must contain v3 vocabulary somewhere in body.
     // Historical migration files are frozen (§14 #6); they still contain the
     // pre-rename `awaiting_logistics_action` literal even after migration 0121
-    // renamed the live enum value to `awaiting_operation_action`.
+    // renamed the live enum value to `in_production`.
     expect(text).toContain("awaiting_logistics_action");
 
     // Must NOT contain the quoted-literal v2 enum vocabulary in any non-
@@ -227,7 +227,7 @@ describe("Phase 4.5a T2 — v2 RPC v3-vocabulary sweep (migration 0038)", () => 
   });
 
   // Phase 4.5a T5: 0039b re-emits operation_dashboard_summary with the JSON
-  // KEY renamed to 'awaiting_operation_action' (lockstep with the FE rename).
+  // KEY renamed to 'in_production' (lockstep with the FE rename).
   // The full file body — even WITHOUT the JSON-key allowlist — must contain
   // ZERO quoted-literal 'awaiting_stock' occurrences in non-comment lines.
   it("migration 0039b file body uses v3 vocabulary throughout (JSON key renamed; no allowlist needed)", async () => {
@@ -239,7 +239,7 @@ describe("Phase 4.5a T2 — v2 RPC v3-vocabulary sweep (migration 0038)", () => 
     // as the renamed JSON key).
     // Historical migration files are frozen (§14 #6); they still contain the
     // pre-rename `awaiting_logistics_action` literal even after migration 0121
-    // renamed the live enum value to `awaiting_operation_action`.
+    // renamed the live enum value to `in_production`.
     expect(text).toContain("awaiting_logistics_action");
 
     // T5 scope: the JSON key has been renamed in lockstep with the FE. Strip

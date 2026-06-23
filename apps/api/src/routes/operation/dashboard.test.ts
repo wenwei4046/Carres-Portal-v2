@@ -36,7 +36,7 @@ async function makeJwt(role: string) {
 
 const SUMMARY_PAYLOAD = {
   kpis: { today_deliveries: 3, open_pos: 7, overdue: 1, active_orders: 12, active_gmv: 45000 },
-  pipeline: { awaiting_operation_action: [], ready_to_dispatch: [], dispatched: [] },
+  pipeline: { in_production: [], ready_to_dispatch: [], dispatched: [] },
   open_pos: [],
   low_stock: [],
 };
@@ -60,10 +60,12 @@ afterAll(() => _setJwksForTesting(null));
 /**
  * Mock the supabase user client for dashboard tests. The route does:
  *   1. sb.rpc("operation_dashboard_summary")
- *   2. sb.from("orders").select("id", { count: "exact", head: true }).eq("status", "place")
- *   3. sb.from("orders").select("id", { count: "exact", head: true }).eq("operation_stage", "proceed_request")
+ *   2. Placed count   — .from('orders').select(...).eq('status','place').or(<native>)
+ *   3. Confirmed count — .from('orders').select(...).or(<confirmed OR autocount-place>)
  *
- * `placedCount` and `proceedRequestCount` set the return values for steps 2/3.
+ * Both count queries terminate on `.or(...)`; `.eq` (query 2 above) is an
+ * intermediate link. `placedCount` / `proceedRequestCount` set the return
+ * values for the first / second terminal `.or` call.
  */
 function mockDashboard(opts: {
   summary?: typeof SUMMARY_PAYLOAD | null;
@@ -76,19 +78,22 @@ function mockDashboard(opts: {
       ? { data: null, error: opts.rpcError }
       : { data: opts.summary ?? SUMMARY_PAYLOAD, error: null },
   );
-  // For each .from('orders') call, return a chainable that resolves on .eq(...)
-  // to { data: null, error: null, count: <chosen> }. The eq sequence determines
-  // which count we return — first .eq call is for status='place', second for
-  // operation_stage='proceed_request'.
-  let eqCallIdx = 0;
+  // Each .from('orders') call returns a chainable where .eq() links onward and
+  // .or() is the terminal that resolves to { data, error, count }. The .or call
+  // order picks the count: first .or (placed query) → placedCount, second .or
+  // (confirmed query) → proceedRequestCount.
+  let orCallIdx = 0;
   const counts = [opts.placedCount ?? 0, opts.proceedRequestCount ?? 0];
   const from = vi.fn(() => {
-    const eq = vi.fn(() => {
-      const count = counts[eqCallIdx] ?? 0;
-      eqCallIdx += 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chain: any = {};
+    chain.eq = vi.fn(() => chain);
+    chain.or = vi.fn(() => {
+      const count = counts[orCallIdx] ?? 0;
+      orCallIdx += 1;
       return Promise.resolve({ data: null, error: null, count });
     });
-    return { select: vi.fn(() => ({ eq })) };
+    return { select: vi.fn(() => chain) };
   });
   vi.mocked(userClient).mockReturnValue({
     rpc,
@@ -115,7 +120,7 @@ describe("GET /api/operation/dashboard", () => {
     expect(body.kpis.today_deliveries).toBe(3);
   });
 
-  it("merges pipeline.placed + pipeline.proceed_request count fields (Pipeline v2)", async () => {
+  it("merges pipeline.placed + pipeline.confirmed count fields (Pipeline v2)", async () => {
     mockDashboard({ summary: SUMMARY_PAYLOAD, placedCount: 4, proceedRequestCount: 2 });
 
     const jwt = await makeJwt("operation");
@@ -129,16 +134,16 @@ describe("GET /api/operation/dashboard", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(body.pipeline.placed).toBe(4);
-    expect(body.pipeline.proceed_request).toBe(2);
+    expect(body.pipeline.confirmed).toBe(2);
     // Existing 0019 RPC counts must still be present.
-    expect(body.pipeline.awaiting_operation_action).toEqual([]);
+    expect(body.pipeline.in_production).toEqual([]);
     expect(body.pipeline.ready_to_dispatch).toEqual([]);
     expect(body.pipeline.dispatched).toEqual([]);
   });
 
   it("RPC pipeline keys win on collision with route-side counts (spread order intent)", async () => {
-    // Spread order in dashboard.ts is `{ placed: ..., proceed_request: ..., ...pipeline }`.
-    // If the 0019 RPC ever starts returning its own placed/proceed_request inside
+    // Spread order in dashboard.ts is `{ placed: ..., confirmed: ..., ...pipeline }`.
+    // If the 0019 RPC ever starts returning its own placed/confirmed inside
     // `summary.pipeline`, those values must clobber the route's count queries
     // (since the RPC is the source of truth and the count queries are a temporary
     // augmentation while 0019 is frozen). Lock that intent in here so a careless
@@ -147,8 +152,8 @@ describe("GET /api/operation/dashboard", () => {
       kpis: { today_deliveries: 3, open_pos: 7, overdue: 1, active_orders: 12, active_gmv: 45000 },
       pipeline: {
         placed: 999,
-        proceed_request: 999,
-        awaiting_operation_action: [],
+        confirmed: 999,
+        in_production: [],
         ready_to_dispatch: [],
         dispatched: [],
       },
@@ -174,7 +179,7 @@ describe("GET /api/operation/dashboard", () => {
     const body = (await res.json()) as any;
     // RPC wins — its 999 values override the route-side 5/7 counts.
     expect(body.pipeline.placed).toBe(999);
-    expect(body.pipeline.proceed_request).toBe(999);
+    expect(body.pipeline.confirmed).toBe(999);
   });
 
   it("returns 403 for principal role (no Supabase round-trip)", async () => {

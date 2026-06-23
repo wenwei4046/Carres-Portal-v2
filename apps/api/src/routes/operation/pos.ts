@@ -84,7 +84,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
 // DUAL-PATH: the auto-fill target population is the union of two paths.
 //
 // 1. PRIMARY (v3-S4.6): order_supplier_threads where
-//    operation_stage='awaiting_operation_action' AND po_id IS NULL. After
+//    operation_stage='in_production' AND po_id IS NULL. After
 //    confirm_proceed_request_v3 (migration 0034) every order is split into
 //    per-(supplier, category) threads; a thread with po_id NULL is the exact
 //    "not yet covered by a PO" target. This filter is correct by construction
@@ -92,7 +92,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
 //    RPC closes the race window with SELECT ... FOR UPDATE on the same rows.
 //
 // 2. LEGACY FALLBACK (v3-S2.1 so/so_refs filter): orders in
-//    operation_stage='awaiting_operation_action' that have NO row in
+//    operation_stage='in_production' that have NO row in
 //    order_supplier_threads — i.e. legacy/unsplit data, or orders where
 //    confirm_proceed_request_v3 has not yet been called. For these we apply
 //    the v3-S2.1 v2-style filter: drop orders whose `so` matches an OPEN PO's
@@ -106,7 +106,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
 //
 // Tables touched (one round-trip each, all in parallel):
 //   - order_supplier_threads (no filter — TS narrows by stage + po_id)
-//   - orders (.eq("operation_stage", "awaiting_operation_action"))
+//   - orders (.eq("operation_stage", "in_production"))
 //   - purchase_orders (.eq("status", "open") for the legacy coverage filter)
 //   - order_lines (.in("order_id", [...]) on the union set)
 //   - stock_balances (no filter — sum across all warehouses per Q2=A)
@@ -168,7 +168,7 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
   const ordersBuilder = sb
     .from("orders")
     .select("id, so, delivery_date")
-    .eq("operation_stage", "awaiting_operation_action");
+    .eq("operation_stage", "in_production");
   const ordersQuery = dlsFilter
     ? ordersBuilder.in("so", dlsFilter)
     : ordersBuilder;
@@ -190,7 +190,7 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
     return c.json(m.body, m.status);
   }
 
-  // Primary path: threads where stage='awaiting_operation_action' AND po_id
+  // Primary path: threads where stage='in_production' AND po_id
   // IS NULL. Each such thread maps its order_id into the union — multiple
   // threads on the same order (different supplier/category) collapse to one
   // entry in the Set, but their lines all show up later via order_lines (the
@@ -198,13 +198,13 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
   const primaryOrderIds = new Set<string>();
   // "Has any thread" gate for the legacy fallback — an order with at least
   // one thread row has been split, so it should NOT enter the legacy path
-  // even if its orders.operation_stage is still awaiting_operation_action.
+  // even if its orders.operation_stage is still in_production.
   const orderIdsWithAnyThread = new Set<string>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const t of (threadsRes.data ?? []) as any[]) {
     const oid = String(t.order_id);
     orderIdsWithAnyThread.add(oid);
-    if (t.operation_stage === "awaiting_operation_action" && t.po_id == null) {
+    if (t.operation_stage === "in_production" && t.po_id == null) {
       primaryOrderIds.add(oid);
     }
   }
@@ -314,7 +314,7 @@ operationPosRouter.get("/awaiting-stock-shortage", requireOperation, async (c) =
   };
 
   // Build order_id → so map from ordersRes. Only orders in
-  // awaiting_operation_action stage are fetched; the union of primary +
+  // in_production stage are fetched; the union of primary +
   // legacy paths intersects with this set when dlsFilter is on, so every
   // contributing order_id has a row here under the dls-scoped call. Orders
   // missing a so (defensive) drop their per-so attribution but still

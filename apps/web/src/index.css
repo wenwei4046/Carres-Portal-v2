@@ -199,4 +199,78 @@
    * --warning-soft #FEF3C7). Added 2026-06-12 per Jess. */
   .pill-warning   { background:#FEF3C7; color:#92400E; }
   .pill-neutral   { @apply bg-base-100 text-base-700; }
+
+  /* ===== 2990s-style POS surfaces (Phase 1, flame-kept). Scoped to the
+   * dealer POS; pure presentation, no token-value changes to :root. ===== */
+
+  /* Price hero — Archivo Black, condensed, flame. RM is a muted superscript. */
+  .pos-price    { @apply font-price font-black tracking-[-0.02em] text-primary;
+                  font-stretch: 80%; font-variant-numeric: tabular-nums; }
+  .pos-price-rm { @apply font-price font-semibold align-top opacity-70;
+                  font-size: 0.6em; margin-right: 0.12em; }
+
+  /* Card — white, radius 16, soft ink shadow, hover lift. */
+  .pos-card {
+    @apply bg-white rounded-2xl transition-[transform,box-shadow] duration-200;
+    border: 1.5px solid rgba(17,24,39,0.06);
+    box-shadow: 0 1px 2px rgba(17,24,39,0.05), 0 1px 1px rgba(17,24,39,0.03);
+  }
+  @media (hover:hover) and (pointer:fine) {
+    .pos-card:hover { transform: translateY(-2px);
+                      box-shadow: 0 12px 24px rgba(17,24,39,0.10); }
+  }
+
+  /* Selected / in-cart ring — add this class (toggled) to any selectable
+   * surface; its base class supplies the resting border. */
+  .pos-selected {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.16);
+  }
+
+  /* Cart FAB — ink pill, flame icon tile, count badge. */
+  .pos-fab {
+    @apply fixed bottom-6 right-6 z-50 inline-flex items-center gap-3
+           rounded-[18px] bg-base-900 text-white pl-2 pr-4 py-2
+           transition-transform duration-150;
+    box-shadow: 0 8px 18px rgba(17,24,39,0.20);
+  }
+  .pos-fab:hover { transform: translateY(-2px); }
+  .pos-fab:active { transform: scale(0.98); }
+
+  /* Step pill — active white+flame, done green. */
+  .pos-step-pill { @apply inline-flex items-center gap-2 text-[13px] font-semibold text-base-500; }
+  .pos-step-pill .num { @apply inline-flex h-6 w-6 items-center justify-center rounded-full
+                               border border-base-300 text-[12px]; }
+  .pos-step-pill.is-active { @apply text-base-900; }
+  .pos-step-pill.is-active .num { @apply border-primary text-primary bg-white; }
+  .pos-step-pill.is-done .num   { @apply border-success text-success bg-success-soft; }
+
+  /* Pay-card — selectable payment method tile. */
+  .pos-pay-card {
+    @apply bg-white rounded-xl px-4 py-3 text-left transition-shadow;
+    border: 1.5px solid rgba(17,24,39,0.10);
+  }
+
+  /* Drawer scrim — ink wash + blur (matches v17 white-drawer convention).
+   * z-[55] sits above the cart FAB (z-50) so scrim covers the whole page
+   * when a drawer is open. Drawer panel goes on z-[60] above the scrim. */
+  .pos-drawer-scrim { @apply fixed inset-0 z-[55];
+                      background: rgba(17,24,39,0.40); backdrop-filter: blur(4px); }
+}
+
+@layer utilities {
+  @keyframes pos-page-enter { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+  @keyframes pos-cart-pulse { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+  @keyframes pos-drawer-slide-in { from { transform:translateX(100%); } to { transform:translateX(0); } }
+  .animate-page-enter { animation: pos-page-enter .32s cubic-bezier(0.22,1,0.36,1) both; }
+  .animate-cart-pulse { animation: pos-cart-pulse .28s cubic-bezier(0.22,1,0.36,1); }
+  .animate-drawer-slide-in { animation: pos-drawer-slide-in 0.26s cubic-bezier(0.22,1,0.36,1) both; }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-page-enter, .animate-cart-pulse { animation: none; }
+    .animate-drawer-slide-in { animation: none; }
+    .pos-card { transition: none; }
+    .pos-card:hover { transform: none; }
+    .pos-fab { transition: none; }
+    .pos-fab:hover, .pos-fab:active { transform: none; }
+  }
 }

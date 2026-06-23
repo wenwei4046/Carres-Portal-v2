@@ -6,6 +6,7 @@ import type {
   ProductSkuDto,
   SofaFabricDto,
 } from "@carres/shared";
+import { SUPPLIERLESS_CATEGORIES, resolveFabricDelta } from "@carres/shared";
 import { AlertTriangle } from "lucide-react";
 
 // T42-C1 — Form state uses `ManualCostSource` (3-value, no `auto_issued`)
@@ -170,11 +171,16 @@ function findSupplierForSku(
   // category, e.g. mattress from two factories). Both paths cover the
   // real-world data; the old proto-style category:model:variant split is gone.
   const skuRow = skuByCode.get(sku);
+  const cat = categoryForSku(sku, skuByCode, models);
+  // 0171 explicit guard: service/accessory SKUs are internal (null supplier)
+  // and must NEVER be procurable — not via a stray supplier_id, nor via a
+  // supplier whose cat_covered ever drifts to include those categories. The
+  // line falls to `orphans` and blocks submit (see the groups memo + valid gate).
+  if (cat && (SUPPLIERLESS_CATEGORIES as readonly string[]).includes(cat)) return null;
   if (skuRow?.supplierId) {
     const direct = suppliers.find((s) => s.id === skuRow.supplierId);
     if (direct) return direct;
   }
-  const cat = categoryForSku(sku, skuByCode, models);
   if (!cat) return null;
   return suppliers.find((s) => (s.cat_covered ?? []).includes(cat)) ?? null;
 }
@@ -1346,12 +1352,21 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
                         const f = fabrics.find(
                           (x) => x.id === e.target.value,
                         );
+                        const overrideForModel =
+                          (catalogQ.data?.modelFabricTierOverrides ?? []).find(
+                            (o) => o.modelId === l.modelId,
+                          ) ?? null;
                         setLine(i, {
                           attrs: f
                             ? {
                                 fabric_id: f.id,
                                 fabric_name: f.fabricName,
-                                fabric_surcharge: f.surcharge,
+                                fabric_tier: f.tier,
+                                fabric_surcharge: resolveFabricDelta(
+                                  f.tier,
+                                  overrideForModel,
+                                  catalogQ.data?.fabricTierConfig ?? null,
+                                ),
                               }
                             : null,
                         });
@@ -1593,6 +1608,27 @@ export default function CreatePOModal({ prefill, onClose }: Props) {
       {!warehousesOk && groups.groups.length > 0 && (
         <div className="text-[11px] text-base-600 mb-2 font-body">
           Pick a warehouse for each PO.
+        </div>
+      )}
+
+      {/* 0171 — orphan lines: a SKU with no supplier (service/accessory items
+          are internal and cannot be procured). The valid gate already blocks
+          submit on these; this band explains WHY the Issue button is disabled
+          instead of leaving a silent dead-end (e.g. an auto-fill / shortage
+          path injected one by SKU code, bypassing the category-filtered dropdown). */}
+      {groups.orphans.length > 0 && (
+        <div
+          className="text-[11.5px] px-3 py-2.5 rounded-[4px] mb-2.5 leading-[1.5] font-body"
+          style={{
+            background: "rgba(220,38,38,.06)",
+            border: "1px solid rgba(220,38,38,.28)",
+          }}
+        >
+          <AlertTriangle size={12} strokeWidth={2.5} className="inline -mt-px mr-1 text-danger" />
+          <strong>Can&rsquo;t procure:</strong>{" "}
+          {Array.from(new Set(groups.orphans.map((l) => l.sku))).join(", ")} — service /
+          accessory items have no supplier. Remove{" "}
+          {groups.orphans.length === 1 ? "it" : "them"} to issue this PO.
         </div>
       )}
 

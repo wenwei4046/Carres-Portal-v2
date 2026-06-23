@@ -1,3 +1,6 @@
+import type { ComboDto } from "@carres/shared";
+import { explodeCombo } from "@carres/shared";
+
 /**
  * Wizard draft state — local UI shape, not the DB row.
  *
@@ -17,7 +20,7 @@
  * (camelCase, sku + qty + attrs + unitPrice) plus a transient `localId` used
  * for React keys + Remove targeting since real `id` lands only after the RPC
  * inserts the row. attrs may carry { color, gap } for bedframe or
- * { fabric_name, fabric_surcharge } for sofa custom-with-fabric.
+ * { fabric_name, fabric_surcharge, fabric_tier } for sofa custom-with-fabric.
  */
 export interface DraftLine {
   localId: string;
@@ -27,6 +30,60 @@ export interface DraftLine {
   unitPrice: number;
   /** Free-text label for the LineList row, e.g. "Carres Cloud · Queen" */
   label: string;
+}
+
+/**
+ * Fresh local id for a staged line. Inlined here (NOT imported from
+ * `configurators.tsx`) so this lower-level draft module never depends on a
+ * React component file — same `crypto.randomUUID()`-with-JSDOM-guard pattern.
+ */
+function newLocalId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Explode a fixed-set combo (套餐, migration 0177) into the component
+ * `DraftLine`s the cart + submit pipeline already understand. PURE: no React,
+ * no IO — delegates the price split to shared `explodeCombo` (integer-cents,
+ * proportional to each component's selling price), then maps each exploded
+ * line into a `DraftLine` carrying `attrs.combo_key` / `attrs.combo_label` so
+ * the CartDrawer can group them under one "Remove combo".
+ *
+ * `lookup(sku)` supplies the SELLING price (for the split weight) + a human
+ * label, both from the catalog index. A component SKU absent from the
+ * (pos_active-filtered) catalog bundle returns `price: NaN`; `explodeCombo`
+ * treats a non-finite price as 0 weight, so that component is priced 0 and the
+ * remaining components absorb the combo price — the combo TOTAL still equals
+ * `comboPrice`. Accepted v1 behaviour (the controller's carry-forward); we do
+ * NOT try to fetch inactive sku prices here.
+ *
+ * `attrs` is EXACTLY `{ combo_key, combo_label }` — combo components are
+ * concrete SKUs with no configurator options in v1.
+ */
+export function comboToDraftLines(
+  combo: ComboDto,
+  lookup: (sku: string) => { price: number; label: string },
+): DraftLine[] {
+  const exploded = explodeCombo(
+    {
+      comboKey: combo.comboKey,
+      name: combo.name,
+      comboPrice: combo.comboPrice,
+      components: combo.components,
+    },
+    (sku) => lookup(sku).price,
+  );
+  return exploded.map((e) => ({
+    localId: newLocalId(),
+    sku: e.sku,
+    qty: e.qty,
+    attrs: { combo_key: e.comboKey, combo_label: e.comboLabel },
+    unitPrice: e.unitPrice,
+    label: lookup(e.sku).label || e.sku,
+  }));
 }
 
 /** Addon staged on the order. Persisted as order_addons rows on submit.
@@ -108,6 +165,10 @@ export interface WizardDraft {
   };
   delivery: {
     date: string;
+    // Phase 11.1 (Loo) — salesperson-entered planned production-start
+    // ("Proceed") date. Paired with `date` via the same `dateTbd` toggle
+    // (both-or-neither). Must be on/before `date`. Empty string = not picked.
+    proceedDate: string;
     dateTbd: boolean;
     floor: number;
     hasLift: boolean;
@@ -163,7 +224,7 @@ export function emptyDraft(): WizardDraft {
       emergencyRelationship: "",
       emergencyRelationshipOther: "",
     },
-    delivery: { date: "", dateTbd: false, floor: 1, hasLift: false, stairItems: null, asap: false },
+    delivery: { date: "", proceedDate: "", dateTbd: false, floor: 1, hasLift: false, stairItems: null, asap: false },
     lines: [],
     addons: [],
     paid: 0,
@@ -215,6 +276,12 @@ export function loadDraft(): WizardDraft | null {
     // draft never had, breaking save/load round-trip equality).
     const delivery = {
       ...parsed.delivery,
+      // Phase 11.1 — backfill proceedDate for drafts saved before this field
+      // existed, so old in-flight drafts restore cleanly.
+      proceedDate:
+        typeof parsed.delivery.proceedDate === "string"
+          ? parsed.delivery.proceedDate
+          : "",
       stairItems:
         typeof parsed.delivery.stairItems === "number"
           ? parsed.delivery.stairItems
@@ -359,6 +426,21 @@ export function step3DateFirstIssue(
     if (picked < new Date(min.toISOString().slice(0, 10))) {
       return `Delivery — earliest date is ${min.toISOString().slice(0, 10)} (${minLeadDays}-day lead time)`;
     }
+  }
+  // Phase 11.1 (Loo) — the salesperson must ALSO commit a proceed
+  // (production-start) date whenever a delivery date is set. It can't be in the
+  // past and can't be after the delivery date (you don't start building after
+  // you've promised delivery). TBD orders skip this (handled by the early
+  // return above) — both dates get filled in later via the confirm-date flow.
+  if (!d.delivery.proceedDate) {
+    return "Proceed date — pick when production should start, or tick 'Confirm later'";
+  }
+  const todayIso = today.toISOString().slice(0, 10);
+  if (d.delivery.proceedDate < todayIso) {
+    return `Proceed date — can't be in the past (earliest ${todayIso})`;
+  }
+  if (d.delivery.proceedDate > d.delivery.date) {
+    return "Proceed date — must be on or before the delivery date";
   }
   return null;
 }

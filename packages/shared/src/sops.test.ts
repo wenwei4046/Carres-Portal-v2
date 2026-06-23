@@ -42,8 +42,8 @@ describe('SOP shape invariants', () => {
     ['SOP_SOFA_SPECIAL', SOP_SOFA_SPECIAL],
   ];
 
-  it.each(sops)('%s starts with awaiting_operation_action', (_name, sop) => {
-    expect(sop.stages[0]).toBe<OperationStageV3>('awaiting_operation_action');
+  it.each(sops)('%s starts with in_production', (_name, sop) => {
+    expect(sop.stages[0]).toBe<OperationStageV3>('in_production');
   });
 
   it.each(sops)('%s ends with delivered', (_name, sop) => {
@@ -94,9 +94,9 @@ describe('SOP shape invariants', () => {
     }
   });
 
-  it('SOP_SOFA_SPECIAL allows two transitions from awaiting_operation_action via receive RPC', () => {
+  it('SOP_SOFA_SPECIAL allows two transitions from in_production via receive RPC', () => {
     const matches = SOP_SOFA_SPECIAL.transitions.filter(
-      t => t.from === 'awaiting_operation_action' && t.rpc === 'operation_receive_po_with_do'
+      t => t.from === 'in_production' && t.rpc === 'operation_receive_po_with_do'
     );
     expect(matches).toHaveLength(2);
     const tos = matches.map(t => t.to).sort();

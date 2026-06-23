@@ -34,8 +34,8 @@ interface Props {
  */
 export const STAGE_DESCRIPTIONS: Record<OperationStage, string> = {
   placed: "Placed at the showroom · awaiting coordinator triage",
-  proceed_request: "Sales pressed Proceed · ready to be picked up by ops",
-  awaiting_operation_action:
+  confirmed: "Sales pressed Proceed · ready to be picked up by ops",
+  in_production:
     "PO open with supplier · monitor stock + bundle when ready",
   ready_to_dispatch: "Stock secured · assign delivery partner",
   dispatched: "With delivery partner · attach DO when collected",

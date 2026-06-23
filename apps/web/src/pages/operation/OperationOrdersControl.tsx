@@ -124,7 +124,7 @@ function stageOf(o: operationOrderListRow): OperationStage {
   if (o.status === "place") return "placed";
   if (o.operation_stage) return o.operation_stage as OperationStage;
   if (o.status === "delivered") return "delivered";
-  return "awaiting_operation_action";
+  return "in_production";
 }
 
 /** Which control tab an order belongs to. */
@@ -132,8 +132,8 @@ function controlTabOf(o: operationOrderListRow): SettledTab {
   const s = stageOf(o);
   if (s === "delivered") return "completed";
   if (s === "dispatched" || s === "ready_to_dispatch") return "scheduled";
-  if (s === "awaiting_operation_action") return "pending";
-  if (s === "proceed_request") return "proceed";
+  if (s === "in_production") return "pending";
+  if (s === "confirmed") return "proceed";
   // s === "placed": entry rule splits by source.
   return o.source_system === "autocount" ? "proceed" : "placed";
 }
@@ -173,7 +173,7 @@ function stockReadiness(
   const s = stageOf(o);
   if (s === "ready_to_dispatch" || s === "dispatched" || s === "delivered")
     return { state: "ready" };
-  if (s === "awaiting_operation_action") return { state: "awaiting" };
+  if (s === "in_production") return { state: "awaiting" };
 
   // Early stages: real free-stock check, only when the live map is present AND
   // every line SKU is a known catalog SKU (else we can't honestly compute it).
@@ -386,9 +386,9 @@ function tabFromStageParam(raw: string | undefined): ControlTab | null {
   switch (raw) {
     case "placed":
       return "placed";
-    case "proceed_request":
+    case "confirmed":
       return "proceed";
-    case "awaiting_operation_action":
+    case "in_production":
       return "pending";
     case "ready_to_dispatch":
     case "dispatched":
@@ -586,7 +586,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       const s = String(v ?? "");
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const header = ["SO", "Customer", "Phone", "Units", "Items", "Deadline", "Location", "Logistic", "Status"];
+    const header = ["SO", "Customer", "Phone", "Units", "Items", "Deadline", "Process", "Location", "Logistic", "Status"];
     const body = selectedOrders.map((o) => {
       const ls = o.order_lines ?? [];
       const units = unitTotal(ls);
@@ -597,6 +597,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       return [
         `SO-${o.so}`, o.customer_name ?? "", o.customer_phone ?? "", units,
         itemRollup(ls), o.delivery_date_tbd ? "TBD" : o.delivery_date ?? "",
+        o.proceed_date ?? "",
         loc.label ?? "", logi, TAB_LABEL[controlTabOf(o)],
       ].map(cell).join(",");
     });
@@ -868,6 +869,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Status</Th>
               <Th>Order ID</Th>
               <Th>Deadline</Th>
+              <Th>Process</Th>
               <Th>Location</Th>
               <Th>Logistic</Th>
               <Th>Items</Th>
@@ -878,7 +880,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1203,6 +1205,19 @@ function OrderRow({
               </div>
             );
           })()
+        ) : (
+          <span className="text-base-400">—</span>
+        )}
+      </td>
+      {/* Process — Phase 11.1 planned production-start ("proceed") date the
+          salesperson keys in alongside the deadline: when the factory should
+          begin. Distinct from the Proceed status tab. */}
+      <td
+        className="px-4 py-2.5 whitespace-nowrap text-base-700"
+        title="Process date = planned production-start (proceed) date — when the factory should begin. Set by the salesperson alongside the delivery deadline."
+      >
+        {o.proceed_date ? (
+          <div className="text-[12px] text-base-700">{fmtDate(o.proceed_date)}</div>
         ) : (
           <span className="text-base-400">—</span>
         )}

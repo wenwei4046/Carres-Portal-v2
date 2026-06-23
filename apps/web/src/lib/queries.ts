@@ -24,6 +24,24 @@ import {
   type ProductSkuPatchInput,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
+  type ComboDto,
+  type ComboCreateInput,
+  type ComboPatchInput,
+  type SofaComboDto,
+  type SofaComboCreateInput,
+  type SofaComboPatchInput,
+  type SofaCompartmentDto,
+  type SofaCompartmentCreateInput,
+  type SofaCompartmentPatchInput,
+  type ModelSofaCompartmentDto,
+  type ModelSofaCompartmentInput,
+  type SizesActiveInput,
+  type GenerateSkusInput,
+  type FloorConfigPatchInput,
+  type AddonCreateInput,
+  type AddonPatchInput,
+  type AddonDto,
+  type FloorConfigDto,
   type ConfirmProceedRequestInput,
   type LpRejectOrderInput,
   type ReselectPartnerInput,
@@ -70,8 +88,14 @@ import {
   type OpsOrderControlResponse,
   type UpdateOpsOrderControlInput,
   type SetOpsAssignedLogisticInput,
+  type SoGridResponse,
+  type SoGridConfig,
+  type UpdateSoGridConfigInput,
+  type FabricTierConfigDto,
+  type ModelFabricTierOverrideDto,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
+import { uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
   dealers:      () => ["dealers"] as const,
@@ -160,7 +184,7 @@ export const qk = {
      *  awaiting stock" button on CreatePOModal. Lazy: fired only on click via
      *  the hook's `refetch()`. Nested under `pos` so future blunt
      *  invalidations on `["operation","pos"]` reach this cache too (e.g. when
-     *  a PO is issued, the awaiting_operation_action pool changes).
+     *  a PO is issued, the in_production pool changes).
      *
      *  `dls` (optional, sorted) scopes shortage to a specific so set, used by
      *  the cross-order bundle prefill flow. Sorting keeps the cache key stable
@@ -256,6 +280,13 @@ export const qk = {
   pickupEvent: {
     print: (eventId: string) => ["pickupEvent", eventId] as const,
     byPo:  (poId: string)  => ["pickupEvents", poId] as const,
+  },
+  // 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid).
+  // Top-level prefix `["sales-order-grid"]` so a single blunt invalidate after
+  // a config save refreshes both the grid (carries config) and the config read.
+  salesOrderGrid: {
+    grid:   () => ["sales-order-grid", "grid"] as const,
+    config: () => ["sales-order-grid", "config"] as const,
   },
 };
 
@@ -789,6 +820,46 @@ export function useCancelOrder(
       // List views (kanban / orders tabs) — invalidate so paid pct,
       // status badge, and counts refresh when reopened.
       void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+// ===========================================================================
+// 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid)
+// ===========================================================================
+/** GET /api/operation/sales-order-maintenance/grid — flattened order×line rows
+ *  + the shared column config. Internal (operation/principal) only. */
+export function useSalesOrderGrid(
+  opts?: Partial<UseQueryOptions<SoGridResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.salesOrderGrid.grid(),
+    queryFn: () =>
+      apiFetch<SoGridResponse>("/api/operation/sales-order-maintenance/grid"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** PUT /api/operation/sales-order-maintenance/config — replace the shared
+ *  column/option config. Invalidates the whole `["sales-order-grid"]` sub-tree
+ *  so the grid + config reads re-fetch the merged result. */
+export function useUpdateSoGridConfig(
+  opts?: Partial<
+    UseMutationOptions<{ config: SoGridConfig }, ApiError, UpdateSoGridConfigInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ config: SoGridConfig }, ApiError, UpdateSoGridConfigInput>({
+    mutationFn: (input) =>
+      apiFetch<{ config: SoGridConfig }>(
+        "/api/operation/sales-order-maintenance/config",
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["sales-order-grid"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -1481,10 +1552,10 @@ export interface operationPipelineCounts {
   /** Pipeline v2 (C3): orders with `status='place'` — dealer-side, not yet
    *  proceeded. Counted via the dashboard route since the RPC is frozen. */
   placed: number;
-  /** Pipeline v2 (C3): orders with `operation_stage='proceed_request'` —
+  /** Pipeline v2 (C3): orders with `operation_stage='confirmed'` —
    *  awaiting HQ operation triage decision. */
-  proceed_request: number;
-  awaiting_operation_action: number;
+  confirmed: number;
+  in_production: number;
   ready_to_dispatch: number;
   dispatched: number;
 }
@@ -1567,8 +1638,8 @@ export interface operationOrderThreadRow {
   category: string;
   operation_stage:
     | "placed"
-    | "proceed_request"
-    | "awaiting_operation_action"
+    | "confirmed"
+    | "in_production"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered";
@@ -1590,7 +1661,7 @@ export interface operationOrderThreadRow {
 /** Row in GET /api/operation/orders. Embedded `dealers(name)` is a PostgREST
  *  nested fetch shape — the route forwards it verbatim.
  *
- *  Pipeline v2 (C1/C2): adds `'placed'` + `'proceed_request'` to operation_stage
+ *  Pipeline v2 (C1/C2): adds `'placed'` + `'confirmed'` to operation_stage
  *  and widens status to include the dealer-side `'place'` value (orders that
  *  haven't been pushed to operation yet still surface in the kanban so HQ can
  *  see what's coming).
@@ -1606,8 +1677,8 @@ export interface operationOrderListRow {
   status: "place" | "proceed_order" | "delivered";
   operation_stage:
     | "placed"
-    | "proceed_request"
-    | "awaiting_operation_action"
+    | "confirmed"
+    | "in_production"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered"
@@ -1624,6 +1695,9 @@ export interface operationOrderListRow {
   placed_at: string;
   delivery_date: string | null;
   delivery_date_tbd?: boolean | null;
+  /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
+   *  ("Process") date, pairs with delivery_date. Null on pre-11.1 / AutoCount orders. */
+  proceed_date?: string | null;
   /** AutoCount provenance (migration 0132/0136). source_system='autocount'
    *  drives the entry rule (AutoCount→Proceed tab, native→Placed); source_ref
    *  is the CR/TCF doc-no list shown as the ref prefix. */
@@ -1673,8 +1747,8 @@ export interface operationOrderDetailOrder {
   status: string;
   operation_stage:
     | "placed"
-    | "proceed_request"
-    | "awaiting_operation_action"
+    | "confirmed"
+    | "in_production"
     | "ready_to_dispatch"
     | "dispatched"
     | "delivered"
@@ -1686,6 +1760,10 @@ export interface operationOrderDetailOrder {
   customer_address_unknown: boolean;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
+  /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
+   *  date, pairs with delivery_date. Null on pre-11.1 / AutoCount orders.
+   *  Optional so detail fixtures that predate the field keep typechecking. */
+  proceed_date?: string | null;
   placed_at: string;
   do_number: string | null;
   do_note: string | null;
@@ -2272,7 +2350,7 @@ export function useReservedDrilldown(
  *  "Auto-fill from awaiting stock" button. Lazy: `enabled: false` so the
  *  query only fires when the user clicks the button (via `refetch()`). The
  *  result replaces the modal's `lines` state. staleTime is 0 so a fresh
- *  refetch is always triggered — the awaiting_operation_action pool can change between
+ *  refetch is always triggered — the in_production pool can change between
  *  clicks (e.g. user dispatches an order, abandons one).
  *
  *  Bundle scoping: when `dls` is non-empty the query appends `?dls=1,2,3` so
@@ -2597,7 +2675,7 @@ export function useAbandonOrderMutation(
   });
 }
 
-/** 2026-05-12 (Loo) — back-arrow from Proceed Request column → Placed.
+/** 2026-05-12 (Loo) — back-arrow from Confirmed column → Placed.
  *  No body. Server enforces operation or principal role + RPC 0095 enforces
  *  current stage. */
 export function useRevertOrderProceedMutation(
@@ -2650,7 +2728,7 @@ export function useRevertOrderDispatchMutation(
   });
 }
 
-/** Manual override of the auto-picked source warehouse (E1 awaiting_operation_action). */
+/** Manual override of the auto-picked source warehouse (E1 in_production). */
 export function useWarehousePickMutation(
   orderId: string,
   opts?: Partial<
@@ -2674,8 +2752,8 @@ export function useWarehousePickMutation(
   });
 }
 
-/** Pipeline v2 (C2 / migration 0024) — confirm a `proceed_request` order.
- *  RPC `operation_confirm_proceed_request` decides awaiting_operation_action vs
+/** Pipeline v2 (C2 / migration 0024) — confirm a `confirmed` order.
+ *  RPC `operation_confirm_proceed_request` decides in_production vs
  *  ready_to_dispatch based on shortage at the chosen warehouse. `warehouseId`
  *  is optional — RPC accepts NULL when the order already has a warehouse_id.
  *
@@ -2835,8 +2913,8 @@ export function usePartnerIncomingOrders() {
   });
 }
 
-/** Pipeline v2 (C2 / migration 0024) — flip a `proceed_request` or
- *  `awaiting_operation_action` order directly to `ready_to_dispatch`. Wraps
+/** Pipeline v2 (C2 / migration 0024) — flip a `confirmed` or
+ *  `in_production` order directly to `ready_to_dispatch`. Wraps
  *  `operation_warehouse_pick` whose source-stage guard widens to permit both
  *  stages. `warehouseId` is REQUIRED here (the RPC raises 22023
  *  `warehouse_required` on NULL — confirm-proceed accepts NULL via a different
@@ -2901,7 +2979,7 @@ export function useRecheckStockMutation(
   });
 }
 
-/** Auto-issue POs for an awaiting_operation_action order's shortages. Body empty. */
+/** Auto-issue POs for an in_production order's shortages. Body empty. */
 export function useIssuePosForOrderMutation(
   orderId: string,
   opts?: Partial<
@@ -2943,7 +3021,7 @@ export function useCreatePoMutation(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      // If the PO is tied to a SO (single or via so_refs), the awaiting_operation_action
+      // If the PO is tied to a SO (single or via so_refs), the in_production
       // drawer for those orders should refresh. Bust the orders sub-tree too.
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
@@ -2961,7 +3039,7 @@ export function useCreatePoMutation(
  * (say) the 3rd supplier validation fails.
  *
  * Cache invalidation matches useCreatePoMutation (pos / dashboard / warehouse
- * / orders sub-trees) so the procurement list, KPI strip, awaiting_operation_action
+ * / orders sub-trees) so the procurement list, KPI strip, in_production
  * drawers, and the warehouse stock view all refresh after the batch lands.
  *
  * de8bf4e pattern: spread `...opts` BEFORE `onSuccess` so caller-supplied
@@ -3024,7 +3102,7 @@ export function useReceivePoWithDoMutation(
       // alerts" stay stale for up to 30s after qty/reserved change.
       await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
-      // Receiving stock can unblock awaiting_operation_action orders → invalidate orders.
+      // Receiving stock can unblock in_production orders → invalidate orders.
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
@@ -3064,7 +3142,7 @@ export function useReceivePoAsPartnerMutation(
       // Partner-side caches.
       await qc.invalidateQueries({ queryKey: ["partner"] });
       // operation-side caches (PO appears in Received tab; warehouse stock
-      // bumped; orders may unblock awaiting_operation_action).
+      // bumped; orders may unblock in_production).
       await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
       await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
       await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
@@ -4376,7 +4454,7 @@ export function usePickupEventPrint(eventId: string | null) {
 // next consumer mount (Create-PO modal, dealer wizard, etc.).
 // ---------------------------------------------------------------------------
 
-function catalogJson(method: "POST" | "PATCH" | "DELETE", body?: unknown) {
+function catalogJson(method: "POST" | "PATCH" | "PUT" | "DELETE", body?: unknown) {
   return {
     method,
     headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
@@ -4461,6 +4539,308 @@ export function useDeleteSofaFabric() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/sofa-fabrics/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// 0176 — Alias so callers can use the Task-5 brief's naming convention.
+// Both names are exported; the underlying hook is the same.
+export { usePatchSofaFabric as useUpdateSofaFabric };
+
+// ---------------------------------------------------------------------------
+// 0177 — fixed-set combos (套餐). Three CRUD mutations mirroring the sofa-fabric
+// hooks: POST creates a combo + its components, PATCH replaces the scalar fields
+// and/or the full component set, DELETE soft-deletes (active=false). All three
+// are principal-only at the API/RLS layer (combos_write_principal); the UI gate
+// in CombosTab is just a friendly read-only veneer. Each invalidates the whole
+// `['catalog']` tree so the admin bundle re-fetches (combos ride in the bundle —
+// no dedicated query key needed).
+// ---------------------------------------------------------------------------
+
+export function useCreateCombo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ComboCreateInput) =>
+      apiFetch<{ combo: ComboDto }>("/api/catalog/combos", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateCombo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: ComboPatchInput }) =>
+      apiFetch<{ combo: ComboDto }>(`/api/catalog/combos/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteCombo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/combos/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0179 — sofa combos (sofa engine Phase 2). Slots = ordered OR-sets of
+// compartment codes; prices_by_height matrix per SOFA_HEIGHTS. Three CRUD
+// mutations mirroring the 0177 combo hooks: POST creates, PATCH replaces
+// fields, DELETE soft-deletes (active=false + discontinued_at). Principal-only
+// at the API/RLS layer (sofa_combo_pricing_write_principal); the UI gate in
+// ProductModelDrawer's Sofa Combos panel is a friendly read-only veneer. Each
+// invalidates the whole `['catalog']` tree so the admin bundle re-fetches (sofa
+// combos ride in the bundle — no dedicated query key needed).
+// ---------------------------------------------------------------------------
+
+export function useCreateSofaCombo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SofaComboCreateInput) =>
+      apiFetch<{ sofaCombo: SofaComboDto }>("/api/catalog/sofa-combos", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateSofaCombo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: SofaComboPatchInput }) =>
+      apiFetch<{ sofaCombo: SofaComboDto }>(`/api/catalog/sofa-combos/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteSofaCombo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/sofa-combos/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// 0178 — sofa compartment pool + per-model offered (sofa engine Phase 1). CRUD
+// hooks mirroring the sofa-fabric / combo hooks; all invalidate ['catalog'] so
+// the admin bundle re-fetches. Principal-only at the API/RLS layer; the UI gate
+// in the maintenance page is a friendly read-only veneer.
+export function useCreateSofaCompartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SofaCompartmentCreateInput) =>
+      apiFetch<{ compartment: SofaCompartmentDto }>("/api/catalog/sofa-compartments", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateSofaCompartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: SofaCompartmentPatchInput }) =>
+      apiFetch<{ compartment: SofaCompartmentDto }>(`/api/catalog/sofa-compartments/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteSofaCompartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/sofa-compartments/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpsertModelSofaCompartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      modelId,
+      compartmentId,
+      input,
+    }: {
+      modelId: string;
+      compartmentId: string;
+      input: ModelSofaCompartmentInput;
+    }) =>
+      apiFetch<{ modelSofaCompartment: ModelSofaCompartmentDto }>(
+        `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
+        catalogJson("PUT", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteModelSofaCompartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelId, compartmentId }: { modelId: string; compartmentId: string }) =>
+      apiFetch<{ ok: true }>(
+        `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
+        catalogJson("DELETE"),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/**
+ * PATCH /api/catalog/fabric-tier-config — update the global tier deltas
+ * (sofaTier2Delta / sofaTier3Delta). Principal-only at the RLS layer.
+ * Invalidates the whole `['catalog']` tree so the admin bundle re-fetches.
+ */
+export function useUpdateFabricTierConfig(
+  opts?: Partial<UseMutationOptions<{ fabricTierConfig: FabricTierConfigDto }, ApiError, FabricTierConfigDto>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ fabricTierConfig: FabricTierConfigDto }, ApiError, FabricTierConfigDto>({
+    mutationFn: (input) =>
+      apiFetch<{ fabricTierConfig: FabricTierConfigDto }>(
+        "/api/catalog/fabric-tier-config",
+        catalogJson("PATCH", input),
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["catalog"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * PUT /api/catalog/model-fabric-tier-override/:modelId — upsert a per-model
+ * tier delta override. Pass `tier2Delta: null` / `tier3Delta: null` to revert
+ * that tier's delta to the global config. Principal-only at the RLS layer.
+ * Invalidates the whole `['catalog']` tree.
+ */
+export function useUpsertModelFabricTierOverride(
+  opts?: Partial<
+    UseMutationOptions<
+      { override: ModelFabricTierOverrideDto },
+      ApiError,
+      { modelId: string; tier2Delta: number | null; tier3Delta: number | null }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { override: ModelFabricTierOverrideDto },
+    ApiError,
+    { modelId: string; tier2Delta: number | null; tier3Delta: number | null }
+  >({
+    mutationFn: ({ modelId, tier2Delta, tier3Delta }) =>
+      apiFetch<{ override: ModelFabricTierOverrideDto }>(
+        `/api/catalog/model-fabric-tier-override/${modelId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tier2Delta, tier3Delta }),
+        },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["catalog"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0169-0173 — Product & Maintenance mutations (Modular + Maintenance tabs).
+// Each invalidates ['catalog'] so the admin bundle + every consumer
+// (dealer wizard, Create-PO) re-reads on the next mount.
+// ---------------------------------------------------------------------------
+
+/** Modular "active sizes" cascade — writes allowed_options.sizes AND flips
+ *  pos_active across the model's size SKUs (in-set on, others off). Never
+ *  touches discontinued_at. */
+export function useToggleSizesActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelId, input }: { modelId: string; input: SizesActiveInput }) =>
+      apiFetch<{ ok: true; sizes: string[] }>(
+        `/api/catalog/models/${modelId}/sizes-active`,
+        catalogJson("PATCH", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** Materialize one SKU per variant (from allowed_options.sizes or an explicit
+ *  list). Idempotent — existing codes are skipped server-side. */
+export function useGenerateSkus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelId, input }: { modelId: string; input: GenerateSkusInput }) =>
+      apiFetch<{ ok: true; generated: number; skipped: number }>(
+        `/api/catalog/models/${modelId}/generate-skus`,
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** Photo upload (signed-upload flow in photo-upload.ts). Takes the raw File;
+ *  the helper shrinks → signs → uploads → stores → returns the updated model. */
+export function useSetModelPhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelId, file }: { modelId: string; file: Blob }) =>
+      uploadModelPhoto(modelId, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteModelPhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (modelId: string) =>
+      apiFetch<{ model: ProductModelDto }>(
+        `/api/catalog/models/${modelId}/photo`,
+        catalogJson("DELETE"),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** Delivery-fee singleton (floor_config, id=1). Principal-only server-side
+ *  (floor_write_principal) — the Maintenance editor UI-gates to principal. */
+export function usePatchFloorConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: FloorConfigPatchInput) =>
+      apiFetch<{ floorConfig: FloorConfigDto }>(
+        "/api/catalog/floor-config",
+        catalogJson("PATCH", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useCreateAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AddonCreateInput) =>
+      apiFetch<{ addon: AddonDto }>("/api/catalog/addons", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function usePatchAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, patch }: { key: string; patch: AddonPatchInput }) =>
+      apiFetch<{ addon: AddonDto }>(`/api/catalog/addons/${key}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/addons/${key}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

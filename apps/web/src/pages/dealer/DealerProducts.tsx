@@ -36,7 +36,11 @@ export default function DealerProducts() {
     );
   }
 
-  const allModels = catalog.data?.models ?? [];
+  // Dealers only see the 3 sellable categories; 0169 added accessory/service
+  // (internal-only: delivery/disposal/labour SKUs), which must never surface in
+  // the dealer catalog. Filter them out before counting + rendering.
+  const dealerCats = new Set<ProductCategory>(CATEGORIES.map((c) => c.key));
+  const allModels = (catalog.data?.models ?? []).filter((m) => dealerCats.has(m.category));
   const inCat = allModels.filter((m) => m.category === activeCat);
   const filtered = search
     ? inCat.filter(
@@ -51,6 +55,8 @@ export default function DealerProducts() {
     mattress: { models: 0, skus: 0 },
     bedframe: { models: 0, skus: 0 },
     sofa: { models: 0, skus: 0 },
+    accessory: { models: 0, skus: 0 },
+    service: { models: 0, skus: 0 },
   };
   for (const m of allModels) {
     countsByCat[m.category].models += 1;

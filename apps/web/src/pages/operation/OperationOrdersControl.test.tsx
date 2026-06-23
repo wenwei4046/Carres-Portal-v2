@@ -123,13 +123,13 @@ const ROWS: operationOrderListRow[] = [
     ],
   }),
   // C — proceed_request → Proceed
-  makeRow({ id: "c", so: 1003, status: "proceed_order", operation_stage: "proceed_request" }),
+  makeRow({ id: "c", so: 1003, status: "proceed_order", operation_stage: "confirmed" }),
   // D — awaiting → Pending, with a triage LP that resolves via partners map
   makeRow({
     id: "d",
     so: 1004,
     status: "proceed_order",
-    operation_stage: "awaiting_operation_action",
+    operation_stage: "in_production",
     ops_assigned_logistic: "p-nets",
   }),
   // E — ready_to_dispatch → Scheduled, with a formal LP joined
@@ -273,7 +273,7 @@ describe("OperationOrdersControl", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={["/operation/orders/awaiting_operation_action"]}>
+        <MemoryRouter initialEntries={["/operation/orders/in_production"]}>
           <Routes>
             <Route
               path="/operation/orders/:stage"
@@ -283,7 +283,7 @@ describe("OperationOrdersControl", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    // awaiting_operation_action maps to the Pending tab → only order d.
+    // in_production maps to the Pending tab → only order d.
     expect(rowsBySo()).toEqual(["1004"]);
   });
 
@@ -396,7 +396,7 @@ describe("OperationOrdersControl · Stock column", () => {
       id: "aw",
       so: 2005,
       status: "proceed_order",
-      operation_stage: "awaiting_operation_action",
+      operation_stage: "in_production",
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
@@ -616,7 +616,12 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
   it("labels the date column 'Deadline' and shows the 📞 contact window inside 3 days (A3)", () => {
     const soon = new Date();
     soon.setDate(soon.getDate() + 2);
-    const iso = soon.toISOString().slice(0, 10);
+    // Build the ISO date from LOCAL parts (not toISOString, which is UTC):
+    // deadlineInfo parses `${date}T00:00:00` as local midnight, so a UTC date
+    // is a day behind in UTC+8 during local early-morning hours and the
+    // countdown reads "1d" instead of "2d" (flaky-by-timezone, surfaced when
+    // the suite ran in MYT pre-dawn). Local parts keep it exactly 2 days out.
+    const iso = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, "0")}-${String(soon.getDate()).padStart(2, "0")}`;
     oneRow({ id: "r4", so: 3004, delivery_date: iso });
     wrap(<OperationOrdersControl />);
     // header renamed

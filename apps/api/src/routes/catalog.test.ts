@@ -88,6 +88,12 @@ function buildSb(
       return chain;
     };
     chain.maybeSingle = async () => ({ data: rows[0] ?? null, error: null });
+    // c132b97 — GET /api/catalog pages product_skus via `.range(from, to)` to
+    // beat Supabase's 1000-row REST cap. The mock returns the whole stubbed
+    // set in one page (test fixtures are always < 1000 rows, so fetchAllSkus
+    // breaks after the first page).
+    chain.range = (_from: number, _to: number) =>
+      Promise.resolve({ data: rows, error: null });
     chain.then = (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
       resolve({ data: rows, error: null });
     return chain;
@@ -176,6 +182,11 @@ describe("GET /api/catalog", () => {
           floor_config: [
             { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
           ],
+          // 0176 — fabric tier tables (seeded to zero deltas + no overrides).
+          fabric_tier_addon_config: [
+            { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+          ],
+          model_fabric_tier_overrides: [],
         },
         recorded,
       ),
@@ -212,6 +223,10 @@ describe("GET /api/catalog", () => {
 
     // active=true filter on addons applied
     expect(recorded.addons).toContainEqual({ method: "eq", col: "active", val: true });
+
+    // 0176 — fabricTierConfig seeded at {0,0} + no model overrides
+    expect(body.fabricTierConfig).toEqual({ sofaTier2Delta: 0, sofaTier3Delta: 0 });
+    expect(body.modelFabricTierOverrides).toEqual([]);
 
     // Cache hint
     // 0074 — switched from `private, max-age=300` to `no-store` so the
@@ -346,7 +361,7 @@ describe("GET /api/salespersons", () => {
 
 interface AdminCall {
   table: string;
-  op: "insert" | "update";
+  op: "insert" | "update" | "upsert" | "delete";
   payload: unknown;
 }
 
@@ -378,6 +393,21 @@ function buildWriteSb(opts: {
       mode = "write";
       writeBody = body;
       recorded.push({ table, op: "update", payload: body });
+      return chain;
+    };
+    // 0176 — upsert support for model-fabric-tier-override route.
+    chain.upsert = (body: unknown, _opts?: unknown) => {
+      mode = "write";
+      writeBody = body;
+      recorded.push({ table, op: "upsert", payload: body });
+      return chain;
+    };
+    // 0178 — delete support for the per-model offered un-offer route. The route
+    // does `.delete().eq().eq()` then awaits the (non-thenable) chain → error
+    // undefined → ok; we just record the op for assertions.
+    chain.delete = () => {
+      mode = "write";
+      recorded.push({ table, op: "delete", payload: null });
       return chain;
     };
     chain.eq = (col: string, val: unknown) => {
@@ -538,7 +568,7 @@ describe("Catalog admin — DELETE /api/catalog/models/:id (soft-delete)", () =>
 });
 
 describe("Catalog admin — POST /api/catalog/skus", () => {
-  it("derives sku string from model.category + model_key + variant", async () => {
+  it("derives sku as {MODEL_KEY}-{variant} (Loo 2026-06-14, dash format)", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(
       buildWriteSb({
@@ -567,7 +597,7 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
         writeReturn: {
           id: "00000000-0000-0000-0000-00000000bb01",
           model_id: MODEL_ID_LIVE,
-          sku: "mattress:carres-classic:Twin",
+          sku: "CARRES-CLASSIC-Twin",
           variant: "Twin",
           variant_kind: "size",
           price: 2400,
@@ -577,7 +607,8 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
         },
       }),
     );
-    const jwt = await makeJwt("operation", null);
+    // 0175 — setting price+cost on create is principal-only (Master Admin).
+    const jwt = await makeJwt("principal", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/skus", {
         method: "POST",
@@ -594,9 +625,7 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
     );
     expect(res.status).toBe(201);
     const insert = recorded.find((r) => r.op === "insert");
-    expect((insert?.payload as { sku: string }).sku).toBe(
-      "mattress:carres-classic:Twin",
-    );
+    expect((insert?.payload as { sku: string }).sku).toBe("CARRES-CLASSIC-Twin");
     expect((insert?.payload as { cost: number }).cost).toBe(1300);
   });
 });
@@ -620,7 +649,8 @@ describe("Catalog admin — PATCH /api/catalog/skus/:id", () => {
         },
       }),
     );
-    const jwt = await makeJwt("operation", null);
+    // 0175 — changing cost is principal-only (Master Admin).
+    const jwt = await makeJwt("principal", null);
     const res = await app.fetch(
       new Request("http://t/api/catalog/skus/00000000-0000-0000-0000-00000000bb01", {
         method: "PATCH",
@@ -632,6 +662,210 @@ describe("Catalog admin — PATCH /api/catalog/skus/:id", () => {
     expect(res.status).toBe(200);
     const upd = recorded.find((r) => r.op === "update");
     expect(upd?.payload).toEqual({ cost: 950 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0175 — Master-Admin pricing lock. Only the principal may SET/CHANGE
+// product_skus.price or .cost. The DB trigger is the real boundary; this API
+// gate returns a clean 403 before the round-trip. All OTHER SKU edits stay
+// open to internal (operation) roles, and a non-principal may still create an
+// UNPRICED sku (price 0 / cost null).
+// ---------------------------------------------------------------------------
+describe("0175 — SKU price/cost lock (principal only)", () => {
+  const SKU_ID = "00000000-0000-0000-0000-00000000bb01";
+
+  it("PATCH price by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ price: 1999 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/Master Admin/i);
+  });
+
+  it("PATCH cost by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: 950 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH cost:null (clearing) by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH a non-price/cost field (pos_active) by a non-principal → allowed", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: SKU_ID,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Queen",
+          variant: "queen",
+          variant_kind: "size",
+          price: 1500,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+          pos_active: false,
+          description: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ posActive: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toEqual({ pos_active: false });
+  });
+
+  it("PATCH price by the principal → allowed", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: SKU_ID,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Queen",
+          variant: "queen",
+          variant_kind: "size",
+          price: 1999,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+          pos_active: true,
+          description: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ price: 1999 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ price: 1999 });
+  });
+
+  it("POST a priced sku by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Twin",
+          variantKind: "size",
+          price: 2400,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("POST a costed sku by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Twin",
+          variantKind: "size",
+          price: 0,
+          cost: 1300,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("POST an UNPRICED sku (price 0 / cost null) by a non-principal → allowed", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-classic" },
+          ],
+          suppliers: [
+            { id: "00000000-0000-0000-0000-00000000ff01", cat_covered: ["mattress"] },
+          ],
+        },
+        recorded,
+        writeReturn: {
+          id: SKU_ID,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Twin",
+          variant: "Twin",
+          variant_kind: "size",
+          price: 0,
+          cost: null,
+          supplier_id: "00000000-0000-0000-0000-00000000ff01",
+          discontinued_at: null,
+          pos_active: true,
+          description: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Twin",
+          variantKind: "size",
+          price: 0,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const insert = recorded.find((r) => r.op === "insert");
+    expect((insert?.payload as { price: number }).price).toBe(0);
   });
 });
 
@@ -647,6 +881,7 @@ describe("Catalog admin — sofa fabrics CRUD", () => {
           fabric_name: "Linen Slate",
           surcharge: 250,
           discontinued_at: null,
+          tier: "PRICE_1",
         },
       }),
     );
@@ -671,6 +906,8 @@ describe("Catalog admin — sofa fabrics CRUD", () => {
       surcharge: 250,
       // 0075 — colors defaults to null when caller omits the field.
       colors: null,
+      // 0176 — tier defaults to PRICE_1 when caller omits the field.
+      tier: "PRICE_1",
     });
   });
 
@@ -693,5 +930,1752 @@ describe("Catalog admin — sofa fabrics CRUD", () => {
     expect(res.status).toBe(200);
     const upd = recorded.find((r) => r.op === "update");
     expect((upd!.payload as { discontinued_at: string }).discontinued_at).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0169-0173 — Product & Maintenance endpoints (pos_active filter, sizes-active
+// cascade, generate-skus idempotency, service no-supplier relaxation, photo
+// sign-upload + role gates, floor-config + addons).
+// ---------------------------------------------------------------------------
+
+/**
+ * scriptedSb — a more capable mock than buildWriteSb for the multi-query
+ * endpoints. Each `.from(table)` chain is BOTH thenable (so routes that
+ * `await sb.from(...).update().eq()` directly resolve to `{data,error}`) AND
+ * exposes `.maybeSingle()/.single()`. `.then` returns the inserted rows once
+ * `.insert()` ran on that chain, else `reads[table+"__list"]`.
+ */
+function scriptedSb(opts: {
+  reads?: Record<string, unknown>;
+  inserted?: unknown[];
+  records?: { table: string; op: "insert" | "update"; body: unknown }[];
+}): SbStub {
+  const reads = opts.reads ?? {};
+  const inserted = opts.inserted ?? [{ id: "00000000-0000-0000-0000-0000000insrt" }];
+  const records = opts.records ?? [];
+  const mk = (table: string) => {
+    let didInsert = false;
+    const chain: Record<string, unknown> = {};
+    chain.select = () => chain;
+    chain.eq = () => chain;
+    chain.in = () => chain;
+    chain.contains = () => chain;
+    chain.limit = () => chain;
+    chain.is = () => chain;
+    chain.order = () => chain;
+    chain.insert = (body: unknown) => {
+      didInsert = true;
+      records.push({ table, op: "insert", body });
+      return chain;
+    };
+    chain.update = (body: unknown) => {
+      records.push({ table, op: "update", body });
+      return chain;
+    };
+    chain.maybeSingle = async () => ({ data: reads[table] ?? null, error: null });
+    chain.single = async () => ({
+      data: didInsert ? inserted[0] ?? null : reads[table] ?? null,
+      error: null,
+    });
+    chain.then = (resolve: (v: { data: unknown; error: null }) => unknown) =>
+      resolve({ data: didInsert ? inserted : (reads[`${table}__list`] ?? []), error: null });
+    return chain;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { from: (table: string) => mk(table) } as any;
+}
+
+describe("GET /api/catalog — pos_active sell-side filter (0170)", () => {
+  const SKU_ON = "00000000-0000-0000-0000-00000000bb10";
+  const SKU_OFF = "00000000-0000-0000-0000-00000000bb11";
+
+  function bundle() {
+    return {
+      product_models: [
+        {
+          id: MODEL_ID_LIVE,
+          category: "mattress",
+          model_key: "carres-classic",
+          name: "Classic",
+          blurb: null,
+          colors: null,
+          gaps: null,
+          sofa_mode: null,
+          discontinued_at: null,
+          photo_url: null,
+          allowed_options: {},
+        },
+      ],
+      product_skus: [
+        {
+          id: SKU_ON,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-Queen",
+          variant: "Queen",
+          variant_kind: "size",
+          price: 1500,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+          pos_active: true,
+          description: null,
+        },
+        {
+          id: SKU_OFF,
+          model_id: MODEL_ID_LIVE,
+          sku: "CARRES-CLASSIC-King",
+          variant: "King",
+          variant_kind: "size",
+          price: 1800,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+          pos_active: false,
+          description: null,
+        },
+      ],
+      sofa_fabrics: [],
+      addons: [],
+      floor_config: [{ id: 1, free_up_to_floor: 2, per_floor_per_item: 50 }],
+      // 0176 — fabric tier tables required by the new parallel bundle fetch.
+      fabric_tier_addon_config: [
+        { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+      ],
+      model_fabric_tier_overrides: [],
+    };
+  }
+
+  it("dealer (non-admin) bundle drops pos_active=false SKUs", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb(bundle()));
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.skus.map((s) => s.id)).toEqual([SKU_ON]);
+  });
+
+  it("admin bundle keeps OFF SKUs so the editor can toggle them back on", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb(bundle()));
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog?admin=true", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.skus.map((s) => s.id).sort()).toEqual([SKU_ON, SKU_OFF].sort());
+    expect(body.skus.find((s) => s.id === SKU_OFF)?.posActive).toBe(false);
+  });
+});
+
+describe("POST /api/catalog/skus — service category no-supplier relaxation (0171)", () => {
+  it("inserts a service SKU with supplier_id null (no 422)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "service", model_key: "service-addons" },
+          ],
+          // NOTE: no suppliers row — a service SKU must insert anyway.
+        },
+        recorded,
+        writeReturn: {
+          id: "00000000-0000-0000-0000-00000000bb20",
+          model_id: MODEL_ID_LIVE,
+          sku: "SERVICE-ADDONS-Install",
+          variant: "Install",
+          variant_kind: "preset",
+          price: 120,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+          pos_active: true,
+          description: null,
+        },
+      }),
+    );
+    // 0175 — setting price on create is principal-only (Master Admin).
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Install",
+          variantKind: "preset",
+          price: 120,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const insert = recorded.find((r) => r.op === "insert");
+    expect((insert?.payload as { supplier_id: unknown }).supplier_id).toBeNull();
+  });
+});
+
+describe("PATCH /api/catalog/models/:id/sizes-active (0171 cascade)", () => {
+  it("writes allowed_options.sizes + cascades pos_active, never discontinued_at", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: { product_models: { allowed_options: { sizes: ["Queen"] } } },
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/sizes-active`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sizes: ["Queen", "King"] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; sizes: string[] };
+    expect(body.sizes).toEqual(["Queen", "King"]);
+
+    const modelUpdate = records.find((r) => r.table === "product_models");
+    expect((modelUpdate?.body as { allowed_options: { sizes: string[] } }).allowed_options.sizes).toEqual([
+      "Queen",
+      "King",
+    ]);
+    // Two cascade updates on product_skus (all-off, then in-set-on).
+    const skuUpdates = records.filter((r) => r.table === "product_skus");
+    expect(skuUpdates).toHaveLength(2);
+    expect(skuUpdates.map((u) => (u.body as { pos_active: boolean }).pos_active)).toEqual([
+      false,
+      true,
+    ]);
+    // The cascade NEVER touches discontinued_at.
+    for (const r of records) {
+      expect(r.body).not.toHaveProperty("discontinued_at");
+    }
+  });
+
+  it("403s for a dealer (internal-only)", async () => {
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/sizes-active`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sizes: ["Queen"] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
+  it("skips existing codes and only inserts the missing variant", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "carres-classic",
+            allowed_options: { sizes: ["Queen", "King"] },
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          // Queen already exists → only King should be inserted.
+          product_skus__list: [{ sku: "CARRES-CLASSIC-Queen" }],
+        },
+        inserted: [{ id: "00000000-0000-0000-0000-00000000bb30" }],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { generated: number; skipped: number };
+    expect(body).toMatchObject({ generated: 1, skipped: 1 });
+    const insert = records.find((r) => r.op === "insert");
+    const rows = insert?.body as { sku: string }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sku).toBe("CARRES-CLASSIC-King");
+  });
+});
+
+describe("Photo sign-upload — role gate + validation (0173)", () => {
+  it("403s for a dealer", async () => {
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/photo/sign-upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ mimeType: "image/jpeg", sizeBytes: 1000 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("422s an operation user on a non-image mime / oversize", async () => {
+    vi.mocked(userClient).mockReturnValue(scriptedSb({}));
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/photo/sign-upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ mimeType: "application/pdf", sizeBytes: 1000 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("Maintenance — floor-config + addons role gate", () => {
+  it("floor-config 403s for a dealer", async () => {
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/floor-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ freeUpToFloor: 3 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("floor-config patches free_up_to_floor for an internal user", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: { id: 1, free_up_to_floor: 3, per_floor_per_item: 60 },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/floor-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ freeUpToFloor: 3, perFloorPerItem: 60 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ free_up_to_floor: 3, per_floor_per_item: 60 });
+  });
+
+  it("addons POST inserts for an internal user", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          key: "dispose-mattress",
+          name: "Dispose old mattress",
+          price: 50,
+          active: true,
+          service_sku: "SVC-DISPOSE-MATTRESS",
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/addons", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "dispose-mattress",
+          name: "Dispose old mattress",
+          price: 50,
+          serviceSku: "SVC-DISPOSE-MATTRESS",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.payload).toMatchObject({
+      key: "dispose-mattress",
+      service_sku: "SVC-DISPOSE-MATTRESS",
+    });
+  });
+
+  it("addons POST 422s an invalid service SKU code", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/addons", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "bad-addon",
+          name: "Bad addon",
+          price: 10,
+          serviceSku: "NOT-A-SVC-CODE",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0176 — Fabric tier pricing (config singleton + per-model overrides).
+// ---------------------------------------------------------------------------
+
+describe("0176 — PATCH /api/catalog/fabric-tier-config (principal only)", () => {
+  it("principal updates the tier config and returns the updated values", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: 1,
+          sofa_tier2_delta: 300,
+          sofa_tier3_delta: 700,
+          updated_at: "2026-06-20T00:00:00Z",
+          updated_by: "11111111-1111-1111-1111-000000000999",
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabric-tier-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sofaTier2Delta: 300, sofaTier3Delta: 700 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { fabricTierConfig: { sofaTier2Delta: number; sofaTier3Delta: number } };
+    expect(body.fabricTierConfig).toEqual({ sofaTier2Delta: 300, sofaTier3Delta: 700 });
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ sofa_tier2_delta: 300, sofa_tier3_delta: 700 });
+  });
+
+  it("non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabric-tier-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sofaTier2Delta: 300, sofaTier3Delta: 700 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/Master Admin/i);
+  });
+
+  it("dealer → 403", async () => {
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabric-tier-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sofaTier2Delta: 0, sofaTier3Delta: 0 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("422s negative deltas", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabric-tier-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sofaTier2Delta: -100, sofaTier3Delta: 0 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("0176 — PUT /api/catalog/model-fabric-tier-override/:modelId (principal only)", () => {
+  it("principal upserts an override and returns the row", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          model_id: MODEL_ID_LIVE,
+          tier2_delta: 200,
+          tier3_delta: null,
+          updated_at: "2026-06-20T00:00:00Z",
+          updated_by: "11111111-1111-1111-1111-000000000999",
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-fabric-tier-override/${MODEL_ID_LIVE}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tier2Delta: 200, tier3Delta: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      override: { modelId: string; tier2Delta: number | null; tier3Delta: number | null };
+    };
+    expect(body.override).toMatchObject({ modelId: MODEL_ID_LIVE, tier2Delta: 200, tier3Delta: null });
+  });
+
+  it("principal can set both deltas to null (inherit from global)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          model_id: MODEL_ID_LIVE,
+          tier2_delta: null,
+          tier3_delta: null,
+          updated_at: "2026-06-20T00:00:00Z",
+          updated_by: "11111111-1111-1111-1111-000000000999",
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-fabric-tier-override/${MODEL_ID_LIVE}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tier2Delta: null, tier3Delta: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      override: { tier2Delta: number | null; tier3Delta: number | null };
+    };
+    expect(body.override.tier2Delta).toBeNull();
+    expect(body.override.tier3Delta).toBeNull();
+  });
+
+  it("non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-fabric-tier-override/${MODEL_ID_LIVE}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tier2Delta: 100, tier3Delta: 200 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/Master Admin/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0178 — Sofa compartments (the "Base" pool) + per-model offered. GET bundles
+// `sofaCompartments` + `modelSofaCompartments`; all writes are principal-only.
+// ---------------------------------------------------------------------------
+describe("0178 — sofa compartments (pool + per-model offered)", () => {
+  const COMP_ID = "00000000-0000-0000-0000-0000000c0001";
+  const COMP_ROW = {
+    id: COMP_ID,
+    code: "1A(LHF)",
+    description: "1 seat, ONE arm (left)",
+    seat_count: 1,
+    arm_config: "left",
+    icon_url: null,
+    default_price: 250,
+    sort_order: 1,
+    active: true,
+  };
+
+  it("GET /api/catalog includes sofaCompartments + modelSofaCompartments", async () => {
+    const recorded: Record<string, FilterCall[]> = {};
+    vi.mocked(userClient).mockReturnValue(
+      buildSb(
+        {
+          product_models: [
+            {
+              id: MODEL_ID_LIVE,
+              category: "mattress",
+              model_key: "carres-classic",
+              name: "Classic",
+              blurb: null,
+              colors: null,
+              gaps: null,
+              sofa_mode: null,
+              discontinued_at: null,
+            },
+          ],
+          product_skus: [],
+          sofa_fabrics: [],
+          addons: [],
+          floor_config: [
+            { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
+          ],
+          fabric_tier_addon_config: [
+            { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+          ],
+          model_fabric_tier_overrides: [],
+          sofa_compartments: [COMP_ROW],
+          model_sofa_compartments: [
+            { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+          ],
+        },
+        recorded,
+      ),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.sofaCompartments).toHaveLength(1);
+    expect(body.sofaCompartments?.[0]).toMatchObject({
+      id: COMP_ID,
+      code: "1A(LHF)",
+      defaultPrice: 250,
+      seatCount: 1,
+    });
+    expect(body.modelSofaCompartments).toHaveLength(1);
+    expect(body.modelSofaCompartments?.[0]).toMatchObject({
+      modelId: MODEL_ID_LIVE,
+      compartmentId: COMP_ID,
+      priceOverride: null,
+    });
+  });
+
+  it("POST /sofa-compartments — principal inserts → 201", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: COMP_ROW }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-compartments", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "1A(LHF)", description: "1 seat, ONE arm (left)", seatCount: 1, defaultPrice: 250 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("sofa_compartments");
+    expect((ins?.payload as { code: string }).code).toBe("1A(LHF)");
+    const body = (await res.json()) as { compartment: { code: string; defaultPrice: number } };
+    expect(body.compartment).toMatchObject({ code: "1A(LHF)", defaultPrice: 250 });
+  });
+
+  it("POST /sofa-compartments — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-compartments", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "1A(LHF)" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("PATCH /sofa-compartments/:id — empty body → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH /sofa-compartments/:id — principal updates default_price → 200", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { ...COMP_ROW, default_price: 300 } }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ defaultPrice: 300 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect((upd?.payload as { default_price: number }).default_price).toBe(300);
+  });
+
+  it("DELETE /sofa-compartments/:id — soft-delete via active=false", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { id: COMP_ID } }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect((upd?.payload as { active: boolean }).active).toBe(false);
+  });
+
+  it("PUT /models/:id/compartments/:cid — principal upserts offered → 200", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: 280, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: 280 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const ups = recorded.find((r) => r.op === "upsert");
+    expect((ups?.payload as { compartment_id: string }).compartment_id).toBe(COMP_ID);
+    const body = (await res.json()) as {
+      modelSofaCompartment: { modelId: string; compartmentId: string; priceOverride: number };
+    };
+    expect(body.modelSofaCompartment).toMatchObject({ modelId: MODEL_ID_LIVE, compartmentId: COMP_ID, priceOverride: 280 });
+  });
+
+  it("PUT /models/:id/compartments/:cid — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: 280 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("DELETE /models/:id/compartments/:cid — un-offer → 200 (delete recorded)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(recorded.find((r) => r.op === "delete")?.table).toBe("model_sofa_compartments");
+  });
+});
+
+describe("0176 — PATCH /api/catalog/sofa-fabrics/:id persists tier", () => {
+  const FABRIC_ID = "00000000-0000-0000-0000-00000000cc02";
+
+  it("persists tier PRICE_2 when sent in the patch body", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: FABRIC_ID,
+          model_id: MODEL_ID_LIVE,
+          fabric_name: "Velvet Ash",
+          surcharge: 300,
+          colors: null,
+          discontinued_at: null,
+          tier: "PRICE_2",
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-fabrics/${FABRIC_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tier: "PRICE_2" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect((upd?.payload as { tier: string }).tier).toBe("PRICE_2");
+    const body = (await res.json()) as { fabric: { tier: string } };
+    expect(body.fabric.tier).toBe("PRICE_2");
+  });
+
+  it("422s on an invalid tier value", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-fabrics/${FABRIC_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tier: "PRICE_99" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0177 — Combos (套餐). GET bundles `combos` (each with `components`, sorted by
+// sortOrder, adminMode-filtered); principal-gated POST / PATCH / DELETE.
+// ---------------------------------------------------------------------------
+
+const COMBO_ID = "00000000-0000-0000-0000-00000000d101";
+const COMBO_ID_2 = "00000000-0000-0000-0000-00000000d102";
+
+/**
+ * GET-bundle fixture builder including combos + combo_components, mirroring the
+ * `bundle()` helper above (every parallel-query table must be present so the
+ * route's Promise.all resolves).
+ */
+function comboBundle(opts: {
+  combos: unknown[];
+  combo_components: unknown[];
+}) {
+  return {
+    product_models: [
+      {
+        id: MODEL_ID_LIVE,
+        category: "mattress",
+        model_key: "carres-classic",
+        name: "Classic",
+        blurb: null,
+        colors: null,
+        gaps: null,
+        sofa_mode: null,
+        discontinued_at: null,
+        photo_url: null,
+        allowed_options: {},
+      },
+    ],
+    product_skus: [],
+    sofa_fabrics: [],
+    addons: [],
+    floor_config: [{ id: 1, free_up_to_floor: 2, per_floor_per_item: 50 }],
+    fabric_tier_addon_config: [
+      { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+    ],
+    model_fabric_tier_overrides: [],
+    combos: opts.combos,
+    combo_components: opts.combo_components,
+  };
+}
+
+type ComboBody = {
+  combos: { id: string; comboKey: string; name: string; comboPrice: number; active: boolean; effectiveFrom: string; components: { sku: string; qty: number; sortOrder: number }[] }[];
+};
+
+describe("0177 — GET /api/catalog includes combos with components", () => {
+  it("attaches each combo's components sorted by sortOrder; combo with none → []", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb(
+        comboBundle({
+          combos: [
+            {
+              id: COMBO_ID,
+              combo_key: "bedroom-set",
+              name: "Bedroom Set",
+              combo_price: 3000,
+              active: true,
+              effective_from: "2026-06-20T00:00:00Z",
+              discontinued_at: null,
+            },
+            {
+              id: COMBO_ID_2,
+              combo_key: "empty-combo",
+              name: "Empty Combo",
+              combo_price: 100,
+              active: true,
+              effective_from: "2026-06-20T00:00:00Z",
+              discontinued_at: null,
+            },
+          ],
+          // Deliberately OUT of sort_order to prove the route sorts.
+          combo_components: [
+            { combo_id: COMBO_ID, sku: "MAT-QUEEN", qty: 1, sort_order: 2 },
+            { combo_id: COMBO_ID, sku: "FRAME-QUEEN", qty: 1, sort_order: 1 },
+          ],
+        }),
+      ),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ComboBody;
+    expect(body.combos).toHaveLength(2);
+
+    const withComps = body.combos.find((x) => x.id === COMBO_ID)!;
+    expect(withComps.comboKey).toBe("bedroom-set");
+    expect(withComps.comboPrice).toBe(3000);
+    // Sorted ascending by sortOrder (1 then 2).
+    expect(withComps.components.map((c) => c.sku)).toEqual(["FRAME-QUEEN", "MAT-QUEEN"]);
+    expect(withComps.components.map((c) => c.sortOrder)).toEqual([1, 2]);
+
+    const empty = body.combos.find((x) => x.id === COMBO_ID_2)!;
+    expect(empty.components).toEqual([]);
+  });
+
+  it("two combos each get EXACTLY their own components (componentsByCombo keys on combo_id, no merge/cross-talk)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb(
+        comboBundle({
+          combos: [
+            {
+              id: COMBO_ID,
+              combo_key: "bedroom-set",
+              name: "Bedroom Set",
+              combo_price: 3000,
+              active: true,
+              effective_from: "2026-06-20T00:00:00Z",
+              discontinued_at: null,
+            },
+            {
+              id: COMBO_ID_2,
+              combo_key: "living-set",
+              name: "Living Set",
+              combo_price: 5000,
+              active: true,
+              effective_from: "2026-06-20T00:00:00Z",
+              discontinued_at: null,
+            },
+          ],
+          // Interleaved + out of order so a buggy non-keyed grouping (or a merge)
+          // would visibly leak one combo's components into the other.
+          combo_components: [
+            { combo_id: COMBO_ID_2, sku: "SOFA-3S", qty: 1, sort_order: 1 },
+            { combo_id: COMBO_ID, sku: "MAT-QUEEN", qty: 1, sort_order: 2 },
+            { combo_id: COMBO_ID_2, sku: "COFFEE-TABLE", qty: 1, sort_order: 2 },
+            { combo_id: COMBO_ID, sku: "FRAME-QUEEN", qty: 1, sort_order: 1 },
+          ],
+        }),
+      ),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ComboBody;
+    expect(body.combos).toHaveLength(2);
+
+    // Each combo carries ONLY its own two components, sorted ascending.
+    const bedroom = body.combos.find((x) => x.id === COMBO_ID)!;
+    expect(bedroom.components.map((c) => c.sku)).toEqual(["FRAME-QUEEN", "MAT-QUEEN"]);
+
+    const living = body.combos.find((x) => x.id === COMBO_ID_2)!;
+    expect(living.components.map((c) => c.sku)).toEqual(["SOFA-3S", "COFFEE-TABLE"]);
+
+    // Explicit no-cross-talk: neither combo contains the other's SKUs, and
+    // neither got the merged 4-item set.
+    expect(bedroom.components).toHaveLength(2);
+    expect(living.components).toHaveLength(2);
+    expect(bedroom.components.some((c) => c.sku === "SOFA-3S" || c.sku === "COFFEE-TABLE")).toBe(false);
+    expect(living.components.some((c) => c.sku === "FRAME-QUEEN" || c.sku === "MAT-QUEEN")).toBe(false);
+  });
+
+  it("non-admin excludes active:false / discontinued combos; ?admin=true includes them", async () => {
+    const combos = [
+      {
+        id: COMBO_ID,
+        combo_key: "live-combo",
+        name: "Live",
+        combo_price: 500,
+        active: true,
+        effective_from: "2026-06-20T00:00:00Z",
+        discontinued_at: null,
+      },
+      {
+        id: COMBO_ID_2,
+        combo_key: "off-combo",
+        name: "Off",
+        combo_price: 600,
+        active: false,
+        effective_from: "2026-06-20T00:00:00Z",
+        discontinued_at: null,
+      },
+    ];
+    // Non-admin: only the live combo.
+    vi.mocked(userClient).mockReturnValue(buildSb(comboBundle({ combos, combo_components: [] })));
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const resPos = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(resPos.status).toBe(200);
+    const posBody = (await resPos.json()) as ComboBody;
+    expect(posBody.combos.map((x) => x.id)).toEqual([COMBO_ID]);
+
+    // Admin: both.
+    vi.mocked(userClient).mockReturnValue(buildSb(comboBundle({ combos, combo_components: [] })));
+    const opJwt = await makeJwt("operation", null);
+    const resAdmin = await app.fetch(
+      new Request("http://t/api/catalog?admin=true", { headers: { Authorization: `Bearer ${opJwt}` } }),
+      env,
+    );
+    expect(resAdmin.status).toBe(200);
+    const adminBody = (await resAdmin.json()) as ComboBody;
+    expect(adminBody.combos.map((x) => x.id).sort()).toEqual([COMBO_ID, COMBO_ID_2].sort());
+  });
+});
+
+/**
+ * comboWriteSb — write-aware mock for the combo CRUD routes. Records every
+ * insert/update/delete per table, returns a scripted row from the combos write
+ * chain's `.maybeSingle()`, and (optionally) makes the `combo_components`
+ * insert error so the compensating-delete path can be asserted.
+ */
+interface ComboCall {
+  table: string;
+  op: "insert" | "update" | "delete";
+  payload?: unknown;
+  eq?: { col: string; val: unknown }[];
+}
+function comboWriteSb(opts: {
+  comboReturn?: Record<string, unknown> | null;
+  /** When true, the combo_components insert resolves with an error. */
+  componentsInsertError?: boolean;
+  /**
+   * Rows the `combo_components` READ-back (select().eq() → then) resolves with.
+   * Used by the PATCH "components omitted" path, which re-reads the existing set
+   * so the response stays complete. Defaults to [] (the pre-existing behaviour).
+   */
+  componentReadReturn?: unknown[];
+  records?: ComboCall[];
+}): SbStub {
+  const records = opts.records ?? [];
+  const comboReturn = opts.comboReturn ?? null;
+  const componentsInsertError = opts.componentsInsertError ?? false;
+  const componentReadReturn = opts.componentReadReturn ?? [];
+
+  const mk = (table: string) => {
+    let op: "insert" | "update" | "delete" | null = null;
+    let payload: unknown = null;
+    const eqs: { col: string; val: unknown }[] = [];
+
+    const chain: Record<string, unknown> = {};
+    chain.select = () => chain;
+    chain.insert = (body: unknown) => {
+      op = "insert";
+      payload = body;
+      return chain;
+    };
+    chain.update = (body: unknown) => {
+      op = "update";
+      payload = body;
+      return chain;
+    };
+    chain.delete = () => {
+      op = "delete";
+      return chain;
+    };
+    chain.eq = (col: string, val: unknown) => {
+      eqs.push({ col, val });
+      return chain;
+    };
+    // Only WRITE ops are recorded; pure reads (select().eq().then) are not, so
+    // assertions like "no combo_components write happened" stay accurate.
+    const record = () => {
+      if (op !== null) records.push({ table, op, payload, eq: [...eqs] });
+    };
+    // combo_components insert is awaited directly (no .select) → thenable. The
+    // PATCH "no components" path also awaits a read here (select().eq() → then).
+    chain.then = (resolve: (v: { data: unknown; error: { code?: string; message?: string } | null }) => unknown) => {
+      record();
+      if (table === "combo_components" && op === "insert" && componentsInsertError) {
+        return resolve({ data: null, error: { code: "23503", message: "fk violation" } });
+      }
+      // A pure read on combo_components (no write op) → the PATCH "components
+      // omitted" read-back. Return the scripted existing set (default []).
+      if (table === "combo_components" && op === null) {
+        return resolve({ data: componentReadReturn, error: null });
+      }
+      return resolve({ data: [], error: null });
+    };
+    chain.maybeSingle = async () => {
+      record();
+      // combos insert/update returns the scripted row; delete returns {id}.
+      if (table === "combos") {
+        if (op === "delete") return { data: comboReturn ? { id: comboReturn.id } : null, error: null };
+        return { data: comboReturn, error: null };
+      }
+      return { data: comboReturn, error: null };
+    };
+    chain.single = chain.maybeSingle;
+    return chain;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { from: (table: string) => mk(table) } as any;
+}
+
+describe("0177 — POST /api/catalog/combos (principal only)", () => {
+  it("principal creates a combo + components → 201", async () => {
+    const records: ComboCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      comboWriteSb({
+        records,
+        comboReturn: {
+          id: COMBO_ID,
+          combo_key: "bedroom-set",
+          name: "Bedroom Set",
+          combo_price: 3000,
+          active: true,
+          effective_from: "2026-06-20T00:00:00Z",
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Bedroom Set",
+          comboPrice: 3000,
+          components: [
+            { sku: "FRAME-QUEEN", qty: 1 },
+            { sku: "MAT-QUEEN", qty: 1 },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { combo: { id: string; comboKey: string; components: unknown[] } };
+    expect(body.combo.id).toBe(COMBO_ID);
+    // comboKey derived from the name (slugified) since none was supplied.
+    expect(body.combo.comboKey).toBe("bedroom-set");
+    expect(body.combo.components).toHaveLength(2);
+
+    const comboInsert = records.find((r) => r.table === "combos" && r.op === "insert");
+    expect(comboInsert?.payload).toMatchObject({ name: "Bedroom Set", combo_price: 3000, combo_key: "bedroom-set" });
+    const compInsert = records.find((r) => r.table === "combo_components" && r.op === "insert");
+    const compRows = compInsert?.payload as { combo_id: string; sku: string; sort_order: number }[];
+    expect(compRows).toHaveLength(2);
+    expect(compRows.every((r) => r.combo_id === COMBO_ID)).toBe(true);
+    // sort_order defaulted from array position.
+    expect(compRows.map((r) => r.sort_order)).toEqual([0, 1]);
+  });
+
+  it("non-principal → 403 (/Master Admin/i)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Bedroom Set",
+          comboPrice: 3000,
+          components: [{ sku: "FRAME-QUEEN", qty: 1 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/Master Admin/i);
+  });
+
+  it("compensates (deletes the orphan combo) when the components insert errors", async () => {
+    const records: ComboCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      comboWriteSb({
+        records,
+        componentsInsertError: true,
+        comboReturn: {
+          id: COMBO_ID,
+          combo_key: "doomed",
+          name: "Doomed",
+          combo_price: 1000,
+          active: true,
+          effective_from: "2026-06-20T00:00:00Z",
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Doomed",
+          comboPrice: 1000,
+          components: [{ sku: "BAD-SKU", qty: 1 }],
+        }),
+      }),
+      env,
+    );
+    // Surfaces the components error (mapPgError default → 500 for 23503).
+    expect(res.status).toBe(500);
+    // The just-created combo row was compensated-deleted.
+    const del = records.find((r) => r.table === "combos" && r.op === "delete");
+    expect(del).toBeTruthy();
+    expect(del?.eq).toContainEqual({ col: "id", val: COMBO_ID });
+  });
+
+  it("derives a fallback combo_key for a name that slugifies to empty (Chinese)", async () => {
+    const records: ComboCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      comboWriteSb({
+        records,
+        comboReturn: {
+          id: COMBO_ID,
+          combo_key: "combo-xxxxxxxx",
+          name: "卧室套餐",
+          combo_price: 2000,
+          active: true,
+          effective_from: "2026-06-20T00:00:00Z",
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "卧室套餐",
+          comboPrice: 2000,
+          components: [{ sku: "FRAME-QUEEN", qty: 1 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const comboInsert = records.find((r) => r.table === "combos" && r.op === "insert");
+    const key = (comboInsert?.payload as { combo_key: string }).combo_key;
+    // Fallback shape: combo-<hex>, never empty.
+    expect(key).toMatch(/^combo-[0-9a-f]+$/);
+  });
+
+  it("combo insert returning no row → 500 (and no components insert happens)", async () => {
+    const records: ComboCall[] = [];
+    // comboReturn:null → the combos insert .maybeSingle() yields {data:null},
+    // tripping the "combo insert returned no row" 500 branch BEFORE any
+    // combo_components write.
+    vi.mocked(userClient).mockReturnValue(comboWriteSb({ records, comboReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Ghost Set",
+          comboPrice: 999,
+          components: [{ sku: "FRAME-QUEEN", qty: 1 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/combo insert returned no row/i);
+    // The early-return means the components were never inserted.
+    expect(records.some((r) => r.table === "combo_components")).toBe(false);
+  });
+});
+
+describe("0177 — PATCH /api/catalog/combos/:id (principal only)", () => {
+  it("principal updates scalar fields (name + price)", async () => {
+    const records: ComboCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      comboWriteSb({
+        records,
+        comboReturn: {
+          id: COMBO_ID,
+          combo_key: "bedroom-set",
+          name: "Bedroom Set Deluxe",
+          combo_price: 3500,
+          active: true,
+          effective_from: "2026-06-20T00:00:00Z",
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Bedroom Set Deluxe", comboPrice: 3500 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = records.find((r) => r.table === "combos" && r.op === "update");
+    expect(upd?.payload).toMatchObject({ name: "Bedroom Set Deluxe", combo_price: 3500 });
+    // No components key sent → no combo_components writes.
+    expect(records.some((r) => r.table === "combo_components")).toBe(false);
+  });
+
+  it("components-replace path deletes the old set then re-inserts", async () => {
+    const records: ComboCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      comboWriteSb({
+        records,
+        comboReturn: {
+          id: COMBO_ID,
+          combo_key: "bedroom-set",
+          name: "Bedroom Set",
+          combo_price: 3000,
+          active: true,
+          effective_from: "2026-06-20T00:00:00Z",
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          components: [
+            { sku: "FRAME-KING", qty: 1 },
+            { sku: "MAT-KING", qty: 1 },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const del = records.find((r) => r.table === "combo_components" && r.op === "delete");
+    expect(del?.eq).toContainEqual({ col: "combo_id", val: COMBO_ID });
+    const ins = records.find((r) => r.table === "combo_components" && r.op === "insert");
+    const rows = ins?.payload as { sku: string; combo_id: string }[];
+    expect(rows.map((r) => r.sku)).toEqual(["FRAME-KING", "MAT-KING"]);
+    expect(rows.every((r) => r.combo_id === COMBO_ID)).toBe(true);
+  });
+
+  it("components omitted → response reflects the read-back existing set (no component write)", async () => {
+    const records: ComboCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      comboWriteSb({
+        records,
+        comboReturn: {
+          id: COMBO_ID,
+          combo_key: "bedroom-set",
+          name: "Bedroom Set Deluxe",
+          combo_price: 3500,
+          active: true,
+          effective_from: "2026-06-20T00:00:00Z",
+          discontinued_at: null,
+        },
+        // The existing component set the read-back returns (out of sort_order to
+        // also prove the response is sorted ascending).
+        componentReadReturn: [
+          { combo_id: COMBO_ID, sku: "MAT-QUEEN", qty: 1, sort_order: 2 },
+          { combo_id: COMBO_ID, sku: "FRAME-QUEEN", qty: 1, sort_order: 1 },
+        ],
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        // Scalar-only patch (no `components` key) → existing set is preserved.
+        body: JSON.stringify({ name: "Bedroom Set Deluxe", comboPrice: 3500 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      combo: { components: { sku: string; sortOrder: number }[] };
+    };
+    // Response carries the READ-BACK existing set, sorted ascending by sortOrder.
+    expect(body.combo.components.map((c) => c.sku)).toEqual(["FRAME-QUEEN", "MAT-QUEEN"]);
+    expect(body.combo.components.map((c) => c.sortOrder)).toEqual([1, 2]);
+    // No component write of ANY kind happened (set untouched).
+    expect(records.some((r) => r.table === "combo_components")).toBe(false);
+  });
+
+  it("combo not found → 404", async () => {
+    // comboReturn:null → the combos update .maybeSingle() yields {data:null},
+    // tripping the "combo not found" 404 branch.
+    vi.mocked(userClient).mockReturnValue(comboWriteSb({ comboReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Does Not Exist" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/combo not found/i);
+  });
+
+  it("non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "x" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("empty patch (no fields, no components) → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("0177 — DELETE /api/catalog/combos/:id (principal only)", () => {
+  it("principal soft-deletes (active=false + discontinued_at) → ok", async () => {
+    const records: ComboCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      comboWriteSb({ records, comboReturn: { id: COMBO_ID } }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean };
+    expect(body.ok).toBe(true);
+    const upd = records.find((r) => r.table === "combos" && r.op === "update");
+    expect(upd?.payload).toMatchObject({ active: false });
+    expect((upd?.payload as { discontinued_at: string }).discontinued_at).toBeTruthy();
+  });
+
+  it("combo not found → 404", async () => {
+    // comboReturn:null → the combos update .maybeSingle() yields {data:null},
+    // tripping the "combo not found" 404 branch.
+    vi.mocked(userClient).mockReturnValue(comboWriteSb({ comboReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/combo not found/i);
+  });
+
+  it("non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0179 — Sofa combo pricing. GET bundles `sofaCombos` (active-filtered for
+// non-principal / non-admin); all writes principal-only ("Master Admin"); slots
+// canonicalized on save.
+// ---------------------------------------------------------------------------
+describe("0179 — sofa combo pricing (GET bundle + principal-gated CRUD)", () => {
+  const SOFA_COMBO_ID = "00000000-0000-0000-0000-0000000f0001";
+  const SOFA_COMBO_ID_2 = "00000000-0000-0000-0000-0000000f0002";
+  const sofaComboRow = (over: Record<string, unknown> = {}) => ({
+    id: SOFA_COMBO_ID,
+    model_id: MODEL_ID_LIVE,
+    slots: [["2A(LHF)", "2A(RHF)"], ["L(LHF)", "L(RHF)"]],
+    tier: null,
+    prices_by_height: { "24": 2640, "28": 2750 },
+    label: "L-shape combo",
+    effective_from: "2026-06-21",
+    active: true,
+    discontinued_at: null,
+    created_at: "2026-06-21T00:00:00Z",
+    updated_at: "2026-06-21T00:00:00Z",
+    updated_by: null,
+    ...over,
+  });
+
+  // A minimal catalog GET fixture (floor_config row 1 required) + the sofa
+  // combo rows under test.
+  const getBundle = (sofaCombos: unknown[]) => ({
+    product_models: [
+      {
+        id: MODEL_ID_LIVE,
+        category: "sofa",
+        model_key: "carres-sofa",
+        name: "Sofa",
+        blurb: null,
+        colors: null,
+        gaps: null,
+        sofa_mode: null,
+        discontinued_at: null,
+      },
+    ],
+    product_skus: [],
+    sofa_fabrics: [],
+    addons: [],
+    floor_config: [
+      { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
+    ],
+    fabric_tier_addon_config: [
+      { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+    ],
+    model_fabric_tier_overrides: [],
+    sofa_combo_pricing: sofaCombos,
+  });
+
+  it("GET /api/catalog includes sofaCombos (mapped via sofaComboFromRow)", async () => {
+    vi.mocked(userClient).mockReturnValue(buildSb(getBundle([sofaComboRow()])));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.sofaCombos).toHaveLength(1);
+    expect(body.sofaCombos?.[0]).toMatchObject({
+      id: SOFA_COMBO_ID,
+      modelId: MODEL_ID_LIVE,
+      slots: [["2A(LHF)", "2A(RHF)"], ["L(LHF)", "L(RHF)"]],
+      tier: null,
+      pricesByHeight: { "24": 2640, "28": 2750 },
+      label: "L-shape combo",
+    });
+  });
+
+  it("non-admin excludes active:false / discontinued sofa combos; ?admin=true includes them", async () => {
+    const rows = [
+      sofaComboRow(), // live
+      sofaComboRow({ id: SOFA_COMBO_ID_2, active: false }), // inactive
+    ];
+    // POS (non-admin) — only the live combo.
+    vi.mocked(userClient).mockReturnValue(buildSb(getBundle(rows)));
+    let jwt = await makeJwt("dealer", DEALER_ID);
+    let res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    let body = (await res.json()) as CatalogResponse;
+    expect(body.sofaCombos?.map((x) => x.id)).toEqual([SOFA_COMBO_ID]);
+
+    // admin=true — both.
+    vi.mocked(userClient).mockReturnValue(buildSb(getBundle(rows)));
+    jwt = await makeJwt("principal", null);
+    res = await app.fetch(
+      new Request("http://t/api/catalog?admin=true", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    body = (await res.json()) as CatalogResponse;
+    expect(body.sofaCombos?.map((x) => x.id).sort()).toEqual([SOFA_COMBO_ID, SOFA_COMBO_ID_2].sort());
+  });
+
+  it("POST /sofa-combos — principal inserts (slots canonicalized) → 201", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          // Deliberately UNsorted within-slot + slots out of order + a dupe code
+          // to prove canonicalization (sort within slot, de-dupe, sort slots).
+          slots: [["L(RHF)", "L(LHF)"], ["2A(RHF)", "2A(LHF)", "2A(LHF)"]],
+          pricesByHeight: { "24": 2640, "28": 2750 },
+          label: "L-shape combo",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("sofa_combo_pricing");
+    const payload = ins?.payload as { model_id: string; slots: string[][]; prices_by_height: Record<string, number> };
+    expect(payload.model_id).toBe(MODEL_ID_LIVE);
+    // Codes sorted within each slot; empty slot dropped; dupes removed; slots
+    // sorted by first code (canonicalizeSofaSlots).
+    expect(payload.slots).toEqual([["2A(LHF)", "2A(RHF)"], ["L(LHF)", "L(RHF)"]]);
+    expect(payload.prices_by_height).toEqual({ "24": 2640, "28": 2750 });
+    const body = (await res.json()) as { sofaCombo: { id: string; modelId: string } };
+    expect(body.sofaCombo).toMatchObject({ id: SOFA_COMBO_ID, modelId: MODEL_ID_LIVE });
+  });
+
+  it("POST /sofa-combos — non-principal → 403 (/Master Admin/i)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId: MODEL_ID_LIVE, slots: [["2A(LHF)"]] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("PATCH /sofa-combos/:id — empty body → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH /sofa-combos/:id — principal updates slots (canonicalized) → 200", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ slots: [["2A(RHF)", "2A(LHF)"]], pricesByHeight: { "30": 2900 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    const payload = upd?.payload as { slots: string[][]; prices_by_height: Record<string, number> };
+    expect(payload.slots).toEqual([["2A(LHF)", "2A(RHF)"]]);
+    expect(payload.prices_by_height).toEqual({ "30": 2900 });
+  });
+
+  it("PATCH /sofa-combos/:id — non-principal → 403 (/Master Admin/i)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ active: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("PATCH /sofa-combos/:id — missing row → 404", async () => {
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ writeReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ active: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/sofa combo not found/i);
+  });
+
+  it("DELETE /sofa-combos/:id — soft-delete via active=false + discontinued_at → 200", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { id: SOFA_COMBO_ID } }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    const payload = upd?.payload as { active: boolean; discontinued_at: string };
+    expect(payload.active).toBe(false);
+    expect(payload.discontinued_at).toBeTruthy();
+  });
+
+  it("DELETE /sofa-combos/:id — non-principal → 403 (/Master Admin/i)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("DELETE /sofa-combos/:id — missing row → 404", async () => {
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ writeReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/sofa combo not found/i);
   });
 });

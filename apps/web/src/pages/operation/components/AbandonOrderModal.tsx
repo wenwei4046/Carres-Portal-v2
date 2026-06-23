@@ -30,7 +30,7 @@ export default function AbandonOrderModal({ order, onClose }: Props) {
   // Mirror operation_abandon_order RPC: stock reserve only exists at
   // ready_to_dispatch + dispatched, so a release only happens there.
   // Earlier copy claimed "stock released" unconditionally, which lied for
-  // proceed_request + awaiting_operation_action abandons (Loo 2026-05-12).
+  // confirmed + in_production abandons (Loo 2026-05-12).
   const hadReserve =
     order.operation_stage === "ready_to_dispatch" ||
     order.operation_stage === "dispatched";

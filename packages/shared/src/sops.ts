@@ -1,13 +1,13 @@
 /**
  * SOP (Standard Operating Procedure) state machines for the v3 operation pipeline.
  *
- * Per spec §4.3, two state machines govern post-`awaiting_operation_action` flow:
+ * Per spec §4.3, two state machines govern post-`in_production` flow:
  *
  *   SOP_STANDARD     — Nice Future Mattress + Ohana Bedframe
- *                      awaiting_operation_action → ready_to_dispatch → dispatched → delivered
+ *                      in_production → ready_to_dispatch → dispatched → delivered
  *
  *   SOP_SOFA_SPECIAL — Ohana Sofa (partner-driven happy path)
- *                      awaiting_operation_action → dispatched → delivered
+ *                      in_production → dispatched → delivered
  *                                              ↘ waiting → delivered
  *
  * SOPs are TS-hardcoded (Loo Q4=B, no DB config layer). Supplier-slug ↔ supplier_id
@@ -18,8 +18,8 @@
 
 export type OperationStageV3 =
   | 'placed'
-  | 'proceed_request'
-  | 'awaiting_operation_action'
+  | 'confirmed'
+  | 'in_production'
   | 'ready_to_dispatch'
   | 'dispatched'
   | 'waiting'
@@ -37,9 +37,9 @@ export interface SopDef {
 
 export const SOP_STANDARD: SopDef = {
   name: 'STANDARD',
-  stages: ['awaiting_operation_action', 'ready_to_dispatch', 'dispatched', 'delivered'],
+  stages: ['in_production', 'ready_to_dispatch', 'dispatched', 'delivered'],
   transitions: [
-    { from: 'awaiting_operation_action', to: 'ready_to_dispatch', rpc: 'operation_receive_po_with_do' },
+    { from: 'in_production', to: 'ready_to_dispatch', rpc: 'operation_receive_po_with_do' },
     { from: 'ready_to_dispatch',         to: 'dispatched',        rpc: 'operation_assign_partner_and_dispatch' },
     { from: 'dispatched',                to: 'delivered',         rpc: 'operation_attach_pod_do' },
   ],
@@ -47,16 +47,16 @@ export const SOP_STANDARD: SopDef = {
 
 export const SOP_SOFA_SPECIAL: SopDef = {
   name: 'SOFA_SPECIAL',
-  stages: ['awaiting_operation_action', 'ready_to_dispatch', 'waiting', 'dispatched', 'delivered'],
+  stages: ['in_production', 'ready_to_dispatch', 'waiting', 'dispatched', 'delivered'],
   // Transitions are advisory: (from, to, rpc) tuples document allowed paths.
   // Two transitions sharing (from, rpc) with different `to` is intentional —
   // the receive RPC branches on previous PO sup_status (relocated → waiting,
   // else → ready_to_dispatch). Keeps RPC dispatch consistent with one UI button.
   transitions: [
     // LP Accept happy path: previous sup_status was ready_confirm_sent or partner_confirmed
-    { from: 'awaiting_operation_action', to: 'ready_to_dispatch', rpc: 'operation_receive_po_with_do' },
+    { from: 'in_production', to: 'ready_to_dispatch', rpc: 'operation_receive_po_with_do' },
     // LP Reject + Relocate path: previous sup_status was 'relocated'
-    { from: 'awaiting_operation_action', to: 'waiting',           rpc: 'operation_receive_po_with_do' },
+    { from: 'in_production', to: 'waiting',           rpc: 'operation_receive_po_with_do' },
     // Resume after customer reschedules (Phase 4.5 Chunk 2: thread-scoped, was order-scoped operation_resume_from_waiting in 0045 / Chunk 1)
     { from: 'waiting',                   to: 'ready_to_dispatch', rpc: 'operation_resume_dispatch_from_waiting' },
     // Customer-delivery dispatch (RFD or Force)

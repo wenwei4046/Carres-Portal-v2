@@ -5,6 +5,13 @@ export {
   DELIVERY_LEAD_DAYS,
   maxLeadDaysFor,
   minDeliveryDateISO,
+  // 0169-0173 — Product & Maintenance rebuild.
+  PRODUCT_CATEGORIES,
+  SERVICE_SKU,
+  SERVICE_SKU_REGEX,
+  CARRES_INTERNAL_SUPPLIER_SLUG,
+  PRODUCT_MODEL_PHOTOS_BUCKET,
+  SUPPLIERLESS_CATEGORIES,
   type DeliveryLeadCategory,
 } from "./constants";
 
@@ -108,6 +115,37 @@ export {
   productSkuPatchInput,
   sofaFabricCreateInput,
   sofaFabricPatchInput,
+  // 0169-0173 — Product & Maintenance rebuild.
+  allowedOptionsSchema,
+  // 0176 — fabric tier pricing schemas.
+  fabricTierSchema,
+  fabricTierConfigSchema,
+  modelFabricTierOverrideSchema,
+  // 0177 — combo (套餐) schemas.
+  comboComponentSchema,
+  comboSchema,
+  comboCreateInput,
+  comboPatchInput,
+  // 0178 — sofa compartment pool + per-model offered schemas.
+  sofaCompartmentSchema,
+  sofaCompartmentCreateInput,
+  sofaCompartmentPatchInput,
+  modelSofaCompartmentSchema,
+  modelSofaCompartmentInput,
+  serviceSkuCodeSchema,
+  sizesActiveInput,
+  generateSkusInput,
+  skuMasterListQuery,
+  floorConfigPatchInput,
+  addonCreateInput,
+  addonPatchInput,
+  type AllowedOptions,
+  type SizesActiveInput,
+  type GenerateSkusInput,
+  type SkuMasterListQuery,
+  type FloorConfigPatchInput,
+  type AddonCreateInput,
+  type AddonPatchInput,
   type CatalogResponse,
   type ProductModelDto,
   type ProductSkuDto,
@@ -128,6 +166,27 @@ export {
   type ProductSkuPatchInput,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
+  type FabricTierValue,
+  type FabricTierConfigDto,
+  type ModelFabricTierOverrideDto,
+  // 0177 — combo (套餐) Dto types.
+  type ComboComponentDto,
+  type ComboDto,
+  type ComboCreateInput,
+  type ComboPatchInput,
+  // 0178 — sofa compartment Dto + input types.
+  type SofaCompartmentDto,
+  type SofaCompartmentCreateInput,
+  type SofaCompartmentPatchInput,
+  type ModelSofaCompartmentDto,
+  type ModelSofaCompartmentInput,
+  // 0179 — sofa combo pricing schemas + input/Dto types.
+  sofaComboSchema,
+  sofaComboCreateInput,
+  sofaComboPatchInput,
+  type SofaComboDto,
+  type SofaComboCreateInput,
+  type SofaComboPatchInput,
 } from "./schemas/catalog";
 
 export {
@@ -384,3 +443,147 @@ export {
   type OpsOrderControlResponse,
 } from "./schemas/ops-order-control";
 export * from "./schemas/ops-cockpit";
+
+// Migration 0176 — fabric tier pricing resolver + types.
+export {
+  resolveFabricDelta,
+  type FabricTier,
+  type FabricTierOverride,
+  type FabricTierGlobalConfig,
+} from "./fabric-tier";
+
+// Migration 0177 — combo (套餐) price-split helper + types. `explodeCombo` is
+// the pure split used by the POS (web Task 4) to fan a combo into N order lines.
+export {
+  explodeCombo,
+  type ExplodedComboLine,
+} from "./combo";
+
+// 0177 — combo domain types (camelCased). Top-level alias so consumers can
+// `import type { Combo } from "@carres/shared"` without dipping into Domain.*
+// (mirrors how CostSource is surfaced above). The zod schemas + Dto types live
+// in the schemas/catalog export block.
+export type { Combo, ComboComponent } from "./domain";
+
+// 0178 — sofa compartment domain types (camelCased). Top-level alias so the API
+// + web can `import type { SofaCompartment } from "@carres/shared"` without
+// dipping into Domain.* (mirrors the Combo alias above). The zod schemas + Dto
+// types live in the schemas/catalog export block; the adapters are reached via
+// Adapters.* like comboFromRow / fabricTierConfigFromRow.
+export type { SofaCompartment, ModelSofaCompartment } from "./domain";
+
+// 0179 — sofa engine Phase 2: sofa combo domain type + the row→domain adapter +
+// the canonical seat-height axis. `sofaComboFromRow` is also reachable via
+// `Adapters.*` (like comboFromRow); the top-level alias mirrors the Combo/
+// SofaCompartment surfacing above so the API + web can import it directly.
+export type { SofaCombo } from "./domain";
+export { sofaComboFromRow } from "./adapters";
+export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
+
+// Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo
+// match + explodeSofaBuild). No DB/IO; runs identically on web + (Phase 4) Hono.
+export {
+  resolveCompartmentPrice,
+  mirrorCode,
+  canonicalizeSofaSlots,
+  matchSofaCombo,
+  pickSofaCombo,
+  computeSofaPrice,
+  explodeSofaBuild,
+  type SofaComboLike,
+  type PickSofaComboArgs,
+  type SofaComboPick,
+  type SofaBuildCell,
+  type SofaBuild,
+  type SofaPricingSnapshot,
+  type SofaPriceBasis,
+  type SofaPriceResult,
+  type ExplodedSofaLine,
+} from "./sofa-pricing";
+
+// Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /
+// arm-cap closure). No DOM/React; cm-space math reused by the web builder + P4
+// explode. `mirrorCode` / `computeSofaPrice` are NOT re-exported here — they
+// already ship from `sofa-pricing`; the geometry module has no imports (the
+// web auto-mirror-on-drop in Task 3 imports mirrorCode from `sofa-pricing`).
+export {
+  SOFA_MODULES,
+  MODULE_EDGES_BASE,
+  DEFAULT_FOOTPRINT,
+  ROOM_W,
+  ROOM_H,
+  SNAP_CM,
+  CONTACT_TOL,
+  EDGE_W,
+  EDGE_N,
+  EDGE_E,
+  EDGE_S,
+  parseCompartmentStructure,
+  familyRepresentative,
+  findModule,
+  normalizeCompartmentCode,
+  representativeArtCode,
+  isAccessoryModule,
+  classifySofaCompartment,
+  moduleFootprint,
+  cellBbox,
+  cellRenderBox,
+  cellsBbox,
+  centerCellsWithin,
+  centerCellsInRoom,
+  cellEdges,
+  lCapEdgeOf,
+  edgeContacts,
+  groupSofas,
+  orderSofaCellsLeftToRight,
+  findSnap,
+  hasArmConflict,
+  analyzeSofa,
+  type Rot,
+  type Depth,
+  type GeoCell,
+  type SofaModuleSpec,
+  type CompartmentStructure,
+  type SofaCompartmentGroup,
+  type EdgeType,
+  type EdgeIdx,
+  type Bbox,
+  type SnapDelta,
+  type ViolationReason,
+  type ArmViolation,
+  type ClosureFailure,
+  type SofaAnalysis,
+} from "./sofa-geometry";
+
+// Table-name constants (prevents raw string literals in application code).
+export * from "./tables";
+
+// Sales Order Maintenance — AutoCount-style configurable SO grid (2026-06-16).
+// See docs/superpowers/plans/2026-06-16-sales-order-maintenance.md.
+export {
+  SO_GRID_COLUMN_TYPES,
+  SO_GRID_COLUMN_SOURCES,
+  SO_GRID_COLUMN_GROUPS,
+  SO_GRID_COLUMNS,
+  SO_GRID_COLUMN_KEYS,
+  SO_GRID_OPTION_KEYS,
+  soGridColumnDef,
+  soGridColumnConfigSchema,
+  soGridConfigSchema,
+  updateSoGridConfigSchema,
+  soGridCellValueSchema,
+  soGridRowSchema,
+  soGridResponseSchema,
+  defaultSoGridConfig,
+  mergeSoGridConfig,
+  type SoGridColumnType,
+  type SoGridColumnSource,
+  type SoGridColumnGroup,
+  type SoGridColumnDef,
+  type SoGridColumnConfig,
+  type SoGridConfig,
+  type UpdateSoGridConfigInput,
+  type SoGridCellValue,
+  type SoGridRow,
+  type SoGridResponse,
+} from "./schemas/sales-order-maintenance";

@@ -4,12 +4,16 @@
  */
 
 import type { CostSource, OperationStage } from "./db-types";
+import type { FabricTier } from "./fabric-tier";
 
 // Re-exported so UI code can write `import type { CostSource } from
 // "@carres/shared/domain"` alongside the rest of the camelCase surface.
 // The enum labels themselves are 1:1 with DB (snake-cased like the other DB
 // enums consumed in domain types — see Order.status, PartnerStage, etc.).
 export type { CostSource };
+
+// 0176 — fabric tier type re-exported for UI consumption.
+export type { FabricTier };
 
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
@@ -46,7 +50,7 @@ export interface Salesperson {
 
 export interface ProductModel {
   id: string;
-  category: "mattress" | "bedframe" | "sofa";
+  category: "mattress" | "bedframe" | "sofa" | "accessory" | "service"; // 0169
   modelKey: string;
   name: string;
   blurb: string | null;
@@ -55,6 +59,9 @@ export interface ProductModel {
   sofaMode: "preset" | "custom" | "both" | null;
   // 0074 — soft-delete flag for the catalog admin UI (Loo 2026-05-09).
   discontinuedAt?: string | null;
+  // 0171 — model photo (public URL) + generate-skus option pool.
+  photoUrl?: string | null;
+  allowedOptions?: Record<string, string[] | undefined>;
 }
 
 export interface ProductSku {
@@ -74,6 +81,14 @@ export interface ProductSku {
   // (the proto-era convention that's no longer how SKUs are formatted).
   supplierId: string | null;
   discontinuedAt?: string | null;
+  // 0170 — sell-side ON/OFF (Modular toggle, DISTINCT from discontinuedAt) +
+  // editable sell-side description.
+  posActive?: boolean;
+  description?: string | null;
+  // 0178 (sofa engine Phase 1) — additive, nullable link to a sofa_compartments
+  // type. NULL for every existing SKU; only future generated compartment SKUs
+  // carry it.
+  compartmentId?: string | null;
 }
 
 export interface SofaFabric {
@@ -85,6 +100,27 @@ export interface SofaFabric {
   // product_models.colors[] pattern.
   colors: string[] | null;
   discontinuedAt?: string | null;
+  // 0176 — price tier. PRICE_1 = base (no delta), PRICE_2/3 = mid/premium.
+  tier: FabricTier;
+}
+
+/**
+ * Global fabric tier config singleton (migration 0176). Sourced from the
+ * `fabric_tier_addon_config` table (id=1). Deltas are in RM and always >= 0.
+ */
+export interface FabricTierConfig {
+  sofaTier2Delta: number;
+  sofaTier3Delta: number;
+}
+
+/**
+ * Per-model fabric tier delta override (migration 0176). Keyed by model UUID.
+ * Nullable deltas mean "inherit from global config" — 0 is a valid set value.
+ */
+export interface ModelFabricTierOverride {
+  modelId: string;
+  tier2Delta: number | null;
+  tier3Delta: number | null;
 }
 
 export interface Addon {
@@ -92,6 +128,83 @@ export interface Addon {
   name: string;
   price: number;
   active: boolean;
+  // 0172 — links the add-on to a real Service-category SKU (bare SVC- code).
+  serviceSku?: string | null;
+}
+
+/**
+ * One component SKU inside a combo (migration 0177). `qty` = how many of this
+ * SKU the bundle contains; `sortOrder` drives the deterministic explode order
+ * (the last component absorbs the rounding residue in explodeCombo).
+ */
+export interface ComboComponent {
+  sku: string;
+  qty: number;
+  sortOrder: number;
+}
+
+/**
+ * A fixed-set combo / bundle (套餐, migration 0177) sold at one `comboPrice`.
+ * `comboFromRow` maps the `combos` row; `components` is attached by the caller
+ * (the API assembles the nested `combo_components` rows, the same way other
+ * nested domain objects are composed).
+ */
+export interface Combo {
+  id: string;
+  comboKey: string;
+  name: string;
+  comboPrice: number;
+  active: boolean;
+  effectiveFrom: string;
+  components: ComboComponent[];
+}
+
+/**
+ * A sofa compartment type from the principal-owned pool (migration 0178, sofa
+ * engine Phase 1). `defaultPrice` is the pool RM price; a model may override it
+ * per compartment via `ModelSofaCompartment`. `code` is the stable unique key.
+ */
+export interface SofaCompartment {
+  id: string;
+  code: string;
+  description: string | null;
+  seatCount: number | null;
+  armConfig: string | null;
+  iconUrl: string | null;
+  defaultPrice: number;
+  sortOrder: number;
+  active: boolean;
+}
+
+/**
+ * A per-model offered compartment (migration 0178). Row present = the model
+ * offers this compartment. `priceOverride` NULL = use the pool's `defaultPrice`;
+ * a value (>= 0) supersedes it for this model.
+ */
+export interface ModelSofaCompartment {
+  modelId: string;
+  compartmentId: string;
+  priceOverride: number | null;
+  sortOrder: number;
+}
+
+/**
+ * A sofa combo (migration 0179, sofa engine Phase 2). A base model + an ordered
+ * list of `slots` (each slot an OR-set of compartment `code` strings) priced per
+ * seat height in `pricesByHeight` (height-string → RM | null; a null/absent key
+ * = the combo does not apply at that height). `tier` null = applies to any
+ * fabric tier. Principal-owned; soft-deleted via active/discontinuedAt.
+ */
+export interface SofaCombo {
+  id: string;
+  modelId: string;
+  slots: string[][];
+  tier: FabricTier | null;
+  pricesByHeight: Record<string, number | null>;
+  label: string | null;
+  effectiveFrom: string;
+  active: boolean;
+  discontinuedAt: string | null;
 }
 
 export interface FloorConfig {
@@ -211,6 +324,9 @@ export interface Order {
 
   delivery: {
     date: string | null;
+    /** Phase 11.1 — salesperson-entered planned production-start ("Proceed")
+     *  date. Pairs with `date` via `dateTbd` (both-or-neither). <= `date`. */
+    proceedDate: string | null;
     dateTbd: boolean;
     floor: number;
     hasLift: boolean;
@@ -227,13 +343,13 @@ export interface Order {
   approvalCode: string | null;
   installmentMonths: 6 | 12 | null;
 
-  // v3-S3 (migration 0028) added `awaiting_operation_action` + `waiting`.
+  // v3-S3 (migration 0028) added `in_production` + `waiting`.
   // Phase 4.5a (2026-05-05): legacy `awaiting_stock` value fully removed —
   // T5 swept FE/tests, T6 (migration 0040) dropped it from the DB enum.
   // operation_stage now matches this union 1:1.
   operationStage:
-    | "placed" | "proceed_request"
-    | "awaiting_operation_action"
+    | "placed" | "confirmed"
+    | "in_production"
     | "ready_to_dispatch" | "dispatched"
     | "waiting" | "delivered"
     | null;
