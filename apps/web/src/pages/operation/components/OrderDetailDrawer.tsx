@@ -437,29 +437,37 @@ function DrawerSection({
     <div
       className={`border border-base-200 border-l-[3px] ${a.bar} rounded-[4px] bg-white mb-2 overflow-hidden`}
     >
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-left ${a.head} hover:brightness-[0.97]`}
+      <div
+        className={`w-full flex items-center justify-between gap-3 px-3 py-2 ${a.head}`}
       >
-        <span className="flex items-center gap-2 min-w-0">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="flex items-center gap-2 min-w-0 flex-1 text-left hover:brightness-[0.97]"
+        >
           <span className={`${a.icon} shrink-0`}>{icon}</span>
           <span className="t-h4 text-base-900">{title}</span>
           {titleExtra}
-        </span>
+        </button>
         <span className="flex items-center gap-2 shrink-0">
-          {headerRight}
           {!open && summary != null && (
             <span className="text-[11px] text-base-500 truncate max-w-[180px]">
               {summary}
             </span>
           )}
-          <ChevronDown
-            className={`w-4 h-4 text-base-400 transition-transform ${open ? "rotate-180" : ""}`}
-          />
+          {headerRight}
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-label={open ? "Collapse section" : "Expand section"}
+          >
+            <ChevronDown
+              className={`w-4 h-4 text-base-400 transition-transform ${open ? "rotate-180" : ""}`}
+            />
+          </button>
         </span>
-      </button>
+      </div>
       {open && (
         <div className="px-3 pb-2.5 pt-1.5 border-t border-base-100">
           {children}
@@ -545,27 +553,11 @@ function DrawerBody({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header — slim title bar: SO · name · status, a ⋮ actions menu, close.
-          (Service/export actions + doc reprints all live in the ⋮ menu now.) */}
-      <div className="px-5 pt-3 pb-2.5 border-b border-base-100 shrink-0 flex items-center justify-end gap-1">
-        <ActionsMenu
-          order={order}
-          lines={lines}
-          stage={stage}
-          onServiceNoteClick={onServiceNoteClick}
-        />
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close drawer"
-          className="p-1 text-[20px] text-base-700 hover:text-base-900 leading-none shrink-0"
-        >
-          ×
-        </button>
-      </div>
-
+      {/* No separate top bar — the ⋮ actions menu + close moved into the Order
+          section header next to the status chip (Jess: save a row). Backdrop
+          click still closes the drawer. */}
       {/* Scrolling section stack — 5 sections, one category each (P5). */}
-      <div className="flex-1 min-h-0 overflow-auto px-5 py-4">
+      <div className="flex-1 min-h-0 overflow-auto px-5 py-4 pt-3">
         {/* Needs-action banner — the "action for logistic" note surfaced at the
             top so it can't be missed (Jess). */}
         {form.draft.action_for_logistic.trim() && (
@@ -592,7 +584,25 @@ function DrawerBody({
               #{order.so}
             </span>
           }
-          headerRight={<StageChip stage={stage} />}
+          headerRight={
+            <span className="flex items-center gap-1">
+              <StageChip stage={stage} />
+              <ActionsMenu
+                order={order}
+                lines={lines}
+                stage={stage}
+                onServiceNoteClick={onServiceNoteClick}
+              />
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close drawer"
+                className="p-1 text-[18px] text-base-700 hover:text-base-900 leading-none shrink-0"
+              >
+                ×
+              </button>
+            </span>
+          }
           accent="neutral"
           summary={order.customer_name}
           defaultOpen
