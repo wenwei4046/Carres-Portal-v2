@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   computeStorageFee,
@@ -500,6 +501,29 @@ export function StorageControlFields({
   const sofPeriods =
     storage.days > 0 ? Math.ceil(storage.days / STORAGE_RATES.sof.periodDays) : 0;
   const incurred = draft.storage_from.trim() !== "";
+  // Storage alert (Jess) — countdown to the To date, SAME pills as the Deadline
+  // column (amber pill-warning / red pill-overdue + ⚠), NOT emoji. Shows only
+  // when ≤3 days out, overdue, OR the logistic ETA is missing / later than To
+  // (storage extending → collect payment). Healthy (>3d) shows nothing.
+  const toDiff = Math.round(
+    (new Date(`${endEff}T00:00:00`).getTime() -
+      new Date(`${today}T00:00:00`).getTime()) /
+      86_400_000,
+  );
+  const extending =
+    !draft.logistic_eta.trim() || draft.logistic_eta.trim() > endEff;
+  const storageAlert =
+    !incurred || (toDiff > 3 && !extending)
+      ? null
+      : toDiff < 0
+        ? { label: `Overdue ${-toDiff}d`, pill: "pill-overdue", urgent: true }
+        : toDiff <= 1
+          ? {
+              label: toDiff === 0 ? "Due today" : "Due soon 1d",
+              pill: "pill-overdue",
+              urgent: true,
+            }
+          : { label: `Due soon ${toDiff}d`, pill: "pill-warning", urgent: false };
   return (
     <>
       <FieldRow label="Storage?">
@@ -537,6 +561,20 @@ export function StorageControlFields({
               className={CELL}
             />
           </FieldRow>
+          {storageAlert && (
+            <FieldRow label="Alert">
+              <div className="px-2 py-1">
+                <span
+                  className={`pill ${storageAlert.pill} ${storageAlert.urgent ? "inline-flex items-center gap-1" : ""}`}
+                >
+                  {storageAlert.urgent && (
+                    <AlertTriangle size={11} strokeWidth={2.5} />
+                  )}
+                  {storageAlert.label}
+                </span>
+              </div>
+            </FieldRow>
+          )}
           {/* Auto breakdown — separate MS/BF (per month) and Sofa (per 2 weeks)
               lines (Jess), each = rate × commenced periods between From and To. */}
           {hasMsbf && (
