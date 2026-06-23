@@ -34,19 +34,20 @@ import {
   sofaComboPatchInput,
   canonicalizeSofaSlots,
   SOFA_COMBO_PRICING,
+  deriveSkuCode,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
+import { syncCompartmentSku, discontinueCompartmentSku } from "../lib/sofa-compartment-sku";
 import type { AppEnv } from "../types";
 
 const catalogRouter = new Hono<AppEnv>();
 
-// Loo 2026-06-14 — new SKU codes are `{MODEL_KEY}-{variant}` (uppercase, dash),
-// matching the AutoCount-style scheme the 1013 existing SKUs use. NOT the legacy
-// `category:model_key:variant` colon format (which 0148 documented as broken).
-function deriveSkuCode(modelKey: string, variant: string): string {
-  return `${modelKey.toUpperCase()}-${variant}`;
-}
+// SKU codes are `{MODEL_KEY}-{variant}` (uppercase, dash) — the AutoCount-style
+// scheme the 1013 existing SKUs use, NOT the legacy `category:model_key:variant`
+// colon format (0148 documented that as broken). The formula now lives in
+// `@carres/shared` (deriveSkuCode) so the mint + generate-skus + the web
+// read-back can't drift.
 
 // Service/accessory categories carry no supplier (their SKUs are internal:
 // delivery / disposal / labour / pure accessories). The create-SKU supplier
@@ -1341,6 +1342,18 @@ catalogRouter.put("/models/:modelId/compartments/:compartmentId", async (c) => {
   const parsed = await parseJsonBody(c, modelSofaCompartmentInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Phase 5 — auto-sync the compartment into a REAL product_skus row BEFORE the
+  // offered row is written, so an offered compartment never exists without its
+  // sellable sku (the explode would otherwise fail closed). Idempotent +
+  // principal-gated (the 0175 price-lock trigger allows the principal's write).
+  const synced = await syncCompartmentSku(sb, {
+    modelId,
+    compartmentId,
+    priceOverride: parsed.data.priceOverride ?? null,
+  });
+  if (!synced.ok) return c.json(synced.body, synced.status);
+
   const { data, error } = await sb
     .from(MODEL_SOFA_COMPARTMENTS)
     .upsert(
@@ -1377,6 +1390,12 @@ catalogRouter.delete("/models/:modelId/compartments/:compartmentId", async (c) =
     .eq("model_id", modelId)
     .eq("compartment_id", compartmentId);
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+
+  // Phase 5 — soft-discontinue the compartment's sku (pos_active=false +
+  // discontinued_at). NEVER delete it: historical order_lines may FK the sku. A
+  // later re-offer re-activates it. Idempotent (0 matched rows = no-op).
+  const disc = await discontinueCompartmentSku(sb, { modelId, compartmentId });
+  if (!disc.ok) return c.json(disc.body, disc.status);
   return c.json({ ok: true });
 });
 

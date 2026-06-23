@@ -1699,6 +1699,8 @@ function buildSbForSofa(opts: {
       select: () => chain,
       eq: () => chain,
       is: () => chain,
+      // Phase 5 — the compartment-sku fetch uses `.not("compartment_id","is",null)`.
+      not: () => chain,
       in: async () => listRes(),
       order: async () => listRes(),
       maybeSingle: async () => oneRes(),
@@ -1733,7 +1735,16 @@ const SOFA_REP_SKU = "SOFA-OHANA-REP";
  *  of [2A, 1A] at PRICE_1 prices à-la-carte to RM1600. */
 function sofaTables(over: Partial<Record<string, SofaTableData>> = {}): Record<string, SofaTableData> {
   return {
-    product_skus: { one: { model_id: SOFA_MODEL_ID } },
+    product_skus: {
+      // `.maybeSingle()` (model resolve) returns `one`; the thenable
+      // compartment-sku fetch returns `list` — the 5A-synced per-compartment
+      // skus the Phase-5 explode maps each cell to.
+      one: { model_id: SOFA_MODEL_ID },
+      list: [
+        { sku: "OHANA-2A", compartment_id: "comp-2a" },
+        { sku: "OHANA-1A", compartment_id: "comp-1a" },
+      ],
+    },
     sofa_compartments: {
       list: [
         { id: "comp-2a", code: "2A", description: null, seat_count: 2, arm_config: null, icon_url: null, default_price: "1000", sort_order: 0, active: true },
@@ -1788,12 +1799,14 @@ function buildOrderBody(unitPrice: number, sofaBuildOver: Record<string, unknown
   });
 }
 
-describe("POST /api/orders — sofa build recompute (Phase 4)", () => {
+describe("POST /api/orders — sofa build recompute + explode (Phase 5)", () => {
   const NEW_ID = "11111111-1111-1111-1111-111111111111";
   const rpcOk = { id: NEW_ID, so: 1301, placed_at: "2026-06-23T00:00:00Z" };
 
-  it("accepts an honest client price (within 0.5%) and overwrites it with the server number", async () => {
-    // Client claims RM1605; server computes RM1600 (drift 0.31% < 0.5%).
+  it("accepts an honest client price (within 0.5%) and EXPLODES it into per-compartment lines at the server total", async () => {
+    // Client claims RM1605; server computes RM1600 (drift 0.31% < 0.5%). The one
+    // build line explodes into 2 real compartment lines (2A=RM1000, 1A=RM600)
+    // summing to the SERVER 1600, not the client 1605.
     const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("dealer", DEALER_A);
@@ -1806,10 +1819,23 @@ describe("POST /api/orders — sofa build recompute (Phase 4)", () => {
       env,
     );
     expect(res.status).toBe(201);
-    // create_order was called with the SERVER price (1600), not the client 1605.
     expect(sb._rpcCalls).toHaveLength(1);
-    const payload = sb._rpcCalls[0]!.payload as { lines: Array<{ unit_price: number }> };
-    expect(payload.lines[0]!.unit_price).toBe(1600);
+    const payload = sb._rpcCalls[0]!.payload as {
+      lines: Array<{ sku: string; qty: number; unit_price: number; attrs: Record<string, unknown> }>;
+    };
+    // One build line → two real per-compartment lines under the sofa model.
+    expect(payload.lines).toHaveLength(2);
+    expect(payload.lines.map((l) => l.sku)).toEqual(["OHANA-2A", "OHANA-1A"]);
+    // Σ unit_price === the SERVER total (1600), not the client 1605.
+    expect(payload.lines.reduce((s, l) => s + l.unit_price * l.qty, 0)).toBe(1600);
+    expect(payload.lines.map((l) => l.unit_price)).toEqual([1000, 600]);
+    // Each line carries the regroup key + its cell index + fabric.
+    expect(payload.lines[0]!.attrs).toMatchObject({ sofa_build_key: "sc_test_1", cell_index: 0 });
+    expect(payload.lines[1]!.attrs).toMatchObject({
+      sofa_build_key: "sc_test_1",
+      cell_index: 1,
+      fabric_tier: "PRICE_1",
+    });
   });
 
   it("rejects a tampered client price (> 0.5% drift) with 422 sofa_price_drift and does NOT create", async () => {
@@ -1833,10 +1859,18 @@ describe("POST /api/orders — sofa build recompute (Phase 4)", () => {
     expect(sb._rpcCalls).toHaveLength(0);
   });
 
-  it("server price 0 + client 0 → accepted (genuine free build)", async () => {
-    // Pool has none of the built codes → every cell prices to 0 → server 0.
+  it("server price 0 + client 0 → accepted (genuine free build, still explodes)", async () => {
+    // Both compartments offered but priced 0 → server total 0; the build still
+    // explodes into 2 real (RM0) lines whose skus map.
     const sb = buildSbForSofa({
-      tables: sofaTables({ sofa_compartments: { list: [] } }),
+      tables: sofaTables({
+        sofa_compartments: {
+          list: [
+            { id: "comp-2a", code: "2A", description: null, seat_count: 2, arm_config: null, icon_url: null, default_price: "0", sort_order: 0, active: true },
+            { id: "comp-1a", code: "1A", description: null, seat_count: 1, arm_config: null, icon_url: null, default_price: "0", sort_order: 1, active: true },
+          ],
+        },
+      }),
       rpcResult: rpcOk,
     });
     vi.mocked(userClient).mockReturnValue(sb);
@@ -1851,6 +1885,9 @@ describe("POST /api/orders — sofa build recompute (Phase 4)", () => {
     );
     expect(res.status).toBe(201);
     expect(sb._rpcCalls).toHaveLength(1);
+    const payload = sb._rpcCalls[0]!.payload as { lines: Array<{ unit_price: number }> };
+    expect(payload.lines).toHaveLength(2);
+    expect(payload.lines.reduce((s, l) => s + l.unit_price, 0)).toBe(0);
   });
 
   it("server price 0 + client > 0 → rejected (model can't justify any price)", async () => {
@@ -1981,5 +2018,32 @@ describe("POST /api/orders — sofa build recompute (Phase 4)", () => {
     expect(res.status).toBe(201);
     // Snapshot pool fetched exactly once despite two build lines.
     expect(sb._fromCalls.filter((t: string) => t === "sofa_compartments")).toHaveLength(1);
+  });
+
+  it("a build cell whose compartment has no synced sku → 400 fail-closed (never drops the line)", async () => {
+    // 1A is priced (server total still 1600, drift gate passes) but its sku was
+    // never synced (only 2A in product_skus.list) → the explode can't make a real
+    // line for it → fail closed, no create.
+    const sb = buildSbForSofa({
+      tables: sofaTables({
+        product_skus: {
+          one: { model_id: SOFA_MODEL_ID },
+          list: [{ sku: "OHANA-2A", compartment_id: "comp-2a" }],
+        },
+      }),
+      rpcResult: rpcOk,
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(1600)),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
   });
 });

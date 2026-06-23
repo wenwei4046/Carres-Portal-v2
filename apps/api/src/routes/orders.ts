@@ -25,7 +25,7 @@ import {
   validateDeliveryLeadTime,
   type LeadTimeViolation,
 } from "../lib/lead-time";
-import { recomputeSofaBuildLines } from "../lib/sofa-recompute";
+import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
 import type { AppEnv } from "../types";
 
 /**
@@ -261,11 +261,11 @@ ordersRouter.post("/", async (c) => {
   // Phase 4 (sofa engine) — server recompute + 0.5% drift-reject for any sofa
   // BUILD line (one carrying `attrs.sofa_build`). The client price is a preview;
   // we re-run the SAME pure `computeSofaPrice` against FRESH DB catalog prices.
-  // Mismatch > 0.5% → 422 (anti-fudge); within → the line's unitPrice is
-  // overwritten in place with the authoritative server number. Non-build lines
-  // are untouched; `create_order` + `order_lines` stay UNCHANGED (the explode
-  // into per-compartment lines is Phase 5).
-  const recompute = await recomputeSofaBuildLines(sb, parsed.data.lines);
+  // Mismatch > 0.5% → 422 (anti-fudge); within → the build line is EXPLODED into
+  // one real per-compartment line (Phase 5), summing to the authoritative server
+  // total. Non-build lines pass through verbatim; `create_order` + `order_lines`
+  // stay UNCHANGED — the RPC just inserts the (possibly expanded) line set.
+  const recompute = await recomputeAndExplodeSofaBuildLines(sb, parsed.data.lines);
   if (recompute.status === "bad_request") {
     throw new HTTPException(400, { message: recompute.message });
   }
@@ -288,7 +288,13 @@ ordersRouter.post("/", async (c) => {
     );
   }
 
-  const payload = Adapters.orderInputToRpcPayload(parsed.data, auth.dealerId);
+  // Phase 5 — feed the (possibly exploded) sofa lines into the RPC. For a
+  // non-build order `recompute.lines` is `parsed.data.lines` verbatim; for a
+  // sofa build it is the per-compartment explosion summing to the server total.
+  const payload = Adapters.orderInputToRpcPayload(
+    { ...parsed.data, lines: recompute.lines },
+    auth.dealerId,
+  );
   const { data: created, error } = await sb.rpc("create_order", { payload });
   if (error) {
     // 42501 = manual cross-dealer check inside the RPC. We map to 403 so the
