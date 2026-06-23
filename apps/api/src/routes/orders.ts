@@ -25,6 +25,7 @@ import {
   validateDeliveryLeadTime,
   type LeadTimeViolation,
 } from "../lib/lead-time";
+import { recomputeSofaBuildLines } from "../lib/sofa-recompute";
 import type { AppEnv } from "../types";
 
 /**
@@ -255,6 +256,36 @@ ordersRouter.post("/", async (c) => {
     const skus = parsed.data.lines.map((l) => l.sku);
     const violation = await validateDeliveryLeadTime(sb, skus, parsed.data.delivery.date);
     if (violation) return c.json(leadTimeBody(violation), 422);
+  }
+
+  // Phase 4 (sofa engine) — server recompute + 0.5% drift-reject for any sofa
+  // BUILD line (one carrying `attrs.sofa_build`). The client price is a preview;
+  // we re-run the SAME pure `computeSofaPrice` against FRESH DB catalog prices.
+  // Mismatch > 0.5% → 422 (anti-fudge); within → the line's unitPrice is
+  // overwritten in place with the authoritative server number. Non-build lines
+  // are untouched; `create_order` + `order_lines` stay UNCHANGED (the explode
+  // into per-compartment lines is Phase 5).
+  const recompute = await recomputeSofaBuildLines(sb, parsed.data.lines);
+  if (recompute.status === "bad_request") {
+    throw new HTTPException(400, { message: recompute.message });
+  }
+  if (recompute.status === "server_error") {
+    throw new HTTPException(500, { message: recompute.message });
+  }
+  if (recompute.status === "drift") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "sofa_price_drift",
+        message:
+          `Sofa price mismatch on '${recompute.drift.lineSku}': client RM ` +
+          `${recompute.drift.clientTotal.toFixed(2)} vs server RM ` +
+          `${recompute.drift.serverTotal.toFixed(2)}. Please rebuild and retry.`,
+        clientTotal: recompute.drift.clientTotal,
+        serverTotal: recompute.drift.serverTotal,
+      },
+      422,
+    );
   }
 
   const payload = Adapters.orderInputToRpcPayload(parsed.data, auth.dealerId);

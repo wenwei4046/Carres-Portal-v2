@@ -443,6 +443,9 @@ export {
   type OpsOrderControlResponse,
 } from "./schemas/ops-order-control";
 export * from "./schemas/ops-cockpit";
+// Sofa engine Phase 4 — build-line attrs schema + guard (server-recompute trust
+// gate re-parses the build out of order_lines.attrs free jsonb before pricing).
+export * from "./schemas/sofa-build";
 
 // Migration 0176 — fabric tier pricing resolver + types.
 export {
@@ -490,6 +493,8 @@ export {
   pickSofaCombo,
   computeSofaPrice,
   explodeSofaBuild,
+  sofaPriceWithinTolerance,
+  SOFA_PRICE_DRIFT_TOLERANCE,
   type SofaComboLike,
   type PickSofaComboArgs,
   type SofaComboPick,

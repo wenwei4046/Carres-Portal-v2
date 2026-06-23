@@ -465,6 +465,39 @@ export function computeSofaPrice(
   };
 }
 
+/* ─── sofaPriceWithinTolerance (Phase 4 server-recompute drift gate) ────── */
+
+/**
+ * Max allowed drift between the client-previewed sofa price and Hono's
+ * authoritative server recompute: 0.5% (anti-price-fudge, identical to 2990s).
+ */
+export const SOFA_PRICE_DRIFT_TOLERANCE = 0.005;
+
+/**
+ * Does the client-claimed total agree with the server-recomputed total within
+ * `SOFA_PRICE_DRIFT_TOLERANCE`? Pure — the Phase-4 Hono guard uses this to
+ * decide accept-and-overwrite vs 422-reject.
+ *
+ * Rules (fail CLOSED — any odd input rejects rather than silently accepting):
+ *   · non-finite either side                  → false
+ *   · server < 0                              → false (a price can't be negative)
+ *   · server ≈ 0 (≤ half a cent): the model can't justify any price, so the
+ *     client must also be ≈ 0 (|client| < 0.005) — a genuine free build passes,
+ *     any positive claim fails.
+ *   · else                                    → |client − server| / server ≤ 0.5%
+ * The boundary is inclusive (exactly 0.5% passes).
+ */
+export function sofaPriceWithinTolerance(
+  clientTotal: number,
+  serverTotal: number,
+): boolean {
+  if (!Number.isFinite(clientTotal) || !Number.isFinite(serverTotal)) return false;
+  if (serverTotal < 0) return false;
+  // Server can't justify any price → client must be ≈ 0 (sub-cent residue ok).
+  if (serverTotal <= 0.005) return Math.abs(clientTotal) < 0.005;
+  return Math.abs(clientTotal - serverTotal) / serverTotal <= SOFA_PRICE_DRIFT_TOLERANCE;
+}
+
 /* ─── explodeSofaBuild ─────────────────────────────────────────────────── */
 
 /** One exploded per-cell line (Phase 4 wires `sku`/`itemCode` + order_lines). */

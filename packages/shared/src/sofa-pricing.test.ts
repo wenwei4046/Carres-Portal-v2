@@ -7,6 +7,8 @@ import {
   pickSofaCombo,
   computeSofaPrice,
   explodeSofaBuild,
+  sofaPriceWithinTolerance,
+  SOFA_PRICE_DRIFT_TOLERANCE,
   type SofaBuild,
   type SofaPricingSnapshot,
   type SofaComboLike,
@@ -629,5 +631,55 @@ describe("explodeSofaBuild", () => {
 
   it("empty cells → empty output", () => {
     expect(explodeSofaBuild(build({ cells: [] }), 0, lookup)).toEqual([]);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * sofaPriceWithinTolerance (Phase 4 server-recompute drift gate)
+ * The anti-price-fudge check: |client − server| / server <= 0.5%.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+describe("sofaPriceWithinTolerance", () => {
+  it("tolerance constant is 0.5%", () => {
+    expect(SOFA_PRICE_DRIFT_TOLERANCE).toBe(0.005);
+  });
+
+  it("exact match passes", () => {
+    expect(sofaPriceWithinTolerance(5000, 5000)).toBe(true);
+  });
+
+  it("drift just under 0.5% passes (RM 5000 ± 25)", () => {
+    expect(sofaPriceWithinTolerance(5024.99, 5000)).toBe(true);
+    expect(sofaPriceWithinTolerance(4975.01, 5000)).toBe(true);
+  });
+
+  it("drift exactly 0.5% passes (boundary inclusive)", () => {
+    expect(sofaPriceWithinTolerance(5025, 5000)).toBe(true);
+  });
+
+  it("drift over 0.5% fails (tampered client price)", () => {
+    expect(sofaPriceWithinTolerance(5026, 5000)).toBe(false);
+    expect(sofaPriceWithinTolerance(4000, 5000)).toBe(false);
+    expect(sofaPriceWithinTolerance(6000, 5000)).toBe(false);
+  });
+
+  it("server 0 + client 0 → passes (genuine free build)", () => {
+    expect(sofaPriceWithinTolerance(0, 0)).toBe(true);
+  });
+
+  it("server 0 + client > 0 → fails (model can't justify any price)", () => {
+    expect(sofaPriceWithinTolerance(1500, 0)).toBe(false);
+    expect(sofaPriceWithinTolerance(0.01, 0)).toBe(false);
+  });
+
+  it("sub-cent client residue against server 0 still passes", () => {
+    // A 0-priced build the client also computed as ~0 (floating residue).
+    expect(sofaPriceWithinTolerance(0.004, 0)).toBe(true);
+  });
+
+  it("negative / non-finite inputs fail closed (never silently accept)", () => {
+    expect(sofaPriceWithinTolerance(NaN, 5000)).toBe(false);
+    expect(sofaPriceWithinTolerance(5000, NaN)).toBe(false);
+    expect(sofaPriceWithinTolerance(5000, -5000)).toBe(false);
   });
 });
