@@ -48,7 +48,6 @@ import {
   RemarkControlField,
   OrderControlSaveBar,
   FieldGrid,
-  FieldRow,
 } from "./OrderControlPanel";
 import ServiceNoteModal from "./ServiceNoteModal";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
@@ -226,7 +225,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
         aria-modal="true"
         aria-label="Order detail"
         className="bg-card text-card-foreground border border-base-200 rounded-none flex flex-col h-screen"
-        style={{ width: 780, maxWidth: "100vw" }}
+        style={{ width: 920, maxWidth: "100vw" }}
         data-testid="order-detail-drawer"
       >
         {isLoading && <DrawerSkeleton onClose={onClose} />}
@@ -513,6 +512,13 @@ function DrawerBody({
       return acc;
     }, {}),
   ).sort((a, b) => lineSortRank(a.sku) - lineSortRank(b.sku));
+  // Per-item ETA defaults to the linked PO's delivery date (Jess), overridable
+  // via line_etas. First PO carrying the SKU wins.
+  const poEtaBySku = new Map<string, string>();
+  for (const po of pos)
+    if (po.eta_date)
+      for (const pl of po.lines)
+        if (!poEtaBySku.has(pl.sku)) poEtaBySku.set(pl.sku, po.eta_date);
   const hasMsbf = lines.some((l) => {
     const c = lineCategory(l.sku);
     return c === "mattress" || c === "bedframe";
@@ -663,8 +669,10 @@ function DrawerBody({
                     ? (savedLoc[0] ?? "")
                     : (defaultLineLocation(l.sku) ?? "");
                 // Per-item stock ETA (migration 0170) — products don't all arrive
-                // on the same date, so each line carries its own ETA.
-                const etaValue = form.draft.line_etas[l.sku] ?? "";
+                // on the same date. Defaults to the linked PO's delivery date,
+                // overridable via line_etas.
+                const etaValue =
+                  form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
                 // One row per SKU (duplicate lines combined above) → key on SKU.
                 return (
                   <tr key={l.sku}>
@@ -727,11 +735,6 @@ function DrawerBody({
           </table>
           <div className="mt-2">
             <FieldGrid>
-              <FieldRow label="Warehouse">
-                <div className="px-2 py-1.5 text-[12px] text-base-900">
-                  {warehouse?.name ?? <em className="text-base-500">—</em>}
-                </div>
-              </FieldRow>
               <RemarkControlField
                 form={form}
                 field="warehouse_remark"
