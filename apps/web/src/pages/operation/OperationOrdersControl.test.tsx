@@ -531,7 +531,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).queryByText("2× SOF")).not.toBeInTheDocument();
   });
 
-  it("orders columns Status → Order ID → Deadline → Location → Logistic → Items → Stock with the customer under the SO (P2)", () => {
+  it("orders columns Status → Order ID → Deadline → Process → Location → Logistic → Items → Stock with the customer under the SO (P2)", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -546,6 +546,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Status",
       "Order ID",
       "Deadline",
+      "Process", // Phase 11.1 planned production-start (proceed_date) column
       "Location",
       "Logistic",
       "Items",

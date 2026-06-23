@@ -794,6 +794,7 @@ function DrawerBody({
                   orderId={order.id}
                   customerAddress={order.customer_address ?? null}
                   deliveryDate={order.delivery_date}
+                  proceedDate={order.proceed_date ?? null}
                   opsAssignedLogistic={order.ops_assigned_logistic ?? null}
                   form={form}
                 />
