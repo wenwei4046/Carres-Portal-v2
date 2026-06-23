@@ -1241,10 +1241,12 @@ function OrderRow({
             </span>
             {loc.area === "Outstation" && (
               <span
-                title="Outstation — confirm the delivery window with the customer before raising the PO (no warehouse buffer outstation)."
+                className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-warning whitespace-nowrap"
+                title="Call customer to confirm final ETA before ordering stock (no warehouse buffer outstation)."
                 aria-label="call customer before raising PO"
               >
-                <Phone size={12} strokeWidth={2} className="inline text-warning" />
+                <Phone size={11} strokeWidth={2} className="inline" />
+                Call before PO
               </span>
             )}
           </span>

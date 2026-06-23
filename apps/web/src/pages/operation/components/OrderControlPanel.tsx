@@ -356,7 +356,7 @@ export function RoutingFields({
         />
       </FieldRow>
       {area === "Outstation" && (
-        <FieldRow label="Called?">
+        <FieldRow label="Call before PO">
           <select
             value={form.draft.called_customer ? "yes" : "no"}
             onChange={(e) =>
@@ -364,8 +364,8 @@ export function RoutingFields({
             }
             className={CELL}
           >
-            <option value="no">No — call before proceed</option>
-            <option value="yes">Yes — called</option>
+            <option value="no">Not called yet</option>
+            <option value="yes">Called ✓</option>
           </select>
         </FieldRow>
       )}

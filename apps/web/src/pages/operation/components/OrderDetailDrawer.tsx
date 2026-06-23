@@ -580,7 +580,7 @@ function DrawerBody({
           icon={<ClipboardList className="w-4 h-4" />}
           title="Order"
           titleExtra={
-            <span className="font-mono text-[13px] font-semibold text-base-700">
+            <span className="font-mono text-[20px] font-bold text-base-900 leading-none">
               #{order.so}
             </span>
           }
@@ -1179,8 +1179,8 @@ function ActionBar({
         </div>
         {proceedBlocked && (
           <div className="text-[11px] text-warning mb-2 font-medium">
-            Outstation — call the customer first, then tick Called? (Delivery)
-            before you can proceed.
+            Outstation: call the customer to confirm the final ETA before
+            ordering stock, then tick "Call before PO" first.
           </div>
         )}
         <div className="flex gap-2 flex-wrap">
