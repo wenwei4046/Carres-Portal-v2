@@ -299,16 +299,6 @@ const CORE_LABEL: Record<CoreCat, string> = {
 };
 const CORE_ORDER: CoreCat[] = ["mattress", "bedframe", "sofa"];
 
-/** Item TIER chips — MONOCHROME (Jess: row was too colourful; colour stays
- *  reserved for status signals). All three tiers keep the box (avoids
- *  misreading) but tier = ink depth, not hue: core furniture darkest +
- *  semibold · accessory goods mid-grey · service charges lightest. */
-const ITEM_TAG: Record<ItemKind, string> = {
-  core: "bg-base-100 text-base-900",
-  acc: "bg-base-100 text-base-600 font-medium",
-  service: "bg-base-50 text-base-400 font-medium",
-};
-
 /** Physical-goods unit total — core + accessories. Service lines (Disposal,
  *  floor charge…) are NOT units, so they don't count (matches the Master
  *  Sheet's qty column: "8 X" = 2 Mattress + 2 Bedframe + 4 Pillow, Disposal
@@ -898,7 +888,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       <div className="bg-white border border-base-200 rounded overflow-auto">
         <table
           className="w-full border-collapse text-[13px]"
-          style={{ minWidth: 960 }}
+          style={{ minWidth: 1280 }}
         >
           <thead>
             <tr className="bg-base-50 border-b border-base-200">
@@ -911,31 +901,36 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   className="cursor-pointer accent-base-900 align-middle"
                 />
               </th>
+              <th className="w-8" />
               <Th>Status</Th>
               <Th>Order ID</Th>
+              <Th>Ref No</Th>
+              <Th>Customer</Th>
+              <Th>Due</Th>
               <Th>Deadline</Th>
-              <Th>Process</Th>
               <Th>Location</Th>
-              <Th>Logistic</Th>
-              <Th>Items</Th>
+              <Th>Carrier</Th>
               <Th>Stock</Th>
+              <Th>Qty</Th>
+              <Th>Items</Th>
             </tr>
           </thead>
           <tbody>
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={13}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
                 </td>
               </tr>
             )}
-            {paged.map((o) => (
+            {paged.map((o, idx) => (
               <OrderRow
                 key={o.id}
                 o={o}
+                idx={idx}
                 partnerName={partnerName}
                 availableBySku={availableBySku}
                 selected={selected.has(o.id)}
@@ -1157,6 +1152,7 @@ function RegionChip({
 
 function OrderRow({
   o,
+  idx,
   partnerName,
   availableBySku,
   selected,
@@ -1165,6 +1161,7 @@ function OrderRow({
   onToggleStar,
 }: {
   o: operationOrderListRow;
+  idx: number;
   partnerName: Map<string, string>;
   availableBySku?: Map<string, number>;
   selected: boolean;
@@ -1192,10 +1189,12 @@ function OrderRow({
   return (
     <tr
       onClick={onOpen}
-      className={`border-t border-base-100 hover:bg-base-50 cursor-pointer align-top ${selected ? "bg-primary/5" : ""}`}
+      className={`border-t border-base-100 hover:bg-base-100/70 cursor-pointer align-top ${
+        selected ? "bg-primary/5" : idx % 2 ? "bg-base-50/50" : ""
+      }`}
       data-testid="order-row"
     >
-      <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+      <td className="px-3 py-2 border-r border-base-100" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={selected}
@@ -1204,97 +1203,96 @@ function OrderRow({
           className="cursor-pointer accent-base-900 align-middle"
         />
       </td>
-      {/* Status — leads the row (Jess P2 column order), with the Gmail-style
-          ⭐ follow-up star: click to flag/unflag without opening the order. */}
-      <td className="px-4 py-2.5 whitespace-nowrap">
-        <span className="inline-flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleStar(o.id, flagged);
-            }}
-            aria-pressed={flagged}
-            aria-label={flagged ? "Clear follow-up flag" : "Flag for follow-up"}
-            title={flagged ? "Flagged for follow-up — click to clear" : "Flag for follow-up"}
-            className="p-0.5 rounded hover:bg-base-100 shrink-0"
-          >
-            <Star
-              size={15}
-              strokeWidth={2}
-              className={flagged ? "fill-current text-warning" : "text-base-300"}
-            />
-          </button>
-          <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
-            {TAB_LABEL[ct]}
-          </span>
+      {/* ⭐ follow-up flag — own column (Gmail star): click to flag/unflag
+          without opening the order. */}
+      <td
+        className="px-1 py-2 text-center border-r border-base-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={() => onToggleStar(o.id, flagged)}
+          aria-pressed={flagged}
+          aria-label={flagged ? "Clear follow-up flag" : "Flag for follow-up"}
+          title={flagged ? "Flagged for follow-up — click to clear" : "Flag for follow-up"}
+          className="p-0.5 rounded hover:bg-base-200 shrink-0"
+        >
+          <Star
+            size={15}
+            strokeWidth={2}
+            className={flagged ? "fill-current text-warning" : "text-base-300"}
+          />
+        </button>
+      </td>
+      {/* Status */}
+      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
+        <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
+          {TAB_LABEL[ct]}
         </span>
       </td>
-      {/* Order ID — SO number, customer name + TCF/CR ref no UNDER it (Jess:
-          keep the ref no visible, not just in the tooltip). Phone stays tooltip. */}
+      {/* Order ID — the SO number (phone in tooltip) */}
       <td
-        className="px-4 py-2.5 whitespace-nowrap"
-        title={[ref.join(" + "), o.customer_phone].filter(Boolean).join(" · ") || undefined}
+        className="px-3 py-2 whitespace-nowrap border-r border-base-100 font-mono font-semibold text-[12px] text-base-900"
+        title={o.customer_phone ?? undefined}
       >
-        <div className="font-mono font-semibold text-base-900">SO-{o.so}</div>
-        <div
-          className={`${cjkClassName(o.customer_name)} text-[11px] font-medium text-base-700 max-w-[200px] truncate mt-0.5`}
-        >
-          {o.customer_name || "—"}
-        </div>
-        {ref.length > 0 && (
-          <div className="font-mono text-[10px] text-base-400 max-w-[200px] truncate mt-0.5">
-            {ref.join(" · ")}
-          </div>
+        SO-{o.so}
+      </td>
+      {/* Ref No — TCF / CR / DL source-doc references (Jess: keep visible) */}
+      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
+        {ref.length > 0 ? (
+          <span className="font-mono text-[11px] text-base-400">{ref.join(" · ")}</span>
+        ) : (
+          <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Deadline — customer's requested delivery date + prep-milestone countdown.
-          Tooltip spells out the SOP: stock at WH 7 days before, logistic
-          contacts the customer 2–3 days before. */}
-      <td
-        className="px-4 py-2.5 whitespace-nowrap text-base-700"
-        title="Deadline = customer's requested delivery date. Stock should be at the warehouse 7 days before; logistic contacts the customer 2–3 days before to arrange delivery."
-      >
+      {/* Customer */}
+      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
+        {o.customer_name ? (
+          <span className={`${cjkClassName(o.customer_name)} text-[12px] text-base-800`}>
+            {o.customer_name}
+          </span>
+        ) : (
+          <span className="text-base-300">—</span>
+        )}
+      </td>
+      {/* Due — countdown to the deadline (Jess: its own column = the urgency
+          signal); red when overdue / due today / tomorrow. */}
+      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
         {o.delivery_date_tbd ? (
-          <span className="pill pill-warning">TBD</span>
+          <span className="text-[11px] font-medium text-warning">TBD</span>
         ) : o.delivery_date ? (
           (() => {
             const dl = deadlineInfo(o.delivery_date);
+            if (!dl) return <span className="text-base-300">—</span>;
             return (
-              <div className="flex flex-col items-start gap-1">
-                <div className="text-[12px] text-base-700">{fmtDate(o.delivery_date)}</div>
-                {dl && (
-                  <span
-                    className={`pill ${dl.pill} whitespace-nowrap ${dl.urgent ? "inline-flex items-center gap-1" : ""}`}
-                  >
-                    {dl.urgent && <AlertTriangle size={11} strokeWidth={2.5} />}
-                    {dl.label}
-                  </span>
-                )}
-              </div>
+              <span
+                className={`inline-flex items-center gap-1 text-[12px] font-semibold tabular-nums whitespace-nowrap ${
+                  dl.urgent ? "text-destructive" : "text-base-500"
+                }`}
+              >
+                {dl.urgent && <AlertTriangle size={11} strokeWidth={2.5} />}
+                {dl.label}
+              </span>
             );
           })()
         ) : (
-          <span className="text-base-400">—</span>
+          <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Process — Phase 11.1 planned production-start ("proceed") date the
-          salesperson keys in alongside the deadline: when the factory should
-          begin. Distinct from the Proceed status tab. */}
+      {/* Deadline — the customer's requested delivery date */}
       <td
-        className="px-4 py-2.5 whitespace-nowrap text-base-700"
-        title="Process date = planned production-start (proceed) date — when the factory should begin. Set by the salesperson alongside the delivery deadline."
+        className="px-3 py-2 whitespace-nowrap border-r border-base-100 text-[12px] text-base-700 tabular-nums"
+        title="Customer's requested delivery date. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
-        {o.proceed_date ? (
-          <div className="text-[12px] text-base-700">{fmtDate(o.proceed_date)}</div>
+        {o.delivery_date && !o.delivery_date_tbd ? (
+          fmtDate(o.delivery_date)
         ) : (
-          <span className="text-base-400">—</span>
+          <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Location — the real delivery place from the imported address (city/state),
-          coloured by KV (green) vs Outstation (amber). Outstation carries a 📞
-          flag for the call-first-before-PO SOP. */}
-      <td className="px-4 py-2.5 whitespace-nowrap">
+      {/* Location — delivery city/state from the imported address; KV (green) vs
+          Outstation (amber). Outstation carries the call-first-before-PO flag. */}
+      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
         {loc.label ? (
           <span className="inline-flex items-center gap-1">
             <span
@@ -1323,60 +1321,60 @@ function OrderRow({
           <span className="text-base-400">—</span>
         )}
       </td>
-      {/* Logistic */}
-      <td className="px-4 py-2.5 whitespace-nowrap">
+      {/* Carrier (was Logistic) */}
+      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
         {logistic ? (
-          <span className="text-[12px] font-medium text-base-800">
-            {logistic}
-          </span>
+          <span className="text-[12px] font-medium text-base-800">{logistic}</span>
         ) : (
-          <span className="text-base-400">—</span>
-        )}
-      </td>
-      {/* Items — Master-Sheet style: goods-unit total as a bold number in a
-          fixed-width LEFT slot (service lines don't count; digits + tags align
-          down the column), then TWO tag lines (Jess): line 1 = core goods
-          (MS/BF/SOF), line 2 = accessories + services. Monochrome tiers by ink
-          depth. Single-category CORE orders drop the qty inside the tag — the
-          left number already says it ("1 [SOF]") — but acc/service tags always
-          carry qty (P1). Tooltip = full SKU list. */}
-      <td className="px-4 py-2.5">
-        {lines.length === 0 ? (
-          <span className="text-base-400">—</span>
-        ) : (
-          <div className="flex items-start gap-2">
-            <span
-              className={`min-w-[20px] text-right text-[15px] font-semibold tabular-nums leading-snug whitespace-nowrap ${
-                qtyTotal === 0 ? "text-base-400" : "text-base-900"
-              }`}
-              title={`${qtyTotal} goods unit${qtyTotal === 1 ? "" : "s"} (services not counted)`}
-            >
-              {qtyTotal}
-            </span>
-            <div
-              className="flex flex-col gap-1 max-w-[280px] pt-0.5"
-              title={itemBreakdown(lines)}
-            >
-              {[tags.filter((t) => t.kind === "core"), tags.filter((t) => t.kind !== "core")]
-                .filter((row) => row.length > 0)
-                .map((row, ri) => (
-                  <div key={ri} className="flex flex-wrap gap-1">
-                    {row.map((t, i) => (
-                      <span key={i} className={`pill ${ITEM_TAG[t.kind]} text-[10px] px-1.5 py-0`}>
-                        {t.kind === "core" && tags.length === 1 && t.qty === qtyTotal
-                          ? t.name
-                          : tagLabel(t)}
-                      </span>
-                    ))}
-                  </div>
-                ))}
-            </div>
-          </div>
+          <span className="text-base-300">—</span>
         )}
       </td>
       {/* Stock */}
-      <td className="px-4 py-2.5 whitespace-nowrap">
+      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
         <StockCell info={stock} />
+      </td>
+      {/* Qty — total goods units (Jess: split out as its own column) */}
+      <td className="px-3 py-2 text-right border-r border-base-100">
+        <span
+          className={`text-[14px] font-semibold tabular-nums ${
+            qtyTotal === 0 ? "text-base-400" : "text-base-900"
+          }`}
+          title={`${qtyTotal} goods unit${qtyTotal === 1 ? "" : "s"} (services not counted)`}
+        >
+          {qtyTotal}
+        </span>
+      </td>
+      {/* Items — 2-line summary (Jess): core goods (dark) on top, accessories
+          (dim) below; the size is kept in every tag (e.g. "1× MS(K)"). */}
+      <td className="px-3 py-2 max-w-[300px]" title={itemBreakdown(lines)}>
+        {tags.length === 0 ? (
+          <span className="text-base-300">—</span>
+        ) : (
+          <div className="leading-tight space-y-0.5">
+            {tags.filter((t) => t.kind === "core").length > 0 && (
+              <div className="truncate text-[11px] font-medium text-base-800">
+                {tags
+                  .filter((t) => t.kind === "core")
+                  .map((t, i) => (
+                    <span key={i} className="mr-3">
+                      {tagLabel(t)}
+                    </span>
+                  ))}
+              </div>
+            )}
+            {tags.filter((t) => t.kind !== "core").length > 0 && (
+              <div className="truncate text-[11px] text-base-400">
+                {tags
+                  .filter((t) => t.kind !== "core")
+                  .map((t, i) => (
+                    <span key={i} className="mr-3">
+                      {tagLabel(t)}
+                    </span>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
       </td>
     </tr>
   );

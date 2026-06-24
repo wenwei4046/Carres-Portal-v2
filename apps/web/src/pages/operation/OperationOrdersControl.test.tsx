@@ -238,8 +238,8 @@ describe("OperationOrdersControl", () => {
       .find((r) => r.textContent?.includes("SO-1002"))!;
     // 2 + 1 = 3 goods units across 2 lines — bold "3" on the left
     expect(within(row).getByText("3")).toBeInTheDocument();
-    // the CR/TCF ref moved into the Order ID cell tooltip (P2)
-    expect(row.querySelector('td[title*="CR0418"]')).toBeTruthy();
+    // the CR/TCF ref now has its OWN column (Jess: Order split into 3).
+    expect(row).toHaveTextContent("CR0418");
   });
 
   it("resolves the triage LP (ops_assigned_logistic) via the partners map", () => {
@@ -424,7 +424,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     listHookState.data = { orders: [makeRow(partial)] };
   }
 
-  it("rolls items up into boxed per-category tags, tier-coloured, services not counted (A1)", () => {
+  it("rolls items up into a 2-line tier-coloured summary, services not counted (A1)", () => {
     oneRow({
       id: "r1",
       so: 3001,
@@ -438,15 +438,17 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Goods-unit total on the left — 2+1+3+1 = 7; Disposal (service) NOT counted.
+    // Goods-unit total now lives in its OWN Qty column — 2+1+3+1 = 7; Disposal
+    // (service) NOT counted.
     expect(within(row).getByText("7")).toBeInTheDocument();
-    // Master-Sheet short codes (MS/BF/SOF), one boxed tag per category,
-    // MONOCHROME tiers: core darkest · accessories mid-grey · service lightest.
-    expect(within(row).getByText("2× MS(Q)").className).toContain("text-base-900");
-    expect(within(row).getByText("1× BF").className).toContain("text-base-900");
-    expect(within(row).getByText("3× Pillow").className).toContain("text-base-600");
-    expect(within(row).getByText("1× M.P").className).toContain("text-base-600");
-    expect(within(row).getByText("1× Disposal").className).toContain("text-base-400");
+    // Master-Sheet short codes (MS/BF/SOF) as a 2-line summary; MONOCHROME tiers
+    // by LINE: core goods dark (text-base-800), accessories/services dim
+    // (text-base-400). The colour sits on the line, not the individual tag.
+    expect(within(row).getByText("2× MS(Q)").parentElement?.className).toContain("text-base-800");
+    expect(within(row).getByText("1× BF").parentElement?.className).toContain("text-base-800");
+    expect(within(row).getByText("3× Pillow").parentElement?.className).toContain("text-base-400");
+    expect(within(row).getByText("1× M.P").parentElement?.className).toContain("text-base-400");
+    expect(within(row).getByText("1× Disposal").parentElement?.className).toContain("text-base-400");
     // Two-line layout: core tags sit in a different flex row from acc/service.
     const coreRow = within(row).getByText("2× MS(Q)").parentElement;
     expect(coreRow).toBe(within(row).getByText("1× BF").parentElement);
@@ -517,7 +519,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).queryByText("M.P")).not.toBeInTheDocument();
   });
 
-  it("drops the duplicated qty inside the tag on single-category orders (A1)", () => {
+  it("Qty column holds the total; the Items tag keeps its own qty + size (single-category)", () => {
     oneRow({
       id: "r1b",
       so: 3010,
@@ -525,13 +527,13 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // "2 [SOF]" — the left total carries the qty; no "2× SOF" repetition.
+    // Qty column = total (2); the Items tag now ALWAYS carries its own qty +
+    // size ("2× SOF") — no single-category de-dup, since Qty is its own column.
     expect(within(row).getByText("2")).toBeInTheDocument();
-    expect(within(row).getByText("SOF")).toBeInTheDocument();
-    expect(within(row).queryByText("2× SOF")).not.toBeInTheDocument();
+    expect(within(row).getByText("2× SOF")).toBeInTheDocument();
   });
 
-  it("orders columns Status → Order ID → Deadline → Process → Location → Logistic → Items → Stock with the customer under the SO (P2)", () => {
+  it("orders columns: ⭐ · Status · Order ID · Ref No · Customer · Due · Deadline · Location · Carrier · Stock · Qty · Items (Order split into 3)", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -543,23 +545,27 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
+      "", // ⭐ follow-up star
       "Status",
       "Order ID",
+      "Ref No",
+      "Customer",
+      "Due",
       "Deadline",
-      "Process", // Phase 11.1 planned production-start (proceed_date) column
       "Location",
-      "Logistic",
-      "Items",
+      "Carrier",
       "Stock",
+      "Qty",
+      "Items",
     ]);
-    // Customer column is gone — the name renders INSIDE the Order ID cell.
+    // Order is split into THREE columns now (Jess): SO# · ref · customer, each
+    // its own cell. Phone stays in the Order ID cell tooltip.
     const row = screen.getByTestId("order-row");
+    expect(within(row).getByText("SO-3012")).toBeInTheDocument();
+    expect(within(row).getByText("Tan Ah Kow")).toBeInTheDocument();
+    expect(within(row).getByText("TCF2024/06-461")).toBeInTheDocument();
     const idCell = within(row).getByText("SO-3012").closest("td")!;
-    expect(within(idCell as HTMLElement).getByText("Tan Ah Kow")).toBeInTheDocument();
-    // TCF ref shows UNDER the customer name (Jess: keep the ref no visible);
-    // phone stays in the tooltip alongside the ref.
-    expect(idCell).toHaveAttribute("title", "TCF2024/06-461 · 012-3456789");
-    expect(within(idCell as HTMLElement).getByText("TCF2024/06-461")).toBeInTheDocument();
+    expect(idCell).toHaveAttribute("title", "012-3456789");
   });
 
   it("sorts by deadline ascending — overdue/earliest first, TBD + undated last (P3)", () => {
