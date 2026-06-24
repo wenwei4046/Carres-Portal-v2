@@ -1,25 +1,52 @@
 # CHECKPOINT — Operation order-drawer redesign (2026-06-23)
 
-## ▶ RESUME AT HOME (session 2 — READ THIS FIRST)
+## ▶ RESUME (session 3 — READ THIS FIRST)
 
 **Where the work is:** branch **`feat/orders-drawer-redesign`**, **pushed to origin**.
-At home, in the Carres-Portal-v2 repo: `git fetch origin && git checkout
-feat/orders-drawer-redesign`. HEAD = `1f040dc` (or later). Main repo `main` =
-`origin/main` (clean). **NOT merged to main, NOT deployed** — await `上线`.
+New chat: `git fetch origin && git checkout feat/orders-drawer-redesign` in the
+Carres-Portal-v2 repo. HEAD = `ad537ba` (or later). Main repo `main` = `origin/main`
+(clean). **NOT merged to main, NOT deployed** — await `上线`. Tune visuals in the LIVE
+v19 preview (operation@carres.com, real prod data) — NOT in mocks (the muted mock
+palette misled us for ~11 iterations; real v17 colour is stronger).
 
-**Done this session (all committed on feat):**
-- ✅ **RECONCILE** with origin/main (Jess phase 11 + sofa engine, +104 commits) — see §0.
-  Migrations renumbered **0167-0170 → 0180-0183** (NOT yet applied to prod). Verified
-  tsc + tests + build, zero new regressions.
-- ✅ **UI tweaks** (`1f040dc`): order **#SO in drawer header → 20px bold**; outstation
-  call-first gate reworded to **"Call before PO"** (list badge + drawer field + proceed
-  gate msg; full sentence "Call customer to confirm final ETA before ordering stock"
-  in the hover tooltip).
-- Answered Jess (no code): the ⋮ Download "missing Excel/PDF" = Invoice/DO PDFs are
-  conditional (only after that doc exists) + "Excel" is a CSV export. "General note" =
-  the AnnotationTimeline note + tags (Follow up / Escalate to Jess / Resolved).
+**DONE (all committed on feat):**
+- ✅ **RECONCILE** with origin/main (Jess phase 11 + sofa engine) — migrations renumbered
+  **0167-0170 → 0180-0183** (NOT applied to prod). See §0.
+- ✅ **Drawer tweaks** (`1f040dc`): #SO bigger+bold; outstation "Call before PO" copy.
+- ✅ **⭐ Follow-up star** (`a3ba0f3` + kit-fix `29258cf`): Gmail-style, **web-only, NO
+  migration** — reuses `order_annotations` follow_up/resolved tags. Drawer-header star +
+  Orders-list ⭐ column + "Starred" filter chip; `useAddAnnotation` now also invalidates
+  the orders list. On the v17 `warning` token. Helper `apps/web/src/lib/follow-up.ts`.
+- ✅ **Orders list redesign B1** (`ad537ba`): rebuilt the `OperationOrdersControl` table —
+  Order split into 3 cols (Order ID · Ref No · Customer); **Due** (countdown, red when
+  urgent) its own col before **Deadline** (date); Logistic→**Carrier**; **Stock** before
+  **Qty**(total)/**Items**(2-line summary: core dark on top, accessories dim below, each
+  tag keeps its size e.g. `1× MS(K)`, each tier truncates → 2 lines max); ⭐ promoted to
+  its own column; column grid-lines + zebra; minWidth 1280 (horizontal scroll); top
+  pagination + Region/Stock filter rows kept; Process column dropped. 29/29 tests pass.
 
-**NEXT — decided this session, NOT started:**
+**ACTIVE: the Orders PANEL redesign — B1 done, B1b/B2/B3 next** (Jess drove 11 mocks; the
+LOCKED spec is this):
+- **B1b** — every column filterable (a `▾` per header, reuse the SO Maintenance DataGrid
+  filter pattern) + **FREEZE the left columns** (sticky Order ID) for the horizontal scroll.
+- **B2** — an **"Action needed" column**: typed, labelled, clickable chips per order
+  (🔔 follow-up / 🚨 escalate / 💰 refund / 📋 service) so operators see WHAT to do without
+  opening each order. follow-up/escalate come from `order_annotations` (have); **refund +
+  service cases need the list query to embed/count them** (backend). ONE column, NOT five
+  (Jess agreed: 5 columns would be 90% empty).
+- **B3** — a right-hand **Alerts rail** in the ops-cockpit right rail (beside
+  Calendar/Keep/Tasks): escalate-tagged notes surface here FOR JESS (not just the dashboard
+  `EscalationInboxCard`). `useEscalations` + `/api/operation/escalations` already exist.
+- **Header polish** — keep all rows (tabs + Region + Stock — Jess: do NOT delete) but fix
+  hierarchy: status tabs = segmented PRIMARY; Region/Stock = labelled SECONDARY filter rows.
+- **Colour restraint** — one signal colour per row: Stock carries colour, Due-overdue red,
+  **Status pill → demote to quiet** (Jess wants it calmer; it's still a filled pill after B1).
+- Live-tune with Jess: row height/spacing + exact colours, in the v19 preview.
+
+**PAUSED: STORAGE-FEE COLLECTION** (approved earlier, full plan in §"NEXT" below + tasks
+#7-#10). Resume after the Orders panel redesign, OR when Jess says.
+
+**Detail of the two features decided earlier (STAR = ✅ done; STORAGE = paused):**
 1. **STORAGE-FEE COLLECTION — APPROVED, build next.** Workflow: storage fee accrues
    from ETA (**MS/BF RM150/mo, Sofa RM200/2wk**, auto + editable); operation **collects
    it BEFORE delivery** → issues a **receipt** (PDF, opened from the ⋮ menu) → **delivery
@@ -37,8 +64,8 @@ feat/orders-drawer-redesign`. HEAD = `1f040dc` (or later). Main repo `main` =
    principal/approvals.ts + apps/web ApprovalDrawer.tsx); invoice/DO PDF
    (apps/web/src/lib/pdf/{invoice,do}-template.tsx, JSON-from-API → browser @react-pdf);
    dispatch RPCs `operation_attach_do_and_deliver` (0128) + `operation_confirm_proceed_request_v3`.
-2. **STAR / follow-up flag (multi-operator handoff) — PROPOSED, Jess leaning yes; confirm
-   before building.** Operation is run by MULTIPLE people with mid-order handoffs. Plan
+2. **STAR / follow-up flag — ✅ DONE** (`a3ba0f3`, web-only via `order_annotations`; see
+   RESUME above). Original plan: Operation is run by MULTIPLE people with mid-order handoffs. Plan
    (my rec, Jess liked it): a Gmail-style **⭐ Star in the drawer header** → shows in the
    Orders list + a **"⭐ Follow-up" filter chip** (next to the Urgent chip) → filter to
    flagged orders. The "why / what's left for the next person" reuses the existing
