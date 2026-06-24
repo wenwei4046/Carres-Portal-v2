@@ -46,6 +46,16 @@ const mockPatchMutate = vi.fn();
 const mockPatchMutateAsync = vi.fn();
 const mockDeleteMutate = vi.fn();
 const mockCreateSkuMutateAsync = vi.fn();
+const mockImportMutateAsync = vi.fn();
+// vi.hoisted so the const exists before the (hoisted) vi.mock factory runs.
+const mockDownloadCsv = vi.hoisted(() => vi.fn());
+
+// Keep the real export builder; spy only the DOM download (jsdom has no
+// URL.createObjectURL).
+vi.mock("@/lib/sku-csv", async (orig) => {
+  const actual = await orig<typeof import("@/lib/sku-csv")>();
+  return { ...actual, downloadCsv: mockDownloadCsv };
+});
 
 vi.mock("@/lib/queries", () => ({
   usePatchCatalogSku: () => ({
@@ -71,6 +81,11 @@ vi.mock("@/lib/queries", () => ({
   useCreateCatalogSku: () => ({
     mutate: vi.fn(),
     mutateAsync: mockCreateSkuMutateAsync,
+    isPending: false,
+  }),
+  useImportSkus: () => ({
+    mutate: vi.fn(),
+    mutateAsync: mockImportMutateAsync,
     isPending: false,
   }),
 }));
@@ -156,6 +171,9 @@ beforeEach(() => {
   mockPatchMutateAsync.mockReset();
   mockCreateSkuMutateAsync.mockReset();
   mockCreateSkuMutateAsync.mockResolvedValue({ sku: { id: "s-new" } });
+  mockImportMutateAsync.mockReset();
+  mockImportMutateAsync.mockResolvedValue({ upserted: 0, createdModels: 0, failed: 0, failures: [] });
+  mockDownloadCsv.mockReset();
   // Default every test to the Master Admin (principal) — the price/cost lock
   // tests below override this to a non-principal role.
   mockRole = "principal";
@@ -460,5 +478,42 @@ describe("0175 — price/cost lock (non-principal read-only)", () => {
     const args = mockCreateSkuMutateAsync.mock.calls[0][0];
     expect(args.price).toBe(2990);
     expect(args.cost).toBe(1800);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2990s Products parity Phase 1 — Export / Import toolbar buttons.
+// ---------------------------------------------------------------------------
+describe("SkuMasterTab — Export / Import buttons", () => {
+  it("renders Export + Import buttons", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    expect(screen.getByTestId("sku-export")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-import")).toBeInTheDocument();
+  });
+
+  it("Export builds a CSV of the filtered rows and triggers a download", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
+    fireEvent.click(screen.getByTestId("sku-export"));
+    expect(mockDownloadCsv).toHaveBeenCalledOnce();
+    const [filename, csv] = mockDownloadCsv.mock.calls[0];
+    expect(filename).toMatch(/^carres-skus-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(csv).toContain("CLOUD-KING");
+    expect(csv).toContain("LUNA-3S");
+  });
+
+  it("Export stamps the active category into the filename", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
+    fireEvent.click(screen.getByRole("button", { name: "Sofa" })); // category chip
+    fireEvent.click(screen.getByTestId("sku-export"));
+    const [filename, csv] = mockDownloadCsv.mock.calls[0];
+    expect(filename).toMatch(/^carres-skus-sofa-/);
+    expect(csv).toContain("LUNA-3S");
+    expect(csv).not.toContain("CLOUD-KING"); // mattress filtered out
+  });
+
+  it("Import button opens the dialog", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    fireEvent.click(screen.getByTestId("sku-import"));
+    expect(screen.getByTestId("import-pick-file")).toBeInTheDocument();
   });
 });

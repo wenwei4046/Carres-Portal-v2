@@ -513,6 +513,28 @@ export {
 // generate-skus + the web maintenance read-back (no triplicated copies).
 export { deriveSkuCode } from "./sku-code";
 
+// 2990s Products parity Phase 1 — SKU Import: the one record->row mapper + zod
+// shared by the staged-preview client and the import endpoint.
+export {
+  parseMoney,
+  deriveModelKey,
+  normalizeCategory,
+  normalizeVariantKind,
+  parseBoolish,
+  csvRecordToImportRow,
+  skuImportRowSchema,
+  skuImportInput,
+  hasPricingIntent,
+  MAX_IMPORT_MONEY,
+  type MoneyParse,
+  type SkuImportRow,
+  type ImportRowResult,
+  type SkuImportRowParsed,
+  type SkuImportInput,
+  type SkuImportFailure,
+  type SkuImportResult,
+} from "./sku-import";
+
 // Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /
 // arm-cap closure). No DOM/React; cm-space math reused by the web builder + P4
 // explode. `mirrorCode` / `computeSofaPrice` are NOT re-exported here — they

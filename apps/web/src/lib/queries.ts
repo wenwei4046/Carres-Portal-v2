@@ -22,6 +22,8 @@ import {
   type ProductModelPatchInput,
   type ProductSkuCreateInput,
   type ProductSkuPatchInput,
+  type SkuImportRow,
+  type SkuImportResult,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
   type ComboDto,
@@ -4512,6 +4514,18 @@ export function useDeleteCatalogSku() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/skus/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// 2990s Products parity Phase 1 — bulk SKU import. Sends the staged + validated
+// rows; the server resolves/creates models, upserts SKUs (blank=preserve), and
+// returns a per-row result. Invalidates the catalog bundle on success.
+export function useImportSkus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rows: SkuImportRow[]) =>
+      apiFetch<SkuImportResult>("/api/catalog/import-skus", catalogJson("POST", { rows })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }
