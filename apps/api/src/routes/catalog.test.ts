@@ -2806,3 +2806,200 @@ describe("0179 — sofa combo pricing (GET bundle + principal-gated CRUD)", () =
     expect(((await res.json()) as { message?: string }).message).toMatch(/sofa combo not found/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 2990s Products parity Phase 1 — POST /api/catalog/import-skus
+// ---------------------------------------------------------------------------
+
+describe("POST /api/catalog/import-skus", () => {
+  type ImportResult = {
+    upserted: number;
+    createdModels: number;
+    failed: number;
+    failures: { row: number; key: string; reason: string }[];
+  };
+
+  async function importAs(
+    role: string,
+    rows: unknown[],
+    opts: {
+      reads?: Record<string, unknown>;
+      records?: { table: string; op: "insert" | "update"; body: unknown }[];
+      inserted?: unknown[];
+    } = {},
+  ) {
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({ reads: opts.reads ?? {}, records: opts.records, inserted: opts.inserted }),
+    );
+    const jwt = await makeJwt(role, role === "dealer" ? DEALER_ID : null);
+    return app.fetch(
+      new Request("http://t/api/catalog/import-skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+      }),
+      env,
+    );
+  }
+
+  const baseRow = (over: Record<string, unknown> = {}) => ({
+    model: "Booqit",
+    modelKey: "booqit",
+    category: "sofa",
+    variant: "1S",
+    variantKind: "size",
+    ...over,
+  });
+
+  it("403s a dealer (internal only)", async () => {
+    const res = await importAs("dealer", [baseRow()]);
+    expect(res.status).toBe(403);
+  });
+
+  it("403s a non-principal that imports a price (0175 lock)", async () => {
+    const res = await importAs("operation", [baseRow({ price: 1899 })]);
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code?: string }).code).toBe("import_pricing_principal_only");
+  });
+
+  it("operation imports UNPRICED structure → creates model + sku", async () => {
+    const records: { table: string; op: string; body: unknown }[] = [];
+    const res = await importAs("operation", [baseRow()], {
+      reads: { suppliers__list: [{ id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa", "bedframe"] }] },
+      records: records as never,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ImportResult;
+    expect(body).toMatchObject({ upserted: 1, createdModels: 1, failed: 0 });
+    const modelIns = records.find((r) => r.table === "product_models" && r.op === "insert");
+    expect(modelIns?.body).toMatchObject({ category: "sofa", model_key: "booqit", name: "Booqit" });
+    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
+    expect(skuIns?.body).toMatchObject({ sku: "BOOQIT-1S", variant: "1S", price: 0, cost: null, supplier_id: "sup-ohana" });
+  });
+
+  it("principal imports a priced sku (price reaches the insert body)", async () => {
+    const records: { table: string; op: string; body: unknown }[] = [];
+    const res = await importAs("principal", [baseRow({ price: 1899, cost: 900 })], {
+      reads: { suppliers__list: [{ id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa"] }] },
+      records: records as never,
+    });
+    expect(res.status).toBe(200);
+    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
+    expect(skuIns?.body).toMatchObject({ price: 1899, cost: 900 });
+  });
+
+  it("updates an existing sku and preserves blank fields (no price key in patch)", async () => {
+    const records: { table: string; op: string; body: unknown }[] = [];
+    const res = await importAs("operation", [baseRow({ description: "Updated blurb" })], {
+      reads: {
+        product_models__list: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
+        product_skus__list: [{ id: "s-booqit-1s", sku: "BOOQIT-1S", model_id: "m-booqit" }],
+      },
+      records: records as never,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ImportResult;
+    expect(body).toMatchObject({ upserted: 1, createdModels: 0, failed: 0 });
+    const skuUpd = records.find((r) => r.table === "product_skus" && r.op === "update");
+    expect(skuUpd?.body).toMatchObject({ variant: "1S", description: "Updated blurb" });
+    expect(skuUpd?.body).not.toHaveProperty("price");
+    expect(skuUpd?.body).not.toHaveProperty("cost");
+    // no new model created, no insert on product_skus
+    expect(records.find((r) => r.op === "insert")).toBeUndefined();
+  });
+
+  it("preserves variant_kind on update when the column is omitted", async () => {
+    const records: { table: string; op: string; body: unknown }[] = [];
+    // Existing SKU is a 'preset'; the import row omits variant_kind entirely.
+    const res = await importAs(
+      "operation",
+      [{ model: "Booqit", modelKey: "booqit", category: "sofa", variant: "1S" }], // no variantKind
+      {
+        reads: {
+          product_models__list: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
+          product_skus__list: [{ id: "s-booqit-1s", sku: "BOOQIT-1S", model_id: "m-booqit" }],
+        },
+        records: records as never,
+      },
+    );
+    expect(res.status).toBe(200);
+    const skuUpd = records.find((r) => r.table === "product_skus" && r.op === "update");
+    // blank variant_kind must NOT be written — it would silently re-type the SKU.
+    expect(skuUpd?.body).not.toHaveProperty("variant_kind");
+  });
+
+  it("fails a row whose derived code already belongs to a different model (cross-category collision)", async () => {
+    const res = await importAs(
+      "operation",
+      [{ model: "Booqit", modelKey: "booqit", category: "mattress", variant: "1S" }],
+      {
+        reads: {
+          // mattress 'booqit' model exists; the BOOQIT-1S code already lives under a SOFA model.
+          product_models__list: [{ id: "m-mattress", category: "mattress", model_key: "booqit" }],
+          product_skus__list: [{ id: "s-sofa", sku: "BOOQIT-1S", model_id: "m-sofa" }],
+        },
+      },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ImportResult;
+    expect(body.upserted).toBe(0);
+    expect(body.failed).toBe(1);
+    expect(body.failures[0].reason.toLowerCase()).toContain("already belongs");
+  });
+
+  it("resolves the supplier by NAME (not just slug), case-insensitively", async () => {
+    const records: { table: string; op: string; body: unknown }[] = [];
+    await importAs(
+      "operation",
+      [{ model: "Akka", modelKey: "akka", category: "mattress", variant: "K", supplier: "NICE FUTURE" }],
+      {
+        reads: { suppliers__list: [{ id: "sup-nf", slug: "nice-future", name: "Nice Future", cat_covered: ["mattress"] }] },
+        records: records as never,
+      },
+    );
+    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
+    expect(skuIns?.body).toMatchObject({ supplier_id: "sup-nf" });
+  });
+
+  it("auto-resolves the supplier by category for a new sku", async () => {
+    const records: { table: string; op: string; body: unknown }[] = [];
+    await importAs("operation", [baseRow({ model: "Akka", modelKey: "akka", category: "mattress", variant: "K" })], {
+      reads: { suppliers__list: [{ id: "sup-nf", slug: "nice-future", name: "Nice Future", cat_covered: ["mattress"] }] },
+      records: records as never,
+    });
+    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
+    expect(skuIns?.body).toMatchObject({ supplier_id: "sup-nf" });
+  });
+
+  it("a new accessory sku carries a null supplier (supplierless)", async () => {
+    const records: { table: string; op: string; body: unknown }[] = [];
+    await importAs("operation", [baseRow({ model: "Pillow", modelKey: "pillow", category: "accessory", variant: "STD" })], {
+      reads: { suppliers__list: [] },
+      records: records as never,
+    });
+    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
+    expect(skuIns?.body).toMatchObject({ supplier_id: null });
+  });
+
+  it("fails a row with an unknown explicit supplier (others still process)", async () => {
+    const res = await importAs("principal", [baseRow({ supplier: "ghost-co" })], {
+      reads: { suppliers__list: [{ id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa"] }] },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ImportResult;
+    expect(body.upserted).toBe(0);
+    expect(body.failed).toBe(1);
+    expect(body.failures[0].reason.toLowerCase()).toContain("supplier");
+  });
+
+  it("422s a batch over 500 rows", async () => {
+    const rows = Array.from({ length: 501 }, () => baseRow());
+    const res = await importAs("operation", rows);
+    expect(res.status).toBe(422);
+  });
+
+  it("422s an empty batch", async () => {
+    const res = await importAs("operation", []);
+    expect(res.status).toBe(422);
+  });
+});

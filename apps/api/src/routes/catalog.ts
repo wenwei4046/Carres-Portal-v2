@@ -35,6 +35,10 @@ import {
   canonicalizeSofaSlots,
   SOFA_COMBO_PRICING,
   deriveSkuCode,
+  skuImportInput,
+  hasPricingIntent,
+  type SkuImportRow,
+  type SkuImportFailure,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
@@ -565,6 +569,246 @@ catalogRouter.delete("/skus/:id", async (c) => {
     return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
   }
   return c.json({ ok: true });
+});
+
+// POST /import-skus — bulk SKU import (2990s Products parity Phase 1). Faithful
+// port of the 2990s batch-import: max 500 rows, **blank cell = preserve** (an
+// omitted field is never written on update, so an export -> edit -> re-import
+// round-trip can't zero a price), per-row failures so one bad row never sinks
+// the batch. Carres divergence: each row resolves/creates a product_model by
+// (category, model_key) FIRST, then upserts a product_sku under it keyed by the
+// derived `{MODEL_KEY}-{variant}` code (the load-bearing order/PO/stock join key).
+//
+// Gating: internalOnly to run at all; principal-only the moment ANY row carries
+// a price/cost (mirrors the 0175 lock — the DB trigger is still the real boundary
+// since we forward the user JWT). Reads are batched; writes are per-row for
+// granular reporting. userClient/RLS only — never service_role.
+catalogRouter.post("/import-skus", async (c) => {
+  internalOnly(c);
+  const parsed = await parseJsonBody(c, skuImportInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const rows = parsed.data.rows;
+
+  if (hasPricingIntent(rows) && c.var.auth.role !== "principal") {
+    return c.json(
+      {
+        error: "forbidden",
+        code: "import_pricing_principal_only",
+        message:
+          "Only the principal (Master Admin) can import SKU price or cost. Remove the price/cost columns, or ask the principal to run the priced import.",
+      },
+      403,
+    );
+  }
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const failures: SkuImportFailure[] = [];
+  const rowKey = (r: SkuImportRow) => deriveSkuCode(r.modelKey, r.variant);
+
+  // ---- (1) Resolve models by (category, model_key); create the missing ones --
+  const modelComposite = (category: string, modelKey: string) => `${category}::${modelKey}`;
+  const wantedModelKeys = Array.from(new Set(rows.map((r) => r.modelKey)));
+  const { data: existingModels, error: modelsErr } = await sb
+    .from("product_models")
+    .select("id, category, model_key")
+    .in("model_key", wantedModelKeys);
+  if (modelsErr) {
+    const m = mapPgError(modelsErr);
+    return c.json(m.body, m.status);
+  }
+  const modelIdByComposite = new Map<string, string>();
+  for (const row of existingModels ?? []) {
+    const mr = row as { id: string; category: string; model_key: string };
+    modelIdByComposite.set(modelComposite(mr.category, mr.model_key), mr.id);
+  }
+
+  // Gather the distinct models we still need to create (name from the first row;
+  // allowed_options.sizes seeded from the row's size variants for Modular parity).
+  const toCreate = new Map<string, { category: string; modelKey: string; name: string; sizes: Set<string> }>();
+  for (const r of rows) {
+    const comp = modelComposite(r.category, r.modelKey);
+    if (modelIdByComposite.has(comp)) continue;
+    let entry = toCreate.get(comp);
+    if (!entry) {
+      entry = { category: r.category, modelKey: r.modelKey, name: r.model, sizes: new Set() };
+      toCreate.set(comp, entry);
+    }
+    if (r.variantKind === "size") entry.sizes.add(r.variant);
+  }
+  let createdModels = 0;
+  for (const [comp, entry] of toCreate) {
+    const allowedOptions = entry.sizes.size > 0 ? { sizes: Array.from(entry.sizes) } : {};
+    const { data: created, error: createErr } = await sb
+      .from("product_models")
+      .insert({
+        category: entry.category,
+        model_key: entry.modelKey,
+        name: entry.name,
+        allowed_options: allowedOptions,
+      })
+      .select("id")
+      .single();
+    if (createErr || !created) {
+      // Every row that needed this model fails (with the same reason).
+      const reason = createErr ? mapPgError(createErr).body.message ?? createErr.message : "model create failed";
+      rows.forEach((r, i) => {
+        if (modelComposite(r.category, r.modelKey) === comp) {
+          failures.push({ row: i + 1, key: rowKey(r), reason: `model "${entry.modelKey}": ${reason}` });
+        }
+      });
+      continue;
+    }
+    modelIdByComposite.set(comp, (created as { id: string }).id);
+    createdModels += 1;
+  }
+
+  // ---- (2) Supplier resolution maps (load all suppliers once) ----------------
+  // .order(slug) so category auto-resolve (first-wins) is deterministic if two
+  // suppliers ever cover the same category.
+  const { data: suppliers, error: supErr } = await sb
+    .from("suppliers")
+    .select("id, slug, name, cat_covered")
+    .order("slug");
+  if (supErr) {
+    const m = mapPgError(supErr);
+    return c.json(m.body, m.status);
+  }
+  const supBySlug = new Map<string, string>();
+  const supByName = new Map<string, string>();
+  const supByCategory = new Map<string, string>();
+  for (const row of suppliers ?? []) {
+    const s = row as { id: string; slug: string | null; name: string | null; cat_covered: string[] | null };
+    if (s.slug) supBySlug.set(s.slug.toLowerCase(), s.id);
+    if (s.name) supByName.set(s.name.toLowerCase(), s.id);
+    for (const cat of s.cat_covered ?? []) {
+      if (!supByCategory.has(cat)) supByCategory.set(cat, s.id);
+    }
+  }
+
+  // ---- (3) Preload existing SKUs by derived code -----------------------------
+  // Carry model_id so a code that already belongs to a DIFFERENT model (a
+  // cross-category {MODEL_KEY}-{variant} collision) is rejected, never silently
+  // re-targeted — the derived code doesn't encode category.
+  const wantedCodes = Array.from(new Set(rows.map(rowKey)));
+  const { data: existingSkus, error: skusErr } = await sb
+    .from("product_skus")
+    .select("id, sku, model_id")
+    .in("sku", wantedCodes);
+  if (skusErr) {
+    const m = mapPgError(skusErr);
+    return c.json(m.body, m.status);
+  }
+  const skuByCode = new Map<string, { id: string; modelId: string }>();
+  for (const row of existingSkus ?? []) {
+    const sr = row as { id: string; sku: string; model_id: string };
+    skuByCode.set(sr.sku, { id: sr.id, modelId: sr.model_id });
+  }
+
+  // ---- (4) Per-row upsert (insert new / update existing, blank = preserve) ----
+  const failedRowKeys = new Set(failures.map((f) => f.key));
+  let upserted = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const code = rowKey(r);
+    // Skip rows whose model could not be created above.
+    if (failedRowKeys.has(code) && !modelIdByComposite.has(modelComposite(r.category, r.modelKey))) {
+      continue;
+    }
+    const modelId = modelIdByComposite.get(modelComposite(r.category, r.modelKey));
+    if (!modelId) continue; // already recorded as a failure during model create
+
+    // A code that already exists under a DIFFERENT model means a cross-category
+    // collision (same {MODEL_KEY}-{variant}, different category). Fail the row
+    // rather than clobber an unrelated SKU.
+    const existing = skuByCode.get(code);
+    if (existing && existing.modelId !== modelId) {
+      failures.push({
+        row: i + 1,
+        key: code,
+        reason: `code ${code} already belongs to another model — pick a distinct model_key`,
+      });
+      continue;
+    }
+    const existingId = existing?.id;
+
+    // Supplier: an explicit column always resolves (and is written on either
+    // path). A NEW sku in a supplier-bearing category must resolve one (else the
+    // row fails). An UPDATE with no explicit supplier preserves the stored one —
+    // so we don't require a covering supplier just to edit a price/description.
+    let supplierId: string | null = null;
+    if (r.supplier) {
+      const found = supBySlug.get(r.supplier.toLowerCase()) ?? supByName.get(r.supplier.toLowerCase());
+      if (!found) {
+        failures.push({ row: i + 1, key: code, reason: `supplier "${r.supplier}" not found` });
+        continue;
+      }
+      supplierId = found;
+    } else if (!existingId && !SUPPLIERLESS_CATEGORIES.has(r.category)) {
+      const auto = supByCategory.get(r.category);
+      if (!auto) {
+        failures.push({ row: i + 1, key: code, reason: `no supplier covers ${r.category}` });
+        continue;
+      }
+      supplierId = auto;
+    }
+
+    if (existingId) {
+      // UPDATE — only present fields (blank cells were omitted upstream so they
+      // preserve the stored value). variant_kind is written ONLY when the row
+      // carried one, so a file that omits the column never re-types an existing
+      // preset/part SKU to 'size'. Never touch sku / model_id.
+      const patch: Record<string, unknown> = { variant: r.variant };
+      if (r.variantKind !== undefined) patch.variant_kind = r.variantKind;
+      if (r.price !== undefined) patch.price = r.price;
+      if (r.cost !== undefined) patch.cost = r.cost;
+      if (r.description !== undefined) patch.description = r.description;
+      if (r.posActive !== undefined) patch.pos_active = r.posActive;
+      if (r.supplier) patch.supplier_id = supplierId;
+      const { error } = await sb.from("product_skus").update(patch).eq("id", existingId);
+      if (error) {
+        failures.push({ row: i + 1, key: code, reason: mapPgError(error).body.message ?? error.message });
+      } else {
+        upserted += 1;
+      }
+    } else {
+      // INSERT — omitted price -> 0, omitted cost -> null, omitted pos_active -> true.
+      const { data: inserted, error } = await sb
+        .from("product_skus")
+        .insert({
+          model_id: modelId,
+          sku: code,
+          variant: r.variant,
+          // Omitted variant_kind defaults to 'size' on a fresh insert.
+          variant_kind: r.variantKind ?? "size",
+          price: r.price ?? 0,
+          cost: r.cost ?? null,
+          supplier_id: supplierId,
+          description: r.description ?? null,
+          pos_active: r.posActive ?? true,
+        })
+        .select("id")
+        .single();
+      if (error || !inserted) {
+        failures.push({
+          row: i + 1,
+          key: code,
+          reason: error ? mapPgError(error).body.message ?? error.message : "insert failed",
+        });
+      } else {
+        upserted += 1;
+        // A later duplicate (model_key, variant) in the same batch now updates
+        // this freshly inserted row (last-wins) instead of colliding.
+        skuByCode.set(code, { id: (inserted as { id: string }).id, modelId });
+      }
+    }
+  }
+
+  return c.json({
+    upserted,
+    createdModels,
+    failed: failures.length,
+    failures: failures.slice(0, 50),
+  });
 });
 
 // ----- Sofa fabrics -----

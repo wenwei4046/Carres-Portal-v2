@@ -15,6 +15,8 @@ import { CategoryChip, CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../compon
 import { skuMargin } from "../margin";
 import NewSkuModal from "./NewSkuModal";
 import EditSkuModal from "./EditSkuModal";
+import ImportSkusDialog from "./ImportSkusDialog";
+import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
 
 /**
  * SKU Master — flat product table with cost + plan-margin visibility for the
@@ -61,6 +63,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   const [editMode, setEditMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editRow, setEditRow] = useState<FlatRow | null>(null);
 
   const del = useDeleteCatalogSku();
@@ -152,6 +155,19 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     else toast.error(`${ids.length - failed} done · ${failed} failed`);
   }
 
+  // Export the CURRENTLY FILTERED set (category + search), one row per SKU, in
+  // the round-trippable import format. Stamps the active category into the name.
+  function exportCsv() {
+    if (filtered.length === 0) {
+      toast.error("Nothing to export with the current filter");
+      return;
+    }
+    const csv = buildSkuExportCsv(filtered.map((r) => ({ sku: r.sku, model: r.model })));
+    const tag = category === "all" ? "" : `${category}-`;
+    downloadCsv(`carres-skus-${tag}${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    toast.success(`Exported ${filtered.length} SKU${filtered.length === 1 ? "" : "s"}`);
+  }
+
   return (
     <div>
       {/* Filter + actions */}
@@ -205,6 +221,22 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               Prices: Master Admin only
             </span>
           )}
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="btn-secondary text-[12px]"
+            data-testid="sku-export"
+          >
+            Export SKUs
+          </button>
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="btn-secondary text-[12px]"
+            data-testid="sku-import"
+          >
+            Import SKUs
+          </button>
           <button
             type="button"
             onClick={() => setNewOpen(true)}
@@ -272,6 +304,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
       </div>
 
       {newOpen && <NewSkuModal models={catalog.models} onClose={() => setNewOpen(false)} />}
+      {importOpen && <ImportSkusDialog onClose={() => setImportOpen(false)} />}
       {editRow && (
         <EditSkuModal sku={editRow.sku} model={editRow.model} onClose={() => setEditRow(null)} />
       )}

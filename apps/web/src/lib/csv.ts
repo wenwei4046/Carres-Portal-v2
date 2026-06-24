@@ -30,6 +30,10 @@ export interface CsvParseResult {
 export function parseCsv(text: string): CsvParseResult {
   const errors: CsvParseError[] = [];
 
+  // Strip a leading UTF-8 BOM (Excel's "CSV UTF-8" save prepends one) so the
+  // first header isn't read as "﻿model". Header trimming already absorbs it
+  // incidentally, but stripping here keeps the parser robust on its own.
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   // Normalise CRLF/CR → LF first so the state machine doesn't have to.
   const src = text.replace(/\r\n?/g, "\n");
 
