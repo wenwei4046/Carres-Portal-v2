@@ -252,6 +252,21 @@ function isUrgentOrder(o: operationOrderListRow): boolean {
   return deadlineInfo(o.delivery_date)?.urgent ?? false;
 }
 
+/** Left-edge urgency accent per row (Jess 2026-06-24, his CRM-sample "priority
+ *  lane"): red overdue/today/tomorrow · amber the 2–7-day prep window · none
+ *  otherwise. Completed / TBD / undated rows get no bar. */
+function urgencyColor(o: operationOrderListRow, ct: SettledTab): string | null {
+  if (ct === "completed" || o.delivery_date_tbd || !o.delivery_date) return null;
+  const d = new Date(`${o.delivery_date}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  if (diff <= 1) return "#DC2626"; // overdue / today / tomorrow
+  if (diff <= 7) return "#D97706"; // prep window
+  return null;
+}
+
 /** ⭐ Flagged for follow-up — derived from the order's annotations (the latest
  *  follow_up/resolved note is a follow_up). Drives the row star + the "Starred"
  *  filter chip; mirrors the drawer-header star (Jess: multi-operator handoff). */
@@ -761,7 +776,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       {/* Filter panel — one bordered card (Jess 2026-06-24 "designed" look):
           status tabs on top, Region + Stock filters below, read as a defined
           section instead of three loose pill rows floating on the page. */}
-      <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-sm mb-3">
+      <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-md mb-3">
       <div className="flex items-center gap-3 px-3 py-2 border-b border-base-100 flex-wrap">
         <div
           className="flex gap-1 p-1 bg-base-100 rounded-md w-fit max-w-full overflow-auto"
@@ -825,28 +840,31 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
       {/* Region + Stock filters — the card's second row (Jess: pick a state →
           select-all → assign logistic; filter by stock too). */}
-      <div className="flex items-start gap-x-6 gap-y-2 px-3 py-2 flex-wrap">
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Region</span>
-        <RegionChip
-          label="All"
-          count={tabFiltered.length}
-          active={regionFilter === null}
-          onClick={() => setRegionFilter(null)}
-        />
-        {regionEntries.map((e) => (
+      <div className="flex items-center gap-x-6 px-3 py-2">
+      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5 shrink-0">Region</span>
+        <div className="flex items-center gap-1.5 overflow-x-auto min-w-0 pb-0.5">
           <RegionChip
-            key={e.region}
-            label={e.region}
-            count={e.count}
-            active={regionFilter === e.region}
-            onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+            label="All"
+            count={tabFiltered.length}
+            active={regionFilter === null}
+            onClick={() => setRegionFilter(null)}
           />
-        ))}
+          {regionEntries.map((e) => (
+            <RegionChip
+              key={e.region}
+              label={e.region}
+              count={e.count}
+              active={regionFilter === e.region}
+              onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Stock-status filter (Ready / Waiting / Not set). */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      {/* Stock-status filter — coloured dots (green / amber / red) tie it to the
+          Stock column AND set it visually apart from the neutral Region chips. */}
+      <div className="flex items-center gap-1.5 shrink-0">
         <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Stock</span>
         <RegionChip
           label="All"
@@ -860,6 +878,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             label={e.bucket}
             count={e.count}
             active={stockFilter === e.bucket}
+            dot={e.bucket === "Ready" ? "#16A34A" : e.bucket === "Waiting" ? "#D97706" : "#DC2626"}
             onClick={() =>
               setStockFilter((r) => (r === e.bucket ? null : e.bucket))
             }
@@ -904,7 +923,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       {/* Listing — the ONLY scroll area (Jess 2026-06-24: the page itself stays
           put, only the rows scroll). table-fixed + a colgroup → columns keep
           their width; long Ref/Customer/Location/Remark wrap to ≤3 lines. */}
-      <div className="flex-1 min-h-0 bg-white border border-base-200 rounded-lg shadow-sm overflow-auto">
+      <div className="flex-1 min-h-0 bg-white border border-base-200 rounded-lg shadow-md overflow-auto">
         <table
           className="w-full border-collapse text-[13px] table-fixed"
           style={{ minWidth: 1180 }}
@@ -916,25 +935,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 70 }} />
             <col style={{ width: 80 }} />
             <col style={{ width: 132 }} />
-            <col style={{ width: 56 }} />
-            <col style={{ width: 84 }} />
+            <col style={{ width: 56, background: "#F4F2EC" }} />
+            <col style={{ width: 84, background: "#F4F2EC" }} />
             <col style={{ width: 96 }} />
             <col style={{ width: 64 }} />
-            <col style={{ width: 70 }} />
-            <col style={{ width: 168 }} />
+            <col style={{ width: 70, background: "#F4F2EC" }} />
+            <col style={{ width: 168, background: "#F4F2EC" }} />
             <col style={{ width: 188 }} />
           </colgroup>
+          {/* ONE header row — categories are shown by the alternating column
+              SHADE (Order white · Deadline shaded · Delivery white · Stock shaded
+              · Remark white), NOT an extra row (Jess 2026-06-24: no added height). */}
           <thead>
-            {/* Category group row (Jess 2026-06-24): Order · Deadline · Delivery ·
-                Stock · Remark. */}
-            <tr className="bg-base-100 border-b border-base-200">
-              <th colSpan={3} className="border-r border-base-200" />
-              <GroupTh span={3}>Order</GroupTh>
-              <GroupTh span={2}>Deadline</GroupTh>
-              <GroupTh span={2}>Delivery</GroupTh>
-              <GroupTh span={2}>Stock</GroupTh>
-              <GroupTh span={1}>Remark</GroupTh>
-            </tr>
             <tr className="bg-base-50 border-b border-base-200">
               <th className="px-3 py-2 border-r border-base-100">
                 <input
@@ -1170,22 +1182,33 @@ function RegionChip({
   count,
   active,
   onClick,
+  dot,
 }: {
   label: string;
   count: number;
   active: boolean;
   onClick: () => void;
+  /** Optional leading colour dot — the Stock chips use it (green/amber/red) to
+   *  tie to the Stock column + set them apart from the neutral Region chips. */
+  dot?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11.5px] transition-colors ${
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11.5px] whitespace-nowrap shrink-0 transition-colors ${
         active
           ? "bg-base-900 text-white font-semibold"
           : "bg-base-100 text-base-600 font-medium hover:bg-base-200"
       }`}
     >
+      {dot && (
+        <span
+          className="inline-block w-2 h-2 rounded-full shrink-0"
+          style={{ backgroundColor: dot }}
+          aria-hidden="true"
+        />
+      )}
       {label}
       <span className={`text-[10px] tabular-nums ${active ? "text-white/70" : "text-base-400"}`}>
         {count}
@@ -1214,6 +1237,7 @@ function OrderRow({
   onToggleStar: (orderId: string, flagged: boolean) => void;
 }) {
   const ct = controlTabOf(o);
+  const urg = urgencyColor(o, ct);
   const flagged = isFlaggedOrder(o);
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
@@ -1257,11 +1281,15 @@ function OrderRow({
     <tr
       onClick={onOpen}
       className={`border-t border-base-100 hover:bg-base-100/70 cursor-pointer align-top ${
-        selected ? "bg-primary/5" : idx % 2 ? "bg-base-50/50" : ""
+        selected ? "bg-primary/5" : ""
       }`}
       data-testid="order-row"
     >
-      <td className="px-3 py-2 border-r border-base-100" onClick={(e) => e.stopPropagation()}>
+      <td
+        className="px-3 py-2 border-r border-base-100"
+        style={{ borderLeft: `3px solid ${urg ?? "transparent"}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <input
           type="checkbox"
           checked={selected}
@@ -1371,7 +1399,7 @@ function OrderRow({
       {/* Deadline — the customer's requested delivery date (wraps in its fixed
           column). */}
       <td
-        className="px-3 py-2 border-r border-base-100 text-[11px] text-base-700 tabular-nums leading-[1.3]"
+        className="px-3 py-2 border-r border-base-100 text-[11px] text-base-500 tabular-nums leading-[1.3]"
         title="Customer's requested delivery date. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
         {o.delivery_date && !o.delivery_date_tbd ? (
@@ -1406,7 +1434,7 @@ function OrderRow({
       {/* Carrier (was Logistic) */}
       <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
         {logistic ? (
-          <span className="text-[12px] font-medium text-base-800">{logistic}</span>
+          <span className="text-[12px] text-base-500">{logistic}</span>
         ) : (
           <span className="text-base-300">—</span>
         )}
@@ -1472,39 +1500,36 @@ function OrderRow({
   );
 }
 
-/** Stock · qty cell — ONE button showing the ready RATIO have/need + a colour
- *  alert (Jess 2026-06-24: "1/2 or 2/2"). Fully covered = quiet grey; partial /
- *  PO-open = amber (the thing to act on). Free-text (AutoCount) SKUs can't be
- *  auto-checked → "?/N" grey, where N is the goods-unit count. The denominator
- *  doubles as the quantity (Stock + Qty in one). */
+/** Stock · qty cell — a colour-coded WORD badge that tallies with the top Stock
+ *  legend (Jess 2026-06-24): green "Ready N" · amber "Waiting N/M" · RED "Not set
+ *  N" (alert — go set it). The number is the goods-unit count (have/need where a
+ *  short is known). A traffic-light read: green ok · amber on its way · red act. */
 function StockCell({ info, qty }: { info: StockInfo; qty: number }) {
+  const n = qty > 0 ? ` ${qty}` : "";
   let label: string;
   let pill: string;
   let title: string;
   switch (info.state) {
     case "unknown":
-      label = `?/${qty}`;
-      pill = "pill-neutral";
-      title = "Stock not auto-checked (free-text SKU) — open the order to confirm";
+      label = `Not set${n}`;
+      pill = "pill-overdue"; // red — readiness unknown, a human must set it
+      title = "Stock not auto-checked (free-text SKU) — open the order to set it";
       break;
     case "ready":
-      label = `${qty}/${qty}`;
-      pill = "pill-neutral";
+      label = `Ready${n}`;
+      pill = "pill-confirmed"; // green — secured / reserved
       title = "Stock secured / reserved for this order";
       break;
-    case "in_stock": {
-      const need = info.need ?? qty;
-      const have = info.have ?? need;
-      label = `${have}/${need}`;
-      pill = "pill-neutral";
+    case "in_stock":
+      label = `Ready ${info.have ?? qty}`;
+      pill = "pill-confirmed";
       title = "Free warehouse stock covers every line";
       break;
-    }
     case "need_po": {
       const need = info.need ?? qty;
       const have = info.have ?? 0;
-      label = `${have}/${need}`;
-      pill = "pill-warning";
+      label = `Waiting ${have}/${need}`;
+      pill = "pill-warning"; // amber — short, raise a PO
       title =
         "Short — raise a PO" +
         (info.short && info.short.length > 0
@@ -1512,8 +1537,8 @@ function StockCell({ info, qty }: { info: StockInfo; qty: number }) {
           : "");
       break;
     }
-    default:
-      label = `0/${qty}`;
+    default: // awaiting
+      label = `Waiting${n}`;
       pill = "pill-warning";
       title = "PO open — stock on the way";
       break;
@@ -1533,19 +1558,6 @@ function StockCell({ info, qty }: { info: StockInfo; qty: number }) {
 function shortSku(sku: string): string {
   const s = sku.includes(":") ? sku.split(":").slice(1).join(":") : sku;
   return s.length > 14 ? s.slice(0, 13) + "…" : s;
-}
-
-/** Category group header (Jess 2026-06-24): spans the sub-columns of one
- *  category — Order / Deadline / Delivery / Stock / Remark. */
-function GroupTh({ span, children }: { span: number; children: React.ReactNode }) {
-  return (
-    <th
-      colSpan={span}
-      className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-base-400 text-left border-r border-base-200"
-    >
-      {children}
-    </th>
-  );
 }
 
 function Th({ children }: { children: React.ReactNode }) {
