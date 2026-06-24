@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useParams } from "react-router-dom";
@@ -433,9 +433,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
-  // 15 rows/page → a fixed listing box that stays put, no endless scroll (Jess
-  // 2026-06-24).
-  const [pageSize] = useState<number | "all">(15);
+  // Rows per page (Jess 2026-06-24): 15 / 30 / 45 / 60. The listing is a FIXED
+  // box — it never scrolls vertically; instead the whole table auto-scales (CSS
+  // zoom) so the chosen number of rows fits. More rows ⇒ smaller rows.
+  const [pageSize, setPageSize] = useState<number | "all">(15);
   const [page, setPage] = useState(0);
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -593,6 +594,36 @@ export default function OperationOrdersControl({ onImport }: Props) {
   }, [visible, pageSize, safePage]);
   const rangeStart = total === 0 ? 0 : safePage * (pageSize === "all" ? total : pageSize) + 1;
   const rangeEnd = pageSize === "all" ? total : Math.min(total, (safePage + 1) * pageSize);
+
+  // Denser rows once the page shows 30+ (single-line cells) so the auto-scale
+  // doesn't have to shrink the text as hard.
+  const compact = typeof pageSize === "number" && pageSize >= 30;
+
+  // Fixed listing — scale the whole table (CSS zoom) so every row of the page
+  // fits the box with NO vertical scroll (Jess 2026-06-24: "fix listing, not
+  // scroll; 15/30/45/60 → show smaller"). zoom reflows (font + row height shrink
+  // together) and is set imperatively so it can't trigger a re-render loop.
+  const listBoxRef = useRef<HTMLDivElement>(null);
+  const listTableRef = useRef<HTMLTableElement>(null);
+  useLayoutEffect(() => {
+    const box = listBoxRef.current;
+    const table = listTableRef.current;
+    if (!box || !table) return;
+    const fit = () => {
+      table.style.zoom = "1";
+      const natural = table.scrollHeight;
+      const avail = box.clientHeight - 2; // small margin so a fit doesn't leave a 1px scrollbar
+      // Scale down to fit, but never below a readable floor — past that (45/60
+      // rows on a short screen) the box scrolls rather than hiding rows.
+      table.style.zoom =
+        avail > 0 && natural > avail ? String(Math.max(0.5, avail / natural)) : "1";
+    };
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(fit);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [pageSize, safePage, paged]);
 
   // ── Bulk select (Gmail-style) ──────────────────────────────────────────────
   const pagedIds = useMemo(() => paged.map((o) => o.id), [paged]);
@@ -914,6 +945,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
             rangeEnd={rangeEnd}
             pageCount={pageCount}
             onRefresh={() => void refetch()}
+            pageSize={pageSize}
+            onPageSize={setPageSize}
           />
         )
       )}
@@ -923,9 +956,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
       {/* Listing — the ONLY scroll area (Jess 2026-06-24: the page itself stays
           put, only the rows scroll). table-fixed + a colgroup → columns keep
           their width; long Ref/Customer/Location/Remark wrap to ≤3 lines. */}
-      <div className="flex-1 min-h-0 bg-white border border-base-200 rounded-lg shadow-md overflow-auto">
+      <div
+        ref={listBoxRef}
+        className="flex-1 min-h-0 bg-white border border-base-200 rounded-lg shadow-md overflow-auto"
+      >
         <table
-          className="w-full border-collapse text-[13px] table-fixed"
+          ref={listTableRef}
+          className={`w-full border-collapse text-[13px] table-fixed ${
+            compact ? "[&_td]:py-0.5 [&_th]:py-1" : ""
+          }`}
           style={{ minWidth: 1180 }}
         >
           <colgroup>
@@ -987,6 +1026,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 key={o.id}
                 o={o}
                 idx={idx}
+                compact={compact}
                 partnerName={partnerName}
                 availableBySku={availableBySku}
                 selected={selected.has(o.id)}
@@ -1017,6 +1057,8 @@ function Pager({
   rangeEnd,
   pageCount,
   onRefresh,
+  pageSize,
+  onPageSize,
 }: {
   safePage: number;
   onPage: (updater: (p: number) => number) => void;
@@ -1025,20 +1067,38 @@ function Pager({
   rangeEnd: number;
   pageCount: number;
   onRefresh: () => void;
+  pageSize: number | "all";
+  onPageSize: (n: number) => void;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 mb-2.5 text-[12px] text-base-600">
-      {/* Gmail-style toolbar (left) — refresh. Select-all + a ⋮ bulk-action menu
-          land in the next pass. */}
-      <button
-        type="button"
-        onClick={onRefresh}
-        title="Refresh"
-        aria-label="Refresh orders"
-        className="p-1.5 rounded text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
-      >
-        <RefreshCw size={15} strokeWidth={2} />
-      </button>
+      {/* Left — refresh + the rows-per-page selector (Jess 2026-06-24: the box is
+          fixed, more rows ⇒ smaller rows, no scroll). */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onRefresh}
+          title="Refresh"
+          aria-label="Refresh orders"
+          className="p-1.5 rounded text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
+        >
+          <RefreshCw size={15} strokeWidth={2} />
+        </button>
+        <label className="flex items-center gap-1.5 text-[11px] text-base-500">
+          Rows
+          <select
+            value={pageSize === "all" ? 15 : pageSize}
+            onChange={(e) => onPageSize(Number(e.target.value))}
+            aria-label="Rows per page"
+            className="border border-base-200 rounded px-1.5 py-1 text-[11px] bg-white outline-none focus:border-base-700 cursor-pointer"
+          >
+            <option value={15}>15</option>
+            <option value={30}>30</option>
+            <option value={45}>45</option>
+            <option value={60}>60</option>
+          </select>
+        </label>
+      </div>
       {/* Range + prev/next (right) */}
       <div className="flex items-center gap-1.5">
         <span className="tabular-nums text-base-500 mr-1">
@@ -1220,6 +1280,7 @@ function RegionChip({
 function OrderRow({
   o,
   idx,
+  compact,
   partnerName,
   availableBySku,
   selected,
@@ -1229,6 +1290,9 @@ function OrderRow({
 }: {
   o: operationOrderListRow;
   idx: number;
+  /** Page shows 30+ rows → clamp wrapping cells to a single line so the
+   *  auto-scale doesn't have to shrink the text as hard. */
+  compact: boolean;
   partnerName: Map<string, string>;
   availableBySku?: Map<string, number>;
   selected: boolean;
@@ -1273,7 +1337,7 @@ function OrderRow({
   const clamp3 = {
     display: "-webkit-box",
     WebkitBoxOrient: "vertical" as const,
-    WebkitLineClamp: 3,
+    WebkitLineClamp: compact ? 1 : 3,
     overflow: "hidden",
   };
 
