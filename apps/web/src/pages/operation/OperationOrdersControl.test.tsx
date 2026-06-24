@@ -557,7 +557,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Deadline",
       "Location",
       "Carrier",
-      "Stock · qty",
+      "Stock",
       "Items",
       "Remark",
     ]);

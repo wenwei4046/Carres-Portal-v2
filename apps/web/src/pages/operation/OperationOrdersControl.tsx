@@ -809,6 +809,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           section instead of three loose pill rows floating on the page. */}
       <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-md mb-3">
       <div className="flex items-center gap-3 px-3 py-2 border-b border-base-100 flex-wrap">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Status</span>
         <div
           className="flex gap-1 p-1 bg-base-100 rounded-md w-fit max-w-full overflow-auto"
           role="tablist"
@@ -871,8 +872,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
       {/* Region + Stock filters — the card's second row (Jess: pick a state →
           select-all → assign logistic; filter by stock too). */}
-      <div className="flex items-center gap-x-6 px-3 py-2">
-      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+      <div className="flex items-center gap-3 px-3 py-2">
+      <div className="flex items-center gap-1.5 flex-1 min-w-0 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
         <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5 shrink-0">Region</span>
         <div className="flex items-center gap-1.5 overflow-x-auto min-w-0 pb-0.5">
           <RegionChip
@@ -893,9 +894,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </div>
       </div>
 
-      {/* Stock-status filter — coloured dots (green / amber / red) tie it to the
-          Stock column AND set it visually apart from the neutral Region chips. */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      {/* Stock-status filter — its own panel; coloured dots (green / amber / red)
+          tie it to the Stock column AND set it apart from the Region panel. */}
+      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
         <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Stock</span>
         <RegionChip
           label="All"
@@ -974,20 +975,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 70 }} />
             <col style={{ width: 80 }} />
             <col style={{ width: 132 }} />
-            <col style={{ width: 56, background: "#F4F2EC" }} />
-            <col style={{ width: 84, background: "#F4F2EC" }} />
+            <col style={{ width: 56 }} />
+            <col style={{ width: 84 }} />
             <col style={{ width: 96 }} />
             <col style={{ width: 64 }} />
-            <col style={{ width: 70, background: "#F4F2EC" }} />
-            <col style={{ width: 168, background: "#F4F2EC" }} />
+            <col style={{ width: 70 }} />
+            <col style={{ width: 168 }} />
             <col style={{ width: 188 }} />
           </colgroup>
-          {/* ONE header row — categories are shown by the alternating column
-              SHADE (Order white · Deadline shaded · Delivery white · Stock shaded
-              · Remark white), NOT an extra row (Jess 2026-06-24: no added height). */}
+          {/* ONE thin, darker header band so it reads clearly AS the header
+              (Jess 2026-06-24: header darker, no column shade, less thick). */}
           <thead>
-            <tr className="bg-base-50 border-b border-base-200">
-              <th className="px-3 py-2 border-r border-base-100">
+            <tr className="bg-base-100 border-b border-base-300">
+              <th className="px-3 py-1.5 border-r border-base-200">
                 <input
                   type="checkbox"
                   checked={allPagedSelected}
@@ -996,7 +996,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   className="cursor-pointer accent-base-900 align-middle"
                 />
               </th>
-              <th className="border-r border-base-100" />
+              <th className="border-r border-base-200" />
               <Th>Status</Th>
               <Th>Order ID</Th>
               <Th>Ref No</Th>
@@ -1005,7 +1005,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Deadline</Th>
               <Th>Location</Th>
               <Th>Carrier</Th>
-              <Th>Stock · qty</Th>
+              <Th>Stock</Th>
               <Th>Items</Th>
               <Th>Remark</Th>
             </tr>
@@ -1093,9 +1093,9 @@ function Pager({
             className="border border-base-200 rounded px-1.5 py-1 text-[11px] bg-white outline-none focus:border-base-700 cursor-pointer"
           >
             <option value={15}>15</option>
+            <option value={20}>20</option>
+            <option value={25}>25</option>
             <option value={30}>30</option>
-            <option value={45}>45</option>
-            <option value={60}>60</option>
           </select>
         </label>
       </div>
@@ -1392,7 +1392,7 @@ function OrderRow({
       </td>
       {/* Order ID — the SO number (phone in tooltip) */}
       <td
-        className="px-3 py-2 whitespace-nowrap border-r border-base-100 font-mono font-semibold text-[12px] text-base-900"
+        className="px-3 py-2 whitespace-nowrap border-r border-base-100 font-mono font-semibold text-[11px] text-base-900"
         title={o.customer_phone ?? undefined}
       >
         SO-{o.so}
@@ -1420,7 +1420,7 @@ function OrderRow({
       <td className="px-3 py-2 border-r border-base-100">
         {o.customer_name ? (
           <span
-            className={`${cjkClassName(o.customer_name)} text-[12px] text-base-800 leading-[1.3]`}
+            className={`${cjkClassName(o.customer_name)} text-[11px] text-base-800 leading-[1.3]`}
             style={clamp3}
             title={o.customer_name}
           >
@@ -1626,7 +1626,7 @@ function shortSku(sku: string): string {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 text-left border-r border-base-100">
+    <th className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-base-700 text-left border-r border-base-200">
       {children}
     </th>
   );
