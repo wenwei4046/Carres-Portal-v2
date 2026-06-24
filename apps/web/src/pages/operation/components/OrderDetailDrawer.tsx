@@ -581,7 +581,7 @@ function DrawerBody({
           icon={<ClipboardList className="w-4 h-4" />}
           title="Order"
           titleExtra={
-            <span className="font-mono text-[20px] font-bold text-base-900 leading-none">
+            <span className="font-mono t-h3 font-bold text-base-900 leading-none">
               #{order.so}
             </span>
           }

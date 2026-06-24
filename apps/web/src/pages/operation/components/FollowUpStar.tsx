@@ -50,7 +50,7 @@ export default function FollowUpStar({ orderId }: { orderId: string }) {
       className="p-1 rounded hover:bg-base-100 disabled:opacity-50 shrink-0"
     >
       <Star
-        className={`w-[18px] h-[18px] ${flagged ? "fill-yellow-400 text-yellow-500" : "text-base-400"}`}
+        className={`w-[18px] h-[18px] ${flagged ? "fill-current text-warning" : "text-base-400"}`}
         strokeWidth={2}
       />
     </button>

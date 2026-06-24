@@ -812,8 +812,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
             title="Flagged for follow-up (⭐ starred, not yet resolved)"
             className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[12px] font-semibold transition-colors ${
               flaggedOnly
-                ? "bg-yellow-400 text-yellow-950"
-                : "border border-yellow-400/50 text-yellow-700 hover:bg-yellow-50"
+                ? "bg-warning text-white"
+                : "border border-warning/40 text-warning hover:bg-warning/5"
             }`}
           >
             <Star size={13} strokeWidth={2.5} className="fill-current" /> Starred {flaggedCount}
@@ -1222,7 +1222,7 @@ function OrderRow({
             <Star
               size={15}
               strokeWidth={2}
-              className={flagged ? "fill-yellow-400 text-yellow-500" : "text-base-300"}
+              className={flagged ? "fill-current text-warning" : "text-base-300"}
             />
           </button>
           <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
