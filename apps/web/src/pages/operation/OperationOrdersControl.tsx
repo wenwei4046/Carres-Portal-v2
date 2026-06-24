@@ -7,6 +7,7 @@ import {
   useOperationStock,
   useDeliveryPartners,
   useAddAnnotation,
+  useSaveOrderControl,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
@@ -433,6 +434,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
+  // Inline remark editor (Jess 2026-06-24): the order whose remarks are open.
+  const [editRemark, setEditRemark] = useState<operationOrderListRow | null>(null);
   // Rows per page (Jess 2026-06-24): 15 / 30 / 45 / 60. The listing is a FIXED
   // box — it never scrolls vertically; instead the whole table auto-scales (CSS
   // zoom) so the chosen number of rows fits. More rows ⇒ smaller rows.
@@ -809,6 +812,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           section instead of three loose pill rows floating on the page. */}
       <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-md mb-3">
       <div className="flex items-center gap-3 px-3 py-2 border-b border-base-100 flex-wrap">
+        <div className="flex items-center gap-2 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
         <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Status</span>
         <div
           className="flex gap-1 p-1 bg-base-100 rounded-md w-fit max-w-full overflow-auto"
@@ -839,6 +843,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               </button>
             );
           })}
+        </div>
         </div>
         {urgentCount > 0 && (
           <button
@@ -998,8 +1003,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
               </th>
               <th className="border-r border-base-200" />
               <Th>Status</Th>
-              <Th>Order ID</Th>
-              <Th>Ref No</Th>
+              <Th noBorder>Order ID</Th>
+              <Th noBorder>Ref No</Th>
               <Th>Customer</Th>
               <Th>Due</Th>
               <Th>Deadline</Th>
@@ -1033,6 +1038,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 onToggle={() => toggleOne(o.id)}
                 onOpen={() => setOpenOrderId(o.id)}
                 onToggleStar={toggleFollowUp}
+                onEditRemark={() => setEditRemark(o)}
               />
             ))}
           </tbody>
@@ -1044,6 +1050,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
           orderId={openOrderId}
           onClose={() => setOpenOrderId(null)}
         />
+      )}
+
+      {editRemark && (
+        <RemarkEditModal order={editRemark} onClose={() => setEditRemark(null)} />
       )}
     </div>
   );
@@ -1277,6 +1287,95 @@ function RegionChip({
   );
 }
 
+/** Inline remark editor (Jess 2026-06-24: edit the 4 operator remarks straight
+ *  from the list, no need to open the full order drawer). Saves via the
+ *  order-control overlay PUT, which also refreshes the orders list. */
+function RemarkEditModal({
+  order,
+  onClose,
+}: {
+  order: operationOrderListRow;
+  onClose: () => void;
+}) {
+  const ovlRaw = order.ops_order_control;
+  const ovl = Array.isArray(ovlRaw) ? ovlRaw[0] : ovlRaw;
+  const [carres, setCarres] = useState(ovl?.carres_remark ?? "");
+  const [warehouse, setWarehouse] = useState(ovl?.warehouse_remark ?? "");
+  const [cust, setCust] = useState(ovl?.customer_request ?? "");
+  const [action, setAction] = useState(ovl?.action_for_logistic ?? "");
+  const save = useSaveOrderControl(order.id, {
+    onSuccess: () => {
+      toast.success("Remarks saved");
+      onClose();
+    },
+    onError: (e) => toast.error(`Couldn't save — ${e.message}`),
+  });
+  const fields: { label: string; value: string; set: (v: string) => void }[] = [
+    { label: "Carres remark", value: carres, set: setCarres },
+    { label: "Warehouse remark", value: warehouse, set: setWarehouse },
+    { label: "Customer request", value: cust, set: setCust },
+    { label: "Action for logistic", value: action, set: setAction },
+  ];
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl border border-base-200 w-full max-w-md p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="t-h4 font-semibold">
+            Remarks · <span className="font-mono">SO-{order.so}</span>
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="p-1 rounded text-base-400 hover:text-base-900 hover:bg-base-100"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="space-y-3">
+          {fields.map((f) => (
+            <label key={f.label} className="block">
+              <span className="t-micro text-base-500">{f.label}</span>
+              <textarea
+                value={f.value}
+                onChange={(e) => f.set(e.target.value)}
+                rows={2}
+                className="mt-1 w-full px-2.5 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700 resize-none"
+              />
+            </label>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <button type="button" onClick={onClose} className="btn-secondary text-[12px]">
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={save.isPending}
+            onClick={() =>
+              save.mutate({
+                carres_remark: carres.trim() || null,
+                warehouse_remark: warehouse.trim() || null,
+                customer_request: cust.trim() || null,
+                action_for_logistic: action.trim() || null,
+              })
+            }
+            className="btn-primary text-[12px]"
+          >
+            {save.isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OrderRow({
   o,
   idx,
@@ -1287,6 +1386,7 @@ function OrderRow({
   onToggle,
   onOpen,
   onToggleStar,
+  onEditRemark,
 }: {
   o: operationOrderListRow;
   idx: number;
@@ -1299,6 +1399,7 @@ function OrderRow({
   onToggle: () => void;
   onOpen: () => void;
   onToggleStar: (orderId: string, flagged: boolean) => void;
+  onEditRemark: () => void;
 }) {
   const ct = controlTabOf(o);
   const urg = urgencyColor(o, ct);
@@ -1392,17 +1493,17 @@ function OrderRow({
       </td>
       {/* Order ID — the SO number (phone in tooltip) */}
       <td
-        className="px-3 py-2 whitespace-nowrap border-r border-base-100 font-mono font-semibold text-[11px] text-base-900"
+        className="px-3 py-2 whitespace-nowrap font-mono font-semibold text-[12px] text-base-900"
         title={o.customer_phone ?? undefined}
       >
         SO-{o.so}
       </td>
-      {/* Ref No — each ref on its OWN line, ≤3 lines, fixed width (Jess
-          2026-06-24: small font; never widen or heighten the row). */}
-      <td className="px-3 py-2 border-r border-base-100">
+      {/* Ref No — each ref on its OWN line, ≤3 lines. Part of the customer-detail
+          group (Order ID · Ref · Customer) → no inner divider, darker text. */}
+      <td className="px-3 py-2">
         {ref.length > 0 ? (
           <div
-            className="font-mono text-[10px] text-base-400 leading-[1.3]"
+            className="font-mono text-[10px] text-base-500 leading-[1.3]"
             style={clamp3}
             title={ref.join("\n")}
           >
@@ -1460,14 +1561,21 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Deadline — the customer's requested delivery date (wraps in its fixed
-          column). */}
+      {/* Deadline — date on top, weekday below on its own line (Jess 2026-06-24). */}
       <td
-        className="px-3 py-2 border-r border-base-100 text-[11px] text-base-500 tabular-nums leading-[1.3]"
+        className="px-3 py-2 border-r border-base-100 text-[11px] text-base-600 tabular-nums leading-[1.2]"
         title="Customer's requested delivery date. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
         {o.delivery_date && !o.delivery_date_tbd ? (
-          fmtDate(o.delivery_date)
+          (() => {
+            const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
+            return (
+              <>
+                <div>{datePart}</div>
+                {dayPart && <div className="text-base-400">{dayPart}</div>}
+              </>
+            );
+          })()
         ) : (
           <span className="text-base-300">—</span>
         )}
@@ -1540,17 +1648,20 @@ function OrderRow({
           </div>
         )}
       </td>
-      {/* Remark — the 4 operator remarks (Carres / WH / Cust / Action), ≤3 lines,
-          full text on hover (Jess 2026-06-24: everyone sees what's happening). */}
-      <td className="px-3 py-2">
+      {/* Remark — the 4 operator remarks; CLICK to edit inline (Jess 2026-06-24:
+          edit from the list without opening the full drawer). */}
+      <td
+        className="px-3 py-2 cursor-text hover:bg-base-50"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEditRemark();
+        }}
+        title="Click to edit remarks"
+      >
         {remarks.length === 0 ? (
-          <span className="text-base-300">—</span>
+          <span className="text-[10px] text-base-300">+ add remark</span>
         ) : (
-          <div
-            className="leading-[1.3]"
-            style={clamp3}
-            title={remarks.map((r) => `${r.k}: ${r.v}`).join("\n")}
-          >
+          <div className="leading-[1.3]" style={clamp3}>
             {remarks.map((r, i) => (
               <div key={i} className="truncate text-[10px]">
                 <span className="font-semibold text-base-500">{r.k}:</span>{" "}
@@ -1624,9 +1735,21 @@ function shortSku(sku: string): string {
   return s.length > 14 ? s.slice(0, 13) + "…" : s;
 }
 
-function Th({ children }: { children: React.ReactNode }) {
+function Th({
+  children,
+  noBorder,
+}: {
+  children: React.ReactNode;
+  /** Drop the right divider so adjacent columns read as ONE category group
+   *  (e.g. Order ID · Ref · Customer = customer detail). */
+  noBorder?: boolean;
+}) {
   return (
-    <th className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-base-700 text-left border-r border-base-200">
+    <th
+      className={`px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-base-700 text-left ${
+        noBorder ? "" : "border-r border-base-200"
+      }`}
+    >
       {children}
     </th>
   );
