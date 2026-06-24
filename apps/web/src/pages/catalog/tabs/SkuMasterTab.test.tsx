@@ -517,3 +517,30 @@ describe("SkuMasterTab — Export / Import buttons", () => {
     expect(screen.getByTestId("import-pick-file")).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 2990s Products parity Phase 2 — model filter in SKU Master.
+// ---------------------------------------------------------------------------
+describe("SkuMasterTab — model filter", () => {
+  it("shows a model dropdown when >1 model is in scope, and filters by it", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
+    const select = screen.getByTestId("sku-model-filter");
+    expect(select).toBeInTheDocument();
+    // both models' SKUs visible initially
+    expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-cost-LUNA-3S")).toBeInTheDocument();
+    // pick the sofa model → only its SKU remains
+    fireEvent.change(select, { target: { value: "m-sofa" } });
+    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sku-cost-LUNA-3S")).toBeInTheDocument();
+  });
+
+  it("resets the model filter when the category changes", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
+    fireEvent.change(screen.getByTestId("sku-model-filter"), { target: { value: "m-sofa" } });
+    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    // switch to the Mattress category — model filter should reset to "all"
+    fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
+    expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
+  });
+});
