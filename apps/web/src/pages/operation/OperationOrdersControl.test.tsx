@@ -236,9 +236,9 @@ describe("OperationOrdersControl", () => {
     const row = screen
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1002"))!;
-    // 2 + 1 = 3 goods units → the count now rides inside the merged Stock · qty
-    // button ("Not set ×3" — AutoCount free-text SKU, so stock can't auto-check).
-    expect(within(row).getByText("Not set ×3")).toBeInTheDocument();
+    // 2 + 1 = 3 goods units → the count rides in the merged Stock · qty ratio
+    // ("?/3" — AutoCount free-text SKU, so readiness can't be auto-checked).
+    expect(within(row).getByText("?/3")).toBeInTheDocument();
     // the CR/TCF ref now has its OWN column (Jess: Order split into 3).
     expect(row).toHaveTextContent("CR0418");
   });
@@ -333,8 +333,8 @@ describe("OperationOrdersControl · Stock column", () => {
     ]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // have = min(5,2)+min(3,1) = 3 ; need = 3 → one green pill "Ready 3/3"
-    expect(within(row).getByText("Ready 3/3")).toBeInTheDocument();
+    // have = min(5,2)+min(3,1) = 3 ; need = 3 → ratio button "3/3" (fully ready)
+    expect(within(row).getByText("3/3")).toBeInTheDocument();
   });
 
   it("shows Make to order + partial coverage when a line is short", () => {
@@ -354,8 +354,8 @@ describe("OperationOrdersControl · Stock column", () => {
     ]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // have = min(1,3)+min(2,2) = 3 ; need = 5 → one amber pill "Waiting 3/5"
-    expect(within(row).getByText("Waiting 3/5")).toBeInTheDocument();
+    // have = min(1,3)+min(2,2) = 3 ; need = 5 → amber ratio button "3/5"
+    expect(within(row).getByText("3/5")).toBeInTheDocument();
   });
 
   it("falls back to a muted Not set for AutoCount free-text SKUs absent from the catalog", () => {
@@ -370,8 +370,8 @@ describe("OperationOrdersControl · Stock column", () => {
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
     expect(row.querySelector('[data-stock-state="unknown"]')).toBeTruthy();
-    // merged Stock · qty → "Not set ×1" (1 free-text line).
-    expect(within(row).getByText("Not set ×1")).toBeInTheDocument();
+    // merged Stock · qty → "?/1" (1 free-text line, can't auto-check readiness).
+    expect(within(row).getByText("?/1")).toBeInTheDocument();
     expect(within(row).queryByText(/^Ready/)).not.toBeInTheDocument();
     expect(within(row).queryByText(/^Waiting/)).not.toBeInTheDocument();
   });
@@ -389,8 +389,8 @@ describe("OperationOrdersControl · Stock column", () => {
     stockHookState.data = stockResponse([{ sku: "SOFA-1", available: 0 }]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Stock + Qty merged → the count rides in the button ("Ready ×99").
-    expect(within(row).getByText("Ready ×99")).toBeInTheDocument();
+    // Stock + Qty merged → ratio button; secured stage shows "99/99".
+    expect(within(row).getByText("99/99")).toBeInTheDocument();
     expect(row.querySelector('[data-stock-state="ready"]')).toBeTruthy();
   });
 
@@ -403,7 +403,7 @@ describe("OperationOrdersControl · Stock column", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    expect(within(row).getByText("Waiting")).toBeInTheDocument();
+    expect(within(row).getByText("0/0")).toBeInTheDocument();
     expect(row.querySelector('[data-stock-state="awaiting"]')?.className).toContain("pill-warning");
   });
 
@@ -441,9 +441,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Goods-unit total now rides inside the merged Stock · qty button — 2+1+3+1
-    // = 7; Disposal (service) NOT counted.
-    expect(within(row).getByText("Not set ×7")).toBeInTheDocument();
+    // Goods-unit total now rides inside the merged Stock · qty ratio — 2+1+3+1
+    // = 7 (denominator); Disposal (service) NOT counted → "?/7".
+    expect(within(row).getByText("?/7")).toBeInTheDocument();
     // Master-Sheet short codes (MS/BF/SOF) as a 2-line summary; MONOCHROME tiers
     // by LINE: core goods dark (text-base-800), accessories/services dim
     // (text-base-400). The colour sits on the line, not the individual tag.
@@ -530,9 +530,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Qty total (2) now rides in the merged Stock · qty button ("Not set ×2" —
-    // free-text SKU); the Items tag still carries its own qty + size ("2× SOF").
-    expect(within(row).getByText("Not set ×2")).toBeInTheDocument();
+    // Qty total (2) now rides in the merged Stock · qty ratio ("?/2" — free-text
+    // SKU); the Items tag still carries its own qty + size ("2× SOF").
+    expect(within(row).getByText("?/2")).toBeInTheDocument();
     expect(within(row).getByText("2× SOF")).toBeInTheDocument();
   });
 
@@ -545,8 +545,15 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       source_ref: ["TCF2024/06-461"],
     });
     wrap(<OperationOrdersControl />);
-    const head = within(screen.getByRole("table")).getAllByRole("columnheader");
-    expect(head.map((h) => h.textContent)).toEqual([
+    // Two header rows now: a category-group row (Order / Deadline / Delivery /
+    // Stock / Remark), then the column row. Assert both.
+    const headRows = within(screen.getByRole("table")).getAllByRole("row");
+    expect(
+      within(headRows[0]).getAllByRole("columnheader").map((h) => h.textContent),
+    ).toEqual(["", "Order", "Deadline", "Delivery", "Stock", "Remark"]);
+    expect(
+      within(headRows[1]).getAllByRole("columnheader").map((h) => h.textContent),
+    ).toEqual([
       "", // select-all checkbox
       "", // ⭐ follow-up star
       "Status",
@@ -559,6 +566,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Carrier",
       "Stock · qty",
       "Items",
+      "Remark",
     ]);
     // Order is split into THREE columns now (Jess): SO# · ref · customer, each
     // its own cell. Phone stays in the Order ID cell tooltip.

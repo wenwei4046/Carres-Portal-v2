@@ -721,9 +721,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
   }
 
   return (
-    <div className="px-9 py-8 pb-14" data-testid="operation-orders-control">
-      {/* Header — compact: title + inline count, no kicker/subtitle (Gmail-style) */}
-      <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
+    <div
+      className="h-full flex flex-col px-9 pt-7 pb-5"
+      data-testid="operation-orders-control"
+    >
+      {/* Header — title + count + search + import (fixed; does not scroll) */}
+      <div className="flex items-center justify-between gap-4 mb-3 flex-wrap shrink-0">
         <div className="flex items-baseline gap-2.5 flex-wrap">
           <h1 className="t-h1 font-display">Orders</h1>
           <span className="text-[14px] font-medium text-base-500 tabular-nums">
@@ -755,10 +758,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </div>
       </div>
 
-      {/* Status tabs (tier-coloured counts) + the Urgent chip */}
-      <div className="flex items-center gap-3 mb-2.5 flex-wrap">
+      {/* Filter panel — one bordered card (Jess 2026-06-24 "designed" look):
+          status tabs on top, Region + Stock filters below, read as a defined
+          section instead of three loose pill rows floating on the page. */}
+      <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-sm mb-3">
+      <div className="flex items-center gap-3 px-3 py-2 border-b border-base-100 flex-wrap">
         <div
-          className="flex gap-1 p-1 bg-base-100 rounded w-fit max-w-full overflow-auto"
+          className="flex gap-1 p-1 bg-base-100 rounded-md w-fit max-w-full overflow-auto"
           role="tablist"
           aria-label="Order status"
         >
@@ -817,10 +823,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
         )}
       </div>
 
-      {/* State-region filter pills (Jess: pick a state → select-all → assign
-          logistic). Stacks with the status tab + Urgent chip above. */}
-      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-        <span className="text-[11px] font-medium text-base-400 mr-0.5">Region</span>
+      {/* Region + Stock filters — the card's second row (Jess: pick a state →
+          select-all → assign logistic; filter by stock too). */}
+      <div className="flex items-start gap-x-6 gap-y-2 px-3 py-2 flex-wrap">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Region</span>
         <RegionChip
           label="All"
           count={tabFiltered.length}
@@ -838,11 +845,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
         ))}
       </div>
 
-      {/* Stock-status filter pills (Jess: header should filter by stock too —
-          Ready / Waiting / Not set, the same three states as the Stock column).
-          Stacks on top of the status tab + region above. */}
-      <div className="flex items-center gap-1.5 mb-3.5 flex-wrap">
-        <span className="text-[11px] font-medium text-base-400 mr-0.5">Stock</span>
+      {/* Stock-status filter (Ready / Waiting / Not set). */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Stock</span>
         <RegionChip
           label="All"
           count={tabFiltered.length}
@@ -861,8 +866,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
           />
         ))}
       </div>
+      </div>
+      </div>
 
-      {/* Toolbar: bulk-action bar when rows are selected, else the pager. */}
+      {/* Toolbar — result count + bulk actions, between the filter card and the
+          listing (fixed, does not scroll). */}
+      <div className="shrink-0">
       {selected.size > 0 ? (
         <BulkBar
           count={selected.size}
@@ -890,15 +899,44 @@ export default function OperationOrdersControl({ onImport }: Props) {
         )
       )}
 
-      {/* Table */}
-      <div className="bg-white border border-base-200 rounded overflow-auto">
+      </div>
+
+      {/* Listing — the ONLY scroll area (Jess 2026-06-24: the page itself stays
+          put, only the rows scroll). table-fixed + a colgroup → columns keep
+          their width; long Ref/Customer/Location/Remark wrap to ≤3 lines. */}
+      <div className="flex-1 min-h-0 bg-white border border-base-200 rounded-lg shadow-sm overflow-auto">
         <table
-          className="w-full border-collapse text-[13px]"
-          style={{ minWidth: 1280 }}
+          className="w-full border-collapse text-[13px] table-fixed"
+          style={{ minWidth: 1180 }}
         >
+          <colgroup>
+            <col style={{ width: 34 }} />
+            <col style={{ width: 28 }} />
+            <col style={{ width: 96 }} />
+            <col style={{ width: 70 }} />
+            <col style={{ width: 80 }} />
+            <col style={{ width: 132 }} />
+            <col style={{ width: 56 }} />
+            <col style={{ width: 84 }} />
+            <col style={{ width: 96 }} />
+            <col style={{ width: 64 }} />
+            <col style={{ width: 70 }} />
+            <col style={{ width: 168 }} />
+            <col style={{ width: 188 }} />
+          </colgroup>
           <thead>
+            {/* Category group row (Jess 2026-06-24): Order · Deadline · Delivery ·
+                Stock · Remark. */}
+            <tr className="bg-base-100 border-b border-base-200">
+              <th colSpan={3} className="border-r border-base-200" />
+              <GroupTh span={3}>Order</GroupTh>
+              <GroupTh span={2}>Deadline</GroupTh>
+              <GroupTh span={2}>Delivery</GroupTh>
+              <GroupTh span={2}>Stock</GroupTh>
+              <GroupTh span={1}>Remark</GroupTh>
+            </tr>
             <tr className="bg-base-50 border-b border-base-200">
-              <th className="px-3 py-2.5 w-9">
+              <th className="px-3 py-2 border-r border-base-100">
                 <input
                   type="checkbox"
                   checked={allPagedSelected}
@@ -907,7 +945,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   className="cursor-pointer accent-base-900 align-middle"
                 />
               </th>
-              <th className="w-8" />
+              <th className="border-r border-base-100" />
               <Th>Status</Th>
               <Th>Order ID</Th>
               <Th>Ref No</Th>
@@ -918,13 +956,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Carrier</Th>
               <Th>Stock · qty</Th>
               <Th>Items</Th>
+              <Th>Remark</Th>
             </tr>
           </thead>
           <tbody>
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={13}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1191,6 +1230,29 @@ function OrderRow({
       ? partnerName.get(o.ops_assigned_logistic) ?? "…"
       : null);
 
+  // Remark column — the 4 operator remark fields surfaced from the
+  // ops_order_control overlay (Jess 2026-06-24: multi-operator handoff). The 1:1
+  // PostgREST embed is an object; defensively unwrap an array too.
+  const ovlRaw = o.ops_order_control;
+  const ovl = Array.isArray(ovlRaw) ? ovlRaw[0] : ovlRaw;
+  const remarks = (
+    [
+      ovl?.carres_remark ? { k: "Carres", v: ovl.carres_remark } : null,
+      ovl?.warehouse_remark ? { k: "WH", v: ovl.warehouse_remark } : null,
+      ovl?.customer_request ? { k: "Cust", v: ovl.customer_request } : null,
+      ovl?.action_for_logistic ? { k: "Action", v: ovl.action_for_logistic } : null,
+    ] as ({ k: string; v: string } | null)[]
+  ).filter((r): r is { k: string; v: string } => r !== null);
+
+  // ≤3-line clamp shared by the wrapping cells (Ref / Customer / Location /
+  // Remark) — fixed width, never taller than 3 lines (Jess 2026-06-24).
+  const clamp3 = {
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical" as const,
+    WebkitLineClamp: 3,
+    overflow: "hidden",
+  };
+
   return (
     <tr
       onClick={onOpen}
@@ -1243,31 +1305,33 @@ function OrderRow({
       >
         SO-{o.so}
       </td>
-      {/* Ref No — TCF / CR / DL source refs. Compact (Jess 2026-06-24): 10px,
-          wraps to ≤3 tight lines inside a capped width, so several refs save
-          space without making the row taller. */}
+      {/* Ref No — each ref on its OWN line, ≤3 lines, fixed width (Jess
+          2026-06-24: small font; never widen or heighten the row). */}
       <td className="px-3 py-2 border-r border-base-100">
         {ref.length > 0 ? (
-          <span
-            className="font-mono text-[10px] text-base-400 break-words max-w-[140px]"
-            style={{
-              display: "-webkit-box",
-              WebkitBoxOrient: "vertical",
-              WebkitLineClamp: 3,
-              overflow: "hidden",
-              lineHeight: 1.3,
-            }}
+          <div
+            className="font-mono text-[10px] text-base-400 leading-[1.3]"
+            style={clamp3}
+            title={ref.join("\n")}
           >
-            {ref.join(" · ")}
-          </span>
+            {ref.map((r, i) => (
+              <div key={i} className="truncate">
+                {r}
+              </div>
+            ))}
+          </div>
         ) : (
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Customer */}
-      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
+      {/* Customer — fixed width, wraps to ≤3 lines (Jess 2026-06-24). */}
+      <td className="px-3 py-2 border-r border-base-100">
         {o.customer_name ? (
-          <span className={`${cjkClassName(o.customer_name)} text-[12px] text-base-800`}>
+          <span
+            className={`${cjkClassName(o.customer_name)} text-[12px] text-base-800 leading-[1.3]`}
+            style={clamp3}
+            title={o.customer_name}
+          >
             {o.customer_name}
           </span>
         ) : (
@@ -1304,9 +1368,10 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Deadline — the customer's requested delivery date */}
+      {/* Deadline — the customer's requested delivery date (wraps in its fixed
+          column). */}
       <td
-        className="px-3 py-2 whitespace-nowrap border-r border-base-100 text-[12px] text-base-700 tabular-nums"
+        className="px-3 py-2 border-r border-base-100 text-[11px] text-base-700 tabular-nums leading-[1.3]"
         title="Customer's requested delivery date. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
         {o.delivery_date && !o.delivery_date_tbd ? (
@@ -1319,16 +1384,17 @@ function OrderRow({
           KV (the majority) is now NEUTRAL grey so the green leaves the table;
           only Outstation keeps a quiet amber (no warehouse buffer = special
           handling). The "Call before PO" action moved INTO the drawer. */}
-      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
+      <td className="px-3 py-2 border-r border-base-100">
         {loc.label ? (
           <span
-            className={`text-[11px] font-medium ${
+            className={`text-[11px] font-medium leading-[1.3] ${
               loc.area === "Outstation" ? "text-warning" : "text-base-600"
             }`}
+            style={clamp3}
             title={
               loc.area === "Outstation"
                 ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
-                : undefined
+                : loc.label ?? undefined
             }
           >
             {loc.label}
@@ -1352,7 +1418,7 @@ function OrderRow({
       </td>
       {/* Items — 2-line summary (Jess): core goods (dark) on top, accessories
           (dim) below; the size is kept in every tag (e.g. "1× MS(K)"). */}
-      <td className="px-3 py-2 max-w-[300px]" title={itemBreakdown(lines)}>
+      <td className="px-3 py-2 border-r border-base-100" title={itemBreakdown(lines)}>
         {tags.length === 0 ? (
           <span className="text-base-300">—</span>
         ) : (
@@ -1382,56 +1448,83 @@ function OrderRow({
           </div>
         )}
       </td>
+      {/* Remark — the 4 operator remarks (Carres / WH / Cust / Action), ≤3 lines,
+          full text on hover (Jess 2026-06-24: everyone sees what's happening). */}
+      <td className="px-3 py-2">
+        {remarks.length === 0 ? (
+          <span className="text-base-300">—</span>
+        ) : (
+          <div
+            className="leading-[1.3]"
+            style={clamp3}
+            title={remarks.map((r) => `${r.k}: ${r.v}`).join("\n")}
+          >
+            {remarks.map((r, i) => (
+              <div key={i} className="truncate text-[10px]">
+                <span className="font-semibold text-base-500">{r.k}:</span>{" "}
+                <span className="text-base-700">{r.v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </td>
     </tr>
   );
 }
 
-/** Stock · qty cell — ONE button carrying readiness + the goods-unit count
- *  (Jess 2026-06-24 merged Stock + Qty). Grey Ready (secured / shelf covers it) ·
- *  amber Waiting (short → PO, or PO open) · grey Not set (can't auto-check).
- *  Coverage rides inside where known ("Ready 3/3" / "Waiting 0/1"), else "×N". */
+/** Stock · qty cell — ONE button showing the ready RATIO have/need + a colour
+ *  alert (Jess 2026-06-24: "1/2 or 2/2"). Fully covered = quiet grey; partial /
+ *  PO-open = amber (the thing to act on). Free-text (AutoCount) SKUs can't be
+ *  auto-checked → "?/N" grey, where N is the goods-unit count. The denominator
+ *  doubles as the quantity (Stock + Qty in one). */
 function StockCell({ info, qty }: { info: StockInfo; qty: number }) {
-  const qtySuffix = qty > 0 ? ` ×${qty}` : "";
-  if (info.state === "unknown")
-    return (
-      <span
-        data-stock-state="unknown"
-        className="pill pill-neutral text-base-400 font-medium whitespace-nowrap tabular-nums"
-        title="Can't auto-check from the catalog (free-text SKU) — open the order to check stock"
-      >
-        Not set{qtySuffix}
-      </span>
-    );
-
-  // have/need coverage when known; otherwise the goods-unit count (Stock + Qty
-  // merged into one button, Jess 2026-06-24).
-  const counts =
-    info.need != null && info.have != null ? ` ${info.have}/${info.need}` : qtySuffix;
-  // Q1 colour restraint (Jess 2026-06-24): Ready is the common case → render it
-  // QUIET (neutral grey) so the green leaves the table; colour now only marks the
-  // exception — amber Waiting = "raise a PO / on the way".
-  const cfg = {
-    ready: { pill: "pill-neutral", label: `Ready${qtySuffix}`, title: "Stock secured / reserved for this order" },
-    in_stock: { pill: "pill-neutral", label: `Ready${counts}`, title: "Free warehouse stock covers every line" },
-    need_po: {
-      pill: "pill-warning",
-      label: `Waiting${counts}`,
-      title:
+  let label: string;
+  let pill: string;
+  let title: string;
+  switch (info.state) {
+    case "unknown":
+      label = `?/${qty}`;
+      pill = "pill-neutral";
+      title = "Stock not auto-checked (free-text SKU) — open the order to confirm";
+      break;
+    case "ready":
+      label = `${qty}/${qty}`;
+      pill = "pill-neutral";
+      title = "Stock secured / reserved for this order";
+      break;
+    case "in_stock": {
+      const need = info.need ?? qty;
+      const have = info.have ?? need;
+      label = `${have}/${need}`;
+      pill = "pill-neutral";
+      title = "Free warehouse stock covers every line";
+      break;
+    }
+    case "need_po": {
+      const need = info.need ?? qty;
+      const have = info.have ?? 0;
+      label = `${have}/${need}`;
+      pill = "pill-warning";
+      title =
         "Short — raise a PO" +
         (info.short && info.short.length > 0
           ? ": " + info.short.map((s) => `${shortSku(s.sku)} ${s.have}/${s.need}`).join(", ")
-          : ""),
-    },
-    awaiting: { pill: "pill-warning", label: `Waiting${qtySuffix}`, title: "PO open — stock on the way" },
-  }[info.state];
-
+          : "");
+      break;
+    }
+    default:
+      label = `0/${qty}`;
+      pill = "pill-warning";
+      title = "PO open — stock on the way";
+      break;
+  }
   return (
     <span
-      className={`pill ${cfg.pill} whitespace-nowrap tabular-nums`}
-      title={cfg.title}
+      className={`pill ${pill} whitespace-nowrap tabular-nums`}
+      title={title}
       data-stock-state={info.state}
     >
-      {cfg.label}
+      {label}
     </span>
   );
 }
@@ -1442,9 +1535,22 @@ function shortSku(sku: string): string {
   return s.length > 14 ? s.slice(0, 13) + "…" : s;
 }
 
+/** Category group header (Jess 2026-06-24): spans the sub-columns of one
+ *  category — Order / Deadline / Delivery / Stock / Remark. */
+function GroupTh({ span, children }: { span: number; children: React.ReactNode }) {
+  return (
+    <th
+      colSpan={span}
+      className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-base-400 text-left border-r border-base-200"
+    >
+      {children}
+    </th>
+  );
+}
+
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-base-700 text-left">
+    <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 text-left border-r border-base-100">
       {children}
     </th>
   );

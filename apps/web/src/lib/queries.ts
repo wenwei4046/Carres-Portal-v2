@@ -1735,6 +1735,18 @@ export interface operationOrderListRow {
   /** Phase B (migration 0138) — latest annotation snippet for kanban card.
    *  PostgREST returns all annotations; card picks newest by created_at. */
   order_annotations: { content: string; tag: string | null; created_at: string }[];
+  /** Jess 2026-06-24 — the 4 operator remark fields surfaced into the list (was
+   *  drawer-only) so the Orders table's Remark column can show them. From
+   *  ops_order_control (1:1 via order_id); PostgREST returns the embed as a
+   *  single object, or null when no overlay row exists yet. Defensively also
+   *  typed as an array in case PostgREST resolves the relation as to-many. */
+  ops_order_control?: opsRemarkEmbed | opsRemarkEmbed[] | null;
+}
+export interface opsRemarkEmbed {
+  customer_request: string | null;
+  action_for_logistic: string | null;
+  carres_remark: string | null;
+  warehouse_remark: string | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];

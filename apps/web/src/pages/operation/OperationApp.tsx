@@ -167,7 +167,7 @@ export default function OperationApp() {
 
   return (
     <div
-      className="min-h-screen text-base-900 grid"
+      className="h-screen text-base-900 grid"
       style={{ gridTemplateColumns: "232px minmax(0, 1fr) auto" }}
     >
       <OperationSidebar active={activeTab} onChange={changeTab} />
