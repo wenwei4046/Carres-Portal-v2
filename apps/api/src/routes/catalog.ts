@@ -34,6 +34,9 @@ import {
   sofaComboPatchInput,
   canonicalizeSofaSlots,
   SOFA_COMBO_PRICING,
+  specialAddonCreateInput,
+  specialAddonPatchInput,
+  SPECIAL_ADDONS,
   deriveSkuCode,
   skuImportInput,
   hasPricingIntent,
@@ -164,7 +167,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -191,6 +194,9 @@ catalogRouter.get("/", async (c) => {
     // 0177 combos branch), since non-admin POS consumers must not see retired
     // combos while the maintenance tab (admin=true) must.
     sb.from(SOFA_COMBO_PRICING).select("*"),
+    // 0181 — special add-ons (additive). Fetched unfiltered; active filter
+    // applied client-side below (admin sees retired; POS sees active only).
+    sb.from(SPECIAL_ADDONS).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -203,6 +209,7 @@ catalogRouter.get("/", async (c) => {
   if (sofaCompsR.error) throw new HTTPException(500, { message: sofaCompsR.error.message });
   if (modelSofaCompsR.error) throw new HTTPException(500, { message: modelSofaCompsR.error.message });
   if (sofaCombosR.error) throw new HTTPException(500, { message: sofaCombosR.error.message });
+  if (specialAddonsR.error) throw new HTTPException(500, { message: specialAddonsR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -288,6 +295,10 @@ catalogRouter.get("/", async (c) => {
         return r.active === true && r.discontinued_at == null;
       })
       .map((r) => Adapters.sofaComboFromRow(r as DB.SofaComboPricingRow)),
+    // 0181 — special add-ons. POS sees active only; admin (maintenance) sees all.
+    specialAddons: (specialAddonsR.data ?? [])
+      .filter((row) => adminMode || (row as DB.SpecialAddonRow).active === true)
+      .map((r) => Adapters.specialAddonFromRow(r as DB.SpecialAddonRow)),
   });
 
   // 0074 — was `private, max-age=300` but the browser cache was beating
@@ -1201,6 +1212,92 @@ catalogRouter.delete("/addons/:key", async (c) => {
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "addon not found" }, 404);
+  }
+  return c.json({ ok: true });
+});
+
+// ----- Special add-ons (0181, principal-only) -----
+// Per-model SELLING surcharges with one-level follow-up question groups.
+// principalOnly() is the friendly early 403; the RLS policy
+// (special_addons_write_principal) is the real boundary (user JWT forwarded).
+const SPECIAL_ADDON_GATE = "Only the principal (Master Admin) can manage special add-ons";
+
+catalogRouter.post("/special-addons", async (c) => {
+  principalOnly(c, SPECIAL_ADDON_GATE);
+  const parsed = await parseJsonBody(c, specialAddonCreateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SPECIAL_ADDONS)
+    .insert({
+      code: parsed.data.code,
+      label: parsed.data.label,
+      so_description: parsed.data.soDescription ?? "",
+      categories: parsed.data.categories,
+      selling_price: parsed.data.sellingPrice,
+      cost: parsed.data.cost ?? null,
+      option_groups: parsed.data.optionGroups ?? [],
+      active: parsed.data.active ?? true,
+      sort_order: parsed.data.sortOrder ?? 0,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .single();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ specialAddon: Adapters.specialAddonFromRow(data as DB.SpecialAddonRow) }, 201);
+});
+
+catalogRouter.patch("/special-addons/:id", async (c) => {
+  principalOnly(c, SPECIAL_ADDON_GATE);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, specialAddonPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // `code` is intentionally NOT patchable (stable key referenced by
+  // allowed_options.specials + order_lines.attrs).
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.label !== undefined) patch.label = parsed.data.label;
+  if (parsed.data.soDescription !== undefined) patch.so_description = parsed.data.soDescription;
+  if (parsed.data.categories !== undefined) patch.categories = parsed.data.categories;
+  if (parsed.data.sellingPrice !== undefined) patch.selling_price = parsed.data.sellingPrice;
+  if (parsed.data.cost !== undefined) patch.cost = parsed.data.cost;
+  if (parsed.data.optionGroups !== undefined) patch.option_groups = parsed.data.optionGroups;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SPECIAL_ADDONS)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "special add-on not found" }, 404);
+  }
+  return c.json({ specialAddon: Adapters.specialAddonFromRow(data as DB.SpecialAddonRow) });
+});
+
+// Soft-delete (active=false) — preserves the code referenced by existing models'
+// allowed_options.specials + historical order_lines.attrs.
+catalogRouter.delete("/special-addons/:id", async (c) => {
+  principalOnly(c, SPECIAL_ADDON_GATE);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SPECIAL_ADDONS)
+    .update({ active: false })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "special add-on not found" }, 404);
   }
   return c.json({ ok: true });
 });

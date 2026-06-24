@@ -35,6 +35,8 @@ export const allowedOptionsSchema = z
     compartments: z.array(z.string()).optional(),
     colors: z.array(z.string()).optional(),
     gaps: z.array(z.string()).optional(),
+    // 0181 — special add-on codes this model offers (per-model attach).
+    specials: z.array(z.string()).optional(),
   })
   .passthrough();
 export type AllowedOptions = z.infer<typeof allowedOptionsSchema>;
@@ -120,6 +122,37 @@ export const addonSchema = z.object({
   serviceSku: serviceSkuCodeSchema.nullable().optional(),
 });
 export type AddonDto = z.infer<typeof addonSchema>;
+
+// 0181 — Special Add-ons: per-model SELLING surcharges with one-level follow-up
+// question groups (group → choices, each choice carries an `extra`). Surcharges
+// (base + extras) may be NEGATIVE (a deduction). Principal-owned; folds into the
+// product line's unitPrice (no separate SKU). The ±1M bound keeps a typo out of
+// the numeric(12,2) column while leaving plenty of room for real surcharges.
+const SPECIAL_MONEY = z.number().gte(-1_000_000).lte(1_000_000);
+export const specialAddonChoiceSchema = z.object({
+  label: z.string().trim().min(1).max(60),
+  extra: SPECIAL_MONEY,
+});
+export const specialAddonOptionGroupSchema = z.object({
+  label: z.string().trim().min(1).max(60),
+  required: z.boolean(),
+  choices: z.array(specialAddonChoiceSchema).min(1).max(20),
+});
+export type SpecialAddonOptionGroupDto = z.infer<typeof specialAddonOptionGroupSchema>;
+
+export const specialAddonSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  label: z.string(),
+  soDescription: z.string(),
+  categories: z.array(productCategorySchema),
+  sellingPrice: z.number(),
+  cost: z.number().nullable(),
+  optionGroups: z.array(specialAddonOptionGroupSchema),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type SpecialAddonDto = z.infer<typeof specialAddonSchema>;
 
 export const floorConfigSchema = z.object({
   id: z.number().int(),
@@ -360,6 +393,8 @@ export const catalogResponseSchema = z.object({
   modelSofaCompartments: z.array(modelSofaCompartmentSchema).optional(),
   // 0179 — sofa combo pricing (additive, OPTIONAL). Pre-0179 clients unaffected.
   sofaCombos: z.array(sofaComboSchema).optional(),
+  // 0181 — special add-ons (additive, OPTIONAL). Pre-0181 clients unaffected.
+  specialAddons: z.array(specialAddonSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 
@@ -578,3 +613,38 @@ export const addonPatchInput = z
   })
   .strict();
 export type AddonPatchInput = z.infer<typeof addonPatchInput>;
+
+/** Special Add-ons CRUD (0181, principal-only). `code` is the stable key
+ *  referenced from allowed_options.specials + order_lines.attrs — set on create,
+ *  NEVER patched (a rename would orphan those references). selling_price/extra
+ *  may be negative. */
+export const specialAddonCreateInput = z
+  .object({
+    // Stable cross-reference key (allowed_options.specials + order_lines.attrs);
+    // kebab-case like comboKey/addon.key so it stays clean as a jsonb key.
+    code: z.string().trim().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/, "code must be kebab-case (a-z, 0-9, dash)"),
+    label: z.string().trim().min(1).max(80),
+    soDescription: z.string().trim().max(200).optional(),
+    categories: z.array(productCategorySchema).max(5),
+    sellingPrice: SPECIAL_MONEY,
+    cost: z.number().nonnegative().nullable().optional(),
+    optionGroups: z.array(specialAddonOptionGroupSchema).max(20).optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type SpecialAddonCreateInput = z.infer<typeof specialAddonCreateInput>;
+
+export const specialAddonPatchInput = z
+  .object({
+    label: z.string().trim().min(1).max(80).optional(),
+    soDescription: z.string().trim().max(200).optional(),
+    categories: z.array(productCategorySchema).max(5).optional(),
+    sellingPrice: SPECIAL_MONEY.optional(),
+    cost: z.number().nonnegative().nullable().optional(),
+    optionGroups: z.array(specialAddonOptionGroupSchema).max(20).optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type SpecialAddonPatchInput = z.infer<typeof specialAddonPatchInput>;

@@ -12,9 +12,11 @@ import type {
   ModelSofaCompartmentDto,
   SofaComboDto,
   FabricTierConfigDto,
+  SpecialAddonDto,
 } from "@carres/shared";
 import { resolveFabricDelta } from "@carres/shared";
 import type { DraftLine } from "./draft";
+import { SpecialAddonsPicker, useSpecials } from "./special-addons-picker";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
 
@@ -78,28 +80,32 @@ export function newLocalId(): string {
 export function MattressConfigurator({
   model,
   skus,
+  specialAddons,
   onAdd,
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
+  specialAddons?: SpecialAddonDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
   const [skuId, setSkuId] = useState<string>("");
   const [qty, setQty] = useState(1);
   const sku = skus.find((s) => s.id === skuId);
+  const sp = useSpecials(model, specialAddons);
 
   function add() {
-    if (!sku) return;
+    if (!sku || !sp.complete) return;
     onAdd({
       localId: newLocalId(),
       sku: sku.sku,
       qty,
-      attrs: null,
-      unitPrice: sku.price,
+      attrs: sp.picks.length > 0 ? sp.attrsPatch : null,
+      unitPrice: sku.price + sp.surcharge,
       label: `${model.name} · ${sku.variant}`,
     });
     setSkuId("");
     setQty(1);
+    sp.reset();
   }
 
   return (
@@ -119,11 +125,13 @@ export function MattressConfigurator({
         </select>
       </FieldLabel>
 
+      <SpecialAddonsPicker defs={sp.offered} value={sp.picks} onChange={sp.setPicks} />
+
       <div className="flex items-end justify-between gap-4">
         <QtyPill qty={qty} onChange={setQty} />
         <button
           onClick={add}
-          disabled={!sku}
+          disabled={!sku || !sp.complete}
           className="btn-primary whitespace-nowrap"
         >
           + Add
@@ -136,10 +144,12 @@ export function MattressConfigurator({
 export function BedframeConfigurator({
   model,
   skus,
+  specialAddons,
   onAdd,
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
+  specialAddons?: SpecialAddonDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
   // 2026-05-18 (Loo screenshot — SO-1006 saved no fabric / no color). The
@@ -154,19 +164,21 @@ export function BedframeConfigurator({
   const [gap, setGap] = useState<string>(model.gaps?.[0] ?? "");
   const [qty, setQty] = useState(1);
   const sku = skus.find((s) => s.id === skuId);
+  const sp = useSpecials(model, specialAddons);
 
   function add() {
-    if (!sku) return;
+    if (!sku || !sp.complete) return;
     onAdd({
       localId: newLocalId(),
       sku: sku.sku,
       qty,
-      attrs: { color, gap },
-      unitPrice: sku.price,
+      attrs: { color, gap, ...sp.attrsPatch },
+      unitPrice: sku.price + sp.surcharge,
       label: `${model.name} · ${sku.variant} · ${color}${gap ? ` · gap ${gap}` : ""}`,
     });
     setSkuId("");
     setQty(1);
+    sp.reset();
   }
 
   return (
@@ -217,11 +229,13 @@ export function BedframeConfigurator({
         </FieldLabel>
       </div>
 
+      <SpecialAddonsPicker defs={sp.offered} value={sp.picks} onChange={sp.setPicks} />
+
       <div className="flex items-end justify-between gap-4">
         <QtyPill qty={qty} onChange={setQty} />
         <button
           onClick={add}
-          disabled={!sku}
+          disabled={!sku || !sp.complete}
           className="btn-primary whitespace-nowrap"
         >
           + Add
@@ -237,6 +251,7 @@ export function SofaConfigurator({
   fabrics,
   fabricTierConfig,
   modelFabricTierOverrides,
+  specialAddons,
   onAdd,
 }: {
   model: ProductModelDto;
@@ -246,6 +261,7 @@ export function SofaConfigurator({
   fabricTierConfig?: FabricTierGlobalConfig | null;
   /** Per-model tier overrides array (from catalog bundle). May be absent; looked up by model.id. */
   modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
+  specialAddons?: SpecialAddonDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
   // Mode = 'preset' (pick a complete sub-model) or 'custom' (pick a part).
@@ -290,11 +306,12 @@ export function SofaConfigurator({
     fabricTierConfig ?? null,
   );
 
-  const unitPrice = (sku?.price ?? 0) + effectiveDelta;
+  const sp = useSpecials(model, specialAddons);
+  const unitPrice = (sku?.price ?? 0) + effectiveDelta + sp.surcharge;
 
   function add() {
-    if (!sku) return;
-    const attrs: Record<string, unknown> = { mode };
+    if (!sku || !sp.complete) return;
+    const attrs: Record<string, unknown> = { mode, ...sp.attrsPatch };
     if (fabric) {
       // 2026-05-12 (Loo): persist fabric_id (FK) alongside fabric_name
       // (display) + fabric_surcharge (price). Without fabric_id, the
@@ -318,6 +335,7 @@ export function SofaConfigurator({
     setSkuId("");
     setFabricId(fabrics[0]?.id ?? "");
     setQty(1);
+    sp.reset();
   }
 
   return (
@@ -386,6 +404,8 @@ export function SofaConfigurator({
         </FieldLabel>
       </div>
 
+      <SpecialAddonsPicker defs={sp.offered} value={sp.picks} onChange={sp.setPicks} />
+
       {/* Live unit price */}
       {sku && (
         <div className="flex items-baseline gap-1.5">
@@ -406,7 +426,7 @@ export function SofaConfigurator({
         <QtyPill qty={qty} onChange={setQty} />
         <button
           onClick={add}
-          disabled={!sku}
+          disabled={!sku || !sp.complete}
           className="btn-primary whitespace-nowrap"
         >
           + Add
@@ -431,6 +451,7 @@ export function ConfiguratorForModel({
   sofaCompartments,
   modelSofaCompartments,
   sofaCombos,
+  specialAddons,
   onAdd,
 }: {
   model: ProductModelDto;
@@ -446,13 +467,16 @@ export function ConfiguratorForModel({
   modelSofaCompartments?: ModelSofaCompartmentDto[] | null;
   /** Sofa combos (0179) — passed through to the builder for combo pricing. */
   sofaCombos?: SofaComboDto[] | null;
+  /** Special add-ons (0181) — the full catalog set; each configurator filters to
+   *  the codes this model offers (allowed_options.specials). */
+  specialAddons?: SpecialAddonDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
   if (model.category === "mattress") {
-    return <MattressConfigurator model={model} skus={skus} onAdd={onAdd} />;
+    return <MattressConfigurator model={model} skus={skus} specialAddons={specialAddons} onAdd={onAdd} />;
   }
   if (model.category === "bedframe") {
-    return <BedframeConfigurator model={model} skus={skus} onAdd={onAdd} />;
+    return <BedframeConfigurator model={model} skus={skus} specialAddons={specialAddons} onAdd={onAdd} />;
   }
   if (model.category === "sofa") {
     return (
@@ -465,6 +489,7 @@ export function ConfiguratorForModel({
         sofaCompartments={sofaCompartments}
         modelSofaCompartments={modelSofaCompartments}
         sofaCombos={sofaCombos}
+        specialAddons={specialAddons}
         onAdd={onAdd}
       />
     );
@@ -491,6 +516,7 @@ function SofaConfiguratorOrBuilder({
   sofaCompartments,
   modelSofaCompartments,
   sofaCombos,
+  specialAddons,
   onAdd,
 }: {
   model: ProductModelDto;
@@ -501,6 +527,7 @@ function SofaConfiguratorOrBuilder({
   sofaCompartments?: SofaCompartmentDto[] | null;
   modelSofaCompartments?: ModelSofaCompartmentDto[] | null;
   sofaCombos?: SofaComboDto[] | null;
+  specialAddons?: SpecialAddonDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -526,6 +553,7 @@ function SofaConfiguratorOrBuilder({
         fabrics={fabrics}
         fabricTierConfig={fabricTierConfig}
         modelFabricTierOverrides={modelFabricTierOverrides}
+        specialAddons={specialAddons}
         onAdd={onAdd}
       />
     );

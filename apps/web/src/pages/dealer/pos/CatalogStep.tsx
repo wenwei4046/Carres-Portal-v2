@@ -307,6 +307,7 @@ export default function CatalogStep({
           sofaCompartments={catalog.sofaCompartments}
           modelSofaCompartments={catalog.modelSofaCompartments}
           sofaCombos={catalog.sofaCombos}
+          specialAddons={catalog.specialAddons}
           onAdd={addLine}
           onClose={() => setConfigureModelId(null)}
         />

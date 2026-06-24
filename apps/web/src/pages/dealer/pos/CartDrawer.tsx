@@ -8,6 +8,7 @@ import {
   type WizardDraft,
 } from "../new-order/draft";
 import { cartAddonSubtotal, cartItemCount, cartLineSubtotal } from "./cart";
+import { SpecialsSummary } from "../new-order/special-addons-picker";
 
 /** The combo key a line belongs to (set by `comboToDraftLines`), or null for a
  *  standalone (non-combo) line. */
@@ -161,6 +162,7 @@ export default function CartDrawer({
                   <div className="min-w-0 flex-1">
                     <div className="t-small font-medium text-base-900 truncate">{l.label}</div>
                     <div className="font-mono text-[11px] text-base-500 mt-0.5">{l.sku}</div>
+                    <SpecialsSummary attrs={l.attrs} />
 
                     {/* Pill stepper */}
                     <div className="flex items-center gap-2 mt-2">
