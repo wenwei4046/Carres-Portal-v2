@@ -11,6 +11,7 @@ import { ApiError } from "@/lib/api";
 import { usePatchCatalogModel } from "@/lib/queries";
 import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
 import ProductModelDrawer from "./ProductModelDrawer";
+import NewModelModal from "./NewModelModal";
 
 /**
  * Modular — model cards grouped by category. Each row: photo · category · code
@@ -36,6 +37,7 @@ export default function ModularTab({
 }) {
   const [category, setCategory] = useState<CatFilter>("all");
   const [drawerModelId, setDrawerModelId] = useState<string | null>(null);
+  const [newModelOpen, setNewModelOpen] = useState(false);
 
   const skusByModel = useMemo(() => {
     const m = new Map<string, ProductSkuDto[]>();
@@ -67,15 +69,25 @@ export default function ModularTab({
 
   return (
     <div>
-      <div className="flex items-center gap-1.5 flex-wrap mb-4">
-        <CategoryChip active={category === "all"} onClick={() => setCategory("all")}>
-          All
-        </CategoryChip>
-        {PRODUCT_CATEGORIES.map((c) => (
-          <CategoryChip key={c} active={category === c} onClick={() => setCategory(c)}>
-            {CATEGORY_LABEL[c]}
+      <div className="flex justify-between items-center gap-3 mb-4 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <CategoryChip active={category === "all"} onClick={() => setCategory("all")}>
+            All
           </CategoryChip>
-        ))}
+          {PRODUCT_CATEGORIES.map((c) => (
+            <CategoryChip key={c} active={category === c} onClick={() => setCategory(c)}>
+              {CATEGORY_LABEL[c]}
+            </CategoryChip>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setNewModelOpen(true)}
+          className="btn-hero text-[12px]"
+          data-testid="model-new"
+        >
+          + New Model
+        </button>
       </div>
 
       {grouped.length === 0 && (
@@ -122,6 +134,8 @@ export default function ModularTab({
           onClose={() => setDrawerModelId(null)}
         />
       )}
+
+      {newModelOpen && <NewModelModal onClose={() => setNewModelOpen(false)} />}
     </div>
   );
 }
