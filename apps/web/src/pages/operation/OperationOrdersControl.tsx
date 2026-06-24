@@ -25,7 +25,6 @@ import { apiFetch } from "@/lib/api";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import type { OperationStage } from "./components/StageChip";
 import {
-  Phone,
   AlertTriangle,
   RefreshCw,
   ChevronLeft,
@@ -91,15 +90,18 @@ const TABS: { key: ControlTab; label: string }[] = [
 
 type SettledTab = Exclude<ControlTab, "all">;
 
-/** v17 status pills per control tab (warning=amber for Pending = waiting on
- *  stock). placed→neutral, proceed→purple, pending→amber, scheduled→indigo,
- *  completed→green. */
-const TAB_PILL: Record<SettledTab, string> = {
-  placed: "pill-neutral",
-  proceed: "pill-draft",
-  pending: "pill-warning",
-  scheduled: "pill-collected",
-  completed: "pill-confirmed",
+/** Status DOT colour per control tab (Q2, Jess 2026-06-24: status demoted from a
+ *  filled pill to a small dot + grey label, so the column stops painting the
+ *  table green/rainbow). Colour is a quiet category cue — the in-motion states
+ *  carry a hue (proceed→purple, pending→amber, scheduled→indigo); the settled
+ *  states stay grey (placed=new, completed=done) so the table reads calm and the
+ *  green is gone. Tune in the live preview. */
+const TAB_DOT: Record<SettledTab, string> = {
+  placed: "#9CA3AF", // base-400 — new, neutral
+  proceed: "#7C3AED", // violet-600
+  pending: "#D97706", // amber-600 — the "waiting on stock" cue
+  scheduled: "#4F46E5", // indigo-600
+  completed: "#9CA3AF", // base-400 — done, neutral (no green)
 };
 
 const TAB_LABEL: Record<SettledTab, string> = {
@@ -761,7 +763,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
         >
           {TABS.map((t) => {
             const active = tab === t.key;
-            const pill = t.key === "all" ? "pill-neutral" : TAB_PILL[t.key as SettledTab];
             return (
               <button
                 key={t.key}
@@ -776,7 +777,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 }`}
               >
                 <span>{t.label}</span>
-                <span className={`pill ${pill} text-[10px] px-1.5 py-0`}>{counts[t.key]}</span>
+                <span
+                  className={`text-[11px] tabular-nums ${active ? "text-base-600" : "text-base-400"}`}
+                >
+                  {counts[t.key]}
+                </span>
               </button>
             );
           })}
@@ -1224,9 +1229,18 @@ function OrderRow({
           />
         </button>
       </td>
-      {/* Status */}
+      {/* Status — Q2 (Jess 2026-06-24): a small colour dot + grey label, NOT a
+          filled pill, so the column no longer paints the table green/rainbow. */}
       <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
-        <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
+        <span
+          title={TAB_DESC[ct]}
+          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-base-600"
+        >
+          <span
+            className="inline-block w-[7px] h-[7px] rounded-full shrink-0"
+            style={{ backgroundColor: TAB_DOT[ct] }}
+            aria-hidden="true"
+          />
           {TAB_LABEL[ct]}
         </span>
       </td>
@@ -1237,10 +1251,23 @@ function OrderRow({
       >
         SO-{o.so}
       </td>
-      {/* Ref No — TCF / CR / DL source-doc references (Jess: keep visible) */}
-      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
+      {/* Ref No — TCF / CR / DL source refs. Compact (Jess 2026-06-24): 10px,
+          wraps to ≤3 tight lines inside a capped width, so several refs save
+          space without making the row taller. */}
+      <td className="px-3 py-2 border-r border-base-100">
         {ref.length > 0 ? (
-          <span className="font-mono text-[11px] text-base-400">{ref.join(" · ")}</span>
+          <span
+            className="font-mono text-[10px] text-base-400 break-words max-w-[140px]"
+            style={{
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical",
+              WebkitLineClamp: 3,
+              overflow: "hidden",
+              lineHeight: 1.3,
+            }}
+          >
+            {ref.join(" · ")}
+          </span>
         ) : (
           <span className="text-base-300">—</span>
         )}
@@ -1290,32 +1317,23 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Location — delivery city/state from the imported address; KV (green) vs
-          Outstation (amber). Outstation carries the call-first-before-PO flag. */}
+      {/* Location — delivery city/state. Q1 colour restraint (Jess 2026-06-24):
+          KV (the majority) is now NEUTRAL grey so the green leaves the table;
+          only Outstation keeps a quiet amber (no warehouse buffer = special
+          handling). The "Call before PO" action moved INTO the drawer. */}
       <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
         {loc.label ? (
-          <span className="inline-flex items-center gap-1">
-            <span
-              className={`text-[11px] font-medium ${
-                loc.area === "KV"
-                  ? "text-success"
-                  : loc.area === "Outstation"
-                    ? "text-warning"
-                    : "text-base-600"
-              }`}
-            >
-              {loc.label}
-            </span>
-            {loc.area === "Outstation" && (
-              <span
-                className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-warning whitespace-nowrap"
-                title="Call customer to confirm final ETA before ordering stock (no warehouse buffer outstation)."
-                aria-label="call customer before raising PO"
-              >
-                <Phone size={11} strokeWidth={2} className="inline" />
-                Call before PO
-              </span>
-            )}
+          <span
+            className={`text-[11px] font-medium ${
+              loc.area === "Outstation" ? "text-warning" : "text-base-600"
+            }`}
+            title={
+              loc.area === "Outstation"
+                ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
+                : undefined
+            }
+          >
+            {loc.label}
           </span>
         ) : (
           <span className="text-base-400">—</span>
@@ -1399,9 +1417,12 @@ function StockCell({ info }: { info: StockInfo }) {
 
   const counts =
     info.need != null && info.have != null ? ` ${info.have}/${info.need}` : "";
+  // Q1 colour restraint (Jess 2026-06-24): Ready is the common case → render it
+  // QUIET (neutral grey) so the green leaves the table; colour now only marks the
+  // exception — amber Waiting = "raise a PO / on the way".
   const cfg = {
-    ready: { pill: "pill-confirmed", label: "Ready", title: "Stock secured / reserved for this order" },
-    in_stock: { pill: "pill-confirmed", label: `Ready${counts}`, title: "Free warehouse stock covers every line" },
+    ready: { pill: "pill-neutral", label: "Ready", title: "Stock secured / reserved for this order" },
+    in_stock: { pill: "pill-neutral", label: `Ready${counts}`, title: "Free warehouse stock covers every line" },
     need_po: {
       pill: "pill-warning",
       label: `Waiting${counts}`,

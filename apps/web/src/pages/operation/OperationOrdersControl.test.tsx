@@ -590,7 +590,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(rowsBySo()).toEqual(["6002", "6005", "6001", "6004", "6003"]);
   });
 
-  it("shows the real delivery location for outstation + a 📞 flag, NOT the word 'Outstation' (A2/A4)", () => {
+  it("shows the real outstation location, NOT the word 'Outstation' — call-first flag moved into the drawer (A2/A4)", () => {
     oneRow({
       id: "r2",
       so: 3002,
@@ -600,13 +600,15 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const row = screen.getByTestId("order-row");
     expect(within(row).getByText("Penang")).toBeInTheDocument();
     expect(within(row).queryByText("Outstation")).not.toBeInTheDocument();
-    // 📞 call-first flag present for outstation
+    // The "Call before PO" flag is no longer in the LIST — the call-first action
+    // now lives inside the order drawer (Jess 2026-06-24), keeping the row calm.
+    expect(within(row).queryByText(/Call before PO/i)).not.toBeInTheDocument();
     expect(
-      within(row).getByLabelText("call customer before raising PO"),
-    ).toBeInTheDocument();
+      within(row).queryByLabelText("call customer before raising PO"),
+    ).not.toBeInTheDocument();
   });
 
-  it("shows a KV location in green with no 📞 flag (A2/A4)", () => {
+  it("shows a KV location in neutral grey (no green) with no call flag (A2/A4)", () => {
     oneRow({
       id: "r3",
       so: 3003,
@@ -614,7 +616,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    expect(within(row).getByText("Selangor")).toBeInTheDocument();
+    const loc = within(row).getByText("Selangor");
+    expect(loc).toBeInTheDocument();
+    // Q1 colour restraint: KV is no longer painted green — it reads neutral.
+    expect(loc.className).not.toContain("text-success");
     expect(
       within(row).queryByLabelText("call customer before raising PO"),
     ).not.toBeInTheDocument();
