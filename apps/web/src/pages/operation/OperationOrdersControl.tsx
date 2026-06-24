@@ -330,6 +330,17 @@ const CORE_LABEL: Record<CoreCat, string> = {
 };
 const CORE_ORDER: CoreCat[] = ["mattress", "bedframe", "sofa"];
 
+/** Product-category filter options (Jess 2026-06-24): Mattress / Bedframe / Sofa
+ *  — an order matches when it has at least one line of that core type. */
+const CATEGORY_OPTS: { cat: CoreCat; label: string }[] = [
+  { cat: "mattress", label: "Mattress" },
+  { cat: "bedframe", label: "Bedframe" },
+  { cat: "sofa", label: "Sofa" },
+];
+function orderHasCategory(o: operationOrderListRow, cat: CoreCat): boolean {
+  return (o.order_lines ?? []).some((l) => lineCategory(l.sku) === cat);
+}
+
 /** Physical-goods unit total — core + accessories. Service lines (Disposal,
  *  floor charge…) are NOT units, so they don't count (matches the Master
  *  Sheet's qty column: "8 X" = 2 Mattress + 2 Bedframe + 4 Pillow, Disposal
@@ -448,8 +459,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
-  // Inline remark editor (Jess 2026-06-24): the order whose remarks are open.
-  const [editRemark, setEditRemark] = useState<operationOrderListRow | null>(null);
   // Rows per page (Jess 2026-06-24): 15 / 30 / 45 / 60. The listing is a FIXED
   // box — it never scrolls vertically; instead the whole table auto-scales (CSS
   // zoom) so the chosen number of rows fits. More rows ⇒ smaller rows.
@@ -463,6 +472,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [stockFilter, setStockFilter] = useState<StockBucket | null>(null);
   const [logisticFilter, setLogisticFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<CoreCat | null>(null);
   // ⭐ Follow-up star (Gmail-style) — flag from the row OR the drawer header.
   // The flag itself is a follow_up note; one shared mutation toggles it.
   const [flaggedOnly, setFlaggedOnly] = useState(false);
@@ -590,6 +600,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
       .map(([carrier, count]) => ({ carrier, count }));
   }, [tabFiltered, partnerName]);
 
+  const categoryEntries = useMemo(
+    () =>
+      CATEGORY_OPTS.map(({ cat, label }) => ({
+        cat,
+        label,
+        count: tabFiltered.filter((o) => orderHasCategory(o, cat)).length,
+      })),
+    [tabFiltered],
+  );
+
   const visible = useMemo(() => {
     let r = tabFiltered;
     if (urgentOnly) r = r.filter(isUrgentOrder);
@@ -598,8 +618,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
     if (logisticFilter)
       r = r.filter((o) => (logisticOf(o, partnerName) ?? NO_CARRIER) === logisticFilter);
+    if (categoryFilter) r = r.filter((o) => orderHasCategory(o, categoryFilter));
     return [...r].sort(compareByDeadline);
-  }, [tabFiltered, urgentOnly, flaggedOnly, regionFilter, stockFilter, logisticFilter, availableBySku, partnerName]);
+  }, [tabFiltered, urgentOnly, flaggedOnly, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -611,7 +632,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Reset to the first page whenever the filtered set changes.
   useEffect(
     () => setPage(0),
-    [tab, search, pageSize, urgentOnly, flaggedOnly, regionFilter, stockFilter, logisticFilter],
+    [tab, search, pageSize, urgentOnly, flaggedOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
   );
 
   const total = visible.length;
@@ -906,10 +927,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
       {/* Region + Stock filters — the card's second row (Jess: pick a state →
           select-all → assign logistic; filter by stock too). */}
-      <div className="flex items-center gap-3 px-3 py-2">
-      <div className="flex items-center gap-1.5 flex-1 min-w-0 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5 shrink-0">Region</span>
-        <div className="flex items-center gap-1.5 overflow-x-auto min-w-0 pb-0.5">
+      <div className="px-3 py-2 border-b border-base-100">
+      <div className="flex items-start gap-1.5 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5 shrink-0 mt-1">Region</span>
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
           <RegionChip
             label="All"
             count={tabFiltered.length}
@@ -927,7 +948,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
           ))}
         </div>
       </div>
+      </div>
 
+      <div className="flex items-start gap-3 px-3 py-2 flex-wrap">
       {/* Stock-status filter — its own panel; coloured dots (green / amber / red)
           tie it to the Stock column AND set it apart from the Region panel. */}
       <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
@@ -970,6 +993,25 @@ export default function OperationOrdersControl({ onImport }: Props) {
             onClick={() =>
               setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))
             }
+          />
+        ))}
+      </div>
+      {/* Category filter — Mattress / Bedframe / Sofa (Jess 2026-06-24). */}
+      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Category</span>
+        <RegionChip
+          label="All"
+          count={tabFiltered.length}
+          active={categoryFilter === null}
+          onClick={() => setCategoryFilter(null)}
+        />
+        {categoryEntries.map((e) => (
+          <RegionChip
+            key={e.cat}
+            label={e.label}
+            count={e.count}
+            active={categoryFilter === e.cat}
+            onClick={() => setCategoryFilter((r) => (r === e.cat ? null : e.cat))}
           />
         ))}
       </div>
@@ -1089,7 +1131,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 onToggle={() => toggleOne(o.id)}
                 onOpen={() => setOpenOrderId(o.id)}
                 onToggleStar={toggleFollowUp}
-                onEditRemark={() => setEditRemark(o)}
               />
             ))}
           </tbody>
@@ -1103,9 +1144,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
         />
       )}
 
-      {editRemark && (
-        <RemarkEditModal order={editRemark} onClose={() => setEditRemark(null)} />
-      )}
     </div>
   );
 }
@@ -1341,89 +1379,101 @@ function RegionChip({
 /** Inline remark editor (Jess 2026-06-24: edit the 4 operator remarks straight
  *  from the list, no need to open the full order drawer). Saves via the
  *  order-control overlay PUT, which also refreshes the orders list. */
-function RemarkEditModal({
-  order,
-  onClose,
-}: {
-  order: operationOrderListRow;
-  onClose: () => void;
-}) {
+/** Remark cell — shows the 4 operator remarks (Carres / Action / WH / Cust) IN
+ *  the cell and edits them IN PLACE on click (Jess 2026-06-24: no popup modal).
+ *  Saves via the order-control overlay PUT, which also refreshes the list. */
+const REMARK_FIELDS = [
+  { key: "carres_remark", label: "Carres" },
+  { key: "action_for_logistic", label: "Action" },
+  { key: "warehouse_remark", label: "WH" },
+  { key: "customer_request", label: "Cust" },
+] as const;
+function RemarkCell({ order }: { order: operationOrderListRow }) {
   const ovlRaw = order.ops_order_control;
   const ovl = Array.isArray(ovlRaw) ? ovlRaw[0] : ovlRaw;
-  const [carres, setCarres] = useState(ovl?.carres_remark ?? "");
-  const [warehouse, setWarehouse] = useState(ovl?.warehouse_remark ?? "");
-  const [cust, setCust] = useState(ovl?.customer_request ?? "");
-  const [action, setAction] = useState(ovl?.action_for_logistic ?? "");
+  const [editing, setEditing] = useState(false);
+  const [vals, setVals] = useState({
+    carres_remark: ovl?.carres_remark ?? "",
+    action_for_logistic: ovl?.action_for_logistic ?? "",
+    warehouse_remark: ovl?.warehouse_remark ?? "",
+    customer_request: ovl?.customer_request ?? "",
+  });
   const save = useSaveOrderControl(order.id, {
     onSuccess: () => {
-      toast.success("Remarks saved");
-      onClose();
+      toast.success("Remark saved");
+      setEditing(false);
     },
     onError: (e) => toast.error(`Couldn't save — ${e.message}`),
   });
-  const fields: { label: string; value: string; set: (v: string) => void }[] = [
-    { label: "Carres remark", value: carres, set: setCarres },
-    { label: "Warehouse remark", value: warehouse, set: setWarehouse },
-    { label: "Customer request", value: cust, set: setCust },
-    { label: "Action for logistic", value: action, set: setAction },
-  ];
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-lg shadow-xl border border-base-200 w-full max-w-md p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="t-h4 font-semibold">
-            Remarks · <span className="font-mono">SO-{order.so}</span>
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="p-1 rounded text-base-400 hover:text-base-900 hover:bg-base-100"
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <div className="space-y-3">
-          {fields.map((f) => (
-            <label key={f.label} className="block">
-              <span className="t-micro text-base-500">{f.label}</span>
-              <textarea
-                value={f.value}
-                onChange={(e) => f.set(e.target.value)}
-                rows={2}
-                className="mt-1 w-full px-2.5 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700 resize-none"
+
+  if (editing) {
+    return (
+      <td className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
+        <div className="space-y-1">
+          {REMARK_FIELDS.map((f) => (
+            <div key={f.key} className="flex items-center gap-1">
+              <span className="text-[9px] font-semibold uppercase text-base-400 w-9 shrink-0">
+                {f.label}
+              </span>
+              <input
+                value={vals[f.key]}
+                onChange={(e) => setVals((v) => ({ ...v, [f.key]: e.target.value }))}
+                className="flex-1 min-w-0 px-1.5 py-0.5 border border-base-200 rounded text-[11px] bg-white outline-none focus:border-base-700"
               />
-            </label>
+            </div>
+          ))}
+          <div className="flex justify-end gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="text-[10px] text-base-500 hover:text-base-900"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={save.isPending}
+              onClick={() =>
+                save.mutate({
+                  carres_remark: vals.carres_remark.trim() || null,
+                  action_for_logistic: vals.action_for_logistic.trim() || null,
+                  warehouse_remark: vals.warehouse_remark.trim() || null,
+                  customer_request: vals.customer_request.trim() || null,
+                })
+              }
+              className="text-[10px] font-semibold text-primary hover:underline disabled:opacity-50"
+            >
+              {save.isPending ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      </td>
+    );
+  }
+
+  const filled = REMARK_FIELDS.filter((f) => vals[f.key].trim());
+  return (
+    <td
+      className="px-3 py-2 align-top cursor-text hover:bg-base-50"
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      title="Click to edit remarks"
+    >
+      {filled.length === 0 ? (
+        <span className="text-[10px] text-base-300">+ add remark</span>
+      ) : (
+        <div className="leading-[1.3]">
+          {filled.map((f) => (
+            <div key={f.key} className="truncate text-[10px]">
+              <span className="font-semibold text-base-500">{f.label}:</span>{" "}
+              <span className="text-base-700">{vals[f.key]}</span>
+            </div>
           ))}
         </div>
-        <div className="flex justify-end gap-2 mt-4">
-          <button type="button" onClick={onClose} className="btn-secondary text-[12px]">
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={save.isPending}
-            onClick={() =>
-              save.mutate({
-                carres_remark: carres.trim() || null,
-                warehouse_remark: warehouse.trim() || null,
-                customer_request: cust.trim() || null,
-                action_for_logistic: action.trim() || null,
-              })
-            }
-            className="btn-primary text-[12px]"
-          >
-            {save.isPending ? "Saving…" : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
+      )}
+    </td>
   );
 }
 
@@ -1437,7 +1487,6 @@ function OrderRow({
   onToggle,
   onOpen,
   onToggleStar,
-  onEditRemark,
 }: {
   o: operationOrderListRow;
   idx: number;
@@ -1450,7 +1499,6 @@ function OrderRow({
   onToggle: () => void;
   onOpen: () => void;
   onToggleStar: (orderId: string, flagged: boolean) => void;
-  onEditRemark: () => void;
 }) {
   const ct = controlTabOf(o);
   const urg = urgencyColor(o, ct);
@@ -1470,22 +1518,8 @@ function OrderRow({
       ? partnerName.get(o.ops_assigned_logistic) ?? "…"
       : null);
 
-  // Remark column — the 4 operator remark fields surfaced from the
-  // ops_order_control overlay (Jess 2026-06-24: multi-operator handoff). The 1:1
-  // PostgREST embed is an object; defensively unwrap an array too.
-  const ovlRaw = o.ops_order_control;
-  const ovl = Array.isArray(ovlRaw) ? ovlRaw[0] : ovlRaw;
-  const remarks = (
-    [
-      ovl?.carres_remark ? { k: "Carres", v: ovl.carres_remark } : null,
-      ovl?.warehouse_remark ? { k: "WH", v: ovl.warehouse_remark } : null,
-      ovl?.customer_request ? { k: "Cust", v: ovl.customer_request } : null,
-      ovl?.action_for_logistic ? { k: "Action", v: ovl.action_for_logistic } : null,
-    ] as ({ k: string; v: string } | null)[]
-  ).filter((r): r is { k: string; v: string } => r !== null);
-
-  // ≤3-line clamp shared by the wrapping cells (Ref / Customer / Location /
-  // Remark) — fixed width, never taller than 3 lines (Jess 2026-06-24).
+  // ≤3-line clamp shared by the wrapping cells (Ref / Customer / Location) —
+  // fixed width, never taller than 3 lines (Jess 2026-06-24).
   const clamp3 = {
     display: "-webkit-box",
     WebkitBoxOrient: "vertical" as const,
@@ -1699,29 +1733,8 @@ function OrderRow({
           </div>
         )}
       </td>
-      {/* Remark — the 4 operator remarks; CLICK to edit inline (Jess 2026-06-24:
-          edit from the list without opening the full drawer). */}
-      <td
-        className="px-3 py-2 cursor-text hover:bg-base-50"
-        onClick={(e) => {
-          e.stopPropagation();
-          onEditRemark();
-        }}
-        title="Click to edit remarks"
-      >
-        {remarks.length === 0 ? (
-          <span className="text-[10px] text-base-300">+ add remark</span>
-        ) : (
-          <div className="leading-[1.3]" style={clamp3}>
-            {remarks.map((r, i) => (
-              <div key={i} className="truncate text-[10px]">
-                <span className="font-semibold text-base-500">{r.k}:</span>{" "}
-                <span className="text-base-700">{r.v}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </td>
+      {/* Remark — the 4 operator remarks shown in-cell; click to edit in place. */}
+      <RemarkCell order={o} />
     </tr>
   );
 }
