@@ -301,6 +301,20 @@ function regionBucket(address: string | null): string {
   return detectState(address) ?? OTHERS_LABEL;
 }
 
+/** Carrier / logistic name for an order — the formal LP, else the Inbox-triage
+ *  assignment resolved via the partners map; null when none yet. Drives the
+ *  Logistic filter chips + the Carrier cell (Jess 2026-06-24). */
+function logisticOf(
+  o: operationOrderListRow,
+  partnerName: Map<string, string>,
+): string | null {
+  return (
+    o.delivery_partners?.name ??
+    (o.ops_assigned_logistic ? partnerName.get(o.ops_assigned_logistic) ?? null : null)
+  );
+}
+const NO_CARRIER = "—";
+
 /** Item category short-form (Master Sheet model): core goods Mattress / Bedframe
  *  / Sofa need POs + stock; everything else is accessory/service. Native SKUs
  *  carry a `mattress:` / `bedframe:` / `sofa:` prefix; AutoCount free-text SKUs
@@ -448,6 +462,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [stockFilter, setStockFilter] = useState<StockBucket | null>(null);
+  const [logisticFilter, setLogisticFilter] = useState<string | null>(null);
   // ⭐ Follow-up star (Gmail-style) — flag from the row OR the drawer header.
   // The flag itself is a follow_up note; one shared mutation toggles it.
   const [flaggedOnly, setFlaggedOnly] = useState(false);
@@ -564,14 +579,27 @@ export default function OperationOrdersControl({ onImport }: Props) {
     }));
   }, [tabFiltered, availableBySku]);
 
+  const logisticEntries = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of tabFiltered) {
+      const key = logisticOf(o, partnerName) ?? NO_CARRIER;
+      m.set(key, (m.get(key) ?? 0) + 1);
+    }
+    return [...m.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([carrier, count]) => ({ carrier, count }));
+  }, [tabFiltered, partnerName]);
+
   const visible = useMemo(() => {
     let r = tabFiltered;
     if (urgentOnly) r = r.filter(isUrgentOrder);
     if (flaggedOnly) r = r.filter(isFlaggedOrder);
     if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
+    if (logisticFilter)
+      r = r.filter((o) => (logisticOf(o, partnerName) ?? NO_CARRIER) === logisticFilter);
     return [...r].sort(compareByDeadline);
-  }, [tabFiltered, urgentOnly, flaggedOnly, regionFilter, stockFilter, availableBySku]);
+  }, [tabFiltered, urgentOnly, flaggedOnly, regionFilter, stockFilter, logisticFilter, availableBySku, partnerName]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -583,7 +611,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Reset to the first page whenever the filtered set changes.
   useEffect(
     () => setPage(0),
-    [tab, search, pageSize, urgentOnly, flaggedOnly, regionFilter, stockFilter],
+    [tab, search, pageSize, urgentOnly, flaggedOnly, regionFilter, stockFilter, logisticFilter],
   );
 
   const total = visible.length;
@@ -598,9 +626,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const rangeStart = total === 0 ? 0 : safePage * (pageSize === "all" ? total : pageSize) + 1;
   const rangeEnd = pageSize === "all" ? total : Math.min(total, (safePage + 1) * pageSize);
 
-  // Denser rows once the page shows 30+ (single-line cells) so the auto-scale
-  // doesn't have to shrink the text as hard.
-  const compact = typeof pageSize === "number" && pageSize >= 30;
+  // Denser rows once the page shows 20+ (single-line cells + tight padding) so
+  // they fit at FULL-SIZE text instead of the auto-scale shrinking the font to
+  // unreadable (Jess 2026-06-24: "20 rows too small"). 15 = roomy multi-line.
+  const compact = typeof pageSize === "number" && pageSize >= 20;
 
   // Fixed listing — scale the whole table (CSS zoom) so every row of the page
   // fits the box with NO vertical scroll (Jess 2026-06-24: "fix listing, not
@@ -771,7 +800,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   return (
     <div
-      className="h-full flex flex-col px-9 pt-7 pb-5"
+      className="h-full flex flex-col px-9 pt-7 pb-5 bg-base-200"
       data-testid="operation-orders-control"
     >
       {/* Header — title + count + search + import (fixed; does not scroll) */}
@@ -918,6 +947,28 @@ export default function OperationOrdersControl({ onImport }: Props) {
             dot={e.bucket === "Ready" ? "#16A34A" : e.bucket === "Waiting" ? "#D97706" : "#DC2626"}
             onClick={() =>
               setStockFilter((r) => (r === e.bucket ? null : e.bucket))
+            }
+          />
+        ))}
+      </div>
+      {/* Logistic / carrier filter — its own panel (Jess 2026-06-24), like
+          Status / Region / Stock. */}
+      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Logistic</span>
+        <RegionChip
+          label="All"
+          count={tabFiltered.length}
+          active={logisticFilter === null}
+          onClick={() => setLogisticFilter(null)}
+        />
+        {logisticEntries.map((e) => (
+          <RegionChip
+            key={e.carrier}
+            label={e.carrier}
+            count={e.count}
+            active={logisticFilter === e.carrier}
+            onClick={() =>
+              setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))
             }
           />
         ))}
@@ -1445,8 +1496,8 @@ function OrderRow({
   return (
     <tr
       onClick={onOpen}
-      className={`border-t border-base-100 hover:bg-base-100/70 cursor-pointer align-top ${
-        selected ? "bg-primary/5" : ""
+      className={`border-t border-base-200 hover:bg-info-soft/50 cursor-pointer align-top ${
+        selected ? "bg-primary/5" : idx % 2 ? "bg-base-100/70" : "bg-white"
       }`}
       data-testid="order-row"
     >
