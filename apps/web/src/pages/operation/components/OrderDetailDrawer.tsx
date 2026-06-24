@@ -38,6 +38,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import AnnotationTimeline from "./AnnotationTimeline";
 import DeliveryChain from "./DeliveryChain";
+import FollowUpStar from "./FollowUpStar";
 import {
   useOrderControlForm,
   RoutingFields,
@@ -586,6 +587,7 @@ function DrawerBody({
           }
           headerRight={
             <span className="flex items-center gap-1">
+              <FollowUpStar orderId={order.id} />
               <StageChip stage={stage} />
               <ActionsMenu
                 order={order}

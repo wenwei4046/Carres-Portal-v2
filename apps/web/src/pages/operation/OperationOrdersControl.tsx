@@ -6,10 +6,12 @@ import {
   useOperationOrders,
   useOperationStock,
   useDeliveryPartners,
+  useAddAnnotation,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { cjkClassName } from "@/lib/cjk";
+import { isFollowUpFlagged } from "@/lib/follow-up";
 import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
 import {
   type CoreCat,
@@ -34,6 +36,7 @@ import {
   ListTodo,
   CheckCircle2,
   X,
+  Star,
   type LucideIcon,
 } from "lucide-react";
 
@@ -248,6 +251,15 @@ function isUrgentOrder(o: operationOrderListRow): boolean {
   return deadlineInfo(o.delivery_date)?.urgent ?? false;
 }
 
+/** ⭐ Flagged for follow-up — derived from the order's annotations (the latest
+ *  follow_up/resolved note is a follow_up). Drives the row star + the "Starred"
+ *  filter chip; mirrors the drawer-header star (Jess: multi-operator handoff). */
+function isFlaggedOrder(o: operationOrderListRow): boolean {
+  return isFollowUpFlagged(
+    (o.order_annotations ?? []).map((a) => ({ tag: a.tag, at: a.created_at })),
+  );
+}
+
 /** Default sort — deadline ASCENDING (Jess P3): overdue/earliest first so the
  *  table reads as a work queue. TBD + undated sink to the bottom; within that
  *  tail (and on date ties) newest placed_at first, the old list default. */
@@ -424,6 +436,23 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [stockFilter, setStockFilter] = useState<StockBucket | null>(null);
+  // ⭐ Follow-up star (Gmail-style) — flag from the row OR the drawer header.
+  // The flag itself is a follow_up note; one shared mutation toggles it.
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
+  const addFollowUpNote = useAddAnnotation();
+  const toggleFollowUp = (orderId: string, flagged: boolean) => {
+    if (addFollowUpNote.isPending) return;
+    addFollowUpNote.mutate(
+      flagged
+        ? { orderId, content: "✅ Follow-up cleared", tag: "resolved" }
+        : { orderId, content: "⭐ Flagged for follow-up", tag: "follow_up" },
+      {
+        onSuccess: () =>
+          toast.success(flagged ? "Follow-up cleared" : "Flagged for follow-up"),
+        onError: () => toast.error("Couldn't update — retry"),
+      },
+    );
+  };
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -495,6 +524,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     [orders, tab],
   );
   const urgentCount = useMemo(() => tabFiltered.filter(isUrgentOrder).length, [tabFiltered]);
+  const flaggedCount = useMemo(() => tabFiltered.filter(isFlaggedOrder).length, [tabFiltered]);
   const regionEntries = useMemo(() => {
     const m = new Map<string, number>();
     for (const o of tabFiltered) {
@@ -525,10 +555,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const visible = useMemo(() => {
     let r = tabFiltered;
     if (urgentOnly) r = r.filter(isUrgentOrder);
+    if (flaggedOnly) r = r.filter(isFlaggedOrder);
     if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
     return [...r].sort(compareByDeadline);
-  }, [tabFiltered, urgentOnly, regionFilter, stockFilter, availableBySku]);
+  }, [tabFiltered, urgentOnly, flaggedOnly, regionFilter, stockFilter, availableBySku]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -540,7 +571,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Reset to the first page whenever the filtered set changes.
   useEffect(
     () => setPage(0),
-    [tab, search, pageSize, urgentOnly, regionFilter, stockFilter],
+    [tab, search, pageSize, urgentOnly, flaggedOnly, regionFilter, stockFilter],
   );
 
   const total = visible.length;
@@ -774,6 +805,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <AlertTriangle size={13} strokeWidth={2.5} /> Urgent {urgentCount}
           </button>
         )}
+        {flaggedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setFlaggedOnly((v) => !v)}
+            title="Flagged for follow-up (⭐ starred, not yet resolved)"
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[12px] font-semibold transition-colors ${
+              flaggedOnly
+                ? "bg-yellow-400 text-yellow-950"
+                : "border border-yellow-400/50 text-yellow-700 hover:bg-yellow-50"
+            }`}
+          >
+            <Star size={13} strokeWidth={2.5} className="fill-current" /> Starred {flaggedCount}
+          </button>
+        )}
       </div>
 
       {/* State-region filter pills (Jess: pick a state → select-all → assign
@@ -896,6 +941,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 selected={selected.has(o.id)}
                 onToggle={() => toggleOne(o.id)}
                 onOpen={() => setOpenOrderId(o.id)}
+                onToggleStar={toggleFollowUp}
               />
             ))}
           </tbody>
@@ -1116,6 +1162,7 @@ function OrderRow({
   selected,
   onToggle,
   onOpen,
+  onToggleStar,
 }: {
   o: operationOrderListRow;
   partnerName: Map<string, string>;
@@ -1123,8 +1170,10 @@ function OrderRow({
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
+  onToggleStar: (orderId: string, flagged: boolean) => void;
 }) {
   const ct = controlTabOf(o);
+  const flagged = isFlaggedOrder(o);
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
   const qtyTotal = unitTotal(lines);
@@ -1155,10 +1204,30 @@ function OrderRow({
           className="cursor-pointer accent-base-900 align-middle"
         />
       </td>
-      {/* Status — leads the row (Jess P2 column order) */}
+      {/* Status — leads the row (Jess P2 column order), with the Gmail-style
+          ⭐ follow-up star: click to flag/unflag without opening the order. */}
       <td className="px-4 py-2.5 whitespace-nowrap">
-        <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
-          {TAB_LABEL[ct]}
+        <span className="inline-flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleStar(o.id, flagged);
+            }}
+            aria-pressed={flagged}
+            aria-label={flagged ? "Clear follow-up flag" : "Flag for follow-up"}
+            title={flagged ? "Flagged for follow-up — click to clear" : "Flag for follow-up"}
+            className="p-0.5 rounded hover:bg-base-100 shrink-0"
+          >
+            <Star
+              size={15}
+              strokeWidth={2}
+              className={flagged ? "fill-yellow-400 text-yellow-500" : "text-base-300"}
+            />
+          </button>
+          <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
+            {TAB_LABEL[ct]}
+          </span>
         </span>
       </td>
       {/* Order ID — SO number, customer name + TCF/CR ref no UNDER it (Jess:

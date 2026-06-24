@@ -4914,6 +4914,10 @@ export function useAddAnnotation() {
       }),
     onSuccess: (_data, { orderId }) => {
       void qc.invalidateQueries({ queryKey: qk.operation.orderTimeline(orderId) });
+      // The ⭐ follow-up star + the Orders-list "Follow-up" filter derive from each
+      // order's embedded annotations, so the list must refetch when a follow_up /
+      // resolved note is added — else the star stays stale in the list view.
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
     },
   });
 }
