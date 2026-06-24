@@ -2,12 +2,23 @@
 
 ## ▶ RESUME (session 3 — READ THIS FIRST)
 
-**Where the work is:** branch **`feat/orders-drawer-redesign`**, **pushed to origin**.
-New chat: `git fetch origin && git checkout feat/orders-drawer-redesign` in the
-Carres-Portal-v2 repo. HEAD = `ad537ba` (or later). Main repo `main` = `origin/main`
-(clean). **NOT merged to main, NOT deployed** — await `上线`. Tune visuals in the LIVE
-v19 preview (operation@carres.com, real prod data) — NOT in mocks (the muted mock
-palette misled us for ~11 iterations; real v17 colour is stronger).
+**Where the work is:** branch **`feat/orders-drawer-redesign`** (PUSHED to origin), in a git
+**worktree** at `C:/Users/User/carres-worktrees/orders-drawer` (deps installed, `.env.local`
+copied in, the in-app preview `.claude/launch.json` already points here). HEAD = `ad537ba`
+(or later). Main repo `…/OneDrive/Desktop/Carres-Portal v2` stays on `main` = `origin/main`.
+
+- **SAME machine (new chat opens here):** the worktree already exists — **just keep working
+  IN it**. Operate on files under `C:/Users/User/carres-worktrees/orders-drawer/...` and run
+  git as `git -C "C:/Users/User/carres-worktrees/orders-drawer" …`. **Do NOT delete the
+  worktree. Do NOT `git checkout feat/…` in the main repo** (the branch is held by the
+  worktree → that checkout errors). No fetch/checkout needed; the work is already on disk.
+- **DIFFERENT machine (e.g. home):** no worktree there — `git fetch origin && git checkout
+  feat/orders-drawer-redesign` directly in the cloned repo (a worktree is NOT required).
+- Delete the worktree (`git worktree remove`) ONLY after this feature is merged to main + shipped.
+
+**NOT merged to main, NOT deployed** — await `上线`. Tune visuals in the LIVE v19 preview
+(operation@carres.com, real prod data) — NOT in mocks (the muted mock palette misled us for
+~11 iterations; real v17 colour is stronger).
 
 **DONE (all committed on feat):**
 - ✅ **RECONCILE** with origin/main (Jess phase 11 + sofa engine) — migrations renumbered
