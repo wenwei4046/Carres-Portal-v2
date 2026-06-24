@@ -204,6 +204,24 @@ export interface AddonRow {
   service_sku: string | null;
 }
 
+/** `special_addons` (migration 0181). Per-model selling surcharge + one-level
+ *  follow-up question groups (jsonb). selling_price/extra may be negative. */
+export interface SpecialAddonRow {
+  id: string;
+  code: string;
+  label: string;
+  so_description: string;
+  categories: string[];
+  selling_price: number;
+  cost: number | null;
+  option_groups: { label: string; required: boolean; choices: { label: string; extra: number }[] }[];
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
 /**
  * `combos` (migration 0177). A fixed-set bundle (套餐) sold at one
  * `combo_price`. Components live in `combo_components`. `combo_key` is the

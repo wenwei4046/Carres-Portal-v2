@@ -12,6 +12,7 @@ import { proceedBlockers } from "@/lib/order-blockers";
 import { useCatalog, useOrder, useProceedOrder } from "@/lib/queries";
 import { orderTotal, lineSubtotal, addonSubtotal, floorSurcharge } from "@/lib/order-totals";
 import { groupSofaBuildLines } from "@/lib/sofa-build-display";
+import { SpecialsSummary } from "./new-order/special-addons-picker";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import AddAddressModal from "./order-actions/AddAddressModal";
 import CancelOrderDialog from "./order-actions/CancelOrderDialog";
@@ -212,9 +213,12 @@ function OrderBody({
               <span className="font-mono">RM {row.totalPrice.toLocaleString()}</span>
             </div>
           ) : (
-            <div key={row.line.id} className={`flex justify-between px-3.5 py-2.5 text-sm ${i ? "border-t border-base-100" : ""}`}>
-              <span className="font-mono">{row.line.sku} × {row.line.qty}</span>
-              <span className="font-mono">RM {(row.line.unitPrice * row.line.qty).toLocaleString()}</span>
+            <div key={row.line.id} className={`px-3.5 py-2.5 text-sm ${i ? "border-t border-base-100" : ""}`}>
+              <div className="flex justify-between">
+                <span className="font-mono">{row.line.sku} × {row.line.qty}</span>
+                <span className="font-mono">RM {(row.line.unitPrice * row.line.qty).toLocaleString()}</span>
+              </div>
+              <SpecialsSummary attrs={row.line.attrs} className="mt-1 ml-0.5 flex flex-col gap-0.5" />
             </div>
           ),
         )}

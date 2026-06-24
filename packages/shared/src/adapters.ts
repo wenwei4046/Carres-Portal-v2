@@ -116,6 +116,24 @@ export const addonFromRow = (r: DB.AddonRow): D.Addon => ({
   serviceSku: r.service_sku ?? null,
 });
 
+// 0181 — special add-on (per-model selling surcharge + jsonb option groups).
+export const specialAddonFromRow = (r: DB.SpecialAddonRow): D.SpecialAddon => ({
+  id: r.id,
+  code: r.code,
+  label: r.label,
+  soDescription: r.so_description ?? "",
+  categories: r.categories ?? [],
+  sellingPrice: Number(r.selling_price),
+  cost: r.cost == null ? null : Number(r.cost),
+  optionGroups: (r.option_groups ?? []).map((g) => ({
+    label: g.label,
+    required: !!g.required,
+    choices: (g.choices ?? []).map((c) => ({ label: c.label, extra: Number(c.extra) })),
+  })),
+  active: r.active,
+  sortOrder: r.sort_order,
+});
+
 export const floorConfigFromRow = (r: DB.FloorConfigRow): D.FloorConfig => ({
   id: r.id,
   freeUpToFloor: r.free_up_to_floor,

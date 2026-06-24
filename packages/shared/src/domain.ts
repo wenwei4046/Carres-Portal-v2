@@ -133,6 +133,30 @@ export interface Addon {
 }
 
 /**
+ * Special Add-on (migration 0181) — a per-model SELLING surcharge with optional
+ * one-level follow-up question groups. `sellingPrice` + a chosen choice's `extra`
+ * may be NEGATIVE (a deduction). Attached per-model via allowed_options.specials;
+ * folds into the line unitPrice (no separate SKU).
+ */
+export interface SpecialAddonOptionGroup {
+  label: string;
+  required: boolean;
+  choices: { label: string; extra: number }[];
+}
+export interface SpecialAddon {
+  id: string;
+  code: string;
+  label: string;
+  soDescription: string;
+  categories: string[];
+  sellingPrice: number;
+  cost: number | null;
+  optionGroups: SpecialAddonOptionGroup[];
+  active: boolean;
+  sortOrder: number;
+}
+
+/**
  * One component SKU inside a combo (migration 0177). `qty` = how many of this
  * SKU the bundle contains; `sortOrder` drives the deterministic explode order
  * (the last component absorbs the rounding residue in explodeCombo).

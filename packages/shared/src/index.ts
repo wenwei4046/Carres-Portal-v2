@@ -187,6 +187,15 @@ export {
   type SofaComboDto,
   type SofaComboCreateInput,
   type SofaComboPatchInput,
+  // 0181 — special add-ons schemas + input/Dto types.
+  specialAddonSchema,
+  specialAddonOptionGroupSchema,
+  specialAddonCreateInput,
+  specialAddonPatchInput,
+  type SpecialAddonDto,
+  type SpecialAddonOptionGroupDto,
+  type SpecialAddonCreateInput,
+  type SpecialAddonPatchInput,
 } from "./schemas/catalog";
 
 export {
@@ -481,6 +490,22 @@ export type { SofaCompartment, ModelSofaCompartment } from "./domain";
 // SofaCompartment surfacing above so the API + web can import it directly.
 export type { SofaCombo } from "./domain";
 export { sofaComboFromRow } from "./adapters";
+
+// 0181 — Special Add-ons: the pure surcharge resolver (shared by the POS picker
+// + the Hono server-recompute) + the domain type. Schemas live in the
+// schemas/catalog export block; the adapter is reached via Adapters.specialAddonFromRow.
+export {
+  resolveSpecialAddonSurcharge,
+  resolveSpecialsTotal,
+  specialPickComplete,
+  type SpecialAddonChoice,
+  type SpecialAddonOptionGroup,
+  type SpecialAddonDef,
+  type SpecialAddonPick,
+  type ResolvedSpecialLine,
+  type SpecialsTotalResult,
+} from "./special-addons";
+export type { SpecialAddon } from "./domain";
 export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
 
 // Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo

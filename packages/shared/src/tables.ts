@@ -52,6 +52,7 @@ export const MODEL_SOFA_COMPARTMENTS = "model_sofa_compartments" as const;
 // 0179 — sofa engine Phase 2: principal-owned sofa combo pricing (a base model
 // + ordered slots of compartment codes priced per seat height).
 export const SOFA_COMBO_PRICING      = "sofa_combo_pricing" as const;
+export const SPECIAL_ADDONS          = "special_addons" as const;
 
 // ---------------------------------------------------------------------------
 // People / org tables

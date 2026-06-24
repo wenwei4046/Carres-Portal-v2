@@ -24,6 +24,9 @@ import {
   type ProductSkuPatchInput,
   type SkuImportRow,
   type SkuImportResult,
+  type SpecialAddonDto,
+  type SpecialAddonCreateInput,
+  type SpecialAddonPatchInput,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
   type ComboDto,
@@ -4526,6 +4529,35 @@ export function useImportSkus() {
   return useMutation({
     mutationFn: (rows: SkuImportRow[]) =>
       apiFetch<SkuImportResult>("/api/catalog/import-skus", catalogJson("POST", { rows })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// 0181 — Special Add-ons CRUD (principal-only on the server; the catalog bundle
+// invalidates so the Maintenance tab + per-model attach + POS picker all refresh).
+export function useCreateSpecialAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SpecialAddonCreateInput) =>
+      apiFetch<{ specialAddon: SpecialAddonDto }>("/api/catalog/special-addons", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function usePatchSpecialAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: SpecialAddonPatchInput }) =>
+      apiFetch<{ specialAddon: SpecialAddonDto }>(`/api/catalog/special-addons/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteSpecialAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/special-addons/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

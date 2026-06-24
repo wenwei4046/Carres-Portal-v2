@@ -3003,3 +3003,133 @@ describe("POST /api/catalog/import-skus", () => {
     expect(res.status).toBe(422);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 0181 — Special Add-ons CRUD (principal-only)
+// ---------------------------------------------------------------------------
+
+describe("Special add-ons CRUD (/api/catalog/special-addons)", () => {
+  const SA_ID = "00000000-0000-0000-0000-00000000aa90";
+  const SA_ROW = {
+    id: SA_ID,
+    code: "right-drawer",
+    label: "Right Drawer",
+    so_description: "Right pull-out drawer",
+    categories: ["bedframe"],
+    selling_price: 50,
+    cost: null,
+    option_groups: [{ label: "Thickness", required: true, choices: [{ label: '10"', extra: 0 }, { label: '8"', extra: -10 }] }],
+    active: true,
+    sort_order: 0,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    updated_by: null,
+  };
+
+  it("POST 403s a non-principal", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/special-addons", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "x", label: "X", categories: ["sofa"], sellingPrice: 10 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("POST creates (principal) with snake_case body incl negative price + option groups", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { ...SA_ROW, selling_price: -40 } }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/special-addons", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: "no-side-panel",
+          label: "No Side Panel",
+          soDescription: "Omit the side panel",
+          categories: ["bedframe", "sofa"],
+          sellingPrice: -40,
+          optionGroups: [{ label: "Thickness", required: true, choices: [{ label: '8"', extra: -10 }] }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("special_addons");
+    expect(ins?.payload).toMatchObject({
+      code: "no-side-panel",
+      so_description: "Omit the side panel",
+      categories: ["bedframe", "sofa"],
+      selling_price: -40,
+    });
+    expect((ins?.payload as { option_groups: unknown[] }).option_groups).toHaveLength(1);
+    const body = (await res.json()) as { specialAddon: { sellingPrice: number } };
+    expect(body.specialAddon.sellingPrice).toBe(-40);
+  });
+
+  it("PATCH maps camel→snake and never writes `code`", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { ...SA_ROW, selling_price: 75 } }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/special-addons/${SA_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sellingPrice: 75, soDescription: "updated" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ selling_price: 75, so_description: "updated" });
+    expect(upd?.payload).not.toHaveProperty("code");
+  });
+
+  it("PATCH 403s a non-principal", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/special-addons/${SA_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sellingPrice: 75 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("DELETE soft-deletes (active=false)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { id: SA_ID } }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/special-addons/${SA_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ active: false });
+  });
+
+  it("DELETE 404s a missing row", async () => {
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ writeReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/special-addons/${SA_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+});

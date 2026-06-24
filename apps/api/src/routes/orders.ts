@@ -26,6 +26,7 @@ import {
   type LeadTimeViolation,
 } from "../lib/lead-time";
 import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
+import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
 import type { AppEnv } from "../types";
 
 /**
@@ -302,11 +303,38 @@ ordersRouter.post("/", async (c) => {
     );
   }
 
-  // Phase 5 — feed the (possibly exploded) sofa lines into the RPC. For a
-  // non-build order `recompute.lines` is `parsed.data.lines` verbatim; for a
-  // sofa build it is the per-compartment explosion summing to the server total.
+  // 0181 (special add-ons) — honest-pricing trust gate. Any line carrying
+  // `attrs.specials` has its surcharge re-resolved against FRESH active defs; a
+  // retired code or a >0.5% (min RM0.01) drift rejects the POST. On pass the
+  // line's unitPrice is nudged to the server total + attrs.specials canonicalised.
+  // Runs on the post-sofa line set; sofa-exploded lines carry no specials so they
+  // pass through. create_order / order_lines stay UNCHANGED.
+  const specialRecompute = await recomputeSpecialAddonLines(sb, recompute.lines);
+  if (specialRecompute.status === "bad_request") {
+    throw new HTTPException(400, { message: specialRecompute.message });
+  }
+  if (specialRecompute.status === "server_error") {
+    throw new HTTPException(500, { message: specialRecompute.message });
+  }
+  if (specialRecompute.status === "drift") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "special_price_drift",
+        message:
+          `Special add-on price mismatch on '${specialRecompute.drift.lineSku}': client RM ` +
+          `${specialRecompute.drift.clientTotal.toFixed(2)} vs server RM ` +
+          `${specialRecompute.drift.serverTotal.toFixed(2)}. Please reconfigure and retry.`,
+        clientTotal: specialRecompute.drift.clientTotal,
+        serverTotal: specialRecompute.drift.serverTotal,
+      },
+      422,
+    );
+  }
+
+  // Feed the fully-verified (sofa-exploded + special-checked) line set into the RPC.
   const payload = Adapters.orderInputToRpcPayload(
-    { ...parsed.data, lines: recompute.lines },
+    { ...parsed.data, lines: specialRecompute.lines },
     effectiveDealerId,
   );
   const { data: created, error } = await sb.rpc("create_order", { payload });

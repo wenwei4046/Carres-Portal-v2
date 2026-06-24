@@ -9,6 +9,7 @@ import type {
   SofaCompartmentDto,
   ModelSofaCompartmentDto,
   SofaComboDto,
+  SpecialAddonDto,
 } from "@carres/shared";
 import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import type { DraftLine } from "../new-order/draft";
@@ -33,6 +34,7 @@ export default function ConfigureDrawer({
   sofaCompartments,
   modelSofaCompartments,
   sofaCombos,
+  specialAddons,
   onAdd,
   onClose,
 }: {
@@ -47,6 +49,9 @@ export default function ConfigureDrawer({
   sofaCompartments?: SofaCompartmentDto[] | null;
   modelSofaCompartments?: ModelSofaCompartmentDto[] | null;
   sofaCombos?: SofaComboDto[] | null;
+  /** Special add-ons (0181) — passed through so a model's offered specials
+   *  render in the configurator. ADDITIVE. */
+  specialAddons?: SpecialAddonDto[] | null;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -122,6 +127,7 @@ export default function ConfigureDrawer({
             sofaCompartments={sofaCompartments}
             modelSofaCompartments={modelSofaCompartments}
             sofaCombos={sofaCombos}
+            specialAddons={specialAddons}
             onAdd={(line) => {
               onAdd(line);
               onClose();
