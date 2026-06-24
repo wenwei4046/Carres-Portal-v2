@@ -90,18 +90,17 @@ const TABS: { key: ControlTab; label: string }[] = [
 
 type SettledTab = Exclude<ControlTab, "all">;
 
-/** Status DOT colour per control tab (Q2, Jess 2026-06-24: status demoted from a
- *  filled pill to a small dot + grey label, so the column stops painting the
- *  table green/rainbow). Colour is a quiet category cue — the in-motion states
- *  carry a hue (proceed→purple, pending→amber, scheduled→indigo); the settled
- *  states stay grey (placed=new, completed=done) so the table reads calm and the
- *  green is gone. Tune in the live preview. */
-const TAB_DOT: Record<SettledTab, string> = {
-  placed: "#9CA3AF", // base-400 — new, neutral
-  proceed: "#7C3AED", // violet-600
-  pending: "#D97706", // amber-600 — the "waiting on stock" cue
-  scheduled: "#4F46E5", // indigo-600
-  completed: "#9CA3AF", // base-400 — done, neutral (no green)
+/** Status pill per control tab (Jess 2026-06-24 Q1: colour confined to the
+ *  Status "lane" — like his CRM reference — so a coloured Status column is fine
+ *  now that Location + Stock read neutral). Active states carry a hue; Completed
+ *  stays neutral grey because it's ~78% of orders, so a green-for-done pill would
+ *  re-flood the table with colour. Tune in the live preview. */
+const TAB_PILL: Record<SettledTab, string> = {
+  placed: "pill-sent", // blue — new, needs triage
+  proceed: "pill-draft", // purple — being arranged
+  pending: "pill-warning", // amber — waiting on stock
+  scheduled: "pill-collected", // indigo — LP assigned / en route
+  completed: "pill-neutral", // grey — done (kept calm; the majority state)
 };
 
 const TAB_LABEL: Record<SettledTab, string> = {
@@ -240,7 +239,7 @@ function deadlineInfo(
   const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
   // Jess: short form + ≤1 day = urgent (red). Overdue / today / tomorrow read
   // red; everything else is a plain neutral "Nd" countdown.
-  if (diff < 0) return { label: `Overdue ${-diff}d`, pill: "pill-overdue", urgent: true };
+  if (diff < 0) return { label: `${-diff}d`, pill: "pill-overdue", urgent: true };
   if (diff === 0) return { label: "Today", pill: "pill-overdue", urgent: true };
   if (diff === 1) return { label: "1d", pill: "pill-overdue", urgent: true };
   return { label: `${diff}d`, pill: "pill-neutral", urgent: false };
@@ -419,7 +418,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
-  const [pageSize] = useState<number | "all">(50);
+  // 15 rows/page → a fixed listing box that stays put, no endless scroll (Jess
+  // 2026-06-24).
+  const [pageSize] = useState<number | "all">(15);
   const [page, setPage] = useState(0);
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -915,8 +916,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Deadline</Th>
               <Th>Location</Th>
               <Th>Carrier</Th>
-              <Th>Stock</Th>
-              <Th>Qty</Th>
+              <Th>Stock · qty</Th>
               <Th>Items</Th>
             </tr>
           </thead>
@@ -924,7 +924,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={13}
+                  colSpan={12}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1229,18 +1229,10 @@ function OrderRow({
           />
         </button>
       </td>
-      {/* Status — Q2 (Jess 2026-06-24): a small colour dot + grey label, NOT a
-          filled pill, so the column no longer paints the table green/rainbow. */}
+      {/* Status — Q1 (Jess 2026-06-24): a soft coloured pill, colour confined to
+          THIS column (his CRM-ref pattern). Completed stays neutral grey. */}
       <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
-        <span
-          title={TAB_DESC[ct]}
-          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-base-600"
-        >
-          <span
-            className="inline-block w-[7px] h-[7px] rounded-full shrink-0"
-            style={{ backgroundColor: TAB_DOT[ct] }}
-            aria-hidden="true"
-          />
+        <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
           {TAB_LABEL[ct]}
         </span>
       </td>
@@ -1282,22 +1274,28 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Due — countdown to the deadline (Jess: its own column = the urgency
-          signal); red when overdue / due today / tomorrow. */}
+      {/* Due — compact countdown. Urgent (overdue/today/tomorrow) = a small red
+          badge; otherwise a plain grey "Nd". Completed orders show a quiet "—"
+          (no fake "overdue" on a closed order — Jess 2026-06-24). */}
       <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
-        {o.delivery_date_tbd ? (
+        {ct === "completed" ? (
+          <span className="text-base-300">—</span>
+        ) : o.delivery_date_tbd ? (
           <span className="text-[11px] font-medium text-warning">TBD</span>
         ) : o.delivery_date ? (
           (() => {
             const dl = deadlineInfo(o.delivery_date);
             if (!dl) return <span className="text-base-300">—</span>;
-            return (
+            return dl.urgent ? (
               <span
-                className={`inline-flex items-center gap-1 text-[12px] font-semibold tabular-nums whitespace-nowrap ${
-                  dl.urgent ? "text-destructive" : "text-base-500"
-                }`}
+                className="inline-flex items-center gap-0.5 text-[11px] font-semibold tabular-nums whitespace-nowrap rounded px-1.5 py-0.5 bg-destructive/10 text-destructive"
+                title="Urgent — due today / tomorrow or overdue"
               >
-                {dl.urgent && <AlertTriangle size={11} strokeWidth={2.5} />}
+                <AlertTriangle size={10} strokeWidth={2.5} />
+                {dl.label}
+              </span>
+            ) : (
+              <span className="text-[12px] font-medium tabular-nums text-base-500">
                 {dl.label}
               </span>
             );
@@ -1347,20 +1345,10 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Stock */}
+      {/* Stock · qty — merged (Jess 2026-06-24): one button carries readiness +
+          the goods-unit count, sitting next to Items. */}
       <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
-        <StockCell info={stock} />
-      </td>
-      {/* Qty — total goods units (Jess: split out as its own column) */}
-      <td className="px-3 py-2 text-right border-r border-base-100">
-        <span
-          className={`text-[14px] font-semibold tabular-nums ${
-            qtyTotal === 0 ? "text-base-400" : "text-base-900"
-          }`}
-          title={`${qtyTotal} goods unit${qtyTotal === 1 ? "" : "s"} (services not counted)`}
-        >
-          {qtyTotal}
-        </span>
+        <StockCell info={stock} qty={qtyTotal} />
       </td>
       {/* Items — 2-line summary (Jess): core goods (dark) on top, accessories
           (dim) below; the size is kept in every tag (e.g. "1× MS(K)"). */}
@@ -1398,30 +1386,32 @@ function OrderRow({
   );
 }
 
-/** Stock cell — ONE three-state pill, one-glance (Jess): green Ready (stock
- *  secured/reserved OR shelf covers it) · amber Waiting (short → PO needed, or
- *  PO already open) · grey Not set (can't compute / nothing arranged). Coverage
- *  numbers ride inside the pill where known ("Ready 3/3" / "Waiting 0/1");
- *  tooltip carries the next-action detail. */
-function StockCell({ info }: { info: StockInfo }) {
+/** Stock · qty cell — ONE button carrying readiness + the goods-unit count
+ *  (Jess 2026-06-24 merged Stock + Qty). Grey Ready (secured / shelf covers it) ·
+ *  amber Waiting (short → PO, or PO open) · grey Not set (can't auto-check).
+ *  Coverage rides inside where known ("Ready 3/3" / "Waiting 0/1"), else "×N". */
+function StockCell({ info, qty }: { info: StockInfo; qty: number }) {
+  const qtySuffix = qty > 0 ? ` ×${qty}` : "";
   if (info.state === "unknown")
     return (
       <span
         data-stock-state="unknown"
-        className="pill pill-neutral text-base-400 font-medium"
-        title="Can't compute from the catalog (free-text SKU) — open the order to check stock"
+        className="pill pill-neutral text-base-400 font-medium whitespace-nowrap tabular-nums"
+        title="Can't auto-check from the catalog (free-text SKU) — open the order to check stock"
       >
-        Not set
+        Not set{qtySuffix}
       </span>
     );
 
+  // have/need coverage when known; otherwise the goods-unit count (Stock + Qty
+  // merged into one button, Jess 2026-06-24).
   const counts =
-    info.need != null && info.have != null ? ` ${info.have}/${info.need}` : "";
+    info.need != null && info.have != null ? ` ${info.have}/${info.need}` : qtySuffix;
   // Q1 colour restraint (Jess 2026-06-24): Ready is the common case → render it
   // QUIET (neutral grey) so the green leaves the table; colour now only marks the
   // exception — amber Waiting = "raise a PO / on the way".
   const cfg = {
-    ready: { pill: "pill-neutral", label: "Ready", title: "Stock secured / reserved for this order" },
+    ready: { pill: "pill-neutral", label: `Ready${qtySuffix}`, title: "Stock secured / reserved for this order" },
     in_stock: { pill: "pill-neutral", label: `Ready${counts}`, title: "Free warehouse stock covers every line" },
     need_po: {
       pill: "pill-warning",
@@ -1432,7 +1422,7 @@ function StockCell({ info }: { info: StockInfo }) {
           ? ": " + info.short.map((s) => `${shortSku(s.sku)} ${s.have}/${s.need}`).join(", ")
           : ""),
     },
-    awaiting: { pill: "pill-warning", label: "Waiting", title: "PO open — stock on the way" },
+    awaiting: { pill: "pill-warning", label: `Waiting${qtySuffix}`, title: "PO open — stock on the way" },
   }[info.state];
 
   return (

@@ -236,8 +236,9 @@ describe("OperationOrdersControl", () => {
     const row = screen
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1002"))!;
-    // 2 + 1 = 3 goods units across 2 lines — bold "3" on the left
-    expect(within(row).getByText("3")).toBeInTheDocument();
+    // 2 + 1 = 3 goods units → the count now rides inside the merged Stock · qty
+    // button ("Not set ×3" — AutoCount free-text SKU, so stock can't auto-check).
+    expect(within(row).getByText("Not set ×3")).toBeInTheDocument();
     // the CR/TCF ref now has its OWN column (Jess: Order split into 3).
     expect(row).toHaveTextContent("CR0418");
   });
@@ -369,7 +370,8 @@ describe("OperationOrdersControl · Stock column", () => {
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
     expect(row.querySelector('[data-stock-state="unknown"]')).toBeTruthy();
-    expect(within(row).getByText("Not set")).toBeInTheDocument();
+    // merged Stock · qty → "Not set ×1" (1 free-text line).
+    expect(within(row).getByText("Not set ×1")).toBeInTheDocument();
     expect(within(row).queryByText(/^Ready/)).not.toBeInTheDocument();
     expect(within(row).queryByText(/^Waiting/)).not.toBeInTheDocument();
   });
@@ -387,7 +389,8 @@ describe("OperationOrdersControl · Stock column", () => {
     stockHookState.data = stockResponse([{ sku: "SOFA-1", available: 0 }]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    expect(within(row).getByText("Ready")).toBeInTheDocument();
+    // Stock + Qty merged → the count rides in the button ("Ready ×99").
+    expect(within(row).getByText("Ready ×99")).toBeInTheDocument();
     expect(row.querySelector('[data-stock-state="ready"]')).toBeTruthy();
   });
 
@@ -438,9 +441,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Goods-unit total now lives in its OWN Qty column — 2+1+3+1 = 7; Disposal
-    // (service) NOT counted.
-    expect(within(row).getByText("7")).toBeInTheDocument();
+    // Goods-unit total now rides inside the merged Stock · qty button — 2+1+3+1
+    // = 7; Disposal (service) NOT counted.
+    expect(within(row).getByText("Not set ×7")).toBeInTheDocument();
     // Master-Sheet short codes (MS/BF/SOF) as a 2-line summary; MONOCHROME tiers
     // by LINE: core goods dark (text-base-800), accessories/services dim
     // (text-base-400). The colour sits on the line, not the individual tag.
@@ -519,7 +522,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).queryByText("M.P")).not.toBeInTheDocument();
   });
 
-  it("Qty column holds the total; the Items tag keeps its own qty + size (single-category)", () => {
+  it("merged Stock · qty button carries the goods-unit total; the Items tag keeps its own qty + size", () => {
     oneRow({
       id: "r1b",
       so: 3010,
@@ -527,13 +530,13 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Qty column = total (2); the Items tag now ALWAYS carries its own qty +
-    // size ("2× SOF") — no single-category de-dup, since Qty is its own column.
-    expect(within(row).getByText("2")).toBeInTheDocument();
+    // Qty total (2) now rides in the merged Stock · qty button ("Not set ×2" —
+    // free-text SKU); the Items tag still carries its own qty + size ("2× SOF").
+    expect(within(row).getByText("Not set ×2")).toBeInTheDocument();
     expect(within(row).getByText("2× SOF")).toBeInTheDocument();
   });
 
-  it("orders columns: ⭐ · Status · Order ID · Ref No · Customer · Due · Deadline · Location · Carrier · Stock · Qty · Items (Order split into 3)", () => {
+  it("orders columns: ⭐ · Status · Order ID · Ref No · Customer · Due · Deadline · Location · Carrier · Stock · qty · Items (Stock + Qty merged)", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -554,8 +557,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Deadline",
       "Location",
       "Carrier",
-      "Stock",
-      "Qty",
+      "Stock · qty",
       "Items",
     ]);
     // Order is split into THREE columns now (Jess): SO# · ref · customer, each
@@ -644,18 +646,18 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("2d")).toBeInTheDocument();
   });
 
-  it("paginates — 50/page by default, Next works", () => {
+  it("paginates — 15/page by default (fixed listing box), Next works", () => {
     listHookState.data = {
       orders: Array.from({ length: 120 }, (_, i) =>
         makeRow({ id: `p${i}`, so: 4000 + i }),
       ),
     };
     wrap(<OperationOrdersControl />);
-    expect(screen.getByText(/1.50 of 120/)).toBeInTheDocument();
-    expect(screen.getAllByTestId("order-row")).toHaveLength(50);
+    expect(screen.getByText(/1.15 of 120/)).toBeInTheDocument();
+    expect(screen.getAllByTestId("order-row")).toHaveLength(15);
 
     fireEvent.click(screen.getByRole("button", { name: /Next/ }));
-    expect(screen.getByText(/51.100 of 120/)).toBeInTheDocument();
+    expect(screen.getByText(/16.30 of 120/)).toBeInTheDocument();
   });
 
   it("gives each status tab a plain-English tooltip (legend)", () => {
