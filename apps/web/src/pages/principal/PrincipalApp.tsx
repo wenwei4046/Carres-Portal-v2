@@ -6,7 +6,10 @@ import PrincipalDealers from "./PrincipalDealers";
 import PrincipalPartners from "./PrincipalPartners";
 import PrincipalAccounts from "./PrincipalAccounts";
 import PrincipalAudit from "./PrincipalAudit";
-// 2026-05-19 — Suppliers / Orders / Stock moved to Operation sidebar.
+import PrincipalPos from "./PrincipalPos";
+import PrincipalOrders from "./PrincipalOrders";
+// 2026-05-19 — Suppliers / Stock moved to Operation sidebar. Orders + a place-
+// order POS (on behalf of a picked dealer) re-added to Principal 2026-06-25.
 import ProductMaintenancePage from "@/pages/catalog/ProductMaintenancePage";
 import { usePrincipalDashboard } from "@/lib/queries";
 
@@ -41,6 +44,8 @@ export default function PrincipalApp() {
       />
       <main className="min-w-0 overflow-auto bg-base-50">
         {tab === "dashboard" && <PrincipalDashboard setTab={setTab} />}
+        {tab === "pos" && <PrincipalPos onExit={() => setTab("orders")} />}
+        {tab === "orders" && <PrincipalOrders />}
         {tab === "approvals" && <PrincipalApprovals />}
         {tab === "dealers" && <PrincipalDealers />}
         {tab === "partners" && <PrincipalPartners />}

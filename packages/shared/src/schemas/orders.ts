@@ -204,6 +204,12 @@ export const createOrderInputSchema = z.object({
   /** Installment plan months. Only valid when paymentMethod === "installment".
    *  RPC re-checks the cross-field rule and rejects with 22023. */
   installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
+  /** Attribution dealer for an order an INTERNAL role (principal/operation/
+   *  finance/bd) places ON BEHALF OF a dealer it picks. Additive + optional: a
+   *  dealer/salesperson/showroom omits it — the API uses their JWT dealer and
+   *  IGNORES this field (no spoofing); only an internal role with no own
+   *  dealer_id has its value honored. */
+  dealerId: z.string().uuid().optional(),
 }).superRefine((data, ctx) => {
   // Phase 11.1 — Proceed date pairs with Delivery date. When the order is NOT
   // marked TBD, both dates are required and proceed date must be on/before the

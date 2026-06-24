@@ -19,7 +19,17 @@ import ConfirmDateModal from "./order-actions/ConfirmDateModal";
 import EditOrderModal from "./order-actions/EditOrderModal";
 import TopUpDepositModal from "./order-actions/TopUpDepositModal";
 
-export default function DealerOrderDetail({ id, onClose }: { id: string; onClose: () => void }) {
+export default function DealerOrderDetail({
+  id,
+  onClose,
+  readOnly = false,
+}: {
+  id: string;
+  onClose: () => void;
+  /** Trace-only view (principal): hide the dealer Edit/Cancel + the Proceed
+   *  action panel. Default false → the dealer's full interactive detail. */
+  readOnly?: boolean;
+}) {
   const { data: order, isPending, error } = useOrder(id);
   const { data: catalog } = useCatalog();
   const role = useAuth((s) => s.role);
@@ -68,7 +78,7 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
                 variant="secondary"
               />
             )}
-            {order?.status === "place" && (
+            {!readOnly && order?.status === "place" && (
               <>
                 <button
                   type="button"
@@ -104,7 +114,7 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
               {(error as Error).message}
             </p>
           )}
-          {order && catalog && <OrderBody order={order} floorConfig={catalog.floorConfig} />}
+          {order && catalog && <OrderBody order={order} floorConfig={catalog.floorConfig} readOnly={readOnly} />}
           {order && !catalog && <p className="text-sm text-base-500">Loading totals…</p>}
         </div>
       </div>
@@ -125,9 +135,11 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
 function OrderBody({
   order,
   floorConfig,
+  readOnly = false,
 }: {
   order: Order;
   floorConfig: FloorConfigDto;
+  readOnly?: boolean;
 }) {
   const total = orderTotal(order, floorConfig);
   const sub = lineSubtotal(order);
@@ -171,8 +183,9 @@ function OrderBody({
         ))}
       </div>
 
-      {/* Action panel — Place→Proceed transition or status info */}
-      <ActionPanel order={order} />
+      {/* Action panel — Place→Proceed transition or status info. Hidden in the
+       *  principal trace-only view (read access without dealer mutations). */}
+      {!readOnly && <ActionPanel order={order} />}
 
       {/* Customer */}
       <p className="label mb-2">Customer details</p>
