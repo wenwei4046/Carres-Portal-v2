@@ -42,13 +42,44 @@ function draftHasContent(d: WizardDraft): boolean {
 }
 
 /**
+ * Resolve the dealer an order is placed under.
+ *  - Dealer / salesperson / showroom: `actingDealerId` undefined → use the JWT
+ *    dealer, and the order body carries NO `dealerId` (the API uses the JWT) —
+ *    today's behavior, byte-identical.
+ *  - Principal placing ON BEHALF OF a picked dealer: `actingDealerId` set → it is
+ *    the storage upload folder + the body `dealerId` the API honors for internal
+ *    roles (a dealer can never spoof it; the API ignores the body field for them).
+ */
+export function resolveActingDealer(
+  actingDealerId: string | undefined,
+  authDealerId: string | null,
+): { effectiveDealerId: string | null; bodyDealerId: string | undefined } {
+  return {
+    effectiveDealerId: actingDealerId ?? authDealerId ?? null,
+    bodyDealerId: actingDealerId,
+  };
+}
+
+/**
  * Full-screen POS order-entry flow — the dealer landing page. Three steps:
  * 01 CATALOG (pick products → cart) → 02 CUSTOMER (info + delivery + access) →
  * 03 CONFIRM (payment + signature + submit). Replaces the legacy 4-step
  * `?new=1` modal wizard; reuses its draft persistence, validation gates, and
  * submit pipeline verbatim so the API / schema are untouched.
  */
-export default function DealerPos() {
+export default function DealerPos({
+  actingDealerId,
+  actingDealerName,
+  onExit,
+}: {
+  /** When set, the caller (a principal) is placing this order ON BEHALF OF this
+   *  dealer — it owns the order. Undefined = the signed-in dealer places for
+   *  themselves (the default, byte-identical to before). */
+  actingDealerId?: string;
+  actingDealerName?: string;
+  /** Where "Exit" / ThankYou-close goes. Default: navigate to /dealer/orders. */
+  onExit?: () => void;
+} = {}) {
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [draft, setDraft] = useState<WizardDraft>(() => loadDraft() ?? emptyDraft());
@@ -67,10 +98,24 @@ export default function DealerPos() {
   const createOrder = useCreateOrder();
   const proceedOrder = useProceedOrder();
 
-  const dealerQ = useDealerSelf();
+  const { effectiveDealerId, bodyDealerId } = resolveActingDealer(actingDealerId, dealerId);
+  // useDealerSelf 403s for a principal (no own dealer) — skip it when acting.
+  const dealerQ = useDealerSelf({ enabled: !actingDealerId });
   const outletsQ = useOutlets();
   const salespersonsQ = useSalespersons();
   const catalogQ = useCatalog();
+
+  // When a principal places on behalf of a picked dealer, constrain the outlet +
+  // salesperson choices to THAT dealer (the lists are RLS-read-all for internal
+  // roles). A normal dealer already sees only their own, so this is a no-op there.
+  const outlets = useMemo(() => {
+    const all = outletsQ.data?.outlets ?? [];
+    return actingDealerId ? all.filter((o) => o.dealerId === actingDealerId) : all;
+  }, [outletsQ.data, actingDealerId]);
+  const salespersons = useMemo(() => {
+    const all = salespersonsQ.data?.salespersons ?? [];
+    return actingDealerId ? all.filter((s) => s.dealerId === actingDealerId) : all;
+  }, [salespersonsQ.data, actingDealerId]);
 
   // Refetch catalog once on mount so the dealer's locked unit_price is fresh
   // against principal updates (the legacy wizard refetched on Step 2 entry).
@@ -136,7 +181,7 @@ export default function DealerPos() {
   }, [draft, catalogQ.data]);
 
   const submitDisabled =
-    !confirmReady || uploading || createOrder.isPending || !dealerId;
+    !confirmReady || uploading || createOrder.isPending || !effectiveDealerId;
 
   /**
    * Submit pipeline (ported verbatim from the legacy wizard):
@@ -145,13 +190,13 @@ export default function DealerPos() {
    *   3. clearDraft + render ThankYou; auto-proceed if ASAP
    */
   async function handleSubmit() {
-    if (!confirmReady || !step3DateValid(draft, minLeadDays) || !dealerId || !draft.wizardSessionId)
+    if (!confirmReady || !step3DateValid(draft, minLeadDays) || !effectiveDealerId || !draft.wizardSessionId)
       return;
     setSubmitError(null);
     try {
       setUploading(true);
       const signaturePath = await uploadDataUrl({
-        dealerId,
+        dealerId: effectiveDealerId,
         wizardSessionId: draft.wizardSessionId,
         filename: "signature.png",
         dataUrl: draft.signature!,
@@ -159,7 +204,7 @@ export default function DealerPos() {
       let paymentSlipPath: string | null = null;
       if (draft.payment.slip) {
         paymentSlipPath = await uploadDataUrl({
-          dealerId,
+          dealerId: effectiveDealerId,
           wizardSessionId: draft.wizardSessionId,
           filename: `payment-slip.${extensionForMime(draft.payment.slip.mime)}`,
           dataUrl: draft.payment.slip.dataUrl,
@@ -180,6 +225,9 @@ export default function DealerPos() {
         postcode: draft.customer.addressPostcode,
       });
       const input: CreateOrderInput = {
+        // Only an internal role (principal) sends a body dealerId; the API honors
+        // it only when the JWT carries no dealer. A dealer omits it → JWT wins.
+        ...(bodyDealerId ? { dealerId: bodyDealerId } : {}),
         outletId: draft.outletId!,
         salespersonId: draft.salespersonId!,
         customer: {
@@ -270,13 +318,13 @@ export default function DealerPos() {
       );
       if (!leave) return;
     }
-    navigate("/dealer/orders");
+    (onExit ?? (() => navigate("/dealer/orders")))();
   }
 
   const outletName = draft.outletId
-    ? outletsQ.data?.outlets.find((o) => o.id === draft.outletId)?.name
+    ? outlets.find((o) => o.id === draft.outletId)?.name
     : undefined;
-  const contextLabel = outletName ?? dealerQ.data?.name ?? "New sale";
+  const contextLabel = outletName ?? actingDealerName ?? dealerQ.data?.name ?? "New sale";
   const itemCount = cartItemCount(draft.lines);
   const cartTotal = cartTotalExStair(draft.lines, draft.addons);
 
@@ -359,7 +407,7 @@ export default function DealerPos() {
                 onNewOrder={startAnotherOrder}
                 onClose={() => {
                   clearDraft();
-                  navigate("/dealer/orders");
+                  (onExit ?? (() => navigate("/dealer/orders")))();
                 }}
               />
             </div>
@@ -390,8 +438,8 @@ export default function DealerPos() {
               <CustomerStep
                 draft={draft}
                 onChange={setDraft}
-                outlets={outletsQ.data.outlets}
-                salespersons={salespersonsQ.data.salespersons}
+                outlets={outlets}
+                salespersons={salespersons}
                 catalog={catalogQ.data}
                 minLeadDays={minLeadDays}
               />

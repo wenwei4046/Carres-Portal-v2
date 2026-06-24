@@ -33,6 +33,15 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    // 2026-06-25 — Principal can place an order on behalf of a picked dealer
+    // (reuses the dealer POS) + trace every order across the network.
+    label: "Sales",
+    items: [
+      { k: "pos", t: "New order", icon: "▶", enabled: true },
+      { k: "orders", t: "Orders", icon: "▣", enabled: true },
+    ],
+  },
+  {
     label: "Network",
     items: [
       { k: "dealers", t: "Dealers", icon: "▤", enabled: true },

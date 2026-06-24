@@ -185,10 +185,17 @@ ordersRouter.get("/inbox", async (c) => {
  *   5. Re-fetch the inserted order with rels (same shape as GET /:id) so the
  *      client can route directly to /dealer/orders/:id without a second fetch.
  *
- * Cross-dealer guard: input has no `dealerId` field; the API derives it from
- * the JWT. The RPC also re-checks via SECURITY DEFINER manual check, so even
- * a hand-crafted payload can't sneak through.
+ * Attribution: a dealer/salesperson/showroom places under its OWN JWT dealer —
+ * the body `dealerId` is IGNORED for them (no spoofing). An internal role
+ * (principal/operation/finance/bd) carries no own dealer_id and places ON BEHALF
+ * OF a dealer it picks, supplied as the body `dealerId`. The RPC also re-checks
+ * cross-dealer via SECURITY DEFINER, so a hand-crafted payload can't sneak through.
  */
+// Internal roles that may place an order on behalf of a picked dealer (they
+// carry no own dealer_id). A dealer/salesperson/showroom never reaches the
+// body-dealerId branch — their JWT dealer always wins.
+const ORDER_CREATE_INTERNAL_ROLES = new Set<string>(["principal", "operation", "finance", "bd"]);
+
 ordersRouter.post("/", async (c) => {
   const auth = c.var.auth;
 
@@ -214,10 +221,17 @@ ordersRouter.post("/", async (c) => {
       message: "Invalid order input: " + parsed.error.issues[0]?.message,
     });
   }
-  if (!auth.dealerId) {
-    // Internal roles (principal/operation/finance/bd) creating on behalf of a
-    // dealer must Phase 3 — for 2B only dealers/salespersons create.
-    throw new HTTPException(403, { message: "Phase 2B only supports dealer-self order creation" });
+  // Effective dealer: a dealer/salesperson/showroom uses its OWN JWT dealer; an
+  // internal role (principal/operation/finance/bd, no own dealer_id) uses the
+  // picked body `dealerId`. The body field is honored ONLY when the JWT has no
+  // dealer AND the role is internal — a dealer can never spoof another via body.
+  const effectiveDealerId =
+    auth.dealerId ??
+    (ORDER_CREATE_INTERNAL_ROLES.has(auth.role) ? parsed.data.dealerId ?? null : null);
+  if (!effectiveDealerId) {
+    throw new HTTPException(403, {
+      message: "An order needs a dealer to place it under — pick a dealer first",
+    });
   }
 
   // Storage path guard: the wizard uploads attachments directly to Supabase
@@ -228,7 +242,7 @@ ordersRouter.post("/", async (c) => {
   // the order detail (which has read-all on storage) would see an attachment
   // belonging to a different dealer. Reject any path outside the caller's
   // dealer folder before we persist it.
-  const expectedPrefix = `orders-attachments/${auth.dealerId}/`;
+  const expectedPrefix = `orders-attachments/${effectiveDealerId}/`;
   if (!parsed.data.signaturePath.startsWith(expectedPrefix)) {
     throw new HTTPException(400, {
       message: "signaturePath must be inside your dealer folder",
@@ -293,7 +307,7 @@ ordersRouter.post("/", async (c) => {
   // sofa build it is the per-compartment explosion summing to the server total.
   const payload = Adapters.orderInputToRpcPayload(
     { ...parsed.data, lines: recompute.lines },
-    auth.dealerId,
+    effectiveDealerId,
   );
   const { data: created, error } = await sb.rpc("create_order", { payload });
   if (error) {

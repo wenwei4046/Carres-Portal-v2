@@ -2047,3 +2047,102 @@ describe("POST /api/orders — sofa build recompute + explode (Phase 5)", () => 
     expect(sb._rpcCalls).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Principal-portal orders (Option A) — an internal role (principal/operation/
+// finance/bd) places an order ON BEHALF OF a dealer it picks (body `dealerId`).
+// A dealer/salesperson/showroom always uses its OWN JWT dealer (no body spoof).
+// ---------------------------------------------------------------------------
+describe("POST /api/orders — internal role places on behalf of a picked dealer (Option A)", () => {
+  const NEW_ID = "11111111-1111-1111-1111-111111111111";
+  const rpcOk = { id: NEW_ID, so: 1401, placed_at: "2026-06-25T00:00:00Z" };
+  const tbd = { delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false } };
+  const mkFetched = (dealerId: string) => ({
+    ...makeOrderRow({ id: NEW_ID, so: 1401, dealer_id: dealerId, paid: "750" }),
+    order_lines: [
+      { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", order_id: NEW_ID, sku: "mattress:carres-classic:queen", qty: 1, attrs: null, unit_price: "1500" },
+    ],
+    order_addons: [],
+    order_history: [],
+  });
+
+  it("dealer flow unchanged: the JWT dealer wins and a body dealerId is IGNORED (no spoof)", async () => {
+    const sb = buildSbForCreate({ rpcResult: rpcOk, fetchedRow: mkFetched(DEALER_A) });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        // dealer A tries to attribute the order to dealer B via the body → must be ignored.
+        body: JSON.stringify(validCreateBody({ ...tbd, dealerId: DEALER_B })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const payload = sb._rpcCalls[0]!.payload as { dealer_id: string };
+    expect(payload.dealer_id).toBe(DEALER_A);
+  });
+
+  it("principal places under the PICKED dealer (body dealerId honored)", async () => {
+    const sb = buildSbForCreate({ rpcResult: rpcOk, fetchedRow: mkFetched(DEALER_B) });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          validCreateBody({
+            ...tbd,
+            dealerId: DEALER_B,
+            signaturePath: `orders-attachments/${DEALER_B}/wiz/signature.png`,
+          }),
+        ),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const payload = sb._rpcCalls[0]!.payload as { dealer_id: string };
+    expect(payload.dealer_id).toBe(DEALER_B);
+  });
+
+  it("principal without a dealerId → 403, no create", async () => {
+    const sb = buildSbForCreate({ rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(validCreateBody({ ...tbd })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("storage guard uses the effective (picked) dealer: principal + signature under a DIFFERENT dealer → 400", async () => {
+    const sb = buildSbForCreate({ rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          validCreateBody({
+            ...tbd,
+            dealerId: DEALER_B,
+            // signature lives under DEALER_A's folder but the order is for DEALER_B.
+            signaturePath: `orders-attachments/${DEALER_A}/wiz/signature.png`,
+          }),
+        ),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+});
