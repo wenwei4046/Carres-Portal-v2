@@ -861,8 +861,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           status tabs on top, Region + Stock filters below, read as a defined
           section instead of three loose pill rows floating on the page. */}
       <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-md mb-3">
-      <div className="flex items-center gap-3 px-3 py-2 border-b border-base-100 flex-wrap">
-        <div className="flex items-center gap-2 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
+      <div className="flex items-center gap-2.5 px-3 py-1.5 border-b border-base-100 flex-wrap">
         <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Status</span>
         <div
           className="flex gap-1 p-1 bg-base-100 rounded-md w-fit max-w-full overflow-auto"
@@ -878,7 +877,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 aria-selected={active}
                 onClick={() => setTab(t.key)}
                 title={t.key === "all" ? "Every active order" : TAB_DESC[t.key as SettledTab]}
-                className={`px-3 py-1.5 text-[12px] rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 text-[11px] rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   active
                     ? "bg-white text-base-900 font-semibold shadow-sm"
                     : "text-base-600 font-medium hover:text-base-900"
@@ -886,7 +885,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               >
                 <span>{t.label}</span>
                 <span
-                  className={`text-[11px] tabular-nums ${active ? "text-base-600" : "text-base-400"}`}
+                  className={`text-[10px] tabular-nums ${active ? "text-base-600" : "text-base-400"}`}
                 >
                   {counts[t.key]}
                 </span>
@@ -894,13 +893,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
             );
           })}
         </div>
-        </div>
         {urgentCount > 0 && (
           <button
             type="button"
             onClick={() => setUrgentOnly((v) => !v)}
             title="Due within 1 day (today / tomorrow) or overdue"
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[12px] font-semibold transition-colors ${
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
               urgentOnly
                 ? "bg-destructive text-white"
                 : "border border-destructive/40 text-destructive hover:bg-destructive/5"
@@ -914,7 +912,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             type="button"
             onClick={() => setFlaggedOnly((v) => !v)}
             title="Flagged for follow-up (⭐ starred, not yet resolved)"
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[12px] font-semibold transition-colors ${
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
               flaggedOnly
                 ? "bg-warning text-white"
                 : "border border-warning/40 text-warning hover:bg-warning/5"
@@ -928,7 +926,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       {/* Region + Stock filters — the card's second row (Jess: pick a state →
           select-all → assign logistic; filter by stock too). */}
       <div className="px-3 py-2 border-b border-base-100">
-      <div className="flex items-start gap-1.5 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
+      <div className="flex items-start gap-1.5 border border-base-200 rounded-md px-2 py-1 bg-white">
         <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5 shrink-0 mt-1">Region</span>
         <div className="flex flex-wrap items-center gap-1.5 min-w-0">
           <RegionChip
@@ -953,7 +951,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       <div className="flex items-start gap-3 px-3 py-2 flex-wrap">
       {/* Stock-status filter — its own panel; coloured dots (green / amber / red)
           tie it to the Stock column AND set it apart from the Region panel. */}
-      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
+      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2 py-1 bg-white">
         <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Stock</span>
         <RegionChip
           label="All"
@@ -976,7 +974,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       </div>
       {/* Logistic / carrier filter — its own panel (Jess 2026-06-24), like
           Status / Region / Stock. */}
-      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
+      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2 py-1 bg-white">
         <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Logistic</span>
         <RegionChip
           label="All"
@@ -997,7 +995,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         ))}
       </div>
       {/* Category filter — Mattress / Bedframe / Sofa (Jess 2026-06-24). */}
-      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2.5 py-1.5 bg-white">
+      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2 py-1 bg-white">
         <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Category</span>
         <RegionChip
           label="All"
@@ -1355,7 +1353,7 @@ function RegionChip({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11.5px] whitespace-nowrap shrink-0 transition-colors ${
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap shrink-0 transition-colors ${
         active
           ? "bg-base-900 text-white font-semibold"
           : "bg-base-100 text-base-600 font-medium hover:bg-base-200"
