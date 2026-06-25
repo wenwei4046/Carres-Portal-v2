@@ -167,6 +167,17 @@ function rowsBySo(): string[] {
     .filter(Boolean);
 }
 
+/** The Status filter group — its chips replaced the old role="tablist" tabs
+ *  (Jess 2026-06-25 boxed filter: Status is now one labelled chip-group box).
+ *  Scoping queries to it keeps labels that also appear elsewhere ("All" sits in
+ *  every group) unambiguous. */
+function statusGroup() {
+  return within(screen.getByTestId("filter-status"));
+}
+function clickStatus(label: string) {
+  fireEvent.click(statusGroup().getByRole("button", { name: new RegExp(`^${label}`) }));
+}
+
 beforeEach(() => {
   listHookState = {
     data: { orders: ROWS },
@@ -188,18 +199,17 @@ beforeEach(() => {
 });
 
 describe("OperationOrdersControl", () => {
-  it("renders the 6 status tabs with correct per-tab counts", () => {
+  it("renders the 6 status chips with correct per-tab counts", () => {
     wrap(<OperationOrdersControl />);
-    const tablist = screen.getByRole("tablist");
-    const tabs = within(tablist).getAllByRole("tab");
-    expect(tabs).toHaveLength(6);
-    // counts: Placed 1, Proceed 2, Pending 1, Scheduled 2, Completed 1, All 7
-    expect(within(tabs[0]).getByText("1")).toBeInTheDocument(); // Placed
-    expect(within(tabs[1]).getByText("2")).toBeInTheDocument(); // Proceed
-    expect(within(tabs[2]).getByText("1")).toBeInTheDocument(); // Pending
-    expect(within(tabs[3]).getByText("2")).toBeInTheDocument(); // Scheduled
-    expect(within(tabs[4]).getByText("1")).toBeInTheDocument(); // Completed
-    expect(within(tabs[5]).getByText("7")).toBeInTheDocument(); // All
+    const g = statusGroup();
+    expect(g.getAllByRole("button")).toHaveLength(6);
+    // counts: All 7, Placed 1, Proceed 2, Pending 1, Scheduled 2, Completed 1
+    expect(g.getByRole("button", { name: /All\s*7/ })).toBeInTheDocument();
+    expect(g.getByRole("button", { name: /Placed\s*1/ })).toBeInTheDocument();
+    expect(g.getByRole("button", { name: /Proceed\s*2/ })).toBeInTheDocument();
+    expect(g.getByRole("button", { name: /Pending\s*1/ })).toBeInTheDocument();
+    expect(g.getByRole("button", { name: /Scheduled\s*2/ })).toBeInTheDocument();
+    expect(g.getByRole("button", { name: /Completed\s*1/ })).toBeInTheDocument();
   });
 
   it("defaults to the All tab and shows every order", () => {
@@ -212,27 +222,24 @@ describe("OperationOrdersControl", () => {
 
   it("entry rule: AutoCount placed → Proceed, native placed → Placed", () => {
     wrap(<OperationOrdersControl />);
-    const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
 
-    fireEvent.click(tabs[0]); // Placed
+    clickStatus("Placed");
     expect(rowsBySo()).toEqual(["1001"]); // only the native-placed order
 
-    fireEvent.click(tabs[1]); // Proceed
+    clickStatus("Proceed");
     // AutoCount-placed (1002) + proceed_request (1003), NOT the native one.
     expect(rowsBySo().sort()).toEqual(["1002", "1003"]);
   });
 
   it("Scheduled tab buckets both ready_to_dispatch and dispatched", () => {
     wrap(<OperationOrdersControl />);
-    const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
-    fireEvent.click(tabs[3]); // Scheduled
+    clickStatus("Scheduled");
     expect(rowsBySo().sort()).toEqual(["1005", "1006"]);
   });
 
   it("renders an items summary from order_lines", () => {
     wrap(<OperationOrdersControl />);
-    const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
-    fireEvent.click(tabs[1]); // Proceed (contains the AutoCount order with lines)
+    clickStatus("Proceed"); // contains the AutoCount order with lines
     const row = screen
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1002"))!;
@@ -244,16 +251,14 @@ describe("OperationOrdersControl", () => {
 
   it("resolves the triage LP (ops_assigned_logistic) via the partners map", () => {
     wrap(<OperationOrdersControl />);
-    const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
-    fireEvent.click(tabs[2]); // Pending (order d has ops_assigned_logistic=p-nets)
+    clickStatus("Pending"); // order d has ops_assigned_logistic=p-nets
     const row = screen.getAllByTestId("order-row")[0];
     expect(within(row).getByText("NETS")).toBeInTheDocument();
   });
 
   it("shows the formal joined LP name on scheduled orders", () => {
     wrap(<OperationOrdersControl />);
-    const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
-    fireEvent.click(tabs[3]); // Scheduled
+    clickStatus("Scheduled");
     const row = screen
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1005"))!;
@@ -534,7 +539,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("2× SOF")).toBeInTheDocument();
   });
 
-  it("orders columns: ⭐ · Status · Order ID · Ref No · Customer · Due · Deadline · Location · Carrier · Stock · qty · Items (Stock + Qty merged)", () => {
+  it("orders columns: select · Status · Order ID · Ref No · Customer · Due · Deadline · Location · Carrier · Stock · Items · Action · Remark", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -543,12 +548,12 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       source_ref: ["TCF2024/06-461"],
     });
     wrap(<OperationOrdersControl />);
-    // ONE header row — categories are shown by the alternating column SHADE, not
-    // an extra group row (Jess 2026-06-24: no added height).
+    // ONE header row. The old ⭐ star column is gone — the follow-up flag now lives
+    // in the Action column (Jess 2026-06-25), which is the operation team's own
+    // handoff note, distinct from the per-party Remark column.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
-      "", // ⭐ follow-up star
       "Status",
       "Order ID",
       "Ref No",
@@ -559,6 +564,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Carrier",
       "Stock",
       "Items",
+      "Action",
       "Remark",
     ]);
     // Order is split into THREE columns now (Jess): SO# · ref · customer, each
@@ -661,11 +667,11 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(screen.getByText(/16.30 of 120/)).toBeInTheDocument();
   });
 
-  it("gives each status tab a plain-English tooltip (legend)", () => {
+  it("gives each status chip a plain-English tooltip (legend)", () => {
     oneRow({ id: "lg", so: 5001 });
     wrap(<OperationOrdersControl />);
-    const proceedTab = screen.getByRole("tab", { name: /Proceed/ });
-    expect(proceedTab).toHaveAttribute(
+    const proceedChip = statusGroup().getByRole("button", { name: /Proceed/ });
+    expect(proceedChip).toHaveAttribute(
       "title",
       expect.stringContaining("Confirmed"),
     );

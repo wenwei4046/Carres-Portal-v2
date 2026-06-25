@@ -36,7 +36,9 @@ import {
   ListTodo,
   CheckCircle2,
   X,
-  Star,
+  Flag,
+  ChevronsUp,
+  Check,
   type LucideIcon,
 } from "lucide-react";
 
@@ -246,13 +248,6 @@ function deadlineInfo(
   return { label: `${diff}d`, pill: "pill-neutral", urgent: false };
 }
 
-/** Whether an order needs urgent attention — open (not delivered) + a deadline
- *  ≤1 day out (today/tomorrow/overdue). Drives the top "Urgent" filter chip. */
-function isUrgentOrder(o: operationOrderListRow): boolean {
-  if (o.status === "delivered" || o.delivery_date_tbd || !o.delivery_date) return false;
-  return deadlineInfo(o.delivery_date)?.urgent ?? false;
-}
-
 /** Left-edge urgency accent per row (Jess 2026-06-24, his CRM-sample "priority
  *  lane"): red overdue/today/tomorrow · amber the 2–7-day prep window · none
  *  otherwise. Completed / TBD / undated rows get no bar. */
@@ -275,6 +270,90 @@ function isFlaggedOrder(o: operationOrderListRow): boolean {
   return isFollowUpFlagged(
     (o.order_annotations ?? []).map((a) => ({ tag: a.tag, at: a.created_at })),
   );
+}
+
+/** Days from today to the customer deadline (negative = overdue); null when the
+ *  order carries no actionable date (TBD / undated). */
+function daysToDue(o: operationOrderListRow): number | null {
+  if (o.delivery_date_tbd || !o.delivery_date) return null;
+  const d = new Date(`${o.delivery_date}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - today.getTime()) / 86_400_000);
+}
+
+/** DUE filter group (Jess 2026-06-25): one standardised urgency ladder by
+ *  days-to-deadline, so urgency is a proper filter dimension like Status/Stock —
+ *    Overdue (past) · Urgent (≤1d, today/tomorrow) · Attention (2–3d) ·
+ *    Upcoming (4–7d) · Later (7+d).
+ *  Completed / TBD / undated orders sit in NO bucket (only "All" shows them). */
+const DUE_BUCKETS = ["Overdue", "Urgent", "Attention", "Upcoming", "Later"] as const;
+type DueBucket = (typeof DUE_BUCKETS)[number];
+/** Soft colour per bucket — a red→grey heat ramp (matches the agreed mock): the
+ *  hotter the deadline, the warmer the chip. Applied as the chip's resting tint;
+ *  the selected chip still flips to the shared black active state. */
+const DUE_TONE: Record<DueBucket, { bg: string; text: string; border: string }> = {
+  Overdue: { bg: "#FCEBEB", text: "#A32D2D", border: "#F0959566" },
+  Urgent: { bg: "#FAECE7", text: "#993C1D", border: "#F0997B66" },
+  Attention: { bg: "#FAEEDA", text: "#854F0B", border: "#EF9F2766" },
+  Upcoming: { bg: "#E6F1FB", text: "#185FA5", border: "#85B7EB66" },
+  Later: { bg: "#F1EFE8", text: "#5F5E5A", border: "#D3D1C766" },
+};
+const DUE_DESC: Record<DueBucket, string> = {
+  Overdue: "Past the delivery date",
+  Urgent: "Due today or tomorrow (≤1 day)",
+  Attention: "Due in 2–3 days",
+  Upcoming: "Due in 4–7 days",
+  Later: "More than 7 days away",
+};
+function dueBucketOf(o: operationOrderListRow): DueBucket | null {
+  if (controlTabOf(o) === "completed") return null;
+  const diff = daysToDue(o);
+  if (diff === null) return null;
+  if (diff < 0) return "Overdue";
+  if (diff <= 1) return "Urgent";
+  if (diff <= 3) return "Attention";
+  if (diff <= 7) return "Upcoming";
+  return "Later";
+}
+
+/** 🚨 Escalated-to-Jess — the escalate/resolved lane (mirrors isFollowUpFlagged
+ *  for the follow_up lane). Drives the "For Jess" quick-view + the Action cell. */
+function isEscalatedOrder(o: operationOrderListRow): boolean {
+  let latest: { tag: string; at: string } | null = null;
+  for (const a of o.order_annotations ?? []) {
+    if (a.tag !== "escalate" && a.tag !== "resolved") continue;
+    if (!latest || a.created_at > latest.at) latest = { tag: a.tag, at: a.created_at };
+  }
+  return latest?.tag === "escalate";
+}
+
+/** The open action note for a row's Action cell — the operation team's handoff.
+ *  Two lanes, escalate first (boss action before team follow-up): returns the
+ *  lane + the latest unresolved note's text, or null when nothing is open. */
+function openActionFor(
+  o: operationOrderListRow,
+): { lane: "escalate" | "follow_up"; content: string } | null {
+  const latestNote = (tag: "escalate" | "follow_up"): string | null => {
+    let at = "";
+    let open = false;
+    let content = "";
+    for (const a of o.order_annotations ?? []) {
+      if (a.tag !== tag && a.tag !== "resolved") continue;
+      if (a.created_at >= at) {
+        at = a.created_at;
+        open = a.tag === tag;
+        content = a.content;
+      }
+    }
+    return open ? content : null;
+  };
+  const esc = latestNote("escalate");
+  if (esc !== null) return { lane: "escalate", content: esc };
+  const fu = latestNote("follow_up");
+  if (fu !== null) return { lane: "follow_up", content: fu };
+  return null;
 }
 
 /** Default sort — deadline ASCENDING (Jess P3): overdue/earliest first so the
@@ -466,29 +545,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMenu, setBulkMenu] = useState<null | "menu" | "assign">(null);
-  // Urgent chip + state-region pills — both stack on top of the status tab.
-  const [urgentOnly, setUrgentOnly] = useState(false);
+  // Filter dimensions stacked on top of the status tabs.
+  const [dueFilter, setDueFilter] = useState<DueBucket | null>(null);
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [stockFilter, setStockFilter] = useState<StockBucket | null>(null);
   const [logisticFilter, setLogisticFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<CoreCat | null>(null);
-  // ⭐ Follow-up star (Gmail-style) — flag from the row OR the drawer header.
-  // The flag itself is a follow_up note; one shared mutation toggles it.
+  // Two action lanes (Jess 2026-06-25): 🚩 Follow-up = team handoff (follow_up
+  // annotations) · ⏫ For Jess = escalations needing the boss (escalate). Each is
+  // a derived open-annotation state with its own quick-view filter; the per-row
+  // Action cell owns flag/resolve via its own useAddAnnotation.
   const [flaggedOnly, setFlaggedOnly] = useState(false);
-  const addFollowUpNote = useAddAnnotation();
-  const toggleFollowUp = (orderId: string, flagged: boolean) => {
-    if (addFollowUpNote.isPending) return;
-    addFollowUpNote.mutate(
-      flagged
-        ? { orderId, content: "✅ Follow-up cleared", tag: "resolved" }
-        : { orderId, content: "⭐ Flagged for follow-up", tag: "follow_up" },
-      {
-        onSuccess: () =>
-          toast.success(flagged ? "Follow-up cleared" : "Flagged for follow-up"),
-        onError: () => toast.error("Couldn't update — retry"),
-      },
-    );
-  };
+  const [escalateOnly, setEscalateOnly] = useState(false);
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -559,8 +627,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
     () => (tab === "all" ? orders : orders.filter((o) => controlTabOf(o) === tab)),
     [orders, tab],
   );
-  const urgentCount = useMemo(() => tabFiltered.filter(isUrgentOrder).length, [tabFiltered]);
   const flaggedCount = useMemo(() => tabFiltered.filter(isFlaggedOrder).length, [tabFiltered]);
+  const escalateCount = useMemo(() => tabFiltered.filter(isEscalatedOrder).length, [tabFiltered]);
+  const dueEntries = useMemo(() => {
+    const m = new Map<DueBucket, number>();
+    for (const o of tabFiltered) {
+      const b = dueBucketOf(o);
+      if (b) m.set(b, (m.get(b) ?? 0) + 1);
+    }
+    return DUE_BUCKETS.filter((b) => m.has(b)).map((b) => ({
+      bucket: b,
+      count: m.get(b) ?? 0,
+    }));
+  }, [tabFiltered]);
   const regionEntries = useMemo(() => {
     const m = new Map<string, number>();
     for (const o of tabFiltered) {
@@ -611,15 +690,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   const visible = useMemo(() => {
     let r = tabFiltered;
-    if (urgentOnly) r = r.filter(isUrgentOrder);
     if (flaggedOnly) r = r.filter(isFlaggedOrder);
+    if (escalateOnly) r = r.filter(isEscalatedOrder);
+    if (dueFilter) r = r.filter((o) => dueBucketOf(o) === dueFilter);
     if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
     if (logisticFilter)
       r = r.filter((o) => (logisticOf(o, partnerName) ?? NO_CARRIER) === logisticFilter);
     if (categoryFilter) r = r.filter((o) => orderHasCategory(o, categoryFilter));
     return [...r].sort(compareByDeadline);
-  }, [tabFiltered, urgentOnly, flaggedOnly, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -631,7 +711,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Reset to the first page whenever the filtered set changes.
   useEffect(
     () => setPage(0),
-    [tab, search, pageSize, urgentOnly, flaggedOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
+    [tab, search, pageSize, dueFilter, flaggedOnly, escalateOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
   );
 
   const total = visible.length;
@@ -820,7 +900,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   return (
     <div
-      className="h-full flex flex-col px-9 pt-7 pb-5 bg-base-200"
+      className="h-full flex flex-col px-6 pt-6 pb-5 bg-base-200"
       data-testid="operation-orders-control"
     >
       {/* Header — title + count + search + import (fixed; does not scroll) */}
@@ -856,150 +936,148 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </div>
       </div>
 
-      {/* Filter panel — one bordered card (Jess 2026-06-24 "designed" look):
-          status tabs on top, Region + Stock filters below, read as a defined
-          section instead of three loose pill rows floating on the page. */}
-      <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-md mb-3">
-      <div className="flex items-center gap-2.5 px-3 py-1.5 border-b border-base-100 flex-wrap">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 mr-0.5">Status</span>
-        <div
-          className="flex gap-1 p-1 bg-base-100 rounded-md w-fit max-w-full overflow-auto"
-          role="tablist"
-          aria-label="Order status"
-        >
-          {TABS.map((t) => {
-            const active = tab === t.key;
-            return (
-              <button
+      {/* Filter panel — boxed 3-row (Jess 2026-06-25 "go"): each group in its own
+          box (clear separation without columns — columns would wrap chips and
+          grow taller, which Jess rejected). Row 1 Status + the 🚩 Follow-up / ⏫
+          For Jess action lanes · Row 2 Due + Stock + Category · Row 3 Region +
+          Logistic. All 11px chips, selected = black. */}
+      <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-md mb-3 p-2 space-y-1.5">
+        {/* Row 1 — Status, plus the two action quick-views on the right. */}
+        <div className="flex items-start gap-1.5 flex-wrap">
+          <FilterGroup label="Status">
+            <RegionChip
+              label="All"
+              count={counts.all}
+              active={tab === "all"}
+              title="Every active order"
+              onClick={() => setTab("all")}
+            />
+            {TABS.filter((t) => t.key !== "all").map((t) => (
+              <RegionChip
                 key={t.key}
-                role="tab"
-                aria-selected={active}
+                label={t.label}
+                count={counts[t.key]}
+                active={tab === t.key}
+                title={TAB_DESC[t.key as SettledTab]}
                 onClick={() => setTab(t.key)}
-                title={t.key === "all" ? "Every active order" : TAB_DESC[t.key as SettledTab]}
-                className={`px-2.5 py-1 text-[11px] rounded cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                  active
-                    ? "bg-white text-base-900 font-semibold shadow-sm"
-                    : "text-base-600 font-medium hover:text-base-900"
-                }`}
-              >
-                <span>{t.label}</span>
-                <span
-                  className={`text-[10px] tabular-nums ${active ? "text-base-600" : "text-base-400"}`}
-                >
-                  {counts[t.key]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        {urgentCount > 0 && (
-          <button
-            type="button"
-            onClick={() => setUrgentOnly((v) => !v)}
-            title="Due within 1 day (today / tomorrow) or overdue"
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
-              urgentOnly
-                ? "bg-destructive text-white"
-                : "border border-destructive/40 text-destructive hover:bg-destructive/5"
-            }`}
-          >
-            <AlertTriangle size={13} strokeWidth={2.5} /> Urgent {urgentCount}
-          </button>
-        )}
-        {flaggedCount > 0 && (
-          <button
-            type="button"
-            onClick={() => setFlaggedOnly((v) => !v)}
-            title="Flagged for follow-up (⭐ starred, not yet resolved)"
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
-              flaggedOnly
-                ? "bg-warning text-white"
-                : "border border-warning/40 text-warning hover:bg-warning/5"
-            }`}
-          >
-            <Star size={13} strokeWidth={2.5} className="fill-current" /> Starred {flaggedCount}
-          </button>
-        )}
-      </div>
-
-      {/* Region / Stock / Logistic / Category — ONE compact row, NO boxes (Jess
-          2026-06-25): labelled inline chip-groups (darker labels = the anchors),
-          wraps when there are many chips. No per-filter boxes. */}
-      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 px-3 py-2">
-        <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 mr-0.5 shrink-0">Region</span>
-          <RegionChip
-            label="All"
-            count={tabFiltered.length}
-            active={regionFilter === null}
-            onClick={() => setRegionFilter(null)}
-          />
-          {regionEntries.map((e) => (
-            <RegionChip
-              key={e.region}
-              label={e.region}
-              count={e.count}
-              active={regionFilter === e.region}
-              onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+              />
+            ))}
+          </FilterGroup>
+          <div className="ml-auto flex items-center gap-2">
+            <QuickView
+              icon={Flag}
+              label="Follow-up"
+              count={flaggedCount}
+              tone="warning"
+              active={flaggedOnly}
+              title="Team handoff — orders with an open follow-up note for the next operator"
+              onClick={() => setFlaggedOnly((v) => !v)}
             />
-          ))}
-        </div>
-        <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 mr-0.5 shrink-0">Stock</span>
-          <RegionChip
-            label="All"
-            count={tabFiltered.length}
-            active={stockFilter === null}
-            onClick={() => setStockFilter(null)}
-          />
-          {stockEntries.map((e) => (
-            <RegionChip
-              key={e.bucket}
-              label={e.bucket}
-              count={e.count}
-              active={stockFilter === e.bucket}
-              dot={e.bucket === "Ready" ? "#16A34A" : e.bucket === "Waiting" ? "#D97706" : "#DC2626"}
-              onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
+            <QuickView
+              icon={ChevronsUp}
+              label="For Jess"
+              count={escalateCount}
+              tone="danger"
+              active={escalateOnly}
+              title="Escalated to Jess — orders needing the boss's action"
+              onClick={() => setEscalateOnly((v) => !v)}
             />
-          ))}
+          </div>
         </div>
-        <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 mr-0.5 shrink-0">Logistic</span>
-          <RegionChip
-            label="All"
-            count={tabFiltered.length}
-            active={logisticFilter === null}
-            onClick={() => setLogisticFilter(null)}
-          />
-          {logisticEntries.map((e) => (
+        {/* Row 2 — Due · Stock · Category (the fixed / fast filters). */}
+        <div className="flex items-start gap-1.5 flex-wrap">
+          <FilterGroup label="Due">
             <RegionChip
-              key={e.carrier}
-              label={e.carrier}
-              count={e.count}
-              active={logisticFilter === e.carrier}
-              onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
+              label="All"
+              count={tabFiltered.length}
+              active={dueFilter === null}
+              onClick={() => setDueFilter(null)}
             />
-          ))}
-        </div>
-        <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 mr-0.5 shrink-0">Category</span>
-          <RegionChip
-            label="All"
-            count={tabFiltered.length}
-            active={categoryFilter === null}
-            onClick={() => setCategoryFilter(null)}
-          />
-          {categoryEntries.map((e) => (
+            {dueEntries.map((e) => (
+              <RegionChip
+                key={e.bucket}
+                label={e.bucket}
+                count={e.count}
+                active={dueFilter === e.bucket}
+                tone={DUE_TONE[e.bucket]}
+                title={DUE_DESC[e.bucket]}
+                onClick={() => setDueFilter((r) => (r === e.bucket ? null : e.bucket))}
+              />
+            ))}
+          </FilterGroup>
+          <FilterGroup label="Stock">
             <RegionChip
-              key={e.cat}
-              label={e.label}
-              count={e.count}
-              active={categoryFilter === e.cat}
-              onClick={() => setCategoryFilter((r) => (r === e.cat ? null : e.cat))}
+              label="All"
+              count={tabFiltered.length}
+              active={stockFilter === null}
+              onClick={() => setStockFilter(null)}
             />
-          ))}
+            {stockEntries.map((e) => (
+              <RegionChip
+                key={e.bucket}
+                label={e.bucket}
+                count={e.count}
+                active={stockFilter === e.bucket}
+                dot={e.bucket === "Ready" ? "#16A34A" : e.bucket === "Waiting" ? "#D97706" : "#DC2626"}
+                onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
+              />
+            ))}
+          </FilterGroup>
+          <FilterGroup label="Category">
+            <RegionChip
+              label="All"
+              count={tabFiltered.length}
+              active={categoryFilter === null}
+              onClick={() => setCategoryFilter(null)}
+            />
+            {categoryEntries.map((e) => (
+              <RegionChip
+                key={e.cat}
+                label={e.label}
+                count={e.count}
+                active={categoryFilter === e.cat}
+                onClick={() => setCategoryFilter((r) => (r === e.cat ? null : e.cat))}
+              />
+            ))}
+          </FilterGroup>
         </div>
-      </div>
+        {/* Row 3 — Region · Logistic (the long / growing filters). */}
+        <div className="flex items-start gap-1.5 flex-wrap">
+          <FilterGroup label="Region">
+            <RegionChip
+              label="All"
+              count={tabFiltered.length}
+              active={regionFilter === null}
+              onClick={() => setRegionFilter(null)}
+            />
+            {regionEntries.map((e) => (
+              <RegionChip
+                key={e.region}
+                label={e.region}
+                count={e.count}
+                active={regionFilter === e.region}
+                onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+              />
+            ))}
+          </FilterGroup>
+          <FilterGroup label="Logistic">
+            <RegionChip
+              label="All"
+              count={tabFiltered.length}
+              active={logisticFilter === null}
+              onClick={() => setLogisticFilter(null)}
+            />
+            {logisticEntries.map((e) => (
+              <RegionChip
+                key={e.carrier}
+                label={e.carrier}
+                count={e.count}
+                active={logisticFilter === e.carrier}
+                onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
+              />
+            ))}
+          </FilterGroup>
+        </div>
       </div>
 
       {/* Toolbar — result count + bulk actions, between the filter card and the
@@ -1046,11 +1124,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
           className={`w-full border-collapse text-[13px] table-fixed ${
             compact ? "[&_td]:py-0.5 [&_th]:py-1" : ""
           }`}
-          style={{ minWidth: 1180 }}
+          style={{ minWidth: 1260 }}
         >
           <colgroup>
             <col style={{ width: 34 }} />
-            <col style={{ width: 28 }} />
             <col style={{ width: 96 }} />
             <col style={{ width: 70 }} />
             <col style={{ width: 80 }} />
@@ -1060,8 +1137,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 96 }} />
             <col style={{ width: 64 }} />
             <col style={{ width: 70 }} />
+            <col style={{ width: 150 }} />
+            <col style={{ width: 160 }} />
             <col style={{ width: 168 }} />
-            <col style={{ width: 188 }} />
           </colgroup>
           {/* ONE thin, darker header band so it reads clearly AS the header
               (Jess 2026-06-24: header darker, no column shade, less thick). */}
@@ -1076,7 +1154,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   className="cursor-pointer accent-base-900 align-middle"
                 />
               </th>
-              <th className="border-r border-base-200" />
               <Th>Status</Th>
               <Th noBorder>Order ID</Th>
               <Th noBorder>Ref No</Th>
@@ -1087,6 +1164,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Carrier</Th>
               <Th>Stock</Th>
               <Th>Items</Th>
+              <Th>Action</Th>
               <Th>Remark</Th>
             </tr>
           </thead>
@@ -1112,7 +1190,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 selected={selected.has(o.id)}
                 onToggle={() => toggleOne(o.id)}
                 onOpen={() => setOpenOrderId(o.id)}
-                onToggleStar={toggleFollowUp}
               />
             ))}
           </tbody>
@@ -1306,6 +1383,8 @@ function RegionChip({
   active,
   onClick,
   dot,
+  tone,
+  title,
 }: {
   label: string;
   count: number;
@@ -1314,15 +1393,29 @@ function RegionChip({
   /** Optional leading colour dot — the Stock chips use it (green/amber/red) to
    *  tie to the Stock column + set them apart from the neutral Region chips. */
   dot?: string;
+  /** Resting colour tint for the DUE buckets (red→grey heat ramp). Applied only
+   *  when NOT selected; selected still flips to the shared black active state. */
+  tone?: { bg: string; text: string; border: string };
+  /** Hover tooltip — Status tab meaning, Due bucket day-range, etc. */
+  title?: string;
 }) {
+  const tinted = !!tone && !active;
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap shrink-0 transition-colors ${
+      title={title}
+      style={
+        tinted
+          ? { backgroundColor: tone!.bg, color: tone!.text, border: `0.5px solid ${tone!.border}` }
+          : undefined
+      }
+      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] whitespace-nowrap shrink-0 transition-colors ${
         active
           ? "bg-base-900 text-white font-semibold"
-          : "bg-base-100 text-base-600 font-medium hover:bg-base-200"
+          : tinted
+            ? "font-medium hover:brightness-95"
+            : "bg-base-100 text-base-600 font-medium hover:bg-base-200"
       }`}
     >
       {dot && (
@@ -1333,9 +1426,78 @@ function RegionChip({
         />
       )}
       {label}
-      <span className={`text-[10px] tabular-nums ${active ? "text-white/70" : "text-base-400"}`}>
+      <span
+        className={`text-[10px] tabular-nums ${
+          active ? "text-white/70" : tinted ? "opacity-60" : "text-base-400"
+        }`}
+      >
         {count}
       </span>
+    </button>
+  );
+}
+
+/** Filter-group box — one bordered container per dimension (Jess 2026-06-25): a
+ *  dark uppercase label + a hairline + the group's chips, so groups read as
+ *  separated units without the height cost of stacking them into columns. */
+function FilterGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="inline-flex items-center gap-x-0.5 gap-y-1 flex-wrap border border-base-200 rounded-md px-1.5 py-0.5"
+      data-testid={`filter-${label.toLowerCase()}`}
+    >
+      <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-800 border-r border-base-200 pr-1.5 shrink-0">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/** Action-lane quick-view (Jess 2026-06-25): the two clickable filters for the
+ *  open-annotation lanes — 🚩 Follow-up (amber, team) + ⏫ For Jess (red, boss).
+ *  Always shown (even at 0) so the lanes are discoverable. */
+function QuickView({
+  icon: Icon,
+  label,
+  count,
+  active,
+  tone,
+  title,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  count: number;
+  active: boolean;
+  tone: "warning" | "danger";
+  title: string;
+  onClick: () => void;
+}) {
+  const cls =
+    tone === "danger"
+      ? active
+        ? "bg-destructive text-white"
+        : "border border-destructive/40 text-destructive hover:bg-destructive/5"
+      : active
+        ? "bg-warning text-white"
+        : "border border-warning/40 text-warning hover:bg-warning/5";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors ${cls}`}
+    >
+      <Icon size={13} strokeWidth={2.5} /> {label}
+      <span className="tabular-nums opacity-80">{count}</span>
     </button>
   );
 }
@@ -1450,7 +1612,6 @@ function OrderRow({
   selected,
   onToggle,
   onOpen,
-  onToggleStar,
 }: {
   o: operationOrderListRow;
   idx: number;
@@ -1462,11 +1623,9 @@ function OrderRow({
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
-  onToggleStar: (orderId: string, flagged: boolean) => void;
 }) {
   const ct = controlTabOf(o);
   const urg = urgencyColor(o, ct);
-  const flagged = isFlaggedOrder(o);
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
   const qtyTotal = unitTotal(lines);
@@ -1511,27 +1670,6 @@ function OrderRow({
           aria-label={`Select SO-${o.so}`}
           className="cursor-pointer accent-base-900 align-middle"
         />
-      </td>
-      {/* ⭐ follow-up flag — own column (Gmail star): click to flag/unflag
-          without opening the order. */}
-      <td
-        className="px-1 py-2 text-center border-r border-base-100"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          onClick={() => onToggleStar(o.id, flagged)}
-          aria-pressed={flagged}
-          aria-label={flagged ? "Clear follow-up flag" : "Flag for follow-up"}
-          title={flagged ? "Flagged for follow-up — click to clear" : "Flag for follow-up"}
-          className="p-0.5 rounded hover:bg-base-200 shrink-0"
-        >
-          <Star
-            size={15}
-            strokeWidth={2}
-            className={flagged ? "fill-current text-warning" : "text-base-300"}
-          />
-        </button>
       </td>
       {/* Status — Q1 (Jess 2026-06-24): a soft coloured pill, colour confined to
           THIS column (his CRM-ref pattern). Completed stays neutral grey. */}
@@ -1697,9 +1835,78 @@ function OrderRow({
           </div>
         )}
       </td>
+      {/* Action — the operation team's own handoff (🚩 follow-up / ⏫ escalate
+          note); separate from the 4 party Remarks. */}
+      <ActionCell order={o} />
       {/* Remark — the 4 operator remarks shown in-cell; click to edit in place. */}
       <RemarkCell order={o} />
     </tr>
+  );
+}
+
+/** Action cell — the operation team's internal next-step (Jess 2026-06-25),
+ *  DISTINCT from the 4 per-party Remarks. Surfaces the latest open annotation in
+ *  either lane (⏫ Escalate to Jess first, then 🚩 Follow up) + a one-click ✓
+ *  Resolve; an empty cell offers a quick Flag. Add/escalate proper happens in the
+ *  drawer timeline. Self-contained mutation, like RemarkCell. */
+function ActionCell({ order }: { order: operationOrderListRow }) {
+  const open = openActionFor(order);
+  const add = useAddAnnotation();
+  const post = (content: string, tag: "follow_up" | "resolved", ok: string) => {
+    if (add.isPending) return;
+    add.mutate(
+      { orderId: order.id, content, tag },
+      { onSuccess: () => toast.success(ok), onError: () => toast.error("Couldn't update — retry") },
+    );
+  };
+  return (
+    <td className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
+      {open ? (
+        <div className="flex items-start gap-1.5">
+          {open.lane === "escalate" ? (
+            <ChevronsUp
+              size={13}
+              strokeWidth={2.5}
+              className="text-destructive shrink-0 mt-px"
+              aria-label="Escalated to Jess"
+            />
+          ) : (
+            <Flag
+              size={12}
+              strokeWidth={2}
+              className="text-warning fill-current shrink-0 mt-px"
+              aria-label="Follow up"
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <div
+              className="text-[10px] leading-[1.3] text-base-700 line-clamp-2"
+              title={open.content}
+            >
+              {open.content}
+            </div>
+            <button
+              type="button"
+              disabled={add.isPending}
+              onClick={() => post("Resolved", "resolved", "Resolved")}
+              className="mt-0.5 inline-flex items-center gap-0.5 text-[9px] font-medium text-base-400 hover:text-success disabled:opacity-50"
+            >
+              <Check size={10} strokeWidth={2.5} /> Resolve
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={add.isPending}
+          onClick={() => post("Flagged for follow-up", "follow_up", "Flagged for follow-up")}
+          title="Flag for follow-up (set the next action in the order drawer)"
+          className="inline-flex items-center gap-1 text-[10px] text-base-300 hover:text-warning disabled:opacity-50"
+        >
+          <Flag size={11} strokeWidth={2} /> Flag
+        </button>
+      )}
+    </td>
   );
 }
 
