@@ -1012,15 +1012,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
               title="Escalated to Jess — orders needing the boss's action"
               onClick={() => setEscalateOnly((v) => !v)}
             />
-            <QuickView
-              icon={CalendarClock}
-              label="No ETA"
-              count={etaCount}
-              tone="warning"
-              active={etaOnly}
-              title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
-              onClick={() => setEtaOnly((v) => !v)}
-            />
           </div>
         </div>
         {/* Row 2 — Due · Stock · Category (the fixed / fast filters). */}
@@ -1117,6 +1108,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
               />
             ))}
           </FilterGroup>
+          {/* No ETA quick-view sits with Region/Logistic (Jess 2026-06-25: it's a
+              logistic-chase filter, belongs on the delivery row). */}
+          <div className="ml-auto flex items-center">
+            <QuickView
+              icon={CalendarClock}
+              label="No ETA"
+              count={etaCount}
+              tone="warning"
+              active={etaOnly}
+              title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
+              onClick={() => setEtaOnly((v) => !v)}
+            />
+          </div>
         </div>
       </div>
 
@@ -1861,25 +1865,26 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Deadline — merged Due + Deadline (Jess 2026-06-25 screenshot): the date
-          on top, the days-left countdown below — saves a column + reads cleaner.
-          Overdue/today/tomorrow read red, the rest grey. */}
+      {/* Deadline — merged Due + Deadline (Jess 2026-06-25): date on top, weekday +
+          days-left below. ALWAYS shows the date (incl. completed — Jess: don't
+          hide it); the countdown only on still-open orders. */}
       <td
         className="px-3 py-2 border-r border-base-100 leading-[1.2] whitespace-nowrap"
         title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
-        {ct === "completed" ? (
-          <span className="text-base-300">—</span>
-        ) : o.delivery_date_tbd ? (
+        {o.delivery_date_tbd ? (
           <span className="text-[11px] font-medium text-warning">TBD</span>
         ) : o.delivery_date ? (
           (() => {
-            const datePart = fmtDate(o.delivery_date).split(", ")[0];
-            const cd = countdownLabel(o);
+            const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
+            const cd = ct === "completed" ? null : countdownLabel(o);
             return (
               <>
                 <div className="text-[11px] text-base-700 tabular-nums">{datePart}</div>
-                {cd && <div className={`text-[10px] tabular-nums ${cd.cls}`}>{cd.text}</div>}
+                <div className="text-[10px] tabular-nums text-base-400">
+                  {dayPart}
+                  {cd && <span className={cd.cls}> · {cd.text}</span>}
+                </div>
               </>
             );
           })()
@@ -1969,18 +1974,36 @@ function OrderRow({
 }
 
 /** Action cell — the operation team's internal next-step (Jess 2026-06-25),
- *  DISTINCT from the 4 per-party Remarks. Surfaces the latest open annotation in
- *  either lane (⏫ Escalate to Jess first, then 🚩 Follow up) + a one-click ✓
- *  Resolve; an empty cell offers a quick Flag. Add/escalate proper happens in the
- *  drawer timeline. Self-contained mutation, like RemarkCell. */
+ *  DISTINCT from the 4 per-party Remarks. Shows the latest open annotation (⏫
+ *  Escalate to Jess first, then 🚩 Follow up) + a one-click ✓ Resolve. An empty
+ *  cell's "Flag" opens an inline box to TYPE the actual next-action (Jess: don't
+ *  write a useless placeholder) → saved as a follow_up note. Escalate stays in
+ *  the drawer timeline. Self-contained mutation, like RemarkCell. */
 function ActionCell({ order }: { order: operationOrderListRow }) {
   const open = openActionFor(order);
   const add = useAddAnnotation();
-  const post = (content: string, tag: "follow_up" | "resolved", ok: string) => {
+  const [adding, setAdding] = useState(false);
+  const [note, setNote] = useState("");
+  const resolve = () => {
     if (add.isPending) return;
     add.mutate(
-      { orderId: order.id, content, tag },
-      { onSuccess: () => toast.success(ok), onError: () => toast.error("Couldn't update — retry") },
+      { orderId: order.id, content: "Resolved", tag: "resolved" },
+      { onSuccess: () => toast.success("Resolved"), onError: () => toast.error("Couldn't update — retry") },
+    );
+  };
+  const saveFollowUp = () => {
+    const text = note.trim();
+    if (!text || add.isPending) return;
+    add.mutate(
+      { orderId: order.id, content: text, tag: "follow_up" },
+      {
+        onSuccess: () => {
+          toast.success("Follow-up added");
+          setAdding(false);
+          setNote("");
+        },
+        onError: () => toast.error("Couldn't add — retry"),
+      },
     );
   };
   return (
@@ -2012,20 +2035,56 @@ function ActionCell({ order }: { order: operationOrderListRow }) {
             <button
               type="button"
               disabled={add.isPending}
-              onClick={() => post("Resolved", "resolved", "Resolved")}
+              onClick={resolve}
               className="mt-0.5 inline-flex items-center gap-0.5 text-[9px] font-medium text-base-400 hover:text-success disabled:opacity-50"
             >
               <Check size={10} strokeWidth={2.5} /> Resolve
             </button>
           </div>
         </div>
+      ) : adding ? (
+        <div className="flex flex-col gap-1">
+          <input
+            autoFocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveFollowUp();
+              if (e.key === "Escape") {
+                setAdding(false);
+                setNote("");
+              }
+            }}
+            placeholder="What to follow up?"
+            className="w-full px-1.5 py-0.5 border border-base-200 rounded text-[10px] bg-white outline-none focus:border-base-700"
+          />
+          <div className="flex justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setAdding(false);
+                setNote("");
+              }}
+              className="text-[9px] text-base-500 hover:text-base-900"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!note.trim() || add.isPending}
+              onClick={saveFollowUp}
+              className="text-[9px] font-semibold text-primary hover:underline disabled:opacity-40"
+            >
+              {add.isPending ? "…" : "Save"}
+            </button>
+          </div>
+        </div>
       ) : (
         <button
           type="button"
-          disabled={add.isPending}
-          onClick={() => post("Flagged for follow-up", "follow_up", "Flagged for follow-up")}
-          title="Flag for follow-up (set the next action in the order drawer)"
-          className="inline-flex items-center gap-1 text-[10px] text-base-300 hover:text-warning disabled:opacity-50"
+          onClick={() => setAdding(true)}
+          title="Add a follow-up — type what the next operator should do"
+          className="inline-flex items-center gap-1 text-[10px] text-base-300 hover:text-warning"
         >
           <Flag size={11} strokeWidth={2} /> Flag
         </button>
@@ -2105,7 +2164,7 @@ function Th({
 }) {
   return (
     <th
-      className={`px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-base-700 text-left ${
+      className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.02em] text-base-900 text-left ${
         noBorder ? "" : "border-r border-base-200"
       }`}
     >

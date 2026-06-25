@@ -649,9 +649,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header renamed
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // 2-day-out deadline → the merged Deadline cell shows "+2d" below the date.
+    // 2-day-out deadline → the merged Deadline cell shows the weekday + "+2d".
     const row = screen.getByTestId("order-row");
-    expect(within(row).getByText("+2d")).toBeInTheDocument();
+    expect(within(row).getByText(/\+2d/)).toBeInTheDocument();
   });
 
   it("paginates — 15/page by default (fixed listing box), Next works", () => {
