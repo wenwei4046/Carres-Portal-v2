@@ -9,19 +9,23 @@ import {
   FileText,
   MoreVertical,
   Package,
+  Pencil,
   RotateCcw,
   StickyNote,
   Truck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { STOCK_LOCATIONS } from "@carres/shared";
+import { STOCK_LOCATIONS, updateOrderInputSchema } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { renderDoPdf } from "@/lib/pdf/render";
 import type { DoTemplateData } from "@/lib/pdf/types";
 import {
+  qk,
   useOperationOrder,
   useRecheckStockMutation,
+  useUpdateOrder,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
   type operationOrderDetailStockBalance,
@@ -609,30 +613,7 @@ function DrawerBody({
           summary={order.customer_name}
           defaultOpen
         >
-          <table className="w-full border-collapse">
-            <tbody>
-              <tr>
-                <Kc>Customer</Kc>
-                <Vc>
-                  <span className={cjkClassName(order.customer_name)}>
-                    {order.customer_name}
-                  </span>
-                </Vc>
-                <Kc>Phone</Kc>
-                <Vc>
-                  {order.customer_phone ?? <em className="text-base-500">—</em>}
-                </Vc>
-              </tr>
-              <tr>
-                <Kc>Address</Kc>
-                <Vc colSpan={3}>
-                  {order.customer_address ?? (
-                    <em className="text-base-500">—</em>
-                  )}
-                </Vc>
-              </tr>
-            </tbody>
-          </table>
+          <OrderCustomerCard order={order} />
         </DrawerSection>
 
         {/* 2 · Items & stock — full-width, directly after the address (Jess:
@@ -923,6 +904,160 @@ function addonsSum(
 
 /** Grid cells (spreadsheet look) — label cell (darker for readability) + value
  *  cell, both fully bordered. Kc/Vc compose into 1- or 2-up grid rows. */
+/**
+ * Customer block of the Order section — read-only, with an inline Edit on a
+ * Place order so operation can correct a customer's name / phone / address
+ * before the order proceeds (typo, customer moved, etc.). Saves via
+ * `useUpdateOrder` → PATCH /api/orders/:id; the `update_order` RPC 422s on any
+ * non-Place order, so the Edit affordance only shows for status 'place' (which
+ * is every real AutoCount order). Validates with the SAME shared zod schema the
+ * API uses. (Jess 2026-06-25, #4 drawer edit.)
+ */
+export function OrderCustomerCard({
+  order,
+}: {
+  order: {
+    id: string;
+    status: string;
+    customer_name: string | null;
+    customer_phone: string | null;
+    customer_address: string | null;
+  };
+}) {
+  const qc = useQueryClient();
+  const editable = order.status === "place";
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(order.customer_name ?? "");
+  const [phone, setPhone] = useState(order.customer_phone ?? "");
+  const [address, setAddress] = useState(order.customer_address ?? "");
+  const [err, setErr] = useState<string | null>(null);
+
+  const update = useUpdateOrder(order.id, {
+    onSuccess: () => {
+      setEditing(false);
+      toast.success("Customer details updated");
+      // useUpdateOrder invalidates the dealer order keys; the drawer reads the
+      // operation detail under a different key, so refresh that one too.
+      void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
+    },
+    onError: (e) => setErr(e.message),
+  });
+
+  function start() {
+    setName(order.customer_name ?? "");
+    setPhone(order.customer_phone ?? "");
+    setAddress(order.customer_address ?? "");
+    setErr(null);
+    setEditing(true);
+  }
+
+  function save() {
+    setErr(null);
+    // Only send fields the user actually changed — the RPC updates by presence.
+    const customer: Record<string, unknown> = {};
+    if (name.trim() !== (order.customer_name ?? "")) customer.name = name.trim();
+    if (phone.trim() !== (order.customer_phone ?? "")) customer.phone = phone.trim();
+    if (address.trim() !== (order.customer_address ?? ""))
+      customer.address = address.trim() || null;
+    if (Object.keys(customer).length === 0) {
+      setEditing(false);
+      return;
+    }
+    const parsed = updateOrderInputSchema.safeParse({ customer });
+    if (!parsed.success) {
+      setErr(parsed.error.issues[0]?.message ?? "Invalid input");
+      return;
+    }
+    update.mutate(parsed.data);
+  }
+
+  if (editing) {
+    const field =
+      "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+    return (
+      <div className="space-y-2">
+        <label className="block">
+          <span className="t-tiny text-base-500">Customer name</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
+        </label>
+        <label className="block">
+          <span className="t-tiny text-base-500">Phone</span>
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            inputMode="tel"
+            className={field}
+          />
+        </label>
+        <label className="block">
+          <span className="t-tiny text-base-500">Address</span>
+          <textarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            rows={2}
+            className={`${field} resize-none`}
+          />
+        </label>
+        {err && <p className="t-tiny text-danger">{err}</p>}
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            disabled={update.isPending}
+            className="btn-ghost text-[12px]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={update.isPending}
+            className="btn-primary text-[12px]"
+          >
+            {update.isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {editable && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={start}
+            className="inline-flex items-center gap-1 text-[11px] text-base-500 hover:text-base-900"
+          >
+            <Pencil className="w-3 h-3" /> Edit
+          </button>
+        </div>
+      )}
+      <table className="w-full border-collapse">
+        <tbody>
+          <tr>
+            <Kc>Customer</Kc>
+            <Vc>
+              <span className={cjkClassName(order.customer_name)}>
+                {order.customer_name}
+              </span>
+            </Vc>
+            <Kc>Phone</Kc>
+            <Vc>{order.customer_phone ?? <em className="text-base-500">—</em>}</Vc>
+          </tr>
+          <tr>
+            <Kc>Address</Kc>
+            <Vc colSpan={3}>
+              {order.customer_address ?? <em className="text-base-500">—</em>}
+            </Vc>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function Kc({ children }: { children: ReactNode }) {
   return (
     <td className="border border-base-200 bg-base-50 text-base-700 text-[10px] font-semibold uppercase tracking-[0.04em] px-2 py-1 align-top whitespace-nowrap">
