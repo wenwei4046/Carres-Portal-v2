@@ -409,16 +409,29 @@ const CORE_LABEL: Record<CoreCat, string> = {
 };
 const CORE_ORDER: CoreCat[] = ["mattress", "bedframe", "sofa"];
 
-/** Product-category filter options (Jess 2026-06-24): Mattress / Bedframe / Sofa
- *  — an order matches when it has at least one line of that core type. */
-const CATEGORY_OPTS: { cat: CoreCat; label: string }[] = [
-  { cat: "mattress", label: "Mattress" },
-  { cat: "bedframe", label: "Bedframe" },
-  { cat: "sofa", label: "Sofa" },
-];
-function orderHasCategory(o: operationOrderListRow, cat: CoreCat): boolean {
+/** Product-category filter options (Jess 2026-06-24, +Pillow/M.P 2026-06-25):
+ *  the 3 core types PLUS the two key accessories — an order matches when it has
+ *  at least one line of that type. Each option carries its own predicate so core
+ *  (lineCategory) and accessory (accShort) matching live in one list. */
+function orderHasCore(o: operationOrderListRow, cat: CoreCat): boolean {
   return (o.order_lines ?? []).some((l) => lineCategory(l.sku) === cat);
 }
+function orderHasAcc(o: operationOrderListRow, name: string): boolean {
+  return (o.order_lines ?? []).some(
+    (l) => lineCategory(l.sku) === "acc" && accShort(l.sku) === name,
+  );
+}
+const CATEGORY_OPTS: {
+  key: string;
+  label: string;
+  match: (o: operationOrderListRow) => boolean;
+}[] = [
+  { key: "mattress", label: "Mattress", match: (o) => orderHasCore(o, "mattress") },
+  { key: "bedframe", label: "Bedframe", match: (o) => orderHasCore(o, "bedframe") },
+  { key: "sofa", label: "Sofa", match: (o) => orderHasCore(o, "sofa") },
+  { key: "pillow", label: "Pillow", match: (o) => orderHasAcc(o, "Pillow") },
+  { key: "mp", label: "M.P", match: (o) => orderHasAcc(o, "M.P") },
+];
 
 /** Physical-goods unit total — core + accessories. Service lines (Disposal,
  *  floor charge…) are NOT units, so they don't count (matches the Master
@@ -550,7 +563,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [stockFilter, setStockFilter] = useState<StockBucket | null>(null);
   const [logisticFilter, setLogisticFilter] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<CoreCat | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   // Two action lanes (Jess 2026-06-25): 🚩 Follow-up = team handoff (follow_up
   // annotations) · ⏫ For Jess = escalations needing the boss (escalate). Each is
   // a derived open-annotation state with its own quick-view filter; the per-row
@@ -680,10 +693,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   const categoryEntries = useMemo(
     () =>
-      CATEGORY_OPTS.map(({ cat, label }) => ({
-        cat,
-        label,
-        count: tabFiltered.filter((o) => orderHasCategory(o, cat)).length,
+      CATEGORY_OPTS.map((opt) => ({
+        key: opt.key,
+        label: opt.label,
+        count: tabFiltered.filter(opt.match).length,
       })),
     [tabFiltered],
   );
@@ -697,7 +710,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
     if (logisticFilter)
       r = r.filter((o) => (logisticOf(o, partnerName) ?? NO_CARRIER) === logisticFilter);
-    if (categoryFilter) r = r.filter((o) => orderHasCategory(o, categoryFilter));
+    if (categoryFilter) {
+      const opt = CATEGORY_OPTS.find((c) => c.key === categoryFilter);
+      if (opt) r = r.filter(opt.match);
+    }
     return [...r].sort(compareByDeadline);
   }, [tabFiltered, flaggedOnly, escalateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName]);
 
@@ -1032,11 +1048,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
             />
             {categoryEntries.map((e) => (
               <RegionChip
-                key={e.cat}
+                key={e.key}
                 label={e.label}
                 count={e.count}
-                active={categoryFilter === e.cat}
-                onClick={() => setCategoryFilter((r) => (r === e.cat ? null : e.cat))}
+                active={categoryFilter === e.key}
+                onClick={() => setCategoryFilter((r) => (r === e.key ? null : e.key))}
               />
             ))}
           </FilterGroup>
@@ -1070,9 +1086,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {logisticEntries.map((e) => (
               <RegionChip
                 key={e.carrier}
-                label={e.carrier}
+                label={e.carrier === NO_CARRIER ? "Unassigned" : e.carrier}
                 count={e.count}
                 active={logisticFilter === e.carrier}
+                title={e.carrier === NO_CARRIER ? "No logistic partner assigned yet — operation to assign / chase" : undefined}
                 onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
               />
             ))}
@@ -1128,6 +1145,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         >
           <colgroup>
             <col style={{ width: 34 }} />
+            <col style={{ width: 26 }} />
             <col style={{ width: 96 }} />
             <col style={{ width: 70 }} />
             <col style={{ width: 80 }} />
@@ -1154,6 +1172,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   className="cursor-pointer accent-base-900 align-middle"
                 />
               </th>
+              <th className="border-r border-base-200" title="Follow-up / escalate flag" />
               <Th>Status</Th>
               <Th noBorder>Order ID</Th>
               <Th noBorder>Ref No</Th>
@@ -1172,7 +1191,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={13}
+                  colSpan={14}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1494,9 +1513,9 @@ function QuickView({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors ${cls}`}
+      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors ${cls}`}
     >
-      <Icon size={13} strokeWidth={2.5} /> {label}
+      <Icon size={11} strokeWidth={2.5} /> {label}
       <span className="tabular-nums opacity-80">{count}</span>
     </button>
   );
@@ -1671,6 +1690,31 @@ function OrderRow({
           className="cursor-pointer accent-base-900 align-middle"
         />
       </td>
+      {/* Action-lane flag (Jess 2026-06-25): a left-edge scan icon — a Flag
+          (amber) for an open follow-up, a ChevronsUp (red) for an open escalate
+          — lights up only when the order has an open action; the note + Resolve
+          live in the Action column. */}
+      <td className="px-1 py-2 text-center border-r border-base-100">
+        {(() => {
+          const a = openActionFor(o);
+          if (!a) return null;
+          return a.lane === "escalate" ? (
+            <ChevronsUp
+              size={14}
+              strokeWidth={2.5}
+              className="text-destructive inline align-middle"
+              aria-label="Escalated to Jess"
+            />
+          ) : (
+            <Flag
+              size={13}
+              strokeWidth={2}
+              className="text-warning fill-current inline align-middle"
+              aria-label="Open follow-up"
+            />
+          );
+        })()}
+      </td>
       {/* Status — Q1 (Jess 2026-06-24): a soft coloured pill, colour confined to
           THIS column (his CRM-ref pattern). Completed stays neutral grey. */}
       <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
@@ -1690,7 +1734,7 @@ function OrderRow({
       <td className="px-3 py-2">
         {ref.length > 0 ? (
           <div
-            className="font-mono text-[10px] text-base-500 leading-[1.3]"
+            className="font-mono text-[10px] text-base-800 leading-[1.3]"
             style={clamp3}
             title={ref.join("\n")}
           >

@@ -554,6 +554,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
+      "", // follow-up / escalate flag (left-edge scan icon)
       "Status",
       "Order ID",
       "Ref No",
