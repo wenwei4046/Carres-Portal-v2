@@ -39,6 +39,7 @@ import {
   Flag,
   ChevronsUp,
   Check,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -225,29 +226,6 @@ function stockBucketOf(
   return "Not set";
 }
 
-/** Countdown from today to the deadline (customer's requested delivery date)
- *  → short label + tone, encoding Jess's prep SOP off the deadline:
- *    • ≤7 days  ⚠  stock must be at the warehouse (the "Before 7 Days" flag —
- *                  standard early-receive to avoid last-minute damage)
- *    • ≤3 days  📞 logistic must contact the customer to arrange delivery
- *  overdue/today/≤3d read red; the 4–7d prep window reads amber. */
-function deadlineInfo(
-  dateStr: string | null | undefined,
-): { label: string; pill: string; urgent: boolean } | null {
-  if (!dateStr) return null;
-  const d = new Date(`${dateStr}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
-  // Jess: short form + ≤1 day = urgent (red). Overdue / today / tomorrow read
-  // red; everything else is a plain neutral "Nd" countdown.
-  if (diff < 0) return { label: `${-diff}d`, pill: "pill-overdue", urgent: true };
-  if (diff === 0) return { label: "Today", pill: "pill-overdue", urgent: true };
-  if (diff === 1) return { label: "1d", pill: "pill-overdue", urgent: true };
-  return { label: `${diff}d`, pill: "pill-neutral", urgent: false };
-}
-
 /** Left-edge urgency accent per row (Jess 2026-06-24, his CRM-sample "priority
  *  lane"): red overdue/today/tomorrow · amber the 2–7-day prep window · none
  *  otherwise. Completed / TBD / undated rows get no bar. */
@@ -354,6 +332,37 @@ function openActionFor(
   const fu = latestNote("follow_up");
   if (fu !== null) return { lane: "follow_up", content: fu };
   return null;
+}
+
+/** Countdown line for the merged Deadline cell (Jess 2026-06-25: date on top,
+ *  days-left below — merges the old Due + Deadline columns into one). "+5d" grey
+ *  for the future · "-2d · overdue" red for the past · "Today" red. */
+function countdownLabel(
+  o: operationOrderListRow,
+): { text: string; cls: string } | null {
+  const diff = daysToDue(o);
+  if (diff === null) return null;
+  if (diff < 0) return { text: `${diff}d · overdue`, cls: "text-destructive font-medium" };
+  if (diff === 0) return { text: "Today", cls: "text-destructive font-medium" };
+  if (diff === 1) return { text: "+1d", cls: "text-destructive font-medium" };
+  return { text: `+${diff}d`, cls: "text-base-400" };
+}
+
+/** The logistic's committed delivery ETA (ops_order_control.logistic_eta, 0180) —
+ *  distinct from the customer `delivery_date` deadline. */
+function logisticEtaOf(o: operationOrderListRow): string | null {
+  const raw = o.ops_order_control;
+  const ovl = Array.isArray(raw) ? raw[0] : raw;
+  return ovl?.logistic_eta ?? null;
+}
+
+/** Order needs its logistic ETA chased (Jess 2026-06-25, Q3): open + no ETA set
+ *  + deadline ≤7 days out. Drives the red "No ETA" alert + the quick-view. */
+function needsEta(o: operationOrderListRow): boolean {
+  if (controlTabOf(o) === "completed") return false;
+  if (logisticEtaOf(o)) return false;
+  const diff = daysToDue(o);
+  return diff !== null && diff <= 7;
 }
 
 /** Default sort — deadline ASCENDING (Jess P3): overdue/earliest first so the
@@ -570,6 +579,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Action cell owns flag/resolve via its own useAddAnnotation.
   const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [escalateOnly, setEscalateOnly] = useState(false);
+  // No-ETA quick-view (Jess 2026-06-25): open orders the logistic hasn't given a
+  // delivery ETA for, with a near deadline — the chase list.
+  const [etaOnly, setEtaOnly] = useState(false);
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -642,6 +654,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const flaggedCount = useMemo(() => tabFiltered.filter(isFlaggedOrder).length, [tabFiltered]);
   const escalateCount = useMemo(() => tabFiltered.filter(isEscalatedOrder).length, [tabFiltered]);
+  const etaCount = useMemo(() => tabFiltered.filter(needsEta).length, [tabFiltered]);
   const dueEntries = useMemo(() => {
     const m = new Map<DueBucket, number>();
     for (const o of tabFiltered) {
@@ -705,6 +718,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     let r = tabFiltered;
     if (flaggedOnly) r = r.filter(isFlaggedOrder);
     if (escalateOnly) r = r.filter(isEscalatedOrder);
+    if (etaOnly) r = r.filter(needsEta);
     if (dueFilter) r = r.filter((o) => dueBucketOf(o) === dueFilter);
     if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
@@ -715,7 +729,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       if (opt) r = r.filter(opt.match);
     }
     return [...r].sort(compareByDeadline);
-  }, [tabFiltered, flaggedOnly, escalateOnly, dueFilter, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -727,7 +741,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Reset to the first page whenever the filtered set changes.
   useEffect(
     () => setPage(0),
-    [tab, search, pageSize, dueFilter, flaggedOnly, escalateOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
+    [tab, search, pageSize, dueFilter, flaggedOnly, escalateOnly, etaOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
   );
 
   const total = visible.length;
@@ -998,6 +1012,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
               title="Escalated to Jess — orders needing the boss's action"
               onClick={() => setEscalateOnly((v) => !v)}
             />
+            <QuickView
+              icon={CalendarClock}
+              label="No ETA"
+              count={etaCount}
+              tone="warning"
+              active={etaOnly}
+              title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
+              onClick={() => setEtaOnly((v) => !v)}
+            />
           </div>
         </div>
         {/* Row 2 — Due · Stock · Category (the fixed / fast filters). */}
@@ -1150,8 +1173,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 70 }} />
             <col style={{ width: 80 }} />
             <col style={{ width: 132 }} />
-            <col style={{ width: 56 }} />
-            <col style={{ width: 84 }} />
+            <col style={{ width: 72 }} />
+            <col style={{ width: 88 }} />
             <col style={{ width: 96 }} />
             <col style={{ width: 64 }} />
             <col style={{ width: 70 }} />
@@ -1177,8 +1200,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th noBorder>Order ID</Th>
               <Th noBorder>Ref No</Th>
               <Th>Customer</Th>
-              <Th>Due</Th>
               <Th>Deadline</Th>
+              <Th>ETA</Th>
               <Th>Location</Th>
               <Th>Carrier</Th>
               <Th>Stock</Th>
@@ -1622,6 +1645,82 @@ function RemarkCell({ order }: { order: operationOrderListRow }) {
   );
 }
 
+/** ETA cell — the logistic's committed delivery date (Jess 2026-06-25), edited
+ *  IN PLACE from the list (click → date) via the same order-control overlay PUT
+ *  the drawer uses. Shows a red "No ETA" alert when missing + the deadline is
+ *  near (≤7d); else the date, or a faint "+ set". Distinct from the Deadline. */
+function EtaCell({ order, ct }: { order: operationOrderListRow; ct: SettledTab }) {
+  const eta = logisticEtaOf(order);
+  const alert = needsEta(order);
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(eta ?? "");
+  const save = useSaveOrderControl(order.id, {
+    onSuccess: () => {
+      toast.success("ETA saved");
+      setEditing(false);
+    },
+    onError: (e) => toast.error(`Couldn't save — ${e.message}`),
+  });
+  if (editing) {
+    return (
+      <td className="px-2 py-2 align-top" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col gap-1">
+          <input
+            type="date"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            className="w-full px-1 py-0.5 border border-base-200 rounded text-[10px] bg-white outline-none focus:border-base-700"
+          />
+          <div className="flex justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="text-[9px] text-base-500 hover:text-base-900"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={save.isPending}
+              onClick={() => save.mutate({ logistic_eta: val.trim() || null })}
+              className="text-[9px] font-semibold text-primary hover:underline disabled:opacity-50"
+            >
+              {save.isPending ? "…" : "Save"}
+            </button>
+          </div>
+        </div>
+      </td>
+    );
+  }
+  return (
+    <td
+      className="px-3 py-2 border-r border-base-100 whitespace-nowrap cursor-text hover:bg-base-50"
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      title="Logistic's committed delivery ETA — click to set"
+    >
+      {eta ? (
+        <span className="text-[11px] text-base-700 tabular-nums">
+          {fmtDate(eta).split(", ")[0]}
+        </span>
+      ) : ct === "completed" ? (
+        <span className="text-base-300">—</span>
+      ) : alert ? (
+        <span
+          className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-destructive"
+          title="No logistic ETA + deadline near — chase the logistic to confirm"
+        >
+          <AlertTriangle size={11} strokeWidth={2.5} /> No ETA
+        </span>
+      ) : (
+        <span className="text-[10px] text-base-300">+ set</span>
+      )}
+    </td>
+  );
+}
+
 function OrderRow({
   o,
   idx,
@@ -1762,48 +1861,25 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Due — compact countdown. Urgent (overdue/today/tomorrow) = a small red
-          badge; otherwise a plain grey "Nd". Completed orders show a quiet "—"
-          (no fake "overdue" on a closed order — Jess 2026-06-24). */}
-      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
+      {/* Deadline — merged Due + Deadline (Jess 2026-06-25 screenshot): the date
+          on top, the days-left countdown below — saves a column + reads cleaner.
+          Overdue/today/tomorrow read red, the rest grey. */}
+      <td
+        className="px-3 py-2 border-r border-base-100 leading-[1.2] whitespace-nowrap"
+        title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
+      >
         {ct === "completed" ? (
           <span className="text-base-300">—</span>
         ) : o.delivery_date_tbd ? (
           <span className="text-[11px] font-medium text-warning">TBD</span>
         ) : o.delivery_date ? (
           (() => {
-            const dl = deadlineInfo(o.delivery_date);
-            if (!dl) return <span className="text-base-300">—</span>;
-            return dl.urgent ? (
-              <span
-                className="inline-flex items-center gap-0.5 text-[11px] font-semibold tabular-nums whitespace-nowrap rounded px-1.5 py-0.5 bg-destructive/10 text-destructive"
-                title="Urgent — due today / tomorrow or overdue"
-              >
-                <AlertTriangle size={10} strokeWidth={2.5} />
-                {dl.label}
-              </span>
-            ) : (
-              <span className="text-[12px] font-medium tabular-nums text-base-500">
-                {dl.label}
-              </span>
-            );
-          })()
-        ) : (
-          <span className="text-base-300">—</span>
-        )}
-      </td>
-      {/* Deadline — date on top, weekday below on its own line (Jess 2026-06-24). */}
-      <td
-        className="px-3 py-2 border-r border-base-100 text-[11px] text-base-600 tabular-nums leading-[1.2]"
-        title="Customer's requested delivery date. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
-      >
-        {o.delivery_date && !o.delivery_date_tbd ? (
-          (() => {
-            const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
+            const datePart = fmtDate(o.delivery_date).split(", ")[0];
+            const cd = countdownLabel(o);
             return (
               <>
-                <div>{datePart}</div>
-                {dayPart && <div className="text-base-400">{dayPart}</div>}
+                <div className="text-[11px] text-base-700 tabular-nums">{datePart}</div>
+                {cd && <div className={`text-[10px] tabular-nums ${cd.cls}`}>{cd.text}</div>}
               </>
             );
           })()
@@ -1811,6 +1887,10 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
+      {/* ETA — the logistic's committed delivery date (Jess 2026-06-25, distinct
+          from the customer Deadline). Inline-editable; a red "No ETA" alert when
+          missing + the deadline is near (≤7d) → chase the logistic. */}
+      <EtaCell order={o} ct={ct} />
       {/* Location — delivery city/state. Q1 colour restraint (Jess 2026-06-24):
           KV (the majority) is now NEUTRAL grey so the green leaves the table;
           only Outstation keeps a quiet amber (no warehouse buffer = special

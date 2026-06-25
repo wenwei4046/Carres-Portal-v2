@@ -539,7 +539,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("2× SOF")).toBeInTheDocument();
   });
 
-  it("orders columns: select · Status · Order ID · Ref No · Customer · Due · Deadline · Location · Carrier · Stock · Items · Action · Remark", () => {
+  it("orders columns: select · flag · Status · Order ID · Ref No · Customer · Deadline · ETA · Location · Carrier · Stock · Items · Action · Remark", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -559,8 +559,8 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Order ID",
       "Ref No",
       "Customer",
-      "Due",
       "Deadline",
+      "ETA",
       "Location",
       "Carrier",
       "Stock",
@@ -649,9 +649,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header renamed
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // 2-day-out deadline → "2d" + a Phone icon contact-window cue
+    // 2-day-out deadline → the merged Deadline cell shows "+2d" below the date.
     const row = screen.getByTestId("order-row");
-    expect(within(row).getByText("2d")).toBeInTheDocument();
+    expect(within(row).getByText("+2d")).toBeInTheDocument();
   });
 
   it("paginates — 15/page by default (fixed listing box), Next works", () => {

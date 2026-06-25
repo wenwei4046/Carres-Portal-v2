@@ -1747,6 +1747,10 @@ export interface opsRemarkEmbed {
   action_for_logistic: string | null;
   carres_remark: string | null;
   warehouse_remark: string | null;
+  /** The logistic's committed delivery date (migration 0180) — distinct from the
+   *  customer's `delivery_date` deadline. Surfaced into the Orders list ETA
+   *  column (Jess 2026-06-25); operation fills it from the drawer or the cell. */
+  logistic_eta?: string | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];
