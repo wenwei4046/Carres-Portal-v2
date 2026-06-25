@@ -14,6 +14,20 @@ Read this file ▶ RESUME (below).
 
 ---
 
+## ▶▶ UPDATE 2026-06-25 (cont.) — #3 LOCKED + #4 export + drawer edit SHIPPED (local, NOT pushed)
+- **#3 filter layout → LOCKED 丙** (keep the shipped 3-row boxes). Loo's call; **no code change** (line layout was already the live terminal state).
+- **#4 top-bar Export menu — DONE** (`66e089f`): header **Export ⋮** next to Import → exports the *filtered* view (every row matching the active filters, not just selection) as **CSV** (UTF-8 BOM so Excel reads Chinese names; +Address column) or **Print / Save as PDF** (lib-free HTML print window). Logic is a pure `buildOrdersCsv` + `buildOrdersPrintHtml` (shared `exportRow`); the bulk selected-CSV reuses it. Live-verified ("Export 124 orders" + both items).
+- **#4 drawer customer edit — DONE** (`86c1717`): inline **Edit** (pencil) on the Order section's Customer/Phone/Address for a **Place** order → `useUpdateOrder` (PATCH `/api/orders/:id`, existing Phase-2C.2 path), sends only changed fields, validates with the SAME shared `updateOrderInputSchema`, refreshes `qk.operation.order`. The `update_order` RPC 422s on non-Place, so Edit only shows for status 'place'. Live-verified (Placed #1001 → Edit + form opens/cancels; Delivered #1007 → no Edit).
+- **Excel decision = lib-free** (the CSV opens in Excel). NO dependency added → bundle CF stays flat. If Loo wants a true formatted `.xlsx`, add a small lib then (his call, overridable).
+- **#4 Ref No column + Deadline** = already shipped earlier this checkpoint (no work needed).
+- Tests **+10** → web **735/740** (5 pre-existing fails: OhanaSofaTab ×4 + NiceFutureMattressTab ×1). tsc + build clean; SERVICE_ROLE dist scan 0. **2 new commits, NOT pushed / NOT deployed — await `上线`.**
+
+### Still open after this session
+- **Unassigned-carrier alert** (small #4 polish): the amber **No ETA** QuickView already exists, and the Logistic group already has an **Unassigned** filter chip + count. Only the red/amber "Unassigned carrier" *action* chip alongside No ETA is left (cosmetic prominence; capability already present).
+- **#2 Follow-up form** — the BIG phase (extend right-rail Tasks: preset-title dropdown + force-assign one person + due dropdown + urgent + escalate-to-Jess + warning state machine). Own session; confirm approach first (draft in RESUME #2 below).
+
+---
+
 ## What shipped this session (commits, newest first)
 - `50f750d` Deadline cell = date (black base-900) + weekday (grey), **dropped the countdown** (Loo: `+2d` was confusing).
 - `2814fac` Flag now opens an **inline box to TYPE a real follow-up note** (no more "Flagged for follow-up" placeholder) · Deadline shows on **completed** orders too (+ weekday) · headers → base-900 bold · "No ETA" quick-view → Region/Logistic row.
@@ -37,10 +51,7 @@ Files touched: `apps/web/src/pages/operation/OperationOrdersControl.tsx` (+test)
 ---
 
 ## ▶ RESUME — pending decisions (Loo to answer)
-1. **#3 filter layout — LOCK ONE** (we iterated 3/4/5-column; mockups shown):
-   - **甲** 5-column (the 4 short groups + Logistic on top; **Region spans 3 cols**; "No ETA" under Logistic)
-   - **乙** 4-column (Region + Logistic each span 2)
-   - **丙** keep the current boxed rows (shipped)
+1. ~~**#3 filter layout — LOCK ONE**~~ → **RESOLVED 2026-06-25: LOCKED 丙** (keep the shipped 3-row boxes; no code change). The other options were 甲 5-column / 乙 4-column — both dropped because column grids wrap chips taller, which Jess had already rejected.
 2. **#2 Follow-up form — confirm approach = EXTEND the existing right-rail Tasks** (`OperationRightRail`, `ops_tasks`). Form opened by clicking **Flag**:
    - **Title = dropdown** of preset common follow-ups (team's English is poor) + free "what to do".
    - **Force-assign ONE person** (no "Anyone").
@@ -52,8 +63,8 @@ Files touched: `apps/web/src/pages/operation/OperationOrdersControl.tsx` (+test)
    - This is the **big phase** — build on its own after #3/#4.
 
 ## APPROVED — build next (no decision needed)
-- **#4** — Ref No column + **export menu** (Excel `.xlsx` needs a lib · PDF via print · CSV) at the top header (⋮) · **edit address etc. in the order drawer** (Q5 = **A**, drawer edit, NOT a full Excel-grid edit).
-- **Logistic alert wording** (confirmed): **"Unassigned carrier"** (orders with no carrier → assign) + **"No ETA"** (carrier set, no ETA → chase) — action chips near the Logistic group, red/amber.
+- ~~**#4** — Ref No column + export menu + edit address in the drawer~~ → **DONE 2026-06-25** (`66e089f` export menu · `86c1717` drawer edit; Ref No column + Deadline were already shipped). Excel = lib-free CSV (no dep). See the UPDATE block at the top.
+- **Logistic alert wording** (confirmed): **"Unassigned carrier"** (orders with no carrier → assign) + **"No ETA"** (carrier set, no ETA → chase) — action chips near the Logistic group, red/amber. **Partial**: "No ETA" amber QuickView + a Logistic "Unassigned" filter chip+count already exist; only the red/amber "Unassigned carrier" *action* chip is left (cosmetic).
 - **Deadline** = date(black)+weekday(grey), no countdown — DONE.
 
 ## Agreed design facts
