@@ -2,7 +2,15 @@
 
 **Branch:** `feat/orders-drawer-redesign` · **Worktree:** `C:\Users\User\carres-worktrees\orders-drawer`
 **Status:** local commits only — **NOT pushed, NOT deployed.** Awaiting Loo's `上线`.
-**To resume:** `git fetch origin && git checkout feat/orders-drawer-redesign`, read this file ▶ RESUME.
+
+### ⚠️ RESUME IN THE WORKTREE — do NOT work in the main repo
+ALL of this work lives in the **worktree** `C:\Users\User\carres-worktrees\orders-drawer` (already checked out on `feat/orders-drawer-redesign`). The main repo (`…\OneDrive\Desktop\Carres-Portal v2`) stays on `main` and is a DIFFERENT checkout.
+- **Edit/read files with absolute worktree paths** (`C:\Users\User\carres-worktrees\orders-drawer\apps\web\...`). Do NOT edit the same file under the OneDrive main-repo path — that's a different branch and the change would be lost.
+- Run tooling with `-C`: `corepack pnpm -C 'C:\Users\User\carres-worktrees\orders-drawer' --filter @carres/web ...`.
+- Commit from the worktree (`cd` into it, or it's the path in the Bash tool). The **preview MCP is already pinned to this worktree** (`.claude/launch.json` web → `…/carres-worktrees/orders-drawer/apps/web`) — just `preview_start` name `web`, no reconfig.
+- **Do NOT `git checkout feat/orders-drawer-redesign` in the main repo** — a branch checked out in a worktree can't be checked out elsewhere; it errors. Nothing to fetch/checkout; the worktree is already there with all 6 commits.
+
+Read this file ▶ RESUME (below).
 
 ---
 
