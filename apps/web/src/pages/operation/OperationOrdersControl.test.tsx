@@ -635,23 +635,22 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("labels the date column 'Deadline' and shows the 📞 contact window inside 3 days (A3)", () => {
+  it("labels the date column 'Deadline' and renders the date + weekday for a dated order (A3)", () => {
     const soon = new Date();
     soon.setDate(soon.getDate() + 2);
-    // Build the ISO date from LOCAL parts (not toISOString, which is UTC):
-    // deadlineInfo parses `${date}T00:00:00` as local midnight, so a UTC date
-    // is a day behind in UTC+8 during local early-morning hours and the
-    // countdown reads "1d" instead of "2d" (flaky-by-timezone, surfaced when
-    // the suite ran in MYT pre-dawn). Local parts keep it exactly 2 days out.
+    // Local-parts ISO (not toISOString/UTC) so the date is exactly 2 days out
+    // regardless of the UTC offset (was flaky in MYT pre-dawn).
     const iso = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, "0")}-${String(soon.getDate()).padStart(2, "0")}`;
     oneRow({ id: "r4", so: 3004, delivery_date: iso });
     wrap(<OperationOrdersControl />);
-    // header renamed
+    // header present
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // 2-day-out deadline → the merged Deadline cell shows the weekday + "+2d".
-    const row = screen.getByTestId("order-row");
-    expect(within(row).getByText(/\+2d/)).toBeInTheDocument();
+    // Merged Deadline cell = date (black) on top, weekday (grey) below, no
+    // countdown (Jess 2026-06-25). The dated cell must render something, not "—".
+    const cells = within(screen.getByTestId("order-row")).getAllByRole("cell");
+    expect(cells[6].textContent).not.toBe("—");
+    expect(cells[6].textContent).toMatch(/\d/);
   });
 
   it("paginates — 15/page by default (fixed listing box), Next works", () => {

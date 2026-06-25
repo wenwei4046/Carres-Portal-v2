@@ -334,20 +334,6 @@ function openActionFor(
   return null;
 }
 
-/** Countdown line for the merged Deadline cell (Jess 2026-06-25: date on top,
- *  days-left below — merges the old Due + Deadline columns into one). "+5d" grey
- *  for the future · "-2d · overdue" red for the past · "Today" red. */
-function countdownLabel(
-  o: operationOrderListRow,
-): { text: string; cls: string } | null {
-  const diff = daysToDue(o);
-  if (diff === null) return null;
-  if (diff < 0) return { text: `${diff}d · overdue`, cls: "text-destructive font-medium" };
-  if (diff === 0) return { text: "Today", cls: "text-destructive font-medium" };
-  if (diff === 1) return { text: "+1d", cls: "text-destructive font-medium" };
-  return { text: `+${diff}d`, cls: "text-base-400" };
-}
-
 /** The logistic's committed delivery ETA (ops_order_control.logistic_eta, 0180) —
  *  distinct from the customer `delivery_date` deadline. */
 function logisticEtaOf(o: operationOrderListRow): string | null {
@@ -1877,14 +1863,10 @@ function OrderRow({
         ) : o.delivery_date ? (
           (() => {
             const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
-            const cd = ct === "completed" ? null : countdownLabel(o);
             return (
               <>
-                <div className="text-[11px] text-base-700 tabular-nums">{datePart}</div>
-                <div className="text-[10px] tabular-nums text-base-400">
-                  {dayPart}
-                  {cd && <span className={cd.cls}> · {cd.text}</span>}
-                </div>
+                <div className="text-[11px] font-medium text-base-900 tabular-nums">{datePart}</div>
+                {dayPart && <div className="text-[10px] tabular-nums text-base-400">{dayPart}</div>}
               </>
             );
           })()
