@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import OperationOrdersControl from "./OperationOrdersControl";
+import OperationOrdersControl, {
+  buildOrdersCsv,
+  buildOrdersPrintHtml,
+} from "./OperationOrdersControl";
 import type {
   operationOrdersListResponse,
   operationOrderListRow,
@@ -675,5 +678,88 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "title",
       expect.stringContaining("Confirmed"),
     );
+  });
+});
+
+// ─── Top-bar Export (Jess 2026-06-25, #4) ────────────────────────────────────
+describe("orders export", () => {
+  it("buildOrdersCsv — header (incl. Address) + one row per order, commas quoted", () => {
+    const rows = [
+      makeRow({
+        id: "x",
+        so: 1001,
+        customer_name: "Tan Ah Kow",
+        customer_phone: "012-3456789",
+        customer_address: "5, Jln A, Penang",
+        order_lines: [{ sku: "mattress:MAT-1", qty: 2 }],
+      }),
+    ];
+    const csv = buildOrdersCsv(rows, new Map());
+    const lines = csv.split("\n");
+    expect(lines[0]).toBe(
+      "SO,Customer,Phone,Address,Units,Items,Deadline,Proceed,Location,Logistic,Status",
+    );
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain("SO-1001");
+    expect(lines[1]).toContain("Tan Ah Kow");
+    // Address has commas → it must be wrapped in quotes, not split into columns.
+    expect(lines[1]).toContain('"5, Jln A, Penang"');
+  });
+
+  it("buildOrdersCsv — resolves the carrier name from the partner map", () => {
+    const rows = [makeRow({ id: "d", so: 1004, ops_assigned_logistic: "p-nets" })];
+    const csv = buildOrdersCsv(rows, new Map([["p-nets", "NETS"]]));
+    expect(csv.split("\n")[1]).toContain("NETS");
+  });
+
+  it("buildOrdersPrintHtml — a titled HTML table with the Address column + escaping", () => {
+    const rows = [makeRow({ id: "x", so: 1001, customer_name: "A & <B>" })];
+    const html = buildOrdersPrintHtml(rows, new Map(), "Orders");
+    expect(html).toContain("<title>Orders</title>");
+    expect(html).toContain("<th>Address</th>");
+    expect(html).toContain("SO-1001");
+    expect(html).toContain("1 orders");
+    // HTML-unsafe characters in the data must be escaped.
+    expect(html).toContain("A &amp; &lt;B&gt;");
+  });
+
+  it("top-bar Export menu offers CSV + print for the filtered view", () => {
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    // 7 orders in the default fixture → the menu announces the filtered count.
+    expect(screen.getByText(/Export 7 orders/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /CSV/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Save as PDF/ })).toBeInTheDocument();
+  });
+
+  it("Export → CSV triggers a file download of the filtered rows", () => {
+    const createObjectURL = vi.fn(() => "blob:mock");
+    const revokeObjectURL = vi.fn();
+    // jsdom doesn't implement these — install for the test, restore after.
+    const url = URL as unknown as {
+      createObjectURL?: unknown;
+      revokeObjectURL?: unknown;
+    };
+    const origCreate = url.createObjectURL;
+    const origRevoke = url.revokeObjectURL;
+    url.createObjectURL = createObjectURL;
+    url.revokeObjectURL = revokeObjectURL;
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    fireEvent.click(screen.getByRole("button", { name: /CSV/ }));
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(1);
+    // Menu closes after the action.
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    click.mockRestore();
+    url.createObjectURL = origCreate;
+    url.revokeObjectURL = origRevoke;
   });
 });

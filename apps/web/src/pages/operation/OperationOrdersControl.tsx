@@ -40,6 +40,8 @@ import {
   ChevronsUp,
   Check,
   CalendarClock,
+  Printer,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -539,6 +541,112 @@ interface Props {
   onImport?: () => void;
 }
 
+/** Columns for the top-bar export (CSV + print). Address added vs the old
+ *  bulk-only CSV — it's core delivery data the ops team exports for the day
+ *  (Jess 2026-06-25, #4 top-bar Export menu). */
+const EXPORT_HEADER = [
+  "SO", "Customer", "Phone", "Address", "Units", "Items",
+  "Deadline", "Proceed", "Location", "Logistic", "Status",
+] as const;
+
+/** One order → its export cells (strings). Shared by CSV + print so the two
+ *  formats can never drift. Pure — every helper it calls is module-scope. */
+function exportRow(
+  o: operationOrderListRow,
+  partnerName: Map<string, string>,
+): string[] {
+  const ls = o.order_lines ?? [];
+  const loc = locationForAddress(o.customer_address ?? null);
+  const logi =
+    o.delivery_partners?.name ??
+    (o.ops_assigned_logistic ? partnerName.get(o.ops_assigned_logistic) ?? "" : "");
+  return [
+    `SO-${o.so}`,
+    o.customer_name ?? "",
+    o.customer_phone ?? "",
+    o.customer_address ?? "",
+    String(unitTotal(ls)),
+    itemRollup(ls),
+    o.delivery_date_tbd ? "TBD" : o.delivery_date ?? "",
+    o.proceed_date ?? "",
+    loc.label ?? "",
+    logi,
+    TAB_LABEL[controlTabOf(o)],
+  ];
+}
+
+/** Build the orders CSV (header + rows). Pure + exported for unit tests; the
+ *  caller adds the UTF-8 BOM and triggers the download. */
+export function buildOrdersCsv(
+  rows: operationOrderListRow[],
+  partnerName: Map<string, string>,
+): string {
+  const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  return [
+    EXPORT_HEADER.join(","),
+    ...rows.map((o) => exportRow(o, partnerName).map(cell).join(",")),
+  ].join("\n");
+}
+
+/** Build a print-friendly HTML doc for the filtered orders → the browser's
+ *  print dialog (the user picks "Save as PDF"). Pure + exported for tests; no
+ *  PDF library, so nothing lands in the bundle. */
+export function buildOrdersPrintHtml(
+  rows: operationOrderListRow[],
+  partnerName: Map<string, string>,
+  title: string,
+): string {
+  const esc = (v: string) =>
+    v.replace(/[&<>]/g, (ch) => (ch === "&" ? "&amp;" : ch === "<" ? "&lt;" : "&gt;"));
+  const head = EXPORT_HEADER.map((h) => `<th>${esc(h)}</th>`).join("");
+  const body = rows
+    .map(
+      (o) =>
+        `<tr>${exportRow(o, partnerName).map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`,
+    )
+    .join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+  *{font-family:Inter,Arial,sans-serif}
+  h1{font-size:16px;margin:0 0 2px}
+  .sub{font-size:11px;color:#666;margin:0 0 12px}
+  table{border-collapse:collapse;width:100%;font-size:10px}
+  th,td{border:1px solid #d4d4d8;padding:4px 6px;text-align:left;vertical-align:top}
+  th{background:#f4f4f5;font-weight:600}
+  @media print{@page{size:A4 landscape;margin:10mm}}
+</style></head><body>
+<h1>${esc(title)}</h1>
+<p class="sub">${rows.length} orders · Carres Portal</p>
+<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+</body></html>`;
+}
+
+/** Trigger a CSV file download. BOM prefix so Excel reads UTF-8 (Chinese
+ *  customer names) instead of mojibake. */
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Open the print HTML in a new window and invoke the print dialog. */
+function openPrint(html: string) {
+  const w = window.open("", "_blank");
+  if (!w) {
+    toast.error("Allow pop-ups to print / save as PDF");
+    return;
+  }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  // Let the new document lay out before the print dialog grabs it.
+  setTimeout(() => w.print(), 200);
+}
+
 export default function OperationOrdersControl({ onImport }: Props) {
   const params = useParams<{ stage?: string }>();
   const [tab, setTab] = useState<ControlTab>(
@@ -553,6 +661,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMenu, setBulkMenu] = useState<null | "menu" | "assign">(null);
+  // Top-bar Export ⋮ menu (exports the filtered view — distinct from the bulk
+  // bar's selected-rows CSV).
+  const [exportMenu, setExportMenu] = useState(false);
   // Filter dimensions stacked on top of the status tabs.
   const [dueFilter, setDueFilter] = useState<DueBucket | null>(null);
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
@@ -800,33 +911,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const selectedOrders = orders.filter((o) => selected.has(o.id));
 
   function exportSelectedCsv() {
-    const cell = (v: unknown) => {
-      const s = String(v ?? "");
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const header = ["SO", "Customer", "Phone", "Units", "Items", "Deadline", "Process", "Location", "Logistic", "Status"];
-    const body = selectedOrders.map((o) => {
-      const ls = o.order_lines ?? [];
-      const units = unitTotal(ls);
-      const loc = locationForAddress(o.customer_address ?? null);
-      const logi =
-        o.delivery_partners?.name ??
-        (o.ops_assigned_logistic ? partnerName.get(o.ops_assigned_logistic) ?? "" : "");
-      return [
-        `SO-${o.so}`, o.customer_name ?? "", o.customer_phone ?? "", units,
-        itemRollup(ls), o.delivery_date_tbd ? "TBD" : o.delivery_date ?? "",
-        o.proceed_date ?? "",
-        loc.label ?? "", logi, TAB_LABEL[controlTabOf(o)],
-      ].map(cell).join(",");
-    });
-    const csv = [header.join(","), ...body].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `orders-${selectedOrders.length}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(
+      `orders-${selectedOrders.length}.csv`,
+      buildOrdersCsv(selectedOrders, partnerName),
+    );
     setBulkMenu(null);
+  }
+
+  // Top-bar export — the whole filtered view (`visible`), not just selection.
+  function exportVisibleCsv() {
+    downloadCsv(`orders-${visible.length}.csv`, buildOrdersCsv(visible, partnerName));
+    setExportMenu(false);
+  }
+  function printVisible() {
+    openPrint(buildOrdersPrintHtml(visible, partnerName, "Orders"));
+    setExportMenu(false);
   }
 
   async function bulkAssignLogistic(partnerId: string) {
@@ -940,6 +1039,49 @@ export default function OperationOrdersControl({ onImport }: Props) {
             placeholder="SO number or customer…"
             className="w-[230px] px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
           />
+          {/* Top-bar Export — the filtered view as CSV (Excel) or print → PDF.
+              Distinct from the bulk bar's selected-rows CSV (Jess 2026-06-25, #4). */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setExportMenu((v) => !v)}
+              disabled={visible.length === 0}
+              aria-haspopup="menu"
+              aria-expanded={exportMenu}
+              className="btn-secondary text-[12px] whitespace-nowrap inline-flex items-center gap-1 disabled:opacity-50"
+            >
+              <Download size={14} /> Export
+            </button>
+            {exportMenu && (
+              <>
+                <button
+                  type="button"
+                  aria-hidden
+                  tabIndex={-1}
+                  className="fixed inset-0 z-20 cursor-default"
+                  onClick={() => setExportMenu(false)}
+                />
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1"
+                >
+                  <div className="px-3 py-1 text-[10px] uppercase tracking-[0.08em] text-base-400">
+                    Export {visible.length} order{visible.length === 1 ? "" : "s"}
+                  </div>
+                  <BulkMenuItem
+                    icon={FileText}
+                    label="CSV (opens in Excel)"
+                    onClick={exportVisibleCsv}
+                  />
+                  <BulkMenuItem
+                    icon={Printer}
+                    label="Print / Save as PDF"
+                    onClick={printVisible}
+                  />
+                </div>
+              </>
+            )}
+          </div>
           {onImport && (
             <button
               type="button"
