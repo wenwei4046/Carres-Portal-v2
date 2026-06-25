@@ -459,10 +459,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
-  // Rows per page (Jess 2026-06-24): 15 / 30 / 45 / 60. The listing is a FIXED
-  // box — it never scrolls vertically; instead the whole table auto-scales (CSS
-  // zoom) so the chosen number of rows fits. More rows ⇒ smaller rows.
-  const [pageSize, setPageSize] = useState<number | "all">(15);
+  // Fixed at 15 rows (Jess 2026-06-25: stick to 15, no selector). The listing is
+  // a fixed box that auto-scales (CSS zoom) so the 15 rows always fit, no scroll.
+  const [pageSize] = useState<number | "all">(15);
   const [page, setPage] = useState(0);
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -862,7 +861,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           section instead of three loose pill rows floating on the page. */}
       <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-md mb-3">
       <div className="flex items-center gap-2.5 px-3 py-1.5 border-b border-base-100 flex-wrap">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Status</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 mr-0.5">Status</span>
         <div
           className="flex gap-1 p-1 bg-base-100 rounded-md w-fit max-w-full overflow-auto"
           role="tablist"
@@ -923,12 +922,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
         )}
       </div>
 
-      {/* Region + Stock filters — the card's second row (Jess: pick a state →
-          select-all → assign logistic; filter by stock too). */}
-      <div className="px-3 py-2 border-b border-base-100">
-      <div className="flex items-start gap-1.5 border border-base-200 rounded-md px-2 py-1 bg-white">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5 shrink-0 mt-1">Region</span>
-        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+      {/* Region / Stock / Logistic / Category — ONE compact row, NO boxes (Jess
+          2026-06-25): labelled inline chip-groups (darker labels = the anchors),
+          wraps when there are many chips. No per-filter boxes. */}
+      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 px-3 py-2">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 mr-0.5 shrink-0">Region</span>
           <RegionChip
             label="All"
             count={tabFiltered.length}
@@ -945,74 +944,61 @@ export default function OperationOrdersControl({ onImport }: Props) {
             />
           ))}
         </div>
-      </div>
-      </div>
-
-      <div className="flex items-start gap-3 px-3 py-2 flex-wrap">
-      {/* Stock-status filter — its own panel; coloured dots (green / amber / red)
-          tie it to the Stock column AND set it apart from the Region panel. */}
-      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2 py-1 bg-white">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Stock</span>
-        <RegionChip
-          label="All"
-          count={tabFiltered.length}
-          active={stockFilter === null}
-          onClick={() => setStockFilter(null)}
-        />
-        {stockEntries.map((e) => (
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 mr-0.5 shrink-0">Stock</span>
           <RegionChip
-            key={e.bucket}
-            label={e.bucket}
-            count={e.count}
-            active={stockFilter === e.bucket}
-            dot={e.bucket === "Ready" ? "#16A34A" : e.bucket === "Waiting" ? "#D97706" : "#DC2626"}
-            onClick={() =>
-              setStockFilter((r) => (r === e.bucket ? null : e.bucket))
-            }
+            label="All"
+            count={tabFiltered.length}
+            active={stockFilter === null}
+            onClick={() => setStockFilter(null)}
           />
-        ))}
-      </div>
-      {/* Logistic / carrier filter — its own panel (Jess 2026-06-24), like
-          Status / Region / Stock. */}
-      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2 py-1 bg-white">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Logistic</span>
-        <RegionChip
-          label="All"
-          count={tabFiltered.length}
-          active={logisticFilter === null}
-          onClick={() => setLogisticFilter(null)}
-        />
-        {logisticEntries.map((e) => (
+          {stockEntries.map((e) => (
+            <RegionChip
+              key={e.bucket}
+              label={e.bucket}
+              count={e.count}
+              active={stockFilter === e.bucket}
+              dot={e.bucket === "Ready" ? "#16A34A" : e.bucket === "Waiting" ? "#D97706" : "#DC2626"}
+              onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
+            />
+          ))}
+        </div>
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 mr-0.5 shrink-0">Logistic</span>
           <RegionChip
-            key={e.carrier}
-            label={e.carrier}
-            count={e.count}
-            active={logisticFilter === e.carrier}
-            onClick={() =>
-              setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))
-            }
+            label="All"
+            count={tabFiltered.length}
+            active={logisticFilter === null}
+            onClick={() => setLogisticFilter(null)}
           />
-        ))}
-      </div>
-      {/* Category filter — Mattress / Bedframe / Sofa (Jess 2026-06-24). */}
-      <div className="flex items-center gap-1.5 shrink-0 border border-base-200 rounded-md px-2 py-1 bg-white">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-400 mr-0.5">Category</span>
-        <RegionChip
-          label="All"
-          count={tabFiltered.length}
-          active={categoryFilter === null}
-          onClick={() => setCategoryFilter(null)}
-        />
-        {categoryEntries.map((e) => (
+          {logisticEntries.map((e) => (
+            <RegionChip
+              key={e.carrier}
+              label={e.carrier}
+              count={e.count}
+              active={logisticFilter === e.carrier}
+              onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
+            />
+          ))}
+        </div>
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-600 mr-0.5 shrink-0">Category</span>
           <RegionChip
-            key={e.cat}
-            label={e.label}
-            count={e.count}
-            active={categoryFilter === e.cat}
-            onClick={() => setCategoryFilter((r) => (r === e.cat ? null : e.cat))}
+            label="All"
+            count={tabFiltered.length}
+            active={categoryFilter === null}
+            onClick={() => setCategoryFilter(null)}
           />
-        ))}
-      </div>
+          {categoryEntries.map((e) => (
+            <RegionChip
+              key={e.cat}
+              label={e.label}
+              count={e.count}
+              active={categoryFilter === e.cat}
+              onClick={() => setCategoryFilter((r) => (r === e.cat ? null : e.cat))}
+            />
+          ))}
+        </div>
       </div>
       </div>
 
@@ -1042,8 +1028,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
             rangeEnd={rangeEnd}
             pageCount={pageCount}
             onRefresh={() => void refetch()}
-            pageSize={pageSize}
-            onPageSize={setPageSize}
           />
         )
       )}
@@ -1154,8 +1138,6 @@ function Pager({
   rangeEnd,
   pageCount,
   onRefresh,
-  pageSize,
-  onPageSize,
 }: {
   safePage: number;
   onPage: (updater: (p: number) => number) => void;
@@ -1164,8 +1146,6 @@ function Pager({
   rangeEnd: number;
   pageCount: number;
   onRefresh: () => void;
-  pageSize: number | "all";
-  onPageSize: (n: number) => void;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 mb-2.5 text-[12px] text-base-600">
@@ -1181,20 +1161,6 @@ function Pager({
         >
           <RefreshCw size={15} strokeWidth={2} />
         </button>
-        <label className="flex items-center gap-1.5 text-[11px] text-base-500">
-          Rows
-          <select
-            value={pageSize === "all" ? 15 : pageSize}
-            onChange={(e) => onPageSize(Number(e.target.value))}
-            aria-label="Rows per page"
-            className="border border-base-200 rounded px-1.5 py-1 text-[11px] bg-white outline-none focus:border-base-700 cursor-pointer"
-          >
-            <option value={15}>15</option>
-            <option value={20}>20</option>
-            <option value={25}>25</option>
-            <option value={30}>30</option>
-          </select>
-        </label>
       </div>
       {/* Range + prev/next (right) */}
       <div className="flex items-center gap-1.5">
