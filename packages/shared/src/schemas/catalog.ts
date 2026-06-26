@@ -233,6 +233,8 @@ export const comboSchema = z.object({
   comboKey: z.string(),
   name: z.string(),
   comboPrice: z.number(),
+  // 0183 — principal-only cost benchmark companion to comboPrice; null = unset.
+  cost: z.number().nullable(),
   active: z.boolean(),
   effectiveFrom: z.string(),
   components: z.array(comboComponentSchema),
@@ -248,6 +250,8 @@ export const comboCreateInput = z
   .object({
     name: z.string().trim().min(2).max(80),
     comboPrice: z.number().nonnegative(),
+    // 0183 — optional cost benchmark (principal-only). null/omit = unset.
+    cost: z.number().nonnegative().nullable().optional(),
     comboKey: z
       .string()
       .trim()
@@ -373,6 +377,8 @@ export const sofaComboSchema = z.object({
   slots: z.array(z.array(z.string())),
   tier: fabricTierSchema.nullable(),
   pricesByHeight: z.record(z.string(), z.union([z.number(), z.null()])),
+  // 0183 — per-seat-height cost benchmark (same shape); null = unset.
+  costByHeight: z.record(z.string(), z.union([z.number(), z.null()])).nullable(),
   label: z.string().nullable(),
   effectiveFrom: z.string(),
   active: z.boolean(),
@@ -391,6 +397,9 @@ export const sofaComboCreateInput = z
     slots: sofaComboSlotsSchema,
     tier: fabricTierSchema.nullable().optional(),
     pricesByHeight: sofaComboPricesByHeightSchema.optional(),
+    // 0183 — optional per-height cost benchmark (principal-only); same
+    // SOFA_HEIGHTS-keyed shape as pricesByHeight. null/omit = unset.
+    costByHeight: sofaComboPricesByHeightSchema.nullable().optional(),
     label: z.string().trim().max(200).nullable().optional(),
     effectiveFrom: z.string().optional(),
     active: z.boolean().optional(),

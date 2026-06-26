@@ -1447,6 +1447,9 @@ catalogRouter.post("/combos", async (c) => {
       combo_key: comboKey,
       name: parsed.data.name,
       combo_price: parsed.data.comboPrice,
+      // 0183 — principal-only cost benchmark (companion to combo_price). null =
+      // unset; never feeds order/finance/PO — selling stays the only price driver.
+      cost: parsed.data.cost ?? null,
       active: parsed.data.active ?? true,
       updated_at: new Date().toISOString(),
       updated_by: c.var.auth.id,
@@ -1500,6 +1503,9 @@ catalogRouter.patch("/combos/:id", async (c) => {
   const patch: Record<string, unknown> = {};
   if (parsed.data.name !== undefined) patch.name = parsed.data.name;
   if (parsed.data.comboPrice !== undefined) patch.combo_price = parsed.data.comboPrice;
+  // 0183 — only write cost when the key is present so an unrelated patch doesn't
+  // clobber the benchmark; an explicit null clears it (back to "unset").
+  if (parsed.data.cost !== undefined) patch.cost = parsed.data.cost;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
   if (parsed.data.comboKey !== undefined) patch.combo_key = parsed.data.comboKey;
 
@@ -1789,6 +1795,9 @@ catalogRouter.post("/sofa-combos", async (c) => {
     slots: canonicalizeSofaSlots(parsed.data.slots),
     tier: parsed.data.tier ?? null,
     prices_by_height: parsed.data.pricesByHeight ?? {},
+    // 0183 — principal-only per-seat-height cost benchmark (companion to
+    // prices_by_height). null = unset; never feeds order/finance/PO.
+    cost_by_height: parsed.data.costByHeight ?? null,
     label: parsed.data.label ?? null,
     active: parsed.data.active ?? true,
     updated_at: new Date().toISOString(),
@@ -1823,6 +1832,9 @@ catalogRouter.patch("/sofa-combos/:id", async (c) => {
   if (parsed.data.slots !== undefined) patch.slots = canonicalizeSofaSlots(parsed.data.slots);
   if (parsed.data.tier !== undefined) patch.tier = parsed.data.tier;
   if (parsed.data.pricesByHeight !== undefined) patch.prices_by_height = parsed.data.pricesByHeight;
+  // 0183 — only write cost_by_height when present so an unrelated patch doesn't
+  // clobber the benchmark; an explicit null clears it (back to "unset").
+  if (parsed.data.costByHeight !== undefined) patch.cost_by_height = parsed.data.costByHeight;
   if (parsed.data.label !== undefined) patch.label = parsed.data.label;
   if (parsed.data.effectiveFrom !== undefined) patch.effective_from = parsed.data.effectiveFrom;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;

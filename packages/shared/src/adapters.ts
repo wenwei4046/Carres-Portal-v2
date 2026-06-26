@@ -174,6 +174,9 @@ export const comboFromRow = (r: DB.ComboRow): D.Combo => ({
   comboKey: r.combo_key,
   name: r.name,
   comboPrice: Number(r.combo_price),
+  // 0183 — cost benchmark; null stays null (not coerced to 0) so "unset" is
+  // distinct from "zero cost".
+  cost: r.cost == null ? null : Number(r.cost),
   active: r.active,
   effectiveFrom: r.effective_from,
   components: [],
@@ -219,18 +222,24 @@ export const modelSofaCompartmentFromRow = (
  * (PostgREST may serialize jsonb numerics as strings) while a `null` price is
  * preserved (null = the combo does not apply at that height).
  */
-export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
-  const rawPrices = r.prices_by_height ?? {};
-  const pricesByHeight: Record<string, number | null> = {};
-  for (const [height, price] of Object.entries(rawPrices)) {
-    pricesByHeight[height] = price == null ? null : Number(price);
+const coerceHeightMap = (raw: Record<string, number | null> | null | undefined) => {
+  const out: Record<string, number | null> = {};
+  for (const [height, price] of Object.entries(raw ?? {})) {
+    out[height] = price == null ? null : Number(price);
   }
+  return out;
+};
+
+export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
   return {
     id: r.id,
     modelId: r.model_id,
     slots: r.slots ?? [],
     tier: (r.tier ?? null) as D.SofaCombo["tier"],
-    pricesByHeight,
+    pricesByHeight: coerceHeightMap(r.prices_by_height),
+    // 0183 — cost benchmark; null (column unset) stays null so the UI can tell
+    // "no cost authored" from "{}", while present maps coerce numerics.
+    costByHeight: r.cost_by_height == null ? null : coerceHeightMap(r.cost_by_height),
     label: r.label ?? null,
     effectiveFrom: r.effective_from,
     active: r.active,

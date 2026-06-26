@@ -88,6 +88,8 @@ const sampleCombo: ComboDto = {
   comboKey: "starter-set",
   name: "Starter Set",
   comboPrice: 2800,
+  // 0183 — cost benchmark; 2100 of 2800 sell → 25.0% margin in the row.
+  cost: 2100,
   active: true,
   effectiveFrom: "2026-06-20",
   components: [
@@ -405,6 +407,94 @@ describe("CombosTab — edit", () => {
     expect(row.className).toContain("opacity");
     // inactive badge
     expect(within(row).getByText(/inactive/i)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cost / margin (0183) — principal-only benchmark, display-only margin
+// ---------------------------------------------------------------------------
+describe("CombosTab — cost / margin", () => {
+  it("row shows the computed margin% when cost is set (2100 of 2800 → 25.0%)", () => {
+    render(
+      wrap(<CombosTab catalog={makeCatalog({ combos: [sampleCombo] })} isPrincipal={true} />),
+    );
+    const cell = screen.getByTestId("combo-margin-combo-1");
+    expect(cell.textContent).toContain("25.0%");
+    // and the cost benchmark surfaces under the combo price
+    const row = screen.getByTestId("combo-row-combo-1");
+    expect(row.textContent).toContain("2,100.00");
+  });
+
+  it("row shows an em-dash margin when cost is null", () => {
+    render(
+      wrap(
+        <CombosTab
+          catalog={makeCatalog({ combos: [{ ...sampleCombo, cost: null }] })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("combo-margin-combo-1").textContent).toBe("—");
+  });
+
+  it("editor: typing a cost reaches the create payload + the margin readout computes", async () => {
+    render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("combos-add"));
+
+    fireEvent.change(screen.getByTestId("combo-name"), { target: { value: "Cost Combo" } });
+    fireEvent.change(screen.getByTestId("combo-price"), { target: { value: "2500" } });
+    pickSku(0, "SOFA-A");
+    // type a cost benchmark
+    fireEvent.change(screen.getByTestId("combo-cost"), { target: { value: "1500" } });
+
+    // margin readout = (2500 − 1500) / 2500 = 40.0%
+    expect(screen.getByTestId("combo-margin-readout").textContent).toContain("40.0%");
+
+    fireEvent.click(screen.getByTestId("combo-save"));
+    await waitFor(() => expect(mockCreateMutateAsync).toHaveBeenCalledOnce());
+    expect(mockCreateMutateAsync.mock.calls[0][0].cost).toBe(1500);
+  });
+
+  it("editor: omitting the cost sends cost:null (unset) and the readout shows no cost set", async () => {
+    render(wrap(<CombosTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("combos-add"));
+
+    fireEvent.change(screen.getByTestId("combo-name"), { target: { value: "No Cost Combo" } });
+    fireEvent.change(screen.getByTestId("combo-price"), { target: { value: "2500" } });
+    pickSku(0, "SOFA-A");
+
+    expect(screen.getByTestId("combo-margin-readout").textContent).toContain("no cost set");
+
+    fireEvent.click(screen.getByTestId("combo-save"));
+    await waitFor(() => expect(mockCreateMutateAsync).toHaveBeenCalledOnce());
+    expect(mockCreateMutateAsync.mock.calls[0][0].cost).toBeNull();
+  });
+
+  it("editor: the Σ component cost hint sums component product_skus.cost × qty", () => {
+    // give SOFA-A a catalog cost so the hint reflects it
+    const catalog = makeCatalog();
+    catalog.skus = catalog.skus.map((s) => (s.sku === "SOFA-A" ? { ...s, cost: 1200 } : s));
+    render(wrap(<CombosTab catalog={catalog} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("combos-add"));
+    pickSku(0, "SOFA-A");
+    fireEvent.change(screen.getByTestId("combo-comp-qty-0"), { target: { value: "2" } });
+    // 1200 × 2 = 2,400.00
+    expect(screen.getByTestId("combo-cost-hint").textContent).toContain("2,400.00");
+  });
+
+  it("editor: edit pre-fills the cost field from the existing combo", () => {
+    render(
+      wrap(<CombosTab catalog={makeCatalog({ combos: [sampleCombo] })} isPrincipal={true} />),
+    );
+    fireEvent.click(screen.getByTestId("combo-edit-combo-1"));
+    expect((screen.getByTestId("combo-cost") as HTMLInputElement).value).toBe("2100");
+  });
+
+  it("non-principal: cost input is never mounted (read-only)", () => {
+    render(
+      wrap(<CombosTab catalog={makeCatalog({ combos: [sampleCombo] })} isPrincipal={false} />),
+    );
+    expect(screen.queryByTestId("combo-cost")).not.toBeInTheDocument();
   });
 });
 
