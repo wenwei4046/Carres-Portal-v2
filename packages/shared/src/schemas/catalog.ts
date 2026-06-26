@@ -154,6 +154,34 @@ export const specialAddonSchema = z.object({
 });
 export type SpecialAddonDto = z.infer<typeof specialAddonSchema>;
 
+// ---------------------------------------------------------------------------
+// 0182 — global option pools (2990s Products parity Phase 4). Principal-owned
+// curated reference lists. One schema, two consumers (§9.5): the API validates
+// these and the Maintenance UI reuses the exact same shapes.
+// ---------------------------------------------------------------------------
+
+/** The three curated pools (branding dropped — every Carres product is one brand). */
+export const CATALOG_OPTION_POOL_NAMES = [
+  "supplier_category",
+  "bedframe_size",
+  "mattress_size",
+] as const;
+export const catalogOptionPoolNameSchema = z.enum(CATALOG_OPTION_POOL_NAMES);
+export type CatalogOptionPoolName = z.infer<typeof catalogOptionPoolNameSchema>;
+
+/** One pool entry (mirrors the domain `CatalogOptionPool` / a row, camelCased).
+ *  `label` + `dimensions` are populated for size pools only (null otherwise). */
+export const catalogOptionPoolSchema = z.object({
+  id: z.string().uuid(),
+  pool: catalogOptionPoolNameSchema,
+  value: z.string(),
+  label: z.string().nullable(),
+  dimensions: z.string().nullable(),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type CatalogOptionPoolDto = z.infer<typeof catalogOptionPoolSchema>;
+
 export const floorConfigSchema = z.object({
   id: z.number().int(),
   freeUpToFloor: z.number().int(),
@@ -395,6 +423,8 @@ export const catalogResponseSchema = z.object({
   sofaCombos: z.array(sofaComboSchema).optional(),
   // 0181 — special add-ons (additive, OPTIONAL). Pre-0181 clients unaffected.
   specialAddons: z.array(specialAddonSchema).optional(),
+  // 0182 — global option pools (additive, OPTIONAL). Pre-0182 clients unaffected.
+  optionPools: z.array(catalogOptionPoolSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 
@@ -648,3 +678,35 @@ export const specialAddonPatchInput = z
   })
   .strict();
 export type SpecialAddonPatchInput = z.infer<typeof specialAddonPatchInput>;
+
+// ---------------------------------------------------------------------------
+// 0182 — global option pool create / patch inputs (principal-gated).
+// ---------------------------------------------------------------------------
+
+/** Create a pool entry. `pool` + `value` required; `label`/`dimensions` apply
+ *  to the size pools (free to send null/omit for supplier_category). */
+export const catalogOptionPoolCreateInput = z
+  .object({
+    pool: catalogOptionPoolNameSchema,
+    value: z.string().trim().min(1).max(60),
+    label: z.string().trim().max(60).nullable().optional(),
+    dimensions: z.string().trim().max(60).nullable().optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type CatalogOptionPoolCreateInput = z.infer<typeof catalogOptionPoolCreateInput>;
+
+/** Patch a pool entry — every field optional EXCEPT `pool`, which is never
+ *  patched (moving an entry between pools would skew the UNIQUE(pool,value)
+ *  intent; delete + recreate instead). */
+export const catalogOptionPoolPatchInput = z
+  .object({
+    value: z.string().trim().min(1).max(60).optional(),
+    label: z.string().trim().max(60).nullable().optional(),
+    dimensions: z.string().trim().max(60).nullable().optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type CatalogOptionPoolPatchInput = z.infer<typeof catalogOptionPoolPatchInput>;
