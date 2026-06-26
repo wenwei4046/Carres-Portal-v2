@@ -14,6 +14,14 @@ Read this file ▶ RESUME (below).
 
 ---
 
+## ▶▶ UPDATE 2026-06-26 — #3 REOPENED → **5-COLUMN shipped** (supersedes the 丙 lock below)
+Jess clarified he had **agreed the 5-column** layout in the design chat — the cont. session below mis-locked it as 丙. **Corrected: the filter is now a 5-column grid** (`760a845`, web-only):
+- **Row 1** (5 cols): Status · Due · Stock · Category · Logistic.
+- **Row 2**: **Region** spans 3 cols (room to grow) + a **"Needs action"** panel spans 2 (under Logistic) holding all four quick-views — 🚩 Follow-up · ⏫ For Jess · 🚚 Unassigned carrier · 📅 No ETA.
+- `FilterGroup` now renders its label **on top** (block span) + chips below, `h-full`, so each group fills its grid cell evenly (was an inline row box).
+- Verified live at 1440px (row 1 = 5 panels same top; Region row-2 wide; Needs-action holds the 4). **36/36** component tests · build clean. NOT pushed/deployed.
+- **LESSON:** when a layout decision is recorded, capture the OPTION LABEL Jess actually said (甲/乙/丙) verbatim — the cont. session recorded 丙 from "keep it" but Jess meant the 5-col mock he was looking at.
+
 ## ▶▶ UPDATE 2026-06-25 (cont.) — #3 LOCKED + #4 export + drawer edit SHIPPED (local, NOT pushed)
 - **#3 filter layout → LOCKED 丙** (keep the shipped 3-row boxes). Loo's call; **no code change** (line layout was already the live terminal state).
 - **#4 export (CSV + Print/PDF) — DONE** (`66e089f`, **relocated `893cf46`**): lives in the **bulk Actions ⋮ menu** (tick row checkboxes → ⋮ → **Export CSV** / **Print / Save as PDF**). Tick ONE customer → Print prints just that order; tick N → batch. **CSV** = UTF-8 BOM (+Address col, Excel-safe Chinese); **Print** = lib-free HTML print window → Save as PDF. Pure `buildOrdersCsv` + `buildOrdersPrintHtml` (shared `exportRow`). ⚠️ The original **top-bar Export button was DROPPED** (Jess 6/26: redundant with the existing checkbox+⋮ flow — per-selection actions belong in the ⋮, not a parallel header button). Live-verified.
@@ -51,7 +59,7 @@ Files touched: `apps/web/src/pages/operation/OperationOrdersControl.tsx` (+test)
 ---
 
 ## ▶ RESUME — pending decisions (Loo to answer)
-1. ~~**#3 filter layout — LOCK ONE**~~ → **RESOLVED 2026-06-25: LOCKED 丙** (keep the shipped 3-row boxes; no code change). The other options were 甲 5-column / 乙 4-column — both dropped because column grids wrap chips taller, which Jess had already rejected.
+1. ~~**#3 filter layout — LOCK ONE**~~ → **RESOLVED 2026-06-26: 5-COLUMN grid** (`760a845`). A cont. session briefly mis-locked 丙 on 6/25; Jess corrected it 6/26 (he'd agreed the 5-column mock). Region spans 3, "Needs action" panel spans 2 under Logistic. See the 6/26 UPDATE block at top.
 2. **#2 Follow-up form — confirm approach = EXTEND the existing right-rail Tasks** (`OperationRightRail`, `ops_tasks`). Form opened by clicking **Flag**:
    - **Title = dropdown** of preset common follow-ups (team's English is poor) + free "what to do".
    - **Force-assign ONE person** (no "Anyone").
