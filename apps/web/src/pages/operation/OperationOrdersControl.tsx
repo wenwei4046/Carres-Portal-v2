@@ -1047,14 +1047,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </div>
       </div>
 
-      {/* Filter panel — boxed 3-row (Jess 2026-06-25 "go"): each group in its own
-          box (clear separation without columns — columns would wrap chips and
-          grow taller, which Jess rejected). Row 1 Status + the 🚩 Follow-up / ⏫
-          For Jess action lanes · Row 2 Due + Stock + Category · Row 3 Region +
-          Logistic. All 11px chips, selected = black. */}
-      <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-md mb-3 p-2 space-y-1.5">
-        {/* Row 1 — Status, plus the two action quick-views on the right. */}
-        <div className="flex items-start gap-1.5 flex-wrap">
+      {/* Filter panel — 5-column grid (Jess 2026-06-25, locked 5-col after the
+          row version): row 1 = the 4 short groups (Status · Due · Stock ·
+          Category) + Logistic; row 2 = Region (spans 3 cols, room to grow when
+          more states appear) + a "Needs action" panel (spans 2, under Logistic)
+          holding the two action lanes + the two logistic-chase alerts. Label on
+          top of each panel, small chips. */}
+      <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-md mb-3 p-2">
+        <div className="grid grid-cols-5 gap-2">
           <FilterGroup label="Status">
             <RegionChip
               label="All"
@@ -1074,29 +1074,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
               />
             ))}
           </FilterGroup>
-          <div className="ml-auto flex items-center gap-2">
-            <QuickView
-              icon={Flag}
-              label="Follow-up"
-              count={flaggedCount}
-              tone="warning"
-              active={flaggedOnly}
-              title="Team handoff — orders with an open follow-up note for the next operator"
-              onClick={() => setFlaggedOnly((v) => !v)}
-            />
-            <QuickView
-              icon={ChevronsUp}
-              label="For Jess"
-              count={escalateCount}
-              tone="danger"
-              active={escalateOnly}
-              title="Escalated to Jess — orders needing the boss's action"
-              onClick={() => setEscalateOnly((v) => !v)}
-            />
-          </div>
-        </div>
-        {/* Row 2 — Due · Stock · Category (the fixed / fast filters). */}
-        <div className="flex items-start gap-1.5 flex-wrap">
           <FilterGroup label="Due">
             <RegionChip
               label="All"
@@ -1151,26 +1128,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
               />
             ))}
           </FilterGroup>
-        </div>
-        {/* Row 3 — Region · Logistic (the long / growing filters). */}
-        <div className="flex items-start gap-1.5 flex-wrap">
-          <FilterGroup label="Region">
-            <RegionChip
-              label="All"
-              count={tabFiltered.length}
-              active={regionFilter === null}
-              onClick={() => setRegionFilter(null)}
-            />
-            {regionEntries.map((e) => (
-              <RegionChip
-                key={e.region}
-                label={e.region}
-                count={e.count}
-                active={regionFilter === e.region}
-                onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
-              />
-            ))}
-          </FilterGroup>
           <FilterGroup label="Logistic">
             <RegionChip
               label="All"
@@ -1189,31 +1146,73 @@ export default function OperationOrdersControl({ onImport }: Props) {
               />
             ))}
           </FilterGroup>
-          {/* Logistic-chase alerts sit with Region/Logistic (Jess 2026-06-25:
-              they belong on the delivery row). "Unassigned carrier" (red — no
-              carrier yet) then "No ETA" (amber — carrier set, no ETA). The first
-              toggles the Logistic=Unassigned filter; both are one-click chase. */}
-          <div className="ml-auto flex items-center gap-2">
-            <QuickView
-              icon={Truck}
-              label="Unassigned carrier"
-              count={noCarrierCount}
-              tone="danger"
-              active={logisticFilter === NO_CARRIER}
-              title="No logistic partner assigned yet — operation to assign a carrier"
-              onClick={() =>
-                setLogisticFilter((r) => (r === NO_CARRIER ? null : NO_CARRIER))
-              }
-            />
-            <QuickView
-              icon={CalendarClock}
-              label="No ETA"
-              count={etaCount}
-              tone="warning"
-              active={etaOnly}
-              title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
-              onClick={() => setEtaOnly((v) => !v)}
-            />
+          {/* Row 2 — Region spans 3 cols (room to grow when more states appear). */}
+          <div className="col-span-3">
+            <FilterGroup label="Region">
+              <RegionChip
+                label="All"
+                count={tabFiltered.length}
+                active={regionFilter === null}
+                onClick={() => setRegionFilter(null)}
+              />
+              {regionEntries.map((e) => (
+                <RegionChip
+                  key={e.region}
+                  label={e.region}
+                  count={e.count}
+                  active={regionFilter === e.region}
+                  onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+                />
+              ))}
+            </FilterGroup>
+          </div>
+          {/* Needs action — spans 2 cols under Logistic: the two action lanes
+              (🚩 Follow-up · ⏫ For Jess) + the two logistic-chase alerts
+              (Unassigned carrier · No ETA). All the "needs attention" filters. */}
+          <div className="col-span-2 border border-base-200 rounded-md px-2 py-1.5 h-full">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.05em] text-base-800 mb-1.5">
+              Needs action
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <QuickView
+                icon={Flag}
+                label="Follow-up"
+                count={flaggedCount}
+                tone="warning"
+                active={flaggedOnly}
+                title="Team handoff — orders with an open follow-up note for the next operator"
+                onClick={() => setFlaggedOnly((v) => !v)}
+              />
+              <QuickView
+                icon={ChevronsUp}
+                label="For Jess"
+                count={escalateCount}
+                tone="danger"
+                active={escalateOnly}
+                title="Escalated to Jess — orders needing the boss's action"
+                onClick={() => setEscalateOnly((v) => !v)}
+              />
+              <QuickView
+                icon={Truck}
+                label="Unassigned carrier"
+                count={noCarrierCount}
+                tone="danger"
+                active={logisticFilter === NO_CARRIER}
+                title="No logistic partner assigned yet — operation to assign a carrier"
+                onClick={() =>
+                  setLogisticFilter((r) => (r === NO_CARRIER ? null : NO_CARRIER))
+                }
+              />
+              <QuickView
+                icon={CalendarClock}
+                label="No ETA"
+                count={etaCount}
+                tone="warning"
+                active={etaOnly}
+                title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
+                onClick={() => setEtaOnly((v) => !v)}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1593,13 +1592,13 @@ function FilterGroup({
 }) {
   return (
     <div
-      className="inline-flex items-center gap-x-0.5 gap-y-1 flex-wrap border border-base-200 rounded-md px-1.5 py-0.5"
+      className="border border-base-200 rounded-md px-2 py-1.5 h-full"
       data-testid={`filter-${label.toLowerCase()}`}
     >
-      <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-800 border-r border-base-200 pr-1.5 shrink-0">
+      <span className="block text-[10px] font-semibold uppercase tracking-[0.05em] text-base-800 mb-1.5">
         {label}
       </span>
-      {children}
+      <div className="flex flex-wrap items-center gap-x-1 gap-y-1">{children}</div>
     </div>
   );
 }
