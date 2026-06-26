@@ -163,11 +163,11 @@ describe("buildCatalogIndex", () => {
       ...catalog(),
       combos: [
         {
-          id: "cA", comboKey: "live-combo", name: "Live Combo", comboPrice: 5000, active: true,
+          id: "cA", comboKey: "live-combo", name: "Live Combo", comboPrice: 5000, cost: null, active: true,
           effectiveFrom: "2026-06-20", components: [{ sku: "CLOUD-QUEEN", qty: 1, sortOrder: 0 }],
         },
         {
-          id: "cB", comboKey: "dead-combo", name: "Dead Combo", comboPrice: 1000, active: false,
+          id: "cB", comboKey: "dead-combo", name: "Dead Combo", comboPrice: 1000, cost: null, active: false,
           effectiveFrom: "2026-06-20", components: [{ sku: "CLOUD-KING", qty: 1, sortOrder: 0 }],
         },
       ],

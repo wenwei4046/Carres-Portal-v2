@@ -16,6 +16,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { useCreateSofaCombo, useDeleteSofaCombo, useUpdateSofaCombo } from "@/lib/queries";
 import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
+import { skuMargin } from "../margin";
 
 /**
  * Sofa Combos panel (migration 0179, sofa engine Phase 2) — lives INSIDE
@@ -254,6 +255,18 @@ function SofaComboEditor({
     }
     return init;
   });
+  // 0183 — cost-by-height: a principal-only benchmark mirroring the price grid.
+  // "" = no cost at that height. The whole map collapses to null when EVERY
+  // height is blank (distinct from {} = authored-but-all-n/a). Display-only —
+  // cost never feeds checkout / order / finance pricing.
+  const [costs, setCosts] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const h of SOFA_HEIGHTS) {
+      const v = combo?.costByHeight?.[h];
+      init[h] = typeof v === "number" ? String(v) : "";
+    }
+    return init;
+  });
   const [tier, setTier] = useState<FabricTierValue | "">(combo?.tier ?? "");
   const [effectiveFrom, setEffectiveFrom] = useState(
     combo?.effectiveFrom ?? new Date().toISOString().slice(0, 10),
@@ -288,6 +301,23 @@ function SofaComboEditor({
     return out;
   }, [prices]);
 
+  // 0183 — cost benchmark map; null when NO height carries a cost (so an
+  // untouched combo never gains a phantom {} cost). Otherwise blanks → null.
+  const costByHeight = useMemo<Record<string, number | null> | null>(() => {
+    const out: Record<string, number | null> = {};
+    let anyCost = false;
+    for (const h of SOFA_HEIGHTS) {
+      const raw = costs[h]?.trim() ?? "";
+      if (raw === "") {
+        out[h] = null;
+      } else {
+        out[h] = Number(raw);
+        anyCost = true;
+      }
+    }
+    return anyCost ? out : null;
+  }, [costs]);
+
   // --- per-height implied-discount baseline ------------------------------
   // À-la-carte baseline = Σ over slots of the FIRST code's resolved price
   // (matches what the combo's matched-subset would cost at à-la-carte; the
@@ -305,6 +335,7 @@ function SofaComboEditor({
     slots: cleanSlots,
     tier: tier === "" ? null : tier,
     pricesByHeight,
+    costByHeight,
     label: label.trim() === "" ? null : label.trim(),
     effectiveFrom,
     active,
@@ -330,6 +361,9 @@ function SofaComboEditor({
       slots: cleanSlots,
       tier: tier === "" ? null : (tier as FabricTierValue),
       pricesByHeight,
+      // Always send costByHeight (null when no height carries a cost) so clearing
+      // every cost on edit clears the DB benchmark.
+      costByHeight,
       label: label.trim() === "" ? null : label.trim(),
       effectiveFrom,
       active,
@@ -492,6 +526,51 @@ function SofaComboEditor({
             slot&apos;s first code):{" "}
             <b className="font-mono text-base-600">RM {fmtRM(baseline)}</b>. The figure under each
             price is the implied discount (or markup) vs that baseline.
+          </p>
+        </div>
+
+        {/* Cost-by-height grid (0183, principal-only benchmark, display-only) */}
+        <div>
+          <span className="label block mb-1.5">Cost benchmark by seat height (RM)</span>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${SOFA_HEIGHTS.length}, minmax(0,1fr))` }}>
+            {SOFA_HEIGHTS.map((h) => {
+              const priceRaw = prices[h]?.trim() ?? "";
+              const priceNum = priceRaw === "" ? null : Number(priceRaw);
+              const costRaw = costs[h]?.trim() ?? "";
+              const costNum = costRaw === "" ? null : Number(costRaw);
+              // Margin of the height's selling price vs its cost benchmark.
+              // Reuses the canonical skuMargin (single source of truth).
+              const margin =
+                priceNum !== null && Number.isFinite(priceNum) && priceNum > 0
+                  ? skuMargin(priceNum, costNum !== null && Number.isFinite(costNum) ? costNum : null)
+                  : null;
+              return (
+                <label key={h} className="block">
+                  <span className="t-tiny text-base-500 block mb-0.5">{h}&Prime;</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={costs[h] ?? ""}
+                    onChange={(e) => setCosts((c) => ({ ...c, [h]: e.target.value }))}
+                    placeholder="n/a"
+                    className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+                    data-testid={`sofa-combo-cost-${h}`}
+                    aria-label={`combo cost at height ${h}`}
+                  />
+                  <span
+                    className={`block t-tiny mt-0.5 text-right font-mono ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-500"}`}
+                    data-testid={`sofa-combo-margin-${h}`}
+                  >
+                    {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : "—"}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <p className="t-tiny text-base-400 mt-1.5">
+            Principal-only benchmark. Blank = no cost set at that height. The figure below each cost
+            is the margin vs that height&apos;s selling price. Cost never affects checkout pricing.
           </p>
         </div>
 

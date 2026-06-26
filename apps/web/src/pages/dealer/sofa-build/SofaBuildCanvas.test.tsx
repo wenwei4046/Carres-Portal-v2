@@ -177,6 +177,7 @@ describe("SofaBuildCanvas", () => {
         slots: [["1S"]],
         tier: null,
         pricesByHeight: { "24": 1000 },
+        costByHeight: null,
         label: "1S deal",
         effectiveFrom: "2020-01-01",
         active: true,
