@@ -6,6 +6,7 @@ import ModularTab from "./modular/ModularTab";
 import MaintenanceTab from "./tabs/MaintenanceTab";
 import CombosTab from "./tabs/CombosTab";
 import SpecialAddonsTab from "./tabs/SpecialAddonsTab";
+import PromoTab from "./tabs/PromoTab";
 
 /**
  * Product & Maintenance — the rebuilt Catalog page (0169-0173). Replaces the
@@ -29,7 +30,7 @@ import SpecialAddonsTab from "./tabs/SpecialAddonsTab";
  * mounting app passes whether the current user is principal.
  */
 
-type TabKey = "sku" | "modular" | "special" | "maintenance" | "combos";
+type TabKey = "sku" | "modular" | "special" | "maintenance" | "combos" | "promo";
 
 const TABS: readonly PillTab<TabKey>[] = [
   { key: "sku", label: "SKU Master" },
@@ -37,6 +38,7 @@ const TABS: readonly PillTab<TabKey>[] = [
   { key: "special", label: "Special Add-ons" },
   { key: "maintenance", label: "Maintenance" },
   { key: "combos", label: "Combos" },
+  { key: "promo", label: "Promo / Free Gifts" },
 ];
 
 export default function ProductMaintenancePage({
@@ -83,6 +85,9 @@ export default function ProductMaintenancePage({
           )}
           {tab === "combos" && (
             <CombosTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
+          )}
+          {tab === "promo" && (
+            <PromoTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
         </>
       )}

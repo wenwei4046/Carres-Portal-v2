@@ -44,6 +44,10 @@ import {
   specialDeliveryFeeRuleInput,
   DELIVERY_FEE_CONFIG,
   SPECIAL_DELIVERY_FEE_RULES,
+  modelDefaultFreeGiftsInput,
+  freeItemCampaignInput,
+  MODEL_DEFAULT_FREE_GIFTS,
+  FREE_ITEM_CAMPAIGNS,
   deriveSkuCode,
   skuImportInput,
   hasPricingIntent,
@@ -174,7 +178,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -218,6 +222,14 @@ catalogRouter.get("/", async (c) => {
     // sorted in JS below (active-first, then sort_order) to stay mock-friendly,
     // mirroring the 0182 option-pools branch.
     sb.from(SPECIAL_DELIVERY_FEE_RULES).select("*"),
+    // 0185 — Default Free Gifts (per model) + Free Item Campaigns (GWP).
+    // Fetched UNFILTERED: the maintenance editor needs every row (incl. inactive
+    // campaigns + empty gift sets), and the POS preview / Hono server resolver
+    // filter by `active` / `gifts` themselves. Additive — pre-0185 clients ignore
+    // both keys, and with NONE authored the resolver is dormant (zero behaviour
+    // change), so a no-gift order stays byte-identical.
+    sb.from(MODEL_DEFAULT_FREE_GIFTS).select("*"),
+    sb.from(FREE_ITEM_CAMPAIGNS).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -234,6 +246,8 @@ catalogRouter.get("/", async (c) => {
   if (optionPoolsR.error) throw new HTTPException(500, { message: optionPoolsR.error.message });
   if (deliveryFeeR.error) throw new HTTPException(500, { message: deliveryFeeR.error.message });
   if (specialDeliveryRulesR.error) throw new HTTPException(500, { message: specialDeliveryRulesR.error.message });
+  if (modelFreeGiftsR.error) throw new HTTPException(500, { message: modelFreeGiftsR.error.message });
+  if (freeItemCampaignsR.error) throw new HTTPException(500, { message: freeItemCampaignsR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -362,6 +376,25 @@ catalogRouter.get("/", async (c) => {
           ? Number(b.active) - Number(a.active)
           : a.sortOrder - b.sortOrder,
       ),
+    // 0185 — Default Free Gifts (per model) + Free Item Campaigns (additive,
+    // optional). Pre-0185 clients that don't read these are wholly unaffected.
+    // Gift rows map straight through (malformed gift entries dropped in the
+    // adapter). Campaigns are active-first, then ascending created_at — sorted on
+    // the ROW before mapping (created_at isn't on the domain shape), mirroring the
+    // delivery-rules active-first ordering.
+    modelDefaultFreeGifts: (modelFreeGiftsR.data ?? []).map(
+      (r) => Adapters.modelDefaultFreeGiftsFromRow(r as DB.ModelDefaultFreeGiftsRow),
+    ),
+    freeItemCampaigns: (freeItemCampaignsR.data ?? [])
+      .slice()
+      .sort((a, b) => {
+        const ra = a as DB.FreeItemCampaignRow;
+        const rb = b as DB.FreeItemCampaignRow;
+        return ra.active !== rb.active
+          ? Number(rb.active) - Number(ra.active)
+          : String(ra.created_at).localeCompare(String(rb.created_at));
+      })
+      .map((r) => Adapters.freeItemCampaignFromRow(r as DB.FreeItemCampaignRow)),
   });
 
   // 0074 — was `private, max-age=300` but the browser cache was beating
@@ -2178,6 +2211,166 @@ catalogRouter.delete("/special-delivery-fee-rules/:id", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0185 — Default Free Gifts (per model) + Free Item Campaigns (2990s Products
+// parity Phase 7, GWP). A free gift is a DETERMINISTIC accessory @ RM0 the
+// server APPENDS for a qualifying paid line; a free item campaign lets a
+// salesperson "Make Free" an ELIGIBLE existing line. Both are principal-owned
+// ("Master Admin"): early friendly 403 here, with RLS
+// (model_default_free_gifts_write_principal / free_item_campaigns_write_principal)
+// the real boundary — we forward the USER JWT (userClient) so RLS runs; NEVER
+// service_role. NO order-side change here — create_order / order_lines / the
+// free-line enforcement live elsewhere; this is the config/CRUD surface only.
+// ---------------------------------------------------------------------------
+
+const FREE_GIFT_MSG = "Only the principal (Master Admin) can manage free gifts";
+
+// Patch variant of the campaign input: every field optional (empty → 422 below).
+// A present `eligible` still requires ≥1 entry (the .min(1) carries through).
+const freeItemCampaignPatchInput = freeItemCampaignInput.partial();
+
+// PUT /model-free-gifts/:modelId — REPLACE a model's whole default-gift set
+// (principal-only). An empty `gifts` clears the config (the row is deleted, so
+// the model triggers no gift). A non-empty set upserts on model_id.
+catalogRouter.put("/model-free-gifts/:modelId", async (c) => {
+  principalOnly(c, FREE_GIFT_MSG);
+  const modelId = c.req.param("modelId");
+  const parsed = await parseJsonBody(c, modelDefaultFreeGiftsInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Empty set = clear: delete the row (the GET resolver then returns nothing for
+  // this model). Return the cleared shape so the client can update its cache.
+  if (parsed.data.gifts.length === 0) {
+    const { error } = await sb
+      .from(MODEL_DEFAULT_FREE_GIFTS)
+      .delete()
+      .eq("model_id", modelId);
+    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    return c.json({ modelDefaultFreeGifts: { modelId, gifts: [] } });
+  }
+
+  const { data, error } = await sb
+    .from(MODEL_DEFAULT_FREE_GIFTS)
+    .upsert(
+      {
+        model_id: modelId,
+        // `gifts` is DefaultFreeGift[] jsonb (re-parsed on read via
+        // parseDefaultFreeGifts, which drops any malformed entry).
+        gifts: parsed.data.gifts,
+        updated_at: new Date().toISOString(),
+        updated_by: c.var.auth.id,
+      },
+      { onConflict: "model_id" },
+    )
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "upsert returned no row" },
+      404,
+    );
+  }
+  return c.json({
+    modelDefaultFreeGifts: Adapters.modelDefaultFreeGiftsFromRow(
+      data as DB.ModelDefaultFreeGiftsRow,
+    ),
+  });
+});
+
+// DELETE /model-free-gifts/:modelId — drop a model's gift config (principal-only).
+// Idempotent: a missing row is a no-op that still returns ok.
+catalogRouter.delete("/model-free-gifts/:modelId", async (c) => {
+  principalOnly(c, FREE_GIFT_MSG);
+  const modelId = c.req.param("modelId");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb
+    .from(MODEL_DEFAULT_FREE_GIFTS)
+    .delete()
+    .eq("model_id", modelId);
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ ok: true });
+});
+
+// POST /free-item-campaigns — create a GWP campaign (principal-only). `eligible`
+// requires ≥1 target; `active` defaults false (a campaign is dormant until the
+// principal flips it on); `maxFreeQty` defaults 1.
+catalogRouter.post("/free-item-campaigns", async (c) => {
+  principalOnly(c, FREE_GIFT_MSG);
+  const parsed = await parseJsonBody(c, freeItemCampaignInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(FREE_ITEM_CAMPAIGNS)
+    .insert({
+      name: parsed.data.name,
+      active: parsed.data.active ?? false,
+      max_free_qty: parsed.data.maxFreeQty ?? 1,
+      // `eligible` is RuleTarget[] jsonb (re-parsed on read via parseRuleTargets).
+      eligible: parsed.data.eligible,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "rpc_failed", code: "rpc_failed", message: "free item campaign insert returned no row" },
+      500,
+    );
+  }
+  return c.json(
+    { freeItemCampaign: Adapters.freeItemCampaignFromRow(data as DB.FreeItemCampaignRow) },
+    201,
+  );
+});
+
+// PATCH /free-item-campaigns/:id — partial update (principal-only); empty → 422.
+catalogRouter.patch("/free-item-campaigns/:id", async (c) => {
+  principalOnly(c, FREE_GIFT_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, freeItemCampaignPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.name !== undefined) patch.name = parsed.data.name;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.maxFreeQty !== undefined) patch.max_free_qty = parsed.data.maxFreeQty;
+  if (parsed.data.eligible !== undefined) patch.eligible = parsed.data.eligible;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(FREE_ITEM_CAMPAIGNS)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "free item campaign not found" },
+      404,
+    );
+  }
+  return c.json({ freeItemCampaign: Adapters.freeItemCampaignFromRow(data as DB.FreeItemCampaignRow) });
+});
+
+// DELETE /free-item-campaigns/:id — HARD delete (principal-only). Nothing FKs to
+// this table, so deletion is safe; the soft-hide path is `active=false` via PATCH.
+catalogRouter.delete("/free-item-campaigns/:id", async (c) => {
+  principalOnly(c, FREE_GIFT_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(FREE_ITEM_CAMPAIGNS).delete().eq("id", id);
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   return c.json({ ok: true });
 });
 

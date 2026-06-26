@@ -28,6 +28,7 @@ import {
 import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
 import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
 import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
+import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
 import type { AppEnv } from "../types";
 
 /**
@@ -274,6 +275,30 @@ ordersRouter.post("/", async (c) => {
     if (violation) return c.json(leadTimeBody(violation), 422);
   }
 
+  // 0185 (free items) — free-item-campaign claims + anti-tamper, FIRST. A line
+  // the client marked `attrs.free_item={campaignId}` is re-validated against
+  // ACTIVE free_item_campaigns (eligibility + qty ≤ max_free_qty); valid → its
+  // unitPrice is FORCED to 0 + the marker canonicalised to `{campaignId,name}`
+  // (the client price is never trusted), ineligible → 409 free_item_not_eligible
+  // (NOT silently honored). ALSO strips any client-sent `attrs.free_gift` (gifts
+  // are server-appended only, below). Runs before the sofa recompute so a forced-0
+  // line is consistent through the rest of the pipeline. No claim + no marker →
+  // byte-identical (DORMANT).
+  const freeItem = await validateFreeItemClaims(sb, parsed.data.lines);
+  if (freeItem.status === "server_error") {
+    throw new HTTPException(500, { message: freeItem.message });
+  }
+  if (freeItem.status === "bad_request") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "free_item_not_eligible",
+        message: freeItem.message,
+      },
+      409,
+    );
+  }
+
   // Phase 4 (sofa engine) — server recompute + 0.5% drift-reject for any sofa
   // BUILD line (one carrying `attrs.sofa_build`). The client price is a preview;
   // we re-run the SAME pure `computeSofaPrice` against FRESH DB catalog prices.
@@ -281,7 +306,7 @@ ordersRouter.post("/", async (c) => {
   // one real per-compartment line (Phase 5), summing to the authoritative server
   // total. Non-build lines pass through verbatim; `create_order` + `order_lines`
   // stay UNCHANGED — the RPC just inserts the (possibly expanded) line set.
-  const recompute = await recomputeAndExplodeSofaBuildLines(sb, parsed.data.lines);
+  const recompute = await recomputeAndExplodeSofaBuildLines(sb, freeItem.lines);
   if (recompute.status === "bad_request") {
     throw new HTTPException(400, { message: recompute.message });
   }
@@ -333,6 +358,22 @@ ordersRouter.post("/", async (c) => {
     );
   }
 
+  // 0185 (default free gifts) — DETERMINISTIC server-appended RM0 lines. Runs
+  // AFTER the special-addon recompute (on the post-sofa-explode set) and BEFORE
+  // the delivery recompute. The server runs the SAME pure resolver the POS preview
+  // used (NO client claim — gifts are server-authoritative) and APPENDS one RM0
+  // order_line per resolved gift (a real accessory sku, `attrs.free_gift`). A
+  // misconfigured gift (giftSku not a real product_skus row) is fail-SOFT (logged
+  // + omitted). DORMANT (no gift configured) → returns nothing → byte-identical.
+  const giftResult = await resolveDefaultFreeGiftLines(sb, specialRecompute.lines);
+  if (giftResult.status === "server_error") {
+    throw new HTTPException(500, { message: giftResult.message });
+  }
+  // The fully-verified line set fed to create_order: paid/freed lines + appended
+  // RM0 gift lines. No-funding: gift + free-item lines are EXCLUDED from the
+  // delivery charged-category set inside recomputeDeliveryFee.
+  const finalLines = [...specialRecompute.lines, ...giftResult.lines];
+
   // 0184 (delivery TRIP fee) — server-authoritative recompute. Re-runs the pure
   // `computeDeliveryFee` against FRESH delivery_fee_config + active
   // special_delivery_fee_rules + the cart's real categories, and APPENDS the
@@ -342,8 +383,9 @@ ordersRouter.post("/", async (c) => {
   // Dormant (0-rate config) → zero components → no addon appended → totals stay
   // byte-identical. A bad cross-order link → 400 (order NOT created); a catalog
   // read error → 500 (fail-closed). create_order / order_lines stay UNTOUCHED —
-  // the delivery addons just ride the existing payload.addons[] path.
-  const deliveryRecompute = await recomputeDeliveryFee(sb, specialRecompute.lines, {
+  // the delivery addons just ride the existing payload.addons[] path. Free lines
+  // (free_gift / free_item) never contribute a delivery charge (no-funding).
+  const deliveryRecompute = await recomputeDeliveryFee(sb, finalLines, {
     additionalDeliveryFee: parsed.data.additionalDeliveryFee ?? 0,
     crossCategorySourceSo: parsed.data.crossCategorySourceSo ?? null,
     customerPhone: parsed.data.customer.phone,
@@ -362,12 +404,12 @@ ordersRouter.post("/", async (c) => {
   const DELIVERY_ADDON_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
   const clientAddons = parsed.data.addons.filter((a) => !DELIVERY_ADDON_KEYS.has(a.addonKey));
 
-  // Feed the fully-verified (sofa-exploded + special-checked) line set + the
-  // appended delivery addons into the RPC.
+  // Feed the fully-verified line set (sofa-exploded + special-checked + freed
+  // items + appended RM0 gifts) + the appended delivery addons into the RPC.
   const payload = Adapters.orderInputToRpcPayload(
     {
       ...parsed.data,
-      lines: specialRecompute.lines,
+      lines: finalLines,
       addons: [...clientAddons, ...deliveryRecompute.addons],
     },
     effectiveDealerId,

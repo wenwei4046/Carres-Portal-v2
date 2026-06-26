@@ -738,6 +738,59 @@ describe("POST /api/orders", () => {
     expect(body.message).toMatch(/sofa/i);
   });
 
+  // 0185 (free items / gifts) — order-path wiring. The shared chain can't return
+  // a configured campaign (campaign read resolves empty), so a claim is
+  // ineligible → 409 free_item_not_eligible (the route maps the typed
+  // bad_request). A client-sent attrs.free_gift is stripped before the RPC.
+  it("rejects an ineligible free-item claim with 409 free_item_not_eligible (no create)", async () => {
+    const sb = buildSbForCreate({});
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const body = validCreateBody({
+      lines: [{ sku: "MATT-1", qty: 1, attrs: { free_item: { campaignId: "camp-x" } }, unitPrice: 1500 }],
+    });
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    const j = (await res.json()) as { error: string; code: string };
+    expect(j.error).toBe("rule_violation");
+    expect(j.code).toBe("free_item_not_eligible");
+    // No order created.
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("strips a client-sent attrs.free_gift before reaching create_order (gifts are server-only)", async () => {
+    const sb = buildSbForCreate({
+      rpcResult: { id: "11111111-1111-1111-1111-111111111111", so: 1252, placed_at: "2026-05-02T10:00:00Z" },
+      fetchedRow: makeOrderRow({ order_lines: [], order_addons: [], order_history: [] }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const body = validCreateBody({
+      lines: [{ sku: "MATT-1", qty: 1, attrs: { free_gift: { giftSku: "HACK-TV" }, color: "blue" }, unitPrice: 1500 }],
+    });
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(sb._rpcCalls).toHaveLength(1);
+    const payload = sb._rpcCalls[0]!.payload as { lines: Array<{ attrs: Record<string, unknown> | null }> };
+    // The bogus client gift marker is gone; the rest of the attrs survive.
+    expect(payload.lines).toHaveLength(1);
+    expect(payload.lines[0]!.attrs).toEqual({ color: "blue" });
+  });
+
   it("returns 403 when dealer role JWT has no dealerId", async () => {
     vi.mocked(userClient).mockReturnValue(buildSbForCreate({}));
     const jwt = await makeJwt("dealer", null);

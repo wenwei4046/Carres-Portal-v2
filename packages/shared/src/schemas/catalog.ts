@@ -484,6 +484,82 @@ export const specialDeliveryFeeRuleInput = z
   .strict();
 export type SpecialDeliveryFeeRuleInput = z.infer<typeof specialDeliveryFeeRuleInput>;
 
+// ---------------------------------------------------------------------------
+// 0185 — Default Free Gifts + Free Item Campaigns (2990s Products parity Phase
+// 7, GWP). Principal-owned. One schema, two consumers (§9.5): the API validates
+// these and the Maintenance UI reuses the exact same shapes. Free lines book as
+// RM0 order_lines with attrs markers — create_order / order_lines untouched.
+// ---------------------------------------------------------------------------
+
+/** A P6 `TargetRefinement` WITHOUT a modelId (a default-gift condition is scoped
+ *  to its own model already). Mirrors the shared `TargetRefinement` type. */
+export const targetRefinementSchema = z.object({
+  scope: ruleTargetScopeSchema,
+  sizeCodes: z.array(z.string()).optional(),
+  comboIds: z.array(z.string()).optional(),
+  compartments: z.array(z.string()).optional(),
+});
+export type TargetRefinementDto = z.infer<typeof targetRefinementSchema>;
+
+/** One configured default free gift (mirrors the shared `DefaultFreeGift`). */
+export const defaultFreeGiftSchema = z.object({
+  giftSku: z.string(),
+  qty: z.number().int().positive(),
+  label: z.string().optional(),
+  condition: targetRefinementSchema.optional(),
+});
+export type DefaultFreeGiftDto = z.infer<typeof defaultFreeGiftSchema>;
+
+/** A `model_default_free_gifts` row DTO (mirrors `ModelDefaultFreeGifts`). */
+export const modelDefaultFreeGiftsSchema = z.object({
+  modelId: z.string().uuid(),
+  gifts: z.array(defaultFreeGiftSchema),
+});
+export type ModelDefaultFreeGiftsDto = z.infer<typeof modelDefaultFreeGiftsSchema>;
+
+/** Upsert a model's gift set (the PUT body for
+ *  /models/:id/default-free-gifts). `giftSku` non-empty + `qty` >= 1; the
+ *  optional `condition` reuses the P6 refinement. Replaces the whole set (an
+ *  empty `gifts` clears it). */
+export const modelDefaultFreeGiftsInput = z
+  .object({
+    gifts: z.array(
+      z
+        .object({
+          giftSku: z.string().trim().min(1),
+          qty: z.number().int().positive(),
+          label: z.string().trim().max(120).optional(),
+          condition: targetRefinementSchema.optional(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type ModelDefaultFreeGiftsInput = z.infer<typeof modelDefaultFreeGiftsInput>;
+
+/** A `free_item_campaigns` row DTO (mirrors the shared `FreeItemCampaign`). */
+export const freeItemCampaignSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  active: z.boolean(),
+  maxFreeQty: z.number().int().positive(),
+  eligible: z.array(ruleTargetSchema),
+});
+export type FreeItemCampaignDto = z.infer<typeof freeItemCampaignSchema>;
+
+/** Create / patch a free item campaign. `eligible` requires >=1 target (an
+ *  EMPTY eligible covers nothing — see `campaignsCoveringLine`); `maxFreeQty`
+ *  >= 1 (optional; server defaults to 1). `active` defaults false server-side. */
+export const freeItemCampaignInput = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    active: z.boolean().optional(),
+    maxFreeQty: z.number().int().positive().optional(),
+    eligible: z.array(ruleTargetSchema).min(1),
+  })
+  .strict();
+export type FreeItemCampaignInput = z.infer<typeof freeItemCampaignInput>;
+
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
   skus: z.array(productSkuSchema),
@@ -511,6 +587,10 @@ export const catalogResponseSchema = z.object({
   // clients that don't read these are wholly unaffected.
   deliveryFeeConfig: deliveryFeeConfigSchema.optional(),
   specialDeliveryFeeRules: z.array(specialDeliveryFeeRuleSchema).optional(),
+  // 0185 — Default Free Gifts + Free Item Campaigns (additive, OPTIONAL).
+  // Pre-0185 clients that don't read these are wholly unaffected.
+  modelDefaultFreeGifts: z.array(modelDefaultFreeGiftsSchema).optional(),
+  freeItemCampaigns: z.array(freeItemCampaignSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 

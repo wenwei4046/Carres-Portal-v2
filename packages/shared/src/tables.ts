@@ -67,6 +67,13 @@ export const SPECIAL_ADDONS          = "special_addons" as const;
 // stays in suppliers.cat_covered).
 export const CATALOG_OPTION_POOLS    = "catalog_option_pools" as const;
 
+// 0185 — 2990s Products parity Phase 7: principal-owned Default Free Gifts (per
+// model) + Free Item Campaigns (GWP). Free lines book as RM0 order_lines with
+// attrs markers (attrs.free_gift / attrs.free_item) — create_order / order_lines
+// are UNTOUCHED. DORMANT until the principal authors gifts / campaigns.
+export const MODEL_DEFAULT_FREE_GIFTS = "model_default_free_gifts" as const;
+export const FREE_ITEM_CAMPAIGNS      = "free_item_campaigns" as const;
+
 // ---------------------------------------------------------------------------
 // People / org tables
 // ---------------------------------------------------------------------------

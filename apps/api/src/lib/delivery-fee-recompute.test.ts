@@ -192,6 +192,40 @@ describe("recomputeDeliveryFee — base + cross-category", () => {
   });
 });
 
+describe("recomputeDeliveryFee — no-funding (Phase 7 free lines)", () => {
+  it("a free_item line alone does NOT trip a base fee (excluded from charged categories)", async () => {
+    const sb = mockSb({ config: cfgRow({ base_fee: 50 }), skus: [skuRow("M1", "mattress")] });
+    const r = await recomputeDeliveryFee(
+      sb,
+      [line("M1", { unitPrice: 0, attrs: { free_item: { campaignId: "c1", name: "GWP" } } })],
+      ctx(),
+    );
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.addons).toEqual([]);
+    expect(r.fee.total).toBe(0);
+  });
+
+  it("a free_gift line is excluded; only the PAID line's category bills", async () => {
+    const sb = mockSb({
+      config: cfgRow({ base_fee: 50 }),
+      skus: [skuRow("M1", "mattress"), skuRow("GIFT", "accessory")],
+    });
+    const r = await recomputeDeliveryFee(
+      sb,
+      [
+        line("M1"),
+        line("GIFT", { unitPrice: 0, attrs: { free_gift: { giftSku: "GIFT", sourceModelId: MODEL_X } } }),
+      ],
+      ctx(),
+    );
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    // The paid mattress bills the base; the free gift adds nothing.
+    expect(r.addons).toEqual([{ addonKey: "DELIVERY", qty: 1, unitPrice: 50, attrs: { kind: "base" } }]);
+  });
+});
+
 describe("recomputeDeliveryFee — special rule match", () => {
   it("a matched model-scope rule supersedes the base (highest wins)", async () => {
     const sb = mockSb({

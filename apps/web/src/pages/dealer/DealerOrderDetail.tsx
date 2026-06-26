@@ -29,6 +29,16 @@ const DELIVERY_ADDON_LABELS: Record<string, string> = {
   DELIVERY_ADD: "Additional delivery fee",
 };
 
+/** 0185 — a free order_line carries either an appended default-gift marker
+ *  (`attrs.free_gift`) or a freed existing line marker (`attrs.free_item`).
+ *  Returns a short tag to render alongside the line + "FREE" instead of RM0. */
+function freeLineTag(attrs: Record<string, unknown> | null): string | null {
+  if (!attrs) return null;
+  if (attrs.free_gift) return "Free gift";
+  if (attrs.free_item) return "Free item";
+  return null;
+}
+
 export default function DealerOrderDetail({
   id,
   onClose,
@@ -224,8 +234,19 @@ function OrderBody({
           ) : (
             <div key={row.line.id} className={`px-3.5 py-2.5 text-sm ${i ? "border-t border-base-100" : ""}`}>
               <div className="flex justify-between">
-                <span className="font-mono">{row.line.sku} × {row.line.qty}</span>
-                <span className="font-mono">RM {(row.line.unitPrice * row.line.qty).toLocaleString()}</span>
+                <span className="font-mono">
+                  {row.line.sku} × {row.line.qty}
+                  {freeLineTag(row.line.attrs) && (
+                    <span className="ml-2 pill pill-confirmed align-middle">
+                      {freeLineTag(row.line.attrs)}
+                    </span>
+                  )}
+                </span>
+                <span className="font-mono">
+                  {freeLineTag(row.line.attrs)
+                    ? "FREE"
+                    : `RM ${(row.line.unitPrice * row.line.qty).toLocaleString()}`}
+                </span>
               </div>
               <SpecialsSummary attrs={row.line.attrs} className="mt-1 ml-0.5 flex flex-col gap-0.5" />
             </div>

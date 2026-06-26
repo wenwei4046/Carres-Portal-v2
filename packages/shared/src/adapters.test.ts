@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   catalogOptionPoolFromRow,
   deliveryFeeConfigFromRow,
+  freeItemCampaignFromRow,
+  modelDefaultFreeGiftsFromRow,
   modelSofaCompartmentFromRow,
   orderInputToRpcPayload,
   orderSupplierThreadFromRow,
@@ -13,6 +15,8 @@ import {
 import type {
   CatalogOptionPoolRow,
   DeliveryFeeConfigRow,
+  FreeItemCampaignRow,
+  ModelDefaultFreeGiftsRow,
   ModelSofaCompartmentRow,
   OrderSupplierThreadRow,
   ProductSkuRow,
@@ -634,5 +638,89 @@ describe("specialDeliveryFeeRuleFromRow (0184)", () => {
     );
     expect(out.target).toEqual([{ scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] }]);
     expect(out.label).toBeNull();
+  });
+});
+
+describe("modelDefaultFreeGiftsFromRow (0185)", () => {
+  function baseRow(over: Partial<ModelDefaultFreeGiftsRow> = {}): ModelDefaultFreeGiftsRow {
+    return {
+      model_id: "00000000-0000-0000-0000-00000000000a",
+      gifts: [
+        { giftSku: "ACC-PILLOW", qty: 1, label: "Free pillow" },
+      ] as unknown as ModelDefaultFreeGiftsRow["gifts"],
+      updated_at: "2026-06-26T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("maps model_id → modelId and parses the gifts jsonb", () => {
+    const out = modelDefaultFreeGiftsFromRow(baseRow());
+    expect(out).toEqual({
+      modelId: "00000000-0000-0000-0000-00000000000a",
+      gifts: [{ giftSku: "ACC-PILLOW", qty: 1, label: "Free pillow" }],
+    });
+  });
+
+  it("drops malformed gift entries + collapses a 'model'-scope condition via parseDefaultFreeGifts", () => {
+    const out = modelDefaultFreeGiftsFromRow(
+      baseRow({
+        gifts: [
+          { giftSku: "", qty: 1 }, // empty sku → dropped
+          { giftSku: "ACC-A", qty: 0 }, // qty < 1 → dropped
+          { giftSku: "ACC-B", qty: 2, condition: { scope: "model" } }, // condition collapses
+        ] as unknown as ModelDefaultFreeGiftsRow["gifts"],
+      }),
+    );
+    expect(out.gifts).toEqual([{ giftSku: "ACC-B", qty: 2 }]);
+  });
+
+  it("defaults a null gifts column to []", () => {
+    const out = modelDefaultFreeGiftsFromRow(
+      baseRow({ gifts: null as unknown as ModelDefaultFreeGiftsRow["gifts"] }),
+    );
+    expect(out.gifts).toEqual([]);
+  });
+});
+
+describe("freeItemCampaignFromRow (0185)", () => {
+  function baseRow(over: Partial<FreeItemCampaignRow> = {}): FreeItemCampaignRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000ca001",
+      name: "Pillow giveaway",
+      active: true,
+      // PostgREST may serialize integer as a string — Number() must normalise it.
+      max_free_qty: "2" as unknown as number,
+      eligible: [
+        { scope: "model", modelId: "00000000-0000-0000-0000-00000000000a" },
+      ] as unknown as FreeItemCampaignRow["eligible"],
+      created_at: "2026-06-26T00:00:00Z",
+      updated_at: "2026-06-26T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("maps fields, coerces max_free_qty, and parses the eligible RuleTarget[]", () => {
+    const out = freeItemCampaignFromRow(baseRow());
+    expect(out).toEqual({
+      id: "00000000-0000-0000-0000-0000000ca001",
+      name: "Pillow giveaway",
+      active: true,
+      maxFreeQty: 2,
+      eligible: [{ scope: "model", modelId: "00000000-0000-0000-0000-00000000000a" }],
+    });
+  });
+
+  it("drops malformed eligible entries via parseFreeItemEligible", () => {
+    const out = freeItemCampaignFromRow(
+      baseRow({
+        eligible: [
+          { scope: "model" }, // no modelId → dropped
+          { scope: "variant", modelId: "m1", sizeCodes: ["queen"] }, // upper-cased
+        ] as unknown as FreeItemCampaignRow["eligible"],
+      }),
+    );
+    expect(out.eligible).toEqual([{ scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] }]);
   });
 });

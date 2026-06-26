@@ -5,6 +5,8 @@
 
 import type { CostSource, OperationStage } from "./db-types";
 import type { FabricTier } from "./fabric-tier";
+import type { DefaultFreeGift } from "./free-gift";
+import type { FreeItemCampaign } from "./free-item-campaign";
 import type { RuleTarget } from "./rule-target";
 
 // Re-exported so UI code can write `import type { CostSource } from
@@ -15,6 +17,11 @@ export type { CostSource };
 
 // 0176 — fabric tier type re-exported for UI consumption.
 export type { FabricTier };
+
+// 0185 — Free Item Campaign is the camelCase domain shape (single source of
+// truth in free-item-campaign.ts); re-exported here so UI code can reach it via
+// `Domain.FreeItemCampaign` alongside the rest of the camelCase surface.
+export type { FreeItemCampaign };
 
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
@@ -298,6 +305,18 @@ export interface SpecialDeliveryFeeRule {
   label: string | null;
   active: boolean;
   sortOrder: number;
+}
+
+/**
+ * A model's configured default free gift set (migration 0185, 2990s Products
+ * parity Phase 7). `modelDefaultFreeGiftsFromRow` maps the
+ * `model_default_free_gifts` row; `gifts` is parsed (malformed entries dropped)
+ * via `parseDefaultFreeGifts`. When a model has no row (or an empty `gifts`) it
+ * triggers no gift — the feature is DORMANT until the principal authors gifts.
+ */
+export interface ModelDefaultFreeGifts {
+  modelId: string;
+  gifts: DefaultFreeGift[];
 }
 
 export interface Warehouse {

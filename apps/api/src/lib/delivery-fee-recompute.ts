@@ -16,6 +16,7 @@ import {
 } from "@carres/shared";
 
 import type { RecomputableLine } from "./sofa-recompute";
+import { embedCategory, resolveSkuInfo, type SkuInfo } from "./rule-line-input";
 
 /**
  * Delivery TRIP fee server-recompute (migration 0184, 2990s Products parity
@@ -84,20 +85,15 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
 const phoneKey = (p: string | null | undefined): string =>
   (p ?? "").replace(/\D/g, "");
 
-/** A product_skus row enriched with its model's category (PostgREST embed). */
-interface SkuInfo {
-  modelId: string | null;
-  category: string;
-  variant: string | null;
-}
-
-/** Read the embedded product_models.category (object or array-of-1 per client). */
-function embedCategory(
-  pm: { category?: string } | Array<{ category?: string }> | null | undefined,
-): string {
-  if (!pm) return "";
-  if (Array.isArray(pm)) return pm[0]?.category ?? "";
-  return pm.category ?? "";
+/** Phase 7 (free gifts) — a free line (an appended RM0 gift carrying
+ *  `attrs.free_gift`, or an existing line freed by a campaign carrying
+ *  `attrs.free_item`) NEVER contributes to a delivery charge. No-funding is
+ *  one-way: a free item alone must not trip a delivery base fee, and a free gift
+ *  is not a deliverable the customer paid for. Excluded from the charged-category
+ *  set + the cross-category span detection below. */
+function isFreeLine(attrs: Record<string, unknown> | null): boolean {
+  if (!attrs) return false;
+  return Boolean(attrs.free_gift) || Boolean(attrs.free_item);
 }
 
 export async function recomputeDeliveryFee(
@@ -160,39 +156,27 @@ export async function recomputeDeliveryFee(
 
   // 3. Resolve every line's sku → { model_id, category, variant } in one batched
   //    read (RLS). Build lines reference their representative / compartment skus
-  //    which are real product_skus rows, so the same join covers them.
-  const skuSet = new Set<string>();
-  for (const line of lines) skuSet.add(line.sku);
-  const skuInfo = new Map<string, SkuInfo>();
-  if (skuSet.size > 0) {
-    const { data, error } = await sb
-      .from("product_skus")
-      .select("sku, model_id, variant, product_models(category)")
-      .in("sku", Array.from(skuSet));
-    if (error) {
-      return { status: "server_error", message: error.message };
-    }
-    for (const row of (data ?? []) as Array<{
-      sku?: string;
-      model_id?: string | null;
-      variant?: string | null;
-      product_models?: { category?: string } | Array<{ category?: string }> | null;
-    }>) {
-      if (!row.sku) continue;
-      skuInfo.set(row.sku, {
-        modelId: row.model_id ?? null,
-        category: embedCategory(row.product_models),
-        variant: row.variant ?? null,
-      });
-    }
+  //    which are real product_skus rows, so the same join covers them. FREE lines
+  //    (free_gift / free_item) are dropped first — no-funding: they must not
+  //    contribute a category to the charged set nor count toward the
+  //    cross-category span (an order whose only deliverable is a freed item must
+  //    not trip a base fee).
+  const chargeableLines = lines.filter((l) => !isFreeLine(l.attrs));
+  const skuRes = await resolveSkuInfo(
+    sb,
+    chargeableLines.map((l) => l.sku),
+  );
+  if (!skuRes.ok) {
+    return { status: "server_error", message: skuRes.message };
   }
+  const skuInfo = skuRes.skuInfo;
 
   // 4. Flatten lines → RuleLineInput[]. Exploded sofa compartment lines
   //    (attrs.sofa_build_key + module_code) regroup into ONE sofa RuleLineInput
   //    per build (mirrors 2990s reconstructDeliveryRuleLines); a defensive
   //    un-exploded build line (attrs.sofa_build) reads its cells directly; every
   //    other line resolves its category/model/size from the sku map.
-  const ruleLines = buildRuleLines(lines, skuInfo);
+  const ruleLines = buildRuleLines(chargeableLines, skuInfo);
 
   // 5. Distinct charged categories present (∩ config.chargedCategories).
   const chargedSet = new Set(config.chargedCategories.map((c) => c.toLowerCase()));

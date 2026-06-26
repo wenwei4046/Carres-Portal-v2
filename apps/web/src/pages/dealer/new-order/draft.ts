@@ -30,6 +30,11 @@ export interface DraftLine {
   unitPrice: number;
   /** Free-text label for the LineList row, e.g. "Carres Cloud · Queen" */
   label: string;
+  /** TRANSIENT (0185, free-item "Make free") — the line's REAL unit price parked
+   *  while it's claimed free (its preview `unitPrice` is forced to 0). Dropped at
+   *  submit (DealerPos sends only sku/qty/attrs/unitPrice), so it never reaches
+   *  the wire; the server is authoritative for the freed price (forces 0). */
+  origUnitPrice?: number;
 }
 
 /**

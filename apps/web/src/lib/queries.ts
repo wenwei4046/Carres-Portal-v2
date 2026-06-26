@@ -51,6 +51,11 @@ import {
   type DeliveryFeeConfigPatchInput,
   type SpecialDeliveryFeeRuleDto,
   type SpecialDeliveryFeeRuleInput,
+  // 0185 — Default Free Gifts (per model) + Free Item Campaigns (GWP).
+  type ModelDefaultFreeGiftsDto,
+  type ModelDefaultFreeGiftsInput,
+  type FreeItemCampaignDto,
+  type FreeItemCampaignInput,
   type AddonCreateInput,
   type AddonPatchInput,
   type AddonDto,
@@ -4958,6 +4963,73 @@ export function useDeleteSpecialDeliveryFeeRule() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/special-delivery-fee-rules/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0185 — Default Free Gifts (per model) + Free Item Campaigns (2990s Products
+// parity Phase 7, GWP). Principal-only on the server (RLS + API gate); the
+// Maintenance UI gate is a friendly read-only veneer. Every mutation invalidates
+// the ['catalog'] tree so the bundle (Promo tab + the POS preview resolver)
+// re-reads. Free lines book as RM0 order_lines with attrs markers — the order
+// submit pipeline (create_order / order_lines / DraftLine) is untouched.
+// ---------------------------------------------------------------------------
+
+/** PUT /api/catalog/model-free-gifts/:modelId — REPLACE a model's whole gift
+ *  set (an empty `gifts` clears it server-side). Principal-only on the server. */
+export function useUpsertModelFreeGifts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelId, input }: { modelId: string; input: ModelDefaultFreeGiftsInput }) =>
+      apiFetch<{ modelDefaultFreeGifts: ModelDefaultFreeGiftsDto }>(
+        `/api/catalog/model-free-gifts/${modelId}`,
+        catalogJson("PUT", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** DELETE /api/catalog/model-free-gifts/:modelId — drop a model's gift config
+ *  (idempotent; a missing row is a no-op). Principal-only on the server. */
+export function useDeleteModelFreeGifts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (modelId: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/model-free-gifts/${modelId}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useCreateFreeItemCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: FreeItemCampaignInput) =>
+      apiFetch<{ freeItemCampaign: FreeItemCampaignDto }>(
+        "/api/catalog/free-item-campaigns",
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateFreeItemCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<FreeItemCampaignInput> }) =>
+      apiFetch<{ freeItemCampaign: FreeItemCampaignDto }>(
+        `/api/catalog/free-item-campaigns/${id}`,
+        catalogJson("PATCH", patch),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteFreeItemCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/free-item-campaigns/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

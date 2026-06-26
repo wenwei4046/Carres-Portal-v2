@@ -102,8 +102,11 @@ function Chip({
 
 // ---------------------------------------------------------------------------
 // Single-model refinement (the per-row scope + lists, model already fixed).
+// Exported (0185) so the Promo / Free Gifts editor can reuse the IDENTICAL
+// category-aware refinement control for a per-model default-gift CONDITION (the
+// model is already fixed by the gift's row) without re-implementing it.
 // ---------------------------------------------------------------------------
-function RuleTargetRefinementRow({
+export function RuleTargetRefinementRow({
   category,
   model,
   catalog,
