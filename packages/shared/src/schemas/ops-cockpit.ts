@@ -57,6 +57,9 @@ export const TASK_STATUSES = ["open", "claimed", "done", "cancelled"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const TASK_PRIORITIES = ["normal", "urgent"] as const;
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+/** Why a follow-up needs the principal (Jess). Drives the Escalate sub-form. */
+export const ESCALATE_REASONS = ["discount", "refund", "question", "other"] as const;
+export type EscalateReason = (typeof ESCALATE_REASONS)[number];
 
 export const opsTaskSchema = z.object({
   id: z.string().uuid(),
@@ -76,6 +79,9 @@ export const opsTaskSchema = z.object({
   doneAt: z.string().nullable(),
   relatedOrderId: z.string().uuid().nullable(),
   relatedSo: z.number().int().nullable(),
+  escalatedAt: z.string().nullable(),
+  escalateReason: z.enum(ESCALATE_REASONS).nullable(),
+  escalateNote: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
   overdue: z.boolean(),
@@ -93,7 +99,10 @@ export const createOpsTaskInputSchema = z.object({
   assignedTo: z.string().uuid().nullable().optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
   slaMinutes: z.number().int().min(5).max(1440).optional(),
+  dueAt: z.string().nullable().optional(),
   relatedOrderId: z.string().uuid().nullable().optional(),
+  escalateReason: z.enum(ESCALATE_REASONS).nullable().optional(),
+  escalateNote: z.string().trim().nullable().optional(),
 });
 export type CreateOpsTaskInput = z.infer<typeof createOpsTaskInputSchema>;
 
@@ -104,7 +113,10 @@ export const updateOpsTaskInputSchema = z.object({
   assignedTo: z.string().uuid().nullable().optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
   slaMinutes: z.number().int().min(5).max(1440).optional(),
-  action: z.enum(["claim", "done", "reopen", "cancel"]).optional(),
+  dueAt: z.string().nullable().optional(),
+  escalateReason: z.enum(ESCALATE_REASONS).nullable().optional(),
+  escalateNote: z.string().trim().nullable().optional(),
+  action: z.enum(["claim", "done", "reopen", "cancel", "escalate"]).optional(),
 });
 export type UpdateOpsTaskInput = z.infer<typeof updateOpsTaskInputSchema>;
 

@@ -48,7 +48,12 @@ tasksRouter.post("/", requireOperationOrPrincipal, async (c) => {
       assigned_to: parsed.assignedTo ?? null,
       priority: parsed.priority ?? "normal",
       sla_minutes: parsed.slaMinutes ?? 60,
+      due_at: parsed.dueAt ?? null,
       related_order_id: parsed.relatedOrderId ?? null,
+      // escalate-on-create: a follow-up can be raised straight to the principal.
+      escalated_at: parsed.escalateReason ? new Date().toISOString() : null,
+      escalate_reason: parsed.escalateReason ?? null,
+      escalate_note: parsed.escalateNote ?? null,
     })
     .select("id")
     .single();
@@ -67,6 +72,9 @@ tasksRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
   if (parsed.assignedTo !== undefined) patch.assigned_to = parsed.assignedTo;
   if (parsed.priority !== undefined) patch.priority = parsed.priority;
   if (parsed.slaMinutes !== undefined) patch.sla_minutes = parsed.slaMinutes;
+  if (parsed.dueAt !== undefined) patch.due_at = parsed.dueAt;
+  if (parsed.escalateReason !== undefined) patch.escalate_reason = parsed.escalateReason;
+  if (parsed.escalateNote !== undefined) patch.escalate_note = parsed.escalateNote;
   // `action` records who/when server-side (claimed_by = the authed user).
   const now = new Date().toISOString();
   switch (parsed.action) {
@@ -99,6 +107,10 @@ tasksRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
       break;
     case "cancel":
       patch.status = "cancelled";
+      break;
+    case "escalate":
+      // raise an existing follow-up to the principal (reason/note arrive above).
+      patch.escalated_at = now;
       break;
     default:
       break;
@@ -134,6 +146,9 @@ interface RawTaskFeed {
   done_at: string | null;
   related_order_id: string | null;
   related_so: number | null;
+  escalated_at: string | null;
+  escalate_reason: string | null;
+  escalate_note: string | null;
   created_at: string;
   updated_at: string;
   overdue: boolean;
@@ -158,6 +173,9 @@ function shape(r: RawTaskFeed) {
     doneAt: r.done_at,
     relatedOrderId: r.related_order_id,
     relatedSo: r.related_so,
+    escalatedAt: r.escalated_at,
+    escalateReason: r.escalate_reason,
+    escalateNote: r.escalate_note,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     overdue: r.overdue,
