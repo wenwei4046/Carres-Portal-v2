@@ -20,11 +20,11 @@ Read this file ▶ RESUME (below).
 - **#4 drawer customer edit — DONE** (`86c1717`): inline **Edit** (pencil) on the Order section's Customer/Phone/Address for a **Place** order → `useUpdateOrder` (PATCH `/api/orders/:id`, existing Phase-2C.2 path), sends only changed fields, validates with the SAME shared `updateOrderInputSchema`, refreshes `qk.operation.order`. The `update_order` RPC 422s on non-Place, so Edit only shows for status 'place'. Live-verified (Placed #1001 → Edit + form opens/cancels; Delivered #1007 → no Edit).
 - **Excel decision = lib-free** (the CSV opens in Excel). NO dependency added → bundle CF stays flat. If Loo wants a true formatted `.xlsx`, add a small lib then (his call, overridable).
 - **#4 Ref No column + Deadline** = already shipped earlier this checkpoint (no work needed).
-- Tests **+10** → web **735/740** (5 pre-existing fails: OhanaSofaTab ×4 + NiceFutureMattressTab ×1). tsc + build clean; SERVICE_ROLE dist scan 0. **2 new commits, NOT pushed / NOT deployed — await `上线`.**
+- **#4 Logistic alert — DONE** (`a58eecc`): red **"Unassigned carrier"** action chip beside the amber **No ETA** on the Region/Logistic row (toggles the Logistic=Unassigned filter; count of no-carrier orders). **#4 is now FULLY closed.**
+- Tests **+11** → web **736/741** (5 pre-existing fails: OhanaSofaTab ×4 + NiceFutureMattressTab ×1). tsc + build clean; SERVICE_ROLE dist scan 0. **4 new commits (`66e089f` `86c1717` `253db28` `a58eecc`), NOT pushed / NOT deployed — await `上线`.**
 
 ### Still open after this session
-- **Unassigned-carrier alert** (small #4 polish): the amber **No ETA** QuickView already exists, and the Logistic group already has an **Unassigned** filter chip + count. Only the red/amber "Unassigned carrier" *action* chip alongside No ETA is left (cosmetic prominence; capability already present).
-- **#2 Follow-up form** — the BIG phase (extend right-rail Tasks: preset-title dropdown + force-assign one person + due dropdown + urgent + escalate-to-Jess + warning state machine). Own session; confirm approach first (draft in RESUME #2 below).
+- **#2 Follow-up form** — the BIG phase (extend right-rail Tasks: preset-title dropdown + force-assign one person + due dropdown + urgent + escalate-to-Jess + warning state machine). Own session; confirm approach first (draft in RESUME #2 below). **This is the only remaining item in this checkpoint.**
 
 ---
 
@@ -64,7 +64,7 @@ Files touched: `apps/web/src/pages/operation/OperationOrdersControl.tsx` (+test)
 
 ## APPROVED — build next (no decision needed)
 - ~~**#4** — Ref No column + export menu + edit address in the drawer~~ → **DONE 2026-06-25** (`66e089f` export menu · `86c1717` drawer edit; Ref No column + Deadline were already shipped). Excel = lib-free CSV (no dep). See the UPDATE block at the top.
-- **Logistic alert wording** (confirmed): **"Unassigned carrier"** (orders with no carrier → assign) + **"No ETA"** (carrier set, no ETA → chase) — action chips near the Logistic group, red/amber. **Partial**: "No ETA" amber QuickView + a Logistic "Unassigned" filter chip+count already exist; only the red/amber "Unassigned carrier" *action* chip is left (cosmetic).
+- ~~**Logistic alert wording**~~ → **DONE 2026-06-25** (`a58eecc`): red "Unassigned carrier" + amber "No ETA" action chips on the Logistic row.
 - **Deadline** = date(black)+weekday(grey), no countdown — DONE.
 
 ## Agreed design facts
