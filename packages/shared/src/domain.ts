@@ -197,6 +197,8 @@ export interface Combo {
   comboKey: string;
   name: string;
   comboPrice: number;
+  // 0183 — principal-only cost benchmark companion to comboPrice; null = unset.
+  cost: number | null;
   active: boolean;
   effectiveFrom: string;
   components: ComboComponent[];
@@ -244,6 +246,9 @@ export interface SofaCombo {
   slots: string[][];
   tier: FabricTier | null;
   pricesByHeight: Record<string, number | null>;
+  // 0183 — principal-only per-seat-height cost benchmark (same shape as
+  // pricesByHeight); null = unset. Benchmark only, never in the selling compute.
+  costByHeight: Record<string, number | null> | null;
   label: string | null;
   effectiveFrom: string;
   active: boolean;

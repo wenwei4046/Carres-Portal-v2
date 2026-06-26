@@ -455,6 +455,12 @@ describe("sofaComboFromRow", () => {
         "28": 2750,
         "30": null,
       },
+      // 0183 — per-height cost benchmark (companion to prices_by_height).
+      cost_by_height: {
+        "24": "1800.00" as unknown as number,
+        "28": 1850,
+        "30": null,
+      },
       label: "Oslo L-shape",
       effective_from: "2026-06-21",
       active: true,
@@ -479,6 +485,12 @@ describe("sofaComboFromRow", () => {
     expect(typeof out.pricesByHeight["24"]).toBe("number");
     expect(out.pricesByHeight["28"]).toBe(2750);
     expect(out.pricesByHeight["30"]).toBeNull();
+    // 0183 — cost map coerces numerics + preserves null, same as prices.
+    expect(out.costByHeight).not.toBeNull();
+    expect(out.costByHeight!["24"]).toBe(1800);
+    expect(typeof out.costByHeight!["24"]).toBe("number");
+    expect(out.costByHeight!["28"]).toBe(1850);
+    expect(out.costByHeight!["30"]).toBeNull();
     expect(out.label).toBe("Oslo L-shape");
     expect(out.effectiveFrom).toBe("2026-06-21");
     expect(out.active).toBe(true);
@@ -498,6 +510,11 @@ describe("sofaComboFromRow", () => {
     expect(out.pricesByHeight).toEqual({});
     expect(out.tier).toBeNull();
     expect(out.label).toBeNull();
+  });
+
+  it("keeps costByHeight null when the column is unset (distinct from {})", () => {
+    const out = sofaComboFromRow(baseRow({ cost_by_height: null }));
+    expect(out.costByHeight).toBeNull();
   });
 });
 

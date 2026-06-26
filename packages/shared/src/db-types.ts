@@ -251,6 +251,9 @@ export interface ComboRow {
   combo_key: string;
   name: string;
   combo_price: number;
+  // 0183 — principal-only cost benchmark (RM) companion to combo_price.
+  // null = unset. Benchmark only — never charged, no order/finance/PO consumer.
+  cost: number | null;
   active: boolean;
   effective_from: string;
   discontinued_at: string | null;
@@ -322,6 +325,9 @@ export interface SofaComboPricingRow {
   slots: string[][];
   tier: string | null;
   prices_by_height: Record<string, number | null>;
+  // 0183 — principal-only per-seat-height cost benchmark, same shape as
+  // prices_by_height. null (or absent keys) = unset. Benchmark only.
+  cost_by_height: Record<string, number | null> | null;
   label: string | null;
   effective_from: string;
   active: boolean;
