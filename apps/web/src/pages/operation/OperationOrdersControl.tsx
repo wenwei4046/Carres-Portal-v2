@@ -1,18 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useParams } from "react-router-dom";
 import {
   useOperationOrders,
   useOperationStock,
   useDeliveryPartners,
-  useAddAnnotation,
   useSaveOrderControl,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { cjkClassName } from "@/lib/cjk";
-import { isFollowUpFlagged } from "@/lib/follow-up";
 import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
 import {
   type CoreCat,
@@ -24,6 +22,9 @@ import {
 } from "@/lib/line-category";
 import { apiFetch } from "@/lib/api";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
+import FollowUpForm from "./components/FollowUpForm";
+import { TASKS_KEY } from "./components/rail/TasksPanel";
+import type { OpsTask, OpsTasksListResponse } from "@carres/shared";
 import type { OperationStage } from "./components/StageChip";
 import {
   AlertTriangle,
@@ -39,6 +40,8 @@ import {
   Flag,
   ChevronsUp,
   Check,
+  Hand,
+  Plus,
   CalendarClock,
   Printer,
   type LucideIcon,
@@ -242,13 +245,24 @@ function urgencyColor(o: operationOrderListRow, ct: SettledTab): string | null {
   return null;
 }
 
-/** ⭐ Flagged for follow-up — derived from the order's annotations (the latest
- *  follow_up/resolved note is a follow_up). Drives the row star + the "Starred"
- *  filter chip; mirrors the drawer-header star (Jess: multi-operator handoff). */
-function isFlaggedOrder(o: operationOrderListRow): boolean {
-  return isFollowUpFlagged(
-    (o.order_annotations ?? []).map((a) => ({ tag: a.tag, at: a.created_at })),
-  );
+/** A follow-up IS an ops_task linked to the order (#2, Jess 2026-06-26). The
+ *  table reads the open (not done/cancelled) tasks per order from the Tasks feed;
+ *  the "lead" task drives the row flag + the Action cell — escalated first, then
+ *  overdue (red ⚠), then in-progress (amber 🚩); newest within a tier. */
+type TaskUrgency = "escalated" | "overdue" | "inprogress";
+function taskUrgency(t: OpsTask): TaskUrgency {
+  if (t.escalatedAt) return "escalated";
+  if (t.overdue) return "overdue";
+  return "inprogress";
+}
+const TASK_RANK: Record<TaskUrgency, number> = { escalated: 3, overdue: 2, inprogress: 1 };
+function openTaskOf(tasks: OpsTask[]): OpsTask | null {
+  if (!tasks.length) return null;
+  return [...tasks].sort(
+    (a, b) =>
+      TASK_RANK[taskUrgency(b)] - TASK_RANK[taskUrgency(a)] ||
+      (a.createdAt < b.createdAt ? 1 : -1),
+  )[0];
 }
 
 /** Days from today to the customer deadline (negative = overdue); null when the
@@ -297,43 +311,8 @@ function dueBucketOf(o: operationOrderListRow): DueBucket | null {
   return "Later";
 }
 
-/** 🚨 Escalated-to-Jess — the escalate/resolved lane (mirrors isFollowUpFlagged
- *  for the follow_up lane). Drives the "For Jess" quick-view + the Action cell. */
-function isEscalatedOrder(o: operationOrderListRow): boolean {
-  let latest: { tag: string; at: string } | null = null;
-  for (const a of o.order_annotations ?? []) {
-    if (a.tag !== "escalate" && a.tag !== "resolved") continue;
-    if (!latest || a.created_at > latest.at) latest = { tag: a.tag, at: a.created_at };
-  }
-  return latest?.tag === "escalate";
-}
-
-/** The open action note for a row's Action cell — the operation team's handoff.
- *  Two lanes, escalate first (boss action before team follow-up): returns the
- *  lane + the latest unresolved note's text, or null when nothing is open. */
-function openActionFor(
-  o: operationOrderListRow,
-): { lane: "escalate" | "follow_up"; content: string } | null {
-  const latestNote = (tag: "escalate" | "follow_up"): string | null => {
-    let at = "";
-    let open = false;
-    let content = "";
-    for (const a of o.order_annotations ?? []) {
-      if (a.tag !== tag && a.tag !== "resolved") continue;
-      if (a.created_at >= at) {
-        at = a.created_at;
-        open = a.tag === tag;
-        content = a.content;
-      }
-    }
-    return open ? content : null;
-  };
-  const esc = latestNote("escalate");
-  if (esc !== null) return { lane: "escalate", content: esc };
-  const fu = latestNote("follow_up");
-  if (fu !== null) return { lane: "follow_up", content: fu };
-  return null;
-}
+// (Follow-up + Escalate-to-Jess now live in ops_tasks, keyed per order — see
+//  openTaskOf / taskUrgency above + the tasksByOrder map in the component.)
 
 /** The logistic's committed delivery ETA (ops_order_control.logistic_eta, 0180) —
  *  distinct from the customer `delivery_date` deadline. */
@@ -723,6 +702,30 @@ export default function OperationOrdersControl({ onImport }: Props) {
     return m;
   }, [stockQ.data]);
 
+  // Follow-ups are ops_tasks linked to an order (#2, Jess 2026-06-26). One shared
+  // Tasks-feed fetch (same cache key as the right-rail board) → the open (not
+  // done/cancelled) tasks grouped per order. The Action cell, the left flag icon
+  // + the Follow-up / For-Jess quick-views all read from this map.
+  const tasksQ = useQuery<OpsTasksListResponse>({
+    queryKey: TASKS_KEY,
+    queryFn: () => apiFetch("/api/ops/tasks"),
+    refetchInterval: 60_000,
+  });
+  const tasksByOrder = useMemo(() => {
+    const m = new Map<string, OpsTask[]>();
+    for (const t of tasksQ.data?.tasks ?? []) {
+      if (!t.relatedOrderId || t.status === "done" || t.status === "cancelled") continue;
+      const arr = m.get(t.relatedOrderId);
+      if (arr) arr.push(t);
+      else m.set(t.relatedOrderId, [t]);
+    }
+    return m;
+  }, [tasksQ.data]);
+  const orderTasks = (o: operationOrderListRow) => tasksByOrder.get(o.id) ?? [];
+  const hasOpenTask = (o: operationOrderListRow) => tasksByOrder.has(o.id);
+  const hasEscalatedTask = (o: operationOrderListRow) =>
+    orderTasks(o).some((t) => t.escalatedAt);
+
   const orders = useMemo(() => data?.orders ?? [], [data]);
 
   const counts = useMemo(() => {
@@ -745,8 +748,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
     () => (tab === "all" ? orders : orders.filter((o) => controlTabOf(o) === tab)),
     [orders, tab],
   );
-  const flaggedCount = useMemo(() => tabFiltered.filter(isFlaggedOrder).length, [tabFiltered]);
-  const escalateCount = useMemo(() => tabFiltered.filter(isEscalatedOrder).length, [tabFiltered]);
+  const flaggedCount = useMemo(() => tabFiltered.filter(hasOpenTask).length, [tabFiltered, tasksByOrder]);
+  const escalateCount = useMemo(() => tabFiltered.filter(hasEscalatedTask).length, [tabFiltered, tasksByOrder]);
   const etaCount = useMemo(() => tabFiltered.filter(needsEta).length, [tabFiltered]);
   const noCarrierCount = useMemo(
     () => tabFiltered.filter((o) => logisticOf(o, partnerName) === null).length,
@@ -813,8 +816,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   const visible = useMemo(() => {
     let r = tabFiltered;
-    if (flaggedOnly) r = r.filter(isFlaggedOrder);
-    if (escalateOnly) r = r.filter(isEscalatedOrder);
+    if (flaggedOnly) r = r.filter(hasOpenTask);
+    if (escalateOnly) r = r.filter(hasEscalatedTask);
     if (etaOnly) r = r.filter(needsEta);
     if (dueFilter) r = r.filter((o) => dueBucketOf(o) === dueFilter);
     if (regionFilter) r = r.filter((o) => regionBucket(o.customer_address ?? null) === regionFilter);
@@ -826,7 +829,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       if (opt) r = r.filter(opt.match);
     }
     return [...r].sort(compareByDeadline);
-  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName]);
+  }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName, tasksByOrder]);
 
   // Most-recent order/import time → shown next to the count.
   const latestIn = useMemo(() => {
@@ -1326,6 +1329,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 compact={compact}
                 partnerName={partnerName}
                 availableBySku={availableBySku}
+                tasks={orderTasks(o)}
                 selected={selected.has(o.id)}
                 onToggle={() => toggleOne(o.id)}
                 onOpen={() => setOpenOrderId(o.id)}
@@ -1827,6 +1831,7 @@ function OrderRow({
   compact,
   partnerName,
   availableBySku,
+  tasks,
   selected,
   onToggle,
   onOpen,
@@ -1838,6 +1843,8 @@ function OrderRow({
   compact: boolean;
   partnerName: Map<string, string>;
   availableBySku?: Map<string, number>;
+  /** Open follow-up ops_tasks for this order (#2) — drives the flag + Action cell. */
+  tasks: OpsTask[];
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
@@ -1850,6 +1857,7 @@ function OrderRow({
   const tags = itemTags(lines);
   const stock = stockReadiness(o, availableBySku);
   const loc = locationForAddress(o.customer_address ?? null);
+  const leadTask = openTaskOf(tasks);
 
   // Logistic: prefer the formal LP (joined name), fall back to the Inbox-triage
   // assignment resolved via the partners map.
@@ -1889,15 +1897,15 @@ function OrderRow({
           className="cursor-pointer accent-base-900 align-middle"
         />
       </td>
-      {/* Action-lane flag (Jess 2026-06-25): a left-edge scan icon — a Flag
-          (amber) for an open follow-up, a ChevronsUp (red) for an open escalate
-          — lights up only when the order has an open action; the note + Resolve
-          live in the Action column. */}
+      {/* Action-lane flag (#2): a left-edge scan icon from the order's lead
+          follow-up task — ChevronsUp (red) escalated · Flag (red) overdue · Flag
+          (amber) in-progress — lit only when an open task exists. The task detail
+          + Take-it live in the Action column + the right-rail board. */}
       <td className="px-1 py-2 text-center border-r border-base-100">
         {(() => {
-          const a = openActionFor(o);
-          if (!a) return null;
-          return a.lane === "escalate" ? (
+          if (!leadTask) return null;
+          const u = taskUrgency(leadTask);
+          return u === "escalated" ? (
             <ChevronsUp
               size={14}
               strokeWidth={2.5}
@@ -1908,8 +1916,8 @@ function OrderRow({
             <Flag
               size={13}
               strokeWidth={2}
-              className="text-warning fill-current inline align-middle"
-              aria-label="Open follow-up"
+              className={`fill-current inline align-middle ${u === "overdue" ? "text-destructive" : "text-warning"}`}
+              aria-label={u === "overdue" ? "Overdue follow-up" : "Open follow-up"}
             />
           );
         })()}
@@ -2056,130 +2064,101 @@ function OrderRow({
           </div>
         )}
       </td>
-      {/* Action — the operation team's own handoff (🚩 follow-up / ⏫ escalate
-          note); separate from the 4 party Remarks. */}
-      <ActionCell order={o} />
+      {/* Action — the order's follow-up task(s): a follow-up IS an ops_task
+          (#2), so this cell + the right-rail board are the same data. */}
+      <ActionCell order={o} tasks={tasks} />
       {/* Remark — the 4 operator remarks shown in-cell; click to edit in place. */}
       <RemarkCell order={o} />
     </tr>
   );
 }
 
-/** Action cell — the operation team's internal next-step (Jess 2026-06-25),
- *  DISTINCT from the 4 per-party Remarks. Shows the latest open annotation (⏫
- *  Escalate to Jess first, then 🚩 Follow up) + a one-click ✓ Resolve. An empty
- *  cell's "Flag" opens an inline box to TYPE the actual next-action (Jess: don't
- *  write a useless placeholder) → saved as a follow_up note. Escalate stays in
- *  the drawer timeline. Self-contained mutation, like RemarkCell. */
-function ActionCell({ order }: { order: operationOrderListRow }) {
-  const open = openActionFor(order);
-  const add = useAddAnnotation();
-  const [adding, setAdding] = useState(false);
-  const [note, setNote] = useState("");
-  const resolve = () => {
-    if (add.isPending) return;
-    add.mutate(
-      { orderId: order.id, content: "Resolved", tag: "resolved" },
-      { onSuccess: () => toast.success("Resolved"), onError: () => toast.error("Couldn't update — retry") },
-    );
-  };
-  const saveFollowUp = () => {
-    const text = note.trim();
-    if (!text || add.isPending) return;
-    add.mutate(
-      { orderId: order.id, content: text, tag: "follow_up" },
-      {
-        onSuccess: () => {
-          toast.success("Follow-up added");
-          setAdding(false);
-          setNote("");
-        },
-        onError: () => toast.error("Couldn't add — retry"),
-      },
-    );
-  };
+/** Action cell (#2) — the order's follow-up task(s). A follow-up IS an ops_task
+ *  (related_order_id), so this cell + the right-rail Tasks board are the SAME
+ *  data. Shows the lead open task (icon by urgency · title · who's on it · Take
+ *  it / Done) + a flag that opens the FollowUpForm; an empty cell's "Flag" opens
+ *  it too. Escalate + the structured report live in the form. */
+function ActionCell({ order, tasks }: { order: operationOrderListRow; tasks: OpsTask[] }) {
+  const lead = openTaskOf(tasks);
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const actMut = useMutation({
+    mutationFn: (v: { id: string; action: "claim" | "done" }) =>
+      apiFetch(`/api/ops/tasks/${v.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: v.action }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: TASKS_KEY }),
+    onError: () => toast.error("Couldn't update — retry"),
+  });
+  const refNo = (order.source_ref ?? []).filter(Boolean)[0] ?? null;
+  const u = lead ? taskUrgency(lead) : null;
   return (
     <td className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
-      {open ? (
+      {lead ? (
         <div className="flex items-start gap-1.5">
-          {open.lane === "escalate" ? (
-            <ChevronsUp
-              size={13}
-              strokeWidth={2.5}
-              className="text-destructive shrink-0 mt-px"
-              aria-label="Escalated to Jess"
-            />
+          {u === "escalated" ? (
+            <ChevronsUp size={13} strokeWidth={2.5} className="text-destructive shrink-0 mt-px" aria-label="Escalated to Jess" />
           ) : (
             <Flag
               size={12}
               strokeWidth={2}
-              className="text-warning fill-current shrink-0 mt-px"
+              className={`fill-current shrink-0 mt-px ${u === "overdue" ? "text-destructive" : "text-warning"}`}
               aria-label="Follow up"
             />
           )}
           <div className="min-w-0 flex-1">
-            <div
-              className="text-[10px] leading-[1.3] text-base-700 line-clamp-2"
-              title={open.content}
-            >
-              {open.content}
+            <div className="text-[10px] leading-[1.3] text-base-700 line-clamp-2" title={lead.title}>
+              {lead.title}
             </div>
-            <button
-              type="button"
-              disabled={add.isPending}
-              onClick={resolve}
-              className="mt-0.5 inline-flex items-center gap-0.5 text-[9px] font-medium text-base-400 hover:text-success disabled:opacity-50"
-            >
-              <Check size={10} strokeWidth={2.5} /> Resolve
-            </button>
-          </div>
-        </div>
-      ) : adding ? (
-        <div className="flex flex-col gap-1">
-          <input
-            autoFocus
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveFollowUp();
-              if (e.key === "Escape") {
-                setAdding(false);
-                setNote("");
-              }
-            }}
-            placeholder="What to follow up?"
-            className="w-full px-1.5 py-0.5 border border-base-200 rounded text-[10px] bg-white outline-none focus:border-base-700"
-          />
-          <div className="flex justify-end gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                setAdding(false);
-                setNote("");
-              }}
-              className="text-[9px] text-base-500 hover:text-base-900"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!note.trim() || add.isPending}
-              onClick={saveFollowUp}
-              className="text-[9px] font-semibold text-primary hover:underline disabled:opacity-40"
-            >
-              {add.isPending ? "…" : "Save"}
-            </button>
+            <div className="mt-0.5 flex items-center gap-x-1.5 gap-y-0.5 text-[9px] text-base-400 flex-wrap">
+              {lead.status === "open" ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={actMut.isPending}
+                    onClick={() => actMut.mutate({ id: lead.id, action: "claim" })}
+                    className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline disabled:opacity-50"
+                  >
+                    <Hand size={10} /> Take it
+                  </button>
+                  {lead.assignedToName && <span>→ {lead.assignedToName}</span>}
+                </>
+              ) : (
+                <span>{lead.claimedByName ?? "Someone"} on it</span>
+              )}
+              <button
+                type="button"
+                disabled={actMut.isPending}
+                onClick={() => actMut.mutate({ id: lead.id, action: "done" })}
+                className="inline-flex items-center gap-0.5 hover:text-success disabled:opacity-50"
+              >
+                <Check size={10} strokeWidth={2.5} /> Done
+              </button>
+              {tasks.length > 1 && <span className="text-base-300">+{tasks.length - 1} more</span>}
+              <button
+                type="button"
+                onClick={() => setShowForm(true)}
+                className="text-base-300 hover:text-warning"
+                aria-label="Add another follow-up"
+              >
+                <Plus size={11} />
+              </button>
+            </div>
           </div>
         </div>
       ) : (
         <button
           type="button"
-          onClick={() => setAdding(true)}
-          title="Add a follow-up — type what the next operator should do"
+          onClick={() => setShowForm(true)}
+          title="Add a follow-up for this order"
           className="inline-flex items-center gap-1 text-[10px] text-base-300 hover:text-warning"
         >
           <Flag size={11} strokeWidth={2} /> Flag
         </button>
+      )}
+      {showForm && (
+        <FollowUpForm orderId={order.id} so={order.so} refNo={refNo} onClose={() => setShowForm(false)} />
       )}
     </td>
   );
