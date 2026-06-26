@@ -6,6 +6,8 @@ import {
   PAYMENT_STATUSES,
   STORAGE_RATES,
   computeStorageFee,
+  summarizePayments,
+  type PaymentKind,
   type UpdateOpsOrderControlInput,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
@@ -26,6 +28,13 @@ interface RawCtrl {
   payment_status: string | null;
   storage_from: string | null;
   storage_fee_override: number | string | null;
+  balance_due_date: string | null;
+  storage_collected_at: string | null;
+  storage_waiver_status: string | null;
+}
+interface RawLedgerEntry {
+  amount: number | string;
+  kind: PaymentKind;
 }
 interface RawPaymentRow {
   id: string;
@@ -37,6 +46,7 @@ interface RawPaymentRow {
   delivered_at: string | null;
   source_ref: string[] | null;
   order_lines: { sku: string; qty: number }[] | null;
+  order_payments: RawLedgerEntry[] | null;
   ops_order_control: RawCtrl[] | RawCtrl | null;
 }
 
@@ -97,6 +107,13 @@ interface Row {
   /** computed (or overridden) storage fee + breakdown */
   storage: { msbf: number; sof: number; total: number; days: number };
   effectiveStorage: number;
+  /** Ledger (0184): goods paid (payment+deposit) + storage collected. */
+  goodsPaid: number;
+  storageCollected: boolean;
+  goodsOwing: number;
+  storageOwing: number;
+  dueDate: string | null;
+  overdue: boolean;
   owing: number;
 }
 
@@ -138,6 +155,21 @@ export default function OperationPayments() {
       const storage = computeStorageFee({ startDate: start, asOf, hasMsbf, hasSof });
       const effectiveStorage = storageOverride ?? storage.total;
       const balance = num(ctrl?.balance);
+      // Net the payment ledger (0184): goods paid reduces the balance owing;
+      // a stamped storage_collected_at means the storage fee is cleared.
+      const ledger = (r.order_payments ?? []).map((p) => ({
+        amount: Number(p.amount) || 0,
+        kind: p.kind,
+      }));
+      const sum = summarizePayments(ledger, balance ?? 0);
+      const goodsPaid = sum.byKind.payment + sum.byKind.deposit;
+      const storageCollected = ctrl?.storage_collected_at != null;
+      const goodsOwing = balance != null ? Math.max(0, balance - goodsPaid) : 0;
+      const storageOwing = storageCollected
+        ? 0
+        : Math.max(0, effectiveStorage - sum.storageCollected);
+      const dueDate = ctrl?.balance_due_date ?? null;
+      const overdue = !!dueDate && dueDate < today && goodsOwing > 0;
       return {
         id: r.id,
         so: r.so,
@@ -154,7 +186,13 @@ export default function OperationPayments() {
         storageOverride,
         storage,
         effectiveStorage,
-        owing: (balance ?? 0) + effectiveStorage,
+        goodsPaid,
+        storageCollected,
+        goodsOwing,
+        storageOwing,
+        dueDate,
+        overdue,
+        owing: goodsOwing + storageOwing,
       };
     });
   }, [data, today]);
@@ -165,8 +203,7 @@ export default function OperationPayments() {
         ? rows
         : rows.filter(
             (x) =>
-              (x.balance ?? 0) > 0 ||
-              x.effectiveStorage > 0 ||
+              x.owing > 0 ||
               (x.paymentStatus != null && x.paymentStatus.toLowerCase() !== "paid"),
           );
     // Most owing first.
@@ -174,13 +211,18 @@ export default function OperationPayments() {
   }, [rows, view]);
 
   const totals = useMemo(() => {
-    let balance = 0;
-    let storage = 0;
+    let goodsOwing = 0;
+    let storageOwing = 0;
     for (const r of visible) {
-      balance += r.balance ?? 0;
-      storage += r.effectiveStorage;
+      goodsOwing += r.goodsOwing;
+      storageOwing += r.storageOwing;
     }
-    return { balance, storage, owing: balance + storage, count: visible.length };
+    return {
+      balance: goodsOwing,
+      storage: storageOwing,
+      owing: goodsOwing + storageOwing,
+      count: visible.length,
+    };
   }, [visible]);
 
   const save = (orderId: string, patch: UpdateOpsOrderControlInput) =>
@@ -340,6 +382,9 @@ function PaymentRow({ r, onSave }: { r: Row; onSave: (id: string, patch: UpdateO
         {r.storageOverride != null && (
           <div className="text-[10px] text-warning mt-0.5">manual (auto {rm(r.storage.total)})</div>
         )}
+        {r.storageCollected && (
+          <div className="text-[10px] text-success mt-0.5">✓ collected</div>
+        )}
       </td>
       {/* Balance — RM owing, editable (from AutoCount import or keyed) */}
       <td className="px-4 py-2.5 whitespace-nowrap">
@@ -350,6 +395,15 @@ function PaymentRow({ r, onSave }: { r: Row; onSave: (id: string, patch: UpdateO
           prefix="RM"
           width={96}
         />
+        {r.goodsPaid > 0 && (
+          <div className="text-[10px] text-success mt-0.5">− {rm(r.goodsPaid)} paid</div>
+        )}
+        {r.dueDate && (
+          <div className={`text-[10px] mt-0.5 ${r.overdue ? "text-destructive font-semibold" : "text-base-400"}`}>
+            {r.overdue ? "overdue " : "due "}
+            {fmtDateShort(r.dueDate)}
+          </div>
+        )}
       </td>
       <td className="px-4 py-2.5 whitespace-nowrap font-semibold tabular-nums text-base-900">
         {rm(r.owing)}

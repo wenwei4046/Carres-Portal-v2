@@ -29,8 +29,11 @@ paymentsRouter.get("/", async (c) => {
     .from("orders")
     // ops_order_control is a 1:1 overlay (its order_id PK FKs orders.id); the
     // PostgREST embed comes back as an array — the FE takes [0].
+    // order_payments embed (0184) lets the FE net the ledger against the
+    // balance + show what's been collected; the extra control cols carry the
+    // due-date + storage-gate state for the overdue / collected badges.
     .select(
-      "id, so, status, operation_stage, customer_name, delivery_date, delivery_date_tbd, delivered_at, source_ref, order_lines(sku, qty), ops_order_control(balance, payment_status, storage_from, storage_fee_override)",
+      "id, so, status, operation_stage, customer_name, delivery_date, delivery_date_tbd, delivered_at, source_ref, order_lines(sku, qty), order_payments(amount, kind), ops_order_control(balance, payment_status, storage_from, storage_fee_override, balance_due_date, storage_collected_at, storage_waiver_status)",
     )
     .in("status", ["place", "proceed_order", "delivered"])
     .order("delivery_date", { ascending: true, nullsFirst: false })
