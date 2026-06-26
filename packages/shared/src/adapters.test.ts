@@ -1,20 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
   catalogOptionPoolFromRow,
+  deliveryFeeConfigFromRow,
   modelSofaCompartmentFromRow,
   orderInputToRpcPayload,
   orderSupplierThreadFromRow,
   productSkuFromRow,
   sofaComboFromRow,
   sofaCompartmentFromRow,
+  specialDeliveryFeeRuleFromRow,
 } from "./adapters";
 import type {
   CatalogOptionPoolRow,
+  DeliveryFeeConfigRow,
   ModelSofaCompartmentRow,
   OrderSupplierThreadRow,
   ProductSkuRow,
   SofaComboPricingRow,
   SofaCompartmentRow,
+  SpecialDeliveryFeeRuleRow,
 } from "./db-types";
 import type { CreateOrderInput } from "./schemas/orders";
 
@@ -545,5 +549,90 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
   it("nulls compartmentId for a non-compartment SKU", () => {
     const out = productSkuFromRow(baseSkuRow({ compartment_id: null }));
     expect(out.compartmentId).toBeNull();
+  });
+});
+
+describe("deliveryFeeConfigFromRow (0184)", () => {
+  function baseRow(over: Partial<DeliveryFeeConfigRow> = {}): DeliveryFeeConfigRow {
+    return {
+      id: 1,
+      // PostgREST serializes numeric as a string — Number() must normalise it.
+      base_fee: "50.00" as unknown as number,
+      cross_category_fee: "30.00" as unknown as number,
+      charged_categories: ["sofa", "mattress", "bedframe"],
+      mattress_bedframe_lead_days: 14,
+      sofa_lead_days: 21,
+      updated_at: "2026-06-26T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("coerces numeric fees + lead days and passes charged categories through; drops id", () => {
+    const out = deliveryFeeConfigFromRow(baseRow());
+    expect(out).toEqual({
+      baseFee: 50,
+      crossCategoryFee: 30,
+      chargedCategories: ["sofa", "mattress", "bedframe"],
+      mattressBedframeLeadDays: 14,
+      sofaLeadDays: 21,
+    });
+    // no singleton id leaks into the domain shape
+    expect(out).not.toHaveProperty("id");
+  });
+
+  it("defaults a null charged_categories to []", () => {
+    const out = deliveryFeeConfigFromRow(
+      baseRow({ charged_categories: null as unknown as string[] }),
+    );
+    expect(out.chargedCategories).toEqual([]);
+  });
+});
+
+describe("specialDeliveryFeeRuleFromRow (0184)", () => {
+  function baseRow(over: Partial<SpecialDeliveryFeeRuleRow> = {}): SpecialDeliveryFeeRuleRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000de001",
+      target: [
+        { scope: "model", modelId: "00000000-0000-0000-0000-00000000000a" },
+      ] as unknown as SpecialDeliveryFeeRuleRow["target"],
+      standalone_fee: "500.00" as unknown as number,
+      cross_cat_followup_fee: "300.00" as unknown as number,
+      label: "Full-latex transport",
+      active: true,
+      sort_order: 0,
+      created_at: "2026-06-26T00:00:00Z",
+      updated_at: "2026-06-26T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("parses the RuleTarget[] and coerces numeric fees", () => {
+    const out = specialDeliveryFeeRuleFromRow(baseRow());
+    expect(out.id).toBe("00000000-0000-0000-0000-0000000de001");
+    expect(out.target).toEqual([
+      { scope: "model", modelId: "00000000-0000-0000-0000-00000000000a" },
+    ]);
+    expect(out.standaloneFee).toBe(500);
+    expect(out.crossCategoryFollowupFee).toBe(300);
+    expect(out.label).toBe("Full-latex transport");
+    expect(out.active).toBe(true);
+    expect(out.sortOrder).toBe(0);
+  });
+
+  it("drops malformed target entries via parseRuleTargets and nulls a missing label", () => {
+    const out = specialDeliveryFeeRuleFromRow(
+      baseRow({
+        // a non-combo entry with no modelId is unusable → dropped
+        target: [
+          { scope: "model" },
+          { scope: "variant", modelId: "m1", sizeCodes: ["queen"] },
+        ] as unknown as SpecialDeliveryFeeRuleRow["target"],
+        label: null,
+      }),
+    );
+    expect(out.target).toEqual([{ scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] }]);
+    expect(out.label).toBeNull();
   });
 });

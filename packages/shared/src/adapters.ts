@@ -4,6 +4,7 @@
 import type * as DB from "./db-types";
 import type * as D from "./domain";
 import type { CreateOrderInput } from "./schemas/orders";
+import { parseRuleTargets } from "./rule-target";
 
 export const dealerFromRow = (r: DB.DealerRow): D.Dealer => ({
   id: r.id,
@@ -138,6 +139,40 @@ export const floorConfigFromRow = (r: DB.FloorConfigRow): D.FloorConfig => ({
   id: r.id,
   freeUpToFloor: r.free_up_to_floor,
   perFloorPerItem: Number(r.per_floor_per_item),
+});
+
+/**
+ * Maps a `delivery_fee_config` row to the camelCase domain shape (0184). Fees
+ * are Postgres numeric — `Number()` normalises the string|number PostgREST
+ * surfaces them as. The singleton `id` is dropped (the domain shape doubles as
+ * the pure `computeDeliveryFee` config); `charged_categories` + lead days pass
+ * through. Lead days are integers, also `Number()`-coerced for parity.
+ */
+export const deliveryFeeConfigFromRow = (
+  r: DB.DeliveryFeeConfigRow,
+): D.DeliveryFeeConfig => ({
+  baseFee: Number(r.base_fee),
+  crossCategoryFee: Number(r.cross_category_fee),
+  chargedCategories: r.charged_categories ?? [],
+  mattressBedframeLeadDays: Number(r.mattress_bedframe_lead_days),
+  sofaLeadDays: Number(r.sofa_lead_days),
+});
+
+/**
+ * Maps a `special_delivery_fee_rules` row to the camelCase domain shape (0184).
+ * `target` jsonb is cleaned via `parseRuleTargets` (drops malformed entries);
+ * fees are Postgres numeric → `Number()`. `label` stays null when unset.
+ */
+export const specialDeliveryFeeRuleFromRow = (
+  r: DB.SpecialDeliveryFeeRuleRow,
+): D.SpecialDeliveryFeeRule => ({
+  id: r.id,
+  target: parseRuleTargets(r.target),
+  standaloneFee: Number(r.standalone_fee),
+  crossCategoryFollowupFee: Number(r.cross_cat_followup_fee),
+  label: r.label ?? null,
+  active: r.active,
+  sortOrder: Number(r.sort_order),
 });
 
 // 0182 — global option pool entry (supplier_category / bedframe_size /

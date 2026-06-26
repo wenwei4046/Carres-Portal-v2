@@ -3,6 +3,8 @@
  * These are snake_case (Postgres convention). Use the camelCase domain types in
  * `domain.ts` for UI code.
  */
+import type { RuleTarget } from "./rule-target";
+
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
   | "operation" | "supplier" | "partner" | "finance" | "bd";
@@ -342,6 +344,45 @@ export interface FloorConfigRow {
   free_up_to_floor: number;
   per_floor_per_item: number;
   updated_at: string;
+}
+
+/**
+ * `delivery_fee_config` (migration 0184, 2990s Products parity Phase 6). The
+ * principal-owned delivery TRIP fee singleton (`id` always 1). `base_fee` is
+ * charged once per order with ≥1 charged-category line; `cross_category_fee` is
+ * added once for a sofa × (mattress|bedframe) cart; `charged_categories` selects
+ * which categories incur the base fee. Numeric MYR (Postgres numeric → `Number()`
+ * in the adapter). Seeds 0/0 → dormant.
+ */
+export interface DeliveryFeeConfigRow {
+  id: number;
+  base_fee: number;
+  cross_category_fee: number;
+  charged_categories: string[];
+  mattress_bedframe_lead_days: number;
+  sofa_lead_days: number;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `special_delivery_fee_rules` (migration 0184). A per-RuleTarget override of the
+ * base delivery fee. `target` is a RuleTarget[] jsonb (scopes
+ * model|variant|combo|compartment); the adapter runs `parseRuleTargets` to drop
+ * malformed entries. Fees are numeric MYR. Principal-owned; `active` + `sort_order`
+ * mirror the catalog convention.
+ */
+export interface SpecialDeliveryFeeRuleRow {
+  id: string;
+  target: RuleTarget[];
+  standalone_fee: number;
+  cross_cat_followup_fee: number;
+  label: string | null;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
 }
 
 export interface WarehouseRow {

@@ -411,6 +411,70 @@ export type SofaComboCreateInput = z.infer<typeof sofaComboCreateInput>;
 export const sofaComboPatchInput = sofaComboCreateInput.partial().strict();
 export type SofaComboPatchInput = z.infer<typeof sofaComboPatchInput>;
 
+// ---------------------------------------------------------------------------
+// 0184 — delivery TRIP fee subsystem (2990s Products parity Phase 6). The
+// principal-owned config singleton + per-RuleTarget special overrides.
+// Principal-only writes. One schema, two consumers (§9.5): the API validates
+// these and the Maintenance UI reuses the exact same shapes. The floor STAIR
+// surcharge (floorConfig) is KEPT + coexists; the delivery fee is ADDITIVE.
+// ---------------------------------------------------------------------------
+
+/** The `delivery_fee_config` singleton DTO (camelCased; the `id` is dropped, the
+ *  shape doubles as the pure `computeDeliveryFee` config). */
+export const deliveryFeeConfigSchema = z.object({
+  baseFee: z.number().nonnegative(),
+  crossCategoryFee: z.number().nonnegative(),
+  chargedCategories: z.array(z.string()),
+  mattressBedframeLeadDays: z.number().int().nonnegative(),
+  sofaLeadDays: z.number().int().nonnegative(),
+});
+export type DeliveryFeeConfigDto = z.infer<typeof deliveryFeeConfigSchema>;
+
+/** Patch the config singleton — every field optional + nonnegative. */
+export const deliveryFeeConfigPatchInput = deliveryFeeConfigSchema.partial().strict();
+export type DeliveryFeeConfigPatchInput = z.infer<typeof deliveryFeeConfigPatchInput>;
+
+/** RuleTarget scope enum (mirrors the `RuleTargetScope` union). */
+export const ruleTargetScopeSchema = z.enum(["model", "variant", "combo", "compartment"]);
+export type RuleTargetScopeValue = z.infer<typeof ruleTargetScopeSchema>;
+
+/** One RuleTarget entry (mirrors the `RuleTarget` shared type). `modelId` may be
+ *  '' for a model-agnostic combo entry; the refinement lists are OR'd within. */
+export const ruleTargetSchema = z.object({
+  scope: ruleTargetScopeSchema,
+  modelId: z.string(),
+  sizeCodes: z.array(z.string()).optional(),
+  comboIds: z.array(z.string()).optional(),
+  compartments: z.array(z.string()).optional(),
+});
+export type RuleTargetDto = z.infer<typeof ruleTargetSchema>;
+
+/** A `special_delivery_fee_rules` row DTO (mirrors `SpecialDeliveryFeeRule`). */
+export const specialDeliveryFeeRuleSchema = z.object({
+  id: z.string().uuid(),
+  target: z.array(ruleTargetSchema),
+  standaloneFee: z.number(),
+  crossCategoryFollowupFee: z.number(),
+  label: z.string().nullable(),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type SpecialDeliveryFeeRuleDto = z.infer<typeof specialDeliveryFeeRuleSchema>;
+
+/** Create / patch a special delivery fee rule. `target` requires ≥1 entry; fees
+ *  are nonnegative; `label` / `active` / `sortOrder` are optional. */
+export const specialDeliveryFeeRuleInput = z
+  .object({
+    target: z.array(ruleTargetSchema).min(1),
+    standaloneFee: z.number().nonnegative(),
+    crossCategoryFollowupFee: z.number().nonnegative(),
+    label: z.string().trim().max(200).nullable().optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type SpecialDeliveryFeeRuleInput = z.infer<typeof specialDeliveryFeeRuleInput>;
+
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
   skus: z.array(productSkuSchema),
@@ -434,6 +498,10 @@ export const catalogResponseSchema = z.object({
   specialAddons: z.array(specialAddonSchema).optional(),
   // 0182 — global option pools (additive, OPTIONAL). Pre-0182 clients unaffected.
   optionPools: z.array(catalogOptionPoolSchema).optional(),
+  // 0184 — delivery fee config + special rules (additive, OPTIONAL). Pre-0184
+  // clients that don't read these are wholly unaffected.
+  deliveryFeeConfig: deliveryFeeConfigSchema.optional(),
+  specialDeliveryFeeRules: z.array(specialDeliveryFeeRuleSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 

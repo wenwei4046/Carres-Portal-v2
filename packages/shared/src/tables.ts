@@ -34,6 +34,12 @@ export const SOFA_FABRICS     = "sofa_fabrics" as const;
 export const ADDONS           = "addons" as const;
 export const FLOOR_CONFIG     = "floor_config" as const;
 
+// 0184 — 2990s Products parity Phase 6: delivery TRIP fee config singleton +
+// per-RuleTarget special overrides. (The floor STAIR surcharge in FLOOR_CONFIG
+// is KEPT + coexists; the delivery fee is ADDITIVE.)
+export const DELIVERY_FEE_CONFIG        = "delivery_fee_config" as const;
+export const SPECIAL_DELIVERY_FEE_RULES = "special_delivery_fee_rules" as const;
+
 // 0176 — fabric tier pricing config + per-model overrides.
 export const FABRIC_TIER_ADDON_CONFIG    = "fabric_tier_addon_config" as const;
 export const MODEL_FABRIC_TIER_OVERRIDES = "model_fabric_tier_overrides" as const;
