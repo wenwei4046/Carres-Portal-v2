@@ -322,6 +322,7 @@ export default function CatalogStep({
             onProceed();
           }}
           onClose={() => onCartOpenChange(false)}
+          catalog={catalog}
         />
       )}
     </div>

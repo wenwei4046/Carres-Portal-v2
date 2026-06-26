@@ -100,6 +100,25 @@ describe("recomputeSpecialAddonLines", () => {
     expect(r.status).toBe("server_error");
   });
 
+  it("F2 — a freed flat line (attrs.free_item) with specials stays at RM0 (no surcharge re-added)", async () => {
+    const line: RecomputableLine = {
+      sku: "BF-K",
+      qty: 1,
+      attrs: {
+        free_item: { campaignId: "c1", name: "GWP" },
+        specials: [{ code: "right-drawer", choiceLabels: ['8"'] }],
+        specials_total: 40,
+      },
+      unitPrice: 0,
+    };
+    const r = await recomputeSpecialAddonLines(mockSb([row()]), [line]);
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    // Locked at RM0 — passed through verbatim, not re-priced.
+    expect(r.lines[0]).toBe(line);
+    expect(r.lines[0].unitPrice).toBe(0);
+  });
+
   it("supports a negative surcharge (deduction) folding into the line", async () => {
     const noPanel = row({ code: "no-side-panel", selling_price: -40, option_groups: [] });
     const line = lineWith([{ code: "no-side-panel", choiceLabels: [] }], -40, 1960);

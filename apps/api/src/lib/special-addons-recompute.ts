@@ -64,13 +64,23 @@ function hasSpecials(attrs: Record<string, unknown> | null): boolean {
   return Array.isArray(s) && s.length > 0;
 }
 
+/** A line already FREE (campaign-freed `attrs.free_item`, or an appended RM0
+ *  gift `attrs.free_gift`) is LOCKED at RM0 — Phase 7 (F2). Any price recompute
+ *  must skip it so a special surcharge is never re-added onto a freed line. */
+function isFreeLine(attrs: Record<string, unknown> | null): boolean {
+  if (!attrs) return false;
+  return Boolean(attrs.free_item) || Boolean(attrs.free_gift);
+}
+
 export async function recomputeSpecialAddonLines(
   sb: SupabaseClient,
   lines: RecomputableLine[],
 ): Promise<SpecialRecomputeOutcome> {
   // 1. Gather every referenced code; bail early if no line carries specials.
+  //    A FREE line is locked at RM0 (F2) — skip it (no surcharge re-add).
   const codes = new Set<string>();
   for (const line of lines) {
+    if (isFreeLine(line.attrs)) continue;
     if (!hasSpecials(line.attrs)) continue;
     const parsed = specialsAttrsSchema.safeParse(line.attrs);
     if (!parsed.success) {
@@ -97,10 +107,11 @@ export async function recomputeSpecialAddonLines(
     defsByCode.set(def.code, def);
   }
 
-  // 3. Verify + nudge each specials line.
+  // 3. Verify + nudge each specials line. A FREE line (locked at RM0) passes
+  //    through verbatim — never re-priced (F2).
   const out: RecomputableLine[] = [];
   for (const line of lines) {
-    if (!hasSpecials(line.attrs)) {
+    if (isFreeLine(line.attrs) || !hasSpecials(line.attrs)) {
       out.push(line);
       continue;
     }

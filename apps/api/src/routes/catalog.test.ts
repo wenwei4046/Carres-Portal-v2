@@ -4051,3 +4051,362 @@ describe("0184 — delivery fee (GET bundle + principal-gated CRUD)", () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 0185 — Default Free Gifts (per model) + Free Item Campaigns (GWP). GET bundle
+// exposure + principal-gated CRUD. Mirrors the 0184 delivery-fee block: buildSb
+// for the read bundle, buildWriteSb for the writes.
+// ---------------------------------------------------------------------------
+describe("0185 — free gifts + free item campaigns (GET bundle + principal-gated CRUD)", () => {
+  const CAMP_A = "aa000000-0000-4000-8000-0000000000a1"; // active
+  const CAMP_B = "bb000000-0000-4000-8000-0000000000b2"; // inactive
+  const campRow = (over: Record<string, unknown>) => ({
+    id: CAMP_A,
+    name: "Active GWP",
+    active: true,
+    max_free_qty: 2,
+    eligible: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+    created_at: "2026-02-01T00:00:00Z",
+    updated_at: "2026-02-01T00:00:00Z",
+    updated_by: null,
+    ...over,
+  });
+
+  it("GET /api/catalog returns modelDefaultFreeGifts (mapped) + freeItemCampaigns (active-first)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        product_models: [
+          {
+            id: MODEL_ID_LIVE,
+            category: "mattress",
+            model_key: "carres-classic",
+            name: "Classic",
+            blurb: null,
+            colors: null,
+            gaps: null,
+            sofa_mode: null,
+            discontinued_at: null,
+          },
+        ],
+        product_skus: [],
+        sofa_fabrics: [],
+        addons: [],
+        floor_config: [
+          { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
+        ],
+        fabric_tier_addon_config: [
+          { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+        ],
+        model_fabric_tier_overrides: [],
+        model_default_free_gifts: [
+          {
+            model_id: MODEL_ID_LIVE,
+            gifts: [{ giftSku: "ACC-PILLOW", qty: 2, label: "Free pillow" }],
+            updated_at: "2026-02-01T00:00:00Z",
+            updated_by: null,
+          },
+        ],
+        free_item_campaigns: [
+          campRow({ id: CAMP_B, name: "Retired GWP", active: false, created_at: "2026-01-01T00:00:00Z" }),
+          campRow({ id: CAMP_A, name: "Active GWP", active: true, created_at: "2026-02-01T00:00:00Z" }),
+        ],
+      }),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+
+    // Gift set mapped camelCase; malformed entries (none here) would be dropped.
+    expect(body.modelDefaultFreeGifts).toHaveLength(1);
+    expect(body.modelDefaultFreeGifts?.[0]?.modelId).toBe(MODEL_ID_LIVE);
+    expect(body.modelDefaultFreeGifts?.[0]?.gifts[0]).toMatchObject({
+      giftSku: "ACC-PILLOW",
+      qty: 2,
+      label: "Free pillow",
+    });
+
+    // Both campaigns returned (inactive included); active-first ordering.
+    expect(body.freeItemCampaigns).toHaveLength(2);
+    expect(body.freeItemCampaigns?.map((c) => c.id)).toEqual([CAMP_A, CAMP_B]);
+    expect(body.freeItemCampaigns?.find((c) => c.id === CAMP_A)).toMatchObject({
+      name: "Active GWP",
+      active: true,
+      maxFreeQty: 2,
+      eligible: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+    });
+  });
+
+  it("GET /api/catalog ships empty arrays when none are authored (dormant)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        product_models: [],
+        product_skus: [],
+        sofa_fabrics: [],
+        addons: [],
+        floor_config: [{ id: 1, free_up_to_floor: 2, per_floor_per_item: 50 }],
+        fabric_tier_addon_config: [
+          { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+        ],
+        model_fabric_tier_overrides: [],
+      }),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.modelDefaultFreeGifts).toEqual([]);
+    expect(body.freeItemCampaigns).toEqual([]);
+  });
+
+  // ----- PUT /model-free-gifts/:modelId -----
+
+  it("PUT /model-free-gifts/:modelId — principal upserts → 200 (camel→snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          model_id: MODEL_ID_LIVE,
+          gifts: [{ giftSku: "ACC-PILLOW", qty: 2 }],
+          updated_at: "2026-02-01T00:00:00Z",
+          updated_by: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-free-gifts/${MODEL_ID_LIVE}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ gifts: [{ giftSku: "ACC-PILLOW", qty: 2 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const up = recorded.find((r) => r.op === "upsert");
+    expect(up?.table).toBe("model_default_free_gifts");
+    expect(up?.payload).toMatchObject({
+      model_id: MODEL_ID_LIVE,
+      gifts: [{ giftSku: "ACC-PILLOW", qty: 2 }],
+    });
+    const body = (await res.json()) as { modelDefaultFreeGifts: { modelId: string; gifts: unknown[] } };
+    expect(body.modelDefaultFreeGifts).toMatchObject({
+      modelId: MODEL_ID_LIVE,
+      gifts: [{ giftSku: "ACC-PILLOW", qty: 2 }],
+    });
+  });
+
+  it("PUT /model-free-gifts/:modelId — empty gifts clears (delete) → 200", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-free-gifts/${MODEL_ID_LIVE}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ gifts: [] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const del = recorded.find((r) => r.op === "delete");
+    expect(del?.table).toBe("model_default_free_gifts");
+    const body = (await res.json()) as { modelDefaultFreeGifts: { modelId: string; gifts: unknown[] } };
+    expect(body.modelDefaultFreeGifts).toEqual({ modelId: MODEL_ID_LIVE, gifts: [] });
+  });
+
+  it("PUT /model-free-gifts/:modelId — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-free-gifts/${MODEL_ID_LIVE}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ gifts: [{ giftSku: "ACC-PILLOW", qty: 1 }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  // ----- DELETE /model-free-gifts/:modelId -----
+
+  it("DELETE /model-free-gifts/:modelId — HARD delete → 200 { ok: true }", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-free-gifts/${MODEL_ID_LIVE}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const del = recorded.find((r) => r.op === "delete");
+    expect(del?.table).toBe("model_default_free_gifts");
+  });
+
+  it("DELETE /model-free-gifts/:modelId — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/model-free-gifts/${MODEL_ID_LIVE}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  // ----- POST /free-item-campaigns -----
+
+  it("POST /free-item-campaigns — principal inserts → 201 (camel→snake; active defaults false)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: campRow({ active: false, max_free_qty: 1 }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/free-item-campaigns", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "New GWP",
+          eligible: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("free_item_campaigns");
+    expect(ins?.payload).toMatchObject({
+      name: "New GWP",
+      active: false,
+      max_free_qty: 1,
+      eligible: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+    });
+    const body = (await res.json()) as { freeItemCampaign: { name: string; active: boolean } };
+    expect(body.freeItemCampaign).toMatchObject({ active: false, maxFreeQty: 1 });
+  });
+
+  it("POST /free-item-campaigns — empty eligible → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/free-item-campaigns", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Bad GWP", eligible: [] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("POST /free-item-campaigns — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/free-item-campaigns", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "New GWP",
+          eligible: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  // ----- PATCH /free-item-campaigns/:id -----
+
+  it("PATCH /free-item-campaigns/:id — principal partial update → 200 (camel→snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: campRow({ active: true, max_free_qty: 3 }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/free-item-campaigns/${CAMP_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ active: true, maxFreeQty: 3 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.table).toBe("free_item_campaigns");
+    expect(upd?.payload).toMatchObject({ active: true, max_free_qty: 3 });
+    const body = (await res.json()) as { freeItemCampaign: { active: boolean; maxFreeQty: number } };
+    expect(body.freeItemCampaign).toMatchObject({ active: true, maxFreeQty: 3 });
+  });
+
+  it("PATCH /free-item-campaigns/:id — empty body → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/free-item-campaigns/${CAMP_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH /free-item-campaigns/:id — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/free-item-campaigns/${CAMP_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ active: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  // ----- DELETE /free-item-campaigns/:id -----
+
+  it("DELETE /free-item-campaigns/:id — HARD delete → 200 { ok: true }", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/free-item-campaigns/${CAMP_A}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const del = recorded.find((r) => r.op === "delete");
+    expect(del?.table).toBe("free_item_campaigns");
+  });
+
+  it("DELETE /free-item-campaigns/:id — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/free-item-campaigns/${CAMP_A}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
