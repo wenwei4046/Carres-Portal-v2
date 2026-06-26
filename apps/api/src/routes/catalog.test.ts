@@ -370,11 +370,14 @@ function buildWriteSb(opts: {
   reads?: Record<string, unknown[]>;
   /** Row that .single()/.maybeSingle() returns from the write chain. */
   writeReturn?: Record<string, unknown> | null;
+  /** Error the write chain's .single()/.maybeSingle() returns (e.g. 23505). */
+  writeError?: { code?: string; message?: string } | null;
   recorded?: AdminCall[];
 }): SbStub {
   const recorded = opts.recorded ?? [];
   const reads = opts.reads ?? {};
   const writeReturn = opts.writeReturn ?? null;
+  const writeError = opts.writeError ?? null;
 
   const mk = (table: string) => {
     let rows: unknown[] = reads[table] ?? [];
@@ -433,11 +436,11 @@ function buildWriteSb(opts: {
     };
     chain.limit = (_n: number) => chain;
     chain.maybeSingle = async () => {
-      if (mode === "write") return { data: writeReturn, error: null };
+      if (mode === "write") return { data: writeError ? null : writeReturn, error: writeError };
       return { data: rows[0] ?? null, error: null };
     };
     chain.single = async () => {
-      if (mode === "write") return { data: writeReturn, error: null };
+      if (mode === "write") return { data: writeError ? null : writeReturn, error: writeError };
       return { data: rows[0] ?? null, error: null };
     };
     void writeBody; // silenced; the recorded payload is what assertions read
@@ -3131,5 +3134,247 @@ describe("Special add-ons CRUD (/api/catalog/special-addons)", () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe("0182 — global option pools (GET bundle + principal-gated CRUD)", () => {
+  const POOL_ID = "00000000-0000-0000-0000-0000000f0001";
+  const POOL_ROW = {
+    id: POOL_ID,
+    pool: "mattress_size",
+    value: "Queen",
+    label: "Queen",
+    dimensions: "152x190",
+    active: true,
+    sort_order: 2,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    updated_by: null,
+  };
+
+  it("GET /api/catalog includes optionPools (active AND inactive, ordered)", async () => {
+    const recorded: Record<string, FilterCall[]> = {};
+    vi.mocked(userClient).mockReturnValue(
+      buildSb(
+        {
+          product_models: [
+            {
+              id: MODEL_ID_LIVE,
+              category: "mattress",
+              model_key: "carres-classic",
+              name: "Classic",
+              blurb: null,
+              colors: null,
+              gaps: null,
+              sofa_mode: null,
+              discontinued_at: null,
+            },
+          ],
+          product_skus: [],
+          sofa_fabrics: [],
+          addons: [],
+          floor_config: [
+            { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
+          ],
+          fabric_tier_addon_config: [
+            { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+          ],
+          model_fabric_tier_overrides: [],
+          catalog_option_pools: [
+            POOL_ROW, // mattress_size / Queen / sort 2
+            { ...POOL_ROW, id: "00000000-0000-0000-0000-0000000f0002", value: "King", label: "King", sort_order: 1, active: false },
+            {
+              ...POOL_ROW,
+              id: "00000000-0000-0000-0000-0000000f0003",
+              pool: "supplier_category",
+              value: "sofa",
+              label: null,
+              dimensions: null,
+              sort_order: 0,
+            },
+          ],
+        },
+        recorded,
+      ),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    // All three returned — inactive included (consumers filter client-side).
+    expect(body.optionPools).toHaveLength(3);
+    expect(body.optionPools?.some((p) => p.active === false)).toBe(true);
+    // Ordered by (pool, sort_order, value): mattress_size/King(1),
+    // mattress_size/Queen(2), supplier_category/sofa(0).
+    expect(body.optionPools?.map((p) => p.value)).toEqual(["King", "Queen", "sofa"]);
+    // Adapter mapping (camelCase + dimensions passthrough).
+    expect(body.optionPools?.[1]).toMatchObject({
+      id: POOL_ID,
+      pool: "mattress_size",
+      value: "Queen",
+      dimensions: "152x190",
+      sortOrder: 2,
+      active: true,
+    });
+  });
+
+  it("POST /option-pools — principal inserts → 201 (camel→snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: POOL_ROW }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pool: "mattress_size", value: "Queen", label: "Queen", dimensions: "152x190", sortOrder: 2 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("catalog_option_pools");
+    expect(ins?.payload).toMatchObject({
+      pool: "mattress_size",
+      value: "Queen",
+      label: "Queen",
+      dimensions: "152x190",
+      sort_order: 2,
+    });
+    const body = (await res.json()) as { optionPool: { value: string; sortOrder: number } };
+    expect(body.optionPool).toMatchObject({ value: "Queen", sortOrder: 2 });
+  });
+
+  it("POST /option-pools — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pool: "mattress_size", value: "Queen" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("POST /option-pools — duplicate (pool,value) → 409", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        writeError: { code: "23505", message: 'duplicate key value violates unique constraint "catalog_option_pools_pool_value_key"' },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pool: "mattress_size", value: "Queen" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_option_pool_value");
+  });
+
+  it("PATCH /option-pools/:id — principal updates → 200, maps camel→snake, never writes pool", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: { ...POOL_ROW, value: "Super King", sort_order: 5 } }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ value: "Super King", sortOrder: 5 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ value: "Super King", sort_order: 5 });
+    expect(upd?.payload).not.toHaveProperty("pool");
+    const body = (await res.json()) as { optionPool: { value: string; sortOrder: number } };
+    expect(body.optionPool).toMatchObject({ value: "Super King", sortOrder: 5 });
+  });
+
+  it("PATCH /option-pools/:id — empty body → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH /option-pools/:id — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ value: "X" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH /option-pools/:id — value rename collision (23505) → 409", async () => {
+    // A rename onto an existing (pool,value) must surface the SAME friendly 409
+    // as POST, not the generic 500 mapPgError defaults 23505 to.
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        writeError: { code: "23505", message: 'duplicate key value violates unique constraint "catalog_option_pools_pool_value_key"' },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ value: "Queen" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_option_pool_value");
+  });
+
+  it("DELETE /option-pools/:id — HARD delete → 200 { ok: true }", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const del = recorded.find((r) => r.op === "delete");
+    expect(del?.table).toBe("catalog_option_pools");
+  });
+
+  it("DELETE /option-pools/:id — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
   });
 });

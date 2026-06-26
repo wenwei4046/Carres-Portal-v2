@@ -196,6 +196,16 @@ export {
   type SpecialAddonOptionGroupDto,
   type SpecialAddonCreateInput,
   type SpecialAddonPatchInput,
+  // 0182 — global option pool schemas + input/Dto types.
+  CATALOG_OPTION_POOL_NAMES,
+  catalogOptionPoolNameSchema,
+  catalogOptionPoolSchema,
+  catalogOptionPoolCreateInput,
+  catalogOptionPoolPatchInput,
+  type CatalogOptionPoolName,
+  type CatalogOptionPoolDto,
+  type CatalogOptionPoolCreateInput,
+  type CatalogOptionPoolPatchInput,
 } from "./schemas/catalog";
 
 export {
@@ -506,6 +516,9 @@ export {
   type SpecialsTotalResult,
 } from "./special-addons";
 export type { SpecialAddon } from "./domain";
+// 0182 — global option pool domain type (the name union is re-exported from the
+// schemas/catalog block above as CatalogOptionPoolName).
+export type { CatalogOptionPool } from "./domain";
 export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
 
 // Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo

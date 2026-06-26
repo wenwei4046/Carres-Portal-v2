@@ -54,6 +54,13 @@ export const MODEL_SOFA_COMPARTMENTS = "model_sofa_compartments" as const;
 export const SOFA_COMBO_PRICING      = "sofa_combo_pricing" as const;
 export const SPECIAL_ADDONS          = "special_addons" as const;
 
+// 0182 — 2990s Products parity Phase 4: principal-owned global option pools
+// (one generic table, a `pool` discriminator). Curated reference lists only —
+// supplier_category, bedframe_size, mattress_size. NOT a source of truth for any
+// order-side consumer (sizes stay per-model in allowed_options; supplier scope
+// stays in suppliers.cat_covered).
+export const CATALOG_OPTION_POOLS    = "catalog_option_pools" as const;
+
 // ---------------------------------------------------------------------------
 // People / org tables
 // ---------------------------------------------------------------------------

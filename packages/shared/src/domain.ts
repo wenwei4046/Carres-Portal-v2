@@ -157,6 +157,25 @@ export interface SpecialAddon {
 }
 
 /**
+ * A principal-curated global option pool entry (migration 0182, 2990s Products
+ * parity Phase 4). `pool` discriminates which pool the entry belongs to;
+ * `value` is the canonical code, `label` + `dimensions` enrich the size pools
+ * (null for supplier_category). Read-only reference list — these do NOT drive
+ * any order-side behaviour (sizes stay per-model in allowedOptions; supplier
+ * scope stays in suppliers.cat_covered).
+ */
+export type CatalogOptionPoolName = "supplier_category" | "bedframe_size" | "mattress_size";
+export interface CatalogOptionPool {
+  id: string;
+  pool: CatalogOptionPoolName;
+  value: string;
+  label: string | null;
+  dimensions: string | null;
+  active: boolean;
+  sortOrder: number;
+}
+
+/**
  * One component SKU inside a combo (migration 0177). `qty` = how many of this
  * SKU the bundle contains; `sortOrder` drives the deterministic explode order
  * (the last component absorbs the rounding residue in explodeCombo).

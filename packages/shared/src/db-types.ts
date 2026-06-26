@@ -222,6 +222,24 @@ export interface SpecialAddonRow {
   updated_by: string | null;
 }
 
+/** `catalog_option_pools` (migration 0182, 2990s Products parity Phase 4). One
+ *  GENERIC table for the principal-curated Maintenance pools, discriminated by
+ *  `pool`. `value` is the canonical code (unique within its pool); `label` +
+ *  `dimensions` are populated for the size pools only (null for
+ *  supplier_category). Read-only reference list — no order-side consumer. */
+export interface CatalogOptionPoolRow {
+  id: string;
+  pool: "supplier_category" | "bedframe_size" | "mattress_size";
+  value: string;
+  label: string | null;
+  dimensions: string | null;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
 /**
  * `combos` (migration 0177). A fixed-set bundle (套餐) sold at one
  * `combo_price`. Components live in `combo_components`. `combo_key` is the

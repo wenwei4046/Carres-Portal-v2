@@ -140,6 +140,19 @@ export const floorConfigFromRow = (r: DB.FloorConfigRow): D.FloorConfig => ({
   perFloorPerItem: Number(r.per_floor_per_item),
 });
 
+// 0182 — global option pool entry (supplier_category / bedframe_size /
+// mattress_size). `label` + `dimensions` are nullable (size pools only) and
+// stay null; `sort_order` is Postgres integer normalised via Number().
+export const catalogOptionPoolFromRow = (r: DB.CatalogOptionPoolRow): D.CatalogOptionPool => ({
+  id: r.id,
+  pool: r.pool,
+  value: r.value,
+  label: r.label ?? null,
+  dimensions: r.dimensions ?? null,
+  active: r.active,
+  sortOrder: Number(r.sort_order),
+});
+
 /**
  * Maps a `combo_components` row to the camelCase domain shape (migration 0177).
  */

@@ -37,6 +37,9 @@ import {
   specialAddonCreateInput,
   specialAddonPatchInput,
   SPECIAL_ADDONS,
+  catalogOptionPoolCreateInput,
+  catalogOptionPoolPatchInput,
+  CATALOG_OPTION_POOLS,
   deriveSkuCode,
   skuImportInput,
   hasPricingIntent,
@@ -167,7 +170,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -197,6 +200,11 @@ catalogRouter.get("/", async (c) => {
     // 0181 — special add-ons (additive). Fetched unfiltered; active filter
     // applied client-side below (admin sees retired; POS sees active only).
     sb.from(SPECIAL_ADDONS).select("*"),
+    // 0182 — global option pools (additive). Fetched UNFILTERED (active AND
+    // inactive): each row carries its own `active`, and the Maintenance editor
+    // must see the inactive ones, so consumers filter client-side. Curated
+    // reference lists only — NOT a source of truth for any order-side consumer.
+    sb.from(CATALOG_OPTION_POOLS).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -210,6 +218,7 @@ catalogRouter.get("/", async (c) => {
   if (modelSofaCompsR.error) throw new HTTPException(500, { message: modelSofaCompsR.error.message });
   if (sofaCombosR.error) throw new HTTPException(500, { message: sofaCombosR.error.message });
   if (specialAddonsR.error) throw new HTTPException(500, { message: specialAddonsR.error.message });
+  if (optionPoolsR.error) throw new HTTPException(500, { message: optionPoolsR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -299,6 +308,19 @@ catalogRouter.get("/", async (c) => {
     specialAddons: (specialAddonsR.data ?? [])
       .filter((row) => adminMode || (row as DB.SpecialAddonRow).active === true)
       .map((r) => Adapters.specialAddonFromRow(r as DB.SpecialAddonRow)),
+    // 0182 — global option pools. Returned in full (active AND inactive — each
+    // row carries its own `active`, so consumers filter client-side), ordered by
+    // (pool, sort_order, value). Sorted in JS to mirror the plain `.select("*")`
+    // fetch (and stay mock-friendly) the way combos sort their components.
+    optionPools: (optionPoolsR.data ?? [])
+      .map((r) => Adapters.catalogOptionPoolFromRow(r as DB.CatalogOptionPoolRow))
+      .sort((a, b) =>
+        a.pool !== b.pool
+          ? a.pool.localeCompare(b.pool)
+          : a.sortOrder !== b.sortOrder
+            ? a.sortOrder - b.sortOrder
+            : a.value.localeCompare(b.value),
+      ),
   });
 
   // 0074 — was `private, max-age=300` but the browser cache was beating
@@ -1846,6 +1868,123 @@ catalogRouter.delete("/sofa-combos/:id", async (c) => {
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sofa combo not found" }, 404);
+  }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0182 — Global option pools (2990s Products parity Phase 4). One generic table
+// with a `pool` discriminator holding THREE curated reference lists:
+// supplier_category, bedframe_size, mattress_size. These are READ-ONLY reference
+// lists — NOT a source of truth for any order-side consumer (sizes stay per-model
+// in product_models.allowed_options; supplier scope stays in
+// suppliers.cat_covered). All writes are principal-only ("Master Admin"),
+// mirroring the 0177/0178/0181 gate: early friendly 403 here, with RLS
+// (catalog_option_pools_write_principal) the real boundary — we forward the USER
+// JWT (userClient) so RLS runs; NEVER service_role.
+// ---------------------------------------------------------------------------
+
+const OPTION_POOL_MSG = "Only the principal (Master Admin) can manage option pools";
+
+// Friendly 409 for a UNIQUE(pool,value) collision. mapPgError defaults 23505 to
+// a generic 500, so the option-pool writes special-case it here (the maintenance
+// editor surfaces "that value already exists in this pool").
+function optionPoolDuplicate(value?: string, pool?: string) {
+  return {
+    error: "conflict",
+    code: "duplicate_option_pool_value",
+    message:
+      value && pool
+        ? `"${value}" already exists in ${pool}`
+        : "that value already exists in this pool",
+  } as const;
+}
+
+// POST /option-pools — create a pool entry (principal-only).
+catalogRouter.post("/option-pools", async (c) => {
+  principalOnly(c, OPTION_POOL_MSG);
+  const parsed = await parseJsonBody(c, catalogOptionPoolCreateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(CATALOG_OPTION_POOLS)
+    .insert({
+      pool: parsed.data.pool,
+      value: parsed.data.value,
+      label: parsed.data.label ?? null,
+      dimensions: parsed.data.dimensions ?? null,
+      active: parsed.data.active ?? true,
+      sort_order: parsed.data.sortOrder ?? 0,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    if (error.code === "23505") {
+      return c.json(optionPoolDuplicate(parsed.data.value, parsed.data.pool), 409);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "option pool insert returned no row" }, 500);
+  }
+  return c.json({ optionPool: Adapters.catalogOptionPoolFromRow(data as DB.CatalogOptionPoolRow) }, 201);
+});
+
+// PATCH /option-pools/:id — update a pool entry (principal-only); empty → 422.
+// `pool` is intentionally NOT patchable (the schema omits it) — moving an entry
+// between pools would skew the UNIQUE(pool,value) intent; delete + recreate.
+catalogRouter.patch("/option-pools/:id", async (c) => {
+  principalOnly(c, OPTION_POOL_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, catalogOptionPoolPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.value !== undefined) patch.value = parsed.data.value;
+  if (parsed.data.label !== undefined) patch.label = parsed.data.label;
+  if (parsed.data.dimensions !== undefined) patch.dimensions = parsed.data.dimensions;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(CATALOG_OPTION_POOLS)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    // A value-rename can also collide with an existing (pool,value).
+    if (error.code === "23505") {
+      return c.json(optionPoolDuplicate(parsed.data.value), 409);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "option pool not found" }, 404);
+  }
+  return c.json({ optionPool: Adapters.catalogOptionPoolFromRow(data as DB.CatalogOptionPoolRow) });
+});
+
+// DELETE /option-pools/:id — HARD delete (principal-only). Nothing FKs to this
+// table (curated reference list, no order-side consumer), so deletion is safe.
+// The soft-hide path is `active=false` via PATCH. Idempotent: a missing id is a
+// no-op that still returns ok (mirrors the un-offer route).
+catalogRouter.delete("/option-pools/:id", async (c) => {
+  principalOnly(c, OPTION_POOL_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(CATALOG_OPTION_POOLS).delete().eq("id", id);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
   }
   return c.json({ ok: true });
 });

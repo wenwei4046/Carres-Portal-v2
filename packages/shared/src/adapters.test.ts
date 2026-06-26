@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  catalogOptionPoolFromRow,
   modelSofaCompartmentFromRow,
   orderInputToRpcPayload,
   orderSupplierThreadFromRow,
@@ -8,6 +9,7 @@ import {
   sofaCompartmentFromRow,
 } from "./adapters";
 import type {
+  CatalogOptionPoolRow,
   ModelSofaCompartmentRow,
   OrderSupplierThreadRow,
   ProductSkuRow,
@@ -393,6 +395,47 @@ describe("modelSofaCompartmentFromRow", () => {
   it("distinguishes an explicit zero override from null", () => {
     const out = modelSofaCompartmentFromRow(baseRow({ price_override: 0 }));
     expect(out.priceOverride).toBe(0);
+  });
+});
+
+describe("catalogOptionPoolFromRow", () => {
+  function baseRow(over: Partial<CatalogOptionPoolRow> = {}): CatalogOptionPoolRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000a0001",
+      pool: "mattress_size",
+      value: "K",
+      label: "6FT",
+      dimensions: "183X190CM",
+      // Postgres integer arrives fine, but exercise the Number() coercion anyway.
+      sort_order: "3" as unknown as number,
+      active: true,
+      created_at: "2026-06-26T08:00:00.000Z",
+      updated_at: "2026-06-26T08:00:00.000Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("snake->camel + coerces sort_order; keeps label/dimensions for size pools", () => {
+    const out = catalogOptionPoolFromRow(baseRow());
+    expect(out.id).toBe("00000000-0000-0000-0000-0000000a0001");
+    expect(out.pool).toBe("mattress_size");
+    expect(out.value).toBe("K");
+    expect(out.label).toBe("6FT");
+    expect(out.dimensions).toBe("183X190CM");
+    expect(out.sortOrder).toBe(3);
+    expect(typeof out.sortOrder).toBe("number");
+    expect(out.active).toBe(true);
+  });
+
+  it("keeps null label/dimensions (supplier_category has neither) — not coerced to empty", () => {
+    const out = catalogOptionPoolFromRow(
+      baseRow({ pool: "supplier_category", value: "sofa", label: null, dimensions: null }),
+    );
+    expect(out.pool).toBe("supplier_category");
+    expect(out.value).toBe("sofa");
+    expect(out.label).toBeNull();
+    expect(out.dimensions).toBeNull();
   });
 });
 
