@@ -18,11 +18,13 @@ import { InvoiceTemplate } from "./invoice-template";
 import { DoTemplate } from "./do-template";
 import { PoTemplate } from "./po-template";
 import { PickupEventTemplate } from "./pickup-event-template";
+import { ReceiptTemplate } from "./receipt-template";
 import { registerNotoSansSC } from "./fonts/noto";
 import type {
   DoTemplateData,
   InvoiceTemplateData,
   PoTemplateData,
+  ReceiptTemplateData,
   SalesOrderTemplateData,
 } from "./types";
 import type { PickupEventPrintPayload } from "@/lib/queries";
@@ -39,6 +41,12 @@ export function renderSalesOrderPdf(data: SalesOrderTemplateData): Promise<Blob>
 
 export function renderInvoicePdf(data: InvoiceTemplateData): Promise<Blob> {
   return toBlob(InvoiceTemplate(data));
+}
+
+/** Balance job (0184) — payment receipt, one per ledger entry. Rendered
+ *  on-demand from the order_payments row + order (no bucket persistence yet). */
+export function renderReceiptPdf(data: ReceiptTemplateData): Promise<Blob> {
+  return toBlob(ReceiptTemplate(data));
 }
 
 export function renderDoPdf(data: DoTemplateData): Promise<Blob> {

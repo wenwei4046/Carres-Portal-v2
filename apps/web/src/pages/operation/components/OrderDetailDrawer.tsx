@@ -844,6 +844,7 @@ function DrawerBody({
                 paid={Number(order.paid || 0)}
                 total={grandTotal}
                 orderId={order.id}
+                receiptMeta={{ orderCode: `SO-${order.so}`, customerName: order.customer_name ?? "" }}
               />
             </FieldGrid>
             <FieldGrid>

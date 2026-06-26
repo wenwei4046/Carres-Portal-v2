@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Plus, Trash2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, ShieldCheck, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import {
   computeStorageFee,
@@ -29,6 +29,7 @@ import {
   useDecideStorageWaiver,
 } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
+import { renderReceiptPdf } from "@/lib/pdf/render";
 import { areaForAddress, suggestCarrier } from "@/lib/region";
 
 /**
@@ -444,11 +445,13 @@ export function PaymentControlFields({
   paid,
   total,
   orderId,
+  receiptMeta,
 }: {
   form: OrderControlForm;
   paid: number;
   total: number;
   orderId?: string;
+  receiptMeta?: { orderCode: string; customerName: string };
 }) {
   const { draft, set } = form;
   // Bill = operator-keyed invoice / owing amount (balance); falls back to the
@@ -468,7 +471,7 @@ export function PaymentControlFields({
       </FieldRow>
       <DueDateRow form={form} bill={bill} orderId={orderId} />
       {orderId ? (
-        <PaymentLedger orderId={orderId} bill={bill} />
+        <PaymentLedger orderId={orderId} bill={bill} receiptMeta={receiptMeta} />
       ) : (
         <LegacyPaidOutstanding form={form} paid={paid} bill={bill} />
       )}
@@ -580,7 +583,15 @@ const KIND_LABEL: Record<PaymentKind, string> = {
 /** The real payment ledger for an order: list of entries + an inline
  *  "Add payment" form, with Paid / Outstanding derived live (storage excluded
  *  from the goods balance). Principal can void a mis-keyed row. */
-function PaymentLedger({ orderId, bill }: { orderId: string; bill: number }) {
+function PaymentLedger({
+  orderId,
+  bill,
+  receiptMeta,
+}: {
+  orderId: string;
+  bill: number;
+  receiptMeta?: { orderCode: string; customerName: string };
+}) {
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
   const { data, isLoading } = useOrderPayments(orderId);
@@ -613,6 +624,7 @@ function PaymentLedger({ orderId, bill }: { orderId: string; bill: number }) {
             row={p}
             canVoid={isPrincipal && !voidPay.isPending}
             onVoid={() => voidPay.mutate(p.id)}
+            receiptMeta={receiptMeta}
           />
         ))}
 
@@ -649,16 +661,42 @@ function PaymentLedger({ orderId, bill }: { orderId: string; bill: number }) {
   );
 }
 
-/** One ledger line: date · amount · kind · method · receipt, with a void ✕ for
- *  the principal. */
+/** Render + open a receipt PDF for one ledger entry (on-demand, client-side). */
+async function printReceipt(
+  row: OrderPaymentRow,
+  meta: { orderCode: string; customerName: string },
+) {
+  try {
+    const blob = await renderReceiptPdf({
+      receipt_no: row.receipt_no ?? row.id.slice(0, 8),
+      issue_date: row.paid_on,
+      order_code: meta.orderCode,
+      customer: { name: meta.customerName },
+      amount: Number(row.amount),
+      method: row.method,
+      kind: row.kind,
+      reference: row.reference,
+      note: row.note,
+      currency: "MYR",
+    });
+    window.open(URL.createObjectURL(blob), "_blank");
+  } catch (e) {
+    toast.error(`Couldn't open receipt — ${(e as Error).message}`);
+  }
+}
+
+/** One ledger line: date · amount · kind · method · receipt, with a receipt
+ *  print + a void ✕ for the principal. */
 function LedgerRow({
   row,
   canVoid,
   onVoid,
+  receiptMeta,
 }: {
   row: OrderPaymentRow;
   canVoid: boolean;
   onVoid: () => void;
+  receiptMeta?: { orderCode: string; customerName: string };
 }) {
   return (
     <div className="flex items-center gap-2 text-[11.5px]">
@@ -670,6 +708,17 @@ function LedgerRow({
         {KIND_LABEL[row.kind]} · {row.method}
         {row.receipt_no ? ` · ${row.receipt_no}` : ""}
       </span>
+      {receiptMeta && (
+        <button
+          type="button"
+          onClick={() => void printReceipt(row, receiptMeta)}
+          title="Print receipt"
+          aria-label={`Receipt ${row.receipt_no ?? row.id}`}
+          className="text-base-400 hover:text-primary shrink-0"
+        >
+          <Receipt size={12} strokeWidth={2} />
+        </button>
+      )}
       {canVoid && (
         <button
           type="button"

@@ -30,6 +30,19 @@ export type DoTemplateData = {
   currency: string;
 };
 
+export type ReceiptTemplateData = {
+  receipt_no: string;
+  issue_date: string; // paid_on (yyyy-mm-dd)
+  order_code: string; // SO-123
+  customer: { name: string };
+  amount: number;
+  method: string; // cash / bank / card / cheque / online / other
+  kind: string; // payment / deposit / storage
+  reference: string | null;
+  note: string | null;
+  currency: string;
+};
+
 export type InvoiceTemplateData = {
   invoice_no: string;
   issue_date: string;
