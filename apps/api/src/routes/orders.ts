@@ -355,13 +355,20 @@ ordersRouter.post("/", async (c) => {
     throw new HTTPException(500, { message: deliveryRecompute.message });
   }
 
+  // 0184 honest-pricing — the delivery fee is SERVER-authoritative. Strip any
+  // client-sent delivery addon (DELIVERY / DELIVERY_CROSS / DELIVERY_ADD) BEFORE
+  // merging, so the charge comes SOLELY from the server recompute above — a
+  // tampered client cannot inject or pre-empt a delivery line.
+  const DELIVERY_ADDON_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
+  const clientAddons = parsed.data.addons.filter((a) => !DELIVERY_ADDON_KEYS.has(a.addonKey));
+
   // Feed the fully-verified (sofa-exploded + special-checked) line set + the
   // appended delivery addons into the RPC.
   const payload = Adapters.orderInputToRpcPayload(
     {
       ...parsed.data,
       lines: specialRecompute.lines,
-      addons: [...parsed.data.addons, ...deliveryRecompute.addons],
+      addons: [...clientAddons, ...deliveryRecompute.addons],
     },
     effectiveDealerId,
   );

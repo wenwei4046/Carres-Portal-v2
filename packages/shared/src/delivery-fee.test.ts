@@ -77,7 +77,12 @@ describe("computeDeliveryFee — base + cross-category", () => {
     expect(r.total).toBe(50);
   });
 
-  it("sofa × mattress trips the cross-category surcharge", () => {
+  // NOTE: the next two cases exercise the PURE engine only — a categoryIds set
+  // containing both 'sofa' and a mattress/bedframe is UNREACHABLE on a real
+  // Carres order (migration 0089's category mutex rejects such an order at
+  // create_order, so the in-order cross surcharge never persists). They verify
+  // the faithful 2990s port, not a bookable Carres order.
+  it("sofa × mattress trips the cross-category surcharge (pure engine only — unreachable on a Carres order, 0089 mutex)", () => {
     const r = computeDeliveryFee(
       input({ categoryIds: ["sofa", "mattress"] }),
       cfg({ baseFee: 50, crossCategoryFee: 30 }),
@@ -87,7 +92,7 @@ describe("computeDeliveryFee — base + cross-category", () => {
     expect(r.total).toBe(80);
   });
 
-  it("sofa × bedframe also trips the cross-category surcharge", () => {
+  it("sofa × bedframe also trips the cross-category surcharge (pure engine only — unreachable on a Carres order, 0089 mutex)", () => {
     const r = computeDeliveryFee(
       input({ categoryIds: ["sofa", "bedframe"] }),
       cfg({ baseFee: 50, crossCategoryFee: 30 }),

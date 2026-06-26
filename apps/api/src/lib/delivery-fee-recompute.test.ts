@@ -24,6 +24,9 @@ interface MockOpts {
   sourceOrderError?: { message: string };
   usedAddons?: Array<{ id: string }>;
   usedAddonsError?: { message: string };
+  /** order_lines rows for the SOURCE order's category resolution (FIX B). */
+  sourceOrderLines?: Array<{ sku: string }>;
+  sourceOrderLinesError?: { message: string };
 }
 
 function mockSb(opts: MockOpts = {}): SupabaseClient {
@@ -39,6 +42,8 @@ function mockSb(opts: MockOpts = {}): SupabaseClient {
         return { single: null, list: opts.combos ?? [], error: opts.combosError };
       case "orders":
         return { single: opts.sourceOrder ?? null, list: [], error: opts.sourceOrderError };
+      case "order_lines":
+        return { single: null, list: opts.sourceOrderLines ?? [], error: opts.sourceOrderLinesError };
       case "order_addons":
         return { single: null, list: opts.usedAddons ?? [], error: opts.usedAddonsError };
       default:
@@ -131,6 +136,18 @@ describe("recomputeDeliveryFee — dormant", () => {
     if (r.status !== "ok") return;
     expect(r.addons).toEqual([]);
   });
+
+  it("dormant path books zero addons WITHOUT touching the category embed (FIX D)", async () => {
+    // A skusError would surface as server_error IF the recompute reached the
+    // product_skus embed; a dormant 0/0 config + no client fee must early-return
+    // before that. status ok proves the embed was skipped.
+    const sb = mockSb({ config: cfgRow(), skusError: { message: "must not read product_skus" } });
+    const r = await recomputeDeliveryFee(sb, [line("M1")], ctx());
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.addons).toEqual([]);
+    expect(r.fee.total).toBe(0);
+  });
 });
 
 describe("recomputeDeliveryFee — base + cross-category", () => {
@@ -144,7 +161,12 @@ describe("recomputeDeliveryFee — base + cross-category", () => {
     ]);
   });
 
-  it("sofa × mattress trips a DELIVERY_CROSS addon alongside the base", async () => {
+  it("in-order sofa × mattress → DELIVERY_CROSS is pure-engine WIRING ONLY — unreachable on a Carres order (0089 mutex rejects the order at create_order, so it never persists)", async () => {
+    // This input cannot occur on a real Carres order: migration 0089's category
+    // mutex rejects any single order mixing sofa with mattress/bedframe (the
+    // recompute runs BEFORE create_order, which 422s `mixed_category_lines` so no
+    // DELIVERY_CROSS addon is ever written). The case is kept only to document
+    // the faithful pure-engine wiring — it does NOT imply such an order books.
     const sb = mockSb({
       config: cfgRow({ base_fee: 50, cross_category_fee: 30 }),
       skus: [skuRow("S1", "sofa"), skuRow("M1", "mattress")],
@@ -219,14 +241,17 @@ describe("recomputeDeliveryFee — additional fee", () => {
 });
 
 describe("recomputeDeliveryFee — cross-order follow-up", () => {
-  it("a valid linked SO bills the reduced cross rate + records the source", async () => {
+  it("a sofa-source + mattress-new link spans a real cross-category pair → follow-up applies + records the source", async () => {
+    // new order = mattress; SOURCE order = sofa (resolved via its order_lines) →
+    // genuinely a second trip → reduced rate + link recorded.
     const sb = mockSb({
       config: cfgRow({ base_fee: 500, cross_category_fee: 175 }),
-      skus: [skuRow("S1", "sofa")],
+      skus: [skuRow("M1", "mattress"), skuRow("S-SRC", "sofa")],
       sourceOrder: { id: "ord-1", so: 1042, status: "place", customer_phone: "012-3456789" },
+      sourceOrderLines: [{ sku: "S-SRC" }],
       usedAddons: [],
     });
-    const r = await recomputeDeliveryFee(sb, [line("S1")], ctx({ crossCategorySourceSo: "SO-1042" }));
+    const r = await recomputeDeliveryFee(sb, [line("M1")], ctx({ crossCategorySourceSo: "SO-1042" }));
     expect(r.status).toBe("ok");
     if (r.status !== "ok") return;
     expect(r.fee.isFollowup).toBe(true);
@@ -240,11 +265,32 @@ describe("recomputeDeliveryFee — cross-order follow-up", () => {
     ]);
   });
 
+  it("a same-customer link where BOTH orders are mattress → NOT a follow-up (full base, no reduced rate, no link)", async () => {
+    // hard checks pass, but mattress→mattress is one bedroom trip, not cross —
+    // book the standalone base, never the reduced follow-up rate, never the link.
+    const sb = mockSb({
+      config: cfgRow({ base_fee: 500, cross_category_fee: 175 }),
+      skus: [skuRow("M1", "mattress"), skuRow("M-SRC", "mattress")],
+      sourceOrder: { id: "ord-1", so: 1042, status: "place", customer_phone: "012-3456789" },
+      sourceOrderLines: [{ sku: "M-SRC" }],
+      usedAddons: [],
+    });
+    const r = await recomputeDeliveryFee(sb, [line("M1")], ctx({ crossCategorySourceSo: "SO-1042" }));
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.fee.isFollowup).toBe(false);
+    // full standalone base, kind "base", and NO source-SO link recorded
+    expect(r.addons).toEqual([
+      { addonKey: "DELIVERY", qty: 1, unitPrice: 500, attrs: { kind: "base" } },
+    ]);
+  });
+
   it("a bare numeric link parses against orders.so", async () => {
     const sb = mockSb({
       config: cfgRow({ base_fee: 500, cross_category_fee: 175 }),
-      skus: [skuRow("S1", "sofa")],
+      skus: [skuRow("S1", "sofa"), skuRow("M-SRC", "mattress")],
       sourceOrder: { id: "ord-1", so: 1042, status: "place", customer_phone: "0123456789" },
+      sourceOrderLines: [{ sku: "M-SRC" }],
       usedAddons: [],
     });
     const r = await recomputeDeliveryFee(sb, [line("S1")], ctx({ crossCategorySourceSo: "1042" }));
@@ -341,8 +387,11 @@ describe("recomputeDeliveryFee — fail-closed", () => {
     expect(r.status).toBe("server_error");
   });
 
-  it("a product_skus read error → server_error", async () => {
-    const sb = mockSb({ config: cfgRow(), skusError: { message: "skus down" } });
+  it("a product_skus read error → server_error (non-dormant config reaches the embed)", async () => {
+    // base_fee 50 makes this NON-dormant, so the recompute reaches the category
+    // embed and the read error surfaces fail-closed (a dormant config would
+    // early-return before the embed — see the FIX D test below).
+    const sb = mockSb({ config: cfgRow({ base_fee: 50 }), skusError: { message: "skus down" } });
     const r = await recomputeDeliveryFee(sb, [line("M1")], ctx());
     expect(r.status).toBe("server_error");
   });

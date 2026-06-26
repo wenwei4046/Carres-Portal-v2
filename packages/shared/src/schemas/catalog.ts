@@ -430,8 +430,17 @@ export const deliveryFeeConfigSchema = z.object({
 });
 export type DeliveryFeeConfigDto = z.infer<typeof deliveryFeeConfigSchema>;
 
-/** Patch the config singleton — every field optional + nonnegative. */
-export const deliveryFeeConfigPatchInput = deliveryFeeConfigSchema.partial().strict();
+/** Patch the config singleton — every field optional + nonnegative. The PATCH
+ *  input CONSTRAINS `chargedCategories` to the product category enum (the DTO
+ *  above stays `z.array(z.string())` for read-tolerance of legacy rows): an
+ *  unknown category never matches a cart line, so a typo/casing would silently
+ *  disable base billing — 422 it instead. */
+export const deliveryFeeConfigPatchInput = deliveryFeeConfigSchema
+  .partial()
+  .extend({
+    chargedCategories: z.array(productCategorySchema).optional(),
+  })
+  .strict();
 export type DeliveryFeeConfigPatchInput = z.infer<typeof deliveryFeeConfigPatchInput>;
 
 /** RuleTarget scope enum (mirrors the `RuleTargetScope` union). */

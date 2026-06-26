@@ -29,7 +29,11 @@ CREATE TABLE public.delivery_fee_config (
   id                          integer PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   -- flat trip fee charged once per order that contains >=1 charged-category line
   base_fee                    numeric(12,2) NOT NULL DEFAULT 0 CHECK (base_fee >= 0),
-  -- added once when an order mixes sofa with mattress/bedframe (a 2nd vehicle trip)
+  -- the cross-ORDER follow-up reduced rate: charged on a SECOND SO that completes
+  -- a cross-category purchase (sofa + mattress/bedframe across two orders). NOTE
+  -- the in-ORDER cross surcharge is INERT on Carres — migration 0089's category
+  -- mutex rejects any single order mixing sofa with mattress/bedframe — so this
+  -- value effectively serves only the cross-order follow-up path.
   cross_category_fee          numeric(12,2) NOT NULL DEFAULT 0 CHECK (cross_category_fee >= 0),
   -- which product categories incur the base trip fee (principal selects). An order
   -- charges base_fee only if it has >=1 line whose category is in this set.

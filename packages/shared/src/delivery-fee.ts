@@ -26,7 +26,17 @@ import type { DeliveryFeeConfig } from "./domain";
  * Mattress + bedframe count as ONE delivery category — the bedroom set travels
  * together. Only sofa mixed with a mattress and/or bedframe trips the surcharge
  * (a 2nd vehicle trip); mattress + bedframe alone does NOT. `categories` are the
- * lowercased charged-category ids the caller already filtered. */
+ * lowercased charged-category ids the caller already filtered.
+ *
+ * ⚠ INERT ON A CARRES ORDER: migration 0089's category mutex REJECTS any single
+ * order that mixes sofa with mattress/bedframe, so a real Carres order can never
+ * present `categoryIds` containing both — this in-order branch is unreachable in
+ * production (the recompute runs before create_order, which 422s such an order
+ * with `mixed_category_lines` so no DELIVERY_CROSS addon ever persists). The
+ * surcharge is kept here as the FAITHFUL pure-engine port; on Carres the real
+ * use of `crossCategoryFee` is the cross-ORDER follow-up rate (the
+ * `isCrossCategoryFollowup` branch below), charged on a SECOND SO that completes
+ * a sofa + mattress/bedframe purchase across two orders. */
 const tripsCrossCategory = (categories: ReadonlySet<string>): boolean =>
   categories.has("sofa") && (categories.has("mattress") || categories.has("bedframe"));
 

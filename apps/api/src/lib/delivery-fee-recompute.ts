@@ -136,6 +136,28 @@ export async function recomputeDeliveryFee(
       };
     });
 
+  // 2b. SHORT-CIRCUIT the dormant case. With a 0/0 config, no active special
+  //     rule, and no client-supplied additional fee or cross-order link, EVERY
+  //     fee component is 0 → no delivery addon would be appended. Return early to
+  //     AVOID the product_skus / product_models category embed (the
+  //     overwhelmingly common order is dormant; this trims the failure surface
+  //     on it). The fail-closed 500 behavior is fully preserved for the
+  //     non-dormant path below (config / rules read errors already returned).
+  const clientWantsFee =
+    (ctx.additionalDeliveryFee ?? 0) > 0 || Boolean((ctx.crossCategorySourceSo ?? "").trim());
+  const dormant =
+    config.baseFee === 0 &&
+    config.crossCategoryFee === 0 &&
+    rules.length === 0 &&
+    !clientWantsFee;
+  if (dormant) {
+    return {
+      status: "ok",
+      addons: [],
+      fee: { base: 0, crossCategory: 0, additional: 0, total: 0, isSpecial: false, isFollowup: false },
+    };
+  }
+
   // 3. Resolve every line's sku → { model_id, category, variant } in one batched
   //    read (RLS). Build lines reference their representative / compartment skus
   //    which are real product_skus rows, so the same join covers them.
@@ -189,19 +211,34 @@ export async function recomputeDeliveryFee(
   }
   const specialModels = specialModelsForLines(ruleLines, rules, comboModulesById);
 
-  // 7. Cross-order follow-up link validation (Hono, fail-closed). On any invalid
-  //    link → bad_request (the order is NOT created).
+  // The new order's distinct deliverable categories (RAW — every cart line's
+  // category, independent of the chargedCategories gate). Used to verify a
+  // cross-order follow-up genuinely spans a sofa × (mattress|bedframe) pair.
+  const newCategories = new Set(
+    ruleLines.map((l) => l.category.toLowerCase()).filter(Boolean),
+  );
+
+  // 7. Cross-order follow-up link validation (Hono, fail-closed). The HARD
+  //    checks (not found / cancelled / different customer / already linked) →
+  //    bad_request (the order is NOT created). But passing the hard checks alone
+  //    no longer grants the reduced rate: the source + new orders must ALSO
+  //    TOGETHER span a genuine cross-category pair (one side sofa, the other
+  //    mattress/bedframe — a real second trip). If they pass the hard checks but
+  //    are NOT category-complementary, this is simply NOT a follow-up: charge the
+  //    standalone base, book the order normally, and DO NOT record the link.
   let isCrossCategoryFollowup = false;
   let sourceSoLabel: string | null = null;
   const rawLink = (ctx.crossCategorySourceSo ?? "").trim();
   if (rawLink) {
-    const elig = await checkCrossCategorySource(sb, rawLink, ctx.customerPhone);
+    const elig = await checkCrossCategorySource(sb, rawLink, ctx.customerPhone, newCategories);
     if (elig.status === "server_error") return elig;
     if (elig.status === "invalid") {
       return { status: "bad_request", message: elig.message };
     }
-    isCrossCategoryFollowup = true;
-    sourceSoLabel = elig.soLabel;
+    if (elig.complementary) {
+      isCrossCategoryFollowup = true;
+      sourceSoLabel = elig.soLabel;
+    }
   }
 
   // 8. Authoritative compute with the SAME pure engine the POS previewed.
@@ -229,6 +266,18 @@ export async function recomputeDeliveryFee(
         kind: fee.isFollowup ? "cross_category_followup" : fee.isSpecial ? "special" : "base",
         ...(sourceSoLabel ? { cross_category_source_so: sourceSoLabel } : {}),
       },
+    });
+  } else if (sourceSoLabel) {
+    // A validly-applied follow-up whose reduced rate computed to 0 (e.g. the
+    // config cross rate + any matched special follow-up fees are all 0). STILL
+    // record the source-SO link so the single-use backstop + audit hold — the
+    // link MUST be recorded regardless of the dollar amount. A 0-price DELIVERY
+    // addon is harmless to the order total.
+    addons.push({
+      addonKey: DELIVERY_ADDON,
+      qty: 1,
+      unitPrice: 0,
+      attrs: { kind: "cross_category_followup", cross_category_source_so: sourceSoLabel },
     });
   }
   if (cross > 0) {
@@ -339,13 +388,72 @@ async function loadComboModules(
 /* ─── cross-category source SO validation ───────────────────────────────── */
 
 type CrossCatResult =
-  | { status: "ok"; soLabel: string }
+  | { status: "ok"; soLabel: string; complementary: boolean }
   | { status: "invalid"; message: string }
   | { status: "server_error"; message: string };
 
+const isBedCategory = (s: ReadonlySet<string>): boolean =>
+  s.has("mattress") || s.has("bedframe");
+
+/**
+ * A GENUINE cross-category pair = one order has a sofa and the OTHER has a
+ * mattress/bedframe (a real second delivery trip). Carres's 0089 mutex rejects
+ * any single order that mixes sofa with mattress/bedframe, so each order is
+ * one-sided — this captures the across-TWO-orders span the follow-up rate exists
+ * for. (mattress + bedframe alone is one bedroom trip, NOT cross-category.)
+ */
+function spansCrossCategory(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  return (a.has("sofa") && isBedCategory(b)) || (isBedCategory(a) && b.has("sofa"));
+}
+
+type OrderCategoriesResult =
+  | { status: "ok"; categories: Set<string> }
+  | { status: "server_error"; message: string };
+
+/**
+ * Resolve an order's DISTINCT line categories via order_lines → product_skus →
+ * product_models.category. `order_lines.sku` has NO FK to `product_skus`, so this
+ * is a two-step read (the SAME resolution path the new order's lines use). Reads
+ * via the user JWT (RLS) — fail-closed on a read error.
+ */
+async function resolveOrderCategories(
+  sb: SupabaseClient,
+  orderId: string,
+): Promise<OrderCategoriesResult> {
+  const linesR = await sb.from("order_lines").select("sku").eq("order_id", orderId);
+  if (linesR.error) return { status: "server_error", message: linesR.error.message };
+  const skus = Array.from(
+    new Set(
+      ((linesR.data ?? []) as Array<{ sku?: string | null }>)
+        .map((r) => r.sku ?? "")
+        .filter(Boolean),
+    ),
+  );
+  const categories = new Set<string>();
+  if (skus.length === 0) return { status: "ok", categories };
+  const { data, error } = await sb
+    .from("product_skus")
+    .select("sku, product_models(category)")
+    .in("sku", skus);
+  if (error) return { status: "server_error", message: error.message };
+  const bySku = new Map<string, string>();
+  for (const row of (data ?? []) as Array<{
+    sku?: string;
+    product_models?: { category?: string } | Array<{ category?: string }> | null;
+  }>) {
+    if (row.sku) bySku.set(row.sku, embedCategory(row.product_models).toLowerCase());
+  }
+  for (const s of skus) {
+    const c = bySku.get(s);
+    if (c) categories.add(c);
+  }
+  return { status: "ok", categories };
+}
+
 /**
  * Validate the linked source SO (mirrors 2990s `checkCrossCategorySource`,
- * adapted to Carres's integer `orders.so` + the addon-attrs uniqueness backstop):
+ * adapted to Carres's integer `orders.so` + the addon-attrs uniqueness backstop).
+ * HARD checks (any failure → invalid → bad_request, order NOT created):
  *   · SO number must parse                              → invalid
  *   · the SO must exist + be visible (RLS)              → invalid (not found)
  *   · not cancelled                                     → invalid
@@ -355,11 +463,18 @@ type CrossCatResult =
  * silently grant the reduced rate). The "already used" check queries the
  * delivery addon attrs (`order_addons.attrs->>cross_category_source_so`), since
  * Carres records the link there (no orders column; create_order untouched).
+ *
+ * On passing the hard checks it ALSO resolves the source order's categories and
+ * reports `complementary` = whether source + new TOGETHER span a real
+ * cross-category pair (see `spansCrossCategory`). The caller only grants the
+ * reduced rate (and records the link) when `complementary` is true; otherwise it
+ * treats the order as a normal standalone (no 400, no link).
  */
 async function checkCrossCategorySource(
   sb: SupabaseClient,
   rawLink: string,
   newPhone: string | null,
+  newCategories: ReadonlySet<string>,
 ): Promise<CrossCatResult> {
   const soNum = Number((rawLink.match(/\d+/) ?? [""])[0]);
   if (!Number.isFinite(soNum) || soNum <= 0) {
@@ -404,5 +519,12 @@ async function checkCrossCategorySource(
     return { status: "invalid", message: `Order ${soLabel} was already used for a cross-category delivery discount.` };
   }
 
-  return { status: "ok", soLabel };
+  // Hard checks passed. Resolve the source order's categories and decide whether
+  // the source + new orders together span a genuine cross-category pair. (NOT
+  // complementary → the caller books the order as a normal standalone; no 400.)
+  const srcCats = await resolveOrderCategories(sb, src.id);
+  if (srcCats.status === "server_error") return srcCats;
+  const complementary = spansCrossCategory(srcCats.categories, newCategories);
+
+  return { status: "ok", soLabel, complementary };
 }

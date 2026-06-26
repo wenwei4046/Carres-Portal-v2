@@ -189,7 +189,10 @@ function DeliveryTripFeeSection({
       {
         baseFee: baseNum,
         crossCategoryFee: crossNum,
-        chargedCategories: charged,
+        // Values come only from the typed CHARGEABLE_CATEGORIES toggles + the
+        // DB's existing (valid) categories; the PATCH input now enums-checks
+        // these server-side too (FIX E).
+        chargedCategories: charged as ProductCategory[],
         mattressBedframeLeadDays: mbNum,
         sofaLeadDays: sofaNum,
       },
@@ -205,9 +208,9 @@ function DeliveryTripFeeSection({
       <div className="t-h4 font-display mb-1">Delivery trip fee</div>
       <p className="t-tiny text-base-500 mb-3">
         A flat trip fee charged once per order that contains a charged-category
-        line, plus a cross-category surcharge when a sofa shares the order with a
-        mattress or bedframe (a 2nd vehicle trip). Leave both at 0 to keep it
-        dormant.
+        line, plus a reduced cross-order follow-up rate on a second SO that
+        completes a sofa + mattress/bedframe purchase across two orders. Leave
+        both at 0 to keep it dormant.
         {!isPrincipal && " Principal only — read-only for your role."}
       </p>
       <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-col gap-4">
@@ -223,7 +226,7 @@ function DeliveryTripFeeSection({
             />
           </label>
           <label className="block">
-            <span className="label block mb-1">Cross-category fee (RM)</span>
+            <span className="label block mb-1">Cross-order follow-up rate (RM)</span>
             <input
               type="number" min={0} step="0.01" value={cross}
               disabled={!isPrincipal}
@@ -233,6 +236,10 @@ function DeliveryTripFeeSection({
             />
           </label>
         </div>
+        <p className="t-tiny text-base-400 -mt-1">
+          Reduced delivery rate on a follow-up SO that completes a cross-category
+          purchase (sofa + mattress/bedframe across two orders).
+        </p>
         <div>
           <span className="label block mb-1.5">Charged categories</span>
           <div className="flex flex-wrap gap-1.5">

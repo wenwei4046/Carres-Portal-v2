@@ -74,7 +74,10 @@ describe("deliveryFeePreview — configured", () => {
     expect(res!.total).toBe(100);
   });
 
-  it("adds the cross-category surcharge when sofa shares the cart with a mattress", () => {
+  // PREVIEW MATH ONLY — a sofa + mattress cart is unreachable on a real Carres
+  // order (the POS category mutex + migration 0089 reject it at submit, so it
+  // never books); this asserts the pure preview engine, not a bookable cart.
+  it("adds the cross-category surcharge when sofa shares the cart with a mattress (preview engine only — unreachable on a Carres order, 0089 mutex)", () => {
     const catalog = baseCatalog({ deliveryFeeConfig: { ...baseCatalog().deliveryFeeConfig!, baseFee: 100, crossCategoryFee: 60 } });
     const res = deliveryFeePreview([matLine, sofaLine], catalog);
     expect(res!.base).toBe(100);
