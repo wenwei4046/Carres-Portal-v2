@@ -23,6 +23,18 @@ let controlState: {
   data: OpsOrderControlResponse | undefined;
   isLoading: boolean;
 };
+interface TestLedgerRow {
+  id: string;
+  amount: number;
+  kind: "payment" | "deposit" | "storage";
+  method: string;
+  paid_on: string;
+  receipt_no: string | null;
+}
+let paymentsState: {
+  data: { payments: TestLedgerRow[] } | undefined;
+  isLoading: boolean;
+};
 
 const noopMutation = { mutate: vi.fn(), isPending: false };
 
@@ -32,6 +44,7 @@ vi.mock("@/lib/queries", async () => {
   return {
     ...actual,
     useOrderControl: () => controlState,
+    useOrderPayments: () => paymentsState,
     useDeliveryPartners: () => ({
       data: { partners: [] },
       isLoading: false,
@@ -40,22 +53,33 @@ vi.mock("@/lib/queries", async () => {
     useSaveOrderControl: () => noopMutation,
     useSetOpsAssignedLogistic: () => noopMutation,
     useOperationSetDeliveryDate: () => noopMutation,
+    useRecordPayment: () => noopMutation,
+    useVoidPayment: () => noopMutation,
+    useCollectStorage: () => noopMutation,
+    useRequestStorageWaiver: () => noopMutation,
+    useDecideStorageWaiver: () => noopMutation,
   };
 });
 
-function Harness({ paid, total }: { paid: number; total: number }) {
+function Harness({ paid, total, orderId }: { paid: number; total: number; orderId?: string }) {
   const form = useOrderControlForm("00000000-0000-0000-0000-0000000000a1");
   return (
     <>
       <DeliveryTimeSlotField form={form} />
-      <PaymentControlFields form={form} paid={paid} total={total} />
+      <PaymentControlFields form={form} paid={paid} total={total} orderId={orderId} />
     </>
   );
 }
 
-function renderPieces(props: { paid: number; total: number }) {
+function renderPieces(props: {
+  paid: number;
+  total: number;
+  orderId?: string;
+  payments?: TestLedgerRow[];
+}) {
   controlState = { data: { control: null }, isLoading: false };
-  return render(<Harness paid={props.paid} total={props.total} />);
+  paymentsState = { data: { payments: props.payments ?? [] }, isLoading: false };
+  return render(<Harness paid={props.paid} total={props.total} orderId={props.orderId} />);
 }
 
 describe("Order-control form pieces — split field groups", () => {
@@ -89,5 +113,40 @@ describe("Order-control form pieces — split field groups", () => {
     expect(within(summary).queryByText("Settled")).not.toBeInTheDocument();
     // No bill (total 0 + balance empty) → Outstanding shows the em-dash.
     expect(within(summary).getAllByText("—").length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+/** Balance job (migration 0184) — the ledger path renders when an orderId is
+ *  passed, deriving Outstanding from the real payments (storage excluded). */
+describe("PaymentControlFields — ledger (with orderId)", () => {
+  const ID = "00000000-0000-0000-0000-0000000000a1";
+
+  it("lists ledger entries and derives Outstanding from goods payments", () => {
+    renderPieces({
+      paid: 0,
+      total: 5000,
+      orderId: ID,
+      payments: [
+        { id: "p1", amount: 1000, kind: "deposit", method: "cash", paid_on: "2026-06-20", receipt_no: "R1-1" },
+        { id: "p2", amount: 1500, kind: "payment", method: "bank", paid_on: "2026-06-25", receipt_no: "R1-2" },
+        { id: "p3", amount: 200, kind: "storage", method: "cash", paid_on: "2026-06-26", receipt_no: "R1-3" },
+      ],
+    });
+    const summary = screen.getByTestId("payment-summary");
+    // The ledger block renders + the add-payment entry point.
+    expect(within(summary).getByText("Add payment")).toBeInTheDocument();
+    expect(within(summary).getByText(/R1-1/)).toBeInTheDocument();
+    // Outstanding = bill 5000 − goods (1000 + 1500) = 2500; storage excluded.
+    expect(within(summary).getByText("RM 2,500")).toBeInTheDocument();
+  });
+
+  it("shows the empty-ledger hint when no payments yet", () => {
+    renderPieces({ paid: 0, total: 5000, orderId: ID, payments: [] });
+    expect(screen.getByText("No payments recorded yet.")).toBeInTheDocument();
+  });
+
+  it("offers a balance Due date field", () => {
+    renderPieces({ paid: 0, total: 5000, orderId: ID, payments: [] });
+    expect(screen.getByLabelText("Balance due date")).toBeInTheDocument();
   });
 });

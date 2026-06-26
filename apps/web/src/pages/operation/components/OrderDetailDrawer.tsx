@@ -843,6 +843,7 @@ function DrawerBody({
                 form={form}
                 paid={Number(order.paid || 0)}
                 total={grandTotal}
+                orderId={order.id}
               />
             </FieldGrid>
             <FieldGrid>
@@ -850,6 +851,7 @@ function DrawerBody({
                 form={form}
                 hasMsbf={hasMsbf}
                 hasSof={hasSof}
+                orderId={order.id}
               />
             </FieldGrid>
           </div>

@@ -1,12 +1,19 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
   computeStorageFee,
   STORAGE_RATES,
   DELIVERY_TIME_SLOTS,
   PAYMENT_STATUSES,
+  PAYMENT_METHODS,
+  PAYMENT_KINDS,
+  summarizePayments,
   type UpdateOpsOrderControlInput,
+  type OpsOrderControl,
+  type OrderPaymentRow,
+  type OrderPaymentMethod,
+  type PaymentKind,
 } from "@carres/shared";
 import {
   useDeliveryPartners,
@@ -14,7 +21,14 @@ import {
   useOrderControl,
   useSaveOrderControl,
   useSetOpsAssignedLogistic,
+  useOrderPayments,
+  useRecordPayment,
+  useVoidPayment,
+  useCollectStorage,
+  useRequestStorageWaiver,
+  useDecideStorageWaiver,
 } from "@/lib/queries";
+import { useAuth } from "@/lib/auth";
 import { areaForAddress, suggestCarrier } from "@/lib/region";
 
 /**
@@ -45,6 +59,7 @@ interface Draft {
   storage_to: string;
   storage_fee_override: string;
   balance: string;
+  balance_due_date: string;
   logistic_eta: string;
   paid_amount: string;
   storage_paid: string;
@@ -66,6 +81,7 @@ const EMPTY: Draft = {
   storage_to: "",
   storage_fee_override: "",
   balance: "",
+  balance_due_date: "",
   logistic_eta: "",
   paid_amount: "",
   storage_paid: "",
@@ -134,6 +150,10 @@ export interface OrderControlForm {
   /** Storage-fee inputs from the control overlay (migration 0165). */
   storageFrom: string | null;
   storageOverride: number | null;
+  /** Raw overlay row as loaded — carries the balance job's gate state
+   *  (storage_collected_at / storage_waiver_*) the draft doesn't track
+   *  (migration 0184). null until the row exists / loads. */
+  control: OpsOrderControl | null;
 }
 
 export function useOrderControlForm(orderId: string): OrderControlForm {
@@ -160,6 +180,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       storage_fee_override:
         c.storage_fee_override != null ? String(c.storage_fee_override) : "",
       balance: c.balance != null ? String(c.balance) : "",
+      balance_due_date: c.balance_due_date ?? "",
       logistic_eta: c.logistic_eta ?? "",
       paid_amount: c.paid_amount != null ? String(c.paid_amount) : "",
       storage_paid: c.storage_paid ?? "",
@@ -204,6 +225,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
         ? Number(draft.storage_fee_override)
         : null,
       balance: draft.balance.trim() ? Number(draft.balance) : null,
+      balance_due_date: draft.balance_due_date.trim() ? draft.balance_due_date.trim() : null,
       logistic_eta: draft.logistic_eta.trim() ? draft.logistic_eta.trim() : null,
       paid_amount: draft.paid_amount.trim() ? Number(draft.paid_amount) : null,
       storage_paid: draft.storage_paid.trim() ? draft.storage_paid.trim() : null,
@@ -249,6 +271,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
     storageOverride: draft.storage_fee_override.trim()
       ? Number(draft.storage_fee_override)
       : null,
+    control: data?.control ?? null,
   };
 }
 
@@ -410,25 +433,27 @@ export function DeliveryTimeSlotField({ form }: { form: OrderControlForm }) {
   );
 }
 
-/** Read-only money summary + manual follow-up status → the Payment section. */
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/** Payment section. With an `orderId` it renders the real multi-entry ledger
+ *  (migration 0184) — list + add-payment form + Outstanding from the ledger.
+ *  Without one (the unit-test harness) it keeps the legacy keyed Paid /
+ *  Outstanding so older callers don't regress. */
 export function PaymentControlFields({
   form,
   paid,
   total,
+  orderId,
 }: {
   form: OrderControlForm;
   paid: number;
   total: number;
+  orderId?: string;
 }) {
   const { draft, set } = form;
   // Bill = operator-keyed invoice / owing amount (balance); falls back to the
-  // computed line total for native orders. Paid = keyed paid_amount (partial
-  // support) or the order deposit. Outstanding = Bill − Paid.
+  // computed line total for native orders.
   const bill = draft.balance.trim() ? Number(draft.balance) : total;
-  const effPaid = draft.paid_amount.trim() ? Number(draft.paid_amount) : paid;
-  const hasBill = bill > 0;
-  const outstanding = Math.max(0, bill - effPaid);
-  const settled = hasBill && outstanding <= 0;
   return (
     <div data-testid="payment-summary">
       <FieldRow label="Bill">
@@ -441,25 +466,12 @@ export function PaymentControlFields({
           className={CELL}
         />
       </FieldRow>
-      <FieldRow label="Paid">
-        <input
-          type="number"
-          min={0}
-          value={draft.paid_amount}
-          onChange={(e) => set("paid_amount", e.target.value)}
-          placeholder={paid > 0 ? `${paid} (deposit)` : "key amount paid"}
-          className={CELL}
-        />
-      </FieldRow>
-      <FieldRow label="Outstanding">
-        <div
-          className={`px-2 py-1.5 font-mono text-[12px] font-semibold ${
-            !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
-          }`}
-        >
-          {!hasBill ? "—" : settled ? "Settled" : RM(outstanding)}
-        </div>
-      </FieldRow>
+      <DueDateRow form={form} bill={bill} orderId={orderId} />
+      {orderId ? (
+        <PaymentLedger orderId={orderId} bill={bill} />
+      ) : (
+        <LegacyPaidOutstanding form={form} paid={paid} bill={bill} />
+      )}
       <FieldRow label="Pay status">
         <select
           value={draft.payment_status}
@@ -479,6 +491,287 @@ export function PaymentControlFields({
   );
 }
 
+/** Balance due-date key-in + overdue flag (Jess: the simple tracker's one real
+ *  gap). Overdue = due < today AND there's still an outstanding goods balance. */
+function DueDateRow({
+  form,
+  bill,
+  orderId,
+}: {
+  form: OrderControlForm;
+  bill: number;
+  orderId?: string;
+}) {
+  const { draft, set } = form;
+  const { data } = useOrderPayments(orderId ?? null);
+  const goodsPaid = (data?.payments ?? [])
+    .filter((p) => p.kind !== "storage")
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+  const outstanding = Math.max(0, bill - goodsPaid);
+  const due = draft.balance_due_date.trim();
+  const overdue = !!due && due < todayIso() && outstanding > 0;
+  return (
+    <FieldRow label="Due date">
+      <div className="flex items-center gap-2 px-1 w-full">
+        <input
+          type="date"
+          value={draft.balance_due_date}
+          onChange={(e) => set("balance_due_date", e.target.value)}
+          aria-label="Balance due date"
+          className={CELL + " flex-1"}
+        />
+        {overdue && (
+          <span className="pill pill-overdue inline-flex items-center gap-1 shrink-0">
+            <AlertTriangle size={11} strokeWidth={2.5} />
+            Overdue
+          </span>
+        )}
+      </div>
+    </FieldRow>
+  );
+}
+
+/** Legacy keyed Paid / Outstanding — kept for callers without an orderId. */
+function LegacyPaidOutstanding({
+  form,
+  paid,
+  bill,
+}: {
+  form: OrderControlForm;
+  paid: number;
+  bill: number;
+}) {
+  const { draft, set } = form;
+  const effPaid = draft.paid_amount.trim() ? Number(draft.paid_amount) : paid;
+  const hasBill = bill > 0;
+  const outstanding = Math.max(0, bill - effPaid);
+  const settled = hasBill && outstanding <= 0;
+  return (
+    <>
+      <FieldRow label="Paid">
+        <input
+          type="number"
+          min={0}
+          value={draft.paid_amount}
+          onChange={(e) => set("paid_amount", e.target.value)}
+          placeholder={paid > 0 ? `${paid} (deposit)` : "key amount paid"}
+          className={CELL}
+        />
+      </FieldRow>
+      <FieldRow label="Outstanding">
+        <div
+          className={`px-2 py-1.5 font-mono text-[12px] font-semibold ${
+            !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
+          }`}
+        >
+          {!hasBill ? "—" : settled ? "Settled" : RM(outstanding)}
+        </div>
+      </FieldRow>
+    </>
+  );
+}
+
+const KIND_LABEL: Record<PaymentKind, string> = {
+  payment: "payment",
+  deposit: "deposit",
+  storage: "storage",
+};
+
+/** The real payment ledger for an order: list of entries + an inline
+ *  "Add payment" form, with Paid / Outstanding derived live (storage excluded
+ *  from the goods balance). Principal can void a mis-keyed row. */
+function PaymentLedger({ orderId, bill }: { orderId: string; bill: number }) {
+  const role = useAuth((s) => s.role);
+  const isPrincipal = role === "principal";
+  const { data, isLoading } = useOrderPayments(orderId);
+  const payments = data?.payments ?? [];
+  const summary = summarizePayments(
+    payments.map((p) => ({ amount: Number(p.amount), kind: p.kind })),
+    bill,
+  );
+  const hasBill = bill > 0;
+  const settled = hasBill && summary.outstanding <= 0;
+
+  const record = useRecordPayment(orderId, {
+    onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
+  });
+  const voidPay = useVoidPayment(orderId, {
+    onError: (e) => toast.error(`Couldn't void — ${e.message}`),
+  });
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <FieldRow label="Payments">
+      <div className="px-1.5 py-1.5 w-full space-y-1.5">
+        {isLoading && <div className="text-[11px] text-base-400">Loading…</div>}
+        {!isLoading && payments.length === 0 && (
+          <div className="text-[11px] text-base-400">No payments recorded yet.</div>
+        )}
+        {payments.map((p) => (
+          <LedgerRow
+            key={p.id}
+            row={p}
+            canVoid={isPrincipal && !voidPay.isPending}
+            onVoid={() => voidPay.mutate(p.id)}
+          />
+        ))}
+
+        {adding ? (
+          <AddPaymentForm
+            pending={record.isPending}
+            onCancel={() => setAdding(false)}
+            onSubmit={(input) =>
+              record.mutate(input, { onSuccess: () => setAdding(false) })
+            }
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+          >
+            <Plus size={12} strokeWidth={2.5} /> Add payment
+          </button>
+        )}
+
+        <div className="flex items-center justify-between border-t border-base-100 pt-1.5 mt-1.5 text-[12px]">
+          <span className="text-base-500">Paid {RM(summary.byKind.payment + summary.byKind.deposit)}</span>
+          <span
+            className={`font-mono font-semibold ${
+              !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
+            }`}
+          >
+            {!hasBill ? "—" : settled ? "Settled" : RM(summary.outstanding)}
+          </span>
+        </div>
+      </div>
+    </FieldRow>
+  );
+}
+
+/** One ledger line: date · amount · kind · method · receipt, with a void ✕ for
+ *  the principal. */
+function LedgerRow({
+  row,
+  canVoid,
+  onVoid,
+}: {
+  row: OrderPaymentRow;
+  canVoid: boolean;
+  onVoid: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-[11.5px]">
+      <span className="text-base-500 tabular-nums w-[68px] shrink-0">{row.paid_on}</span>
+      <span className="font-mono font-semibold text-base-900 w-[78px] shrink-0">
+        {RM(Number(row.amount))}
+      </span>
+      <span className="text-base-600 capitalize flex-1 truncate">
+        {KIND_LABEL[row.kind]} · {row.method}
+        {row.receipt_no ? ` · ${row.receipt_no}` : ""}
+      </span>
+      {canVoid && (
+        <button
+          type="button"
+          onClick={onVoid}
+          title="Void this entry"
+          aria-label={`Void payment ${row.receipt_no ?? row.id}`}
+          className="text-base-400 hover:text-danger shrink-0"
+        >
+          <Trash2 size={12} strokeWidth={2} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Inline add-payment form: amount · date · method · kind → Record. */
+function AddPaymentForm({
+  pending,
+  onCancel,
+  onSubmit,
+}: {
+  pending: boolean;
+  onCancel: () => void;
+  onSubmit: (input: {
+    amount: number;
+    paidOn: string;
+    method: OrderPaymentMethod;
+    kind: PaymentKind;
+  }) => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [paidOn, setPaidOn] = useState(todayIso());
+  const [method, setMethod] = useState<OrderPaymentMethod>("cash");
+  const [kind, setKind] = useState<PaymentKind>("payment");
+  const amt = Number(amount);
+  const valid = amount.trim() !== "" && Number.isFinite(amt) && amt > 0 && !pending;
+  return (
+    <div className="border border-base-200 rounded-[3px] p-2 space-y-1.5 bg-base-50">
+      <div className="grid grid-cols-2 gap-1.5">
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="Amount (RM)"
+          aria-label="Payment amount"
+          className={CELL}
+        />
+        <input
+          type="date"
+          value={paidOn}
+          onChange={(e) => setPaidOn(e.target.value)}
+          aria-label="Payment date"
+          className={CELL}
+        />
+        <select
+          value={method}
+          onChange={(e) => setMethod(e.target.value as OrderPaymentMethod)}
+          aria-label="Payment method"
+          className={CELL}
+        >
+          {PAYMENT_METHODS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value as PaymentKind)}
+          aria-label="Payment kind"
+          className={CELL}
+        >
+          {PAYMENT_KINDS.filter((k) => k !== "storage").map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!valid}
+          onClick={() => onSubmit({ amount: amt, paidOn, method, kind })}
+          className="btn-primary text-[11px] py-1 px-2.5 disabled:opacity-50"
+        >
+          {pending ? "Recording…" : "Record"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-[11px] text-base-500 hover:text-base-700"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Storage block → the RIGHT column of the Payment panel (Jess): accrues from
  *  the ETA per the locked rule; leave the fee blank for the auto amount
  *  (shown as the placeholder) or key a number to override. */
@@ -486,10 +779,12 @@ export function StorageControlFields({
   form,
   hasMsbf = false,
   hasSof = false,
+  orderId,
 }: {
   form: OrderControlForm;
   hasMsbf?: boolean;
   hasSof?: boolean;
+  orderId?: string;
 }) {
   const { draft, set } = form;
   const today = new Date().toISOString().slice(0, 10);
@@ -631,9 +926,235 @@ export function StorageControlFields({
               <option value="Paid">Paid</option>
             </select>
           </FieldRow>
+          {orderId && (
+            <StorageCollectWaiver
+              orderId={orderId}
+              control={form.control}
+              charge={draft.storage_fee_override.trim() ? Number(draft.storage_fee_override) : storage.total}
+            />
+          )}
         </>
       )}
     </>
+  );
+}
+
+/** Collect-before-delivery (migration 0184): collect the storage fee → issue a
+ *  receipt → open the delivery gate. A waiver is the principal-approved
+ *  alternative. Reads the gate state off the loaded overlay row (form.control).
+ *  Jess IS the principal, so this never gates him — it's the operator guardrail. */
+function StorageCollectWaiver({
+  orderId,
+  control,
+  charge,
+}: {
+  orderId: string;
+  control: OpsOrderControl | null;
+  charge: number;
+}) {
+  const role = useAuth((s) => s.role);
+  const isPrincipal = role === "principal";
+  const collectedAt = control?.storage_collected_at ?? null;
+  const waiverStatus = control?.storage_waiver_status ?? "none";
+
+  const collect = useCollectStorage(orderId, {
+    onSuccess: () => toast.success("Storage fee collected — receipt issued"),
+    onError: (e) => toast.error(`Couldn't collect — ${e.message}`),
+  });
+  const requestWaiver = useRequestStorageWaiver(orderId, {
+    onSuccess: () => toast.success("Waiver requested — pending principal approval"),
+    onError: (e) => toast.error(`Couldn't request — ${e.message}`),
+  });
+  const decideWaiver = useDecideStorageWaiver(orderId, {
+    onError: (e) => toast.error(`Couldn't decide — ${e.message}`),
+  });
+
+  const [collecting, setCollecting] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<OrderPaymentMethod>("cash");
+
+  // Already cleared → just confirm the gate is open.
+  if (collectedAt) {
+    return (
+      <FieldRow label="Collected">
+        <div className="px-2 py-1.5 text-[12px] text-success font-semibold inline-flex items-center gap-1">
+          <ShieldCheck size={13} strokeWidth={2.5} />
+          Collected {String(collectedAt).slice(0, 10)} · delivery unlocked
+        </div>
+      </FieldRow>
+    );
+  }
+  if (waiverStatus === "approved") {
+    return (
+      <FieldRow label="Waiver">
+        <div className="px-2 py-1.5 text-[12px] text-success font-semibold inline-flex items-center gap-1">
+          <ShieldCheck size={13} strokeWidth={2.5} />
+          Waived by principal · delivery unlocked
+        </div>
+      </FieldRow>
+    );
+  }
+
+  return (
+    <FieldRow label="Collect">
+      <div className="px-1.5 py-1.5 w-full space-y-1.5">
+        <div className="text-[11px] text-warning font-medium">
+          Storage fee must be collected (or waived) before dispatch.
+        </div>
+
+        {/* Collect */}
+        {collecting ? (
+          <div className="border border-base-200 rounded-[3px] p-2 space-y-1.5 bg-base-50">
+            <div className="grid grid-cols-2 gap-1.5">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={charge > 0 ? `${Math.round(charge)} (fee)` : "Amount (RM)"}
+                aria-label="Storage amount collected"
+                className={CELL}
+              />
+              <select
+                value={method}
+                onChange={(e) => setMethod(e.target.value as OrderPaymentMethod)}
+                aria-label="Storage payment method"
+                className={CELL}
+              >
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={collect.isPending}
+                onClick={() => {
+                  const amt = amount.trim() ? Number(amount) : charge;
+                  if (!Number.isFinite(amt) || amt <= 0) {
+                    toast.error("Enter the amount collected");
+                    return;
+                  }
+                  collect.mutate(
+                    { amount: amt, paidOn: todayIso(), method },
+                    { onSuccess: () => setCollecting(false) },
+                  );
+                }}
+                className="btn-primary text-[11px] py-1 px-2.5 disabled:opacity-50"
+              >
+                {collect.isPending ? "Collecting…" : "Collect + receipt"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCollecting(false)}
+                className="text-[11px] text-base-500 hover:text-base-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setCollecting(true)}
+              className="btn-primary text-[11px] py-1 px-2.5"
+            >
+              Collect storage fee
+            </button>
+            {waiverStatus !== "requested" && (
+              <button
+                type="button"
+                onClick={() => setRequesting((v) => !v)}
+                className="text-[11px] text-base-500 hover:text-base-700"
+              >
+                Request waiver
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Waiver request (operator) */}
+        {requesting && waiverStatus !== "requested" && (
+          <div className="border border-base-200 rounded-[3px] p-2 space-y-1.5 bg-base-50">
+            <textarea
+              rows={2}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Reason for waiver (the principal reviews this)"
+              aria-label="Waiver reason"
+              className={CELL + " resize-y block"}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={reason.trim().length < 3 || requestWaiver.isPending}
+                onClick={() =>
+                  requestWaiver.mutate(
+                    { reason: reason.trim() },
+                    { onSuccess: () => setRequesting(false) },
+                  )
+                }
+                className="btn-primary text-[11px] py-1 px-2.5 disabled:opacity-50"
+              >
+                {requestWaiver.isPending ? "Requesting…" : "Submit request"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRequesting(false)}
+                className="text-[11px] text-base-500 hover:text-base-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Waiver pending — operator sees status, principal decides */}
+        {waiverStatus === "requested" && (
+          <div className="border border-warning/40 bg-warning-soft/40 rounded-[3px] p-2 space-y-1.5">
+            <div className="text-[11px] text-base-700">
+              <span className="pill pill-warning mr-1.5">Waiver requested</span>
+              {control?.storage_waiver_reason ?? ""}
+            </div>
+            {isPrincipal ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={decideWaiver.isPending}
+                  onClick={() => decideWaiver.mutate({ decision: "approved" })}
+                  className="btn-primary text-[11px] py-1 px-2.5 disabled:opacity-50"
+                >
+                  Approve waiver
+                </button>
+                <button
+                  type="button"
+                  disabled={decideWaiver.isPending}
+                  onClick={() => decideWaiver.mutate({ decision: "rejected" })}
+                  className="text-[11px] text-danger hover:underline"
+                >
+                  Reject
+                </button>
+              </div>
+            ) : (
+              <div className="text-[11px] text-base-500">Awaiting principal approval.</div>
+            )}
+          </div>
+        )}
+
+        {waiverStatus === "rejected" && (
+          <div className="text-[11px] text-danger">
+            Waiver rejected — collect the fee to dispatch.
+          </div>
+        )}
+      </div>
+    </FieldRow>
   );
 }
 
