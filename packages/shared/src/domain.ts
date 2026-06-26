@@ -5,6 +5,7 @@
 
 import type { CostSource, OperationStage } from "./db-types";
 import type { FabricTier } from "./fabric-tier";
+import type { RuleTarget } from "./rule-target";
 
 // Re-exported so UI code can write `import type { CostSource } from
 // "@carres/shared/domain"` alongside the rest of the camelCase surface.
@@ -259,6 +260,44 @@ export interface FloorConfig {
   id: number;
   freeUpToFloor: number;
   perFloorPerItem: number;
+}
+
+/**
+ * `delivery_fee_config` singleton (migration 0184, 2990s Products parity Phase
+ * 6). The delivery TRIP fee — distinct from the floor STAIR surcharge in
+ * `FloorConfig` (both coexist + fold into the order total). `baseFee` is charged
+ * once per order that contains ≥1 charged-category line; `crossCategoryFee` is
+ * added once when an order mixes sofa with mattress/bedframe; `chargedCategories`
+ * is which product categories incur the base fee (principal-selected). The lead
+ * days are surfaced for principal editing (Carres's current lead-time rule).
+ * Dormant by default: seeds `baseFee=0`/`crossCategoryFee=0` → byte-identical
+ * totals until the principal sets rates. (The singleton `id` is dropped — the
+ * domain shape doubles as the pure `computeDeliveryFee` config.)
+ */
+export interface DeliveryFeeConfig {
+  baseFee: number;
+  crossCategoryFee: number;
+  chargedCategories: string[];
+  mattressBedframeLeadDays: number;
+  sofaLeadDays: number;
+}
+
+/**
+ * One `special_delivery_fee_rules` row (migration 0184). A per-RuleTarget
+ * override of the base delivery fee. `target` is a RuleTarget[] (scopes
+ * model/variant/combo/compartment) — a matched line's `standaloneFee` supersedes
+ * the config `baseFee` (highest wins, folded by `computeDeliveryFee`);
+ * `crossCategoryFollowupFee` is the reduced rate when THIS order is a
+ * cross-category follow-up linked to the customer's earlier SO. Principal-owned.
+ */
+export interface SpecialDeliveryFeeRule {
+  id: string;
+  target: RuleTarget[];
+  standaloneFee: number;
+  crossCategoryFollowupFee: number;
+  label: string | null;
+  active: boolean;
+  sortOrder: number;
 }
 
 export interface Warehouse {

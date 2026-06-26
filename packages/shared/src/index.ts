@@ -206,6 +206,19 @@ export {
   type CatalogOptionPoolDto,
   type CatalogOptionPoolCreateInput,
   type CatalogOptionPoolPatchInput,
+  // 0184 — delivery fee config + special rules + RuleTarget schemas/inputs.
+  deliveryFeeConfigSchema,
+  deliveryFeeConfigPatchInput,
+  ruleTargetScopeSchema,
+  ruleTargetSchema,
+  specialDeliveryFeeRuleSchema,
+  specialDeliveryFeeRuleInput,
+  type DeliveryFeeConfigDto,
+  type DeliveryFeeConfigPatchInput,
+  type RuleTargetScopeValue,
+  type RuleTargetDto,
+  type SpecialDeliveryFeeRuleDto,
+  type SpecialDeliveryFeeRuleInput,
 } from "./schemas/catalog";
 
 export {
@@ -520,6 +533,42 @@ export type { SpecialAddon } from "./domain";
 // schemas/catalog block above as CatalogOptionPoolName).
 export type { CatalogOptionPool } from "./domain";
 export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
+
+// 0184 — 2990s Products parity Phase 6: the unified RuleTarget matcher (PURE,
+// shared by the delivery-fee subsystem and any future rule consumer). Combo
+// subset-matching delegates to the existing `matchSofaCombo`; compartment
+// normalization to the existing `normalizeCompartmentCode`.
+export {
+  parseRuleTargets,
+  parseTargetRefinement,
+  refinementMatchesLine,
+  lineMatchesTarget,
+  lineMatchesTargets,
+  type RuleTargetScope,
+  type TargetRefinement,
+  type RuleTarget,
+  type RuleLineInput,
+} from "./rule-target";
+
+// 0184 — the PURE delivery TRIP fee engine + the special-rule matcher. The POS
+// preview and the Hono server-recompute import the SAME `computeDeliveryFee`.
+// `DeliveryFeeConfig` is the domain config (re-exported from delivery-fee, which
+// pulls it from ./domain — single source of truth, no duplicate export).
+export {
+  computeDeliveryFee,
+  specialModelsForLines,
+  type DeliveryFeeConfig,
+  type SpecialModelDeliveryFee,
+  type DeliveryFeeInput,
+  type DeliveryFeeResult,
+  type SpecialDeliveryRule,
+} from "./delivery-fee";
+
+// 0184 — the special-delivery-rule domain row type (camelCased). The config
+// domain type ships from the delivery-fee block above; the row→domain adapters
+// (deliveryFeeConfigFromRow / specialDeliveryFeeRuleFromRow) are reached via
+// `Adapters.*` like comboFromRow.
+export type { SpecialDeliveryFeeRule } from "./domain";
 
 // Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo
 // match + explodeSofaBuild). No DB/IO; runs identically on web + (Phase 4) Hono.

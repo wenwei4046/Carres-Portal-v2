@@ -20,6 +20,15 @@ import ConfirmDateModal from "./order-actions/ConfirmDateModal";
 import EditOrderModal from "./order-actions/EditOrderModal";
 import TopUpDepositModal from "./order-actions/TopUpDepositModal";
 
+/** 0184 — friendly labels for the delivery TRIP fee addons the Hono recompute
+ *  appends (keys seeded by migration 0184). Unknown keys fall back to the raw
+ *  addon key (disposal addons etc. render as before). */
+const DELIVERY_ADDON_LABELS: Record<string, string> = {
+  DELIVERY: "Delivery fee",
+  DELIVERY_CROSS: "Cross-category delivery",
+  DELIVERY_ADD: "Additional delivery fee",
+};
+
 export default function DealerOrderDetail({
   id,
   onClose,
@@ -232,11 +241,22 @@ function OrderBody({
             typeof (a.attrs as { size?: unknown }).size === "string"
               ? ((a.attrs as { size: string }).size)
               : null;
+          // 0184 — delivery trip fee addons (appended by the Hono recompute)
+          // render with a friendly label; the base line may carry the linked
+          // source SO when it's a cross-category follow-up.
+          const deliveryLabel = DELIVERY_ADDON_LABELS[a.addonKey] ?? null;
+          const sourceSo =
+            typeof a.attrs === "object" &&
+            a.attrs !== null &&
+            typeof (a.attrs as { cross_category_source_so?: unknown }).cross_category_source_so === "string"
+              ? ((a.attrs as { cross_category_source_so: string }).cross_category_source_so)
+              : null;
           return (
             <div key={a.id} className={`flex justify-between px-3.5 py-2.5 text-sm text-base-600 ${(order.lines?.length ?? 0) + i > 0 ? "border-t border-base-100" : ""}`}>
               <span className="font-mono">
-                + {a.addonKey}
+                + {deliveryLabel ?? a.addonKey}
                 {size && <span className="text-base-700"> · {size}</span>}
+                {sourceSo && <span className="text-base-700"> · ↳ {sourceSo}</span>}
                 {" "}× {a.qty}
               </span>
               <span className="font-mono">RM {(a.unitPrice * a.qty).toLocaleString()}</span>

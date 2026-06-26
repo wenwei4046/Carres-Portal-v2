@@ -210,6 +210,17 @@ export const createOrderInputSchema = z.object({
    *  IGNORES this field (no spoofing); only an internal role with no own
    *  dealer_id has its value honored. */
   dealerId: z.string().uuid().optional(),
+  /** 0184 (2990s parity Phase 6) — the operator's free-form additional delivery
+   *  fee (RM, ≥0). OPTIONAL: non-POS callers omit it. The Hono recompute is
+   *  authoritative for the base + cross-category portions; only this additional
+   *  fee + `crossCategorySourceSo` come from the client. */
+  additionalDeliveryFee: z.number().nonnegative().optional(),
+  /** 0184 — the customer's earlier SO this order is a cross-category follow-up
+   *  of (the base was paid on that SO → this order owes only the reduced cross
+   *  rate). OPTIONAL + nullable: non-follow-up orders omit / null it. Hono
+   *  validates the linked SO (exists / same customer / not cancelled / not
+   *  already linked) before booking. */
+  crossCategorySourceSo: z.string().nullable().optional(),
 }).superRefine((data, ctx) => {
   // Phase 11.1 — Proceed date pairs with Delivery date. When the order is NOT
   // marked TBD, both dates are required and proceed date must be on/before the

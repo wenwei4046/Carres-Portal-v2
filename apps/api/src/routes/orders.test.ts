@@ -621,6 +621,10 @@ describe("POST /api/orders", () => {
     expect(sentPayload.customer_name).toBe("Tan Mei Ling");
     expect(sentPayload.deposit_pct).toBe(50);
     expect((sentPayload.lines as unknown[])).toHaveLength(1);
+    // 0184 — the delivery-fee recompute runs on the dormant 0-rate config in
+    // this harness (the shared mock can't return a configured rate), so it
+    // appends NO delivery addon — the payload addons stay byte-identical.
+    expect((sentPayload.addons as unknown[])).toHaveLength(0);
 
     // Then re-fetched the order by id
     expect(sb._eqs).toContainEqual(["id", NEW_ORDER_ID]);

@@ -1,4 +1,11 @@
-import type { FloorConfigDto, Order } from "@carres/shared";
+import type {
+  CatalogResponse,
+  DeliveryFeeResult,
+  FloorConfigDto,
+  Order,
+  RuleLineInput,
+} from "@carres/shared";
+import { computeDeliveryFee, specialModelsForLines } from "@carres/shared";
 
 /**
  * Pure-function order math. Mirrors the prototype helpers (proto/store.jsx
@@ -57,4 +64,122 @@ export function floorSurcharge(order: Order, cfg: FloorConfigDto): number {
 
 export function orderTotal(order: Order, cfg: FloorConfigDto): number {
   return lineSubtotal(order) + addonSubtotal(order) + floorSurcharge(order, cfg);
+}
+
+// ---------------------------------------------------------------------------
+// 0184 — delivery TRIP fee PREVIEW (2990s Products parity Phase 6). The POS
+// preview runs the SAME pure `computeDeliveryFee` the Hono recompute uses, so
+// the dealer sees the fee the server will charge in the common case. The server
+// is AUTHORITATIVE (it re-runs the engine against fresh config + rules and
+// appends the fee as order_addons); this is preview-only and is NOT submitted.
+//
+// The floor STAIR surcharge (floorSurcharge above) is a DIFFERENT charge and is
+// KEPT — the delivery trip fee is ADDITIVE.
+// ---------------------------------------------------------------------------
+
+/** A cart line reduced to what the delivery matcher needs (structural subset of
+ *  a `DraftLine` / `OrderLine` — `sku` + free-form `attrs`). */
+export interface DeliveryCartLine {
+  sku: string;
+  attrs: Record<string, unknown> | null;
+}
+
+/** Flatten cart lines → `RuleLineInput[]` (mirrors the Hono recompute's
+ *  `buildRuleLines`): resolve each sku → model/category/variant from the catalog
+ *  bundle; a sofa build line (attrs.sofa_build.cells) contributes its module
+ *  codes as `builtCompartments`. Pure. */
+export function buildDeliveryRuleLines(
+  lines: DeliveryCartLine[],
+  catalog: CatalogResponse,
+): RuleLineInput[] {
+  const modelById = new Map(catalog.models.map((m) => [m.id, m]));
+  const skuInfo = new Map<string, { modelId: string | null; category: string; variant: string | null }>();
+  for (const s of catalog.skus) {
+    skuInfo.set(s.sku, {
+      modelId: s.modelId ?? null,
+      category: modelById.get(s.modelId)?.category ?? "",
+      variant: s.variant ?? null,
+    });
+  }
+
+  const out: RuleLineInput[] = [];
+  for (const line of lines) {
+    const attrs = (line.attrs ?? {}) as Record<string, unknown>;
+    const info = skuInfo.get(line.sku) ?? null;
+
+    // A sofa build line carries the full geometry descriptor (POS builds are
+    // NOT exploded client-side — the explode happens server-side on submit).
+    const sofaBuild = attrs.sofa_build as { cells?: Array<{ moduleCode?: unknown }> } | undefined;
+    if (sofaBuild && Array.isArray(sofaBuild.cells)) {
+      const modules = sofaBuild.cells
+        .map((c) => String(c?.moduleCode ?? "").trim())
+        .filter(Boolean);
+      out.push({
+        category: info?.category || "sofa",
+        modelId: info?.modelId ?? null,
+        sizeCode: null,
+        builtCompartments: modules,
+      });
+      continue;
+    }
+
+    const category = info?.category ?? "";
+    const isSofa = category.toLowerCase() === "sofa";
+    out.push({
+      category,
+      modelId: info?.modelId ?? null,
+      sizeCode: !isSofa && info?.variant ? info.variant.toUpperCase() : null,
+      builtCompartments: [],
+    });
+  }
+  return out;
+}
+
+/**
+ * POS delivery-fee preview. Returns null when the bundle carries no
+ * `deliveryFeeConfig` (pre-0184 / not loaded). Dormant config (0/0) + no
+ * matching special rule + no additional fee → a 0 result (the caller hides
+ * 0 lines, so totals stay byte-identical).
+ */
+export function deliveryFeePreview(
+  lines: DeliveryCartLine[],
+  catalog: CatalogResponse,
+  opts?: { additionalFee?: number; isCrossCategoryFollowup?: boolean },
+): DeliveryFeeResult | null {
+  const config = catalog.deliveryFeeConfig;
+  if (!config) return null;
+
+  const ruleLines = buildDeliveryRuleLines(lines, catalog);
+
+  // Distinct charged categories present (∩ config.chargedCategories).
+  const chargedSet = new Set(config.chargedCategories.map((c) => c.toLowerCase()));
+  const present = new Set<string>();
+  for (const l of ruleLines) {
+    const cat = l.category.toLowerCase();
+    if (cat && chargedSet.has(cat)) present.add(cat);
+  }
+
+  // combo subset matching needs the combo id → slots map (sofa combos).
+  const comboModulesById = new Map<string, string[][]>(
+    (catalog.sofaCombos ?? []).map((c) => [c.id, c.slots]),
+  );
+
+  const rules = (catalog.specialDeliveryFeeRules ?? [])
+    .filter((r) => r.active)
+    .map((r) => ({
+      target: r.target,
+      standaloneFee: r.standaloneFee,
+      crossCategoryFollowupFee: r.crossCategoryFollowupFee,
+    }));
+  const specialModels = specialModelsForLines(ruleLines, rules, comboModulesById);
+
+  return computeDeliveryFee(
+    {
+      categoryIds: Array.from(present),
+      specialModels,
+      isCrossCategoryFollowup: opts?.isCrossCategoryFollowup ?? false,
+      additionalFee: opts?.additionalFee ?? 0,
+    },
+    config,
+  );
 }

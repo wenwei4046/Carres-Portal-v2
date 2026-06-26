@@ -35,6 +35,12 @@ vi.mock("@/lib/queries", () => ({
   useCreateSofaCompartment:  () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useUpdateSofaCompartment:  () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteSofaCompartment:  () => ({ mutate: vi.fn(), isPending: false }),
+  // 0184 — delivery TRIP fee hooks (MaintenanceTab now renders the trip-fee +
+  // special-rules sections).
+  useUpdateDeliveryFeeConfig:       () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateSpecialDeliveryFeeRule:  () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useUpdateSpecialDeliveryFeeRule:  () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useDeleteSpecialDeliveryFeeRule:  () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 // ---------------------------------------------------------------------------
