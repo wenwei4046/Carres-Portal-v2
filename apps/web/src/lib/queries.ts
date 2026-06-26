@@ -87,6 +87,11 @@ import {
   type OpsOrderControl,
   type OpsOrderControlResponse,
   type UpdateOpsOrderControlInput,
+  type OrderPaymentRow,
+  type RecordPaymentInput,
+  type CollectStorageInput,
+  type RequestStorageWaiverInput,
+  type DecideStorageWaiverInput,
   type SetOpsAssignedLogisticInput,
   type SoGridResponse,
   type SoGridConfig,
@@ -162,6 +167,10 @@ export const qk = {
      *  drawer. Nested under the order id so a blunt ["operation","orders"]
      *  invalidation after any order mutation refreshes it too. */
     orderControl: (id: string) => ["operation", "orders", id, "control"] as const,
+    /** Balance job (migration 0184) — the multi-entry payment ledger for an
+     *  order. Nested under the order id so a blunt ["operation","orders"]
+     *  invalidation after any order mutation refreshes it too. */
+    orderPayments: (id: string) => ["operation", "orders", id, "payments"] as const,
     partners:  () => ["operation", "partners"] as const,
     suppliers: () => ["operation", "suppliers"] as const,
     pos:       (filters?: operationPoFilters) =>
@@ -2598,6 +2607,153 @@ export function useSaveOrderControl(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+// ===========================================================================
+// Balance job (migration 0184) — payment ledger + storage collect / waiver.
+// ===========================================================================
+/** Read the order's payment ledger (newest first). `null` id disables. */
+export function useOrderPayments(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<{ payments: OrderPaymentRow[] }>>,
+) {
+  return useQuery({
+    queryKey: orderId
+      ? qk.operation.orderPayments(orderId)
+      : (["operation", "orders", "null", "payments"] as const),
+    queryFn: () =>
+      apiFetch<{ payments: OrderPaymentRow[] }>(
+        `/api/operation/orders/${orderId}/payments`,
+      ),
+    enabled: !!orderId,
+    staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/** After any money mutation, refresh the ledger + the overlay (gate state) + the
+ *  order detail/list + the Payments panel so every surface agrees at once. */
+function invalidateOrderMoney(
+  qc: ReturnType<typeof useQueryClient>,
+  orderId: string,
+) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: qk.operation.orderPayments(orderId), exact: true }),
+    qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true }),
+    qc.invalidateQueries({ queryKey: ["operation", "orders"] }),
+    qc.invalidateQueries({ queryKey: ["operation", "payments"] }),
+  ]);
+}
+
+/** Record one payment on the ledger. */
+export function useRecordPayment(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ payment: OrderPaymentRow }, ApiError, RecordPaymentInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ payment: OrderPaymentRow }, ApiError, RecordPaymentInput>({
+    mutationFn: (input) =>
+      apiFetch<{ payment: OrderPaymentRow }>(
+        `/api/operation/orders/${orderId}/payments`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateOrderMoney(qc, orderId);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Void a mis-keyed ledger entry (principal only — server-enforced). */
+export function useVoidPayment(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ ok: true }, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ ok: true }, ApiError, string>({
+    mutationFn: (paymentId) =>
+      apiFetch<{ ok: true }>(
+        `/api/operation/orders/${orderId}/payments/${paymentId}`,
+        { method: "DELETE" },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateOrderMoney(qc, orderId);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Collect the storage fee — records a kind:'storage' payment + opens the
+ *  delivery gate (storage_collected_at). */
+export function useCollectStorage(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { payment: OrderPaymentRow; control: OpsOrderControl },
+      ApiError,
+      CollectStorageInput
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<
+    { payment: OrderPaymentRow; control: OpsOrderControl },
+    ApiError,
+    CollectStorageInput
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ payment: OrderPaymentRow; control: OpsOrderControl }>(
+        `/api/operation/orders/${orderId}/storage/collect`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateOrderMoney(qc, orderId);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Operator requests a storage-fee waiver (reason mandatory). */
+export function useRequestStorageWaiver(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ control: OpsOrderControl }, ApiError, RequestStorageWaiverInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ control: OpsOrderControl }, ApiError, RequestStorageWaiverInput>({
+    mutationFn: (input) =>
+      apiFetch<{ control: OpsOrderControl }>(
+        `/api/operation/orders/${orderId}/storage/waiver/request`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateOrderMoney(qc, orderId);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Principal decides a pending storage waiver (approve opens the gate). */
+export function useDecideStorageWaiver(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ control: OpsOrderControl }, ApiError, DecideStorageWaiverInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ control: OpsOrderControl }, ApiError, DecideStorageWaiverInput>({
+    mutationFn: (input) =>
+      apiFetch<{ control: OpsOrderControl }>(
+        `/api/operation/orders/${orderId}/storage/waiver/decide`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateOrderMoney(qc, orderId);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
