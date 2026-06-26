@@ -40,6 +40,12 @@ export const recordPaymentInputSchema = z.object({
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
 
+/** Collect a storage fee — POST /api/operation/orders/:id/storage/collect. Same
+ *  shape as a payment minus `kind` (the route forces `kind:'storage'` + stamps
+ *  ops_order_control.storage_collected_at, which opens the delivery gate). */
+export const collectStorageInput = recordPaymentInputSchema.omit({ kind: true });
+export type CollectStorageInput = z.infer<typeof collectStorageInput>;
+
 /** One ledger row as the API returns it (snake_case DB shape from `order_payments`). */
 export interface OrderPaymentRow {
   id: string;

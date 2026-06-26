@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { computeStorageFee, STORAGE_RATES } from "./ops-order-control";
+import {
+  computeStorageFee,
+  STORAGE_RATES,
+  storageCategoryForSku,
+  orderStorageScope,
+  computeOrderStorage,
+  requestStorageWaiverInput,
+  decideStorageWaiverInput,
+} from "./ops-order-control";
 
 /**
  * Storage-fee rules (Jess 2026-06-12): accrues from the ETA, charged per
@@ -51,5 +59,115 @@ describe("computeStorageFee", () => {
     expect(STORAGE_RATES.msbf.periodDays).toBe(30);
     expect(STORAGE_RATES.sof.amount).toBe(200);
     expect(STORAGE_RATES.sof.periodDays).toBe(14);
+  });
+});
+
+/** Storage scope — the gate categorises a SKU exactly like the Payments panel
+ *  (one definition, three consumers: panel, drawer, server gate). */
+describe("storageCategoryForSku", () => {
+  it("maps mattress / bed frame to msbf", () => {
+    expect(storageCategoryForSku("mattress:Queen")).toBe("msbf");
+    expect(storageCategoryForSku("BEDFRAME:King")).toBe("msbf");
+    expect(storageCategoryForSku("MS1001")).toBe("msbf");
+    expect(storageCategoryForSku("bf22")).toBe("msbf");
+  });
+  it("maps sofa to sof", () => {
+    expect(storageCategoryForSku("sofa:3-seater")).toBe("sof");
+    expect(storageCategoryForSku("SOF900")).toBe("sof");
+    expect(storageCategoryForSku("sf12")).toBe("sof");
+  });
+  it("everything else is other", () => {
+    expect(storageCategoryForSku("PILLOW-01")).toBe("other");
+    expect(storageCategoryForSku("SVC-DISPOSAL")).toBe("other");
+  });
+});
+
+describe("orderStorageScope", () => {
+  it("flags msbf and sof independently across the line set", () => {
+    expect(orderStorageScope(["MS1", "PILLOW"])).toEqual({ hasMsbf: true, hasSof: false });
+    expect(orderStorageScope(["sofa:x"])).toEqual({ hasMsbf: false, hasSof: true });
+    expect(orderStorageScope(["MS1", "sofa:x"])).toEqual({ hasMsbf: true, hasSof: true });
+    expect(orderStorageScope(["PILLOW", "SVC-X"])).toEqual({ hasMsbf: false, hasSof: false });
+  });
+});
+
+/** computeOrderStorage — the single "is a storage fee owed?" gate input. */
+describe("computeOrderStorage", () => {
+  it("not due with no storage start and no override", () => {
+    const r = computeOrderStorage({
+      storageFrom: null,
+      deliveryDate: null,
+      override: null,
+      skus: ["MS1"],
+      asOf: "2026-06-26",
+    });
+    expect(r.due).toBe(false);
+    expect(r.amount).toBe(0);
+  });
+
+  it("accrues from the ETA when no manual start is set", () => {
+    const r = computeOrderStorage({
+      storageFrom: null,
+      deliveryDate: "2026-06-01",
+      override: null,
+      skus: ["MS1"],
+      asOf: "2026-06-26",
+    });
+    expect(r.hasMsbf).toBe(true);
+    expect(r.computed).toBe(150); // 25 days → 1 commenced month
+    expect(r.amount).toBe(150);
+    expect(r.due).toBe(true);
+  });
+
+  it("a manual storage_from overrides the ETA as the clock start", () => {
+    const r = computeOrderStorage({
+      storageFrom: "2026-06-25",
+      deliveryDate: "2026-01-01",
+      override: null,
+      skus: ["sofa:x"],
+      asOf: "2026-06-26",
+    });
+    expect(r.computed).toBe(200); // 1 day past the manual start → 1 sofa period
+    expect(r.due).toBe(true);
+  });
+
+  it("a manual override wins over the computed fee (even 0 → not due)", () => {
+    const r = computeOrderStorage({
+      storageFrom: "2026-06-01",
+      deliveryDate: "2026-06-01",
+      override: 0,
+      skus: ["MS1"],
+      asOf: "2026-08-01",
+    });
+    expect(r.computed).toBeGreaterThan(0);
+    expect(r.amount).toBe(0);
+    expect(r.due).toBe(false);
+  });
+
+  it("an order with no MS/BF or sofa line is never due", () => {
+    const r = computeOrderStorage({
+      storageFrom: "2026-06-01",
+      deliveryDate: "2026-06-01",
+      override: null,
+      skus: ["PILLOW", "SVC-X"],
+      asOf: "2026-08-01",
+    });
+    expect(r.due).toBe(false);
+    expect(r.amount).toBe(0);
+  });
+});
+
+describe("storage waiver inputs", () => {
+  it("requestStorageWaiverInput needs a non-trivial reason", () => {
+    expect(requestStorageWaiverInput.safeParse({ reason: "goodwill credit" }).success).toBe(true);
+    expect(requestStorageWaiverInput.safeParse({ reason: "  " }).success).toBe(false);
+    expect(requestStorageWaiverInput.safeParse({ reason: "ok" }).success).toBe(false);
+  });
+
+  it("decideStorageWaiverInput only allows approved | rejected", () => {
+    expect(decideStorageWaiverInput.safeParse({ decision: "approved" }).success).toBe(true);
+    expect(decideStorageWaiverInput.safeParse({ decision: "rejected", note: "no" }).success).toBe(true);
+    expect(decideStorageWaiverInput.safeParse({ decision: "requested" }).success).toBe(false);
+    expect(decideStorageWaiverInput.safeParse({ decision: "none" }).success).toBe(false);
   });
 });

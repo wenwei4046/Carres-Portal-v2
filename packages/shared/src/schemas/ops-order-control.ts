@@ -48,6 +48,18 @@ export const DELIVERY_TIME_SLOTS = [
   "Anytime",
 ] as const;
 
+/** Storage-waiver lifecycle (migration 0184). A storage fee can be waived
+ *  instead of collected, but only once a PRINCIPAL approves: operator requests
+ *  → 'requested', principal decides → 'approved' | 'rejected'. The delivery gate
+ *  opens on 'approved' (or once collected). */
+export const STORAGE_WAIVER_STATUSES = [
+  "none",
+  "requested",
+  "approved",
+  "rejected",
+] as const;
+export type StorageWaiverStatus = (typeof STORAGE_WAIVER_STATUSES)[number];
+
 /** ISO yyyy-mm-dd (no time) — matches the DB `date` column for stock_eta. */
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected yyyy-mm-dd");
 
@@ -91,6 +103,21 @@ export const opsOrderControlSchema = z.object({
    *  the same date (migration 0170, Jess). */
   line_etas: z.record(z.string(), z.string()).nullable(),
   called_customer: z.boolean().default(false),
+  /** Balance job (migration 0184) — when the customer's balance is due. Key-in;
+   *  the Payments panel + drawer flag overdue (due < today AND outstanding > 0).
+   *  NOT the delivery deadline — that's orders.delivery_date. */
+  balance_due_date: isoDate.nullable().default(null),
+  /** Storage collect-before-delivery gate (migration 0184). storage_collected_at
+   *  is stamped when a `kind:'storage'` order_payments row is recorded; dispatch
+   *  is blocked until storage is collected OR a principal approves a waiver. These
+   *  are READ-only on the overlay — they're written by the dedicated collect /
+   *  waiver endpoints, never the generic control PUT. */
+  storage_collected_at: z.string().nullable().default(null),
+  storage_waiver_status: z.enum(STORAGE_WAIVER_STATUSES).default("none"),
+  storage_waiver_reason: z.string().nullable().default(null),
+  storage_waiver_requested_by: z.string().uuid().nullable().default(null),
+  storage_waiver_decided_by: z.string().uuid().nullable().default(null),
+  storage_waiver_decided_at: z.string().nullable().default(null),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
 });
@@ -161,6 +188,11 @@ export const updateOpsOrderControlInput = z
     line_locations: z.record(z.string(), z.array(z.string())).nullable(),
     line_etas: z.record(z.string(), z.string()).nullable(),
     called_customer: z.boolean(),
+    // Balance job (migration 0184) — payment due date. The storage_collected_at
+    // / storage_waiver_* columns are intentionally NOT writable here: those go
+    // through the dedicated collect / waiver endpoints (a waiver approval must
+    // be principal-gated, so it can't ride the generic operator PUT).
+    balance_due_date: isoDate.nullable(),
   })
   .partial()
   .strict();
@@ -176,3 +208,82 @@ export const opsOrderControlResponseSchema = z.object({
 export type OpsOrderControlResponse = z.infer<
   typeof opsOrderControlResponseSchema
 >;
+
+// ── Storage scope + collect-before-delivery gate ─────────────────────────────
+/** Storage-fee scope of a SKU: mattress/bed frame bills at the MS/BF rate, sofa
+ *  at the SOF rate, everything else is out of scope. Verbatim port of
+ *  OperationPayments' `catOf` so the panel, the drawer, and the server-side
+ *  delivery gate all categorise a line the SAME way (one definition, three
+ *  consumers). */
+export type StorageCategory = "msbf" | "sof" | "other";
+export function storageCategoryForSku(sku: string): StorageCategory {
+  const s = sku.trim().toLowerCase();
+  if (
+    s.startsWith("mattress:") ||
+    s.startsWith("bedframe:") ||
+    /^ms\d/.test(s) ||
+    /^bf\d/.test(s)
+  )
+    return "msbf";
+  if (s.startsWith("sofa:") || /^(sof|sf)\d/.test(s)) return "sof";
+  return "other";
+}
+
+/** Whether an order's lines pull in the MS/BF and/or Sofa storage rate. */
+export function orderStorageScope(skus: ReadonlyArray<string>): {
+  hasMsbf: boolean;
+  hasSof: boolean;
+} {
+  let hasMsbf = false;
+  let hasSof = false;
+  for (const sku of skus) {
+    const cat = storageCategoryForSku(sku);
+    if (cat === "msbf") hasMsbf = true;
+    else if (cat === "sof") hasSof = true;
+  }
+  return { hasMsbf, hasSof };
+}
+
+/**
+ * The single source of truth for "is a storage fee owed on this order?" — used
+ * by the delivery gate (server) and surfaced in the drawer/panel. Mirrors the
+ * Payments-panel math exactly: accrual starts at the manual `storageFrom` else
+ * the order ETA (`deliveryDate`); the effective amount is the manual `override`
+ * when set, else the computed fee. `due` is amount > 0. An order with no MS/BF
+ * or Sofa line, or no start date, is never due (amount 0).
+ */
+export function computeOrderStorage(opts: {
+  storageFrom: string | null;
+  deliveryDate: string | null;
+  override: number | null;
+  skus: ReadonlyArray<string>;
+  asOf: string;
+}): {
+  hasMsbf: boolean;
+  hasSof: boolean;
+  computed: number;
+  amount: number;
+  due: boolean;
+} {
+  const { hasMsbf, hasSof } = orderStorageScope(opts.skus);
+  const start = opts.storageFrom ?? opts.deliveryDate;
+  const fee = computeStorageFee({ startDate: start, asOf: opts.asOf, hasMsbf, hasSof });
+  const amount = opts.override != null ? opts.override : fee.total;
+  return { hasMsbf, hasSof, computed: fee.total, amount, due: amount > 0 };
+}
+
+// ── Storage-waiver request / decide inputs ───────────────────────────────────
+/** Operator requests a storage-fee waiver (a reason is mandatory — it's the
+ *  justification the principal reviews). POST /:id/storage/waiver/request. */
+export const requestStorageWaiverInput = z.object({
+  reason: z.string().trim().min(3, "a reason is required").max(500),
+});
+export type RequestStorageWaiverInput = z.infer<typeof requestStorageWaiverInput>;
+
+/** Principal decides a pending waiver. POST /:id/storage/waiver/decide —
+ *  principal-only (enforced at the route). */
+export const decideStorageWaiverInput = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  note: z.string().trim().max(500).nullish(),
+});
+export type DecideStorageWaiverInput = z.infer<typeof decideStorageWaiverInput>;

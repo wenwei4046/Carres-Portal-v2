@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   recordPaymentInputSchema,
+  collectStorageInput,
   summarizePayments,
   type PaymentKind,
 } from "./order-payments";
@@ -24,6 +25,19 @@ describe("recordPaymentInputSchema", () => {
     expect(
       recordPaymentInputSchema.safeParse({ amount: 1, paidOn: "2026-06-26", method: "crypto" }).success,
     ).toBe(false);
+  });
+});
+
+describe("collectStorageInput", () => {
+  it("is a payment minus kind (the route forces kind:'storage')", () => {
+    const r = collectStorageInput.parse({ amount: 200, paidOn: "2026-06-26", method: "cash" });
+    expect(r).toMatchObject({ amount: 200, paidOn: "2026-06-26", method: "cash" });
+    expect("kind" in r).toBe(false);
+  });
+
+  it("still validates amount + date", () => {
+    expect(collectStorageInput.safeParse({ amount: 0, paidOn: "2026-06-26" }).success).toBe(false);
+    expect(collectStorageInput.safeParse({ amount: 200, paidOn: "bad" }).success).toBe(false);
   });
 });
 
