@@ -1981,31 +1981,30 @@ function OrderRow({
         ) : o.delivery_date ? (
           (() => {
             const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
-            // Due-day colour badge ABOVE the date (Jess 2026-06-26: bring back the
-            // agreed "DUE + days", clearer than the dropped "+2d"). Hidden on
-            // completed orders + when there's no dated deadline.
+            // Short due-day colour badge INLINE before the date (Jess 2026-06-26):
+            // just the day count -2d / today / 2d, coloured by the SAME DUE bucket
+            // as the top filter header (reuses dueBucketOf + DUE_TONE → they can
+            // never drift into two systems). Inline so the row doesn't grow taller.
+            // Hidden on completed / TBD / undated.
+            const dueBucket = dueBucketOf(o);
             const dd = daysToDue(o);
-            const badge =
-              controlTabOf(o) === "completed" || dd == null
-                ? null
-                : dd < 0
-                  ? { t: `Overdue ${-dd}d`, p: "pill-overdue" }
-                  : dd === 0
-                    ? { t: "Due today", p: "pill-overdue" }
-                    : dd <= 3
-                      ? { t: `${dd}d left`, p: "pill-warning" }
-                      : { t: `${dd}d left`, p: "pill-neutral" };
+            const tone = dueBucket ? DUE_TONE[dueBucket] : null;
+            const dueShort =
+              dd == null ? null : dd < 0 ? `-${-dd}d` : dd === 0 ? "today" : `${dd}d`;
             return (
               <>
-                {badge && (
-                  <div className="mb-0.5">
-                    <span className={`pill ${badge.p} text-[9px] px-1.5 py-0 leading-[1.5]`}>
-                      {badge.t}
+                <div className="flex items-center gap-1.5 leading-none">
+                  {tone && dueShort && (
+                    <span
+                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums shrink-0"
+                      style={{ background: tone.bg, color: tone.text, border: `0.5px solid ${tone.border}` }}
+                    >
+                      {dueShort}
                     </span>
-                  </div>
-                )}
-                <div className="text-[11px] font-medium text-base-900 tabular-nums">{datePart}</div>
-                {dayPart && <div className="text-[10px] tabular-nums text-base-400">{dayPart}</div>}
+                  )}
+                  <span className="text-[11px] font-medium text-base-900 tabular-nums">{datePart}</span>
+                </div>
+                {dayPart && <div className="text-[10px] tabular-nums text-base-400 mt-0.5">{dayPart}</div>}
               </>
             );
           })()
