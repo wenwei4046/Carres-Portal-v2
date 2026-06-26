@@ -22,29 +22,29 @@ export async function storageBlock(
   orderId: string,
 ): Promise<{ message: string; amount: number } | null> {
   try {
-    const [controlRes, orderRes, linesRes] = await Promise.all([
+    const [controlRes, linesRes] = await Promise.all([
       sb
         .from("ops_order_control")
         .select("storage_from, storage_fee_override, storage_collected_at, storage_waiver_status")
         .eq("order_id", orderId)
         .maybeSingle(),
-      sb.from("orders").select("delivery_date").eq("id", orderId).maybeSingle(),
       sb.from("order_lines").select("sku").eq("order_id", orderId),
     ]);
 
     const control = controlRes?.data ?? null;
+    // No overlay row → the operator never turned storage on → gate open.
+    if (!control) return null;
     // Already collected, or a principal approved a waiver → gate open.
-    if (control?.storage_collected_at) return null;
-    if (control?.storage_waiver_status === "approved") return null;
+    if (control.storage_collected_at) return null;
+    if (control.storage_waiver_status === "approved") return null;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const skus: string[] = (linesRes?.data ?? []).map((l: any) => String(l.sku));
     const asOf = new Date().toISOString().slice(0, 10);
     const { due, amount } = computeOrderStorage({
-      storageFrom: control?.storage_from ?? null,
-      deliveryDate: orderRes?.data?.delivery_date ?? null,
+      storageFrom: control.storage_from ?? null,
       override:
-        control?.storage_fee_override != null ? Number(control.storage_fee_override) : null,
+        control.storage_fee_override != null ? Number(control.storage_fee_override) : null,
       skus,
       asOf,
     });

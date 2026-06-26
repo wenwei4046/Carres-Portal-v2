@@ -246,15 +246,19 @@ export function orderStorageScope(skus: ReadonlyArray<string>): {
 
 /**
  * The single source of truth for "is a storage fee owed on this order?" — used
- * by the delivery gate (server) and surfaced in the drawer/panel. Mirrors the
- * Payments-panel math exactly: accrual starts at the manual `storageFrom` else
- * the order ETA (`deliveryDate`); the effective amount is the manual `override`
- * when set, else the computed fee. `due` is amount > 0. An order with no MS/BF
- * or Sofa line, or no start date, is never due (amount 0).
+ * by the delivery gate. A fee is only owed once the OPERATOR has turned storage
+ * on: accrual starts at the manual `storageFrom` (the drawer's "Storage? → Yes"
+ * gate), and the effective amount is the manual `override` when set, else the
+ * computed fee. `due` is amount > 0.
+ *
+ * Deliberately does NOT fall back to the order ETA: the Payments panel shows a
+ * *potential* fee accruing from the ETA for awareness, but the delivery gate
+ * must NOT block a normal dispatch just because an order is past its ETA — only
+ * when storage has been explicitly declared. So an order with no `storageFrom`
+ * (and no override) is never due, no matter how late it is.
  */
 export function computeOrderStorage(opts: {
   storageFrom: string | null;
-  deliveryDate: string | null;
   override: number | null;
   skus: ReadonlyArray<string>;
   asOf: string;
@@ -266,8 +270,13 @@ export function computeOrderStorage(opts: {
   due: boolean;
 } {
   const { hasMsbf, hasSof } = orderStorageScope(opts.skus);
-  const start = opts.storageFrom ?? opts.deliveryDate;
-  const fee = computeStorageFee({ startDate: start, asOf: opts.asOf, hasMsbf, hasSof });
+  // No ETA fallback — storage is owed only when the operator set storageFrom.
+  const fee = computeStorageFee({
+    startDate: opts.storageFrom,
+    asOf: opts.asOf,
+    hasMsbf,
+    hasSof,
+  });
   const amount = opts.override != null ? opts.override : fee.total;
   return { hasMsbf, hasSof, computed: fee.total, amount, due: amount > 0 };
 }

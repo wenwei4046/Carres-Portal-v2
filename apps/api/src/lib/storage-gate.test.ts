@@ -76,12 +76,20 @@ describe("storageBlock", () => {
     expect(await storageBlock(sb, ORDER_ID)).toBeNull();
   });
 
-  it("does not block when no storage start nor ETA exists (fee 0)", async () => {
+  it("does NOT block a past-ETA mattress when storage was never turned on (over-block guard)", async () => {
+    // The single most important guard: a late order whose operator never set
+    // storageFrom must dispatch freely — the gate keys off storageFrom, NEVER
+    // the ETA, so normal late deliveries aren't halted.
     const sb = gateSb({
       control: { storage_from: null, storage_collected_at: null, storage_waiver_status: "none" },
-      order: { delivery_date: null },
+      order: { delivery_date: PAST }, // long past the ETA — irrelevant to the gate
       lines: [{ sku: "MS1001" }],
     });
+    expect(await storageBlock(sb, ORDER_ID)).toBeNull();
+  });
+
+  it("does not block when the order has no overlay row at all", async () => {
+    const sb = gateSb({ control: null, order: { delivery_date: PAST }, lines: [{ sku: "MS1001" }] });
     expect(await storageBlock(sb, ORDER_ID)).toBeNull();
   });
 

@@ -91,12 +91,13 @@ describe("orderStorageScope", () => {
   });
 });
 
-/** computeOrderStorage — the single "is a storage fee owed?" gate input. */
+/** computeOrderStorage — the single "is a storage fee owed?" gate input. Owed
+ *  ONLY when the operator turned storage on (storageFrom / override) — never on
+ *  the ETA alone, so a normal late dispatch isn't blocked. */
 describe("computeOrderStorage", () => {
   it("not due with no storage start and no override", () => {
     const r = computeOrderStorage({
       storageFrom: null,
-      deliveryDate: null,
       override: null,
       skus: ["MS1"],
       asOf: "2026-06-26",
@@ -105,24 +106,22 @@ describe("computeOrderStorage", () => {
     expect(r.amount).toBe(0);
   });
 
-  it("accrues from the ETA when no manual start is set", () => {
+  it("a past ETA does NOT auto-charge — only a manual storageFrom does", () => {
+    // The order is a past-ETA mattress (panel would show a potential fee) but
+    // the operator never turned storage on → the GATE must not fire.
     const r = computeOrderStorage({
       storageFrom: null,
-      deliveryDate: "2026-06-01",
       override: null,
       skus: ["MS1"],
       asOf: "2026-06-26",
     });
-    expect(r.hasMsbf).toBe(true);
-    expect(r.computed).toBe(150); // 25 days → 1 commenced month
-    expect(r.amount).toBe(150);
-    expect(r.due).toBe(true);
+    expect(r.due).toBe(false);
+    expect(r.amount).toBe(0);
   });
 
-  it("a manual storage_from overrides the ETA as the clock start", () => {
+  it("accrues from the manual storageFrom once set", () => {
     const r = computeOrderStorage({
       storageFrom: "2026-06-25",
-      deliveryDate: "2026-01-01",
       override: null,
       skus: ["sofa:x"],
       asOf: "2026-06-26",
@@ -131,10 +130,20 @@ describe("computeOrderStorage", () => {
     expect(r.due).toBe(true);
   });
 
+  it("an override alone (no storageFrom) still charges", () => {
+    const r = computeOrderStorage({
+      storageFrom: null,
+      override: 500,
+      skus: ["MS1"],
+      asOf: "2026-06-26",
+    });
+    expect(r.amount).toBe(500);
+    expect(r.due).toBe(true);
+  });
+
   it("a manual override wins over the computed fee (even 0 → not due)", () => {
     const r = computeOrderStorage({
       storageFrom: "2026-06-01",
-      deliveryDate: "2026-06-01",
       override: 0,
       skus: ["MS1"],
       asOf: "2026-08-01",
@@ -147,7 +156,6 @@ describe("computeOrderStorage", () => {
   it("an order with no MS/BF or sofa line is never due", () => {
     const r = computeOrderStorage({
       storageFrom: "2026-06-01",
-      deliveryDate: "2026-06-01",
       override: null,
       skus: ["PILLOW", "SVC-X"],
       asOf: "2026-08-01",
