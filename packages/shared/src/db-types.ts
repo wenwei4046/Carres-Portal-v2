@@ -3,6 +3,7 @@
  * These are snake_case (Postgres convention). Use the camelCase domain types in
  * `domain.ts` for UI code.
  */
+import type { DefaultFreeGift } from "./free-gift";
 import type { RuleTarget } from "./rule-target";
 
 export type Role =
@@ -380,6 +381,38 @@ export interface SpecialDeliveryFeeRuleRow {
   label: string | null;
   active: boolean;
   sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `model_default_free_gifts` (migration 0185, 2990s Products parity Phase 7).
+ * Per-model deterministic free gift(s). PK is `model_id`. `gifts` is a jsonb
+ * array of `DefaultFreeGift` ({ giftSku, qty, label?, condition? }); the adapter
+ * runs `parseDefaultFreeGifts` to drop malformed entries. Principal-owned.
+ */
+export interface ModelDefaultFreeGiftsRow {
+  model_id: string;
+  gifts: DefaultFreeGift[];
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `free_item_campaigns` (migration 0185). A named GWP campaign: a salesperson
+ * "Make Free"s an ELIGIBLE cart line (up to `max_free_qty`). `eligible` is a
+ * RuleTarget[] jsonb (scopes model|variant|combo|compartment); the adapter runs
+ * `parseFreeItemEligible` to drop malformed entries. `active` defaults false.
+ * Principal-owned; `created_at` / `updated_at` / `updated_by` mirror the catalog
+ * convention.
+ */
+export interface FreeItemCampaignRow {
+  id: string;
+  name: string;
+  active: boolean;
+  max_free_qty: number;
+  eligible: RuleTarget[];
   created_at: string;
   updated_at: string;
   updated_by: string | null;

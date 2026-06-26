@@ -219,6 +219,19 @@ export {
   type RuleTargetDto,
   type SpecialDeliveryFeeRuleDto,
   type SpecialDeliveryFeeRuleInput,
+  // 0185 — Default Free Gifts + Free Item Campaigns (GWP) schemas/inputs/Dtos.
+  targetRefinementSchema,
+  defaultFreeGiftSchema,
+  modelDefaultFreeGiftsSchema,
+  modelDefaultFreeGiftsInput,
+  freeItemCampaignSchema,
+  freeItemCampaignInput,
+  type TargetRefinementDto,
+  type DefaultFreeGiftDto,
+  type ModelDefaultFreeGiftsDto,
+  type ModelDefaultFreeGiftsInput,
+  type FreeItemCampaignDto,
+  type FreeItemCampaignInput,
 } from "./schemas/catalog";
 
 export {
@@ -569,6 +582,28 @@ export {
 // (deliveryFeeConfigFromRow / specialDeliveryFeeRuleFromRow) are reached via
 // `Adapters.*` like comboFromRow.
 export type { SpecialDeliveryFeeRule } from "./domain";
+
+// 0185 — 2990s Products parity Phase 7: Default Free Gifts + Free Item Campaigns
+// (GWP). PURE resolvers shared by the POS preview + the Hono server-side
+// SO-create resolver/validator (honest-pricing: same matching both sides). Both
+// reuse the P6 RuleTarget matcher. A free line books as an RM0 order_line with an
+// attrs marker — create_order / order_lines / DraftLine are UNTOUCHED. The
+// row→domain adapters (modelDefaultFreeGiftsFromRow / freeItemCampaignFromRow)
+// are surfaced top-level here too (mirrors sofaComboFromRow).
+export {
+  parseDefaultFreeGifts,
+  resolveDefaultFreeGifts,
+  type DefaultFreeGift,
+  type DesiredFreeGift,
+  type FreeGiftLineInput,
+} from "./free-gift";
+export {
+  campaignsCoveringLine,
+  parseFreeItemEligible,
+  type FreeItemCampaign,
+} from "./free-item-campaign";
+export { modelDefaultFreeGiftsFromRow, freeItemCampaignFromRow } from "./adapters";
+export type { ModelDefaultFreeGifts } from "./domain";
 
 // Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo
 // match + explodeSofaBuild). No DB/IO; runs identically on web + (Phase 4) Hono.

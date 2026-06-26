@@ -4,6 +4,8 @@
 import type * as DB from "./db-types";
 import type * as D from "./domain";
 import type { CreateOrderInput } from "./schemas/orders";
+import { parseDefaultFreeGifts } from "./free-gift";
+import { parseFreeItemEligible } from "./free-item-campaign";
 import { parseRuleTargets } from "./rule-target";
 
 export const dealerFromRow = (r: DB.DealerRow): D.Dealer => ({
@@ -281,6 +283,34 @@ export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
     discontinuedAt: r.discontinued_at ?? null,
   };
 };
+
+/**
+ * Maps a `model_default_free_gifts` row to the camelCase domain shape (0185).
+ * `gifts` jsonb is cleaned via `parseDefaultFreeGifts` (drops malformed entries
+ * — bad giftSku/qty, and a 'model'-scope condition collapses to no condition).
+ */
+export const modelDefaultFreeGiftsFromRow = (
+  r: DB.ModelDefaultFreeGiftsRow,
+): D.ModelDefaultFreeGifts => ({
+  modelId: r.model_id,
+  gifts: parseDefaultFreeGifts(r.gifts),
+});
+
+/**
+ * Maps a `free_item_campaigns` row to the camelCase domain shape (0185).
+ * `eligible` jsonb is cleaned via `parseFreeItemEligible` (a parseRuleTargets
+ * wrapper); `max_free_qty` is Postgres integer → `Number()` (PostgREST may
+ * serialize it as a string).
+ */
+export const freeItemCampaignFromRow = (
+  r: DB.FreeItemCampaignRow,
+): D.FreeItemCampaign => ({
+  id: r.id,
+  name: r.name,
+  active: r.active,
+  maxFreeQty: Number(r.max_free_qty),
+  eligible: parseFreeItemEligible(r.eligible),
+});
 
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({
   id: r.id,
