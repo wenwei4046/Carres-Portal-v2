@@ -35,7 +35,24 @@ RM150/month · Sofa RM200/2 weeks**, per commenced period, override-able.
   (payment+deposit), floored at 0; storage summed separately). Exported from
   `@carres/shared`.
 
-## Phase 1 — Payment ledger (D) [BUILD NEXT]
+## ⭐ V1 — Lean balance tracker (DO THIS FIRST — small, finishable)
+Jess 2026-06-26: the full ledger/gate/waiver below is too big ("lots never
+complete"). The balance TRACKER mostly exists already (Payments panel + drawer
+key-in: Balance · Paid · Payment status, on prod since 6/12). **The only real
+gap is a DUE DATE.** So V1 = make the simple tracker complete:
+- **Add a balance DUE DATE** — `ops_order_control.balance_due_date` (in migration
+  0184). Surface it in the Payments panel + the drawer Payment section as a
+  key-in date; flag **overdue** (due_date < today AND outstanding > 0) red. This
+  is the payment due date, NOT the delivery deadline (`orders.delivery_date`).
+- Keep Balance / Paid / Payment status as the existing key-in fields.
+- That's it for V1 — no new tables, no gate, no approval. Ship + done.
+
+**Phases 1–2 below = the DELUXE version (Jess's 6/23 spec). DEFER unless Jess
+asks** — the `order_payments` ledger table (0184) is already there for when he
+wants multi-entry payments + receipts, but don't build the ledger UI / gate /
+waiver until he says go.
+
+## Phase 1 — Payment ledger (D) [DELUXE — deferred unless asked]
 Replace the single `paid_amount` with the real ledger.
 1. **API** (`apps/api/src/routes/operation/...`):
    - `GET  /api/operation/orders/:id/payments` → list `order_payments` for the order.

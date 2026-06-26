@@ -51,6 +51,10 @@ create policy order_payments_write_op_principal on public.order_payments
 --    route + an approvals-style flow — see the plan; column writes themselves
 --    stay operation+principal via the existing ops_order_control RLS).
 alter table public.ops_order_control
+  -- Lean balance tracker (Jess 2026-06-26): when the customer's balance is due
+  -- (key-in; the panel flags overdue). NOT the delivery deadline — that's
+  -- orders.delivery_date.
+  add column if not exists balance_due_date            date,
   add column if not exists storage_collected_at        timestamptz,
   add column if not exists storage_waiver_status        text not null default 'none'
         check (storage_waiver_status in ('none','requested','approved','rejected')),
