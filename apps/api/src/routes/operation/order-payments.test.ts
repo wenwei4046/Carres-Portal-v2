@@ -40,9 +40,13 @@ interface TableCfg {
 
 /** Table-routed query-builder mock. Each `from(table)` returns a thenable
  *  builder whose terminal (await / .single() / .maybeSingle()) resolves to that
- *  table's configured result. Captures insert/delete payloads for assertions. */
-function makeSb(byTable: Record<string, TableCfg>) {
-  const calls = { inserts: [] as unknown[], deletes: 0 };
+ *  table's configured result. Captures insert/delete/upsert payloads for
+ *  assertions; an optional `rpc` result backs sb.rpc(). */
+function makeSb(
+  byTable: Record<string, TableCfg>,
+  rpc?: { data: unknown; error: unknown },
+) {
+  const calls = { inserts: [] as unknown[], upserts: [] as unknown[], deletes: 0, rpc: [] as unknown[] };
   const from = vi.fn((table: string) => {
     const cfg = byTable[table] ?? {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,7 +61,10 @@ function makeSb(byTable: Record<string, TableCfg>) {
         return builder;
       }),
       update: vi.fn(() => builder),
-      upsert: vi.fn(() => builder),
+      upsert: vi.fn((payload: unknown) => {
+        calls.upserts.push(payload);
+        return builder;
+      }),
       eq: vi.fn(() => builder),
       order: vi.fn(() => builder),
       single: vi.fn(() => Promise.resolve(cfg.single ?? { data: null, error: null })),
@@ -68,7 +75,11 @@ function makeSb(byTable: Record<string, TableCfg>) {
     };
     return builder;
   });
-  return { from, calls };
+  const rpcFn = vi.fn((name: string, args: unknown) => {
+    calls.rpc.push({ name, args });
+    return Promise.resolve(rpc ?? { data: null, error: null });
+  });
+  return { from, rpc: rpcFn, calls };
 }
 
 beforeAll(async () => {
@@ -237,5 +248,197 @@ describe("DELETE /:id/payments/:pid", () => {
     );
     expect(res.status).toBe(200);
     expect(sb.calls.deletes).toBe(1);
+  });
+});
+
+// =====================================================================
+// POST /:id/storage/collect
+// =====================================================================
+describe("POST /:id/storage/collect", () => {
+  it("201 — records a kind:'storage' payment AND stamps storage_collected_at", async () => {
+    const sb = makeSb({
+      orders: { maybeSingle: { data: { so: 1001 }, error: null } },
+      order_payments: {
+        list: { data: null, error: null, count: 0 },
+        single: { data: { id: PAY_ID, kind: "storage", receipt_no: "R1001-1" }, error: null },
+      },
+      ops_order_control: { single: { data: { order_id: ORDER_ID, storage_collected_at: "2026-06-26T00:00:00Z" }, error: null } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/collect`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 200, paidOn: "2026-06-26", method: "cash" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    // the ledger row was forced to kind:'storage'
+    expect(sb.calls.inserts[0]).toMatchObject({ order_id: ORDER_ID, amount: 200, kind: "storage" });
+    // the overlay was stamped to open the gate
+    expect(sb.calls.upserts[0]).toMatchObject({ order_id: ORDER_ID, storage_paid: "Paid" });
+    expect((sb.calls.upserts[0] as { storage_collected_at?: string }).storage_collected_at).toBeTruthy();
+  });
+
+  it("403 for dealer", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/collect`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 200, paidOn: "2026-06-26" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+// =====================================================================
+// Storage waiver — request (operator) + decide (principal only)
+// =====================================================================
+describe("storage waiver", () => {
+  it("operator requests → status 'requested' with reason + requester", async () => {
+    const sb = makeSb({
+      ops_order_control: { single: { data: { order_id: ORDER_ID, storage_waiver_status: "requested" }, error: null } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/waiver/request`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "goodwill — long-standing customer" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.calls.upserts[0]).toMatchObject({
+      order_id: ORDER_ID,
+      storage_waiver_status: "requested",
+      storage_waiver_reason: "goodwill — long-standing customer",
+      storage_waiver_requested_by: "u1",
+    });
+  });
+
+  it("request rejects an empty reason (422)", async () => {
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/waiver/request`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("operation CANNOT decide a waiver (403 — principal only)", async () => {
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/waiver/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "approved" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("principal approves → status 'approved' with decider stamp", async () => {
+    const sb = makeSb({
+      ops_order_control: { maybeSingle: { data: { order_id: ORDER_ID, storage_waiver_status: "approved" }, error: null } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/waiver/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "approved" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { control: { storage_waiver_status: string } };
+    expect(body.control.storage_waiver_status).toBe("approved");
+  });
+
+  it("decide on an order with no waiver → 404", async () => {
+    const sb = makeSb({ ops_order_control: { maybeSingle: { data: null, error: null } } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/waiver/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "rejected" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+// =====================================================================
+// Delivery gate — POST /:id/assign-partner is blocked by an uncollected fee
+// =====================================================================
+describe("assign-partner storage gate", () => {
+  const PARTNER_ID = "00000000-0000-0000-0000-0000000003cc";
+
+  it("422 storage_uncollected when a fee is owed and not collected/waived", async () => {
+    const sb = makeSb({
+      ops_order_control: {
+        maybeSingle: {
+          data: { storage_from: "2020-01-01", storage_collected_at: null, storage_waiver_status: "none", storage_fee_override: null },
+          error: null,
+        },
+      },
+      orders: { maybeSingle: { data: { delivery_date: "2020-01-01" }, error: null } },
+      order_lines: { list: { data: [{ sku: "MS1001" }], error: null } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/assign-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("storage_uncollected");
+    expect(sb.calls.rpc).toHaveLength(0); // dispatch RPC never reached
+  });
+
+  it("dispatches normally once storage is collected", async () => {
+    const sb = makeSb(
+      {
+        ops_order_control: {
+          maybeSingle: { data: { storage_collected_at: "2026-06-26T00:00:00Z", storage_waiver_status: "none" }, error: null },
+        },
+        orders: { maybeSingle: { data: { delivery_date: "2020-01-01" }, error: null } },
+        order_lines: { list: { data: [{ sku: "MS1001" }], error: null } },
+      },
+      { data: { id: ORDER_ID, status: "proceed_order" }, error: null }, // rpc result
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/assign-partner`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ partnerId: PARTNER_ID }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.calls.rpc).toHaveLength(1); // operation_assign_partner reached
   });
 });

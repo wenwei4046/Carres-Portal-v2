@@ -15,6 +15,7 @@ import {
 import type { DoTemplateData } from "../../lib/pdf/types";
 import { requireOperation, requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -429,6 +430,15 @@ operationOrdersRouter.post("/:id/assign-partner", requireOperation, async (c) =>
   const parsed = await parseJsonBody(c, assignPartnerInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
+  // Balance job (0184) — collect-before-delivery gate. Reject dispatch while a
+  // storage fee is owed and neither collected nor waived by a principal.
+  const block = await storageBlock(sb, c.req.param("id"));
+  if (block) {
+    return c.json(
+      { error: "rule_violation", code: "storage_uncollected", message: block.message },
+      422,
+    );
+  }
   const { data, error } = await sb.rpc("operation_assign_partner", {
     p_order_id: c.req.param("id"),
     p_partner_id: parsed.data.partnerId,

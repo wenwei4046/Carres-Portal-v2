@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { recordPaymentInputSchema } from "@carres/shared";
+import {
+  recordPaymentInputSchema,
+  collectStorageInput,
+  requestStorageWaiverInput,
+  decideStorageWaiverInput,
+} from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -127,6 +132,154 @@ orderPaymentsRouter.delete("/:id/payments/:pid", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ ok: true });
+});
+
+// ── Storage collection + waiver (collect-before-delivery gate, 0184) ─────────
+const CONTROL_GATE_COLS =
+  "order_id, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, storage_paid, updated_at";
+
+// POST /:id/storage/collect — record a storage-fee collection. It's a
+// `kind:'storage'` ledger row (so it issues a receipt + rolls into the
+// storageCollected summary) AND it stamps storage_collected_at, which opens the
+// delivery gate. Two writes (not atomic): the payment is the source of truth;
+// the stamp is the gate flag. Operation/principal.
+orderPaymentsRouter.post("/:id/storage/collect", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const orderId = idCheck.data;
+
+  const parsed = await parseJsonBody(c, collectStorageInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  const receiptNo = await nextReceiptNo(sb, orderId);
+
+  const { data: payment, error: payErr } = await sb
+    .from("order_payments")
+    .insert({
+      order_id: orderId,
+      amount: parsed.data.amount,
+      paid_on: parsed.data.paidOn,
+      method: parsed.data.method,
+      kind: "storage",
+      reference: parsed.data.reference ?? null,
+      note: parsed.data.note ?? null,
+      receipt_no: receiptNo,
+      recorded_by: auth.id,
+    })
+    .select(PAYMENT_COLS)
+    .single();
+  if (payErr) {
+    const m = mapPgError(payErr);
+    return c.json(m.body, m.status);
+  }
+
+  // Open the gate: stamp the collection time + keep the legacy "Paid?" flag in
+  // sync. Sparse upsert creates the overlay row if the order has none yet.
+  const { data: control, error: ctrlErr } = await sb
+    .from("ops_order_control")
+    .upsert(
+      {
+        order_id: orderId,
+        storage_collected_at: new Date().toISOString(),
+        storage_paid: "Paid",
+        updated_by: auth.id,
+      },
+      { onConflict: "order_id" },
+    )
+    .select(CONTROL_GATE_COLS)
+    .single();
+  if (ctrlErr) {
+    const m = mapPgError(ctrlErr);
+    return c.json(m.body, m.status);
+  }
+
+  return c.json({ payment, control }, 201);
+});
+
+// POST /:id/storage/waiver/request — operator asks to waive the storage fee
+// (reason mandatory). Sets status 'requested' + clears any prior decision so a
+// fresh request goes back to the principal. Operation/principal.
+orderPaymentsRouter.post("/:id/storage/waiver/request", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const parsed = await parseJsonBody(c, requestStorageWaiverInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("ops_order_control")
+    .upsert(
+      {
+        order_id: idCheck.data,
+        storage_waiver_status: "requested",
+        storage_waiver_reason: parsed.data.reason,
+        storage_waiver_requested_by: auth.id,
+        storage_waiver_decided_by: null,
+        storage_waiver_decided_at: null,
+        updated_by: auth.id,
+      },
+      { onConflict: "order_id" },
+    )
+    .select(CONTROL_GATE_COLS)
+    .single();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ control: data });
+});
+
+// POST /:id/storage/waiver/decide — PRINCIPAL ONLY. Approve opens the gate;
+// reject closes it. Jess IS the principal, so this never gates him — it's the
+// guardrail that stops a junior operator self-approving a waiver. Defence in
+// depth: the migration-0184 RLS keeps writes to operation/principal, and this
+// route narrows the DECIDE to principal.
+orderPaymentsRouter.post("/:id/storage/waiver/decide", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "principal") {
+    throw new HTTPException(403, { message: "Only a principal can decide a storage waiver" });
+  }
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const parsed = await parseJsonBody(c, decideStorageWaiverInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  // Update an existing overlay row only — there's nothing to decide if no
+  // waiver was ever requested. (note is accepted for API symmetry; there's no
+  // decision-note column yet — see the plan's approvals-inbox follow-up.)
+  const { data, error } = await sb
+    .from("ops_order_control")
+    .update({
+      storage_waiver_status: parsed.data.decision,
+      storage_waiver_decided_by: auth.id,
+      storage_waiver_decided_at: new Date().toISOString(),
+      updated_by: auth.id,
+    })
+    .eq("order_id", idCheck.data)
+    .select(CONTROL_GATE_COLS)
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "no_waiver", message: "No storage waiver to decide on this order" },
+      404,
+    );
+  }
+  return c.json({ control: data });
 });
 
 /** Build the next receipt number for an order: `R{so}-{n}` where n is the
