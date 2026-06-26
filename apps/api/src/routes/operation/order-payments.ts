@@ -1,0 +1,153 @@
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
+import { recordPaymentInputSchema } from "@carres/shared";
+import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { userClient } from "../../lib/supabase";
+import type { AppEnv } from "../../types";
+
+/**
+ * Order payment LEDGER (balance job — Jess 2026-06-26 "complete all the balance
+ * job"; migration 0184). The multi-entry replacement for the single
+ * ops_order_control.paid_amount stopgap: one `order_payments` row per payment
+ * received (goods, deposit, OR a storage-fee collection).
+ *
+ *   GET    /api/operation/orders/:id/payments       — list the ledger (newest first)
+ *   POST   /api/operation/orders/:id/payments       — record one payment
+ *   DELETE /api/operation/orders/:id/payments/:pid  — void a wrong entry (principal only)
+ *
+ * Storage collection + waiver + the delivery gate live in the SAME router
+ * (storage collection is just a `kind:'storage'` payment) — see the storage
+ * section below. Plain-table CRUD via PostgREST; RLS (migration 0184: internal
+ * read, operation/principal write) is the security boundary, the inline role
+ * guards are defence-in-depth + clean 403 messages.
+ *
+ * Mounted at `/operation/orders` in apps/api/src/index.ts (sibling of
+ * orderControlRouter), so the paths above are absolute.
+ */
+const orderPaymentsRouter = new Hono<AppEnv>();
+
+const ORDER_ID = z.string().uuid();
+const PAYMENT_ID = z.string().uuid();
+
+const PAYMENT_COLS =
+  "id, order_id, amount, paid_on, method, kind, reference, receipt_no, receipt_url, note, recorded_by, created_at";
+
+function requireOperationOrPrincipal(
+  role: string,
+): asserts role is "operation" | "principal" {
+  if (role !== "operation" && role !== "principal") {
+    throw new HTTPException(403, { message: "Operation or principal only" });
+  }
+}
+
+// GET /:id/payments — the full ledger for one order, newest first.
+orderPaymentsRouter.get("/:id/payments", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("order_payments")
+    .select(PAYMENT_COLS)
+    .eq("order_id", idCheck.data)
+    .order("paid_on", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ payments: data ?? [] });
+});
+
+// POST /:id/payments — record one payment. Generates a human-friendly receipt
+// number (R{so}-{n}) so a printed receipt is traceable; recorded_by comes from
+// the JWT (never the body).
+orderPaymentsRouter.post("/:id/payments", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const orderId = idCheck.data;
+
+  const parsed = await parseJsonBody(c, recordPaymentInputSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, auth.jwt);
+  const receiptNo = await nextReceiptNo(sb, orderId);
+
+  const { data, error } = await sb
+    .from("order_payments")
+    .insert({
+      order_id: orderId,
+      amount: parsed.data.amount,
+      paid_on: parsed.data.paidOn,
+      method: parsed.data.method,
+      kind: parsed.data.kind,
+      reference: parsed.data.reference ?? null,
+      note: parsed.data.note ?? null,
+      receipt_no: receiptNo,
+      recorded_by: auth.id,
+    })
+    .select(PAYMENT_COLS)
+    .single();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ payment: data }, 201);
+});
+
+// DELETE /:id/payments/:pid — void a mis-keyed entry. Principal only (a junior
+// operator records; only the principal reverses), mirroring the waiver gate.
+orderPaymentsRouter.delete("/:id/payments/:pid", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "principal") {
+    throw new HTTPException(403, { message: "Principal only" });
+  }
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  const pidCheck = PAYMENT_ID.safeParse(c.req.param("pid"));
+  if (!idCheck.success || !pidCheck.success) {
+    throw new HTTPException(404, { message: "Payment not found" });
+  }
+
+  const sb = userClient(c.env, auth.jwt);
+  const { error } = await sb
+    .from("order_payments")
+    .delete()
+    .eq("id", pidCheck.data)
+    .eq("order_id", idCheck.data);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true });
+});
+
+/** Build the next receipt number for an order: `R{so}-{n}` where n is the
+ *  1-based count of existing payments. Falls back to the order id slice when
+ *  the SO lookup is unavailable. Not UNIQUE-constrained, so a (very unlikely)
+ *  concurrent-insert collision is cosmetic, never an error. */
+async function nextReceiptNo(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+): Promise<string> {
+  const [{ data: order }, { count }] = await Promise.all([
+    sb.from("orders").select("so").eq("id", orderId).maybeSingle(),
+    sb
+      .from("order_payments")
+      .select("id", { count: "exact", head: true })
+      .eq("order_id", orderId),
+  ]);
+  const seq = (typeof count === "number" ? count : 0) + 1;
+  const label = order?.so != null ? String(order.so) : orderId.slice(0, 8);
+  return `R${label}-${seq}`;
+}
+
+export default orderPaymentsRouter;
