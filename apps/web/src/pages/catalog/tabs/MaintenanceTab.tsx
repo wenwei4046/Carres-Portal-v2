@@ -15,6 +15,7 @@ import {
 } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
+import OptionPoolEditor from "./OptionPoolEditor";
 
 /**
  * Maintenance (narrow) — the global catalog config that isn't per-model:
@@ -22,10 +23,13 @@ import { CodeChip } from "../components/atoms";
  *     floor_write_principal), so the editor is UI-gated to principal.
  *   • Add-ons (addons) — name / price / active, with a read-only link to the
  *     Service-category SKU each add-on charges through (addons.service_sku).
+ *   • Global option pools (0182) — supplier_category + bedframe/mattress sizes,
+ *     curated principal-only reference lists rendered via OptionPoolEditor.
  *
- * Per-model option pools (sizes / colours / gaps / compartments) live on the
- * Modular tab's drawer, since allowed_options is stored per model — there's no
- * global option-pool table in Carres.
+ * NOTE: the 0182 pools are GLOBAL reference lists. Per-model variant axes
+ * (the actual sizes / colours / gaps / compartments a model offers) still live
+ * per-model in allowed_options, edited on the Modular tab's drawer — the size
+ * pools here only feed that drawer's picker as curated suggestions.
  */
 export default function MaintenanceTab({
   catalog,
@@ -40,7 +44,50 @@ export default function MaintenanceTab({
       <FabricTierDeltasCard catalog={catalog} isPrincipal={isPrincipal} />
       <SofaCompartmentsSection catalog={catalog} isPrincipal={isPrincipal} />
       <AddonsSection addons={catalog.addons} />
+      <OptionPoolsSection catalog={catalog} isPrincipal={isPrincipal} />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 0182 — Global option pools (2990s Products parity Phase 4). Three curated
+// READ-ONLY reference lists: supplier_category + the two size pools. These only
+// SUGGEST — no order-side consumer reads them (sizes still live per-model in
+// allowed_options.sizes; supplier_category is curate-only this phase).
+// ---------------------------------------------------------------------------
+
+function OptionPoolsSection({
+  catalog,
+  isPrincipal,
+}: {
+  catalog: CatalogResponse;
+  isPrincipal: boolean;
+}) {
+  const pools = catalog.optionPools ?? [];
+  return (
+    <>
+      <OptionPoolEditor
+        pool="supplier_category"
+        title="Supplier Categories"
+        description="Curated list of the product categories a supplier can cover. Reference only — supplier coverage is still set per supplier."
+        entries={pools.filter((p) => p.pool === "supplier_category")}
+        isPrincipal={isPrincipal}
+      />
+      <OptionPoolEditor
+        pool="bedframe_size"
+        title="Bedframe Sizes"
+        description="Suggested bedframe sizes shown in the per-model size picker. Each model's active sizes stay authoritative — this only offers quick-add suggestions."
+        entries={pools.filter((p) => p.pool === "bedframe_size")}
+        isPrincipal={isPrincipal}
+      />
+      <OptionPoolEditor
+        pool="mattress_size"
+        title="Mattress Sizes"
+        description="Suggested mattress sizes shown in the per-model size picker. Each model's active sizes stay authoritative — this only offers quick-add suggestions."
+        entries={pools.filter((p) => p.pool === "mattress_size")}
+        isPrincipal={isPrincipal}
+      />
+    </>
   );
 }
 

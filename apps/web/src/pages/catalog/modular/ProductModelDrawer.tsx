@@ -10,6 +10,7 @@ import type {
   SofaCompartmentDto,
   ModelSofaCompartmentDto,
   SpecialAddonDto,
+  CatalogOptionPoolDto,
   FabricTierValue,
 } from "@carres/shared";
 import { deriveSkuCode } from "@carres/shared";
@@ -109,6 +110,27 @@ export default function ProductModelDrawer({
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [opts.sizes, skus, extraSizes]);
 
+  // 0182 — curated size SUGGESTIONS from the global option pool, by category.
+  // These only suggest: clicking a chip adds the value into allowed_options.sizes
+  // (the authoritative per-model source). Sofa/accessory/service have no size pool.
+  const sizePoolName =
+    model.category === "mattress"
+      ? "mattress_size"
+      : model.category === "bedframe"
+        ? "bedframe_size"
+        : null;
+  const sizeSuggestions = useMemo<CatalogOptionPoolDto[]>(() => {
+    if (!sizePoolName) return [];
+    return (catalog?.optionPools ?? [])
+      .filter((p) => p.pool === sizePoolName && p.active)
+      .slice()
+      .sort(
+        (a, b) =>
+          a.sortOrder - b.sortOrder ||
+          a.value.localeCompare(b.value, undefined, { numeric: true }),
+      );
+  }, [catalog?.optionPools, sizePoolName]);
+
   return (
     <div
       role="presentation"
@@ -153,6 +175,7 @@ export default function ProductModelDrawer({
                 model={model}
                 universe={sizeUniverse}
                 active={new Set(opts.sizes ?? [])}
+                suggestions={sizeSuggestions}
                 onRegisterSize={(s) =>
                   setExtraSizes((prev) => (prev.includes(s) ? prev : [...prev, s]))
                 }
@@ -365,11 +388,15 @@ function SizeActivePool({
   model,
   universe,
   active,
+  suggestions = [],
   onRegisterSize,
 }: {
   model: ProductModelDto;
   universe: string[];
   active: Set<string>;
+  /** 0182 — curated pool sizes for this model's category, shown as quick-add
+   *  chips. Suggestions only: clicking one writes into allowed_options.sizes. */
+  suggestions?: CatalogOptionPoolDto[];
   onRegisterSize: (size: string) => void;
 }) {
   const toggle = useToggleSizesActive();
@@ -392,15 +419,23 @@ function SizeActivePool({
     setActive(Array.from(next));
   }
 
-  function addSize() {
-    const v = adding.trim();
-    setAdding("");
+  function addSizeValue(raw: string) {
+    const v = raw.trim();
     if (!v) return;
     // Track it locally so it survives a later "All off", then activate it.
     onRegisterSize(v);
     if (active.has(v)) return;
     setActive([...Array.from(active), v]);
   }
+
+  function addSize() {
+    const v = adding;
+    setAdding("");
+    addSizeValue(v);
+  }
+
+  // Pool sizes not already present in the universe — offered as quick-add chips.
+  const availSuggestions = suggestions.filter((s) => !universe.includes(s.value));
 
   return (
     <div>
@@ -464,6 +499,26 @@ function SizeActivePool({
           + Add size
         </button>
       </div>
+      {availSuggestions.length > 0 && (
+        <div className="mt-2" data-testid="size-suggestions">
+          <div className="t-tiny text-base-400 mb-1">Quick add from pool</div>
+          <div className="flex flex-wrap gap-1.5">
+            {availSuggestions.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => addSizeValue(s.value)}
+                disabled={toggle.isPending}
+                title={s.label ?? s.dimensions ?? undefined}
+                className="t-tiny px-2.5 py-1 rounded-full border border-dashed border-base-300 text-base-500 hover:border-base-500 hover:text-base-700 transition-colors disabled:opacity-50"
+                data-testid={`size-suggestion-${s.value}`}
+              >
+                + {s.value}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <p className="t-tiny text-base-400 mt-1.5">
         Turning a size on/off shows or hides every SKU of that size from dealers.
       </p>

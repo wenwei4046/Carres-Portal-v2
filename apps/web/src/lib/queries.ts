@@ -27,6 +27,9 @@ import {
   type SpecialAddonDto,
   type SpecialAddonCreateInput,
   type SpecialAddonPatchInput,
+  type CatalogOptionPoolDto,
+  type CatalogOptionPoolCreateInput,
+  type CatalogOptionPoolPatchInput,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
   type ComboDto,
@@ -4558,6 +4561,41 @@ export function useDeleteSpecialAddon() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/special-addons/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// 0182 — Global option pools (2990s Products parity Phase 4). Three curated
+// READ-ONLY reference lists (supplier_category / bedframe_size / mattress_size).
+// Not a source of truth for any order-side consumer — sizes only SUGGEST in the
+// per-model size picker; product_models.allowed_options.sizes stays authoritative.
+// CRUD mirrors the special-addon hooks; all invalidate ['catalog'] so the
+// Maintenance tab + per-model size picker refresh (pools ride in the catalog
+// bundle — no dedicated query key needed). Principal-only at the API/RLS layer;
+// the UI gate in OptionPoolEditor is a friendly read-only veneer.
+export function useCreateOptionPoolEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CatalogOptionPoolCreateInput) =>
+      apiFetch<{ optionPool: CatalogOptionPoolDto }>("/api/catalog/option-pools", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function usePatchOptionPoolEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: CatalogOptionPoolPatchInput }) =>
+      apiFetch<{ optionPool: CatalogOptionPoolDto }>(`/api/catalog/option-pools/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteOptionPoolEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/option-pools/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }
