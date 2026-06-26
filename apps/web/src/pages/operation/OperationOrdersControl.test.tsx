@@ -691,7 +691,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
   });
 });
 
-// ─── Top-bar Export (Jess 2026-06-25, #4) ────────────────────────────────────
+// ─── Orders export — bulk ⋮ menu, CSV + Print (Jess 2026-06-26, #4) ──────────
 describe("orders export", () => {
   it("buildOrdersCsv — header (incl. Address) + one row per order, commas quoted", () => {
     const rows = [
@@ -733,20 +733,20 @@ describe("orders export", () => {
     expect(html).toContain("A &amp; &lt;B&gt;");
   });
 
-  it("top-bar Export menu offers CSV + print for the filtered view", () => {
+  it("bulk ⋮ menu (ticked rows) offers Export CSV + Print / Save as PDF", () => {
     wrap(<OperationOrdersControl />);
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    expect(screen.getByRole("menu")).toBeInTheDocument();
-    // 7 orders in the default fixture → the menu announces the filtered count.
-    expect(screen.getByText(/Export 7 orders/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /CSV/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Save as PDF/ })).toBeInTheDocument();
+    // Export/print live behind the row checkboxes + ⋮ — NOT a top-bar button
+    // (Jess 2026-06-26: tick one customer → ⋮ → Print prints just that order).
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    fireEvent.click(screen.getByRole("button", { name: /Actions/ }));
+    expect(screen.getByRole("button", { name: /Export CSV/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Print \/ Save as PDF/ }),
+    ).toBeInTheDocument();
   });
 
-  it("Export → CSV triggers a file download of the filtered rows", () => {
+  it("bulk ⋮ → CSV downloads the ticked rows", () => {
     const createObjectURL = vi.fn(() => "blob:mock");
-    const revokeObjectURL = vi.fn();
-    // jsdom doesn't implement these — install for the test, restore after.
     const url = URL as unknown as {
       createObjectURL?: unknown;
       revokeObjectURL?: unknown;
@@ -754,22 +754,44 @@ describe("orders export", () => {
     const origCreate = url.createObjectURL;
     const origRevoke = url.revokeObjectURL;
     url.createObjectURL = createObjectURL;
-    url.revokeObjectURL = revokeObjectURL;
+    url.revokeObjectURL = vi.fn();
     const click = vi
       .spyOn(HTMLAnchorElement.prototype, "click")
       .mockImplementation(() => {});
 
     wrap(<OperationOrdersControl />);
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    fireEvent.click(screen.getByRole("button", { name: /CSV/ }));
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    fireEvent.click(screen.getByRole("button", { name: /Actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
-    // Menu closes after the action.
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
     click.mockRestore();
     url.createObjectURL = origCreate;
     url.revokeObjectURL = origRevoke;
+  });
+
+  it("bulk ⋮ → Print opens a print window for the ticked rows", () => {
+    const fakeWin = {
+      document: { write: vi.fn(), close: vi.fn() },
+      focus: vi.fn(),
+      print: vi.fn(),
+    };
+    const open = vi
+      .spyOn(window, "open")
+      .mockImplementation(() => fakeWin as unknown as Window);
+
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    fireEvent.click(screen.getByRole("button", { name: /Actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Print \/ Save as PDF/ }));
+
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(fakeWin.document.write).toHaveBeenCalledTimes(1);
+    // the written HTML carries a ticked order's SO
+    expect(fakeWin.document.write.mock.calls[0][0]).toContain("SO-");
+
+    open.mockRestore();
   });
 });

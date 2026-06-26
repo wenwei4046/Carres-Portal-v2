@@ -41,7 +41,6 @@ import {
   Check,
   CalendarClock,
   Printer,
-  FileText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -661,9 +660,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMenu, setBulkMenu] = useState<null | "menu" | "assign">(null);
-  // Top-bar Export ⋮ menu (exports the filtered view — distinct from the bulk
-  // bar's selected-rows CSV).
-  const [exportMenu, setExportMenu] = useState(false);
   // Filter dimensions stacked on top of the status tabs.
   const [dueFilter, setDueFilter] = useState<DueBucket | null>(null);
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
@@ -914,6 +910,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   }
   const selectedOrders = orders.filter((o) => selected.has(o.id));
 
+  // Both export actions live in the bulk ⋮ menu (tick rows → ⋮ → CSV / Print).
+  // Tick one customer → Print prints just that order; tick N → batch.
   function exportSelectedCsv() {
     downloadCsv(
       `orders-${selectedOrders.length}.csv`,
@@ -921,15 +919,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
     );
     setBulkMenu(null);
   }
-
-  // Top-bar export — the whole filtered view (`visible`), not just selection.
-  function exportVisibleCsv() {
-    downloadCsv(`orders-${visible.length}.csv`, buildOrdersCsv(visible, partnerName));
-    setExportMenu(false);
-  }
-  function printVisible() {
-    openPrint(buildOrdersPrintHtml(visible, partnerName, "Orders"));
-    setExportMenu(false);
+  function printSelected() {
+    openPrint(buildOrdersPrintHtml(selectedOrders, partnerName, "Orders"));
+    setBulkMenu(null);
   }
 
   async function bulkAssignLogistic(partnerId: string) {
@@ -1043,49 +1035,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
             placeholder="SO number or customer…"
             className="w-[230px] px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
           />
-          {/* Top-bar Export — the filtered view as CSV (Excel) or print → PDF.
-              Distinct from the bulk bar's selected-rows CSV (Jess 2026-06-25, #4). */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setExportMenu((v) => !v)}
-              disabled={visible.length === 0}
-              aria-haspopup="menu"
-              aria-expanded={exportMenu}
-              className="btn-secondary text-[12px] whitespace-nowrap inline-flex items-center gap-1 disabled:opacity-50"
-            >
-              <Download size={14} /> Export
-            </button>
-            {exportMenu && (
-              <>
-                <button
-                  type="button"
-                  aria-hidden
-                  tabIndex={-1}
-                  className="fixed inset-0 z-20 cursor-default"
-                  onClick={() => setExportMenu(false)}
-                />
-                <div
-                  role="menu"
-                  className="absolute right-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1"
-                >
-                  <div className="px-3 py-1 text-[10px] uppercase tracking-[0.08em] text-base-400">
-                    Export {visible.length} order{visible.length === 1 ? "" : "s"}
-                  </div>
-                  <BulkMenuItem
-                    icon={FileText}
-                    label="CSV (opens in Excel)"
-                    onClick={exportVisibleCsv}
-                  />
-                  <BulkMenuItem
-                    icon={Printer}
-                    label="Print / Save as PDF"
-                    onClick={printVisible}
-                  />
-                </div>
-              </>
-            )}
-          </div>
           {onImport && (
             <button
               type="button"
@@ -1280,6 +1229,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           partners={partnersQ.data?.partners ?? []}
           onAssign={bulkAssignLogistic}
           onExport={exportSelectedCsv}
+          onPrint={printSelected}
           onTasks={bulkCreateTasks}
           onComplete={bulkMarkCompleted}
           onClear={clearSel}
@@ -1467,6 +1417,7 @@ function BulkBar({
   partners,
   onAssign,
   onExport,
+  onPrint,
   onTasks,
   onComplete,
   onClear,
@@ -1478,6 +1429,7 @@ function BulkBar({
   partners: { id: string; name: string }[];
   onAssign: (partnerId: string) => void;
   onExport: () => void;
+  onPrint: () => void;
   onTasks: () => void;
   onComplete: () => void;
   onClear: () => void;
@@ -1503,6 +1455,7 @@ function BulkBar({
               <>
                 <BulkMenuItem icon={Truck} label="Assign logistic…" onClick={() => setMenu("assign")} />
                 <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
+                <BulkMenuItem icon={Printer} label="Print / Save as PDF" onClick={onPrint} />
                 <BulkMenuItem icon={ListTodo} label="Create follow-up tasks" onClick={onTasks} />
                 <BulkMenuItem icon={CheckCircle2} label="Mark completed" onClick={onComplete} />
               </>
