@@ -444,6 +444,19 @@ export {
 } from "./schemas/ops-order-control";
 export * from "./schemas/ops-cockpit";
 
+// Migration 0184 — order payment ledger (balance job foundation).
+export {
+  PAYMENT_METHODS,
+  PAYMENT_KINDS,
+  recordPaymentInputSchema,
+  summarizePayments,
+  type OrderPaymentMethod,
+  type PaymentKind,
+  type RecordPaymentInput,
+  type OrderPaymentRow,
+  type PaymentSummary,
+} from "./schemas/order-payments";
+
 // Migration 0176 — fabric tier pricing resolver + types.
 export {
   resolveFabricDelta,
