@@ -670,6 +670,16 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(screen.getByText(/16.30 of 120/)).toBeInTheDocument();
   });
 
+  it("surfaces an Unassigned-carrier alert (no-carrier count) and filters on click", () => {
+    wrap(<OperationOrdersControl />);
+    // 7 orders; D has a carrier via the partner map (NETS), E has TEOW joined →
+    // the other 5 have no carrier.
+    const chip = screen.getByRole("button", { name: /Unassigned carrier/ });
+    expect(chip).toHaveTextContent("5");
+    fireEvent.click(chip);
+    expect(screen.getAllByTestId("order-row")).toHaveLength(5);
+  });
+
   it("gives each status chip a plain-English tooltip (legend)", () => {
     oneRow({ id: "lg", so: 5001 });
     wrap(<OperationOrdersControl />);

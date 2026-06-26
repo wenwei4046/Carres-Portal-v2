@@ -752,6 +752,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const flaggedCount = useMemo(() => tabFiltered.filter(isFlaggedOrder).length, [tabFiltered]);
   const escalateCount = useMemo(() => tabFiltered.filter(isEscalatedOrder).length, [tabFiltered]);
   const etaCount = useMemo(() => tabFiltered.filter(needsEta).length, [tabFiltered]);
+  const noCarrierCount = useMemo(
+    () => tabFiltered.filter((o) => logisticOf(o, partnerName) === null).length,
+    [tabFiltered, partnerName],
+  );
   const dueEntries = useMemo(() => {
     const m = new Map<DueBucket, number>();
     for (const o of tabFiltered) {
@@ -1236,9 +1240,22 @@ export default function OperationOrdersControl({ onImport }: Props) {
               />
             ))}
           </FilterGroup>
-          {/* No ETA quick-view sits with Region/Logistic (Jess 2026-06-25: it's a
-              logistic-chase filter, belongs on the delivery row). */}
-          <div className="ml-auto flex items-center">
+          {/* Logistic-chase alerts sit with Region/Logistic (Jess 2026-06-25:
+              they belong on the delivery row). "Unassigned carrier" (red — no
+              carrier yet) then "No ETA" (amber — carrier set, no ETA). The first
+              toggles the Logistic=Unassigned filter; both are one-click chase. */}
+          <div className="ml-auto flex items-center gap-2">
+            <QuickView
+              icon={Truck}
+              label="Unassigned carrier"
+              count={noCarrierCount}
+              tone="danger"
+              active={logisticFilter === NO_CARRIER}
+              title="No logistic partner assigned yet — operation to assign a carrier"
+              onClick={() =>
+                setLogisticFilter((r) => (r === NO_CARRIER ? null : NO_CARRIER))
+              }
+            />
             <QuickView
               icon={CalendarClock}
               label="No ETA"
