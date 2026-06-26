@@ -40,6 +40,10 @@ import {
   catalogOptionPoolCreateInput,
   catalogOptionPoolPatchInput,
   CATALOG_OPTION_POOLS,
+  deliveryFeeConfigPatchInput,
+  specialDeliveryFeeRuleInput,
+  DELIVERY_FEE_CONFIG,
+  SPECIAL_DELIVERY_FEE_RULES,
   deriveSkuCode,
   skuImportInput,
   hasPricingIntent,
@@ -170,7 +174,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -205,6 +209,15 @@ catalogRouter.get("/", async (c) => {
     // must see the inactive ones, so consumers filter client-side. Curated
     // reference lists only — NOT a source of truth for any order-side consumer.
     sb.from(CATALOG_OPTION_POOLS).select("*"),
+    // 0184 — delivery TRIP fee config singleton (id=1). maybeSingle so a missing
+    // seed row doesn't throw; we fall back to the dormant {0,0} defaults below.
+    sb.from(DELIVERY_FEE_CONFIG).select("*").eq("id", 1).maybeSingle(),
+    // 0184 — per-RuleTarget special delivery fee rules. Fetched UNFILTERED
+    // (active AND inactive — the Maintenance editor must see retired rows, and
+    // the POS preview / server recompute apply only the matching active ones);
+    // sorted in JS below (active-first, then sort_order) to stay mock-friendly,
+    // mirroring the 0182 option-pools branch.
+    sb.from(SPECIAL_DELIVERY_FEE_RULES).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -219,6 +232,8 @@ catalogRouter.get("/", async (c) => {
   if (sofaCombosR.error) throw new HTTPException(500, { message: sofaCombosR.error.message });
   if (specialAddonsR.error) throw new HTTPException(500, { message: specialAddonsR.error.message });
   if (optionPoolsR.error) throw new HTTPException(500, { message: optionPoolsR.error.message });
+  if (deliveryFeeR.error) throw new HTTPException(500, { message: deliveryFeeR.error.message });
+  if (specialDeliveryRulesR.error) throw new HTTPException(500, { message: specialDeliveryRulesR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -273,6 +288,19 @@ catalogRouter.get("/", async (c) => {
     return { ...Adapters.comboFromRow(r), components };
   });
 
+  // 0184 — delivery fee config. The singleton (id=1) is seeded by the migration,
+  // but fall back to the dormant defaults (all fees 0) when the row is absent so a
+  // fresh/empty DB never ships a broken bundle (mirrors the fabric-tier fallback).
+  const deliveryFeeConfig = deliveryFeeR.data
+    ? Adapters.deliveryFeeConfigFromRow(deliveryFeeR.data as DB.DeliveryFeeConfigRow)
+    : {
+        baseFee: 0,
+        crossCategoryFee: 0,
+        chargedCategories: ["sofa", "mattress", "bedframe"],
+        mattressBedframeLeadDays: 14,
+        sofaLeadDays: 21,
+      };
+
   const body = catalogResponseSchema.parse({
     models: (modelsR.data ?? []).map((m) => Adapters.productModelFromRow(m as DB.ProductModelRow)),
     skus: liveSkus.map((s) => Adapters.productSkuFromRow(s as DB.ProductSkuRow)),
@@ -320,6 +348,19 @@ catalogRouter.get("/", async (c) => {
           : a.sortOrder !== b.sortOrder
             ? a.sortOrder - b.sortOrder
             : a.value.localeCompare(b.value),
+      ),
+    // 0184 — delivery fee config + per-RuleTarget special rules (additive,
+    // optional). Pre-0184 clients that don't read these are wholly unaffected.
+    deliveryFeeConfig,
+    // Active rules first, then ascending sort_order (the maintenance list +
+    // POS preview both want live rules surfaced). Sorted in JS to mirror the
+    // plain `.select("*")` fetch + stay mock-friendly (like option pools).
+    specialDeliveryFeeRules: (specialDeliveryRulesR.data ?? [])
+      .map((r) => Adapters.specialDeliveryFeeRuleFromRow(r as DB.SpecialDeliveryFeeRuleRow))
+      .sort((a, b) =>
+        a.active !== b.active
+          ? Number(b.active) - Number(a.active)
+          : a.sortOrder - b.sortOrder,
       ),
   });
 
@@ -1994,6 +2035,145 @@ catalogRouter.delete("/option-pools/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(CATALOG_OPTION_POOLS).delete().eq("id", id);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0184 — Delivery TRIP fee (2990s Products parity Phase 6). The principal-owned
+// config singleton (a flat trip fee + a sofa × mattress/bedframe cross-category
+// surcharge + the principal-selected charged-category set) + per-RuleTarget
+// special overrides. DORMANT by default (seeds 0/0 → byte-identical order totals
+// until the principal sets rates). The floor STAIR surcharge (floor_config) is
+// KEPT + coexists — the delivery fee is ADDITIVE. All writes are principal-only
+// ("Master Admin"), mirroring the 0177/0178/0181/0182 gate: early friendly 403
+// here, with RLS (delivery_fee_config_write_principal /
+// special_delivery_fee_rules_write_principal) the real boundary — we forward the
+// USER JWT (userClient) so RLS runs; NEVER service_role.
+// ---------------------------------------------------------------------------
+
+const DELIVERY_FEE_MSG = "Only the principal (Master Admin) can manage delivery fees";
+
+// Patch variant of the rule input: every field optional (empty → 422 below). A
+// present `target` still requires ≥1 entry (the .min(1) carries through .partial).
+const specialDeliveryFeeRulePatchInput = specialDeliveryFeeRuleInput.partial();
+
+// PATCH /delivery-fee-config — update the singleton (id=1); empty body → 422.
+catalogRouter.patch("/delivery-fee-config", async (c) => {
+  principalOnly(c, DELIVERY_FEE_MSG);
+  const parsed = await parseJsonBody(c, deliveryFeeConfigPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.baseFee !== undefined) patch.base_fee = parsed.data.baseFee;
+  if (parsed.data.crossCategoryFee !== undefined) patch.cross_category_fee = parsed.data.crossCategoryFee;
+  if (parsed.data.chargedCategories !== undefined) patch.charged_categories = parsed.data.chargedCategories;
+  if (parsed.data.mattressBedframeLeadDays !== undefined)
+    patch.mattress_bedframe_lead_days = parsed.data.mattressBedframeLeadDays;
+  if (parsed.data.sofaLeadDays !== undefined) patch.sofa_lead_days = parsed.data.sofaLeadDays;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(DELIVERY_FEE_CONFIG)
+    .update(patch)
+    .eq("id", 1)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "delivery_fee_config row missing" },
+      404,
+    );
+  }
+  return c.json({ deliveryFeeConfig: Adapters.deliveryFeeConfigFromRow(data as DB.DeliveryFeeConfigRow) });
+});
+
+// POST /special-delivery-fee-rules — create a per-RuleTarget override (principal-only).
+catalogRouter.post("/special-delivery-fee-rules", async (c) => {
+  principalOnly(c, DELIVERY_FEE_MSG);
+  const parsed = await parseJsonBody(c, specialDeliveryFeeRuleInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SPECIAL_DELIVERY_FEE_RULES)
+    .insert({
+      // `target` is RuleTarget[] jsonb (re-parsed on read via parseRuleTargets).
+      target: parsed.data.target,
+      standalone_fee: parsed.data.standaloneFee,
+      cross_cat_followup_fee: parsed.data.crossCategoryFollowupFee,
+      label: parsed.data.label ?? null,
+      active: parsed.data.active ?? true,
+      sort_order: parsed.data.sortOrder ?? 0,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "rpc_failed", code: "rpc_failed", message: "special delivery fee rule insert returned no row" },
+      500,
+    );
+  }
+  return c.json(
+    { specialDeliveryFeeRule: Adapters.specialDeliveryFeeRuleFromRow(data as DB.SpecialDeliveryFeeRuleRow) },
+    201,
+  );
+});
+
+// PATCH /special-delivery-fee-rules/:id — partial update (principal-only); empty → 422.
+catalogRouter.patch("/special-delivery-fee-rules/:id", async (c) => {
+  principalOnly(c, DELIVERY_FEE_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, specialDeliveryFeeRulePatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.target !== undefined) patch.target = parsed.data.target;
+  if (parsed.data.standaloneFee !== undefined) patch.standalone_fee = parsed.data.standaloneFee;
+  if (parsed.data.crossCategoryFollowupFee !== undefined)
+    patch.cross_cat_followup_fee = parsed.data.crossCategoryFollowupFee;
+  if (parsed.data.label !== undefined) patch.label = parsed.data.label;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SPECIAL_DELIVERY_FEE_RULES)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "special delivery fee rule not found" },
+      404,
+    );
+  }
+  return c.json({ specialDeliveryFeeRule: Adapters.specialDeliveryFeeRuleFromRow(data as DB.SpecialDeliveryFeeRuleRow) });
+});
+
+// DELETE /special-delivery-fee-rules/:id — HARD delete (principal-only). Nothing
+// FKs to this table, so deletion is safe; the soft-hide path is `active=false`
+// via PATCH. Idempotent: a missing id is a no-op that still returns ok (mirrors
+// the option-pools un-author route).
+catalogRouter.delete("/special-delivery-fee-rules/:id", async (c) => {
+  principalOnly(c, DELIVERY_FEE_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(SPECIAL_DELIVERY_FEE_RULES).delete().eq("id", id);
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);

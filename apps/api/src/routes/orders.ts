@@ -27,6 +27,7 @@ import {
 } from "../lib/lead-time";
 import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
 import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
+import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import type { AppEnv } from "../types";
 
 /**
@@ -332,9 +333,36 @@ ordersRouter.post("/", async (c) => {
     );
   }
 
-  // Feed the fully-verified (sofa-exploded + special-checked) line set into the RPC.
+  // 0184 (delivery TRIP fee) — server-authoritative recompute. Re-runs the pure
+  // `computeDeliveryFee` against FRESH delivery_fee_config + active
+  // special_delivery_fee_rules + the cart's real categories, and APPENDS the
+  // delivery order_addons (DELIVERY / DELIVERY_CROSS / DELIVERY_ADD) for any
+  // component > 0. The only client-trusted values are additionalDeliveryFee +
+  // crossCategorySourceSo. The floor STAIR surcharge coexists (ADDITIVE).
+  // Dormant (0-rate config) → zero components → no addon appended → totals stay
+  // byte-identical. A bad cross-order link → 400 (order NOT created); a catalog
+  // read error → 500 (fail-closed). create_order / order_lines stay UNTOUCHED —
+  // the delivery addons just ride the existing payload.addons[] path.
+  const deliveryRecompute = await recomputeDeliveryFee(sb, specialRecompute.lines, {
+    additionalDeliveryFee: parsed.data.additionalDeliveryFee ?? 0,
+    crossCategorySourceSo: parsed.data.crossCategorySourceSo ?? null,
+    customerPhone: parsed.data.customer.phone,
+  });
+  if (deliveryRecompute.status === "bad_request") {
+    throw new HTTPException(400, { message: deliveryRecompute.message });
+  }
+  if (deliveryRecompute.status === "server_error") {
+    throw new HTTPException(500, { message: deliveryRecompute.message });
+  }
+
+  // Feed the fully-verified (sofa-exploded + special-checked) line set + the
+  // appended delivery addons into the RPC.
   const payload = Adapters.orderInputToRpcPayload(
-    { ...parsed.data, lines: specialRecompute.lines },
+    {
+      ...parsed.data,
+      lines: specialRecompute.lines,
+      addons: [...parsed.data.addons, ...deliveryRecompute.addons],
+    },
     effectiveDealerId,
   );
   const { data: created, error } = await sb.rpc("create_order", { payload });

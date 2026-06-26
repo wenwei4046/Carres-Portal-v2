@@ -46,6 +46,11 @@ import {
   type SizesActiveInput,
   type GenerateSkusInput,
   type FloorConfigPatchInput,
+  // 0184 — delivery TRIP fee config + per-RuleTarget special rules.
+  type DeliveryFeeConfigDto,
+  type DeliveryFeeConfigPatchInput,
+  type SpecialDeliveryFeeRuleDto,
+  type SpecialDeliveryFeeRuleInput,
   type AddonCreateInput,
   type AddonPatchInput,
   type AddonDto,
@@ -4898,6 +4903,61 @@ export function usePatchFloorConfig() {
         "/api/catalog/floor-config",
         catalogJson("PATCH", input),
       ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0184 — delivery TRIP fee (2990s Products parity Phase 6). The principal-owned
+// config singleton + per-RuleTarget special overrides. All four mutations
+// invalidate the ['catalog'] tree so the bundle (Maintenance + the POS preview)
+// re-reads. Principal-only on the server (RLS + API gate); the Maintenance UI
+// gate is a friendly read-only veneer. The floor STAIR surcharge stays separate.
+// ---------------------------------------------------------------------------
+
+/** PATCH /api/catalog/delivery-fee-config — update the singleton (base/cross
+ *  fee, charged categories, lead days). Principal-only on the server. */
+export function useUpdateDeliveryFeeConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DeliveryFeeConfigPatchInput) =>
+      apiFetch<{ deliveryFeeConfig: DeliveryFeeConfigDto }>(
+        "/api/catalog/delivery-fee-config",
+        catalogJson("PATCH", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useCreateSpecialDeliveryFeeRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SpecialDeliveryFeeRuleInput) =>
+      apiFetch<{ specialDeliveryFeeRule: SpecialDeliveryFeeRuleDto }>(
+        "/api/catalog/special-delivery-fee-rules",
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateSpecialDeliveryFeeRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<SpecialDeliveryFeeRuleInput> }) =>
+      apiFetch<{ specialDeliveryFeeRule: SpecialDeliveryFeeRuleDto }>(
+        `/api/catalog/special-delivery-fee-rules/${id}`,
+        catalogJson("PATCH", patch),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteSpecialDeliveryFeeRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/special-delivery-fee-rules/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

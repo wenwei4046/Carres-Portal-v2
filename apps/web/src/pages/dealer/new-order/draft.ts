@@ -199,6 +199,14 @@ export interface WizardDraft {
    *  (`orders-attachments/{dealerId}/{wizardSessionId}/...`).
    *  Generated lazily on Step 3 mount; persists across refresh + draft restore. */
   wizardSessionId: string | null;
+  /** 0184 (2990s parity Phase 6) — the operator's free-form additional delivery
+   *  fee (RM, ≥0) entered in the CONFIRM step. Threaded into CreateOrderInput;
+   *  the server is authoritative for the base + cross portions. Optional so old
+   *  in-flight drafts (saved before this field existed) restore cleanly. */
+  additionalDeliveryFee?: number;
+  /** 0184 — the customer's earlier SO this order is a cross-category follow-up
+   *  of ("" = none). Validated server-side before booking. */
+  crossCategorySourceSo?: string;
 }
 
 export const DRAFT_STORAGE_KEY = "carres-order-draft";
@@ -237,6 +245,8 @@ export function emptyDraft(): WizardDraft {
     signature: null,
     termsAccepted: false,
     wizardSessionId: null,
+    additionalDeliveryFee: 0,
+    crossCategorySourceSo: "",
   };
 }
 

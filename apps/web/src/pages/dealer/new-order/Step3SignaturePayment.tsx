@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import type { CatalogResponse } from "@carres/shared";
-import { floorSurchargeRaw } from "@/lib/order-totals";
+import { deliveryFeePreview, floorSurchargeRaw } from "@/lib/order-totals";
 import { newWizardSessionId } from "@/lib/storage";
 import {
   composeEmergency,
@@ -66,7 +66,25 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
     stairItemsEffective,
     cfg,
   );
-  const total = lineSub + addonSub + stair;
+
+  // 0184 — delivery TRIP fee preview. Runs the SAME pure engine the Hono
+  // recompute uses, so the dealer sees the fee the server will charge in the
+  // common case. The server is authoritative; this is preview only (NOT
+  // submitted — DealerPos sends only the two client inputs below). Dormant
+  // config (0/0) + no matching rule + no additional fee → 0 (nothing shows).
+  const additionalFee = Math.max(0, draft.additionalDeliveryFee ?? 0);
+  const followupSo = (draft.crossCategorySourceSo ?? "").trim();
+  const deliveryPreview = useMemo(
+    () =>
+      deliveryFeePreview(draft.lines, catalog, {
+        additionalFee,
+        isCrossCategoryFollowup: followupSo.length > 0,
+      }),
+    [draft.lines, catalog, additionalFee, followupSo],
+  );
+  const deliveryTotal = deliveryPreview?.total ?? 0;
+
+  const total = lineSub + addonSub + stair + deliveryTotal;
   const minDeposit = useMemo(() => Math.round(total * 0.5), [total]);
   const paidPct = total > 0 ? Math.round((draft.paid / total) * 100) : 0;
 
@@ -189,10 +207,35 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               <span className="font-mono text-[13px]">RM {stair.toLocaleString()}</span>
             </div>
           )}
+          {deliveryPreview && deliveryPreview.base > 0 && (
+            <div className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600">
+              <span className="text-[13px]">
+                + {deliveryPreview.isFollowup
+                  ? "Cross-category follow-up delivery"
+                  : deliveryPreview.isSpecial
+                    ? "Special delivery fee"
+                    : "Delivery fee"}
+              </span>
+              <span className="font-mono text-[13px]">RM {deliveryPreview.base.toLocaleString()}</span>
+            </div>
+          )}
+          {deliveryPreview && deliveryPreview.crossCategory > 0 && (
+            <div className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600">
+              <span className="text-[13px]">+ Cross-category delivery</span>
+              <span className="font-mono text-[13px]">RM {deliveryPreview.crossCategory.toLocaleString()}</span>
+            </div>
+          )}
+          {deliveryPreview && deliveryPreview.additional > 0 && (
+            <div className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600">
+              <span className="text-[13px]">+ Additional delivery fee</span>
+              <span className="font-mono text-[13px]">RM {deliveryPreview.additional.toLocaleString()}</span>
+            </div>
+          )}
           <div className="px-3.5 py-3 border-t border-base-200 bg-base-50 text-xs">
             <Row label="Subtotal" value={`RM ${lineSub.toLocaleString()}`} />
             {addonSub > 0 && <Row label="Add-ons" value={`RM ${addonSub.toLocaleString()}`} />}
             {stair > 0 && <Row label="Stair carry" value={`RM ${stair.toLocaleString()}`} />}
+            {deliveryTotal > 0 && <Row label="Delivery fee" value={`RM ${deliveryTotal.toLocaleString()}`} />}
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-200">
               <span className="text-sm font-semibold text-base-700">Total</span>
               <span className="pos-price" style={{ fontSize: "36px", lineHeight: 1 }}>
@@ -201,6 +244,53 @@ export default function Step3SignaturePayment({ draft, onChange, catalog }: Prop
               </span>
             </div>
           </div>
+        </div>
+      </Section>
+
+      {/* ---------- Delivery fee (0184) ---------- */}
+      <Section title="Delivery fee" hint="Server-priced — these two are operator inputs">
+        <div className="rounded border border-base-200 bg-white p-4 flex flex-col gap-3.5">
+          <FieldLabel label="Additional delivery fee (optional)">
+            <div className="flex items-center gap-2.5">
+              <span className="font-mono text-[13px] text-base-500">RM</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={draft.additionalDeliveryFee || ""}
+                placeholder="0.00"
+                onChange={(e) =>
+                  onChange({
+                    ...draft,
+                    additionalDeliveryFee: Math.max(0, parseFloat(e.target.value) || 0),
+                  })
+                }
+                className="flex-1 px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl font-mono text-sm bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
+                aria-label="Additional delivery fee"
+                data-testid="step3-additional-delivery-fee"
+              />
+            </div>
+            <div className="text-[11px] text-base-500 mt-1.5">
+              A free-form fee agreed at handover (e.g. remote area). Added on top of the
+              base trip fee.
+            </div>
+          </FieldLabel>
+          <FieldLabel label="Previous SO — cross-category link (optional)">
+            <input
+              type="text"
+              value={draft.crossCategorySourceSo ?? ""}
+              placeholder="e.g. SO-1042"
+              onChange={(e) => onChange({ ...draft, crossCategorySourceSo: e.target.value })}
+              className="w-full px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl font-mono text-sm bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
+              aria-label="Previous SO cross-category link"
+              data-testid="step3-cross-category-so"
+            />
+            <div className="text-[11px] text-base-500 mt-1.5">
+              If this order delivers as a follow-up to the customer's earlier SO (the base
+              fee was already paid there), enter that SO so only the reduced cross-category
+              rate applies. The server validates it before booking.
+            </div>
+          </FieldLabel>
         </div>
       </Section>
 

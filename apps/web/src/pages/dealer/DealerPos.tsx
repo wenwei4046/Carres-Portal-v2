@@ -5,6 +5,7 @@ import type { CreateOrderInput, Order } from "@carres/shared";
 import { maxLeadDaysFor } from "@carres/shared";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import CarresLockup from "@/components/CarresLockup";
+import { deliveryFeePreview } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import { useAuth } from "@/lib/auth";
 import {
@@ -177,7 +178,14 @@ export default function DealerPos({
       : Math.max(0, draft.delivery.floor - catalogQ.data.floorConfig.freeUpToFloor) *
         catalogQ.data.floorConfig.perFloorPerItem *
         itemsTotal;
-    return lineSub + addonSub + stair;
+    // 0184 — delivery TRIP fee preview (same pure engine the server recomputes).
+    // Dormant config (0/0) → 0, so totals stay byte-identical until rates are set.
+    const delivery =
+      deliveryFeePreview(draft.lines, catalogQ.data, {
+        additionalFee: draft.additionalDeliveryFee,
+        isCrossCategoryFollowup: Boolean((draft.crossCategorySourceSo ?? "").trim()),
+      })?.total ?? 0;
+    return lineSub + addonSub + stair + delivery;
   }, [draft, catalogQ.data]);
 
   const submitDisabled =
@@ -274,6 +282,17 @@ export default function DealerPos({
         approvalCode: draft.payment.approvalCode.trim() || null,
         installmentMonths:
           draft.payment.method === "installment" ? draft.payment.installmentMonths : null,
+        // 0184 — the operator's two delivery-fee inputs. The server is
+        // authoritative for the base + cross portions (it recomputes from fresh
+        // config + rules and appends the fee as order_addons); the client only
+        // supplies these two. Omitted when unset so non-POS callers / dormant
+        // orders submit a byte-identical payload.
+        ...(draft.additionalDeliveryFee && draft.additionalDeliveryFee > 0
+          ? { additionalDeliveryFee: draft.additionalDeliveryFee }
+          : {}),
+        ...((draft.crossCategorySourceSo ?? "").trim()
+          ? { crossCategorySourceSo: draft.crossCategorySourceSo!.trim() }
+          : {}),
       };
 
       const created = await createOrder.mutateAsync(input);

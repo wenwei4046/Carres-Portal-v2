@@ -3702,3 +3702,352 @@ describe("0182 — global option pools (GET bundle + principal-gated CRUD)", () 
     expect(res.status).toBe(403);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 0184 — Delivery TRIP fee (config singleton + per-RuleTarget special rules).
+// GET bundle exposure + principal-gated CRUD. Mirrors the 0182 option-pools
+// block: buildSb for the read bundle, buildWriteSb for the writes.
+// ---------------------------------------------------------------------------
+describe("0184 — delivery fee (GET bundle + principal-gated CRUD)", () => {
+  const RULE_A = "aa000000-0000-4000-8000-000000000001"; // active, sort 5
+  const RULE_B = "bb000000-0000-4000-8000-000000000002"; // inactive, sort 0
+  const RULE_C = "cc000000-0000-4000-8000-000000000003"; // active, sort 1
+  const ruleRow = (over: Record<string, unknown>) => ({
+    id: RULE_A,
+    target: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+    standalone_fee: 80,
+    cross_cat_followup_fee: 30,
+    label: "Big sofa transport",
+    active: true,
+    sort_order: 5,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    updated_by: null,
+    ...over,
+  });
+
+  it("GET /api/catalog returns deliveryFeeConfig (mapped) + specialDeliveryFeeRules (active-first, sort_order)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        product_models: [
+          {
+            id: MODEL_ID_LIVE,
+            category: "sofa",
+            model_key: "carres-sofa",
+            name: "Sofa",
+            blurb: null,
+            colors: null,
+            gaps: null,
+            sofa_mode: null,
+            discontinued_at: null,
+          },
+        ],
+        product_skus: [],
+        sofa_fabrics: [],
+        addons: [],
+        floor_config: [
+          { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
+        ],
+        fabric_tier_addon_config: [
+          { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+        ],
+        model_fabric_tier_overrides: [],
+        delivery_fee_config: [
+          {
+            id: 1,
+            base_fee: 120,
+            cross_category_fee: 60,
+            charged_categories: ["sofa", "mattress", "bedframe"],
+            mattress_bedframe_lead_days: 14,
+            sofa_lead_days: 21,
+            updated_at: "2026-01-01T00:00:00Z",
+            updated_by: null,
+          },
+        ],
+        special_delivery_fee_rules: [
+          ruleRow({ id: RULE_A, active: true, sort_order: 5 }),
+          ruleRow({ id: RULE_B, active: false, sort_order: 0, label: "Retired" }),
+          ruleRow({ id: RULE_C, active: true, sort_order: 1 }),
+        ],
+      }),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+
+    // Config mapped camelCase + numeric-coerced.
+    expect(body.deliveryFeeConfig).toEqual({
+      baseFee: 120,
+      crossCategoryFee: 60,
+      chargedCategories: ["sofa", "mattress", "bedframe"],
+      mattressBedframeLeadDays: 14,
+      sofaLeadDays: 21,
+    });
+
+    // All three rules returned (inactive included — consumers filter).
+    expect(body.specialDeliveryFeeRules).toHaveLength(3);
+    // Active-first, then ascending sort_order: C(active,1), A(active,5), B(inactive).
+    expect(body.specialDeliveryFeeRules?.map((r) => r.id)).toEqual([RULE_C, RULE_A, RULE_B]);
+    // Adapter mapping (camelCase + RuleTarget parse).
+    expect(body.specialDeliveryFeeRules?.find((r) => r.id === RULE_A)).toMatchObject({
+      standaloneFee: 80,
+      crossCategoryFollowupFee: 30,
+      label: "Big sofa transport",
+      active: true,
+      sortOrder: 5,
+      target: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+    });
+  });
+
+  it("GET /api/catalog falls back to dormant config defaults when the singleton row is absent", async () => {
+    // Existing pre-0184 bundle stubs never set delivery_fee_config — the bundle
+    // must still ship a (dormant 0-rate) config, never 500.
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        product_models: [],
+        product_skus: [],
+        sofa_fabrics: [],
+        addons: [],
+        floor_config: [{ id: 1, free_up_to_floor: 2, per_floor_per_item: 50 }],
+        fabric_tier_addon_config: [
+          { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+        ],
+        model_fabric_tier_overrides: [],
+      }),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.deliveryFeeConfig).toMatchObject({ baseFee: 0, crossCategoryFee: 0 });
+    expect(body.specialDeliveryFeeRules).toEqual([]);
+  });
+
+  // ----- PATCH /delivery-fee-config -----
+
+  it("PATCH /delivery-fee-config — principal updates → 200 (camel→snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        writeReturn: {
+          id: 1,
+          base_fee: 150,
+          cross_category_fee: 70,
+          charged_categories: ["sofa", "mattress"],
+          mattress_bedframe_lead_days: 10,
+          sofa_lead_days: 18,
+          updated_at: "2026-01-01T00:00:00Z",
+          updated_by: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/delivery-fee-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseFee: 150,
+          crossCategoryFee: 70,
+          chargedCategories: ["sofa", "mattress"],
+          mattressBedframeLeadDays: 10,
+          sofaLeadDays: 18,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.table).toBe("delivery_fee_config");
+    expect(upd?.payload).toMatchObject({
+      base_fee: 150,
+      cross_category_fee: 70,
+      charged_categories: ["sofa", "mattress"],
+      mattress_bedframe_lead_days: 10,
+      sofa_lead_days: 18,
+    });
+    const body = (await res.json()) as { deliveryFeeConfig: { baseFee: number; crossCategoryFee: number } };
+    expect(body.deliveryFeeConfig).toMatchObject({ baseFee: 150, crossCategoryFee: 70 });
+  });
+
+  it("PATCH /delivery-fee-config — empty body → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/delivery-fee-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH /delivery-fee-config — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/delivery-fee-config", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ baseFee: 150 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  // ----- POST /special-delivery-fee-rules -----
+
+  it("POST /special-delivery-fee-rules — principal inserts → 201 (camel→snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: ruleRow({}) }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/special-delivery-fee-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+          standaloneFee: 80,
+          crossCategoryFollowupFee: 30,
+          label: "Big sofa transport",
+          sortOrder: 5,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("special_delivery_fee_rules");
+    expect(ins?.payload).toMatchObject({
+      target: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+      standalone_fee: 80,
+      cross_cat_followup_fee: 30,
+      label: "Big sofa transport",
+      active: true,
+      sort_order: 5,
+    });
+    const body = (await res.json()) as { specialDeliveryFeeRule: { standaloneFee: number } };
+    expect(body.specialDeliveryFeeRule).toMatchObject({ standaloneFee: 80, crossCategoryFollowupFee: 30 });
+  });
+
+  it("POST /special-delivery-fee-rules — empty target → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/special-delivery-fee-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ target: [], standaloneFee: 80, crossCategoryFollowupFee: 30 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("POST /special-delivery-fee-rules — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/special-delivery-fee-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+          standaloneFee: 80,
+          crossCategoryFollowupFee: 30,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  // ----- PATCH /special-delivery-fee-rules/:id -----
+
+  it("PATCH /special-delivery-fee-rules/:id — principal partial update → 200 (camel→snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: ruleRow({ standalone_fee: 95, active: false }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/special-delivery-fee-rules/${RULE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ standaloneFee: 95, active: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ standalone_fee: 95, active: false });
+    const body = (await res.json()) as { specialDeliveryFeeRule: { standaloneFee: number; active: boolean } };
+    expect(body.specialDeliveryFeeRule).toMatchObject({ standaloneFee: 95, active: false });
+  });
+
+  it("PATCH /special-delivery-fee-rules/:id — empty body → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/special-delivery-fee-rules/${RULE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH /special-delivery-fee-rules/:id — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/special-delivery-fee-rules/${RULE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ standaloneFee: 95 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  // ----- DELETE /special-delivery-fee-rules/:id -----
+
+  it("DELETE /special-delivery-fee-rules/:id — HARD delete → 200 { ok: true }", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/special-delivery-fee-rules/${RULE_A}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const del = recorded.find((r) => r.op === "delete");
+    expect(del?.table).toBe("special_delivery_fee_rules");
+  });
+
+  it("DELETE /special-delivery-fee-rules/:id — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/special-delivery-fee-rules/${RULE_A}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
