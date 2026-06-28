@@ -200,6 +200,21 @@ describe("resolvePwp — multiple differentiated rules", () => {
     const grants = resolvePwp([RULE_A, RULE_B], lines);
     expect(grants.find((g) => g.idx === 2)?.triggerRef?.name).toBe("2990 KETTA-SOFT");
   });
+
+  it("attributes each grant to the rule index that actually granted it (ruleIndex)", () => {
+    // Aria (rule A reward) + Orient (rule B reward), each with its own trigger
+    // present. The grant on Aria must carry ruleIndex 0 (RULE_A), Orient ruleIndex
+    // 1 (RULE_B) — so the server can assert the claimed rule == the granting rule.
+    const lines = [
+      line(0, "MATTRESS", "akka"),
+      line(1, "MATTRESS", "ketta"),
+      line(2, "BEDFRAME", "aria", { pwp: true }),
+      line(3, "BEDFRAME", "orient", { pwp: true }),
+    ];
+    const grants = resolvePwp([RULE_A, RULE_B], lines);
+    expect(grants.find((g) => g.idx === 2)?.ruleIndex).toBe(0);
+    expect(grants.find((g) => g.idx === 3)?.ruleIndex).toBe(1);
+  });
 });
 
 /* Promo one-way (Loo 2026-06-06) — a rule whose trigger set == reward set

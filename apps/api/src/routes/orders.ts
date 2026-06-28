@@ -29,6 +29,7 @@ import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
 import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
 import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
+import { recomputePwpLines } from "../lib/pwp-recompute";
 import type { AppEnv } from "../types";
 
 /**
@@ -299,6 +300,33 @@ ordersRouter.post("/", async (c) => {
     );
   }
 
+  // 0186 (PWP / Promo) — STATELESS same-cart purchase-with-purchase + promo
+  // apply. A reward line the salesperson toggled carries `attrs.pwp={ruleId}`;
+  // we re-run the SAME pure `resolvePwp` against ACTIVE pwp_rules + the cart and,
+  // for a genuinely-granted line, FORCE its unitPrice to the reward sku's
+  // `product_skus.pwp_price` ('pwp') or 0 ('promo') + canonicalise the marker to
+  // `{ruleId,type,triggerRef}` (the client price is never trusted). Runs AFTER
+  // the free-item gate (on the free_gift-stripped lines) and BEFORE the sofa
+  // recompute so (a) a sofa-build PWP claim is rejected cleanly (409
+  // pwp_not_eligible_sofa_build — a build line is recomputed under an ABSOLUTE
+  // drift gate) and (b) the forced reward price is the trusted base the
+  // special-addon / delivery recomputes read. Ineligible / over-allowance /
+  // unknown-rule → 409. No marker → byte-identical (DORMANT, no DB read).
+  const pwp = await recomputePwpLines(sb, freeItem.lines);
+  if (pwp.status === "server_error") {
+    throw new HTTPException(500, { message: pwp.message });
+  }
+  if (pwp.status === "bad_request") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: pwp.code,
+        message: pwp.message,
+      },
+      409,
+    );
+  }
+
   // Phase 4 (sofa engine) — server recompute + 0.5% drift-reject for any sofa
   // BUILD line (one carrying `attrs.sofa_build`). The client price is a preview;
   // we re-run the SAME pure `computeSofaPrice` against FRESH DB catalog prices.
@@ -306,7 +334,7 @@ ordersRouter.post("/", async (c) => {
   // one real per-compartment line (Phase 5), summing to the authoritative server
   // total. Non-build lines pass through verbatim; `create_order` + `order_lines`
   // stay UNCHANGED — the RPC just inserts the (possibly expanded) line set.
-  const recompute = await recomputeAndExplodeSofaBuildLines(sb, freeItem.lines);
+  const recompute = await recomputeAndExplodeSofaBuildLines(sb, pwp.lines);
   if (recompute.status === "bad_request") {
     throw new HTTPException(400, { message: recompute.message });
   }

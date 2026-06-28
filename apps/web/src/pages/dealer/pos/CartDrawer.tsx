@@ -18,6 +18,14 @@ import {
   previewDefaultGifts,
   unmarkLineFree,
 } from "./free-line";
+import {
+  coveringPwpForLine,
+  isLinePwp,
+  linePwpRuleId,
+  markLinePwp,
+  pwpRewardPrice,
+  unmarkLinePwp,
+} from "./pwp-line";
 
 /** The combo key a line belongs to (set by `comboToDraftLines`), or null for a
  *  standalone (non-combo) line. */
@@ -30,6 +38,15 @@ function lineComboKey(l: DraftLine): string | null {
 function lineComboLabel(l: DraftLine): string {
   const v = (l.attrs as Record<string, unknown> | null)?.combo_label;
   return typeof v === "string" ? v : "Combo";
+}
+
+/** 0186 — true when the line is claimed under a 'promo' PWP rule (price forced to
+ *  0). A 'pwp' claim (discounted, > 0) shows its discounted price, not FREE. We
+ *  detect promo via the claim + a zeroed unit price (the server canonicalises
+ *  `attrs.pwp.type`, but the client marker only carries `ruleId`, so the price is
+ *  the reliable client-side promo signal). */
+function isPwpFreeLine(l: DraftLine, catalog: CatalogResponse): boolean {
+  return isLinePwp(l) && l.unitPrice === 0 && (catalog.pwpRules?.length ?? 0) > 0;
 }
 
 /**
@@ -85,10 +102,12 @@ export default function CartDrawer({
       lines: draft.lines.filter((l) => lineComboKey(l) !== comboKey),
     });
   }
-  // 0185 — flip a standalone line between paid and free-under-a-campaign. The
-  // helper parks/restores the real price + stamps/strips `attrs.free_item`; the
-  // server re-validates the claim + forces RM0 regardless (client price ignored).
-  function setLineFree(localId: string, next: DraftLine) {
+  // 0185 / 0186 — replace a standalone line with a re-priced copy. Used by both
+  // the free-item "Make free" toggle (parks/restores the real price + stamps/
+  // strips `attrs.free_item`) and the PWP "use PWP price" toggle (stamps/strips
+  // `attrs.pwp`). The server re-validates the claim + forces the price regardless
+  // (the client price is never trusted).
+  function replaceLine(localId: string, next: DraftLine) {
     onChange({ ...draft, lines: draft.lines.map((l) => (l.localId === localId ? next : l)) });
   }
 
@@ -214,13 +233,21 @@ export default function CartDrawer({
 
                     {/* 0185 — free-item "Make free" affordance (eligible lines). */}
                     {catalog && (
-                      <MakeFreeRow line={l} catalog={catalog} onSet={setLineFree} />
+                      <MakeFreeRow line={l} catalog={catalog} onSet={replaceLine} />
+                    )}
+
+                    {/* 0186 — PWP / promo "Use PWP price" affordance (reward lines).
+                        Hidden once the line is claimed free (free-item wins — a
+                        line can't be both free AND PWP-priced). */}
+                    {catalog && !isLineFreeItem(l) && (
+                      <PwpRow line={l} lines={draft.lines} catalog={catalog} onSet={replaceLine} />
                     )}
                   </div>
 
-                  {/* Line price + remove (FREE when claimed under a campaign) */}
+                  {/* Line price + remove (FREE when free / promo-claimed, PWP price
+                      when claimed under a 'pwp' rule) */}
                   <div className="shrink-0 flex flex-col items-end gap-2 pt-0.5">
-                    {catalog && isLineFreeItem(l) ? (
+                    {catalog && (isLineFreeItem(l) || isPwpFreeLine(l, catalog)) ? (
                       <span
                         className="pill pill-confirmed"
                         data-testid={`cart-line-free-${l.localId}`}
@@ -505,6 +532,74 @@ function MakeFreeRow({
           {c.name}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * 0186 — the per-line PWP / promo "Use PWP price" control. Renders nothing unless
+ * the line is grantable under ≥1 ACTIVE pwp_rule right now (a qualifying TRIGGER
+ * is in the cart with spare allowance + the reward scope + a usable reward price)
+ * OR the line is already PWP-claimed. A claimed line shows the rule + an "Undo";
+ * a grantable line shows a "Use PWP" / "Free" action per covering rule, previewing
+ * the EXACT price the server will force (the sku's pwpPrice, or FREE for promo).
+ * `coveringPwpForLine` runs the SAME shared `resolvePwp` the server runs, so the
+ * client never offers a claim the server would 409 (honest-pricing).
+ */
+function PwpRow({
+  line,
+  lines,
+  catalog,
+  onSet,
+}: {
+  line: DraftLine;
+  lines: DraftLine[];
+  catalog: CatalogResponse;
+  onSet: (localId: string, next: DraftLine) => void;
+}) {
+  const claimed = isLinePwp(line);
+
+  if (claimed) {
+    const claimedId = linePwpRuleId(line);
+    const rule = (catalog.pwpRules ?? []).find((r) => r.id === claimedId);
+    const label =
+      rule?.type === "promo" ? "Promo · FREE" : `PWP · ${rm(line.unitPrice)}`;
+    return (
+      <div className="flex items-center gap-2 mt-2" data-testid={`pwp-claimed-${line.localId}`}>
+        <span className="t-tiny text-primary">{label}</span>
+        <button
+          type="button"
+          onClick={() => onSet(line.localId, unmarkLinePwp(line))}
+          className="t-tiny text-base-500 underline hover:text-base-900"
+          data-testid={`undo-pwp-${line.localId}`}
+        >
+          Undo
+        </button>
+      </div>
+    );
+  }
+
+  const covering = coveringPwpForLine(line, lines, catalog);
+  if (covering.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+      <span className="t-tiny text-base-400">Use PWP:</span>
+      {covering.map((rule) => {
+        const price = pwpRewardPrice(line, catalog, rule) ?? 0;
+        const tag = rule.type === "promo" ? "FREE" : rm(price);
+        return (
+          <button
+            key={rule.id}
+            type="button"
+            onClick={() => onSet(line.localId, markLinePwp(line, rule, price))}
+            className="inline-flex items-center gap-1 rounded-[4px] border border-primary/40 bg-primary/5 px-2 py-0.5 text-[11px] text-primary hover:border-primary transition-colors"
+            data-testid={`pwp-toggle-${line.localId}-${rule.id}`}
+          >
+            {tag}
+          </button>
+        );
+      })}
     </div>
   );
 }

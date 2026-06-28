@@ -80,6 +80,11 @@ export interface PwpLineInput extends RuleLineInput {
 export interface PwpGrant {
   /** The reward line (idx) that is granted the PWP/promo price. */
   idx: number;
+  /** The index (into the `rules` array passed to `resolvePwp`) of the rule that
+   *  granted this line — i.e. the rule whose trigger allowance was consumed. The
+   *  server anti-tamper gate asserts THIS rule is the one the client claimed, so a
+   *  forged claim cannot ride a different (overlapping) rule's allowance. */
+  ruleIndex: number;
   /** The trigger unit this reward is redeemed against (for the invoice), or null. */
   triggerRef: { name: string; code: string } | null;
 }
@@ -124,7 +129,8 @@ export function resolvePwp(
   const granted = new Set<number>(); // reward idx already granted (a line matches <= 1 rule)
   const ordered = [...lines].sort((a, b) => a.idx - b.idx);
 
-  for (const rule of rules) {
+  for (let ruleIndex = 0; ruleIndex < rules.length; ruleIndex++) {
+    const rule = rules[ruleIndex]!;
     const qpt = Math.max(1, Math.floor(Number(rule.qtyPerTrigger) || 1));
     const triggerCat = upper(rule.triggerCategory);
     const rewardCat = upper(rule.rewardCategory);
@@ -158,7 +164,7 @@ export function resolvePwp(
       const ref = slots[cursor];
       cursor += need;
       granted.add(line.idx);
-      grants.push({ idx: line.idx, triggerRef: ref ? { ...ref } : null });
+      grants.push({ idx: line.idx, ruleIndex, triggerRef: ref ? { ...ref } : null });
     }
   }
 

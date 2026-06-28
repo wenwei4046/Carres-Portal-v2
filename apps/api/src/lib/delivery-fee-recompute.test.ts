@@ -224,6 +224,35 @@ describe("recomputeDeliveryFee — no-funding (Phase 7 free lines)", () => {
     // The paid mattress bills the base; the free gift adds nothing.
     expect(r.addons).toEqual([{ addonKey: "DELIVERY", qty: 1, unitPrice: 50, attrs: { kind: "base" } }]);
   });
+
+  // Phase 8b — a 'promo' PWP reward forced to RM0 is a giveaway (no-funding):
+  // excluded from the charged-category set just like free_gift / free_item.
+  it("a 'promo' PWP line alone does NOT trip a base fee (excluded, no-funding)", async () => {
+    const sb = mockSb({ config: cfgRow({ base_fee: 50 }), skus: [skuRow("M1", "mattress")] });
+    const r = await recomputeDeliveryFee(
+      sb,
+      [line("M1", { unitPrice: 0, attrs: { pwp: { ruleId: "r1", type: "promo", triggerRef: null } } })],
+      ctx(),
+    );
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.addons).toEqual([]);
+    expect(r.fee.total).toBe(0);
+  });
+
+  // A 'pwp' reward (discounted, > 0) is a PAID deliverable genuinely on the truck
+  // → it COUNTS for delivery (NOT excluded).
+  it("a 'pwp' PWP line (discounted, > 0) IS billed (counts for delivery)", async () => {
+    const sb = mockSb({ config: cfgRow({ base_fee: 50 }), skus: [skuRow("M1", "mattress")] });
+    const r = await recomputeDeliveryFee(
+      sb,
+      [line("M1", { unitPrice: 300, attrs: { pwp: { ruleId: "r1", type: "pwp", triggerRef: null } } })],
+      ctx(),
+    );
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.addons).toEqual([{ addonKey: "DELIVERY", qty: 1, unitPrice: 50, attrs: { kind: "base" } }]);
+  });
 });
 
 describe("recomputeDeliveryFee — special rule match", () => {
