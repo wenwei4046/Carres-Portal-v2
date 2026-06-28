@@ -335,6 +335,31 @@ export const pwpRuleFromRow = (r: DB.PwpRuleRow): D.PwpRule => ({
   active: r.active,
 });
 
+/**
+ * Maps a `pwp_codes` row to the camelCase domain shape (0187, the SAME-CART
+ * voucher ledger). `reward_targets` jsonb is cleaned via `parseRuleTargets`
+ * (drops malformed entries; `[]` = the whole category — the snapshot of the
+ * rule's reward scope). All other columns are direct snake→camel. DORMANT.
+ */
+export const pwpCodeFromRow = (r: DB.PwpCodeRow): D.PwpCode => ({
+  code: r.code,
+  ruleId: r.rule_id,
+  type: r.type,
+  rewardCategory: r.reward_category,
+  rewardTargets: parseRuleTargets(r.reward_targets),
+  status: r.status,
+  ownerStaffId: r.owner_staff_id,
+  cartLineKey: r.cart_line_key,
+  triggerItemCode: r.trigger_item_code,
+  claimGroup: r.claim_group,
+  redeemedOrderId: r.redeemed_order_id,
+  redeemedItemSku: r.redeemed_item_sku,
+  sourceOrderId: r.source_order_id,
+  customerId: r.customer_id,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({
   id: r.id,
   name: r.name,

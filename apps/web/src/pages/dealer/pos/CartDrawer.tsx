@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { X, Trash2, Minus, Plus, Package, Gift } from "lucide-react";
-import type { CatalogResponse } from "@carres/shared";
+import type { CatalogResponse, PwpCodeDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
   step2Valid,
@@ -21,8 +21,10 @@ import {
 import {
   coveringPwpForLine,
   isLinePwp,
+  linePwpCode,
   linePwpRuleId,
   markLinePwp,
+  markLinePwpWithCode,
   pwpRewardPrice,
   unmarkLinePwp,
 } from "./pwp-line";
@@ -62,6 +64,8 @@ export default function CartDrawer({
   onProceed,
   onClose,
   catalog,
+  pwpReservedCodes,
+  pwpClaimGroup,
 }: {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
@@ -71,6 +75,15 @@ export default function CartDrawer({
    *  "Make free" affordance. OPTIONAL: when absent (older callers / tests) the
    *  cart renders exactly as before — no gift rows, no Make-free. */
   catalog?: CatalogResponse;
+  /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (from /pwp-codes/mine).
+   *  P8c is Auto-Fill ONLY: a reward line offers "Apply" only when a RESERVED
+   *  code minted under its covering rule is free to bind; clicking binds the next
+   *  unconsumed code (RESERVED→USED at Confirm). OPTIONAL — absent → the PWP
+   *  toggle binds NO code (P8b-only preview, byte-identical). */
+  pwpReservedCodes?: PwpCodeDto[];
+  /** 0187 — the per-cart claimGroup correlation uuid stamped onto a bound reward
+   *  line's attrs.pwp.claimGroup. OPTIONAL (required to bind a code). */
+  pwpClaimGroup?: string;
 }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -129,6 +142,15 @@ export default function CartDrawer({
       comboOrder.push(key);
     }
     comboGroups.get(key)!.lines.push(l);
+  }
+
+  // 0187 — voucher codes already bound to a reward line in THIS cart. A RESERVED
+  // code already on one reward line must not be offered to another (one code = one
+  // reward); PwpRow picks the first RESERVED code under its rule that is NOT here.
+  const boundPwpCodes = new Set<string>();
+  for (const l of draft.lines) {
+    const c = linePwpCode(l);
+    if (c) boundPwpCodes.add(c);
   }
 
   const lineSub = cartLineSubtotal(draft.lines);
@@ -238,9 +260,18 @@ export default function CartDrawer({
 
                     {/* 0186 — PWP / promo "Use PWP price" affordance (reward lines).
                         Hidden once the line is claimed free (free-item wins — a
-                        line can't be both free AND PWP-priced). */}
+                        line can't be both free AND PWP-priced). 0187 binds a
+                        RESERVED voucher code on claim (Auto-Fill). */}
                     {catalog && !isLineFreeItem(l) && (
-                      <PwpRow line={l} lines={draft.lines} catalog={catalog} onSet={replaceLine} />
+                      <PwpRow
+                        line={l}
+                        lines={draft.lines}
+                        catalog={catalog}
+                        onSet={replaceLine}
+                        reservedCodes={pwpReservedCodes ?? []}
+                        consumedCodes={boundPwpCodes}
+                        claimGroup={pwpClaimGroup}
+                      />
                     )}
                   </div>
 
@@ -551,11 +582,20 @@ function PwpRow({
   lines,
   catalog,
   onSet,
+  reservedCodes,
+  consumedCodes,
+  claimGroup,
 }: {
   line: DraftLine;
   lines: DraftLine[];
   catalog: CatalogResponse;
   onSet: (localId: string, next: DraftLine) => void;
+  /** 0187 — the caller's RESERVED pwp_codes. Auto-Fill binds one on claim. */
+  reservedCodes: PwpCodeDto[];
+  /** 0187 — codes already bound to a reward line in this cart (don't re-offer). */
+  consumedCodes: Set<string>;
+  /** 0187 — the per-cart claimGroup stamped onto a bound line. */
+  claimGroup?: string;
 }) {
   const claimed = isLinePwp(line);
 
@@ -582,18 +622,46 @@ function PwpRow({
   const covering = coveringPwpForLine(line, lines, catalog);
   if (covering.length === 0) return null;
 
+  // 0187 — P8c is Auto-Fill ONLY: a covering rule is offerable only when a
+  // RESERVED code minted under it is free to bind (not already on another reward
+  // line + a claimGroup is present). The first free code under each rule backs the
+  // claim. When NO reserved codes / claimGroup are wired (DORMANT / P8b-only / a
+  // test without the voucher props), we fall back to the P8b code-less claim so
+  // the price preview still works (the server forces price either way).
+  const hasVoucherLayer = typeof claimGroup === "string" && claimGroup.length > 0;
+  function freeCodeFor(ruleId: string): string | null {
+    const hit = reservedCodes.find(
+      (rc) => rc.ruleId === ruleId && rc.status === "RESERVED" && !consumedCodes.has(rc.code),
+    );
+    return hit?.code ?? null;
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-2">
       <span className="t-tiny text-base-400">Use PWP:</span>
       {covering.map((rule) => {
         const price = pwpRewardPrice(line, catalog, rule) ?? 0;
         const tag = rule.type === "promo" ? "FREE" : rm(price);
+        const code = freeCodeFor(rule.id);
+        // With the voucher layer on, the offer is disabled until a RESERVED code
+        // exists for this rule. Without the layer (DORMANT/test) it stays enabled
+        // and binds no code — byte-identical to P8b.
+        const disabled = hasVoucherLayer && !code;
+        const onClick = () => {
+          if (hasVoucherLayer && code && claimGroup) {
+            onSet(line.localId, markLinePwpWithCode(line, rule, price, code, claimGroup));
+          } else if (!hasVoucherLayer) {
+            onSet(line.localId, markLinePwp(line, rule, price));
+          }
+        };
         return (
           <button
             key={rule.id}
             type="button"
-            onClick={() => onSet(line.localId, markLinePwp(line, rule, price))}
-            className="inline-flex items-center gap-1 rounded-[4px] border border-primary/40 bg-primary/5 px-2 py-0.5 text-[11px] text-primary hover:border-primary transition-colors"
+            disabled={disabled}
+            onClick={onClick}
+            title={disabled ? "Buy the trigger product to unlock this voucher" : undefined}
+            className="inline-flex items-center gap-1 rounded-[4px] border border-primary/40 bg-primary/5 px-2 py-0.5 text-[11px] text-primary hover:border-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-primary/40"
             data-testid={`pwp-toggle-${line.localId}-${rule.id}`}
           >
             {tag}

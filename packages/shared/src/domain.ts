@@ -347,6 +347,36 @@ export interface PwpRule {
   active: boolean;
 }
 
+/**
+ * One `pwp_codes` row (migration 0187, 2990s Products parity Phase 8c). The
+ * camelCase voucher-ledger shape: a reserved/claimed PWP voucher slot in the
+ * SAME-CART state machine. `pwpCodeFromRow` maps it; `rewardTargets` is parsed
+ * (malformed entries dropped) via `parseRuleTargets`. `status` RESERVED → USED;
+ * `available`/`sourceOrderId`/`customerId` ship for P8d (written by nobody in
+ * P8c). `claimGroup` is the per-order correlation uuid threaded onto BOTH the
+ * code and the order line's `attrs.pwp.claimGroup`. DORMANT — no codes minted
+ * until the principal authors active pwp_rules.
+ */
+export interface PwpCode {
+  code: string;
+  ruleId: string | null;
+  type: "pwp" | "promo";
+  rewardCategory: string;
+  rewardTargets: RuleTarget[];
+  status: "RESERVED" | "USED" | "AVAILABLE";
+  ownerStaffId: string | null;
+  cartLineKey: string | null;
+  triggerItemCode: string | null;
+  claimGroup: string | null;
+  redeemedOrderId: string | null;
+  redeemedItemSku: string | null;
+  // ── P8d cross-order columns — PRESENT, UNUSED in P8c. ──
+  sourceOrderId: string | null;
+  customerId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Warehouse {
   id: string;
   name: string;

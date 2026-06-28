@@ -450,6 +450,39 @@ export interface PwpRuleRow {
   updated_by: string | null;
 }
 
+/**
+ * `pwp_codes` (migration 0187, 2990s Products parity Phase 8c). One row = one
+ * reserved/claimed PWP voucher slot — the SAME-CART redemption LEDGER on top of
+ * P8b's stateless pricing. `code` is the PK ("occupy-the-number" guarantee: two
+ * carts can never reserve the same string). `status` machine: RESERVED → USED
+ * (claim via pwp_claim_code) | DELETE (free); 'AVAILABLE' is in the CHECK but
+ * written by NOBODY in P8c (it + source_order_id + customer_id ship dormant so
+ * the P8d cross-order carry-forward needs no migration). `claim_group` is the
+ * per-order correlation uuid the POS mints — the cancel/recovery join key that
+ * exists at claim time (vs. redeemed_order_id, stamped only after create_order
+ * returns). Owner-scoped RLS (`owner_staff_id` NULLABLE + ON DELETE SET NULL so
+ * a deleted staff's USED-audit rows survive). `pwpCodeFromRow` maps it. DORMANT.
+ */
+export interface PwpCodeRow {
+  code: string;
+  rule_id: string | null;
+  type: "pwp" | "promo";
+  reward_category: string;
+  reward_targets: RuleTarget[];
+  status: "RESERVED" | "USED" | "AVAILABLE";
+  owner_staff_id: string | null;
+  cart_line_key: string | null;
+  trigger_item_code: string | null;
+  claim_group: string | null;
+  redeemed_order_id: string | null;
+  redeemed_item_sku: string | null;
+  // ── P8d cross-order columns — PRESENT, UNUSED in P8c. ──
+  source_order_id: string | null;
+  customer_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WarehouseRow {
   id: string;
   name: string;

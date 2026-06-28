@@ -59,6 +59,9 @@ import {
   // 0186 — PWP / Promo rules (Phase 8a, principal-only CRUD).
   type PwpRuleDto,
   type PwpRuleInput,
+  // 0187 — PWP voucher codes (Phase 8c, the SAME-CART state machine reserve API).
+  type PwpReserveInput,
+  type PwpCodesResponse,
   type AddonCreateInput,
   type AddonPatchInput,
   type AddonDto,
@@ -126,6 +129,10 @@ export const qk = {
   catalog:      () => ["catalog"] as const,
   outlets:      () => ["outlets"] as const,
   salespersons: (outletId?: string) => ["salespersons", outletId ?? null] as const,
+  /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (GET /api/pwp-codes/mine),
+   *  feeding the POS Auto-Fill voucher rail. The reserve/free mutations invalidate
+   *  this so the rail re-reads the live RESERVED set after a trigger change. */
+  pwpCodesMine: () => ["pwp-codes", "mine"] as const,
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
   // ripples to dealers + dashboard) without touching dealer/order caches.
@@ -914,6 +921,76 @@ export function useOutlets(opts?: Partial<UseQueryOptions<OutletsListResponse>>)
     queryFn: () => apiFetch<OutletsListResponse>("/api/outlets"),
     staleTime: 5 * 60_000,
     ...opts,
+  });
+}
+
+/* ─── 0187 (Phase 8c) — PWP voucher codes (SAME-CART reserve API) ───────────── */
+
+/**
+ * usePwpCodesMine — GET /api/pwp-codes/mine. The caller's RESERVED pwp_codes,
+ * feeding the POS Auto-Fill voucher rail (the cart binds a RESERVED code onto an
+ * eligible reward line so the order route claims it). Self-heals on the server
+ * (an owner-scoped orphan reaper runs before the read). `enabled` defaults true
+ * but the POS only mounts this when a catalog with ACTIVE pwp_rules is loaded —
+ * DORMANT carts pass `enabled: false` so a no-rules order makes zero reserve
+ * traffic (byte-identical). Short `staleTime` so the rail reflects reserves
+ * promptly; the reserve/free mutations also invalidate it.
+ */
+export function usePwpCodesMine(opts?: Partial<UseQueryOptions<PwpCodesResponse>>) {
+  return useQuery({
+    queryKey: qk.pwpCodesMine(),
+    queryFn: () => apiFetch<PwpCodesResponse>("/api/pwp-codes/mine"),
+    staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/**
+ * useReservePwpCode — POST /api/pwp-codes/reserve. Idempotent (sequential)
+ * reconcile of ONE trigger line's RESERVED set (top-up / trim). On success,
+ * invalidate `pwpCodesMine` so the Auto-Fill rail re-reads the live set. The
+ * reconciler treats this as best-effort — a failed reserve just shows fewer
+ * codes in the rail; it never blocks submit.
+ */
+export function useReservePwpCode(
+  opts?: Partial<UseMutationOptions<PwpCodesResponse, ApiError, PwpReserveInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<PwpCodesResponse, ApiError, PwpReserveInput>({
+    mutationFn: (input) =>
+      apiFetch<PwpCodesResponse>("/api/pwp-codes/reserve", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.pwpCodesMine() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * useFreePwpCode — DELETE /api/pwp-codes/reserve?cartLineKey=… Frees a removed /
+ * zeroed trigger line's RESERVED codes (RESERVED only — never USED). On success,
+ * invalidate `pwpCodesMine`. Best-effort — a missed free is swept by the order
+ * route's Confirm-pass / the RESERVED-orphan cron.
+ */
+export function useFreePwpCode(
+  opts?: Partial<UseMutationOptions<{ ok: boolean }, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, ApiError, string>({
+    mutationFn: (cartLineKey) =>
+      apiFetch<{ ok: boolean }>(
+        `/api/pwp-codes/reserve?cartLineKey=${encodeURIComponent(cartLineKey)}`,
+        { method: "DELETE" },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.pwpCodesMine() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }
 

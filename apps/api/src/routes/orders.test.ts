@@ -180,6 +180,140 @@ function buildSbForCreate(opts: {
   ) as any;
 }
 
+/**
+ * 0187 (PWP VOUCHER) — a CONFIGURED-PATH create mock that returns a real PWP rule
+ * (so a coded reward line survives P8b with the code carried through), succeeds
+ * `pwp_claim_code` (returns a row), and records `pwp_release_codes` + the
+ * `pwp_codes` stamp/sweep, so the route's Stage B → rollback → Confirm-pass insert
+ * points are exercised end-to-end. Every OTHER recompute table is dormant/empty.
+ *
+ * P8C_RULE_ID / P8C_MATT_MODEL / P8C_BED_MODEL are valid-hex uuids (the route
+ * never round-trips a pwp_codes row through a uuid schema on these paths, but the
+ * P8b rule adapter + grant want consistent ids).
+ */
+const P8C_RULE_ID = "0000000c-0000-0000-0000-0000000a01e1";
+const P8C_MATT_MODEL = "0000000b-0000-0000-0000-0000000a0770";
+const P8C_BED_MODEL = "0000000d-0000-0000-0000-0000000be000";
+const P8C_GROUP = "00000000-1111-2222-3333-444444444444";
+
+function buildSbForCreatePwp(opts: {
+  rpcResult?: { id: string; so: number; placed_at: string };
+  /** Force create_order to error (to test the exit-10 rollback). */
+  createOrderError?: { code?: string; message?: string; details?: string };
+  /** Force pwp_claim_code to return NULL (not claimable). */
+  claimReturnsNull?: boolean;
+  /** Force the Confirm-pass stamp to match a SHORT row (fail-closed 500). */
+  stampShort?: boolean;
+  fetchedRow?: unknown;
+}) {
+  const rpcCalls: Array<{ name: string; args: unknown }> = [];
+  // The mattress trigger (in-scope) + the bedframe reward (carries pwp_price).
+  const skuRows = [
+    { sku: "MATT-1", model_id: P8C_MATT_MODEL, variant: "QUEEN", product_models: { category: "mattress" }, pwp_price: null },
+    { sku: "BED-1", model_id: P8C_BED_MODEL, variant: null, product_models: { category: "bedframe" }, pwp_price: 300 },
+  ];
+  const ruleRows = [
+    {
+      id: P8C_RULE_ID,
+      type: "pwp",
+      trigger_category: "mattress",
+      trigger_targets: [{ scope: "model", modelId: P8C_MATT_MODEL }],
+      reward_category: "bedframe",
+      reward_targets: [{ scope: "model", modelId: P8C_BED_MODEL }],
+      qty_per_trigger: 1,
+      active: true,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      updated_by: null,
+    },
+  ];
+
+  function rowsFor(table: string): unknown[] {
+    if (table === "product_skus") return skuRows;
+    if (table === "pwp_rules") return ruleRows;
+    return []; // every other recompute table is dormant
+  }
+
+  // A select chain: records nothing, just resolves the table's rows on .in / .then.
+  function selectChain(table: string) {
+    const stampShortApplied = { v: false };
+    const chain: Record<string, unknown> = {
+      eq: () => chain,
+      in: async () => ({ data: rowsFor(table), error: null }),
+      is: () => chain,
+      // .select(...).update(...).eq().is().select("code") path (Confirm-pass stamp)
+      select: () => {
+        // For the stamp re-select, return the stamped codes (or a short row).
+        if (table === "pwp_codes") {
+          const codes = opts.stampShort && !stampShortApplied.v ? [] : [{ code: "PWP-1111AAAA" }];
+          stampShortApplied.v = true;
+          return Promise.resolve({ data: codes, error: null });
+        }
+        return chain;
+      },
+      maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
+      order: async () => ({ data: [], error: null }),
+      then: (resolve: (v: unknown) => unknown) => resolve({ data: rowsFor(table), error: null }),
+    };
+    return chain;
+  }
+
+  const sb = {
+    from: (table: string) => ({
+      select: () => selectChain(table),
+      insert: async () => ({ error: null }),
+      update: () => selectChain(table), // .update().eq().eq().is().select("code")
+      delete: () => {
+        const c: Record<string, unknown> = {
+          eq: () => c,
+          in: async () => ({ error: null }),
+          then: (resolve: (v: unknown) => unknown) => resolve({ error: null }),
+        };
+        return c;
+      },
+    }),
+    rpc: async (name: string, args: unknown) => {
+      rpcCalls.push({ name, args });
+      if (name === "create_order") {
+        if (opts.createOrderError) return { data: null, error: opts.createOrderError };
+        return { data: opts.rpcResult ?? null, error: null };
+      }
+      if (name === "pwp_claim_code") {
+        if (opts.claimReturnsNull) return { data: null, error: null };
+        return { data: { code: String((args as { p_code: string }).p_code) }, error: null };
+      }
+      if (name === "pwp_release_codes") return { data: 1, error: null };
+      return { data: null, error: null };
+    },
+    ...buildStorageMock(),
+    _rpcCalls: rpcCalls,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
+  return sb;
+}
+
+/** A create body whose reward line carries a P8c voucher claim (code+claimGroup).
+ *  The mattress trigger unlocks the bedframe reward under the configured rule. */
+function pwpClaimBody(over: Record<string, unknown> = {}) {
+  return validCreateBody({
+    // TBD delivery date — skips the server lead-time floor (the configured mock
+    // returns a product_skus category join, which would otherwise gate a fixed
+    // date against today + the 14d mattress / bedframe lead).
+    delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+    lines: [
+      { sku: "MATT-1", qty: 1, attrs: null, unitPrice: 1500 },
+      {
+        sku: "BED-1",
+        qty: 1,
+        unitPrice: 900,
+        attrs: { pwp: { ruleId: P8C_RULE_ID, code: "PWP-1111AAAA", claimGroup: P8C_GROUP } },
+      },
+    ],
+    pwpCartLineKeys: ["L-matt"],
+    ...over,
+  });
+}
+
 function validCreateBody(over: Record<string, unknown> = {}) {
   return {
     outletId: "00000000-0000-0000-0000-00000000ee01",
@@ -848,6 +982,137 @@ describe("POST /api/orders", () => {
     const payload = sb._rpcCalls[0]!.payload as { lines: Array<{ attrs: Record<string, unknown> | null }> };
     expect(payload.lines).toHaveLength(1);
     expect(payload.lines[0]!.attrs).toEqual({ color: "blue" });
+  });
+
+  // 0187 (PWP VOUCHER STATE MACHINE) — Stage B order-path wiring. The shared
+  // create mock can't return a configured pwp_rule OR a configured pwp_codes row,
+  // so the CONFIGURED happy paths (a valid attrs.pwp.code claim flips a code USED
+  // + stamps redeemed_order_id; a rollback exit releases the claim) are covered by
+  // the isolated pwp-codes-claim.test.ts unit suite — same mock-limitation
+  // precedent as free-gift-route-configured-test / delivery-route-configured-test
+  // (§17.5). Here we prove Stage B is WIRED IN and INERT on the no-voucher path:
+  // a DORMANT order claims nothing → NO pwp_claim_code / pwp_release_codes RPC
+  // fires and the ONLY rpc is create_order (so the Confirm-pass + rollback are
+  // both skipped → byte-identical).
+  it("Stage B is dormant on a no-voucher order — no pwp_claim_code / pwp_release_codes RPC fires (byte-identical)", async () => {
+    const sb = buildSbForCreate({
+      rpcResult: { id: "11111111-1111-1111-1111-111111111111", so: 1254, placed_at: "2026-05-02T10:00:00Z" },
+      fetchedRow: makeOrderRow({ order_lines: [], order_addons: [], order_history: [] }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    // A plain order with no attrs.pwp marker at all.
+    const body = validCreateBody({
+      lines: [{ sku: "MATT-1", qty: 1, attrs: null, unitPrice: 1500 }],
+    });
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    // ONLY create_order ran — no voucher claim / release.
+    const rpcNames = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
+    expect(rpcNames).toEqual(["create_order"]);
+  });
+
+  // 0187 — CONFIGURED-PATH Stage B (via buildSbForCreatePwp, which returns a real
+  // PWP rule so a coded line survives P8b). Exercises the orders.ts insert points
+  // that the shared mock can't reach.
+  it("Stage B happy path — a valid attrs.pwp.code claim claims the code then create_order runs (claim BEFORE create)", async () => {
+    const sb = buildSbForCreatePwp({
+      rpcResult: { id: "11111111-1111-1111-1111-111111111111", so: 1260, placed_at: "2026-05-02T10:00:00Z" },
+      fetchedRow: makeOrderRow({ order_lines: [], order_addons: [], order_history: [] }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(pwpClaimBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
+    // The claim happens BEFORE create_order; no release on the happy path.
+    expect(names).toContain("pwp_claim_code");
+    expect(names).toContain("create_order");
+    expect(names.indexOf("pwp_claim_code")).toBeLessThan(names.indexOf("create_order"));
+    expect(names).not.toContain("pwp_release_codes");
+  });
+
+  it("Stage B rollback — create_order error releases the claimed voucher (exit 10)", async () => {
+    const sb = buildSbForCreatePwp({
+      createOrderError: { code: "XX000", message: "boom" }, // unmapped → generic 500 path
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(pwpClaimBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(500); // unmapped create_order error → 500 (exit 10)
+    const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
+    // The claim was released after create_order failed.
+    expect(names).toContain("pwp_claim_code");
+    expect(names).toContain("pwp_release_codes");
+    const release = (sb._rpcCalls as Array<{ name: string; args: { p_codes?: string[] } }>).find(
+      (r) => r.name === "pwp_release_codes",
+    );
+    expect(release?.args.p_codes).toEqual(["PWP-1111AAAA"]);
+  });
+
+  it("Stage B claim rejection — an un-reservable code (pwp_claim_code NULL) → 409, no order", async () => {
+    const sb = buildSbForCreatePwp({ claimReturnsNull: true });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(pwpClaimBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    const j = (await res.json()) as { error: string; code: string };
+    expect(j.error).toBe("rule_violation");
+    expect(j.code).toBe("pwp_code_rejected");
+    const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
+    // No order created (claim failed before create_order).
+    expect(names).not.toContain("create_order");
+  });
+
+  it("Confirm-pass fail-closed — a SHORT stamp releases the claim + 500", async () => {
+    const sb = buildSbForCreatePwp({
+      rpcResult: { id: "11111111-1111-1111-1111-111111111111", so: 1261, placed_at: "2026-05-02T10:00:00Z" },
+      stampShort: true, // the stamp re-select returns 0 rows < 1 claimed
+      fetchedRow: makeOrderRow({ order_lines: [], order_addons: [], order_history: [] }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(pwpClaimBody()),
+      }),
+      env,
+    );
+    expect(res.status).toBe(500);
+    const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
+    // create_order committed, then the short stamp → release + 500.
+    expect(names).toContain("create_order");
+    expect(names).toContain("pwp_release_codes");
   });
 
   it("returns 403 when dealer role JWT has no dealerId", async () => {

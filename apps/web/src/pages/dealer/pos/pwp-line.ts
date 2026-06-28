@@ -27,7 +27,7 @@
 // for a build line.
 // ----------------------------------------------------------------------------
 import type { CatalogResponse, PwpRuleDto, PwpRuleEngine, PwpLineInput } from "@carres/shared";
-import { resolvePwp } from "@carres/shared";
+import { lineMatchesTargets, resolvePwp } from "@carres/shared";
 import type { DraftLine } from "../new-order/draft";
 import { toFreeGiftLineInput } from "./free-line";
 
@@ -203,5 +203,111 @@ export function unmarkLinePwp(line: DraftLine): DraftLine {
     ...rest,
     unitPrice: orig,
     attrs: Object.keys(attrs).length ? attrs : null,
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// P8c (migration 0187) — the voucher STATE MACHINE POS layer. The reserve
+// reconciler (DealerPos) calls /pwp-codes/reserve when a TRIGGER line is added /
+// qty-changed and /pwp-codes/reserve DELETE when one is removed; the Auto-Fill
+// rail (CartDrawer) binds a RESERVED code onto a reward line's attrs.pwp so the
+// order route's Stage B can claim it (RESERVED→USED). P8b stays the PRICING
+// authority (markLinePwp forces the price); P8c only adds the code + claimGroup
+// lineage/lock fields onto the SAME attrs.pwp marker.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** A trigger line currently in the cart — a line whose sku matches an ACTIVE
+ *  pwp_rule's TRIGGER scope (category + RuleTarget). The reconciler reserves one
+ *  code per unlocked reward slot for these (the server route is authoritative for
+ *  the actual count = qtyPerTrigger × qty; here we only need the KEY + sku + qty
+ *  to drive the reserve/free calls). */
+export interface PwpTriggerLine {
+  /** The line's stable cart key (DraftLine.localId) — the reserve idempotency +
+   *  delete-on-remove key (= pwp_codes.cart_line_key). */
+  cartLineKey: string;
+  sku: string;
+  qty: number;
+}
+
+/**
+ * The set of TRIGGER lines in the cart — lines whose sku matches an ACTIVE
+ * pwp_rule's trigger scope (UPPERCASED category match AND `lineMatchesTargets`
+ * over the rule's `triggerTargets`). Mirrors the server reserve route's matcher
+ * (`apps/api/src/routes/pwp-codes.ts` step 3) so the POS reconciler and the
+ * server agree on which lines own a reservation. Returns `[]` when nothing is
+ * configured (DORMANT) — the reconciler then never calls reserve. A free /
+ * combo-component / sofa-build line is still scanned (the matcher decides) but a
+ * line carrying `attrs.free_item`/`free_gift` (already a reward) is never a
+ * trigger (it would self-fund — the shared resolver guards this; here a free
+ * line simply won't be RE-reserved for, which is harmless).
+ */
+export function triggerLinesInCart(
+  lines: DraftLine[],
+  catalog: CatalogResponse,
+): PwpTriggerLine[] {
+  const rules = activePwpRules(catalog);
+  if (rules.length === 0) return [];
+  const comboModulesById = comboModulesMap(catalog);
+  const out: PwpTriggerLine[] = [];
+  for (const line of lines) {
+    const li = toFreeGiftLineInput(line, catalog);
+    const ruleLine = {
+      category: li.category,
+      modelId: li.modelId,
+      sizeCode: li.sizeCode,
+      builtCompartments: li.builtCompartments,
+    };
+    const isTrigger = rules.some(
+      (r) =>
+        String(ruleLine.category ?? "").toUpperCase() === String(r.triggerCategory ?? "").toUpperCase() &&
+        lineMatchesTargets(ruleLine, r.triggerTargets, comboModulesById),
+    );
+    if (isTrigger) {
+      out.push({ cartLineKey: line.localId, sku: line.sku, qty: Number(line.qty ?? 1) });
+    }
+  }
+  return out;
+}
+
+/** The voucher code a reward line is bound to (P8c), or null. */
+export function linePwpCode(line: DraftLine): string | null {
+  const pwp = (line.attrs as Record<string, unknown> | null)?.pwp as
+    | { code?: unknown }
+    | undefined;
+  return typeof pwp?.code === "string" && pwp.code.trim() ? pwp.code : null;
+}
+
+/** The per-submit claimGroup correlation uuid a reward line carries (P8c), or null. */
+export function linePwpClaimGroup(line: DraftLine): string | null {
+  const pwp = (line.attrs as Record<string, unknown> | null)?.pwp as
+    | { claimGroup?: unknown }
+    | undefined;
+  return typeof pwp?.claimGroup === "string" && pwp.claimGroup.trim() ? pwp.claimGroup : null;
+}
+
+/**
+ * Mark a cart line as a PWP/promo reward under `rule` AND bind the backing
+ * RESERVED voucher `code` + the per-submit `claimGroup`. Same as `markLinePwp`
+ * (forces the preview price, parks the real price in `origUnitPrice`) but the
+ * `attrs.pwp` marker carries `{ ruleId, code, claimGroup }` so the order route's
+ * Stage B can CLAIM the code (RESERVED→USED, bound to `ruleId`). The server
+ * re-derives `type`/`triggerRef` + forces the price + re-validates the claim
+ * regardless — the client price is never trusted; the code is the lineage/lock
+ * record stamped INTO the order (it persists into `order_lines.attrs.pwp`).
+ */
+export function markLinePwpWithCode(
+  line: DraftLine,
+  rule: PwpRuleDto,
+  price: number,
+  code: string,
+  claimGroup: string,
+): DraftLine {
+  const base = markLinePwp(line, rule, price);
+  return {
+    ...base,
+    attrs: {
+      ...((base.attrs as Record<string, unknown> | null) ?? {}),
+      pwp: { ruleId: rule.id, code, claimGroup },
+    },
   };
 }

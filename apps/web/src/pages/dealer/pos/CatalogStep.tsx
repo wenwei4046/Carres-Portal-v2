@@ -1,7 +1,12 @@
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { CatalogResponse, ComboDto, ProductCategory } from "@carres/shared";
+import type {
+  CatalogResponse,
+  ComboDto,
+  ProductCategory,
+  PwpCodeDto,
+} from "@carres/shared";
 import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { comboToDraftLines, type DraftLine, type WizardDraft } from "../new-order/draft";
@@ -42,6 +47,8 @@ export default function CatalogStep({
   onProceed,
   cartOpen,
   onCartOpenChange,
+  pwpReservedCodes,
+  pwpClaimGroup,
 }: {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
@@ -49,6 +56,13 @@ export default function CatalogStep({
   onProceed: () => void;
   cartOpen: boolean;
   onCartOpenChange: (open: boolean) => void;
+  /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (from /pwp-codes/mine),
+   *  feeding the CartDrawer voucher rail. Optional: absent → no voucher rail
+   *  (DORMANT byte-identical). */
+  pwpReservedCodes?: PwpCodeDto[];
+  /** 0187 — the per-cart claimGroup correlation uuid bound onto a claimed reward
+   *  line's attrs.pwp.claimGroup. Optional. */
+  pwpClaimGroup?: string;
 }) {
   const index = useMemo(
     () =>
@@ -323,6 +337,8 @@ export default function CatalogStep({
           }}
           onClose={() => onCartOpenChange(false)}
           catalog={catalog}
+          pwpReservedCodes={pwpReservedCodes}
+          pwpClaimGroup={pwpClaimGroup}
         />
       )}
     </div>

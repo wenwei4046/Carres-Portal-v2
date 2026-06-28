@@ -12,6 +12,7 @@ import {
   orderSchema,
   ordersListResponseSchema,
   orderStatusSchema,
+  PWP_CODES,
   setOpsAssignedLogisticInputSchema,
   setOrderAddressInputSchema,
   setOrderDateInputSchema,
@@ -30,6 +31,7 @@ import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
 import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
 import { recomputePwpLines } from "../lib/pwp-recompute";
+import { claimPwpCodesForLines } from "../lib/pwp-codes-claim";
 import type { AppEnv } from "../types";
 
 /**
@@ -327,6 +329,39 @@ ordersRouter.post("/", async (c) => {
     );
   }
 
+  // 0187 (PWP VOUCHER STATE MACHINE) — Stage B, the parallel lineage/lock LEDGER.
+  // P8b above is the PRICING authority (it already forced the reward unitPrice +
+  // canonicalised attrs.pwp, carrying through code + claimGroup). Stage B is a
+  // SEPARATE post-recompute step that CLAIMS the RESERVED voucher each priced
+  // reward line references (RESERVED→USED, atomic, bound to the SAME rule that
+  // priced it + a per-submit claimGroup correlation uuid). The code NEVER sets a
+  // price (§4.6) — it is a status row in pwp_codes + a string on attrs.pwp.
+  // userClient/RLS + the SECURITY DEFINER pwp_claim_code / pwp_release_codes RPCs
+  // only — NEVER service_role. DORMANT: no line carries attrs.pwp.code → ZERO DB
+  // call → claimedPwpCodes=[] → every rollback below is a no-op → byte-identical.
+  const pwpClaim = await claimPwpCodesForLines(sb, { id: auth.id }, pwp.lines);
+  if (pwpClaim.status === "server_error") {
+    throw new HTTPException(500, { message: pwpClaim.message });
+  }
+  if (pwpClaim.status === "bad_request") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: pwpClaim.code,
+        message: pwpClaim.message,
+      },
+      409,
+    );
+  }
+  // The rollback ledger for EVERY downstream post-claim early-exit (§4.5). A single
+  // atomic batch RPC reverses USED→RESERVED; empty ledger → early return (no RPC).
+  const claimedPwpCodes = pwpClaim.claimed.map((cc) => cc.code);
+  const pwpClaimGroup = pwpClaim.claimGroup;
+  const rollbackPwpClaims = async (): Promise<void> => {
+    if (claimedPwpCodes.length === 0) return;
+    await sb.rpc("pwp_release_codes", { p_codes: claimedPwpCodes });
+  };
+
   // Phase 4 (sofa engine) — server recompute + 0.5% drift-reject for any sofa
   // BUILD line (one carrying `attrs.sofa_build`). The client price is a preview;
   // we re-run the SAME pure `computeSofaPrice` against FRESH DB catalog prices.
@@ -334,14 +369,20 @@ ordersRouter.post("/", async (c) => {
   // one real per-compartment line (Phase 5), summing to the authoritative server
   // total. Non-build lines pass through verbatim; `create_order` + `order_lines`
   // stay UNCHANGED — the RPC just inserts the (possibly expanded) line set.
-  const recompute = await recomputeAndExplodeSofaBuildLines(sb, pwp.lines);
+  // NOTE: sofa recompute runs on `pwpClaim.lines` (=== pwp.lines — price + attrs
+  // untouched by Stage B). The P8c carry-through left `attrs.pwp.code`/`claimGroup`
+  // on coded lines, so they persist into create_order's payload.lines.
+  const recompute = await recomputeAndExplodeSofaBuildLines(sb, pwpClaim.lines);
   if (recompute.status === "bad_request") {
+    await rollbackPwpClaims(); // exit 1 (§4.5)
     throw new HTTPException(400, { message: recompute.message });
   }
   if (recompute.status === "server_error") {
+    await rollbackPwpClaims(); // exit 2 (§4.5)
     throw new HTTPException(500, { message: recompute.message });
   }
   if (recompute.status === "drift") {
+    await rollbackPwpClaims(); // exit 3 (§4.5)
     return c.json(
       {
         error: "rule_violation",
@@ -365,12 +406,15 @@ ordersRouter.post("/", async (c) => {
   // pass through. create_order / order_lines stay UNCHANGED.
   const specialRecompute = await recomputeSpecialAddonLines(sb, recompute.lines);
   if (specialRecompute.status === "bad_request") {
+    await rollbackPwpClaims(); // exit 4 (§4.5)
     throw new HTTPException(400, { message: specialRecompute.message });
   }
   if (specialRecompute.status === "server_error") {
+    await rollbackPwpClaims(); // exit 5 (§4.5)
     throw new HTTPException(500, { message: specialRecompute.message });
   }
   if (specialRecompute.status === "drift") {
+    await rollbackPwpClaims(); // exit 6 (§4.5)
     return c.json(
       {
         error: "rule_violation",
@@ -395,6 +439,7 @@ ordersRouter.post("/", async (c) => {
   // + omitted). DORMANT (no gift configured) → returns nothing → byte-identical.
   const giftResult = await resolveDefaultFreeGiftLines(sb, specialRecompute.lines);
   if (giftResult.status === "server_error") {
+    await rollbackPwpClaims(); // exit 7 (§4.5)
     throw new HTTPException(500, { message: giftResult.message });
   }
   // The fully-verified line set fed to create_order: paid/freed lines + appended
@@ -419,9 +464,11 @@ ordersRouter.post("/", async (c) => {
     customerPhone: parsed.data.customer.phone,
   });
   if (deliveryRecompute.status === "bad_request") {
+    await rollbackPwpClaims(); // exit 8 (§4.5)
     throw new HTTPException(400, { message: deliveryRecompute.message });
   }
   if (deliveryRecompute.status === "server_error") {
+    await rollbackPwpClaims(); // exit 9 (§4.5)
     throw new HTTPException(500, { message: deliveryRecompute.message });
   }
 
@@ -444,6 +491,11 @@ ordersRouter.post("/", async (c) => {
   );
   const { data: created, error } = await sb.rpc("create_order", { payload });
   if (error) {
+    // exit 10 (§4.5) — the create_order TX rolled back, so the claimed voucher
+    // codes must un-claim. Placed as the FIRST line of the error block so ALL FOUR
+    // sub-exits below (403 throw / mixed_category_lines 422 return / 400 throw /
+    // 500 throw) inherit the rollback before any branch runs.
+    await rollbackPwpClaims();
     // 42501 = manual cross-dealer check inside the RPC. We map to 403 so the
     // client sees the same code as RLS-denied reads.
     if (error.code === "42501" || /forbidden/i.test(error.message ?? "")) {
@@ -471,9 +523,76 @@ ordersRouter.post("/", async (c) => {
   }
 
   const id = (created as { id: string } | null)?.id;
-  if (!id) throw new HTTPException(500, { message: "RPC did not return an order id" });
+  if (!id) {
+    await rollbackPwpClaims(); // exit 11 (§4.5)
+    throw new HTTPException(500, { message: "RPC did not return an order id" });
+  }
+
+  // 0187 (PWP VOUCHER) — the CONFIRM-PASS (§4.4). At claim time the order had no
+  // id (create_order DB-generates it — a caller-minted id can't be threaded in
+  // without touching the RPC, which is forbidden), so each claimed code is USED
+  // with redeemed_order_id NULL but claim_group SET (the interim join key). Now the
+  // id is known: stamp the claimed codes (scoped by claim_group, so it reaches the
+  // rows even though redeemed_order_id is still NULL) then DELETE the unclaimed
+  // RESERVED codes for this cart's triggers. FAIL-CLOSED: a stamp error OR a short
+  // row (fewer stamped than claimed) → release the claims + 500 (the order
+  // committed but the lock record is inconsistent → the client retries cleanly).
+  // Runs via the table under RLS (owner-scoped) — only the claim + batch release
+  // go through the SECURITY DEFINER RPCs. DORMANT: no claimed codes → skipped.
+  if (claimedPwpCodes.length > 0 && pwpClaimGroup) {
+    const { data: stamped, error: stampErr } = await sb
+      .from(PWP_CODES)
+      .update({ redeemed_order_id: id, updated_at: new Date().toISOString() })
+      .eq("owner_staff_id", auth.id)
+      .eq("claim_group", pwpClaimGroup)
+      .eq("status", "USED")
+      .is("redeemed_order_id", null)
+      .select("code");
+    if (stampErr) {
+      await rollbackPwpClaims();
+      throw new HTTPException(500, {
+        message: "Order created but PWP code stamp failed; please retry.",
+      });
+    }
+    if ((stamped?.length ?? 0) < claimedPwpCodes.length) {
+      await rollbackPwpClaims();
+      throw new HTTPException(500, {
+        message: "Order created but PWP code stamp incomplete; please retry.",
+      });
+    }
+
+    // SWEEP unclaimed RESERVED for this cart's triggers — UNION of two sources:
+    //   (a) the client-supplied pwpCartLineKeys (complete: also reaches a trigger
+    //       whose reward was NEVER claimed), and
+    //   (b) a server-derived fallback from the claimed codes' cart_line_key (so a
+    //       client that under-populates the field still cleans claimed triggers'
+    //       siblings). Correctness never hinges on the body field. P8c DELETEs the
+    //       surplus (P8d will instead flip RESERVED→AVAILABLE bound to the customer).
+    const bodyKeys = parsed.data.pwpCartLineKeys ?? [];
+    const { data: derivedRows } = await sb
+      .from(PWP_CODES)
+      .select("cart_line_key")
+      .eq("owner_staff_id", auth.id)
+      .eq("claim_group", pwpClaimGroup)
+      .eq("status", "USED");
+    const derivedKeys = ((derivedRows ?? []) as Array<{ cart_line_key: string | null }>)
+      .map((r) => r.cart_line_key)
+      .filter((k): k is string => Boolean(k));
+    const sweepKeys = Array.from(new Set([...bodyKeys, ...derivedKeys]));
+    if (sweepKeys.length > 0) {
+      await sb
+        .from(PWP_CODES)
+        .delete()
+        .eq("owner_staff_id", auth.id)
+        .eq("status", "RESERVED")
+        .in("cart_line_key", sweepKeys);
+    }
+  }
 
   // Compose full response — same shape as GET /:id (lines + addons + history).
+  // exit 12 (§4.5): a re-fetch failure here does NOT rollback — the order
+  // COMMITTED and the Confirm-pass already stamped the codes; only the 201
+  // response failed. The codes stay USED + stamped (correct); the client re-GETs.
   const { data: full, error: fetchErr } = await sb
     .from("orders")
     .select("*, order_lines(*), order_addons(*), order_history(*)")

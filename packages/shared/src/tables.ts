@@ -81,6 +81,14 @@ export const FREE_ITEM_CAMPAIGNS      = "free_item_campaigns" as const;
 // default false; no order consumer yet) — P8a is the stateless foundation.
 export const PWP_RULES = "pwp_rules" as const;
 
+// 0187 — 2990s Products parity Phase 8c: the PWP voucher LEDGER (SAME-CART
+// state machine). One row = one reserved/claimed voucher slot; code is the PK
+// ("occupy-the-number" guarantee). RESERVED on a cart trigger; CLAIMED
+// (RESERVED→USED) at order Confirm via the pwp_claim_code RPC; unclaimed
+// RESERVED DELETEd at Confirm. Owner-scoped RLS. DORMANT (0 active pwp_rules →
+// 0 codes minted → orders byte-identical).
+export const PWP_CODES = "pwp_codes" as const;
+
 // ---------------------------------------------------------------------------
 // People / org tables
 // ---------------------------------------------------------------------------

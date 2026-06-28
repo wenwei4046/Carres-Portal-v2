@@ -616,6 +616,83 @@ export const pwpRuleInput = z
   .strict();
 export type PwpRuleInput = z.infer<typeof pwpRuleInput>;
 
+// ---------------------------------------------------------------------------
+// 0187 — PWP voucher LEDGER (2990s Products parity Phase 8c, SAME-CART state
+// machine). The pwp_codes DTO (the reconciler's read shape) + the reserve
+// request/response + the extended `attrs.pwp` reward-line marker. One schema,
+// two consumers (§9.5): the API validates these and the POS reuses the exact
+// same shapes. DORMANT — no codes minted until the principal authors active
+// pwp_rules. (The order-path claim runs as a separate post-P8b stage; the price
+// stays P8b-authoritative — see the design plan §0.)
+// ---------------------------------------------------------------------------
+
+/** The voucher status machine: RESERVED (minted on a cart trigger) → USED
+ *  (claimed at Confirm). 'AVAILABLE' ships for the P8d cross-order carry-forward
+ *  (written by nobody in P8c). */
+export const pwpCodeStatusSchema = z.enum(["RESERVED", "USED", "AVAILABLE"]);
+export type PwpCodeStatusValue = z.infer<typeof pwpCodeStatusSchema>;
+
+/** A `pwp_codes` row DTO (mirrors the `PwpCode` domain type, camelCased). The
+ *  reconciler (`GET /mine`) + the reserve endpoint return arrays of these.
+ *  `rewardTargets` is the rule's reward-scope snapshot ([] = whole category).
+ *  The P8d cross-order fields (`sourceOrderId`/`customerId`) are always null in
+ *  P8c. */
+export const pwpCodeSchema = z.object({
+  code: z.string(),
+  ruleId: z.string().uuid().nullable(),
+  type: z.enum(["pwp", "promo"]),
+  rewardCategory: z.string(),
+  rewardTargets: z.array(ruleTargetSchema),
+  status: pwpCodeStatusSchema,
+  ownerStaffId: z.string().uuid().nullable(),
+  cartLineKey: z.string().nullable(),
+  triggerItemCode: z.string().nullable(),
+  claimGroup: z.string().uuid().nullable(),
+  redeemedOrderId: z.string().uuid().nullable(),
+  redeemedItemSku: z.string().nullable(),
+  // P8d cross-order columns — present, null in P8c.
+  sourceOrderId: z.string().uuid().nullable(),
+  customerId: z.string().uuid().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type PwpCodeDto = z.infer<typeof pwpCodeSchema>;
+
+/** POST /api/pwp-codes/reserve input — the trigger cart line just added/changed.
+ *  The route reconciles (top-up / trim) the RESERVED set this line owns. */
+export const pwpReserveInputSchema = z
+  .object({
+    cartLineKey: z.string().min(1),
+    sku: z.string().min(1),
+    qty: z.number().int().positive(),
+  })
+  .strict();
+export type PwpReserveInput = z.infer<typeof pwpReserveInputSchema>;
+
+/** Reserve / `GET /mine` response — the FULL current RESERVED set (no match =>
+ *  `{ codes: [] }`). Keyed client-side by `cartLineKey`. */
+export const pwpCodesResponseSchema = z.object({
+  codes: z.array(pwpCodeSchema),
+});
+export type PwpCodesResponse = z.infer<typeof pwpCodesResponseSchema>;
+
+/** The reward-line `attrs.pwp` marker shape — EXTENDED for P8c. P8b canonicalises
+ *  the marker to `{ ruleId, type?, triggerRef? }`; P8c adds two OPTIONAL fields a
+ *  reward line may carry: `code` (the RESERVED voucher the POS bound to this
+ *  reward, claimed RESERVED→USED at Confirm) + `claimGroup` (the per-submit
+ *  correlation uuid). Both optional — a DORMANT / P8b-only line carries neither,
+ *  so the marker stays byte-identical when no voucher is in play. `.passthrough()`
+ *  keeps P8b's `type` / `triggerRef` fields (this schema only PINS the P8c
+ *  additions; the order-path claim reads `code` + `claimGroup`). */
+export const attrsPwpMarkerSchema = z
+  .object({
+    ruleId: z.string(),
+    code: z.string().optional(),
+    claimGroup: z.string().optional(),
+  })
+  .passthrough();
+export type AttrsPwpMarker = z.infer<typeof attrsPwpMarkerSchema>;
+
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
   skus: z.array(productSkuSchema),

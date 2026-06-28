@@ -170,6 +170,63 @@ describe("recomputePwpLines", () => {
     });
   });
 
+  // P8c (0187 §3.4 / §8.7) — the carry-through. The client `attrs.pwp.code` +
+  // `claimGroup` are captured from the ORIGINAL line (an index-keyed capture, NOT
+  // a spread of stripped attrs) and re-emitted on the canonical marker so Stage B
+  // (claimPwpCodesForLines) can read `attrs.pwp.code` AFTER pricing.
+  it("P8c carry-through — a claimed line's attrs.pwp.code + claimGroup survive recompute (price still forced)", async () => {
+    const sb = mockSb({
+      productSkus: [
+        skuRow("MATT-1"),
+        skuRow("BED-1", { model_id: BED_MODEL, product_models: { category: "bedframe" }, pwp_price: 300 }),
+      ],
+      rules: [ruleRow()],
+    });
+    const lines = [
+      line({ sku: "MATT-1", qty: 1 }),
+      line({
+        sku: "BED-1",
+        qty: 1,
+        unitPrice: 900,
+        attrs: { pwp: { ruleId: "rule-1", code: "PWP-1234ABCD", claimGroup: "11111111-1111-1111-1111-111111111111" } },
+      }),
+    ];
+    const r = await recomputePwpLines(sb, lines);
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.lines[1]!.unitPrice).toBe(300); // price still P8b-forced
+    expect(r.lines[1]!.attrs).toEqual({
+      pwp: {
+        ruleId: "rule-1",
+        type: "pwp",
+        triggerRef: { name: "MATT-1", code: "MATT-1" },
+        code: "PWP-1234ABCD",
+        claimGroup: "11111111-1111-1111-1111-111111111111",
+      },
+    });
+  });
+
+  it("P8c carry-through — a claim WITHOUT a client code rebuilds a marker with NO code/claimGroup key (byte-identical for P8b-only)", async () => {
+    const sb = mockSb({
+      productSkus: [
+        skuRow("MATT-1"),
+        skuRow("BED-1", { model_id: BED_MODEL, product_models: { category: "bedframe" }, pwp_price: 300 }),
+      ],
+      rules: [ruleRow()],
+    });
+    const lines = [
+      line({ sku: "MATT-1", qty: 1 }),
+      line({ sku: "BED-1", qty: 1, unitPrice: 900, attrs: { pwp: { ruleId: "rule-1" } } }),
+    ];
+    const r = await recomputePwpLines(sb, lines);
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    const marker = (r.lines[1]!.attrs as { pwp: Record<string, unknown> }).pwp;
+    expect(marker).not.toHaveProperty("code");
+    expect(marker).not.toHaveProperty("claimGroup");
+    expect(marker).toEqual({ ruleId: "rule-1", type: "pwp", triggerRef: { name: "MATT-1", code: "MATT-1" } });
+  });
+
   it("an ineligible claim (reward model not in the rule's reward scope) → bad_request pwp_not_eligible", async () => {
     const sb = mockSb({
       productSkus: [

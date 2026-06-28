@@ -237,6 +237,17 @@ export {
   pwpRuleInput,
   type PwpRuleDto,
   type PwpRuleInput,
+  // 0187 — PWP voucher ledger (Phase 8c) schemas/inputs/Dtos.
+  pwpCodeStatusSchema,
+  pwpCodeSchema,
+  pwpReserveInputSchema,
+  pwpCodesResponseSchema,
+  attrsPwpMarkerSchema,
+  type PwpCodeStatusValue,
+  type PwpCodeDto,
+  type PwpReserveInput,
+  type PwpCodesResponse,
+  type AttrsPwpMarker,
 } from "./schemas/catalog";
 
 export {
@@ -625,6 +636,13 @@ export {
 } from "./pwp";
 export { pwpRuleFromRow } from "./adapters";
 export type { PwpRule } from "./domain";
+
+// 0187 — 2990s Products parity Phase 8c: the PWP voucher LEDGER (SAME-CART state
+// machine). The row→domain adapter (`pwpCodeFromRow`) + the camelCase domain
+// type are surfaced top-level here (mirrors pwpRuleFromRow / sofaComboFromRow);
+// the zod schemas + Dto/input types live in the schemas/catalog export block.
+export { pwpCodeFromRow } from "./adapters";
+export type { PwpCode } from "./domain";
 
 // Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo
 // match + explodeSofaBuild). No DB/IO; runs identically on web + (Phase 4) Hono.

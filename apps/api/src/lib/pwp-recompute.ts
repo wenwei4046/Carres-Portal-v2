@@ -194,7 +194,12 @@ export async function recomputePwpLines(
   lines: RecomputableLine[],
 ): Promise<PwpRecomputeOutcome> {
   // 0. Collect claims. A sofa-build claim is rejected outright (Hard rule #1).
-  const claims: Array<{ index: number; ruleId: string }> = [];
+  //    P8c (0187): ALSO capture `code` + `claimGroup` from the ORIGINAL client
+  //    `attrs.pwp` here (an index-keyed capture, NOT a spread of the stripped
+  //    attrs — `stripClientPwp` deletes the whole `pwp` object including these
+  //    two). They are re-emitted on the canonical marker at the rebuild below so
+  //    Stage B (`claimPwpCodesForLines`) can read `attrs.pwp.code` after pricing.
+  const claims: Array<{ index: number; ruleId: string; code: string; claimGroup: string }> = [];
   for (let i = 0; i < lines.length; i++) {
     const attrs = lines[i]!.attrs as Record<string, unknown> | null;
     if (!hasPwp(attrs)) continue;
@@ -223,12 +228,16 @@ export async function recomputePwpLines(
           "A line with special add-ons cannot be made a PWP/promo reward — remove the add-ons first.",
       };
     }
-    const pwp = (attrs as { pwp?: { ruleId?: unknown } } | null)?.pwp;
+    const pwp = (attrs as { pwp?: { ruleId?: unknown; code?: unknown; claimGroup?: unknown } } | null)?.pwp;
     const ruleId = typeof pwp?.ruleId === "string" ? pwp.ruleId.trim() : "";
     if (!ruleId) {
       return { status: "bad_request", code: "pwp_unknown_rule", message: "PWP claim is missing a rule id" };
     }
-    claims.push({ index: i, ruleId });
+    // P8c carry-through (§3.4): capture the bound voucher code + the per-submit
+    // claimGroup from the ORIGINAL line. Empty when absent (DORMANT / P8b-only).
+    const code = typeof pwp?.code === "string" ? pwp.code.trim() : "";
+    const claimGroup = typeof pwp?.claimGroup === "string" ? pwp.claimGroup.trim() : "";
+    claims.push({ index: i, ruleId, code, claimGroup });
   }
 
   // 1. Strip every client pwp marker first (re-derived below). Plain lines keep
@@ -366,6 +375,12 @@ export async function recomputePwpLines(
           ruleId: rule.id,
           type: rule.type,
           triggerRef: grant.triggerRef ?? null,
+          // P8c carry-through (§3.4): re-emit the bound voucher code + per-submit
+          // claimGroup captured from the original line. OMIT a key when empty so a
+          // no-voucher (P8b-only) claim rebuilds a marker WITHOUT `code`/`claimGroup`
+          // — byte-identical to pre-P8c. Stage B reads `attrs.pwp.code` to claim.
+          ...(claim.code ? { code: claim.code } : {}),
+          ...(claim.claimGroup ? { claimGroup: claim.claimGroup } : {}),
         },
       },
     };

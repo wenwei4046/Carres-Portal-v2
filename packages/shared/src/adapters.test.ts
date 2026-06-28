@@ -8,6 +8,7 @@ import {
   orderInputToRpcPayload,
   orderSupplierThreadFromRow,
   productSkuFromRow,
+  pwpCodeFromRow,
   sofaComboFromRow,
   sofaCompartmentFromRow,
   specialDeliveryFeeRuleFromRow,
@@ -20,6 +21,7 @@ import type {
   ModelSofaCompartmentRow,
   OrderSupplierThreadRow,
   ProductSkuRow,
+  PwpCodeRow,
   SofaComboPricingRow,
   SofaCompartmentRow,
   SpecialDeliveryFeeRuleRow,
@@ -59,6 +61,9 @@ function baseInput(over: Partial<CreateOrderInput> = {}): CreateOrderInput {
     paymentMethod: "online",
     approvalCode: null,
     installmentMonths: null,
+    // 0187 — defaults to [] (DORMANT); set explicitly because `.default([])`
+    // makes it required in the parsed CreateOrderInput (output) type.
+    pwpCartLineKeys: [],
     ...over,
   };
 }
@@ -747,5 +752,84 @@ describe("freeItemCampaignFromRow (0185)", () => {
       }),
     );
     expect(out.eligible).toEqual([{ scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] }]);
+  });
+});
+
+describe("pwpCodeFromRow (0187)", () => {
+  function baseRow(over: Partial<PwpCodeRow> = {}): PwpCodeRow {
+    return {
+      code: "PWP-1234ABCD",
+      rule_id: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      reward_category: "BEDFRAME",
+      reward_targets: [
+        { scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" },
+      ] as unknown as PwpCodeRow["reward_targets"],
+      status: "RESERVED",
+      owner_staff_id: "00000000-0000-0000-0000-0000000aa001",
+      cart_line_key: "line-1",
+      trigger_item_code: "MAT-QUEEN",
+      claim_group: null,
+      redeemed_order_id: null,
+      redeemed_item_sku: null,
+      source_order_id: null,
+      customer_id: null,
+      created_at: "2026-06-28T00:00:00Z",
+      updated_at: "2026-06-28T00:00:00Z",
+      ...over,
+    };
+  }
+
+  it("maps every column snake→camel and parses the reward_targets RuleTarget[]", () => {
+    const out = pwpCodeFromRow(baseRow());
+    expect(out).toEqual({
+      code: "PWP-1234ABCD",
+      ruleId: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      rewardCategory: "BEDFRAME",
+      rewardTargets: [{ scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" }],
+      status: "RESERVED",
+      ownerStaffId: "00000000-0000-0000-0000-0000000aa001",
+      cartLineKey: "line-1",
+      triggerItemCode: "MAT-QUEEN",
+      claimGroup: null,
+      redeemedOrderId: null,
+      redeemedItemSku: null,
+      sourceOrderId: null,
+      customerId: null,
+      createdAt: "2026-06-28T00:00:00Z",
+      updatedAt: "2026-06-28T00:00:00Z",
+    });
+  });
+
+  it("carries the claimed-stamp fields and a nulled owner (post-redemption audit row)", () => {
+    const out = pwpCodeFromRow(
+      baseRow({
+        status: "USED",
+        owner_staff_id: null,
+        claim_group: "00000000-0000-0000-0000-0000000c6001",
+        redeemed_order_id: "00000000-0000-0000-0000-0000000d0001",
+        redeemed_item_sku: "BED-KING",
+      }),
+    );
+    expect(out.status).toBe("USED");
+    expect(out.ownerStaffId).toBeNull();
+    expect(out.claimGroup).toBe("00000000-0000-0000-0000-0000000c6001");
+    expect(out.redeemedOrderId).toBe("00000000-0000-0000-0000-0000000d0001");
+    expect(out.redeemedItemSku).toBe("BED-KING");
+  });
+
+  it("drops malformed reward_targets entries via parseRuleTargets", () => {
+    const out = pwpCodeFromRow(
+      baseRow({
+        reward_targets: [
+          { scope: "model" }, // no modelId → dropped
+          { scope: "variant", modelId: "m1", sizeCodes: ["queen"] }, // upper-cased
+        ] as unknown as PwpCodeRow["reward_targets"],
+      }),
+    );
+    expect(out.rewardTargets).toEqual([
+      { scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] },
+    ]);
   });
 });
