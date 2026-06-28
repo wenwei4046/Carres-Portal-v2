@@ -48,6 +48,8 @@ import {
   freeItemCampaignInput,
   MODEL_DEFAULT_FREE_GIFTS,
   FREE_ITEM_CAMPAIGNS,
+  pwpRuleInput,
+  PWP_RULES,
   deriveSkuCode,
   skuImportInput,
   hasPricingIntent,
@@ -104,31 +106,34 @@ function principalOnly(
 // early gate just turns the raw 42501 into a clean, friendly 403 before the
 // round-trip. All OTHER catalog edits (pos_active, description, name, modular,
 // add-ons, supplier_id) stay open to internal roles.
+// 0186 — pwp_price joins price + cost under the same principal lock (the DB
+// trigger enforce_sku_price_cost_principal_only was EXTENDED to cover it).
 const SKU_PRICE_COST_ERROR =
-  "Only the principal (Master Admin) can set SKU price or cost";
+  "Only the principal (Master Admin) can set SKU price, cost, or pwp_price";
 
-// POST /skus: a non-principal MAY create an UNPRICED sku (price 0 / cost null);
-// block only when they try to seed a price or cost.
+// POST /skus: a non-principal MAY create an UNPRICED sku (price 0 / cost null /
+// pwp_price null); block only when they try to seed a price, cost, or pwp_price.
 function gateSkuCreatePriceCost(
   c: { var: { auth: { role: string } } },
-  data: { price: number; cost?: number | null },
+  data: { price: number; cost?: number | null; pwpPrice?: number | null },
 ) {
   if (c.var.auth.role === "principal") return;
   const setsPrice = data.price !== 0;
   const setsCost = data.cost !== null && data.cost !== undefined;
-  if (setsPrice || setsCost) {
+  const setsPwpPrice = data.pwpPrice !== null && data.pwpPrice !== undefined;
+  if (setsPrice || setsCost || setsPwpPrice) {
     throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
   }
 }
 
-// PATCH /skus/:id: block when a non-principal includes a price or cost key at
-// all (presence = intent to change; `cost: null` clearing counts as a change).
+// PATCH /skus/:id: block when a non-principal includes a price, cost, or
+// pwp_price key at all (presence = intent to change; a `null` clearing counts).
 function gateSkuPatchPriceCost(
   c: { var: { auth: { role: string } } },
-  data: { price?: number; cost?: number | null },
+  data: { price?: number; cost?: number | null; pwpPrice?: number | null },
 ) {
   if (c.var.auth.role === "principal") return;
-  if (data.price !== undefined || data.cost !== undefined) {
+  if (data.price !== undefined || data.cost !== undefined || data.pwpPrice !== undefined) {
     throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
   }
 }
@@ -178,7 +183,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -230,6 +235,11 @@ catalogRouter.get("/", async (c) => {
     // change), so a no-gift order stays byte-identical.
     sb.from(MODEL_DEFAULT_FREE_GIFTS).select("*"),
     sb.from(FREE_ITEM_CAMPAIGNS).select("*"),
+    // 0186 — PWP & Promo rules. Fetched UNFILTERED: the maintenance editor needs
+    // every row (incl. inactive rules), and a future order resolver filters by
+    // `active` itself. Additive — pre-0186 clients ignore the key, and with NONE
+    // authored / `active` default false it's dormant (zero behaviour change).
+    sb.from(PWP_RULES).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -248,6 +258,7 @@ catalogRouter.get("/", async (c) => {
   if (specialDeliveryRulesR.error) throw new HTTPException(500, { message: specialDeliveryRulesR.error.message });
   if (modelFreeGiftsR.error) throw new HTTPException(500, { message: modelFreeGiftsR.error.message });
   if (freeItemCampaignsR.error) throw new HTTPException(500, { message: freeItemCampaignsR.error.message });
+  if (pwpRulesR.error) throw new HTTPException(500, { message: pwpRulesR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -395,7 +406,30 @@ catalogRouter.get("/", async (c) => {
           : String(ra.created_at).localeCompare(String(rb.created_at));
       })
       .map((r) => Adapters.freeItemCampaignFromRow(r as DB.FreeItemCampaignRow)),
+    // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients that don't
+    // read this key are wholly unaffected. Active-first, then ascending created_at
+    // — sorted on the ROW before mapping (created_at isn't on the domain shape),
+    // mirroring the free-item-campaigns ordering above.
+    pwpRules: (pwpRulesR.data ?? [])
+      .slice()
+      .sort((a, b) => {
+        const ra = a as DB.PwpRuleRow;
+        const rb = b as DB.PwpRuleRow;
+        return ra.active !== rb.active
+          ? Number(rb.active) - Number(ra.active)
+          : String(ra.created_at).localeCompare(String(rb.created_at));
+      })
+      .map((r) => Adapters.pwpRuleFromRow(r as DB.PwpRuleRow)),
   });
+  // EXPOSURE NOTE (0186): unlike `cost`, the PWP discounted reward price
+  // (product_skus.pwp_price → sku.pwpPrice / sofa_combo_pricing.pwp_prices_by_height
+  // → sofaCombo.pwpPricesByHeight) legitimately needs to reach the POS so the
+  // salesperson can preview a PWP-reward line's discounted price. It therefore
+  // rides in the bundle for ALL roles by design — it is NOT stripped. (The
+  // principal-only WRITE lock still applies: the 0186 trigger + the route gate
+  // block a non-principal from SETTING it.) This is a deliberate read-exposure,
+  // tracked as the `pwp-price-pos-bundle-exposure` carry-forward (companion to
+  // `combo-cost-pos-bundle-exposure`).
 
   // 0074 — was `private, max-age=300` but the browser cache was beating
   // react-query's invalidate-on-write (Loo 2026-05-09: new sofa model
@@ -577,6 +611,8 @@ catalogRouter.post("/skus", async (c) => {
       variant_kind: parsed.data.variantKind,
       price: parsed.data.price,
       cost: parsed.data.cost ?? null,
+      // 0186 — principal-only PWP reward price (companion to cost). null = unset.
+      pwp_price: parsed.data.pwpPrice ?? null,
       supplier_id: supplierId,
       description: parsed.data.description ?? null,
       pos_active: parsed.data.posActive ?? true,
@@ -605,6 +641,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   if (parsed.data.variantKind !== undefined) patch.variant_kind = parsed.data.variantKind;
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;
   if (parsed.data.cost !== undefined) patch.cost = parsed.data.cost;
+  // 0186 — only write pwp_price when present so an unrelated patch doesn't clobber
+  // the benchmark; an explicit null clears it (back to "unset").
+  if (parsed.data.pwpPrice !== undefined) patch.pwp_price = parsed.data.pwpPrice;
   if (parsed.data.supplierId !== undefined) patch.supplier_id = parsed.data.supplierId;
   // 0075 — restore toggle (Loo 2026-05-09).
   if (parsed.data.discontinuedAt !== undefined)
@@ -1872,6 +1911,9 @@ catalogRouter.post("/sofa-combos", async (c) => {
     // 0183 — principal-only per-seat-height cost benchmark (companion to
     // prices_by_height). null = unset; never feeds order/finance/PO.
     cost_by_height: parsed.data.costByHeight ?? null,
+    // 0186 — principal-only per-seat-height PWP reward price (companion to
+    // prices_by_height). null = unset. DORMANT — no order consumer in P8a.
+    pwp_prices_by_height: parsed.data.pwpPricesByHeight ?? null,
     label: parsed.data.label ?? null,
     active: parsed.data.active ?? true,
     updated_at: new Date().toISOString(),
@@ -1909,6 +1951,8 @@ catalogRouter.patch("/sofa-combos/:id", async (c) => {
   // 0183 — only write cost_by_height when present so an unrelated patch doesn't
   // clobber the benchmark; an explicit null clears it (back to "unset").
   if (parsed.data.costByHeight !== undefined) patch.cost_by_height = parsed.data.costByHeight;
+  // 0186 — same for the PWP reward price (present-only write; null clears).
+  if (parsed.data.pwpPricesByHeight !== undefined) patch.pwp_prices_by_height = parsed.data.pwpPricesByHeight;
   if (parsed.data.label !== undefined) patch.label = parsed.data.label;
   if (parsed.data.effectiveFrom !== undefined) patch.effective_from = parsed.data.effectiveFrom;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
@@ -2370,6 +2414,109 @@ catalogRouter.delete("/free-item-campaigns/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(FREE_ITEM_CAMPAIGNS).delete().eq("id", id);
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0186 — PWP & Promo RULES (2990s Products parity Phase 8a). A rule unlocks a
+// reward category/scope when a trigger category/scope is in the cart, at the
+// ratio qty_per_trigger. type 'pwp' = the reward is sold at its per-SKU
+// pwp_price; 'promo' = the reward is FREE. The reward PRICE is NOT on the rule —
+// it lives per-SKU (product_skus.pwp_price) / per-sofa-combo
+// (sofa_combo_pricing.pwp_prices_by_height). All writes are principal-owned
+// ("Master Admin"): early friendly 403 here, with RLS (pwp_rules_write_principal)
+// the real boundary — we forward the USER JWT (userClient) so RLS runs; NEVER
+// service_role. DORMANT in P8a — NO order-side consumer; create_order /
+// order_lines are untouched, so orders stay byte-identical. CRUD surface only.
+// Mirrors the 0185 free-item-campaigns routes EXACTLY.
+// ---------------------------------------------------------------------------
+
+const PWP_RULE_MSG = "Only the principal (Master Admin) can manage PWP rules";
+
+// Patch variant of the rule input: every field optional (empty body → 422 below).
+const pwpRulePatchInput = pwpRuleInput.partial();
+
+// POST /pwp-rules — create a PWP/Promo rule (principal-only). `triggerTargets` /
+// `rewardTargets` ALLOW empty ([] = the whole category); `qtyPerTrigger` defaults
+// 1; `active` defaults false (a rule is dormant until the principal flips it on).
+catalogRouter.post("/pwp-rules", async (c) => {
+  principalOnly(c, PWP_RULE_MSG);
+  const parsed = await parseJsonBody(c, pwpRuleInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(PWP_RULES)
+    .insert({
+      type: parsed.data.type,
+      trigger_category: parsed.data.triggerCategory,
+      // `trigger_targets` / `reward_targets` are RuleTarget[] jsonb.
+      trigger_targets: parsed.data.triggerTargets,
+      reward_category: parsed.data.rewardCategory,
+      reward_targets: parsed.data.rewardTargets,
+      qty_per_trigger: parsed.data.qtyPerTrigger ?? 1,
+      active: parsed.data.active ?? false,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "rpc_failed", code: "rpc_failed", message: "pwp rule insert returned no row" },
+      500,
+    );
+  }
+  return c.json(
+    { pwpRule: Adapters.pwpRuleFromRow(data as DB.PwpRuleRow) },
+    201,
+  );
+});
+
+// PATCH /pwp-rules/:id — partial update (principal-only); empty → 422.
+catalogRouter.patch("/pwp-rules/:id", async (c) => {
+  principalOnly(c, PWP_RULE_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, pwpRulePatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.type !== undefined) patch.type = parsed.data.type;
+  if (parsed.data.triggerCategory !== undefined) patch.trigger_category = parsed.data.triggerCategory;
+  if (parsed.data.triggerTargets !== undefined) patch.trigger_targets = parsed.data.triggerTargets;
+  if (parsed.data.rewardCategory !== undefined) patch.reward_category = parsed.data.rewardCategory;
+  if (parsed.data.rewardTargets !== undefined) patch.reward_targets = parsed.data.rewardTargets;
+  if (parsed.data.qtyPerTrigger !== undefined) patch.qty_per_trigger = parsed.data.qtyPerTrigger;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(PWP_RULES)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "pwp rule not found" },
+      404,
+    );
+  }
+  return c.json({ pwpRule: Adapters.pwpRuleFromRow(data as DB.PwpRuleRow) });
+});
+
+// DELETE /pwp-rules/:id — HARD delete (principal-only). Nothing FKs to this
+// table, so deletion is safe; the soft-hide path is `active=false` via PATCH.
+catalogRouter.delete("/pwp-rules/:id", async (c) => {
+  principalOnly(c, PWP_RULE_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(PWP_RULES).delete().eq("id", id);
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   return c.json({ ok: true });
 });

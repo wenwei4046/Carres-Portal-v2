@@ -85,6 +85,11 @@ export const productSkuSchema = z.object({
   // 0178 (sofa engine Phase 1) — nullable link to a sofa compartment type.
   // Additive/optional: pre-0178 serialized SKUs that don't carry it stay valid.
   compartmentId: z.string().uuid().nullable().optional(),
+  // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (the price a
+  // PWP-rule reward line is sold at). Mirrors `cost`: economic, nullable
+  // (null = no PWP price set). Additive/optional so pre-0186 serialized SKUs
+  // stay valid. DORMANT — no order consumer yet.
+  pwpPrice: z.number().nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
 
@@ -379,6 +384,10 @@ export const sofaComboSchema = z.object({
   pricesByHeight: z.record(z.string(), z.union([z.number(), z.null()])),
   // 0183 — per-seat-height cost benchmark (same shape); null = unset.
   costByHeight: z.record(z.string(), z.union([z.number(), z.null()])).nullable(),
+  // 0186 (PWP Phase 8a) — per-seat-height PWP reward price (same shape as
+  // pricesByHeight); null = unset. The price a PWP-rule reward sofa-combo is
+  // sold at. DORMANT — no order consumer yet.
+  pwpPricesByHeight: z.record(z.string(), z.union([z.number(), z.null()])).nullable(),
   label: z.string().nullable(),
   effectiveFrom: z.string(),
   active: z.boolean(),
@@ -400,6 +409,9 @@ export const sofaComboCreateInput = z
     // 0183 — optional per-height cost benchmark (principal-only); same
     // SOFA_HEIGHTS-keyed shape as pricesByHeight. null/omit = unset.
     costByHeight: sofaComboPricesByHeightSchema.nullable().optional(),
+    // 0186 — optional per-height PWP reward price (principal-only); same
+    // SOFA_HEIGHTS-keyed shape as pricesByHeight. null/omit = unset.
+    pwpPricesByHeight: sofaComboPricesByHeightSchema.nullable().optional(),
     label: z.string().trim().max(200).nullable().optional(),
     effectiveFrom: z.string().optional(),
     active: z.boolean().optional(),
@@ -560,6 +572,50 @@ export const freeItemCampaignInput = z
   .strict();
 export type FreeItemCampaignInput = z.infer<typeof freeItemCampaignInput>;
 
+// ---------------------------------------------------------------------------
+// 0186 — PWP & Promo RULES (2990s Products parity Phase 8a). Principal-owned.
+// A rule maps a trigger category/scope → a reward category/scope at a ratio
+// qtyPerTrigger. type 'pwp' = the reward is sold at its per-SKU pwp_price;
+// 'promo' = the reward is FREE. The reward PRICE is NOT on the rule — it lives
+// per-SKU (product_skus.pwp_price) / per-sofa-combo
+// (sofa_combo_pricing.pwp_prices_by_height). One schema, two consumers (§9.5):
+// the API validates these and the Maintenance UI reuses the exact same shapes.
+// DORMANT (active default false; no order consumer in P8a).
+// ---------------------------------------------------------------------------
+
+/** A `pwp_rules` row DTO (mirrors the engine's `PwpRule`, with a row `id` +
+ *  `active`). Trigger/reward scope are P6 RuleTarget[] (`[]` = the whole
+ *  category — the 2990s semantic; NO `.min(1)`, empty-within-a-category is
+ *  intentional for PWP). */
+export const pwpRuleSchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(["pwp", "promo"]),
+  triggerCategory: productCategorySchema,
+  triggerTargets: z.array(ruleTargetSchema),
+  rewardCategory: productCategorySchema,
+  rewardTargets: z.array(ruleTargetSchema),
+  qtyPerTrigger: z.number().int().positive(),
+  active: z.boolean(),
+});
+export type PwpRuleDto = z.infer<typeof pwpRuleSchema>;
+
+/** Create / patch a PWP rule. `triggerTargets` / `rewardTargets` ALLOW empty (an
+ *  empty target list = the whole category — do NOT add `.min(1)`).
+ *  `qtyPerTrigger` optional (server defaults to 1); `active` defaults false
+ *  server-side. */
+export const pwpRuleInput = z
+  .object({
+    type: z.enum(["pwp", "promo"]),
+    triggerCategory: productCategorySchema,
+    triggerTargets: z.array(ruleTargetSchema),
+    rewardCategory: productCategorySchema,
+    rewardTargets: z.array(ruleTargetSchema),
+    qtyPerTrigger: z.number().int().positive().optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+export type PwpRuleInput = z.infer<typeof pwpRuleInput>;
+
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
   skus: z.array(productSkuSchema),
@@ -591,6 +647,8 @@ export const catalogResponseSchema = z.object({
   // Pre-0185 clients that don't read these are wholly unaffected.
   modelDefaultFreeGifts: z.array(modelDefaultFreeGiftsSchema).optional(),
   freeItemCampaigns: z.array(freeItemCampaignSchema).optional(),
+  // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients unaffected.
+  pwpRules: z.array(pwpRuleSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 
@@ -685,6 +743,11 @@ export const productSkuCreateInput = z
     supplierId: z.string().uuid().nullable().optional(),
     description: z.string().trim().max(200).nullable().optional(),
     posActive: z.boolean().optional(),
+    // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (the price a
+    // PWP-rule reward line is sold at). Mirrors `cost`: economic, nullable.
+    // The route gate (gateSkuCreatePriceCost) + the DB trigger enforce
+    // principal-only; null/omit = unset.
+    pwpPrice: z.number().nonnegative().nullable().optional(),
   })
   .strict();
 export type ProductSkuCreateInput = z.infer<typeof productSkuCreateInput>;
@@ -701,6 +764,9 @@ export const productSkuPatchInput = z
     // 0170 — Edit-Prices / Modular toggle / inline description edit.
     posActive: z.boolean().optional(),
     description: z.string().trim().max(200).nullable().optional(),
+    // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (mirrors `cost`).
+    // Presence = intent to change → gated to principal in the route.
+    pwpPrice: z.number().nonnegative().nullable().optional(),
   })
   .strict();
 export type ProductSkuPatchInput = z.infer<typeof productSkuPatchInput>;

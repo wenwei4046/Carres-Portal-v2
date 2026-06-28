@@ -40,6 +40,10 @@ export default function EditSkuModal({
   const [price, setPrice] = useState(String(sku.price));
   // cost: blank string = null ("not set"); a numeric string = the cost value
   const [cost, setCost] = useState(sku.cost !== null ? String(sku.cost) : "");
+  // 0186 — PWP reward price: blank = null ("not set"), same shape as cost.
+  const [pwpPrice, setPwpPrice] = useState(
+    sku.pwpPrice !== null && sku.pwpPrice !== undefined ? String(sku.pwpPrice) : "",
+  );
 
   const priceNum = Number(price);
   const priceOk = price.trim() !== "" && Number.isFinite(priceNum) && priceNum >= 0;
@@ -51,9 +55,15 @@ export default function EditSkuModal({
     costTrimmed === "" ||
     (Number.isFinite(costNum as number) && (costNum as number) >= 0);
 
+  // pwpPrice — same blank=null / non-negative rule as cost.
+  const pwpTrimmed = pwpPrice.trim();
+  const pwpNum: number | null = pwpTrimmed === "" ? null : Number(pwpTrimmed);
+  const pwpOk =
+    pwpTrimmed === "" || (Number.isFinite(pwpNum as number) && (pwpNum as number) >= 0);
+
   const nameOk = !model || name.trim().length >= 2;
-  // Non-principal can't edit price/cost, so their validity doesn't gate Save.
-  const valid = nameOk && (!isPrincipal || (priceOk && costOk));
+  // Non-principal can't edit price/cost/pwpPrice, so their validity doesn't gate Save.
+  const valid = nameOk && (!isPrincipal || (priceOk && costOk && pwpOk));
   const pending = patchSku.isPending || patchModel.isPending;
 
   // Live margin: use the current input values for instant feedback
@@ -63,15 +73,23 @@ export default function EditSkuModal({
   async function save() {
     if (!valid) return;
     try {
-      // SKU-level: description + (principal-only) price + cost (only if changed).
-      const skuPatch: { description?: string | null; price?: number; cost?: number | null } = {};
+      // SKU-level: description + (principal-only) price + cost + pwpPrice (only
+      // if changed).
+      const skuPatch: {
+        description?: string | null;
+        price?: number;
+        cost?: number | null;
+        pwpPrice?: number | null;
+      } = {};
       const nextDesc = description.trim() || null;
       if (nextDesc !== (sku.description ?? null)) skuPatch.description = nextDesc;
-      // 0175 — only the principal can change price/cost. Skip these for everyone
-      // else so the API gate / DB trigger is never tripped on a benign edit.
+      // 0175 / 0186 — only the principal can change price/cost/pwpPrice. Skip
+      // these for everyone else so the API gate / DB trigger is never tripped on
+      // a benign edit.
       if (isPrincipal) {
         if (priceNum !== sku.price) skuPatch.price = priceNum;
         if (costNum !== sku.cost) skuPatch.cost = costNum;
+        if (pwpNum !== (sku.pwpPrice ?? null)) skuPatch.pwpPrice = pwpNum;
       }
       if (Object.keys(skuPatch).length > 0) {
         await patchSku.mutateAsync({ id: sku.id, patch: skuPatch });
@@ -211,6 +229,44 @@ export default function EditSkuModal({
               </div>
             )}
           </div>
+        </div>
+
+        {/* PWP price (0186) — the discounted price this SKU sells at as a PWP
+            reward. Principal-only, same gate as price/cost. */}
+        <div className="grid grid-cols-2 gap-3">
+          {isPrincipal ? (
+            <label className="block">
+              <span className="label block mb-1">PWP price (RM)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={pwpPrice}
+                onChange={(e) => setPwpPrice(e.target.value)}
+                placeholder="not set"
+                data-testid="edit-sku-pwp-price"
+                className={`${INPUT_CLS} text-right font-mono`}
+              />
+              <div className="t-tiny text-base-400 mt-1">
+                Reward price for PWP rules. Blank = not set (null).
+              </div>
+            </label>
+          ) : (
+            <div>
+              <span className="label block mb-1">PWP price (RM)</span>
+              <div
+                className="t-small font-mono text-right text-base-700 mt-2"
+                data-testid="edit-sku-pwp-price-readonly"
+              >
+                {sku.pwpPrice === null || sku.pwpPrice === undefined ? (
+                  <span className="text-base-400 italic">not set</span>
+                ) : (
+                  sku.pwpPrice.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                )}
+              </div>
+              <div className="t-tiny text-base-400 mt-1">Master Admin only.</div>
+            </div>
+          )}
         </div>
       </div>
 

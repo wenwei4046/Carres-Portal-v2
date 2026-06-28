@@ -469,6 +469,12 @@ describe("sofaComboFromRow", () => {
         "28": 1850,
         "30": null,
       },
+      // 0186 — per-height PWP reward price (companion to prices_by_height).
+      pwp_prices_by_height: {
+        "24": "2200.00" as unknown as number,
+        "28": 2300,
+        "30": null,
+      },
       label: "Oslo L-shape",
       effective_from: "2026-06-21",
       active: true,
@@ -499,6 +505,12 @@ describe("sofaComboFromRow", () => {
     expect(typeof out.costByHeight!["24"]).toBe("number");
     expect(out.costByHeight!["28"]).toBe(1850);
     expect(out.costByHeight!["30"]).toBeNull();
+    // 0186 — PWP price map coerces numerics + preserves null, same as prices.
+    expect(out.pwpPricesByHeight).not.toBeNull();
+    expect(out.pwpPricesByHeight!["24"]).toBe(2200);
+    expect(typeof out.pwpPricesByHeight!["24"]).toBe("number");
+    expect(out.pwpPricesByHeight!["28"]).toBe(2300);
+    expect(out.pwpPricesByHeight!["30"]).toBeNull();
     expect(out.label).toBe("Oslo L-shape");
     expect(out.effectiveFrom).toBe("2026-06-21");
     expect(out.active).toBe(true);
@@ -524,6 +536,11 @@ describe("sofaComboFromRow", () => {
     const out = sofaComboFromRow(baseRow({ cost_by_height: null }));
     expect(out.costByHeight).toBeNull();
   });
+
+  it("keeps pwpPricesByHeight null when the column is unset (0186)", () => {
+    const out = sofaComboFromRow(baseRow({ pwp_prices_by_height: null }));
+    expect(out.pwpPricesByHeight).toBeNull();
+  });
 });
 
 describe("productSkuFromRow — 0178 compartmentId", () => {
@@ -541,6 +558,7 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
       pos_active: true,
       description: null,
       compartment_id: "00000000-0000-0000-0000-0000000c0001",
+      pwp_price: null,
       ...over,
     };
   }
@@ -553,6 +571,13 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
   it("nulls compartmentId for a non-compartment SKU", () => {
     const out = productSkuFromRow(baseSkuRow({ compartment_id: null }));
     expect(out.compartmentId).toBeNull();
+  });
+
+  it("maps pwp_price -> pwpPrice, coercing numeric + preserving null (0186)", () => {
+    expect(productSkuFromRow(baseSkuRow({ pwp_price: null })).pwpPrice).toBeNull();
+    const out = productSkuFromRow(baseSkuRow({ pwp_price: "999.00" as unknown as number }));
+    expect(out.pwpPrice).toBe(999);
+    expect(typeof out.pwpPrice).toBe("number");
   });
 });
 

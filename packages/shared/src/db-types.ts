@@ -154,6 +154,10 @@ export interface ProductSkuRow {
   // Only future generated compartment SKUs set it; links a compartment SKU to
   // its pool type. NULL for every existing (non-compartment) SKU.
   compartment_id: string | null;
+  // 0186 (PWP Phase 8a) — principal-only per-SKU PWP reward price. NULL = "no
+  // PWP price set" (mirrors `cost`). Economic field; the 0175 trigger is
+  // extended to lock it to the principal. DORMANT — no order consumer yet.
+  pwp_price: number | null;
 }
 
 export interface SofaFabricRow {
@@ -331,6 +335,10 @@ export interface SofaComboPricingRow {
   // 0183 — principal-only per-seat-height cost benchmark, same shape as
   // prices_by_height. null (or absent keys) = unset. Benchmark only.
   cost_by_height: Record<string, number | null> | null;
+  // 0186 — principal-only per-seat-height PWP reward price, same shape as
+  // prices_by_height. null (or absent keys) = unset. DORMANT — no order
+  // consumer yet.
+  pwp_prices_by_height: Record<string, number | null> | null;
   label: string | null;
   effective_from: string;
   active: boolean;
@@ -413,6 +421,30 @@ export interface FreeItemCampaignRow {
   active: boolean;
   max_free_qty: number;
   eligible: RuleTarget[];
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `pwp_rules` (migration 0186, 2990s Products parity Phase 8a). A principal-owned
+ * PWP/Promo RULE: a trigger category/scope unlocks a reward category/scope at the
+ * ratio `qty_per_trigger`. `type` 'pwp' = the reward is sold at its per-SKU
+ * pwp_price; 'promo' = the reward is FREE. `trigger_targets` / `reward_targets`
+ * are RuleTarget[] jsonb (scopes model|variant|combo|compartment); the adapter
+ * runs `parseRuleTargets` to drop malformed entries ([] = the whole category).
+ * The reward PRICE is NOT on the row (it lives on product_skus.pwp_price /
+ * sofa_combo_pricing.pwp_prices_by_height). `active` defaults false. DORMANT.
+ */
+export interface PwpRuleRow {
+  id: string;
+  type: "pwp" | "promo";
+  trigger_category: string;
+  trigger_targets: RuleTarget[];
+  reward_category: string;
+  reward_targets: RuleTarget[];
+  qty_per_trigger: number;
+  active: boolean;
   created_at: string;
   updated_at: string;
   updated_by: string | null;

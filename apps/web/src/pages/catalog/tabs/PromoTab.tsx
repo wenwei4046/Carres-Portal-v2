@@ -5,21 +5,28 @@ import type {
   CatalogResponse,
   DefaultFreeGift,
   FreeItemCampaignDto,
+  ProductCategory,
   ProductModelDto,
   ProductSkuDto,
+  PwpRuleDto,
   RuleTarget,
   TargetRefinement,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
   useCreateFreeItemCampaign,
+  useCreatePwpRule,
   useDeleteFreeItemCampaign,
   useDeleteModelFreeGifts,
+  useDeletePwpRule,
   useUpdateFreeItemCampaign,
+  useUpdatePwpRule,
   useUpsertModelFreeGifts,
 } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import RuleTargetPicker, { RuleTargetRefinementRow, finalizeRuleTargets } from "./RuleTargetPicker";
+
+const PRODUCT_CATEGORIES: ProductCategory[] = ["mattress", "bedframe", "sofa", "accessory", "service"];
 
 /**
  * Promo / Free Gifts (2990s Products parity Phase 7, migration 0185). Two
@@ -33,6 +40,11 @@ import RuleTargetPicker, { RuleTargetRefinementRow, finalizeRuleTargets } from "
  *   (b) Free Item Campaigns — a named GWP a salesperson can "Make free" an
  *       ELIGIBLE cart line under (eligibility = a P6 RuleTarget[]). CRUD list +
  *       inline form.
+ *   (c) PWP / Promo rules (Phase 8a, migration 0186) — a trigger product (by
+ *       category + RuleTarget[]) unlocks a reward product (by category +
+ *       RuleTarget[]) `qtyPerTrigger` times. Kind = 'pwp' (purchase-with-purchase,
+ *       reward sold at its discounted `pwpPrice`) or 'promo' (the conditional
+ *       free/promo variant). CRUD list grouped by kind + an inline form. DORMANT.
  *
  * Both reuse the P6 RuleTargetPicker for targeting. Free lines book as RM0
  * order_lines with attrs markers — the order submit pipeline is untouched.
@@ -48,6 +60,7 @@ export default function PromoTab({
     <div className="flex flex-col gap-10 max-w-[720px]">
       <DefaultGiftsSection catalog={catalog} isPrincipal={isPrincipal} />
       <FreeItemCampaignsSection catalog={catalog} isPrincipal={isPrincipal} />
+      <PwpRulesSection catalog={catalog} isPrincipal={isPrincipal} />
     </div>
   );
 }
@@ -679,6 +692,338 @@ function CampaignForm({
           data-testid="campaign-save"
         >
           {busy ? "Saving…" : campaign ? "Save" : "Create campaign"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (c) PWP / Promo rules — CRUD (migration 0186, Phase 8a)
+// ---------------------------------------------------------------------------
+
+const KIND_LABEL: Record<PwpRuleDto["type"], string> = {
+  pwp: "Purchase-with-purchase",
+  promo: "Promo",
+};
+
+function PwpRulesSection({
+  catalog,
+  isPrincipal,
+}: {
+  catalog: CatalogResponse;
+  isPrincipal: boolean;
+}) {
+  const [adding, setAdding] = useState(false);
+  const rules = catalog.pwpRules ?? [];
+  const pwpRules = rules.filter((r) => r.type === "pwp");
+  const promoRules = rules.filter((r) => r.type === "promo");
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-1">
+        <div className="t-h4 font-display">PWP / Promo rules</div>
+        {isPrincipal && (
+          <button
+            type="button"
+            onClick={() => setAdding((v) => !v)}
+            className="btn-ghost text-[12px]"
+            data-testid="pwp-add"
+          >
+            {adding ? "Close" : "+ New rule"}
+          </button>
+        )}
+      </div>
+      <p className="t-tiny text-base-500 mb-3">
+        Pair a trigger product with a reward product. Buying the trigger unlocks the reward up to a
+        set count per trigger — sold at the reward SKU's PWP price (set in SKU Master). Choose Kind:{" "}
+        <span className="font-medium">PWP</span> (the classic discounted add-on) or{" "}
+        <span className="font-medium">Promo</span>. Empty targeting = the whole category. A rule is
+        dormant until you flip it Active.
+        {!isPrincipal && " Principal only — read-only for your role."}
+      </p>
+
+      {adding && isPrincipal && <PwpRuleForm catalog={catalog} onDone={() => setAdding(false)} />}
+
+      <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
+        <div
+          className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
+          style={{ gridTemplateColumns: "minmax(200px,1.8fr) 70px 90px" }}
+        >
+          <div className="label">Trigger → reward</div>
+          <div className="label text-right">Per trigger</div>
+          <div className="label text-right">Actions</div>
+        </div>
+        {rules.length === 0 && (
+          <div className="t-small text-base-500 px-3 py-4">No PWP / promo rules.</div>
+        )}
+        {[
+          ["pwp", pwpRules] as const,
+          ["promo", promoRules] as const,
+        ].map(([kind, list]) =>
+          list.length === 0 ? null : (
+            <div key={kind} data-testid={`pwp-group-${kind}`}>
+              <div className="t-micro text-base-400 px-3 pt-2 pb-1 bg-base-50/40">
+                {KIND_LABEL[kind]}
+              </div>
+              {list.map((r) => (
+                <PwpRuleRow key={r.id} rule={r} catalog={catalog} isPrincipal={isPrincipal} />
+              ))}
+            </div>
+          ),
+        )}
+      </div>
+    </section>
+  );
+}
+
+function PwpRuleRow({
+  rule,
+  catalog,
+  isPrincipal,
+}: {
+  rule: PwpRuleDto;
+  catalog: CatalogResponse;
+  isPrincipal: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const del = useDeletePwpRule();
+
+  function remove() {
+    if (!confirm(`Delete this ${KIND_LABEL[rule.type]} rule?`)) return;
+    del.mutate(rule.id, {
+      onSuccess: () => toast.success("Rule deleted"),
+      onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Delete failed"),
+    });
+  }
+
+  if (editing) {
+    return (
+      <div className="px-3 py-3 border-b border-base-100 last:border-b-0 bg-base-50">
+        <PwpRuleForm catalog={catalog} rule={rule} onDone={() => setEditing(false)} />
+      </div>
+    );
+  }
+
+  const triggerLabel =
+    rule.triggerTargets.length > 0
+      ? summarizeTargets(rule.triggerTargets, catalog)
+      : `Any ${rule.triggerCategory}`;
+  const rewardLabel =
+    rule.rewardTargets.length > 0
+      ? summarizeTargets(rule.rewardTargets, catalog)
+      : `Any ${rule.rewardCategory}`;
+
+  return (
+    <div
+      className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 ${rule.active ? "" : "opacity-60"}`}
+      style={{ gridTemplateColumns: "minmax(200px,1.8fr) 70px 90px" }}
+      data-testid={`pwp-row-${rule.id}`}
+    >
+      <div className="min-w-0">
+        <div className="text-[13px] truncate flex items-center gap-2">
+          <span className="pill pill-neutral uppercase">{rule.type}</span>
+          {!rule.active && <span className="pill pill-neutral">inactive</span>}
+        </div>
+        <div className="t-tiny text-base-400 truncate">
+          {triggerLabel} <span className="text-base-300">→</span> {rewardLabel}
+        </div>
+      </div>
+      <div className="text-right font-mono text-[12px]">{rule.qtyPerTrigger}</div>
+      <div className="text-right flex justify-end gap-1.5">
+        {isPrincipal && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="btn-ghost text-[11px]"
+              data-testid={`pwp-edit-${rule.id}`}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={remove}
+              disabled={del.isPending}
+              className="btn-danger text-[11px]"
+              data-testid={`pwp-delete-${rule.id}`}
+            >
+              Delete
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Create / edit a PWP / promo rule. `rule` present = patch mode. */
+function PwpRuleForm({
+  catalog,
+  rule,
+  onDone,
+}: {
+  catalog: CatalogResponse;
+  rule?: PwpRuleDto;
+  onDone: () => void;
+}) {
+  const create = useCreatePwpRule();
+  const update = useUpdatePwpRule();
+  const [type, setType] = useState<PwpRuleDto["type"]>(rule?.type ?? "pwp");
+  const [active, setActive] = useState(rule?.active ?? false);
+  const [qtyPerTrigger, setQtyPerTrigger] = useState(String(rule?.qtyPerTrigger ?? 1));
+  const [triggerCategory, setTriggerCategory] = useState<ProductCategory>(
+    rule?.triggerCategory ?? "mattress",
+  );
+  const [rewardCategory, setRewardCategory] = useState<ProductCategory>(
+    rule?.rewardCategory ?? "accessory",
+  );
+  const [triggerTargets, setTriggerTargets] = useState<RuleTarget[]>(rule?.triggerTargets ?? []);
+  const [rewardTargets, setRewardTargets] = useState<RuleTarget[]>(rule?.rewardTargets ?? []);
+  const busy = create.isPending || update.isPending;
+
+  // Empty targeting is allowed = the whole category; finalize only collapses
+  // half-finished refinements (a 'variant' row with no sizes → scope 'model').
+  const finalTrigger = finalizeRuleTargets(triggerTargets);
+  const finalReward = finalizeRuleTargets(rewardTargets);
+  const qtyNum = Math.floor(Number(qtyPerTrigger));
+  const valid = Number.isInteger(qtyNum) && qtyNum >= 1;
+
+  async function submit() {
+    if (!valid) return;
+    const body = {
+      type,
+      triggerCategory,
+      triggerTargets: finalTrigger,
+      rewardCategory,
+      rewardTargets: finalReward,
+      qtyPerTrigger: qtyNum,
+      active,
+    };
+    try {
+      if (rule) {
+        await update.mutateAsync({ id: rule.id, patch: body });
+        toast.success("Rule updated");
+      } else {
+        await create.mutateAsync(body);
+        toast.success("Rule created");
+      }
+      onDone();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Save failed");
+    }
+  }
+
+  return (
+    <div className="bg-base-50 border border-base-200 rounded-[4px] p-4 mb-3 flex flex-col gap-4">
+      <div className="flex flex-wrap gap-4 items-end">
+        <label className="block">
+          <span className="label block mb-1">Kind</span>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as PwpRuleDto["type"])}
+            className={`${INPUT_CLS} w-44`}
+            data-testid="pwp-kind"
+          >
+            <option value="pwp">PWP — purchase-with-purchase</option>
+            <option value="promo">Promo</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="label block mb-1">Reward / trigger</span>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={qtyPerTrigger}
+            onChange={(e) => setQtyPerTrigger(e.target.value)}
+            className={`${INPUT_CLS} w-24`}
+            data-testid="pwp-qty"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-[13px] cursor-pointer pb-2">
+          <input
+            type="checkbox"
+            checked={active}
+            onChange={(e) => setActive(e.target.checked)}
+            className="w-4 h-4"
+            data-testid="pwp-active"
+          />
+          Active
+        </label>
+      </div>
+
+      {/* Trigger */}
+      <div className="flex flex-col gap-1.5">
+        <span className="label block">Trigger product</span>
+        <label className="flex items-center gap-2 t-tiny text-base-600">
+          Category
+          <select
+            value={triggerCategory}
+            onChange={(e) => setTriggerCategory(e.target.value as ProductCategory)}
+            className={`${INPUT_CLS} w-40`}
+            data-testid="pwp-trigger-category"
+          >
+            {PRODUCT_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </label>
+        <RuleTargetPicker
+          catalog={catalog}
+          value={triggerTargets}
+          onChange={setTriggerTargets}
+          categories={[triggerCategory]}
+        />
+        <p className="t-tiny text-base-400">
+          Tick the models that qualify as the trigger. Leave all unticked = any {triggerCategory}.
+        </p>
+      </div>
+
+      {/* Reward */}
+      <div className="flex flex-col gap-1.5">
+        <span className="label block">Reward product</span>
+        <label className="flex items-center gap-2 t-tiny text-base-600">
+          Category
+          <select
+            value={rewardCategory}
+            onChange={(e) => setRewardCategory(e.target.value as ProductCategory)}
+            className={`${INPUT_CLS} w-40`}
+            data-testid="pwp-reward-category"
+          >
+            {PRODUCT_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </label>
+        <RuleTargetPicker
+          catalog={catalog}
+          value={rewardTargets}
+          onChange={setRewardTargets}
+          categories={[rewardCategory]}
+        />
+        <p className="t-tiny text-base-400">
+          The reward is sold at each reward SKU's PWP price (set in SKU Master). Leave all unticked =
+          any {rewardCategory}.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <button type="button" onClick={onDone} className="btn-ghost text-[12px]">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!valid || busy}
+          className="btn-primary text-[12px] disabled:opacity-40"
+          data-testid="pwp-save"
+        >
+          {busy ? "Saving…" : rule ? "Save" : "Create rule"}
         </button>
       </div>
     </div>

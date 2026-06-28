@@ -72,6 +72,9 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   // 0178 — nullable link to a sofa compartment type (additive, null on every
   // existing SKU).
   compartmentId: r.compartment_id ?? null,
+  // 0186 — principal-only PWP reward price; null stays null (not coerced to 0)
+  // so "unset" is distinct from "zero PWP price".
+  pwpPrice: r.pwp_price == null ? null : Number(r.pwp_price),
 });
 
 export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
@@ -277,6 +280,9 @@ export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
     // 0183 — cost benchmark; null (column unset) stays null so the UI can tell
     // "no cost authored" from "{}", while present maps coerce numerics.
     costByHeight: r.cost_by_height == null ? null : coerceHeightMap(r.cost_by_height),
+    // 0186 — PWP reward price; same null-preserving treatment as costByHeight.
+    pwpPricesByHeight:
+      r.pwp_prices_by_height == null ? null : coerceHeightMap(r.pwp_prices_by_height),
     label: r.label ?? null,
     effectiveFrom: r.effective_from,
     active: r.active,
@@ -310,6 +316,23 @@ export const freeItemCampaignFromRow = (
   active: r.active,
   maxFreeQty: Number(r.max_free_qty),
   eligible: parseFreeItemEligible(r.eligible),
+});
+
+/**
+ * Maps a `pwp_rules` row to the camelCase domain shape (0186). `trigger_targets`
+ * / `reward_targets` jsonb are cleaned via `parseRuleTargets` (drops malformed
+ * entries; `[]` = the whole category — intentional for PWP); `qty_per_trigger`
+ * is Postgres integer → `Number()` (PostgREST may serialize it as a string).
+ */
+export const pwpRuleFromRow = (r: DB.PwpRuleRow): D.PwpRule => ({
+  id: r.id,
+  type: r.type,
+  triggerCategory: r.trigger_category,
+  triggerTargets: parseRuleTargets(r.trigger_targets),
+  rewardCategory: r.reward_category,
+  rewardTargets: parseRuleTargets(r.reward_targets),
+  qtyPerTrigger: Number(r.qty_per_trigger),
+  active: r.active,
 });
 
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({

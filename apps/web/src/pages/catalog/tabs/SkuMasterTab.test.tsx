@@ -392,6 +392,52 @@ describe("EditSkuModal — cost field + margin round-trip", () => {
     const args = mockPatchMutateAsync.mock.calls[0][0];
     expect(args.patch.cost).toBe(1800);
   });
+
+  // 0186 — PWP reward price round-trip, same gate/shape as cost.
+  it("renders the PWP price field for a principal (blank when unset)", () => {
+    mockRole = "principal";
+    render(wrap(<EditSkuModal sku={SKU_COST_NULL} model={MODEL_MAT} onClose={() => {}} />));
+    const pwpInput = screen.getByTestId("edit-sku-pwp-price") as HTMLInputElement;
+    expect(pwpInput).toBeInTheDocument();
+    expect(pwpInput.value).toBe("");
+  });
+
+  it("sends pwpPrice: number when the PWP price field is set and Save is clicked", async () => {
+    mockRole = "principal";
+    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_NULL });
+    render(wrap(<EditSkuModal sku={SKU_COST_NULL} model={MODEL_MAT} onClose={vi.fn()} />));
+    fireEvent.change(screen.getByTestId("edit-sku-pwp-price"), { target: { value: "999" } });
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
+    const args = mockPatchMutateAsync.mock.calls[0][0];
+    expect(args.patch.pwpPrice).toBe(999);
+  });
+
+  it("does NOT send pwpPrice when it is left unchanged", async () => {
+    mockRole = "principal";
+    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_NULL });
+    render(wrap(<EditSkuModal sku={SKU_COST_NULL} model={MODEL_MAT} onClose={vi.fn()} />));
+    // change only the description; pwpPrice untouched (was null → stays unset)
+    fireEvent.change(screen.getByTestId("edit-sku-description"), { target: { value: "x" } });
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
+    const args = mockPatchMutateAsync.mock.calls[0][0];
+    expect(args.patch).not.toHaveProperty("pwpPrice");
+  });
+
+  it("non-principal gets a read-only PWP price (no input) + never sends it", async () => {
+    mockRole = "operation";
+    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_SET });
+    const skuWithPwp: ProductSkuDto = { ...SKU_COST_SET, pwpPrice: 1500 };
+    render(wrap(<EditSkuModal sku={skuWithPwp} model={MODEL_MAT} onClose={vi.fn()} />));
+    expect(screen.queryByTestId("edit-sku-pwp-price")).not.toBeInTheDocument();
+    expect(screen.getByTestId("edit-sku-pwp-price-readonly").textContent).toContain("1,500");
+    fireEvent.change(screen.getByTestId("edit-sku-description"), { target: { value: "y" } });
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
+    const args = mockPatchMutateAsync.mock.calls[0][0];
+    expect(args.patch).not.toHaveProperty("pwpPrice");
+  });
 });
 
 // ---------------------------------------------------------------------------

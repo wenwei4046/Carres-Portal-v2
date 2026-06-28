@@ -74,6 +74,13 @@ export const CATALOG_OPTION_POOLS    = "catalog_option_pools" as const;
 export const MODEL_DEFAULT_FREE_GIFTS = "model_default_free_gifts" as const;
 export const FREE_ITEM_CAMPAIGNS      = "free_item_campaigns" as const;
 
+// 0186 — 2990s Products parity Phase 8a: principal-owned PWP & Promo RULES
+// (trigger category/scope → reward category/scope @ qtyPerTrigger). The reward
+// PRICE lives per-SKU (product_skus.pwp_price) / per-sofa-combo
+// (sofa_combo_pricing.pwp_prices_by_height), NOT on the rule. DORMANT (active
+// default false; no order consumer yet) — P8a is the stateless foundation.
+export const PWP_RULES = "pwp_rules" as const;
+
 // ---------------------------------------------------------------------------
 // People / org tables
 // ---------------------------------------------------------------------------

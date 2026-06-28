@@ -232,6 +232,11 @@ export {
   type ModelDefaultFreeGiftsInput,
   type FreeItemCampaignDto,
   type FreeItemCampaignInput,
+  // 0186 — PWP & Promo rule schemas/inputs/Dtos.
+  pwpRuleSchema,
+  pwpRuleInput,
+  type PwpRuleDto,
+  type PwpRuleInput,
 } from "./schemas/catalog";
 
 export {
@@ -604,6 +609,22 @@ export {
 } from "./free-item-campaign";
 export { modelDefaultFreeGiftsFromRow, freeItemCampaignFromRow } from "./adapters";
 export type { ModelDefaultFreeGifts } from "./domain";
+
+// 0186 — 2990s Products parity Phase 8a: PWP & Promo. The PURE engine
+// (`resolvePwp`) — the SOLE source of truth for which reward lines get the PWP/
+// promo price + which trigger they bind to. Will be shared by the POS preview +
+// the Hono server recompute (P8b+) so the figure cannot drift. Reuses the P6
+// RuleTarget matcher for trigger/reward scope. The row→domain adapter
+// (`pwpRuleFromRow`) is surfaced top-level here too (mirrors sofaComboFromRow).
+export {
+  resolvePwp,
+  parsePwpTargets,
+  type PwpRule as PwpRuleEngine,
+  type PwpLineInput,
+  type PwpGrant,
+} from "./pwp";
+export { pwpRuleFromRow } from "./adapters";
+export type { PwpRule } from "./domain";
 
 // Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo
 // match + explodeSofaBuild). No DB/IO; runs identically on web + (Phase 4) Hono.

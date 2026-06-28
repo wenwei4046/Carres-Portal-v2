@@ -56,6 +56,9 @@ import {
   type ModelDefaultFreeGiftsInput,
   type FreeItemCampaignDto,
   type FreeItemCampaignInput,
+  // 0186 — PWP / Promo rules (Phase 8a, principal-only CRUD).
+  type PwpRuleDto,
+  type PwpRuleInput,
   type AddonCreateInput,
   type AddonPatchInput,
   type AddonDto,
@@ -5030,6 +5033,43 @@ export function useDeleteFreeItemCampaign() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/free-item-campaigns/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0186 — PWP / Promo rules (2990s Products parity Phase 8a). Principal-only on
+// the server (RLS + API gate); the Maintenance UI gate is a friendly read-only
+// veneer. Every mutation invalidates the ['catalog'] tree so the bundle (Promo
+// tab + the POS preview resolver) re-reads. DORMANT — no order-path consumer in
+// P8a; the rule pairs a trigger category/target with a reward category/target,
+// and the reward PRICE lives on product_skus.pwpPrice / sofa_combo_pricing
+// .pwpPricesByHeight (separate principal-locked write paths).
+// ---------------------------------------------------------------------------
+
+export function useCreatePwpRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PwpRuleInput) =>
+      apiFetch<{ pwpRule: PwpRuleDto }>("/api/catalog/pwp-rules", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdatePwpRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<PwpRuleInput> }) =>
+      apiFetch<{ pwpRule: PwpRuleDto }>(`/api/catalog/pwp-rules/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeletePwpRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/pwp-rules/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

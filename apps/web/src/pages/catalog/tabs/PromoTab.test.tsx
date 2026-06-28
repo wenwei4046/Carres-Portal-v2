@@ -25,6 +25,9 @@ const mockDeleteGifts = vi.fn().mockResolvedValue({ ok: true });
 const mockCreateCampaign = vi.fn().mockResolvedValue({ freeItemCampaign: {} });
 const mockUpdateCampaign = vi.fn().mockResolvedValue({ freeItemCampaign: {} });
 const mockDeleteCampaign = vi.fn();
+const mockCreatePwp = vi.fn().mockResolvedValue({ pwpRule: {} });
+const mockUpdatePwp = vi.fn().mockResolvedValue({ pwpRule: {} });
+const mockDeletePwp = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   useUpsertModelFreeGifts: () => ({ mutate: vi.fn(), mutateAsync: mockUpsertGifts, isPending: false }),
@@ -32,6 +35,9 @@ vi.mock("@/lib/queries", () => ({
   useCreateFreeItemCampaign: () => ({ mutate: vi.fn(), mutateAsync: mockCreateCampaign, isPending: false }),
   useUpdateFreeItemCampaign: () => ({ mutate: vi.fn(), mutateAsync: mockUpdateCampaign, isPending: false }),
   useDeleteFreeItemCampaign: () => ({ mutate: mockDeleteCampaign, isPending: false }),
+  useCreatePwpRule: () => ({ mutate: vi.fn(), mutateAsync: mockCreatePwp, isPending: false }),
+  useUpdatePwpRule: () => ({ mutate: vi.fn(), mutateAsync: mockUpdatePwp, isPending: false }),
+  useDeletePwpRule: () => ({ mutate: mockDeletePwp, isPending: false }),
 }));
 
 const MATTRESS_MODEL = "22222222-2222-2222-2222-222222222222";
@@ -70,6 +76,7 @@ function makeCatalog(overrides?: Partial<CatalogResponse>): CatalogResponse {
     modelSofaCompartments: [],
     modelDefaultFreeGifts: [],
     freeItemCampaigns: [],
+    pwpRules: [],
     ...overrides,
   };
 }
@@ -84,19 +91,22 @@ beforeEach(() => {
   mockUpsertGifts.mockResolvedValue({ modelDefaultFreeGifts: {} });
   mockCreateCampaign.mockResolvedValue({ freeItemCampaign: {} });
   mockUpdateCampaign.mockResolvedValue({ freeItemCampaign: {} });
+  mockCreatePwp.mockResolvedValue({ pwpRule: {} });
+  mockUpdatePwp.mockResolvedValue({ pwpRule: {} });
 });
 
 // ---------------------------------------------------------------------------
 // Principal-gating
 // ---------------------------------------------------------------------------
 describe("PromoTab — gating", () => {
-  it("principal: shows the gift model picker + the New campaign control", () => {
+  it("principal: shows the gift model picker + the New campaign control + the New rule control", () => {
     render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
     expect(screen.getByTestId("promo-gift-model-select")).toBeInTheDocument();
     expect(screen.getByTestId("campaign-add")).toBeInTheDocument();
+    expect(screen.getByTestId("pwp-add")).toBeInTheDocument();
   });
 
-  it("non-principal: no gift picker, no campaign add; existing config read-only", () => {
+  it("non-principal: no gift picker, no campaign add, no rule add; existing config read-only", () => {
     render(
       wrap(
         <PromoTab
@@ -105,6 +115,18 @@ describe("PromoTab — gating", () => {
             freeItemCampaigns: [
               { id: "camp-1", name: "Pillow promo", active: true, maxFreeQty: 1, eligible: [{ modelId: MATTRESS_MODEL, scope: "model" }] },
             ],
+            pwpRules: [
+              {
+                id: "pwp-1",
+                type: "pwp",
+                triggerCategory: "mattress",
+                triggerTargets: [{ modelId: MATTRESS_MODEL, scope: "model" }],
+                rewardCategory: "accessory",
+                rewardTargets: [],
+                qtyPerTrigger: 1,
+                active: true,
+              },
+            ],
           })}
           isPrincipal={false}
         />,
@@ -112,12 +134,15 @@ describe("PromoTab — gating", () => {
     );
     expect(screen.queryByTestId("promo-gift-model-select")).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaign-add")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pwp-add")).not.toBeInTheDocument();
     // Lists still render
     expect(screen.getByTestId(`gift-model-card-${MATTRESS_MODEL}`)).toBeInTheDocument();
     expect(screen.getByText("Pillow promo")).toBeInTheDocument();
+    expect(screen.getByTestId("pwp-row-pwp-1")).toBeInTheDocument();
     // ...but no edit controls
     expect(screen.queryByTestId(`gift-edit-${MATTRESS_MODEL}`)).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaign-edit-camp-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pwp-edit-pwp-1")).not.toBeInTheDocument();
   });
 });
 
@@ -268,6 +293,123 @@ describe("PromoTab — free item campaigns", () => {
     fireEvent.click(screen.getByTestId("campaign-delete-camp-1"));
     expect(confirmSpy).toHaveBeenCalled();
     expect(mockDeleteCampaign).toHaveBeenCalledWith("camp-1", expect.anything());
+    confirmSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PWP / Promo rules (0186, Phase 8a)
+// ---------------------------------------------------------------------------
+describe("PromoTab — PWP / promo rules", () => {
+  it("create: kind + categories + tick a trigger model → Save calls useCreatePwpRule", async () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
+
+    // default kind=pwp, trigger=mattress, reward=accessory. Bump qty to 2.
+    fireEvent.change(screen.getByTestId("pwp-qty"), { target: { value: "2" } });
+    fireEvent.click(screen.getByTestId("pwp-active"));
+
+    // tick the mattress model in the TRIGGER picker (the first RuleTargetPicker)
+    const triggerRow = screen.getByTestId(`rtp-model-${MATTRESS_MODEL}`);
+    fireEvent.click(within(triggerRow).getByRole("checkbox"));
+
+    fireEvent.click(screen.getByTestId("pwp-save"));
+
+    await waitFor(() => expect(mockCreatePwp).toHaveBeenCalledOnce());
+    const arg = mockCreatePwp.mock.calls[0][0];
+    expect(arg.type).toBe("pwp");
+    expect(arg.active).toBe(true);
+    expect(arg.qtyPerTrigger).toBe(2);
+    expect(arg.triggerCategory).toBe("mattress");
+    expect(arg.rewardCategory).toBe("accessory");
+    expect(arg.triggerTargets).toEqual([{ modelId: MATTRESS_MODEL, scope: "model" }]);
+    // empty reward targeting = whole category (allowed)
+    expect(arg.rewardTargets).toEqual([]);
+  });
+
+  it("create with empty trigger targeting = whole category is still valid", async () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
+    // touch nothing else — qty defaults to 1, empty targets allowed
+    expect(screen.getByTestId("pwp-save")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("pwp-save"));
+    await waitFor(() => expect(mockCreatePwp).toHaveBeenCalledOnce());
+    const arg = mockCreatePwp.mock.calls[0][0];
+    expect(arg.qtyPerTrigger).toBe(1);
+    expect(arg.triggerTargets).toEqual([]);
+    expect(arg.rewardTargets).toEqual([]);
+  });
+
+  it("Save disabled when qtyPerTrigger < 1", () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
+    fireEvent.change(screen.getByTestId("pwp-qty"), { target: { value: "0" } });
+    expect(screen.getByTestId("pwp-save")).toBeDisabled();
+  });
+
+  it("rules render grouped by kind", () => {
+    render(
+      wrap(
+        <PromoTab
+          catalog={makeCatalog({
+            pwpRules: [
+              { id: "pwp-1", type: "pwp", triggerCategory: "mattress", triggerTargets: [{ modelId: MATTRESS_MODEL, scope: "model" }], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 1, active: true },
+              { id: "promo-1", type: "promo", triggerCategory: "sofa", triggerTargets: [], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 2, active: false },
+            ],
+          })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("pwp-group-pwp")).toBeInTheDocument();
+    expect(screen.getByTestId("pwp-group-promo")).toBeInTheDocument();
+    expect(screen.getByTestId("pwp-row-pwp-1")).toBeInTheDocument();
+    expect(screen.getByTestId("pwp-row-promo-1")).toBeInTheDocument();
+  });
+
+  it("Edit pre-fills + Save calls useUpdatePwpRule with the patch", async () => {
+    render(
+      wrap(
+        <PromoTab
+          catalog={makeCatalog({
+            pwpRules: [
+              { id: "pwp-1", type: "pwp", triggerCategory: "mattress", triggerTargets: [{ modelId: MATTRESS_MODEL, scope: "model" }], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 1, active: false },
+            ],
+          })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId("pwp-edit-pwp-1"));
+    expect((screen.getByTestId("pwp-kind") as HTMLSelectElement).value).toBe("pwp");
+    expect((screen.getByTestId("pwp-qty") as HTMLInputElement).value).toBe("1");
+    fireEvent.click(screen.getByTestId("pwp-active")); // flip ON
+    fireEvent.click(screen.getByTestId("pwp-save"));
+
+    await waitFor(() => expect(mockUpdatePwp).toHaveBeenCalledOnce());
+    const arg = mockUpdatePwp.mock.calls[0][0];
+    expect(arg.id).toBe("pwp-1");
+    expect(arg.patch.active).toBe(true);
+    expect(arg.patch.triggerTargets).toEqual([{ modelId: MATTRESS_MODEL, scope: "model" }]);
+  });
+
+  it("Delete confirms then calls useDeletePwpRule", () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(
+      wrap(
+        <PromoTab
+          catalog={makeCatalog({
+            pwpRules: [
+              { id: "pwp-1", type: "pwp", triggerCategory: "mattress", triggerTargets: [], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 1, active: true },
+            ],
+          })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId("pwp-delete-pwp-1"));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(mockDeletePwp).toHaveBeenCalledWith("pwp-1", expect.anything());
     confirmSpy.mockRestore();
   });
 });
