@@ -62,6 +62,9 @@ import {
   // 0187 — PWP voucher codes (Phase 8c, the SAME-CART state machine reserve API).
   type PwpReserveInput,
   type PwpCodesResponse,
+  // 0188 — PWP cross-order DISCOVERY (Phase 8d) — the stripped (no PII) AVAILABLE
+  // voucher discovery the POS cross-order affordance reads by phone / code.
+  type PwpDiscoverResponse,
   type AddonCreateInput,
   type AddonPatchInput,
   type AddonDto,
@@ -133,6 +136,13 @@ export const qk = {
    *  feeding the POS Auto-Fill voucher rail. The reserve/free mutations invalidate
    *  this so the rail re-reads the live RESERVED set after a trigger change. */
   pwpCodesMine: () => ["pwp-codes", "mine"] as const,
+  /** 0188 (Phase 8d) — cross-order AVAILABLE voucher DISCOVERY (GET
+   *  /api/pwp-codes/available), keyed by the selector (phone / code) so the POS
+   *  auto-suggest + manual-entry affordance cache distinctly per lookup. The
+   *  stripped (no-PII) DTO. Only enabled when a selector is present + PWP is
+   *  active (DORMANT carts make zero discovery traffic). */
+  pwpAvailable: (sel: { phone?: string | null; code?: string | null }) =>
+    ["pwp-codes", "available", sel.phone ?? null, sel.code ?? null] as const,
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
   // ripples to dealers + dashboard) without touching dealer/order caches.
@@ -991,6 +1001,45 @@ export function useFreePwpCode(
       await qc.invalidateQueries({ queryKey: qk.pwpCodesMine() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
+  });
+}
+
+/* ─── 0188 (Phase 8d) — PWP cross-order voucher DISCOVERY ───────────────────── */
+
+/**
+ * usePwpAvailableForPhone — GET /api/pwp-codes/available?phone=…[&code=…]. The
+ * cross-order voucher discovery the POS cross-order affordance reads: the customer
+ * enters / has captured a phone (auto-suggest) OR a salesperson types a voucher
+ * code (manual entry). The route calls the SECURITY DEFINER `pwp_discover_available`
+ * which returns the STRIPPED projection (NO bound phone / owner / trigger sku) +
+ * a server-computed `phoneMatches` boolean — so the raw bound phone is never sent
+ * to the client (no PII / enumeration oracle). PDPA-safe by construction.
+ *
+ * `enabled` is gated by the caller on (PWP active AND a selector is present): with
+ * no phone + no code the query is disabled (the route would 0-row anyway), so a
+ * DORMANT / no-selector cart makes ZERO discovery traffic. Short `staleTime` so a
+ * freshly-redeemed voucher drops out of the suggestion promptly on re-fetch.
+ */
+export function usePwpAvailableForPhone(
+  selector: { phone?: string | null; code?: string | null },
+  opts?: Partial<UseQueryOptions<PwpDiscoverResponse>>,
+) {
+  const phone = (selector.phone ?? "").trim();
+  const code = (selector.code ?? "").trim();
+  return useQuery({
+    queryKey: qk.pwpAvailable({ phone: phone || null, code: code || null }),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (phone) params.set("phone", phone);
+      if (code) params.set("code", code);
+      return apiFetch<PwpDiscoverResponse>(
+        `/api/pwp-codes/available${params.toString() ? `?${params.toString()}` : ""}`,
+      );
+    },
+    // Default off unless a selector exists; the caller AND-gates with PWP-active.
+    enabled: Boolean(phone || code),
+    staleTime: 10_000,
+    ...opts,
   });
 }
 

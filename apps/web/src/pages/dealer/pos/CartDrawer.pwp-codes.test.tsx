@@ -69,6 +69,8 @@ const pwpRule: PwpRuleDto = {
   rewardTargets: [],
   qtyPerTrigger: 1,
   active: true,
+  carryForward: true,
+  carryForwardDays: null,
 };
 
 /** A RESERVED pwp_code minted under `ruleId` (the rest dormant/null per P8c). */
@@ -86,6 +88,9 @@ function reservedCode(over: Partial<PwpCodeDto> & { code: string; ruleId: string
     redeemedItemSku: null,
     sourceOrderId: null,
     customerId: null,
+    boundCustomerPhone: null,
+    ownerDealerId: null,
+    expiresAt: null,
     createdAt: "2026-06-28T00:00:00Z",
     updatedAt: "2026-06-28T00:00:00Z",
     ...over,

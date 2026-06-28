@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import type { CreateOrderInput, Order } from "@carres/shared";
+import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
 import { maxLeadDaysFor } from "@carres/shared";
+import { apiFetch } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import CarresLockup from "@/components/CarresLockup";
 import { deliveryFeePreview } from "@/lib/order-totals";
@@ -15,6 +16,7 @@ import {
   useFreePwpCode,
   useOutlets,
   useProceedOrder,
+  usePwpAvailableForPhone,
   usePwpCodesMine,
   useReservePwpCode,
   useSalespersons,
@@ -182,6 +184,37 @@ export default function DealerPos({
   const reservedCodesQ = usePwpCodesMine({ enabled: pwpActive && !submitted });
   const reservePwp = useReservePwpCode();
   const freePwp = useFreePwpCode();
+
+  // ── 0188 (Phase 8d) — cross-order voucher DISCOVERY (auto-suggest by phone). ──
+  // The customer's phone is captured at the CUSTOMER step; the cart's cross-order
+  // affordance auto-suggests AVAILABLE carry-forward vouchers bound to that phone.
+  // Gated on (PWP active AND a phone is present) so a DORMANT / phone-less cart
+  // makes ZERO discovery traffic. The stripped (no-PII) DTO; the server computes
+  // the phone match. The cross-order claim is re-validated server-side at Confirm.
+  const customerPhone = draft.customer.phone.trim();
+  const pwpAvailableQ = usePwpAvailableForPhone(
+    { phone: customerPhone },
+    { enabled: pwpActive && !submitted && customerPhone.length > 0 },
+  );
+
+  // Manual voucher-code lookup (the salesperson types / scans a number). Imperative
+  // (not a hook) — it fires only on Apply. Returns the stripped discovery DTO (with
+  // the server-computed phoneMatches) or null. The phone is included so the server
+  // can answer the binding without the client ever seeing the stored phone.
+  const lookupVoucherCode = useCallback(
+    async (code: string): Promise<PwpDiscoverDto | null> => {
+      const trimmed = code.trim();
+      if (!trimmed) return null;
+      const params = new URLSearchParams();
+      params.set("code", trimmed);
+      if (customerPhone) params.set("phone", customerPhone);
+      const res = await apiFetch<PwpDiscoverResponse>(
+        `/api/pwp-codes/available?${params.toString()}`,
+      );
+      return res.vouchers.find((v) => v.code === trimmed) ?? null;
+    },
+    [customerPhone],
+  );
 
   // The trigger lines currently in the cart (keyed by localId). A trigger is a
   // line whose sku matches an active rule's trigger scope (shared matcher). Empty
@@ -581,6 +614,9 @@ export default function DealerPos({
               onCartOpenChange={setCartOpen}
               pwpReservedCodes={reservedCodesQ.data?.codes ?? []}
               pwpClaimGroup={pwpActive ? getClaimGroup() : undefined}
+              customerPhone={pwpActive ? customerPhone : undefined}
+              pwpAvailableVouchers={pwpAvailableQ.data?.vouchers ?? []}
+              onApplyVoucherCode={pwpActive ? lookupVoucherCode : undefined}
             />
           </div>
         ) : step === 2 ? (

@@ -2456,6 +2456,10 @@ catalogRouter.post("/pwp-rules", async (c) => {
       reward_targets: parsed.data.rewardTargets,
       qty_per_trigger: parsed.data.qtyPerTrigger ?? 1,
       active: parsed.data.active ?? false,
+      // P8d (0188) — per-rule cross-order carry-forward policy. `carry_forward`
+      // defaults true (the DB default); `carry_forward_days` NULL = perpetual.
+      carry_forward: parsed.data.carryForward ?? true,
+      carry_forward_days: parsed.data.carryForwardDays ?? null,
       updated_at: new Date().toISOString(),
       updated_by: c.var.auth.id,
     })
@@ -2488,6 +2492,10 @@ catalogRouter.patch("/pwp-rules/:id", async (c) => {
   if (parsed.data.rewardTargets !== undefined) patch.reward_targets = parsed.data.rewardTargets;
   if (parsed.data.qtyPerTrigger !== undefined) patch.qty_per_trigger = parsed.data.qtyPerTrigger;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  // P8d (0188) — per-rule cross-order carry-forward policy round-trips through PATCH.
+  if (parsed.data.carryForward !== undefined) patch.carry_forward = parsed.data.carryForward;
+  if (parsed.data.carryForwardDays !== undefined)
+    patch.carry_forward_days = parsed.data.carryForwardDays;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }

@@ -248,6 +248,12 @@ export {
   type PwpReserveInput,
   type PwpCodesResponse,
   type AttrsPwpMarker,
+  // 0188 — PWP cross-order DISCOVERY (Phase 8d) — the STRIPPED projection
+  // (no PII) the /available route returns.
+  pwpDiscoverDtoSchema,
+  pwpDiscoverResponseSchema,
+  type PwpDiscoverDto,
+  type PwpDiscoverResponse,
 } from "./schemas/catalog";
 
 export {
@@ -643,6 +649,15 @@ export type { PwpRule } from "./domain";
 // the zod schemas + Dto/input types live in the schemas/catalog export block.
 export { pwpCodeFromRow } from "./adapters";
 export type { PwpCode } from "./domain";
+
+// 0188 — 2990s Products parity Phase 8d: cross-order voucher carry-forward. The
+// MY-aware phone canonicalizer (`phoneKeyMy`, JS twin of the SQL pwp_phone_key) +
+// the legacy digits-only `phoneKey` (promoted from delivery-fee-recompute). The
+// stripped DISCOVERY adapter (`pwpDiscoverFromRow`) + its camelCase domain type —
+// the ONLY pwp_codes-derived shape a non-owner client receives (no PII).
+export { phoneKey, phoneKeyMy } from "./phone";
+export { pwpDiscoverFromRow } from "./adapters";
+export type { PwpDiscover } from "./domain";
 
 // Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo
 // match + explodeSofaBuild). No DB/IO; runs identically on web + (Phase 4) Hono.

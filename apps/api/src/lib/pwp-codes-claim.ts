@@ -38,10 +38,12 @@ import type { RecomputableLine } from "./sofa-recompute";
  * path.
  */
 
-/** The rollback ledger entry. `prevStatus` is always RESERVED by construction
- *  (the claim only flips a RESERVED code), so only the code string is needed to
- *  reverse it via `pwp_release_codes`. */
-export type ClaimedCode = { code: string };
+/** The rollback ledger entry. `crossOrder` records which claim RPC minted the
+ *  USED state so the rollback restores it to the CORRECT prior state:
+ *    - same-cart (`crossOrder=false`) → was RESERVED → `pwp_release_codes` (owner).
+ *    - cross-order (`crossOrder=true`) → was AVAILABLE → `pwp_release_available_code`
+ *      (DEFINER, allowlist + claim_group bound). */
+export type ClaimedCode = { code: string; crossOrder: boolean };
 
 export type PwpClaimOutcome =
   | { status: "ok"; lines: RecomputableLine[]; claimed: ClaimedCode[]; claimGroup: string | null }
@@ -55,18 +57,22 @@ export interface ClaimAuth {
 }
 
 /** Read a line's `attrs.pwp` claim signal: the bound voucher `code`, the pricing
- *  `ruleId`, and the per-submit `claimGroup`. All three are strings (trimmed) or
- *  "" when absent. */
+ *  `ruleId`, the per-submit `claimGroup`, and the P8d `crossOrder` flag. The three
+ *  strings are trimmed or "" when absent; `crossOrder` is true ONLY for a
+ *  `crossOrder === true` marker (an AVAILABLE carry-forward voucher claim). */
 function readPwpClaim(attrs: Record<string, unknown> | null): {
   code: string;
   ruleId: string;
   claimGroup: string;
+  crossOrder: boolean;
 } {
-  const pwp = (attrs as { pwp?: { code?: unknown; ruleId?: unknown; claimGroup?: unknown } } | null)?.pwp;
+  const pwp = (attrs as { pwp?: { code?: unknown; ruleId?: unknown; claimGroup?: unknown; crossOrder?: unknown } } | null)
+    ?.pwp;
   const code = typeof pwp?.code === "string" ? pwp.code.trim() : "";
   const ruleId = typeof pwp?.ruleId === "string" ? pwp.ruleId.trim() : "";
   const claimGroup = typeof pwp?.claimGroup === "string" ? pwp.claimGroup.trim() : "";
-  return { code, ruleId, claimGroup };
+  const crossOrder = pwp?.crossOrder === true;
+  return { code, ruleId, claimGroup, crossOrder };
 }
 
 /**
@@ -79,19 +85,31 @@ function readPwpClaim(attrs: Record<string, unknown> | null): {
  *              owner from `auth.uid()` — but kept for parity with the other
  *              recompute libs + future use; named `_auth` to satisfy lint).
  * @param lines the P8b-priced lines (price + `attrs.pwp` already canonical).
+ * @param customerPhone the REDEEMING order's customer phone (raw — the RPC
+ *              canonicalizes via `pwp_phone_key`). Required for a cross-order
+ *              (`crossOrder=true`) claim; the SQL twin asserts the phone binding.
+ *              A same-cart claim ignores it.
  */
 export async function claimPwpCodesForLines(
   sb: SupabaseClient,
   _auth: ClaimAuth,
   lines: RecomputableLine[],
+  customerPhone: string | null = null,
 ): Promise<PwpClaimOutcome> {
   // 1. Collect coded reward lines. A line with no non-empty `attrs.pwp.code` is
   //    not a voucher claim. DORMANT short-circuit: no coded line → no DB call.
-  const coded: Array<{ index: number; code: string; ruleId: string; claimGroup: string; sku: string }> = [];
+  const coded: Array<{
+    index: number;
+    code: string;
+    ruleId: string;
+    claimGroup: string;
+    sku: string;
+    crossOrder: boolean;
+  }> = [];
   for (let i = 0; i < lines.length; i++) {
-    const { code, ruleId, claimGroup } = readPwpClaim(lines[i]!.attrs as Record<string, unknown> | null);
+    const { code, ruleId, claimGroup, crossOrder } = readPwpClaim(lines[i]!.attrs as Record<string, unknown> | null);
     if (!code) continue;
-    coded.push({ index: i, code, ruleId, claimGroup, sku: lines[i]!.sku });
+    coded.push({ index: i, code, ruleId, claimGroup, sku: lines[i]!.sku, crossOrder });
   }
   if (coded.length === 0) {
     return { status: "ok", lines, claimed: [], claimGroup: null };
@@ -139,39 +157,61 @@ export async function claimPwpCodesForLines(
     seen.add(c.code);
   }
 
-  // 4. Claim each code atomically (RESERVED→USED), bound to the pricing rule +
-  //    the claimGroup. On any early-return below, release the partial ledger first
-  //    so a partial claim never leaks.
+  // 4. Claim each code atomically, bound to the pricing rule + the claimGroup. The
+  //    claim RPC differs by mode:
+  //      - same-cart  (RESERVED→USED) via `pwp_claim_code` (owner-scoped).
+  //      - cross-order (AVAILABLE→USED) via `pwp_claim_available_code` (DEFINER,
+  //        phone-bound: the SQL twin asserts pwp_phone_key(customerPhone) ==
+  //        bound_customer_phone + expiry). A NULL row → 409 (phone mismatch /
+  //        wrong rule / expired / already USED) — same rejection as a same-cart miss.
+  //    On any early-return below, release the partial ledger first so a partial
+  //    claim never leaks — split by mode so each code returns to its CORRECT state.
   const claimed: ClaimedCode[] = [];
   const releasePartial = async () => {
     if (claimed.length === 0) return;
-    await sb.rpc("pwp_release_codes", { p_codes: claimed.map((c) => c.code) });
+    const ownCodes = claimed.filter((c) => !c.crossOrder).map((c) => c.code);
+    const crossCodes = claimed.filter((c) => c.crossOrder).map((c) => c.code);
+    if (ownCodes.length > 0) await sb.rpc("pwp_release_codes", { p_codes: ownCodes });
+    if (crossCodes.length > 0) {
+      await sb.rpc("pwp_release_available_code", { p_codes: crossCodes, p_claim_group: claimGroup });
+    }
   };
 
   for (const c of coded) {
-    const { data: row, error } = await sb.rpc("pwp_claim_code", {
-      p_code: c.code,
-      p_rule_id: c.ruleId, // the code must be minted under the rule that priced this line
-      p_claim_group: claimGroup, // cancel/recovery join key, set at claim (pre-create_order)
-      p_redeemed_sku: c.sku, // best-effort audit (§4.2a)
-    });
+    const { data: row, error } = c.crossOrder
+      ? await sb.rpc("pwp_claim_available_code", {
+          p_code: c.code,
+          p_rule_id: c.ruleId, // the code must be minted under the rule that priced this line
+          p_claim_group: claimGroup, // cancel/recovery join key, set at claim (pre-create_order)
+          p_redeemed_sku: c.sku, // best-effort audit (§4.2a)
+          p_customer_phone: customerPhone, // the binding the SQL twin asserts (§4.2)
+        })
+      : await sb.rpc("pwp_claim_code", {
+          p_code: c.code,
+          p_rule_id: c.ruleId,
+          p_claim_group: claimGroup,
+          p_redeemed_sku: c.sku,
+        });
     if (error) {
       // Fail-closed: release any partial claims, then 500.
       await releasePartial();
       return { status: "server_error", message: error.message };
     }
     // The RPC RETURNS the claimed row, or NULL when 0 rows matched (not RESERVED /
-    // not the caller's / wrong rule / already USED). PostgREST surfaces a
-    // composite-returning function's NULL as `data === null`.
+    // not AVAILABLE / not the caller's / wrong rule / already USED / phone mismatch
+    // / expired). PostgREST surfaces a composite-returning function's NULL as
+    // `data === null`.
     if (row == null) {
       await releasePartial();
       return {
         status: "bad_request",
         code: "pwp_code_rejected",
-        message: "This PWP voucher is no longer reservable — please re-add the offer and retry.",
+        message: c.crossOrder
+          ? "This saved voucher can't be redeemed — check the customer's phone, or it may be used or expired."
+          : "This PWP voucher is no longer reservable — please re-add the offer and retry.",
       };
     }
-    claimed.push({ code: c.code });
+    claimed.push({ code: c.code, crossOrder: c.crossOrder });
   }
 
   // 5. lines pass through — price already forced by P8b; `code`+`claimGroup`

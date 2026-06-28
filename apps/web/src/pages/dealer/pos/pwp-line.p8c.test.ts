@@ -73,6 +73,8 @@ const pwpRule: PwpRuleDto = {
   rewardTargets: [],
   qtyPerTrigger: 1,
   active: true,
+  carryForward: true,
+  carryForwardDays: null,
 };
 
 const mattLine = (over: Partial<DraftLine> = {}): DraftLine =>

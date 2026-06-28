@@ -8,6 +8,7 @@ import {
   lineMatchesTargets,
   pwpReserveInputSchema,
   pwpCodesResponseSchema,
+  pwpDiscoverResponseSchema,
   type PwpRule,
   type RuleLineInput,
   type RuleTarget,
@@ -226,6 +227,41 @@ pwpCodesRouter.delete("/reserve", async (c) => {
     .eq("status", "RESERVED");
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json({ ok: true });
+});
+
+/* ─── GET /available — cross-order DISCOVERY (P8d, 0188) ────────────────────── */
+
+// GET /api/pwp-codes/available?phone=…  OR  ?code=…[&phone=…]
+//
+// The cross-order voucher DISCOVERY read. Calls the SECURITY DEFINER
+// `pwp_discover_available` — a MINIMAL stripped projection (NO bound phone / owner
+// / trigger sku / customer id). The phone match is computed SERVER-SIDE
+// (`phoneMatches` boolean), so the stored phone is NEVER returned — killing the
+// `?code=` enumeration / PII oracle. The RPC REQUIRES a phone-or-code selector
+// (no dump-all of the AVAILABLE pool) + scopes a salesperson to their own dealer
+// (internal roles see all). PDPA-safe. userClient/RLS + the DEFINER RPC only —
+// never service_role + never a table `select('*')`. DORMANT: 0 AVAILABLE rows →
+// `{ vouchers: [] }`; the POS only calls this when PWP is active.
+pwpCodesRouter.get("/available", async (c) => {
+  const auth = c.var.auth;
+  const sb = userClient(c.env, auth.jwt);
+  const url = new URL(c.req.url);
+  const phone = url.searchParams.get("phone"); // raw; canonicalized in the RPC
+  const code = url.searchParams.get("code");
+  // No selector → no discovery (the RPC also short-circuits, but skip the call).
+  if (!phone && !code) {
+    return c.json(pwpDiscoverResponseSchema.parse({ vouchers: [] }));
+  }
+
+  const { data, error } = await sb.rpc("pwp_discover_available", {
+    p_phone: phone ?? null,
+    p_code: code ?? null,
+  });
+  if (error) throw new HTTPException(500, { message: error.message });
+  // The RPC already returns the STRIPPED shape — map snake→camel into the discover
+  // DTO (no PII can reach the client by construction).
+  const vouchers = ((data ?? []) as DB.PwpDiscoverRow[]).map((r) => Adapters.pwpDiscoverFromRow(r));
+  return c.json(pwpDiscoverResponseSchema.parse({ vouchers }));
 });
 
 /* ─── GET /mine — the reconciler's read (+ owner-scoped self-heal) ──────────── */

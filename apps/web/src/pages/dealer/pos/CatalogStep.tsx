@@ -6,6 +6,7 @@ import type {
   ComboDto,
   ProductCategory,
   PwpCodeDto,
+  PwpDiscoverDto,
 } from "@carres/shared";
 import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
@@ -49,6 +50,9 @@ export default function CatalogStep({
   onCartOpenChange,
   pwpReservedCodes,
   pwpClaimGroup,
+  customerPhone,
+  pwpAvailableVouchers,
+  onApplyVoucherCode,
 }: {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
@@ -63,6 +67,13 @@ export default function CatalogStep({
   /** 0187 — the per-cart claimGroup correlation uuid bound onto a claimed reward
    *  line's attrs.pwp.claimGroup. Optional. */
   pwpClaimGroup?: string;
+  /** 0188 (Phase 8d) — the cart's customer phone (gates the cross-order
+   *  "Redeem saved voucher" affordance). Optional. */
+  customerPhone?: string;
+  /** 0188 — AVAILABLE carry-forward vouchers discovered for the customer phone. */
+  pwpAvailableVouchers?: PwpDiscoverDto[];
+  /** 0188 — manual voucher-code lookup callback (type/scan a number). */
+  onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
 }) {
   const index = useMemo(
     () =>
@@ -339,6 +350,9 @@ export default function CatalogStep({
           catalog={catalog}
           pwpReservedCodes={pwpReservedCodes}
           pwpClaimGroup={pwpClaimGroup}
+          customerPhone={customerPhone}
+          pwpAvailableVouchers={pwpAvailableVouchers}
+          onApplyVoucherCode={onApplyVoucherCode}
         />
       )}
     </div>

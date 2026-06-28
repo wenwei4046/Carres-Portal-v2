@@ -4625,6 +4625,58 @@ describe("0186 — PWP & Promo rules (GET bundle + principal-gated CRUD)", () =>
     expect(body.pwpRule).toMatchObject({ type: "pwp", active: false, qtyPerTrigger: 1 });
   });
 
+  it("POST /pwp-rules — carry_forward defaults true / null when omitted (P8d, 0188)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: pwpRow({}) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/pwp-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "pwp",
+          triggerCategory: "mattress",
+          triggerTargets: [],
+          rewardCategory: "accessory",
+          rewardTargets: [],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.payload).toMatchObject({ carry_forward: true, carry_forward_days: null });
+  });
+
+  it("POST /pwp-rules — carry_forward=false + carry_forward_days=30 round-trip to the insert (P8d, 0188)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: pwpRow({ carry_forward: false, carry_forward_days: 30 }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/pwp-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "pwp",
+          triggerCategory: "mattress",
+          triggerTargets: [],
+          rewardCategory: "accessory",
+          rewardTargets: [],
+          carryForward: false,
+          carryForwardDays: 30,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.payload).toMatchObject({ carry_forward: false, carry_forward_days: 30 });
+  });
+
   it("POST /pwp-rules — bad input (qtyPerTrigger 0) → 422", async () => {
     const jwt = await makeJwt("principal", null);
     const res = await app.fetch(
@@ -4706,6 +4758,25 @@ describe("0186 — PWP & Promo rules (GET bundle + principal-gated CRUD)", () =>
     expect(upd?.payload).toMatchObject({ active: true, qty_per_trigger: 2 });
     const body = (await res.json()) as { pwpRule: { active: boolean; qtyPerTrigger: number } };
     expect(body.pwpRule).toMatchObject({ active: true, qtyPerTrigger: 2 });
+  });
+
+  it("PATCH /pwp-rules/:id — carry_forward=false + carry_forward_days=30 round-trip to the patch (P8d, 0188)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: pwpRow({ carry_forward: false, carry_forward_days: 30 }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/pwp-rules/${RULE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ carryForward: false, carryForwardDays: 30 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ carry_forward: false, carry_forward_days: 30 });
   });
 
   it("PATCH /pwp-rules/:id — empty body → 422", async () => {

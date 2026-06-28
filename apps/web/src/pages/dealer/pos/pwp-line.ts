@@ -311,3 +311,54 @@ export function markLinePwpWithCode(
     },
   };
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// P8d (migration 0188) — the CROSS-ORDER voucher POS layer. P8c bound a
+// RESERVED code minted in THIS cart; P8d adds binding an AVAILABLE carry-forward
+// voucher the customer EARNED on a PRIOR order (discovered by phone / code via
+// the DEFINER `pwp_discover_available`, claimed RESERVED-free AVAILABLE→USED at
+// Confirm by `pwp_claim_available_code`, phone-bound server-side). The marker is
+// the SAME `attrs.pwp` carrier plus the `crossOrder: true` discriminator the
+// order route reads to pick the cross-order claim RPC instead of the same-cart
+// one. Everything else (the forced price authority, the claimGroup, the lineage)
+// is identical to P8c — the client price is never trusted; the server
+// re-validates the phone binding + expiry + forces the reward price regardless.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** True when the line is bound to a CROSS-ORDER (carry-forward) voucher — its
+ *  `attrs.pwp.crossOrder === true`. A same-cart (P8c) binding / a code-less P8b
+ *  claim returns false (the marker omits the flag). */
+export function linePwpCrossOrder(line: DraftLine): boolean {
+  const pwp = (line.attrs as Record<string, unknown> | null)?.pwp as
+    | { crossOrder?: unknown }
+    | undefined;
+  return pwp?.crossOrder === true;
+}
+
+/**
+ * Mark a cart line as a PWP/promo reward backed by a CROSS-ORDER AVAILABLE
+ * voucher `code` (a carry-forward the customer earned on a prior order). Same as
+ * `markLinePwpWithCode` (forces the preview price, parks the real price in
+ * `origUnitPrice`, carries `{ ruleId, code, claimGroup }`) but stamps the extra
+ * `crossOrder: true` discriminator so the order route's Stage B claims it via
+ * `pwp_claim_available_code` (AVAILABLE→USED, phone-bound) rather than the
+ * same-cart `pwp_claim_code` (RESERVED→USED). The server re-asserts the phone
+ * binding + expiry + forces the price regardless — the client price is never
+ * trusted; the bound `code` is the lineage/lock record stamped into the order.
+ */
+export function markLinePwpWithAvailableCode(
+  line: DraftLine,
+  rule: PwpRuleDto,
+  price: number,
+  code: string,
+  claimGroup: string,
+): DraftLine {
+  const base = markLinePwp(line, rule, price);
+  return {
+    ...base,
+    attrs: {
+      ...((base.attrs as Record<string, unknown> | null) ?? {}),
+      pwp: { ruleId: rule.id, code, claimGroup, crossOrder: true },
+    },
+  };
+}

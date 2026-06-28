@@ -435,6 +435,12 @@ export interface FreeItemCampaignRow {
  * runs `parseRuleTargets` to drop malformed entries ([] = the whole category).
  * The reward PRICE is NOT on the row (it lives on product_skus.pwp_price /
  * sofa_combo_pricing.pwp_prices_by_height). `active` defaults false. DORMANT.
+ *
+ * P8d (0188) adds `carry_forward` (default true — when an unclaimed RESERVED
+ * voucher minted by this rule reaches Confirm it flips to AVAILABLE for the
+ * customer's next order instead of being deleted) + `carry_forward_days` (optional
+ * expiry window, NULL = perpetual). `pwpRuleFromRow` reads them with defaults so a
+ * pre-0188 row / mock still maps cleanly.
  */
 export interface PwpRuleRow {
   id: string;
@@ -445,6 +451,9 @@ export interface PwpRuleRow {
   reward_targets: RuleTarget[];
   qty_per_trigger: number;
   active: boolean;
+  // ── P8d (0188) cross-order carry-forward policy ──
+  carry_forward: boolean;
+  carry_forward_days: number | null;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
@@ -462,6 +471,16 @@ export interface PwpRuleRow {
  * exists at claim time (vs. redeemed_order_id, stamped only after create_order
  * returns). Owner-scoped RLS (`owner_staff_id` NULLABLE + ON DELETE SET NULL so
  * a deleted staff's USED-audit rows survive). `pwpCodeFromRow` maps it. DORMANT.
+ *
+ * P8d (0188) turns ON the cross-order path: an unclaimed RESERVED voucher carries
+ * forward to AVAILABLE, bound to the carrying order's CANONICAL customer phone
+ * (`bound_customer_phone` = pwp_phone_key, the MY-aware digits/strip-60/strip-0
+ * key) + the minting salesperson's `owner_dealer_id` (dealer-scope snapshot for
+ * the same-dealer AVAILABLE RLS clause) + an optional `expires_at`. The cross-
+ * order claim asserts the redeeming order's canonical phone matches. These three
+ * are NULL for every RESERVED / same-cart USED code. `bound_customer_phone` is
+ * NEVER returned to a non-owner client (discovery uses the stripped PwpDiscoverRow
+ * with a server-side phone match). `customer_id` (uuid) stays permanently unused.
  */
 export interface PwpCodeRow {
   code: string;
@@ -476,11 +495,37 @@ export interface PwpCodeRow {
   claim_group: string | null;
   redeemed_order_id: string | null;
   redeemed_item_sku: string | null;
-  // ── P8d cross-order columns — PRESENT, UNUSED in P8c. ──
+  // ── P8d cross-order columns ──
   source_order_id: string | null;
+  /** Permanently unused (P8c dormant artifact; the phone binding uses
+   *  `bound_customer_phone`). CF `pwp-customer-id-dead-column`. */
   customer_id: string | null;
+  // ── P8d (0188) cross-order carry-forward binding ──
+  bound_customer_phone: string | null;
+  owner_dealer_id: string | null;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * `pwp_discover_available(text,text)` RETURNS-TABLE row (migration 0188, the P8d
+ * cross-order DISCOVERY read). The STRIPPED projection: it deliberately carries NO
+ * `bound_customer_phone` / `owner_staff_id` / `trigger_item_code` /
+ * `redeemed_item_sku` / `customer_id` — the structural guarantee that discovery
+ * cannot leak another customer's PII. The phone match is computed SERVER-SIDE
+ * (`phone_matches` boolean) so the stored phone is never returned, killing the
+ * `?code=` enumeration/PII oracle. `pwpDiscoverFromRow` maps it.
+ */
+export interface PwpDiscoverRow {
+  code: string;
+  rule_id: string | null;
+  type: "pwp" | "promo";
+  reward_category: string;
+  reward_targets: RuleTarget[];
+  source_order_id: string | null;
+  expires_at: string | null;
+  phone_matches: boolean;
 }
 
 export interface WarehouseRow {

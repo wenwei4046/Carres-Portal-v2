@@ -323,6 +323,8 @@ export const freeItemCampaignFromRow = (
  * / `reward_targets` jsonb are cleaned via `parseRuleTargets` (drops malformed
  * entries; `[]` = the whole category — intentional for PWP); `qty_per_trigger`
  * is Postgres integer → `Number()` (PostgREST may serialize it as a string).
+ * P8d (0188): `carry_forward` defaults to `true` and `carry_forward_days` to
+ * `null` so a pre-0188 row / a test mock that omits them still maps cleanly.
  */
 export const pwpRuleFromRow = (r: DB.PwpRuleRow): D.PwpRule => ({
   id: r.id,
@@ -333,13 +335,20 @@ export const pwpRuleFromRow = (r: DB.PwpRuleRow): D.PwpRule => ({
   rewardTargets: parseRuleTargets(r.reward_targets),
   qtyPerTrigger: Number(r.qty_per_trigger),
   active: r.active,
+  // P8d (0188) — carry-forward defaults: a pre-0188 row / mock reads true / null.
+  carryForward: r.carry_forward ?? true,
+  carryForwardDays: r.carry_forward_days ?? null,
 });
 
 /**
- * Maps a `pwp_codes` row to the camelCase domain shape (0187, the SAME-CART
- * voucher ledger). `reward_targets` jsonb is cleaned via `parseRuleTargets`
+ * Maps a `pwp_codes` row to the camelCase domain shape (0187 ledger + 0188 P8d
+ * cross-order binding). `reward_targets` jsonb is cleaned via `parseRuleTargets`
  * (drops malformed entries; `[]` = the whole category — the snapshot of the
- * rule's reward scope). All other columns are direct snake→camel. DORMANT.
+ * rule's reward scope). All other columns are direct snake→camel. The P8d binding
+ * fields (`bound_customer_phone` / `owner_dealer_id` / `expires_at`) default to
+ * null so a pre-0188 row / mock maps cleanly. OWNER-SCOPED USE ONLY — this carries
+ * `boundCustomerPhone`; cross-order discovery uses `pwpDiscoverFromRow` (stripped,
+ * no PII). DORMANT.
  */
 export const pwpCodeFromRow = (r: DB.PwpCodeRow): D.PwpCode => ({
   code: r.code,
@@ -356,8 +365,30 @@ export const pwpCodeFromRow = (r: DB.PwpCodeRow): D.PwpCode => ({
   redeemedItemSku: r.redeemed_item_sku,
   sourceOrderId: r.source_order_id,
   customerId: r.customer_id,
+  // P8d (0188) — cross-order carry-forward binding (default null pre-0188).
+  boundCustomerPhone: r.bound_customer_phone ?? null,
+  ownerDealerId: r.owner_dealer_id ?? null,
+  expiresAt: r.expires_at ?? null,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
+});
+
+/**
+ * Maps a `pwp_discover_available` row (0188) to the camelCase domain shape. The
+ * STRIPPED projection — NO bound phone / owner / trigger sku / customer id; the
+ * phone match is the server-computed `phone_matches` boolean. `reward_targets`
+ * jsonb is cleaned via `parseRuleTargets`. This is the ONLY pwp_codes-derived
+ * shape a non-owner client ever receives, so it structurally cannot leak PII.
+ */
+export const pwpDiscoverFromRow = (r: DB.PwpDiscoverRow): D.PwpDiscover => ({
+  code: r.code,
+  ruleId: r.rule_id,
+  type: r.type,
+  rewardCategory: r.reward_category,
+  rewardTargets: parseRuleTargets(r.reward_targets),
+  sourceOrderId: r.source_order_id,
+  expiresAt: r.expires_at,
+  phoneMatches: r.phone_matches,
 });
 
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({

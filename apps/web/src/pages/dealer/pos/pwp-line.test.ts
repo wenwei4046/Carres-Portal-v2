@@ -73,6 +73,8 @@ const pwpRule: PwpRuleDto = {
   rewardTargets: [],
   qtyPerTrigger: 1,
   active: true,
+  carryForward: true,
+  carryForwardDays: null,
 };
 
 /** A 'promo' rule: buy a MATTRESS → reward a BEDFRAME FREE. */

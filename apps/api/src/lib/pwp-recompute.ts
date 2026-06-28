@@ -199,7 +199,7 @@ export async function recomputePwpLines(
   //    attrs — `stripClientPwp` deletes the whole `pwp` object including these
   //    two). They are re-emitted on the canonical marker at the rebuild below so
   //    Stage B (`claimPwpCodesForLines`) can read `attrs.pwp.code` after pricing.
-  const claims: Array<{ index: number; ruleId: string; code: string; claimGroup: string }> = [];
+  const claims: Array<{ index: number; ruleId: string; code: string; claimGroup: string; crossOrder: boolean }> = [];
   for (let i = 0; i < lines.length; i++) {
     const attrs = lines[i]!.attrs as Record<string, unknown> | null;
     if (!hasPwp(attrs)) continue;
@@ -228,16 +228,21 @@ export async function recomputePwpLines(
           "A line with special add-ons cannot be made a PWP/promo reward — remove the add-ons first.",
       };
     }
-    const pwp = (attrs as { pwp?: { ruleId?: unknown; code?: unknown; claimGroup?: unknown } } | null)?.pwp;
+    const pwp = (attrs as { pwp?: { ruleId?: unknown; code?: unknown; claimGroup?: unknown; crossOrder?: unknown } } | null)?.pwp;
     const ruleId = typeof pwp?.ruleId === "string" ? pwp.ruleId.trim() : "";
     if (!ruleId) {
       return { status: "bad_request", code: "pwp_unknown_rule", message: "PWP claim is missing a rule id" };
     }
     // P8c carry-through (§3.4): capture the bound voucher code + the per-submit
     // claimGroup from the ORIGINAL line. Empty when absent (DORMANT / P8b-only).
+    // P8d (§4.2): ALSO carry `crossOrder` — when true the bound code is an AVAILABLE
+    // carry-forward voucher claimed via pwp_claim_available_code (phone-bound), not
+    // a same-cart RESERVED code. Without surviving the recompute the cross-order
+    // branch in Stage B is dead.
     const code = typeof pwp?.code === "string" ? pwp.code.trim() : "";
     const claimGroup = typeof pwp?.claimGroup === "string" ? pwp.claimGroup.trim() : "";
-    claims.push({ index: i, ruleId, code, claimGroup });
+    const crossOrder = pwp?.crossOrder === true;
+    claims.push({ index: i, ruleId, code, claimGroup, crossOrder });
   }
 
   // 1. Strip every client pwp marker first (re-derived below). Plain lines keep
@@ -381,6 +386,10 @@ export async function recomputePwpLines(
           // — byte-identical to pre-P8c. Stage B reads `attrs.pwp.code` to claim.
           ...(claim.code ? { code: claim.code } : {}),
           ...(claim.claimGroup ? { claimGroup: claim.claimGroup } : {}),
+          // P8d (§4.2): re-emit `crossOrder` ONLY when true — a same-cart marker
+          // omits the key entirely (byte-identical to a P8c marker). Stage B reads
+          // this to route the claim to pwp_claim_available_code (phone-bound).
+          ...(claim.crossOrder ? { crossOrder: true } : {}),
         },
       },
     };

@@ -69,6 +69,9 @@ interface MockOpts {
   rules?: unknown[];
   skuRows?: Array<Record<string, unknown>>;
   seed?: Array<Partial<MockRow>>;
+  /** P8d — the stripped rows pwp_discover_available returns. A function so a test
+   *  can assert the selector args it was called with. Default → []. */
+  discoverRows?: (args: { p_phone: string | null; p_code: string | null }) => unknown[];
 }
 
 function fullRow(p: Partial<MockRow>): MockRow {
@@ -172,6 +175,10 @@ function mockSb(opts: MockOpts = {}) {
     },
     rpc: async (name: string, args: unknown) => {
       rpcCalls.push({ name, args });
+      if (name === "pwp_discover_available") {
+        const a = args as { p_phone: string | null; p_code: string | null };
+        return { data: opts.discoverRows ? opts.discoverRows(a) : [], error: null };
+      }
       return { data: 0, error: null };
     },
     _table: table,
@@ -398,5 +405,104 @@ describe("POST /api/pwp-codes/reap", () => {
     const reap = sb._rpcCalls.find((c: { name: string }) => c.name === "pwp_reap_orphans");
     // Self-scoped RPC (review BLOCKER fix): no p_owner — owner forced to auth.uid().
     expect(reap?.args).toEqual({ p_grace_minutes: 15 });
+  });
+});
+
+/* ─── GET /available — cross-order DISCOVERY (P8d, 0188 §6.3 / §8.2) ──────────── */
+
+/** One stripped pwp_discover_available row (NO phone / owner / trigger sku). */
+const discoverRow = (over: Record<string, unknown> = {}) => ({
+  code: "PWP-9999ZZZZ",
+  rule_id: RULE_ID,
+  type: "pwp",
+  reward_category: "bedframe",
+  reward_targets: [{ scope: "model", modelId: BED_MODEL }],
+  source_order_id: "00000000-0000-0000-0000-00000000a001",
+  expires_at: null,
+  phone_matches: true,
+  ...over,
+});
+
+describe("GET /api/pwp-codes/available", () => {
+  it("401 without Authorization", async () => {
+    const res = await app.fetch(new Request("http://t/api/pwp-codes/available?phone=0123456789"), env);
+    expect(res.status).toBe(401);
+  });
+
+  it("NO selector (no phone, no code) → { vouchers: [] } WITHOUT calling the RPC (no dump-all)", async () => {
+    const sb = mockSb();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await app.fetch(
+      new Request("http://t/api/pwp-codes/available", { headers: { Authorization: `Bearer ${await makeJwt()}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { vouchers: unknown[] };
+    expect(body.vouchers).toEqual([]);
+    // The route short-circuits — the discovery RPC is never invoked.
+    expect((sb._rpcCalls as Array<{ name: string }>).find((c) => c.name === "pwp_discover_available")).toBeUndefined();
+  });
+
+  it("?phone= → calls pwp_discover_available with the selector + returns the STRIPPED projection", async () => {
+    const sb = mockSb({ discoverRows: () => [discoverRow()] });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await app.fetch(
+      new Request("http://t/api/pwp-codes/available?phone=%2B60%2012-345%206789", {
+        headers: { Authorization: `Bearer ${await makeJwt()}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { vouchers: Array<Record<string, unknown>> };
+    expect(body.vouchers).toHaveLength(1);
+    const v = body.vouchers[0]!;
+    // The DTO carries the discovery fields + the server phoneMatches boolean…
+    expect(v).toMatchObject({ code: "PWP-9999ZZZZ", ruleId: RULE_ID, phoneMatches: true });
+    // …and NO PII (no bound phone / owner / trigger sku / customer id).
+    expect(v).not.toHaveProperty("boundCustomerPhone");
+    expect(v).not.toHaveProperty("ownerStaffId");
+    expect(v).not.toHaveProperty("triggerItemCode");
+    expect(v).not.toHaveProperty("customerId");
+    // The route forwarded the raw selector to the (server-side) RPC.
+    const call = (sb._rpcCalls as Array<{ name: string; args: { p_phone: string | null; p_code: string | null } }>).find(
+      (c) => c.name === "pwp_discover_available",
+    );
+    expect(call?.args).toEqual({ p_phone: "+60 12-345 6789", p_code: null });
+  });
+
+  it("?code= with a mismatched phone → row returned with phoneMatches=false, NO raw phone in payload", async () => {
+    const sb = mockSb({ discoverRows: () => [discoverRow({ phone_matches: false })] });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await app.fetch(
+      new Request("http://t/api/pwp-codes/available?code=PWP-9999ZZZZ&phone=0199999999", {
+        headers: { Authorization: `Bearer ${await makeJwt()}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { vouchers: Array<Record<string, unknown>> };
+    expect(body.vouchers[0]!.phoneMatches).toBe(false);
+    // The serialized response can NEVER contain a bound phone (PII oracle closed).
+    expect(JSON.stringify(body)).not.toContain("boundCustomerPhone");
+    const call = (sb._rpcCalls as Array<{ name: string; args: { p_code: string | null } }>).find(
+      (c) => c.name === "pwp_discover_available",
+    );
+    expect(call?.args.p_code).toBe("PWP-9999ZZZZ");
+  });
+
+  it("a discovery RPC error → 500", async () => {
+    const sb = mockSb();
+    sb.rpc = async (name: string, args: unknown) => {
+      sb._rpcCalls.push({ name, args });
+      return { data: null, error: { message: "boom" } };
+    };
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await app.fetch(
+      new Request("http://t/api/pwp-codes/available?phone=0123456789", {
+        headers: { Authorization: `Bearer ${await makeJwt()}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(500);
   });
 });

@@ -125,6 +125,8 @@ describe("PromoTab — gating", () => {
                 rewardTargets: [],
                 qtyPerTrigger: 1,
                 active: true,
+                carryForward: true,
+                carryForwardDays: null,
               },
             ],
           })}
@@ -353,8 +355,8 @@ describe("PromoTab — PWP / promo rules", () => {
         <PromoTab
           catalog={makeCatalog({
             pwpRules: [
-              { id: "pwp-1", type: "pwp", triggerCategory: "mattress", triggerTargets: [{ modelId: MATTRESS_MODEL, scope: "model" }], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 1, active: true },
-              { id: "promo-1", type: "promo", triggerCategory: "sofa", triggerTargets: [], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 2, active: false },
+              { id: "pwp-1", type: "pwp", triggerCategory: "mattress", triggerTargets: [{ modelId: MATTRESS_MODEL, scope: "model" }], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 1, active: true, carryForward: true, carryForwardDays: null },
+              { id: "promo-1", type: "promo", triggerCategory: "sofa", triggerTargets: [], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 2, active: false, carryForward: true, carryForwardDays: null },
             ],
           })}
           isPrincipal={true}
@@ -373,7 +375,7 @@ describe("PromoTab — PWP / promo rules", () => {
         <PromoTab
           catalog={makeCatalog({
             pwpRules: [
-              { id: "pwp-1", type: "pwp", triggerCategory: "mattress", triggerTargets: [{ modelId: MATTRESS_MODEL, scope: "model" }], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 1, active: false },
+              { id: "pwp-1", type: "pwp", triggerCategory: "mattress", triggerTargets: [{ modelId: MATTRESS_MODEL, scope: "model" }], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 1, active: false, carryForward: true, carryForwardDays: null },
             ],
           })}
           isPrincipal={true}
@@ -400,7 +402,7 @@ describe("PromoTab — PWP / promo rules", () => {
         <PromoTab
           catalog={makeCatalog({
             pwpRules: [
-              { id: "pwp-1", type: "pwp", triggerCategory: "mattress", triggerTargets: [], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 1, active: true },
+              { id: "pwp-1", type: "pwp", triggerCategory: "mattress", triggerTargets: [], rewardCategory: "accessory", rewardTargets: [], qtyPerTrigger: 1, active: true, carryForward: true, carryForwardDays: null },
             ],
           })}
           isPrincipal={true}

@@ -596,13 +596,20 @@ export const pwpRuleSchema = z.object({
   rewardTargets: z.array(ruleTargetSchema),
   qtyPerTrigger: z.number().int().positive(),
   active: z.boolean(),
+  // P8d (0188) — cross-order carry-forward policy. `carryForward` true (default)
+  // = an unclaimed RESERVED voucher minted by this rule carries forward to the
+  // customer's next order; false = same-cart delete (P8c). `carryForwardDays` =
+  // optional expiry window (null = perpetual).
+  carryForward: z.boolean(),
+  carryForwardDays: z.number().int().positive().nullable(),
 });
 export type PwpRuleDto = z.infer<typeof pwpRuleSchema>;
 
 /** Create / patch a PWP rule. `triggerTargets` / `rewardTargets` ALLOW empty (an
  *  empty target list = the whole category — do NOT add `.min(1)`).
  *  `qtyPerTrigger` optional (server defaults to 1); `active` defaults false
- *  server-side. */
+ *  server-side. P8d (0188): `carryForward` optional (server defaults true) +
+ *  `carryForwardDays` optional/nullable (null = perpetual). */
 export const pwpRuleInput = z
   .object({
     type: z.enum(["pwp", "promo"]),
@@ -612,6 +619,9 @@ export const pwpRuleInput = z
     rewardTargets: z.array(ruleTargetSchema),
     qtyPerTrigger: z.number().int().positive().optional(),
     active: z.boolean().optional(),
+    // P8d (0188) — both optional; the server defaults carryForward true.
+    carryForward: z.boolean().optional(),
+    carryForwardDays: z.number().int().positive().nullable().optional(),
   })
   .strict();
 export type PwpRuleInput = z.infer<typeof pwpRuleInput>;
@@ -635,8 +645,12 @@ export type PwpCodeStatusValue = z.infer<typeof pwpCodeStatusSchema>;
 /** A `pwp_codes` row DTO (mirrors the `PwpCode` domain type, camelCased). The
  *  reconciler (`GET /mine`) + the reserve endpoint return arrays of these.
  *  `rewardTargets` is the rule's reward-scope snapshot ([] = whole category).
- *  The P8d cross-order fields (`sourceOrderId`/`customerId`) are always null in
- *  P8c. */
+ *  OWNER-SCOPED USE ONLY — this carries `boundCustomerPhone` (the bound customer's
+ *  PII). Cross-order discovery uses the stripped `pwpDiscoverDtoSchema` instead, so
+ *  a non-owner never receives a phone. P8d (0188) adds the cross-order binding
+ *  fields (`boundCustomerPhone` / `ownerDealerId` / `expiresAt`); `customerId`
+ *  remains permanently null (a P8c dormant artifact — the binding uses
+ *  `boundCustomerPhone`, not `customerId`; CF `pwp-customer-id-dead-column`). */
 export const pwpCodeSchema = z.object({
   code: z.string(),
   ruleId: z.string().uuid().nullable(),
@@ -650,13 +664,44 @@ export const pwpCodeSchema = z.object({
   claimGroup: z.string().uuid().nullable(),
   redeemedOrderId: z.string().uuid().nullable(),
   redeemedItemSku: z.string().nullable(),
-  // P8d cross-order columns — present, null in P8c.
+  // P8d cross-order columns.
   sourceOrderId: z.string().uuid().nullable(),
+  // Permanently null — the binding uses boundCustomerPhone, not customerId.
   customerId: z.string().uuid().nullable(),
+  // P8d (0188) — cross-order carry-forward binding (owner-scoped read only).
+  boundCustomerPhone: z.string().nullable(),
+  ownerDealerId: z.string().uuid().nullable(),
+  expiresAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type PwpCodeDto = z.infer<typeof pwpCodeSchema>;
+
+/** The STRIPPED cross-order DISCOVERY DTO (P8d, 0188) — the `/available` route's
+ *  return shape, mapped from `pwp_discover_available`. It deliberately OMITS
+ *  `boundCustomerPhone` / `ownerStaffId` / `triggerItemCode` / `redeemedItemSku` /
+ *  `customerId` — the structural guarantee that discovery cannot leak another
+ *  customer's PII. The phone match is the server-computed `phoneMatches` boolean,
+ *  so the stored phone is never returned (killing the `?code=` enumeration/PII
+ *  oracle). */
+export const pwpDiscoverDtoSchema = z.object({
+  code: z.string(),
+  ruleId: z.string().uuid().nullable(),
+  type: z.enum(["pwp", "promo"]),
+  rewardCategory: z.string(),
+  rewardTargets: z.array(ruleTargetSchema),
+  sourceOrderId: z.string().uuid().nullable(),
+  expiresAt: z.string().nullable(),
+  phoneMatches: z.boolean(),
+});
+export type PwpDiscoverDto = z.infer<typeof pwpDiscoverDtoSchema>;
+
+/** `GET /api/pwp-codes/available` response — the discovered AVAILABLE vouchers
+ *  (stripped). No selector (no phone + no code) => `{ vouchers: [] }`. */
+export const pwpDiscoverResponseSchema = z.object({
+  vouchers: z.array(pwpDiscoverDtoSchema),
+});
+export type PwpDiscoverResponse = z.infer<typeof pwpDiscoverResponseSchema>;
 
 /** POST /api/pwp-codes/reserve input — the trigger cart line just added/changed.
  *  The route reconciles (top-up / trim) the RESERVED set this line owns. */
@@ -682,13 +727,18 @@ export type PwpCodesResponse = z.infer<typeof pwpCodesResponseSchema>;
  *  reward, claimed RESERVED→USED at Confirm) + `claimGroup` (the per-submit
  *  correlation uuid). Both optional — a DORMANT / P8b-only line carries neither,
  *  so the marker stays byte-identical when no voucher is in play. `.passthrough()`
- *  keeps P8b's `type` / `triggerRef` fields (this schema only PINS the P8c
- *  additions; the order-path claim reads `code` + `claimGroup`). */
+ *  keeps P8b's `type` / `triggerRef` fields (this schema only PINS the P8c/P8d
+ *  additions; the order-path claim reads `code` + `claimGroup` + `crossOrder`).
+ *  P8d (0188) adds `crossOrder` (optional): when true, the bound `code` is an
+ *  AVAILABLE carry-forward voucher claimed via `pwp_claim_available_code` (phone-
+ *  bound), not a same-cart RESERVED code. Omitted/false => same-cart (byte-
+ *  identical to a P8c marker). */
 export const attrsPwpMarkerSchema = z
   .object({
     ruleId: z.string(),
     code: z.string().optional(),
     claimGroup: z.string().optional(),
+    crossOrder: z.boolean().optional(),
   })
   .passthrough();
 export type AttrsPwpMarker = z.infer<typeof attrsPwpMarkerSchema>;

@@ -227,6 +227,74 @@ describe("recomputePwpLines", () => {
     expect(marker).toEqual({ ruleId: "rule-1", type: "pwp", triggerRef: { name: "MATT-1", code: "MATT-1" } });
   });
 
+  // P8d (0188 §4.2 / §8.4) — the cross-order carry-through. `crossOrder` must
+  // survive the recompute (it routes Stage B to pwp_claim_available_code), but be
+  // ABSENT for a same-cart marker so a P8c-only line stays byte-identical.
+  it("P8d carry-through — a cross-order claim's attrs.pwp.crossOrder=true survives the recompute", async () => {
+    const sb = mockSb({
+      productSkus: [
+        skuRow("MATT-1"),
+        skuRow("BED-1", { model_id: BED_MODEL, product_models: { category: "bedframe" }, pwp_price: 300 }),
+      ],
+      rules: [ruleRow()],
+    });
+    const lines = [
+      line({ sku: "MATT-1", qty: 1 }),
+      line({
+        sku: "BED-1",
+        qty: 1,
+        unitPrice: 900,
+        attrs: {
+          pwp: {
+            ruleId: "rule-1",
+            code: "PWP-9999ZZZZ",
+            claimGroup: "22222222-2222-2222-2222-222222222222",
+            crossOrder: true,
+          },
+        },
+      }),
+    ];
+    const r = await recomputePwpLines(sb, lines);
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.lines[1]!.unitPrice).toBe(300);
+    expect(r.lines[1]!.attrs).toEqual({
+      pwp: {
+        ruleId: "rule-1",
+        type: "pwp",
+        triggerRef: { name: "MATT-1", code: "MATT-1" },
+        code: "PWP-9999ZZZZ",
+        claimGroup: "22222222-2222-2222-2222-222222222222",
+        crossOrder: true,
+      },
+    });
+  });
+
+  it("P8d carry-through — a same-cart claim's marker has NO crossOrder key (byte-identical to P8c)", async () => {
+    const sb = mockSb({
+      productSkus: [
+        skuRow("MATT-1"),
+        skuRow("BED-1", { model_id: BED_MODEL, product_models: { category: "bedframe" }, pwp_price: 300 }),
+      ],
+      rules: [ruleRow()],
+    });
+    const lines = [
+      line({ sku: "MATT-1", qty: 1 }),
+      line({
+        sku: "BED-1",
+        qty: 1,
+        unitPrice: 900,
+        // crossOrder OMITTED (a same-cart claim) — must NOT appear on the rebuild.
+        attrs: { pwp: { ruleId: "rule-1", code: "PWP-1234ABCD", claimGroup: "11111111-1111-1111-1111-111111111111" } },
+      }),
+    ];
+    const r = await recomputePwpLines(sb, lines);
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    const marker = (r.lines[1]!.attrs as { pwp: Record<string, unknown> }).pwp;
+    expect(marker).not.toHaveProperty("crossOrder");
+  });
+
   it("an ineligible claim (reward model not in the rule's reward scope) → bad_request pwp_not_eligible", async () => {
     const sb = mockSb({
       productSkus: [

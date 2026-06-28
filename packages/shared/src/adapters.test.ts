@@ -9,6 +9,8 @@ import {
   orderSupplierThreadFromRow,
   productSkuFromRow,
   pwpCodeFromRow,
+  pwpDiscoverFromRow,
+  pwpRuleFromRow,
   sofaComboFromRow,
   sofaCompartmentFromRow,
   specialDeliveryFeeRuleFromRow,
@@ -22,6 +24,8 @@ import type {
   OrderSupplierThreadRow,
   ProductSkuRow,
   PwpCodeRow,
+  PwpDiscoverRow,
+  PwpRuleRow,
   SofaComboPricingRow,
   SofaCompartmentRow,
   SpecialDeliveryFeeRuleRow,
@@ -774,6 +778,9 @@ describe("pwpCodeFromRow (0187)", () => {
       redeemed_item_sku: null,
       source_order_id: null,
       customer_id: null,
+      bound_customer_phone: null,
+      owner_dealer_id: null,
+      expires_at: null,
       created_at: "2026-06-28T00:00:00Z",
       updated_at: "2026-06-28T00:00:00Z",
       ...over,
@@ -797,9 +804,42 @@ describe("pwpCodeFromRow (0187)", () => {
       redeemedItemSku: null,
       sourceOrderId: null,
       customerId: null,
+      boundCustomerPhone: null,
+      ownerDealerId: null,
+      expiresAt: null,
       createdAt: "2026-06-28T00:00:00Z",
       updatedAt: "2026-06-28T00:00:00Z",
     });
+  });
+
+  it("(P8d 0188) maps the cross-order carry-forward binding fields on an AVAILABLE voucher", () => {
+    const out = pwpCodeFromRow(
+      baseRow({
+        status: "AVAILABLE",
+        cart_line_key: null,
+        source_order_id: "00000000-0000-0000-0000-0000000d0aa1",
+        bound_customer_phone: "123456789",
+        owner_dealer_id: "00000000-0000-0000-0000-0000000de001",
+        expires_at: "2026-07-28T00:00:00Z",
+      }),
+    );
+    expect(out.status).toBe("AVAILABLE");
+    expect(out.boundCustomerPhone).toBe("123456789");
+    expect(out.ownerDealerId).toBe("00000000-0000-0000-0000-0000000de001");
+    expect(out.expiresAt).toBe("2026-07-28T00:00:00Z");
+    expect(out.sourceOrderId).toBe("00000000-0000-0000-0000-0000000d0aa1");
+  });
+
+  it("(P8d 0188) defaults the binding fields to null when a pre-0188 row omits them", () => {
+    // Simulate a pre-0188 row / mock that has no binding columns at all.
+    const legacy = baseRow();
+    delete (legacy as Partial<PwpCodeRow>).bound_customer_phone;
+    delete (legacy as Partial<PwpCodeRow>).owner_dealer_id;
+    delete (legacy as Partial<PwpCodeRow>).expires_at;
+    const out = pwpCodeFromRow(legacy);
+    expect(out.boundCustomerPhone).toBeNull();
+    expect(out.ownerDealerId).toBeNull();
+    expect(out.expiresAt).toBeNull();
   });
 
   it("carries the claimed-stamp fields and a nulled owner (post-redemption audit row)", () => {
@@ -831,5 +871,90 @@ describe("pwpCodeFromRow (0187)", () => {
     expect(out.rewardTargets).toEqual([
       { scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] },
     ]);
+  });
+});
+
+describe("pwpRuleFromRow (0186 + 0188 carry-forward)", () => {
+  function baseRow(over: Partial<PwpRuleRow> = {}): PwpRuleRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      trigger_category: "MATTRESS",
+      trigger_targets: [] as unknown as PwpRuleRow["trigger_targets"],
+      reward_category: "BEDFRAME",
+      reward_targets: [] as unknown as PwpRuleRow["reward_targets"],
+      qty_per_trigger: 1,
+      active: true,
+      carry_forward: true,
+      carry_forward_days: null,
+      created_at: "2026-06-28T00:00:00Z",
+      updated_at: "2026-06-28T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("maps the carry-forward policy columns", () => {
+    const out = pwpRuleFromRow(baseRow({ carry_forward: false, carry_forward_days: 30 }));
+    expect(out.carryForward).toBe(false);
+    expect(out.carryForwardDays).toBe(30);
+  });
+
+  it("defaults carryForward to true / carryForwardDays to null when a pre-0188 row omits them", () => {
+    const legacy = baseRow();
+    delete (legacy as Partial<PwpRuleRow>).carry_forward;
+    delete (legacy as Partial<PwpRuleRow>).carry_forward_days;
+    const out = pwpRuleFromRow(legacy);
+    expect(out.carryForward).toBe(true);
+    expect(out.carryForwardDays).toBeNull();
+  });
+
+  it("coerces qty_per_trigger via Number() (PostgREST may serialize it as a string)", () => {
+    const out = pwpRuleFromRow(baseRow({ qty_per_trigger: "2" as unknown as number }));
+    expect(out.qtyPerTrigger).toBe(2);
+  });
+});
+
+describe("pwpDiscoverFromRow (0188 — the stripped cross-order DISCOVERY projection)", () => {
+  function baseRow(over: Partial<PwpDiscoverRow> = {}): PwpDiscoverRow {
+    return {
+      code: "PWP-9876ZZZZ",
+      rule_id: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      reward_category: "BEDFRAME",
+      reward_targets: [
+        { scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" },
+      ] as unknown as PwpDiscoverRow["reward_targets"],
+      source_order_id: "00000000-0000-0000-0000-0000000d0aa1",
+      expires_at: null,
+      phone_matches: true,
+      ...over,
+    };
+  }
+
+  it("maps the stripped projection snake→camel and parses reward_targets", () => {
+    const out = pwpDiscoverFromRow(baseRow());
+    expect(out).toEqual({
+      code: "PWP-9876ZZZZ",
+      ruleId: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      rewardCategory: "BEDFRAME",
+      rewardTargets: [{ scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" }],
+      sourceOrderId: "00000000-0000-0000-0000-0000000d0aa1",
+      expiresAt: null,
+      phoneMatches: true,
+    });
+  });
+
+  it("carries the server-computed phoneMatches=false and never any PII field", () => {
+    const out = pwpDiscoverFromRow(baseRow({ phone_matches: false }));
+    expect(out.phoneMatches).toBe(false);
+    // The structural PII guarantee: the discover shape has no bound phone / owner /
+    // trigger sku / customer id / redeemed sku keys.
+    expect(out).not.toHaveProperty("boundCustomerPhone");
+    expect(out).not.toHaveProperty("ownerStaffId");
+    expect(out).not.toHaveProperty("triggerItemCode");
+    expect(out).not.toHaveProperty("redeemedItemSku");
+    expect(out).not.toHaveProperty("customerId");
   });
 });

@@ -65,6 +65,8 @@ const pwpRule: PwpRuleDto = {
   rewardTargets: [],
   qtyPerTrigger: 1,
   active: true,
+  carryForward: true,
+  carryForwardDays: null,
 };
 const promoRule: PwpRuleDto = { ...pwpRule, id: "rule-promo", type: "promo" };
 

@@ -12,7 +12,6 @@ import {
   orderSchema,
   ordersListResponseSchema,
   orderStatusSchema,
-  PWP_CODES,
   setOpsAssignedLogisticInputSchema,
   setOrderAddressInputSchema,
   setOrderDateInputSchema,
@@ -32,6 +31,7 @@ import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
 import { recomputePwpLines } from "../lib/pwp-recompute";
 import { claimPwpCodesForLines } from "../lib/pwp-codes-claim";
+import { sweepReservedForSubmit } from "../lib/pwp-carry-forward";
 import type { AppEnv } from "../types";
 
 /**
@@ -339,7 +339,10 @@ ordersRouter.post("/", async (c) => {
   // userClient/RLS + the SECURITY DEFINER pwp_claim_code / pwp_release_codes RPCs
   // only — NEVER service_role. DORMANT: no line carries attrs.pwp.code → ZERO DB
   // call → claimedPwpCodes=[] → every rollback below is a no-op → byte-identical.
-  const pwpClaim = await claimPwpCodesForLines(sb, { id: auth.id }, pwp.lines);
+  // P8d (§4.2): pass the order's customer phone so a CROSS-order claim
+  // (attrs.pwp.crossOrder=true) can assert the phone binding in the DEFINER RPC.
+  // A same-cart claim ignores it (byte-identical to P8c).
+  const pwpClaim = await claimPwpCodesForLines(sb, { id: auth.id }, pwp.lines, parsed.data.customer.phone);
   if (pwpClaim.status === "server_error") {
     throw new HTTPException(500, { message: pwpClaim.message });
   }
@@ -353,13 +356,21 @@ ordersRouter.post("/", async (c) => {
       409,
     );
   }
-  // The rollback ledger for EVERY downstream post-claim early-exit (§4.5). A single
-  // atomic batch RPC reverses USED→RESERVED; empty ledger → early return (no RPC).
+  // The rollback ledger for EVERY downstream post-claim early-exit (§4.5). The
+  // ledger records each code's MODE (same-cart vs cross-order) so the rollback
+  // restores it to its CORRECT prior state: same-cart USED→RESERVED via
+  // `pwp_release_codes` (owner); cross-order USED→AVAILABLE via
+  // `pwp_release_available_code` (DEFINER, allowlist + claim_group bound — a
+  // committed-stamped code is NOT releasable there). Empty ledger → no RPC.
   const claimedPwpCodes = pwpClaim.claimed.map((cc) => cc.code);
+  const ownPwpCodes = pwpClaim.claimed.filter((cc) => !cc.crossOrder).map((cc) => cc.code);
+  const crossPwpCodes = pwpClaim.claimed.filter((cc) => cc.crossOrder).map((cc) => cc.code);
   const pwpClaimGroup = pwpClaim.claimGroup;
   const rollbackPwpClaims = async (): Promise<void> => {
-    if (claimedPwpCodes.length === 0) return;
-    await sb.rpc("pwp_release_codes", { p_codes: claimedPwpCodes });
+    if (ownPwpCodes.length > 0) await sb.rpc("pwp_release_codes", { p_codes: ownPwpCodes });
+    if (crossPwpCodes.length > 0 && pwpClaimGroup) {
+      await sb.rpc("pwp_release_available_code", { p_codes: crossPwpCodes, p_claim_group: pwpClaimGroup });
+    }
   };
 
   // Phase 4 (sofa engine) — server recompute + 0.5% drift-reject for any sofa
@@ -528,65 +539,65 @@ ordersRouter.post("/", async (c) => {
     throw new HTTPException(500, { message: "RPC did not return an order id" });
   }
 
-  // 0187 (PWP VOUCHER) — the CONFIRM-PASS (§4.4). At claim time the order had no
-  // id (create_order DB-generates it — a caller-minted id can't be threaded in
-  // without touching the RPC, which is forbidden), so each claimed code is USED
-  // with redeemed_order_id NULL but claim_group SET (the interim join key). Now the
-  // id is known: stamp the claimed codes (scoped by claim_group, so it reaches the
-  // rows even though redeemed_order_id is still NULL) then DELETE the unclaimed
-  // RESERVED codes for this cart's triggers. FAIL-CLOSED: a stamp error OR a short
-  // row (fewer stamped than claimed) → release the claims + 500 (the order
-  // committed but the lock record is inconsistent → the client retries cleanly).
-  // Runs via the table under RLS (owner-scoped) — only the claim + batch release
-  // go through the SECURITY DEFINER RPCs. DORMANT: no claimed codes → skipped.
+  // 0187/0188 (PWP VOUCHER) — the CONFIRM-PASS, now in TWO independent blocks
+  // (P8d §3.1, the BLOCKER fix). At claim time the order had no id (create_order
+  // DB-generates it — a caller-minted id can't be threaded in without touching the
+  // RPC), so each claimed code is USED with redeemed_order_id NULL but claim_group
+  // SET (the interim join key). Now the id is known.
+  let carryForwardWarning: string | undefined;
+
+  // BLOCK 1 — STAMP redeemed_order_id on the codes THIS submit claimed (own +
+  // cross-order). Runs ONLY when a reward was actually claimed. Via the DEFINER
+  // `pwp_stamp_redeemed` (code-allowlist bound) so it reaches a NON-owned cross-
+  // order USED code the owner-scoped table UPDATE could not (§4.4). FAIL-CLOSED:
+  // a stamp error OR a short row (fewer stamped than claimed) → release the claims
+  // + 500 (the order committed but the lock record is inconsistent → clean retry).
   if (claimedPwpCodes.length > 0 && pwpClaimGroup) {
-    const { data: stamped, error: stampErr } = await sb
-      .from(PWP_CODES)
-      .update({ redeemed_order_id: id, updated_at: new Date().toISOString() })
-      .eq("owner_staff_id", auth.id)
-      .eq("claim_group", pwpClaimGroup)
-      .eq("status", "USED")
-      .is("redeemed_order_id", null)
-      .select("code");
+    const { data: stampedN, error: stampErr } = await sb.rpc("pwp_stamp_redeemed", {
+      p_codes: claimedPwpCodes,
+      p_claim_group: pwpClaimGroup,
+      p_order_id: id,
+    });
     if (stampErr) {
       await rollbackPwpClaims();
       throw new HTTPException(500, {
         message: "Order created but PWP code stamp failed; please retry.",
       });
     }
-    if ((stamped?.length ?? 0) < claimedPwpCodes.length) {
+    if ((typeof stampedN === "number" ? stampedN : 0) < claimedPwpCodes.length) {
       await rollbackPwpClaims();
       throw new HTTPException(500, {
         message: "Order created but PWP code stamp incomplete; please retry.",
       });
     }
+  }
 
-    // SWEEP unclaimed RESERVED for this cart's triggers — UNION of two sources:
-    //   (a) the client-supplied pwpCartLineKeys (complete: also reaches a trigger
-    //       whose reward was NEVER claimed), and
-    //   (b) a server-derived fallback from the claimed codes' cart_line_key (so a
-    //       client that under-populates the field still cleans claimed triggers'
-    //       siblings). Correctness never hinges on the body field. P8c DELETEs the
-    //       surplus (P8d will instead flip RESERVED→AVAILABLE bound to the customer).
-    const bodyKeys = parsed.data.pwpCartLineKeys ?? [];
-    const { data: derivedRows } = await sb
-      .from(PWP_CODES)
-      .select("cart_line_key")
-      .eq("owner_staff_id", auth.id)
-      .eq("claim_group", pwpClaimGroup)
-      .eq("status", "USED");
-    const derivedKeys = ((derivedRows ?? []) as Array<{ cart_line_key: string | null }>)
-      .map((r) => r.cart_line_key)
-      .filter((k): k is string => Boolean(k));
-    const sweepKeys = Array.from(new Set([...bodyKeys, ...derivedKeys]));
-    if (sweepKeys.length > 0) {
-      await sb
-        .from(PWP_CODES)
-        .delete()
-        .eq("owner_staff_id", auth.id)
-        .eq("status", "RESERVED")
-        .in("cart_line_key", sweepKeys);
-    }
+  // BLOCK 2 (HOISTED OUT of the claims guard, §3.1) — the CARRY-FORWARD / DELETE
+  // SWEEP. Runs whenever the caller has ANY unclaimed RESERVED codes to dispose
+  // of, INDEPENDENT of whether a reward was claimed — so the headline scenario
+  // (buy a trigger, claim NOTHING this cart, carry a voucher to the next order)
+  // fires reliably. The in-scope RESERVED set is SERVER-DERIVED from the order's
+  // own trigger lines (`finalLines`), NOT the client `pwpCartLineKeys` hint (which
+  // is UNION'd as a belt). For each: active+carry rule + a captured phone → flip
+  // RESERVED→AVAILABLE bound to the customer (P8d); else DELETE (P8c). DORMANT: 0
+  // RESERVED rows → one indexed 0-row read, no write. A sweep failure does NOT
+  // roll back the COMMITTED order (the dangling RESERVED codes are harmless /
+  // reaper-cleaned) — log + continue, mirroring the post-commit "don't punish the
+  // client" philosophy.
+  const sweep = await sweepReservedForSubmit(sb, {
+    ownerStaffId: auth.id,
+    ownerDealerId: effectiveDealerId,
+    orderId: id,
+    customerPhone: parsed.data.customer.phone,
+    finalLines,
+    clientCartLineKeys: parsed.data.pwpCartLineKeys ?? [],
+  });
+  if (sweep.status === "server_error") {
+    console.error("pwp carry-forward sweep failed (non-fatal):", sweep.message);
+  } else if (sweep.softWarning) {
+    // A would-carry voucher was dropped for lack of a captured phone — surface it
+    // (response header, below) so the salesperson can re-capture + redeem manually.
+    carryForwardWarning = sweep.softWarning;
   }
 
   // Compose full response — same shape as GET /:id (lines + addons + history).
@@ -611,6 +622,13 @@ ordersRouter.post("/", async (c) => {
     addons: row.order_addons ?? [],
     history: row.order_history ?? [],
   });
+  // P8d (§3.3): surface the carry-forward soft-warning as a RESPONSE HEADER (NOT a
+  // body field — the 201 body stays a bare `orderSchema` so the POS parse is byte-
+  // identical). The POS reads the header to toast "N earned voucher(s) were not
+  // saved — capture the customer's phone to keep them." Absent on every other order.
+  if (carryForwardWarning) {
+    c.header("X-Pwp-Carry-Forward-Warning", encodeURIComponent(carryForwardWarning));
+  }
   return c.json(orderSchema.parse(order), 201);
 });
 

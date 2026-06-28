@@ -872,6 +872,13 @@ function PwpRuleForm({
   const [type, setType] = useState<PwpRuleDto["type"]>(rule?.type ?? "pwp");
   const [active, setActive] = useState(rule?.active ?? false);
   const [qtyPerTrigger, setQtyPerTrigger] = useState(String(rule?.qtyPerTrigger ?? 1));
+  // P8d (0188) — per-rule cross-order carry-forward policy. carryForward true
+  // (default) = an unclaimed voucher flips to AVAILABLE for the customer's next
+  // order; false = same-cart delete. carryForwardDays blank = no expiry.
+  const [carryForward, setCarryForward] = useState(rule?.carryForward ?? true);
+  const [carryForwardDays, setCarryForwardDays] = useState(
+    rule?.carryForwardDays != null ? String(rule.carryForwardDays) : "",
+  );
   const [triggerCategory, setTriggerCategory] = useState<ProductCategory>(
     rule?.triggerCategory ?? "mattress",
   );
@@ -887,7 +894,11 @@ function PwpRuleForm({
   const finalTrigger = finalizeRuleTargets(triggerTargets);
   const finalReward = finalizeRuleTargets(rewardTargets);
   const qtyNum = Math.floor(Number(qtyPerTrigger));
-  const valid = Number.isInteger(qtyNum) && qtyNum >= 1;
+  // P8d — blank = perpetual (null); otherwise a positive integer.
+  const daysTrimmed = carryForwardDays.trim();
+  const daysNum = daysTrimmed === "" ? null : Math.floor(Number(daysTrimmed));
+  const daysValid = daysNum === null || (Number.isInteger(daysNum) && daysNum >= 1);
+  const valid = Number.isInteger(qtyNum) && qtyNum >= 1 && daysValid;
 
   async function submit() {
     if (!valid) return;
@@ -899,6 +910,8 @@ function PwpRuleForm({
       rewardTargets: finalReward,
       qtyPerTrigger: qtyNum,
       active,
+      carryForward,
+      carryForwardDays: daysNum,
     };
     try {
       if (rule) {
@@ -950,6 +963,30 @@ function PwpRuleForm({
             data-testid="pwp-active"
           />
           Active
+        </label>
+        <label className="flex items-center gap-2 text-[13px] cursor-pointer pb-2">
+          <input
+            type="checkbox"
+            checked={carryForward}
+            onChange={(e) => setCarryForward(e.target.checked)}
+            className="w-4 h-4"
+            data-testid="pwp-carry-forward"
+          />
+          Carry forward unused vouchers to the customer&rsquo;s next order
+        </label>
+        <label className="block">
+          <span className="label block mb-1">Voucher valid for N days (blank = no expiry)</span>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            placeholder="no expiry"
+            value={carryForwardDays}
+            onChange={(e) => setCarryForwardDays(e.target.value)}
+            disabled={!carryForward}
+            className={`${INPUT_CLS} w-44`}
+            data-testid="pwp-carry-forward-days"
+          />
         </label>
       </div>
 

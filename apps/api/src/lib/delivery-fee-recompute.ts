@@ -6,6 +6,7 @@ import {
   SPECIAL_DELIVERY_FEE_RULES,
   SOFA_COMBO_PRICING,
   computeDeliveryFee,
+  phoneKey,
   specialModelsForLines,
   type DeliveryFeeConfig,
   type DeliveryFeeResult,
@@ -80,10 +81,11 @@ export type DeliveryRecomputeOutcome =
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
-/** Digits-only phone key for the same-customer comparison (mirrors the loose
- *  identity used elsewhere; an empty result means "no usable phone"). */
-const phoneKey = (p: string | null | undefined): string =>
-  (p ?? "").replace(/\D/g, "");
+// P8d (§6.4 dedup) — the same-customer phone key is the SHARED `phoneKey`
+// (digits-only) imported from @carres/shared, replacing the module-private const
+// that used to live here. Behaviour-identical (same /\D/g replace); delivery
+// follow-up is NOT switched to the MY-aware phoneKeyMy in P8d to avoid touching
+// shipped delivery behaviour (CF phone-canonicalization-unify).
 
 /** Phase 7 (free gifts) — a free line (an appended RM0 gift carrying
  *  `attrs.free_gift`, or an existing line freed by a campaign carrying
