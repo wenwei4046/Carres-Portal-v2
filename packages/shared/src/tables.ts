@@ -74,6 +74,21 @@ export const CATALOG_OPTION_POOLS    = "catalog_option_pools" as const;
 export const MODEL_DEFAULT_FREE_GIFTS = "model_default_free_gifts" as const;
 export const FREE_ITEM_CAMPAIGNS      = "free_item_campaigns" as const;
 
+// 0186 — 2990s Products parity Phase 8a: principal-owned PWP & Promo RULES
+// (trigger category/scope → reward category/scope @ qtyPerTrigger). The reward
+// PRICE lives per-SKU (product_skus.pwp_price) / per-sofa-combo
+// (sofa_combo_pricing.pwp_prices_by_height), NOT on the rule. DORMANT (active
+// default false; no order consumer yet) — P8a is the stateless foundation.
+export const PWP_RULES = "pwp_rules" as const;
+
+// 0187 — 2990s Products parity Phase 8c: the PWP voucher LEDGER (SAME-CART
+// state machine). One row = one reserved/claimed voucher slot; code is the PK
+// ("occupy-the-number" guarantee). RESERVED on a cart trigger; CLAIMED
+// (RESERVED→USED) at order Confirm via the pwp_claim_code RPC; unclaimed
+// RESERVED DELETEd at Confirm. Owner-scoped RLS. DORMANT (0 active pwp_rules →
+// 0 codes minted → orders byte-identical).
+export const PWP_CODES = "pwp_codes" as const;
+
 // ---------------------------------------------------------------------------
 // People / org tables
 // ---------------------------------------------------------------------------

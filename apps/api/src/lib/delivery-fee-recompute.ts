@@ -6,6 +6,7 @@ import {
   SPECIAL_DELIVERY_FEE_RULES,
   SOFA_COMBO_PRICING,
   computeDeliveryFee,
+  phoneKey,
   specialModelsForLines,
   type DeliveryFeeConfig,
   type DeliveryFeeResult,
@@ -80,20 +81,33 @@ export type DeliveryRecomputeOutcome =
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
-/** Digits-only phone key for the same-customer comparison (mirrors the loose
- *  identity used elsewhere; an empty result means "no usable phone"). */
-const phoneKey = (p: string | null | undefined): string =>
-  (p ?? "").replace(/\D/g, "");
+// P8d (§6.4 dedup) — the same-customer phone key is the SHARED `phoneKey`
+// (digits-only) imported from @carres/shared, replacing the module-private const
+// that used to live here. Behaviour-identical (same /\D/g replace); delivery
+// follow-up is NOT switched to the MY-aware phoneKeyMy in P8d to avoid touching
+// shipped delivery behaviour (CF phone-canonicalization-unify).
 
 /** Phase 7 (free gifts) — a free line (an appended RM0 gift carrying
  *  `attrs.free_gift`, or an existing line freed by a campaign carrying
  *  `attrs.free_item`) NEVER contributes to a delivery charge. No-funding is
  *  one-way: a free item alone must not trip a delivery base fee, and a free gift
  *  is not a deliverable the customer paid for. Excluded from the charged-category
- *  set + the cross-category span detection below. */
+ *  set + the cross-category span detection below.
+ *
+ *  Phase 8b (PWP / Promo) — a 'promo' PWP reward forced to RM0 is economically a
+ *  free line (a giveaway): excluded from delivery (no-funding) just like
+ *  free_gift / free_item. A 'pwp' reward (discounted, > 0) is a PAID deliverable
+ *  genuinely on the truck and DOES count. The `attrs.pwp.type` is set
+ *  SERVER-side by recomputePwpLines (the client marker was stripped + rebuilt),
+ *  so the predicate trusts only the canonical server value. A 'pwp' reward whose
+ *  configured pwp_price is genuinely 0 still counts (type==='pwp') — a deliberate
+ *  RM0 purchase is still a deliverable; only 'promo' (the gift) is no-funding. */
 function isFreeLine(attrs: Record<string, unknown> | null): boolean {
   if (!attrs) return false;
-  return Boolean(attrs.free_gift) || Boolean(attrs.free_item);
+  if (attrs.free_gift || attrs.free_item) return true;
+  const pwp = attrs.pwp as { type?: unknown } | undefined;
+  if (pwp && pwp.type === "promo") return true;
+  return false;
 }
 
 export async function recomputeDeliveryFee(

@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { X, Trash2, Minus, Plus, Package, Gift } from "lucide-react";
-import type { CatalogResponse } from "@carres/shared";
+import { useEffect, useState } from "react";
+import { X, Trash2, Minus, Plus, Package, Gift, Ticket } from "lucide-react";
+import type { CatalogResponse, PwpCodeDto, PwpDiscoverDto, PwpRuleDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
   step2Valid,
@@ -18,6 +18,18 @@ import {
   previewDefaultGifts,
   unmarkLineFree,
 } from "./free-line";
+import {
+  coveringPwpForLine,
+  isLinePwp,
+  linePwpCode,
+  linePwpCrossOrder,
+  linePwpRuleId,
+  markLinePwp,
+  markLinePwpWithAvailableCode,
+  markLinePwpWithCode,
+  pwpRewardPrice,
+  unmarkLinePwp,
+} from "./pwp-line";
 
 /** The combo key a line belongs to (set by `comboToDraftLines`), or null for a
  *  standalone (non-combo) line. */
@@ -30,6 +42,15 @@ function lineComboKey(l: DraftLine): string | null {
 function lineComboLabel(l: DraftLine): string {
   const v = (l.attrs as Record<string, unknown> | null)?.combo_label;
   return typeof v === "string" ? v : "Combo";
+}
+
+/** 0186 — true when the line is claimed under a 'promo' PWP rule (price forced to
+ *  0). A 'pwp' claim (discounted, > 0) shows its discounted price, not FREE. We
+ *  detect promo via the claim + a zeroed unit price (the server canonicalises
+ *  `attrs.pwp.type`, but the client marker only carries `ruleId`, so the price is
+ *  the reliable client-side promo signal). */
+function isPwpFreeLine(l: DraftLine, catalog: CatalogResponse): boolean {
+  return isLinePwp(l) && l.unitPrice === 0 && (catalog.pwpRules?.length ?? 0) > 0;
 }
 
 /**
@@ -45,6 +66,11 @@ export default function CartDrawer({
   onProceed,
   onClose,
   catalog,
+  pwpReservedCodes,
+  pwpClaimGroup,
+  customerPhone,
+  pwpAvailableVouchers,
+  onApplyVoucherCode,
 }: {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
@@ -54,6 +80,31 @@ export default function CartDrawer({
    *  "Make free" affordance. OPTIONAL: when absent (older callers / tests) the
    *  cart renders exactly as before — no gift rows, no Make-free. */
   catalog?: CatalogResponse;
+  /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (from /pwp-codes/mine).
+   *  P8c is Auto-Fill ONLY: a reward line offers "Apply" only when a RESERVED
+   *  code minted under its covering rule is free to bind; clicking binds the next
+   *  unconsumed code (RESERVED→USED at Confirm). OPTIONAL — absent → the PWP
+   *  toggle binds NO code (P8b-only preview, byte-identical). */
+  pwpReservedCodes?: PwpCodeDto[];
+  /** 0187 — the per-cart claimGroup correlation uuid stamped onto a bound reward
+   *  line's attrs.pwp.claimGroup. OPTIONAL (required to bind a code). */
+  pwpClaimGroup?: string;
+  /** 0188 (Phase 8d) — the cart's customer phone (from the CUSTOMER step). The
+   *  cross-order "Redeem saved voucher" affordance is gated on this being
+   *  non-empty (a cross-order voucher is phone-bound; the server re-asserts the
+   *  binding against the FINAL submitted phone). OPTIONAL — absent → the
+   *  cross-order affordance is hidden (only same-cart Auto-Fill shows). */
+  customerPhone?: string;
+  /** 0188 — the AVAILABLE carry-forward vouchers discovered for `customerPhone`
+   *  (the stripped, no-PII discovery DTO from /pwp-codes/available). A reward line
+   *  whose covering rule matches a `phoneMatches` voucher offers "Redeem saved
+   *  voucher". OPTIONAL — absent/empty → no auto-suggest. */
+  pwpAvailableVouchers?: PwpDiscoverDto[];
+  /** 0188 — the manual voucher-code lookup callback (the salesperson types/scans a
+   *  number). Returns the matching discovery DTO (server-validated phone match) or
+   *  null. OPTIONAL — absent → the manual-entry field is hidden (auto-suggest still
+   *  works from `pwpAvailableVouchers`). */
+  onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
 }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -85,10 +136,12 @@ export default function CartDrawer({
       lines: draft.lines.filter((l) => lineComboKey(l) !== comboKey),
     });
   }
-  // 0185 — flip a standalone line between paid and free-under-a-campaign. The
-  // helper parks/restores the real price + stamps/strips `attrs.free_item`; the
-  // server re-validates the claim + forces RM0 regardless (client price ignored).
-  function setLineFree(localId: string, next: DraftLine) {
+  // 0185 / 0186 — replace a standalone line with a re-priced copy. Used by both
+  // the free-item "Make free" toggle (parks/restores the real price + stamps/
+  // strips `attrs.free_item`) and the PWP "use PWP price" toggle (stamps/strips
+  // `attrs.pwp`). The server re-validates the claim + forces the price regardless
+  // (the client price is never trusted).
+  function replaceLine(localId: string, next: DraftLine) {
     onChange({ ...draft, lines: draft.lines.map((l) => (l.localId === localId ? next : l)) });
   }
 
@@ -110,6 +163,15 @@ export default function CartDrawer({
       comboOrder.push(key);
     }
     comboGroups.get(key)!.lines.push(l);
+  }
+
+  // 0187 — voucher codes already bound to a reward line in THIS cart. A RESERVED
+  // code already on one reward line must not be offered to another (one code = one
+  // reward); PwpRow picks the first RESERVED code under its rule that is NOT here.
+  const boundPwpCodes = new Set<string>();
+  for (const l of draft.lines) {
+    const c = linePwpCode(l);
+    if (c) boundPwpCodes.add(c);
   }
 
   const lineSub = cartLineSubtotal(draft.lines);
@@ -214,13 +276,33 @@ export default function CartDrawer({
 
                     {/* 0185 — free-item "Make free" affordance (eligible lines). */}
                     {catalog && (
-                      <MakeFreeRow line={l} catalog={catalog} onSet={setLineFree} />
+                      <MakeFreeRow line={l} catalog={catalog} onSet={replaceLine} />
+                    )}
+
+                    {/* 0186 — PWP / promo "Use PWP price" affordance (reward lines).
+                        Hidden once the line is claimed free (free-item wins — a
+                        line can't be both free AND PWP-priced). 0187 binds a
+                        RESERVED voucher code on claim (Auto-Fill). */}
+                    {catalog && !isLineFreeItem(l) && (
+                      <PwpRow
+                        line={l}
+                        lines={draft.lines}
+                        catalog={catalog}
+                        onSet={replaceLine}
+                        reservedCodes={pwpReservedCodes ?? []}
+                        consumedCodes={boundPwpCodes}
+                        claimGroup={pwpClaimGroup}
+                        customerPhone={customerPhone}
+                        availableVouchers={pwpAvailableVouchers ?? []}
+                        onApplyVoucherCode={onApplyVoucherCode}
+                      />
                     )}
                   </div>
 
-                  {/* Line price + remove (FREE when claimed under a campaign) */}
+                  {/* Line price + remove (FREE when free / promo-claimed, PWP price
+                      when claimed under a 'pwp' rule) */}
                   <div className="shrink-0 flex flex-col items-end gap-2 pt-0.5">
-                    {catalog && isLineFreeItem(l) ? (
+                    {catalog && (isLineFreeItem(l) || isPwpFreeLine(l, catalog)) ? (
                       <span
                         className="pill pill-confirmed"
                         data-testid={`cart-line-free-${l.localId}`}
@@ -505,6 +587,323 @@ function MakeFreeRow({
           {c.name}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * 0186 — the per-line PWP / promo "Use PWP price" control. Renders nothing unless
+ * the line is grantable under ≥1 ACTIVE pwp_rule right now (a qualifying TRIGGER
+ * is in the cart with spare allowance + the reward scope + a usable reward price)
+ * OR the line is already PWP-claimed. A claimed line shows the rule + an "Undo";
+ * a grantable line shows a "Use PWP" / "Free" action per covering rule, previewing
+ * the EXACT price the server will force (the sku's pwpPrice, or FREE for promo).
+ * `coveringPwpForLine` runs the SAME shared `resolvePwp` the server runs, so the
+ * client never offers a claim the server would 409 (honest-pricing).
+ */
+function PwpRow({
+  line,
+  lines,
+  catalog,
+  onSet,
+  reservedCodes,
+  consumedCodes,
+  claimGroup,
+  customerPhone,
+  availableVouchers,
+  onApplyVoucherCode,
+}: {
+  line: DraftLine;
+  lines: DraftLine[];
+  catalog: CatalogResponse;
+  onSet: (localId: string, next: DraftLine) => void;
+  /** 0187 — the caller's RESERVED pwp_codes. Auto-Fill binds one on claim. */
+  reservedCodes: PwpCodeDto[];
+  /** 0187 — codes already bound to a reward line in this cart (don't re-offer). */
+  consumedCodes: Set<string>;
+  /** 0187 — the per-cart claimGroup stamped onto a bound line. */
+  claimGroup?: string;
+  /** 0188 — the cart's customer phone (CUSTOMER step). Gates the cross-order
+   *  affordances (a cross-order voucher is phone-bound; the server re-asserts). */
+  customerPhone?: string;
+  /** 0188 — AVAILABLE carry-forward vouchers discovered for the customer phone. */
+  availableVouchers: PwpDiscoverDto[];
+  /** 0188 — manual voucher-code lookup callback (type/scan a number). */
+  onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
+}) {
+  const claimed = isLinePwp(line);
+
+  if (claimed) {
+    const claimedId = linePwpRuleId(line);
+    const rule = (catalog.pwpRules ?? []).find((r) => r.id === claimedId);
+    // 0188 — a cross-order (carry-forward) binding reads "Saved voucher"; a
+    // same-cart / P8b claim reads "PWP" / "Promo" as before.
+    const cross = linePwpCrossOrder(line);
+    const label = cross
+      ? rule?.type === "promo"
+        ? "Saved voucher · FREE"
+        : `Saved voucher · ${rm(line.unitPrice)}`
+      : rule?.type === "promo"
+        ? "Promo · FREE"
+        : `PWP · ${rm(line.unitPrice)}`;
+    return (
+      <div className="flex items-center gap-2 mt-2" data-testid={`pwp-claimed-${line.localId}`}>
+        <span className="t-tiny text-primary">{label}</span>
+        <button
+          type="button"
+          onClick={() => onSet(line.localId, unmarkLinePwp(line))}
+          className="t-tiny text-base-500 underline hover:text-base-900"
+          data-testid={`undo-pwp-${line.localId}`}
+        >
+          Undo
+        </button>
+      </div>
+    );
+  }
+
+  const covering = coveringPwpForLine(line, lines, catalog);
+  if (covering.length === 0) return null;
+
+  // 0187 — P8c is Auto-Fill ONLY: a covering rule is offerable only when a
+  // RESERVED code minted under it is free to bind (not already on another reward
+  // line + a claimGroup is present). The first free code under each rule backs the
+  // claim. When NO reserved codes / claimGroup are wired (DORMANT / P8b-only / a
+  // test without the voucher props), we fall back to the P8b code-less claim so
+  // the price preview still works (the server forces price either way).
+  const hasVoucherLayer = typeof claimGroup === "string" && claimGroup.length > 0;
+  function freeCodeFor(ruleId: string): string | null {
+    const hit = reservedCodes.find(
+      (rc) => rc.ruleId === ruleId && rc.status === "RESERVED" && !consumedCodes.has(rc.code),
+    );
+    return hit?.code ?? null;
+  }
+
+  const coveringIds = new Set(covering.map((r) => r.id));
+  return (
+    <div className="flex flex-col gap-1.5 mt-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="t-tiny text-base-400">Use PWP:</span>
+        {covering.map((rule) => {
+          const price = pwpRewardPrice(line, catalog, rule) ?? 0;
+          const tag = rule.type === "promo" ? "FREE" : rm(price);
+          const code = freeCodeFor(rule.id);
+          // With the voucher layer on, the offer is disabled until a RESERVED code
+          // exists for this rule. Without the layer (DORMANT/test) it stays enabled
+          // and binds no code — byte-identical to P8b.
+          const disabled = hasVoucherLayer && !code;
+          const onClick = () => {
+            if (hasVoucherLayer && code && claimGroup) {
+              onSet(line.localId, markLinePwpWithCode(line, rule, price, code, claimGroup));
+            } else if (!hasVoucherLayer) {
+              onSet(line.localId, markLinePwp(line, rule, price));
+            }
+          };
+          return (
+            <button
+              key={rule.id}
+              type="button"
+              disabled={disabled}
+              onClick={onClick}
+              title={disabled ? "Buy the trigger product to unlock this voucher" : undefined}
+              className="inline-flex items-center gap-1 rounded-[4px] border border-primary/40 bg-primary/5 px-2 py-0.5 text-[11px] text-primary hover:border-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-primary/40"
+              data-testid={`pwp-toggle-${line.localId}-${rule.id}`}
+            >
+              {tag}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 0188 — the CROSS-ORDER (carry-forward) voucher affordance. Phone-gated:
+          a cross-order voucher is bound to the customer's phone; the server
+          re-asserts the binding against the FINAL submitted phone, so the client
+          gate is UX-only (the security gate is server-side). Shows nothing unless
+          the cart has a customer phone AND a covering rule applies. */}
+      {hasVoucherLayer && claimGroup && (
+        <PwpCrossOrderRow
+          line={line}
+          covering={coveringIds}
+          coveringRules={covering}
+          catalog={catalog}
+          onSet={onSet}
+          claimGroup={claimGroup}
+          customerPhone={customerPhone}
+          availableVouchers={availableVouchers}
+          consumedCodes={consumedCodes}
+          onApplyVoucherCode={onApplyVoucherCode}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * 0188 (Phase 8d) — the CROSS-ORDER (carry-forward) voucher row inside `PwpRow`.
+ * Two affordances, both gated on a captured customer phone:
+ *  (a) Auto-suggest — for each covering rule, an AVAILABLE voucher discovered for
+ *      the customer's phone (`phoneMatches === true`, same `ruleId`, not already
+ *      bound in this cart) is offered as "Redeem saved voucher (RM…/FREE)".
+ *      Clicking binds it via `markLinePwpWithAvailableCode` (crossOrder: true).
+ *  (b) Manual entry — a small text field to type/scan a voucher number. On Apply,
+ *      `onApplyVoucherCode` server-validates (it returns the stripped DTO + the
+ *      server-computed `phoneMatches`); a phone-matched code covering this line
+ *      binds, else an inline message ("different customer" / "not found").
+ * The raw bound phone is NEVER on the client — discovery returns only booleans +
+ * the stripped projection (the §1 PII fix). The server re-validates + forces the
+ * price regardless.
+ */
+function PwpCrossOrderRow({
+  line,
+  covering,
+  coveringRules,
+  catalog,
+  onSet,
+  claimGroup,
+  customerPhone,
+  availableVouchers,
+  consumedCodes,
+  onApplyVoucherCode,
+}: {
+  line: DraftLine;
+  covering: Set<string>;
+  coveringRules: PwpRuleDto[];
+  catalog: CatalogResponse;
+  onSet: (localId: string, next: DraftLine) => void;
+  claimGroup: string;
+  customerPhone?: string;
+  availableVouchers: PwpDiscoverDto[];
+  consumedCodes: Set<string>;
+  onApplyVoucherCode?: (code: string) => Promise<PwpDiscoverDto | null>;
+}) {
+  const [manualCode, setManualCode] = useState("");
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [manualBusy, setManualBusy] = useState(false);
+
+  const hasPhone = Boolean((customerPhone ?? "").trim());
+
+  // Phone not yet captured → a hint to enter it at the CUSTOMER step. (No
+  // discovery happens client-side; the security gate is server-side regardless.)
+  if (!hasPhone) {
+    return (
+      <p
+        className="t-tiny text-base-400 italic"
+        data-testid={`pwp-cross-need-phone-${line.localId}`}
+      >
+        Enter the customer's phone (step 2) to redeem a saved voucher.
+      </p>
+    );
+  }
+
+  /** The rule (covering this line) backing voucher `v`, with the previewed price. */
+  function ruleForVoucher(v: PwpDiscoverDto): { rule: PwpRuleDto; price: number } | null {
+    if (!v.ruleId || !covering.has(v.ruleId)) return null;
+    const rule = coveringRules.find((r) => r.id === v.ruleId);
+    if (!rule) return null;
+    return { rule, price: pwpRewardPrice(line, catalog, rule) ?? 0 };
+  }
+
+  // Auto-suggest: phone-matched AVAILABLE vouchers whose rule covers this line +
+  // not already bound to another reward line in this cart.
+  const suggestions = availableVouchers.filter(
+    (v) => v.phoneMatches && !consumedCodes.has(v.code) && ruleForVoucher(v) !== null,
+  );
+
+  function bind(v: PwpDiscoverDto) {
+    const hit = ruleForVoucher(v);
+    if (!hit) return;
+    onSet(line.localId, markLinePwpWithAvailableCode(line, hit.rule, hit.price, v.code, claimGroup));
+  }
+
+  async function applyManual() {
+    const code = manualCode.trim();
+    if (!code || !onApplyVoucherCode) return;
+    setManualBusy(true);
+    setManualError(null);
+    try {
+      const v = await onApplyVoucherCode(code);
+      if (!v) {
+        setManualError("Voucher not found, already used, or expired.");
+        return;
+      }
+      if (consumedCodes.has(v.code)) {
+        setManualError("This voucher is already applied to a line in this cart.");
+        return;
+      }
+      if (!v.phoneMatches) {
+        setManualError("This voucher belongs to a different customer.");
+        return;
+      }
+      if (ruleForVoucher(v) === null) {
+        setManualError("This voucher doesn't apply to this product.");
+        return;
+      }
+      bind(v);
+      setManualCode("");
+    } catch {
+      setManualError("Couldn't check that voucher — please retry.");
+    } finally {
+      setManualBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5" data-testid={`pwp-cross-${line.localId}`}>
+      {suggestions.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="t-tiny text-base-400">Saved:</span>
+          {suggestions.map((v) => {
+            const hit = ruleForVoucher(v)!;
+            const tag = hit.rule.type === "promo" ? "FREE" : rm(hit.price);
+            return (
+              <button
+                key={v.code}
+                type="button"
+                onClick={() => bind(v)}
+                className="inline-flex items-center gap-1 rounded-[4px] border border-accent/40 bg-accent/5 px-2 py-0.5 text-[11px] text-accent hover:border-accent transition-colors"
+                data-testid={`pwp-cross-suggest-${line.localId}-${v.code}`}
+                title="Redeem this customer's saved voucher"
+              >
+                <Ticket size={12} strokeWidth={1.75} />
+                Redeem saved · {tag}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {onApplyVoucherCode && (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={manualCode}
+            onChange={(e) => {
+              setManualCode(e.target.value);
+              if (manualError) setManualError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void applyManual();
+            }}
+            placeholder="Voucher code"
+            aria-label="Apply voucher code"
+            className="w-32 rounded-[4px] border border-base-200 px-2 py-0.5 font-mono text-[11px] text-base-900 placeholder:text-base-400 focus:border-base-400 focus:outline-none"
+            data-testid={`pwp-cross-input-${line.localId}`}
+          />
+          <button
+            type="button"
+            onClick={() => void applyManual()}
+            disabled={manualBusy || !manualCode.trim()}
+            className="inline-flex items-center rounded-[4px] border border-base-300 px-2 py-0.5 text-[11px] text-base-700 hover:border-base-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            data-testid={`pwp-cross-apply-${line.localId}`}
+          >
+            {manualBusy ? "…" : "Apply"}
+          </button>
+        </div>
+      )}
+      {manualError && (
+        <p className="t-tiny text-warning" data-testid={`pwp-cross-error-${line.localId}`}>
+          {manualError}
+        </p>
+      )}
     </div>
   );
 }

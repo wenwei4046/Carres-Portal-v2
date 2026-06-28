@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import type { CreateOrderInput, Order } from "@carres/shared";
+import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
 import { maxLeadDaysFor } from "@carres/shared";
+import { apiFetch } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import CarresLockup from "@/components/CarresLockup";
 import { deliveryFeePreview } from "@/lib/order-totals";
@@ -12,10 +13,15 @@ import {
   useCatalog,
   useCreateOrder,
   useDealerSelf,
+  useFreePwpCode,
   useOutlets,
   useProceedOrder,
+  usePwpAvailableForPhone,
+  usePwpCodesMine,
+  useReservePwpCode,
   useSalespersons,
 } from "@/lib/queries";
+import { triggerLinesInCart, type PwpTriggerLine } from "./pos/pwp-line";
 import { extensionForMime, uploadDataUrl } from "@/lib/storage";
 import {
   type WizardDraft,
@@ -40,6 +46,33 @@ import { cartItemCount, cartTotalExStair } from "./pos/cart";
 /** True when a restored draft has real content worth resuming. */
 function draftHasContent(d: WizardDraft): boolean {
   return d.lines.length > 0 || d.addons.length > 0 || d.customer.name.trim().length > 0;
+}
+
+/**
+ * 0187 (Phase 8c) — a fresh per-cart claimGroup correlation UUID. Unlike the
+ * draft's `newLocalId` (a client-only text key), this value is sent to the
+ * `p_claim_group uuid` RPC arg + the `pwp_codes.claim_group uuid` column, so the
+ * fallback MUST also be a valid uuid v4 — a non-uuid would fail Postgres text→uuid
+ * coercion (22P02) at claim time (review MINOR). Production browsers always have
+ * `crypto.randomUUID`; the `getRandomValues` v4 polyfill covers JSDOM / older
+ * runtimes so the shape is always a uuid (matching `pwpCodeSchema.claimGroup`'s
+ * `.uuid()`). */
+function newClaimGroup(): string {
+  const c = typeof crypto !== "undefined" ? crypto : undefined;
+  if (c && typeof c.randomUUID === "function") {
+    return c.randomUUID();
+  }
+  // RFC 4122 v4 from getRandomValues (uuid-shaped fallback).
+  const b = new Uint8Array(16);
+  if (c && typeof c.getRandomValues === "function") {
+    c.getRandomValues(b);
+  } else {
+    for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+  }
+  b[6] = (b[6]! & 0x0f) | 0x40; // version 4
+  b[8] = (b[8]! & 0x3f) | 0x80; // variant 10
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0"));
+  return `${h[0]}${h[1]}${h[2]}${h[3]}-${h[4]}${h[5]}-${h[6]}${h[7]}-${h[8]}${h[9]}-${h[10]}${h[11]}${h[12]}${h[13]}${h[14]}${h[15]}`;
 }
 
 /**
@@ -99,6 +132,20 @@ export default function DealerPos({
   const createOrder = useCreateOrder();
   const proceedOrder = useProceedOrder();
 
+  // ── 0187 (Phase 8c) — the per-CART claimGroup correlation uuid. ONE per cart
+  // submit (§6.3): every coded reward line shares it (the server enforces the
+  // agreement) + it is threaded onto each `attrs.pwp.claimGroup`. Minted LAZILY
+  // (review MINOR) on first read via getClaimGroup() — so a dormant / non-PWP cart
+  // never runs crypto.randomUUID(); reset on startAnotherOrder / discardDraft so a
+  // new cart gets a fresh group. Stored in a ref (no re-render) — the CartDrawer
+  // reads it when a voucher is bound; the same value is on the bound lines' attrs
+  // already at submit, so handleSubmit doesn't need to re-stamp it. */
+  const claimGroupRef = useRef<string>("");
+  const getClaimGroup = useCallback((): string => {
+    if (!claimGroupRef.current) claimGroupRef.current = newClaimGroup();
+    return claimGroupRef.current;
+  }, []);
+
   const { effectiveDealerId, bodyDealerId } = resolveActingDealer(actingDealerId, dealerId);
   // useDealerSelf 403s for a principal (no own dealer) — skip it when acting.
   const dealerQ = useDealerSelf({ enabled: !actingDealerId });
@@ -124,6 +171,105 @@ export default function DealerPos({
     void catalogQ.refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── 0187 (Phase 8c) — the PWP voucher reserve reconciler. ────────────────────
+  // DORMANT-aware: the reserve traffic only exists when the catalog carries
+  // ACTIVE pwp_rules. With 0 active rules `pwpActive` is false → the /mine query
+  // is disabled AND the reconciler short-circuits, so a no-PWP cart makes ZERO
+  // reserve calls (byte-identical). The voucher rail reads this RESERVED set.
+  const pwpActive = useMemo(
+    () => (catalogQ.data?.pwpRules ?? []).some((r) => r.active),
+    [catalogQ.data],
+  );
+  const reservedCodesQ = usePwpCodesMine({ enabled: pwpActive && !submitted });
+  const reservePwp = useReservePwpCode();
+  const freePwp = useFreePwpCode();
+
+  // ── 0188 (Phase 8d) — cross-order voucher DISCOVERY (auto-suggest by phone). ──
+  // The customer's phone is captured at the CUSTOMER step; the cart's cross-order
+  // affordance auto-suggests AVAILABLE carry-forward vouchers bound to that phone.
+  // Gated on (PWP active AND a phone is present) so a DORMANT / phone-less cart
+  // makes ZERO discovery traffic. The stripped (no-PII) DTO; the server computes
+  // the phone match. The cross-order claim is re-validated server-side at Confirm.
+  const customerPhone = draft.customer.phone.trim();
+  const pwpAvailableQ = usePwpAvailableForPhone(
+    { phone: customerPhone },
+    { enabled: pwpActive && !submitted && customerPhone.length > 0 },
+  );
+
+  // Manual voucher-code lookup (the salesperson types / scans a number). Imperative
+  // (not a hook) — it fires only on Apply. Returns the stripped discovery DTO (with
+  // the server-computed phoneMatches) or null. The phone is included so the server
+  // can answer the binding without the client ever seeing the stored phone.
+  const lookupVoucherCode = useCallback(
+    async (code: string): Promise<PwpDiscoverDto | null> => {
+      const trimmed = code.trim();
+      if (!trimmed) return null;
+      const params = new URLSearchParams();
+      params.set("code", trimmed);
+      if (customerPhone) params.set("phone", customerPhone);
+      const res = await apiFetch<PwpDiscoverResponse>(
+        `/api/pwp-codes/available?${params.toString()}`,
+      );
+      return res.vouchers.find((v) => v.code === trimmed) ?? null;
+    },
+    [customerPhone],
+  );
+
+  // The trigger lines currently in the cart (keyed by localId). A trigger is a
+  // line whose sku matches an active rule's trigger scope (shared matcher). Empty
+  // when nothing is configured.
+  const triggerLines: PwpTriggerLine[] = useMemo(
+    () => (pwpActive && catalogQ.data ? triggerLinesInCart(draft.lines, catalogQ.data) : []),
+    [pwpActive, catalogQ.data, draft.lines],
+  );
+
+  // Debounced single-flight reconciler: diff the trigger set against the last
+  // reconciled snapshot (key → qty). New trigger / qty-up → reserve; removed /
+  // qty-down to 0 → free. Single-flight per cartLineKey via an in-flight ref, so
+  // reserves stay sequential (the §3.1 idempotency holds). Best-effort — a missed
+  // reserve just shows fewer codes in the rail; never blocks submit. */
+  const lastReconciledRef = useRef<Map<string, number>>(new Map());
+  const inFlightRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!pwpActive || submitted) return;
+    const handle = window.setTimeout(() => {
+      const prev = lastReconciledRef.current;
+      const next = new Map(triggerLines.map((t) => [t.cartLineKey, t]));
+
+      // Reserve new triggers + qty changes (sequential, single-flight per key).
+      for (const t of triggerLines) {
+        if (inFlightRef.current.has(t.cartLineKey)) continue;
+        if (prev.get(t.cartLineKey) === t.qty) continue; // unchanged → no-op
+        inFlightRef.current.add(t.cartLineKey);
+        reservePwp.mutate(
+          { cartLineKey: t.cartLineKey, sku: t.sku, qty: t.qty },
+          {
+            onSettled: () => {
+              inFlightRef.current.delete(t.cartLineKey);
+              lastReconciledRef.current.set(t.cartLineKey, t.qty);
+            },
+          },
+        );
+      }
+
+      // Free removed triggers (a key we reconciled before that's gone now).
+      for (const key of prev.keys()) {
+        if (next.has(key)) continue;
+        if (inFlightRef.current.has(key)) continue;
+        inFlightRef.current.add(key);
+        freePwp.mutate(key, {
+          onSettled: () => {
+            inFlightRef.current.delete(key);
+            lastReconciledRef.current.delete(key);
+          },
+        });
+      }
+    }, 250);
+    return () => window.clearTimeout(handle);
+    // reservePwp / freePwp are stable mutation handles; depend on the trigger set.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pwpActive, submitted, triggerLines]);
 
   // Auto-save on every draft change (except after submit, when it's cleared).
   useEffect(() => {
@@ -293,6 +439,12 @@ export default function DealerPos({
         ...((draft.crossCategorySourceSo ?? "").trim()
           ? { crossCategorySourceSo: draft.crossCategorySourceSo!.trim() }
           : {}),
+        // 0187 (Phase 8c) — the trigger cart-line keys whose RESERVED pwp_codes
+        // belong to THIS submit, so the server's Confirm-pass can DELETE the
+        // unclaimed RESERVED ones (the server also has a claim_group-derived
+        // fallback sweep). Empty on a DORMANT / no-PWP cart — equal to the schema
+        // default, so the server-side effect is byte-identical.
+        pwpCartLineKeys: triggerLines.map((t) => t.cartLineKey),
       };
 
       const created = await createOrder.mutateAsync(input);
@@ -315,12 +467,22 @@ export default function DealerPos({
     }
   }
 
+  // 0187 — a new/cleared cart gets a fresh claimGroup + reconciler snapshot, so
+  // the next order's vouchers never inherit the prior cart's correlation uuid.
+  // Clear (not re-mint) — getClaimGroup() lazily mints a fresh uuid on the next read.
+  function resetPwpReconciler() {
+    claimGroupRef.current = "";
+    lastReconciledRef.current = new Map();
+    inFlightRef.current = new Set();
+  }
+
   function startAnotherOrder() {
     setSubmitted(null);
     setSubmitError(null);
     setDraft(emptyDraft());
     setStep(1);
     setShowResume(false);
+    resetPwpReconciler();
   }
 
   function discardDraft() {
@@ -328,6 +490,7 @@ export default function DealerPos({
     setDraft(emptyDraft());
     setStep(1);
     setShowResume(false);
+    resetPwpReconciler();
   }
 
   function handleExit() {
@@ -449,6 +612,11 @@ export default function DealerPos({
               onProceed={() => setStep(2)}
               cartOpen={cartOpen}
               onCartOpenChange={setCartOpen}
+              pwpReservedCodes={reservedCodesQ.data?.codes ?? []}
+              pwpClaimGroup={pwpActive ? getClaimGroup() : undefined}
+              customerPhone={pwpActive ? customerPhone : undefined}
+              pwpAvailableVouchers={pwpAvailableQ.data?.vouchers ?? []}
+              onApplyVoucherCode={pwpActive ? lookupVoucherCode : undefined}
             />
           </div>
         ) : step === 2 ? (

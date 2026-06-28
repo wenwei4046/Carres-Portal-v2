@@ -221,6 +221,15 @@ export const createOrderInputSchema = z.object({
    *  validates the linked SO (exists / same customer / not cancelled / not
    *  already linked) before booking. */
   crossCategorySourceSo: z.string().nullable().optional(),
+  /** 0187 (2990s parity Phase 8c) — the trigger cart-line keys whose RESERVED
+   *  pwp_codes belong to THIS submit, so the order-path Confirm-pass can DELETE
+   *  the unclaimed ones. OPTIONAL + default [] (DORMANT). A server-derived
+   *  fallback (the claimed codes' own cart_line_key) cleans claimed triggers'
+   *  siblings even if a client omits this, so correctness never hinges on the
+   *  field; it makes the cleanup COMPLETE (also reaches triggers whose reward was
+   *  never claimed). Mirrors the additionalDeliveryFee / crossCategorySourceSo
+   *  precedent. */
+  pwpCartLineKeys: z.array(z.string()).optional().default([]),
 }).superRefine((data, ctx) => {
   // Phase 11.1 — Proceed date pairs with Delivery date. When the order is NOT
   // marked TBD, both dates are required and proceed date must be on/before the

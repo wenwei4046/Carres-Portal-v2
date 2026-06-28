@@ -85,6 +85,11 @@ export const productSkuSchema = z.object({
   // 0178 (sofa engine Phase 1) — nullable link to a sofa compartment type.
   // Additive/optional: pre-0178 serialized SKUs that don't carry it stay valid.
   compartmentId: z.string().uuid().nullable().optional(),
+  // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (the price a
+  // PWP-rule reward line is sold at). Mirrors `cost`: economic, nullable
+  // (null = no PWP price set). Additive/optional so pre-0186 serialized SKUs
+  // stay valid. DORMANT — no order consumer yet.
+  pwpPrice: z.number().nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
 
@@ -379,6 +384,10 @@ export const sofaComboSchema = z.object({
   pricesByHeight: z.record(z.string(), z.union([z.number(), z.null()])),
   // 0183 — per-seat-height cost benchmark (same shape); null = unset.
   costByHeight: z.record(z.string(), z.union([z.number(), z.null()])).nullable(),
+  // 0186 (PWP Phase 8a) — per-seat-height PWP reward price (same shape as
+  // pricesByHeight); null = unset. The price a PWP-rule reward sofa-combo is
+  // sold at. DORMANT — no order consumer yet.
+  pwpPricesByHeight: z.record(z.string(), z.union([z.number(), z.null()])).nullable(),
   label: z.string().nullable(),
   effectiveFrom: z.string(),
   active: z.boolean(),
@@ -400,6 +409,9 @@ export const sofaComboCreateInput = z
     // 0183 — optional per-height cost benchmark (principal-only); same
     // SOFA_HEIGHTS-keyed shape as pricesByHeight. null/omit = unset.
     costByHeight: sofaComboPricesByHeightSchema.nullable().optional(),
+    // 0186 — optional per-height PWP reward price (principal-only); same
+    // SOFA_HEIGHTS-keyed shape as pricesByHeight. null/omit = unset.
+    pwpPricesByHeight: sofaComboPricesByHeightSchema.nullable().optional(),
     label: z.string().trim().max(200).nullable().optional(),
     effectiveFrom: z.string().optional(),
     active: z.boolean().optional(),
@@ -560,6 +572,177 @@ export const freeItemCampaignInput = z
   .strict();
 export type FreeItemCampaignInput = z.infer<typeof freeItemCampaignInput>;
 
+// ---------------------------------------------------------------------------
+// 0186 — PWP & Promo RULES (2990s Products parity Phase 8a). Principal-owned.
+// A rule maps a trigger category/scope → a reward category/scope at a ratio
+// qtyPerTrigger. type 'pwp' = the reward is sold at its per-SKU pwp_price;
+// 'promo' = the reward is FREE. The reward PRICE is NOT on the rule — it lives
+// per-SKU (product_skus.pwp_price) / per-sofa-combo
+// (sofa_combo_pricing.pwp_prices_by_height). One schema, two consumers (§9.5):
+// the API validates these and the Maintenance UI reuses the exact same shapes.
+// DORMANT (active default false; no order consumer in P8a).
+// ---------------------------------------------------------------------------
+
+/** A `pwp_rules` row DTO (mirrors the engine's `PwpRule`, with a row `id` +
+ *  `active`). Trigger/reward scope are P6 RuleTarget[] (`[]` = the whole
+ *  category — the 2990s semantic; NO `.min(1)`, empty-within-a-category is
+ *  intentional for PWP). */
+export const pwpRuleSchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(["pwp", "promo"]),
+  triggerCategory: productCategorySchema,
+  triggerTargets: z.array(ruleTargetSchema),
+  rewardCategory: productCategorySchema,
+  rewardTargets: z.array(ruleTargetSchema),
+  qtyPerTrigger: z.number().int().positive(),
+  active: z.boolean(),
+  // P8d (0188) — cross-order carry-forward policy. `carryForward` true (default)
+  // = an unclaimed RESERVED voucher minted by this rule carries forward to the
+  // customer's next order; false = same-cart delete (P8c). `carryForwardDays` =
+  // optional expiry window (null = perpetual).
+  carryForward: z.boolean(),
+  carryForwardDays: z.number().int().positive().nullable(),
+});
+export type PwpRuleDto = z.infer<typeof pwpRuleSchema>;
+
+/** Create / patch a PWP rule. `triggerTargets` / `rewardTargets` ALLOW empty (an
+ *  empty target list = the whole category — do NOT add `.min(1)`).
+ *  `qtyPerTrigger` optional (server defaults to 1); `active` defaults false
+ *  server-side. P8d (0188): `carryForward` optional (server defaults true) +
+ *  `carryForwardDays` optional/nullable (null = perpetual). */
+export const pwpRuleInput = z
+  .object({
+    type: z.enum(["pwp", "promo"]),
+    triggerCategory: productCategorySchema,
+    triggerTargets: z.array(ruleTargetSchema),
+    rewardCategory: productCategorySchema,
+    rewardTargets: z.array(ruleTargetSchema),
+    qtyPerTrigger: z.number().int().positive().optional(),
+    active: z.boolean().optional(),
+    // P8d (0188) — both optional; the server defaults carryForward true.
+    carryForward: z.boolean().optional(),
+    carryForwardDays: z.number().int().positive().nullable().optional(),
+  })
+  .strict();
+export type PwpRuleInput = z.infer<typeof pwpRuleInput>;
+
+// ---------------------------------------------------------------------------
+// 0187 — PWP voucher LEDGER (2990s Products parity Phase 8c, SAME-CART state
+// machine). The pwp_codes DTO (the reconciler's read shape) + the reserve
+// request/response + the extended `attrs.pwp` reward-line marker. One schema,
+// two consumers (§9.5): the API validates these and the POS reuses the exact
+// same shapes. DORMANT — no codes minted until the principal authors active
+// pwp_rules. (The order-path claim runs as a separate post-P8b stage; the price
+// stays P8b-authoritative — see the design plan §0.)
+// ---------------------------------------------------------------------------
+
+/** The voucher status machine: RESERVED (minted on a cart trigger) → USED
+ *  (claimed at Confirm). 'AVAILABLE' ships for the P8d cross-order carry-forward
+ *  (written by nobody in P8c). */
+export const pwpCodeStatusSchema = z.enum(["RESERVED", "USED", "AVAILABLE"]);
+export type PwpCodeStatusValue = z.infer<typeof pwpCodeStatusSchema>;
+
+/** A `pwp_codes` row DTO (mirrors the `PwpCode` domain type, camelCased). The
+ *  reconciler (`GET /mine`) + the reserve endpoint return arrays of these.
+ *  `rewardTargets` is the rule's reward-scope snapshot ([] = whole category).
+ *  OWNER-SCOPED USE ONLY — this carries `boundCustomerPhone` (the bound customer's
+ *  PII). Cross-order discovery uses the stripped `pwpDiscoverDtoSchema` instead, so
+ *  a non-owner never receives a phone. P8d (0188) adds the cross-order binding
+ *  fields (`boundCustomerPhone` / `ownerDealerId` / `expiresAt`); `customerId`
+ *  remains permanently null (a P8c dormant artifact — the binding uses
+ *  `boundCustomerPhone`, not `customerId`; CF `pwp-customer-id-dead-column`). */
+export const pwpCodeSchema = z.object({
+  code: z.string(),
+  ruleId: z.string().uuid().nullable(),
+  type: z.enum(["pwp", "promo"]),
+  rewardCategory: z.string(),
+  rewardTargets: z.array(ruleTargetSchema),
+  status: pwpCodeStatusSchema,
+  ownerStaffId: z.string().uuid().nullable(),
+  cartLineKey: z.string().nullable(),
+  triggerItemCode: z.string().nullable(),
+  claimGroup: z.string().uuid().nullable(),
+  redeemedOrderId: z.string().uuid().nullable(),
+  redeemedItemSku: z.string().nullable(),
+  // P8d cross-order columns.
+  sourceOrderId: z.string().uuid().nullable(),
+  // Permanently null — the binding uses boundCustomerPhone, not customerId.
+  customerId: z.string().uuid().nullable(),
+  // P8d (0188) — cross-order carry-forward binding (owner-scoped read only).
+  boundCustomerPhone: z.string().nullable(),
+  ownerDealerId: z.string().uuid().nullable(),
+  expiresAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type PwpCodeDto = z.infer<typeof pwpCodeSchema>;
+
+/** The STRIPPED cross-order DISCOVERY DTO (P8d, 0188) — the `/available` route's
+ *  return shape, mapped from `pwp_discover_available`. It deliberately OMITS
+ *  `boundCustomerPhone` / `ownerStaffId` / `triggerItemCode` / `redeemedItemSku` /
+ *  `customerId` — the structural guarantee that discovery cannot leak another
+ *  customer's PII. The phone match is the server-computed `phoneMatches` boolean,
+ *  so the stored phone is never returned (killing the `?code=` enumeration/PII
+ *  oracle). */
+export const pwpDiscoverDtoSchema = z.object({
+  code: z.string(),
+  ruleId: z.string().uuid().nullable(),
+  type: z.enum(["pwp", "promo"]),
+  rewardCategory: z.string(),
+  rewardTargets: z.array(ruleTargetSchema),
+  sourceOrderId: z.string().uuid().nullable(),
+  expiresAt: z.string().nullable(),
+  phoneMatches: z.boolean(),
+});
+export type PwpDiscoverDto = z.infer<typeof pwpDiscoverDtoSchema>;
+
+/** `GET /api/pwp-codes/available` response — the discovered AVAILABLE vouchers
+ *  (stripped). No selector (no phone + no code) => `{ vouchers: [] }`. */
+export const pwpDiscoverResponseSchema = z.object({
+  vouchers: z.array(pwpDiscoverDtoSchema),
+});
+export type PwpDiscoverResponse = z.infer<typeof pwpDiscoverResponseSchema>;
+
+/** POST /api/pwp-codes/reserve input — the trigger cart line just added/changed.
+ *  The route reconciles (top-up / trim) the RESERVED set this line owns. */
+export const pwpReserveInputSchema = z
+  .object({
+    cartLineKey: z.string().min(1),
+    sku: z.string().min(1),
+    qty: z.number().int().positive(),
+  })
+  .strict();
+export type PwpReserveInput = z.infer<typeof pwpReserveInputSchema>;
+
+/** Reserve / `GET /mine` response — the FULL current RESERVED set (no match =>
+ *  `{ codes: [] }`). Keyed client-side by `cartLineKey`. */
+export const pwpCodesResponseSchema = z.object({
+  codes: z.array(pwpCodeSchema),
+});
+export type PwpCodesResponse = z.infer<typeof pwpCodesResponseSchema>;
+
+/** The reward-line `attrs.pwp` marker shape — EXTENDED for P8c. P8b canonicalises
+ *  the marker to `{ ruleId, type?, triggerRef? }`; P8c adds two OPTIONAL fields a
+ *  reward line may carry: `code` (the RESERVED voucher the POS bound to this
+ *  reward, claimed RESERVED→USED at Confirm) + `claimGroup` (the per-submit
+ *  correlation uuid). Both optional — a DORMANT / P8b-only line carries neither,
+ *  so the marker stays byte-identical when no voucher is in play. `.passthrough()`
+ *  keeps P8b's `type` / `triggerRef` fields (this schema only PINS the P8c/P8d
+ *  additions; the order-path claim reads `code` + `claimGroup` + `crossOrder`).
+ *  P8d (0188) adds `crossOrder` (optional): when true, the bound `code` is an
+ *  AVAILABLE carry-forward voucher claimed via `pwp_claim_available_code` (phone-
+ *  bound), not a same-cart RESERVED code. Omitted/false => same-cart (byte-
+ *  identical to a P8c marker). */
+export const attrsPwpMarkerSchema = z
+  .object({
+    ruleId: z.string(),
+    code: z.string().optional(),
+    claimGroup: z.string().optional(),
+    crossOrder: z.boolean().optional(),
+  })
+  .passthrough();
+export type AttrsPwpMarker = z.infer<typeof attrsPwpMarkerSchema>;
+
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
   skus: z.array(productSkuSchema),
@@ -591,6 +774,8 @@ export const catalogResponseSchema = z.object({
   // Pre-0185 clients that don't read these are wholly unaffected.
   modelDefaultFreeGifts: z.array(modelDefaultFreeGiftsSchema).optional(),
   freeItemCampaigns: z.array(freeItemCampaignSchema).optional(),
+  // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients unaffected.
+  pwpRules: z.array(pwpRuleSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 
@@ -685,6 +870,11 @@ export const productSkuCreateInput = z
     supplierId: z.string().uuid().nullable().optional(),
     description: z.string().trim().max(200).nullable().optional(),
     posActive: z.boolean().optional(),
+    // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (the price a
+    // PWP-rule reward line is sold at). Mirrors `cost`: economic, nullable.
+    // The route gate (gateSkuCreatePriceCost) + the DB trigger enforce
+    // principal-only; null/omit = unset.
+    pwpPrice: z.number().nonnegative().nullable().optional(),
   })
   .strict();
 export type ProductSkuCreateInput = z.infer<typeof productSkuCreateInput>;
@@ -701,6 +891,9 @@ export const productSkuPatchInput = z
     // 0170 — Edit-Prices / Modular toggle / inline description edit.
     posActive: z.boolean().optional(),
     description: z.string().trim().max(200).nullable().optional(),
+    // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (mirrors `cost`).
+    // Presence = intent to change → gated to principal in the route.
+    pwpPrice: z.number().nonnegative().nullable().optional(),
   })
   .strict();
 export type ProductSkuPatchInput = z.infer<typeof productSkuPatchInput>;

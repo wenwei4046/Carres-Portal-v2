@@ -4410,3 +4410,674 @@ describe("0185 — free gifts + free item campaigns (GET bundle + principal-gate
     expect(res.status).toBe(403);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 0186 — PWP & Promo rules (2990s Products parity Phase 8a). GET bundle exposure
+// (incl. the per-SKU pwp_price + per-sofa-combo pwp_prices_by_height read-through)
+// + principal-gated CRUD. Mirrors the 0185 free-item-campaigns block: buildSb for
+// the read bundle, buildWriteSb for the writes.
+// ---------------------------------------------------------------------------
+describe("0186 — PWP & Promo rules (GET bundle + principal-gated CRUD)", () => {
+  const RULE_A = "ee000000-0000-4000-8000-0000000000e1"; // active
+  const RULE_B = "ff000000-0000-4000-8000-0000000000f2"; // inactive
+  const pwpRow = (over: Record<string, unknown>) => ({
+    id: RULE_A,
+    type: "pwp",
+    trigger_category: "mattress",
+    trigger_targets: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+    reward_category: "accessory",
+    reward_targets: [],
+    qty_per_trigger: 1,
+    active: true,
+    created_at: "2026-02-01T00:00:00Z",
+    updated_at: "2026-02-01T00:00:00Z",
+    updated_by: null,
+    ...over,
+  });
+
+  it("GET /api/catalog returns pwpRules (mapped via pwpRuleFromRow, active-first)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        product_models: [
+          {
+            id: MODEL_ID_LIVE,
+            category: "mattress",
+            model_key: "carres-classic",
+            name: "Classic",
+            blurb: null,
+            colors: null,
+            gaps: null,
+            sofa_mode: null,
+            discontinued_at: null,
+          },
+        ],
+        product_skus: [],
+        sofa_fabrics: [],
+        addons: [],
+        floor_config: [
+          { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
+        ],
+        fabric_tier_addon_config: [
+          { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+        ],
+        model_fabric_tier_overrides: [],
+        pwp_rules: [
+          pwpRow({ id: RULE_B, type: "promo", active: false, created_at: "2026-01-01T00:00:00Z" }),
+          pwpRow({ id: RULE_A, type: "pwp", active: true, created_at: "2026-02-01T00:00:00Z" }),
+        ],
+      }),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+
+    // Both rules returned (inactive included); active-first ordering.
+    expect(body.pwpRules).toHaveLength(2);
+    expect(body.pwpRules?.map((r) => r.id)).toEqual([RULE_A, RULE_B]);
+    expect(body.pwpRules?.find((r) => r.id === RULE_A)).toMatchObject({
+      type: "pwp",
+      triggerCategory: "mattress",
+      triggerTargets: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+      rewardCategory: "accessory",
+      rewardTargets: [],
+      qtyPerTrigger: 1,
+      active: true,
+    });
+  });
+
+  it("GET /api/catalog surfaces pwp_price on a sku + pwp_prices_by_height on a sofa combo", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        product_models: [
+          {
+            id: MODEL_ID_LIVE,
+            category: "sofa",
+            model_key: "carres-sofa",
+            name: "Sofa",
+            blurb: null,
+            colors: null,
+            gaps: null,
+            sofa_mode: null,
+            discontinued_at: null,
+          },
+        ],
+        product_skus: [
+          {
+            id: "00000000-0000-0000-0000-00000000bb01",
+            model_id: MODEL_ID_LIVE,
+            sku: "CARRES-SOFA-2A",
+            variant: "2A",
+            variant_kind: "part",
+            price: 1500,
+            cost: null,
+            // 0186 — per-SKU PWP reward price rides in the bundle (POS preview).
+            pwp_price: "999.00",
+            supplier_id: null,
+            pos_active: true,
+          },
+        ],
+        sofa_fabrics: [],
+        addons: [],
+        floor_config: [
+          { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
+        ],
+        fabric_tier_addon_config: [
+          { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+        ],
+        model_fabric_tier_overrides: [],
+        sofa_combo_pricing: [
+          {
+            id: "00000000-0000-0000-0000-0000000f0001",
+            model_id: MODEL_ID_LIVE,
+            slots: [["2A(LHF)", "2A(RHF)"]],
+            tier: null,
+            prices_by_height: { "24": 2640 },
+            cost_by_height: null,
+            // 0186 — per-sofa-combo PWP reward price (per seat height).
+            pwp_prices_by_height: { "24": 1990 },
+            label: null,
+            effective_from: "2026-06-21",
+            active: true,
+            discontinued_at: null,
+            created_at: "2026-06-21T00:00:00Z",
+            updated_at: "2026-06-21T00:00:00Z",
+            updated_by: null,
+          },
+        ],
+      }),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    // The PWP reward price legitimately reaches the POS (read-exposure by design).
+    expect(body.skus[0]?.pwpPrice).toBe(999);
+    expect(body.sofaCombos?.[0]?.pwpPricesByHeight).toEqual({ "24": 1990 });
+  });
+
+  it("GET /api/catalog ships an empty pwpRules array when none are authored (dormant)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        product_models: [],
+        product_skus: [],
+        sofa_fabrics: [],
+        addons: [],
+        floor_config: [{ id: 1, free_up_to_floor: 2, per_floor_per_item: 50 }],
+        fabric_tier_addon_config: [
+          { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
+        ],
+        model_fabric_tier_overrides: [],
+      }),
+    );
+    const jwt = await makeJwt("dealer", DEALER_ID);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CatalogResponse;
+    expect(body.pwpRules).toEqual([]);
+  });
+
+  // ----- POST /pwp-rules -----
+
+  it("POST /pwp-rules — principal inserts → 201 (camel→snake; qty defaults 1, active defaults false)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: pwpRow({ active: false, qty_per_trigger: 1 }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/pwp-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "pwp",
+          triggerCategory: "mattress",
+          triggerTargets: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+          rewardCategory: "accessory",
+          // Empty rewardTargets = the whole category (allowed for PWP).
+          rewardTargets: [],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.table).toBe("pwp_rules");
+    expect(ins?.payload).toMatchObject({
+      type: "pwp",
+      trigger_category: "mattress",
+      trigger_targets: [{ scope: "model", modelId: MODEL_ID_LIVE }],
+      reward_category: "accessory",
+      reward_targets: [],
+      qty_per_trigger: 1,
+      active: false,
+    });
+    const body = (await res.json()) as { pwpRule: { type: string; active: boolean; qtyPerTrigger: number } };
+    expect(body.pwpRule).toMatchObject({ type: "pwp", active: false, qtyPerTrigger: 1 });
+  });
+
+  it("POST /pwp-rules — carry_forward defaults true / null when omitted (P8d, 0188)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: pwpRow({}) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/pwp-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "pwp",
+          triggerCategory: "mattress",
+          triggerTargets: [],
+          rewardCategory: "accessory",
+          rewardTargets: [],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.payload).toMatchObject({ carry_forward: true, carry_forward_days: null });
+  });
+
+  it("POST /pwp-rules — carry_forward=false + carry_forward_days=30 round-trip to the insert (P8d, 0188)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: pwpRow({ carry_forward: false, carry_forward_days: 30 }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/pwp-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "pwp",
+          triggerCategory: "mattress",
+          triggerTargets: [],
+          rewardCategory: "accessory",
+          rewardTargets: [],
+          carryForward: false,
+          carryForwardDays: 30,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect(ins?.payload).toMatchObject({ carry_forward: false, carry_forward_days: 30 });
+  });
+
+  it("POST /pwp-rules — bad input (qtyPerTrigger 0) → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/pwp-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "pwp",
+          triggerCategory: "mattress",
+          triggerTargets: [],
+          rewardCategory: "accessory",
+          rewardTargets: [],
+          qtyPerTrigger: 0,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("POST /pwp-rules — bad input (unknown type) → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/pwp-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "discount",
+          triggerCategory: "mattress",
+          triggerTargets: [],
+          rewardCategory: "accessory",
+          rewardTargets: [],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("POST /pwp-rules — non-principal → 403 (/Master Admin/i)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/pwp-rules", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "pwp",
+          triggerCategory: "mattress",
+          triggerTargets: [],
+          rewardCategory: "accessory",
+          rewardTargets: [],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  // ----- PATCH /pwp-rules/:id -----
+
+  it("PATCH /pwp-rules/:id — principal partial update → 200 (camel→snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: pwpRow({ active: true, qty_per_trigger: 2 }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/pwp-rules/${RULE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ active: true, qtyPerTrigger: 2 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.table).toBe("pwp_rules");
+    expect(upd?.payload).toMatchObject({ active: true, qty_per_trigger: 2 });
+    const body = (await res.json()) as { pwpRule: { active: boolean; qtyPerTrigger: number } };
+    expect(body.pwpRule).toMatchObject({ active: true, qtyPerTrigger: 2 });
+  });
+
+  it("PATCH /pwp-rules/:id — carry_forward=false + carry_forward_days=30 round-trip to the patch (P8d, 0188)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: pwpRow({ carry_forward: false, carry_forward_days: 30 }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/pwp-rules/${RULE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ carryForward: false, carryForwardDays: 30 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toMatchObject({ carry_forward: false, carry_forward_days: 30 });
+  });
+
+  it("PATCH /pwp-rules/:id — empty body → 422", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: pwpRow({}) }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/pwp-rules/${RULE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("PATCH /pwp-rules/:id — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/pwp-rules/${RULE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ active: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH /pwp-rules/:id — missing row → 404", async () => {
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ writeReturn: null }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/pwp-rules/${RULE_A}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ active: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  // ----- DELETE /pwp-rules/:id -----
+
+  it("DELETE /pwp-rules/:id — HARD delete → 200 { ok: true }", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/pwp-rules/${RULE_A}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const del = recorded.find((r) => r.op === "delete");
+    expect(del?.table).toBe("pwp_rules");
+  });
+
+  it("DELETE /pwp-rules/:id — non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/pwp-rules/${RULE_A}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0186 — per-SKU pwp_price + per-sofa-combo pwp_prices_by_height write paths
+// (the EXISTING principal-gated sku / sofa-combo update routes). pwp_price joins
+// the 0175 price/cost principal lock; pwp_prices_by_height rides the already
+// principal-only sofa-combo routes (mirrors 0183 cost_by_height).
+// ---------------------------------------------------------------------------
+describe("0186 — pwp_price + pwp_prices_by_height write paths", () => {
+  const SKU_ID = "00000000-0000-0000-0000-00000000bb01";
+  const SOFA_COMBO_ID = "00000000-0000-0000-0000-0000000f0001";
+
+  const skuRow = (over: Record<string, unknown> = {}) => ({
+    id: SKU_ID,
+    model_id: MODEL_ID_LIVE,
+    sku: "CARRES-CLASSIC-Queen",
+    variant: "queen",
+    variant_kind: "size",
+    price: 1500,
+    cost: null,
+    pwp_price: null,
+    supplier_id: null,
+    discontinued_at: null,
+    pos_active: true,
+    description: null,
+    ...over,
+  });
+
+  it("PATCH /skus/:id — principal sets pwp_price → 200 (camelCase pwpPrice → snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: skuRow({ pwp_price: 999 }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pwpPrice: 999 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toEqual({ pwp_price: 999 });
+  });
+
+  it("PATCH /skus/:id — pwpPrice:null (clearing) by a non-principal → 403 (joins the 0175 lock)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pwpPrice: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("PATCH /skus/:id — WITHOUT pwpPrice does NOT write pwp_price (no clobber)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: skuRow({ pos_active: false }) }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ posActive: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).not.toHaveProperty("pwp_price");
+  });
+
+  it("POST /skus — a sku WITH pwpPrice by a non-principal → 403", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Twin",
+          variantKind: "size",
+          price: 0,
+          pwpPrice: 999,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("POST /skus — principal seeds pwp_price → 201 (camel→snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-classic" },
+          ],
+          suppliers: [
+            { id: "00000000-0000-0000-0000-00000000ff01", cat_covered: ["mattress"] },
+          ],
+        },
+        recorded,
+        writeReturn: skuRow({ pwp_price: 999, price: 2400 }),
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "Twin",
+          variantKind: "size",
+          price: 2400,
+          pwpPrice: 999,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect((ins?.payload as { pwp_price: number }).pwp_price).toBe(999);
+  });
+
+  const sofaComboRow = (over: Record<string, unknown> = {}) => ({
+    id: SOFA_COMBO_ID,
+    model_id: MODEL_ID_LIVE,
+    slots: [["2A(LHF)", "2A(RHF)"]],
+    tier: null,
+    prices_by_height: { "24": 2640 },
+    cost_by_height: null,
+    pwp_prices_by_height: null,
+    label: null,
+    effective_from: "2026-06-21",
+    active: true,
+    discontinued_at: null,
+    created_at: "2026-06-21T00:00:00Z",
+    updated_at: "2026-06-21T00:00:00Z",
+    updated_by: null,
+    ...over,
+  });
+
+  it("POST /sofa-combos — principal persists pwp_prices_by_height (camelCase → snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          slots: [["2A(LHF)", "2A(RHF)"]],
+          pricesByHeight: { "24": 2640 },
+          pwpPricesByHeight: { "24": 1990 },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect((ins?.payload as { pwp_prices_by_height: Record<string, number> }).pwp_prices_by_height).toEqual({ "24": 1990 });
+  });
+
+  it("POST /sofa-combos — omitted pwpPricesByHeight → insert writes pwp_prices_by_height: null (unset)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          slots: [["2A(LHF)", "2A(RHF)"]],
+          pricesByHeight: { "24": 2640 },
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect((ins?.payload as { pwp_prices_by_height: unknown }).pwp_prices_by_height).toBeNull();
+  });
+
+  it("PATCH /sofa-combos/:id — updates pwp_prices_by_height (camelCase → snake)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pwpPricesByHeight: { "30": 2100 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect((upd?.payload as { pwp_prices_by_height: Record<string, number> }).pwp_prices_by_height).toEqual({ "30": 2100 });
+  });
+
+  it("PATCH /sofa-combos/:id — WITHOUT pwpPricesByHeight does NOT write pwp_prices_by_height (no clobber)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-combos/${SOFA_COMBO_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ label: "Renamed" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).not.toHaveProperty("pwp_prices_by_height");
+  });
+});

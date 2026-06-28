@@ -97,6 +97,9 @@ export interface ProductSku {
   // type. NULL for every existing SKU; only future generated compartment SKUs
   // carry it.
   compartmentId?: string | null;
+  // 0186 (PWP Phase 8a) — principal-only per-SKU PWP reward price (the price a
+  // PWP-rule reward line is sold at). null = not set (mirrors cost). DORMANT.
+  pwpPrice?: number | null;
 }
 
 export interface SofaFabric {
@@ -257,6 +260,9 @@ export interface SofaCombo {
   // 0183 — principal-only per-seat-height cost benchmark (same shape as
   // pricesByHeight); null = unset. Benchmark only, never in the selling compute.
   costByHeight: Record<string, number | null> | null;
+  // 0186 — principal-only per-seat-height PWP reward price (same shape as
+  // pricesByHeight); null = unset. DORMANT — no order consumer yet.
+  pwpPricesByHeight: Record<string, number | null> | null;
   label: string | null;
   effectiveFrom: string;
   active: boolean;
@@ -317,6 +323,93 @@ export interface SpecialDeliveryFeeRule {
 export interface ModelDefaultFreeGifts {
   modelId: string;
   gifts: DefaultFreeGift[];
+}
+
+/**
+ * One `pwp_rules` row (migration 0186, 2990s Products parity Phase 8a). The
+ * camelCase row shape: a trigger category/scope → reward category/scope @
+ * `qtyPerTrigger`. `pwpRuleFromRow` maps it; `triggerTargets` / `rewardTargets`
+ * are parsed (malformed entries dropped) via `parseRuleTargets`. The reward PRICE
+ * is NOT here — it lives on product_skus.pwpPrice / sofa_combo_pricing
+ * .pwpPricesByHeight. The pure engine (`resolvePwp`) consumes the
+ * `{type, triggerCategory, triggerTargets, rewardCategory, rewardTargets,
+ * qtyPerTrigger}` subset (the engine's `PwpRule` in pwp.ts); this domain row adds
+ * the `id` + `active` columns. DORMANT — no order consumer in P8a.
+ *
+ * P8d (0188) adds `carryForward` (default true — an unclaimed RESERVED voucher
+ * minted by this rule carries forward to the customer's next order instead of
+ * being deleted) + `carryForwardDays` (optional expiry window, null = perpetual).
+ */
+export interface PwpRule {
+  id: string;
+  type: "pwp" | "promo";
+  triggerCategory: string;
+  triggerTargets: RuleTarget[];
+  rewardCategory: string;
+  rewardTargets: RuleTarget[];
+  qtyPerTrigger: number;
+  active: boolean;
+  // ── P8d (0188) cross-order carry-forward policy ──
+  carryForward: boolean;
+  carryForwardDays: number | null;
+}
+
+/**
+ * One `pwp_codes` row (migration 0187, 2990s Products parity Phase 8c). The
+ * camelCase voucher-ledger shape: a reserved/claimed PWP voucher slot. P8c was
+ * SAME-CART; P8d (0188) turns ON the cross-order carry-forward. `pwpCodeFromRow`
+ * maps it; `rewardTargets` is parsed (malformed entries dropped) via
+ * `parseRuleTargets`. `status` RESERVED → USED (same-cart) | RESERVED → AVAILABLE
+ * → USED (cross-order). `claimGroup` is the per-order correlation uuid threaded
+ * onto BOTH the code and the order line's `attrs.pwp.claimGroup`. An AVAILABLE
+ * carry-forward voucher binds to `boundCustomerPhone` (the canonical phone key) +
+ * `ownerDealerId` + optional `expiresAt`. `customerId` (uuid) stays permanently
+ * unused (the binding uses `boundCustomerPhone`). DORMANT — no codes minted until
+ * the principal authors active pwp_rules.
+ */
+export interface PwpCode {
+  code: string;
+  ruleId: string | null;
+  type: "pwp" | "promo";
+  rewardCategory: string;
+  rewardTargets: RuleTarget[];
+  status: "RESERVED" | "USED" | "AVAILABLE";
+  ownerStaffId: string | null;
+  cartLineKey: string | null;
+  triggerItemCode: string | null;
+  claimGroup: string | null;
+  redeemedOrderId: string | null;
+  redeemedItemSku: string | null;
+  // ── P8d cross-order columns ──
+  sourceOrderId: string | null;
+  customerId: string | null;
+  // ── P8d (0188) cross-order carry-forward binding ──
+  // NOTE: pwpCodeFromRow (which maps boundCustomerPhone) is OWNER-scoped use only;
+  // cross-order discovery uses the stripped PwpDiscover shape so a non-owner never
+  // sees the bound phone.
+  boundCustomerPhone: string | null;
+  ownerDealerId: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * The camelCase shape of a `pwp_discover_available` row (migration 0188, P8d
+ * cross-order DISCOVERY). The STRIPPED projection — NO bound phone / owner /
+ * trigger sku / customer id. The phone match is computed server-side
+ * (`phoneMatches`), so the stored phone is never returned. `pwpDiscoverFromRow`
+ * maps it; the POS auto-suggest + manual-entry affordance render from this shape.
+ */
+export interface PwpDiscover {
+  code: string;
+  ruleId: string | null;
+  type: "pwp" | "promo";
+  rewardCategory: string;
+  rewardTargets: RuleTarget[];
+  sourceOrderId: string | null;
+  expiresAt: string | null;
+  phoneMatches: boolean;
 }
 
 export interface Warehouse {

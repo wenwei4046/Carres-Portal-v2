@@ -72,6 +72,9 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   // 0178 — nullable link to a sofa compartment type (additive, null on every
   // existing SKU).
   compartmentId: r.compartment_id ?? null,
+  // 0186 — principal-only PWP reward price; null stays null (not coerced to 0)
+  // so "unset" is distinct from "zero PWP price".
+  pwpPrice: r.pwp_price == null ? null : Number(r.pwp_price),
 });
 
 export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
@@ -277,6 +280,9 @@ export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
     // 0183 — cost benchmark; null (column unset) stays null so the UI can tell
     // "no cost authored" from "{}", while present maps coerce numerics.
     costByHeight: r.cost_by_height == null ? null : coerceHeightMap(r.cost_by_height),
+    // 0186 — PWP reward price; same null-preserving treatment as costByHeight.
+    pwpPricesByHeight:
+      r.pwp_prices_by_height == null ? null : coerceHeightMap(r.pwp_prices_by_height),
     label: r.label ?? null,
     effectiveFrom: r.effective_from,
     active: r.active,
@@ -310,6 +316,79 @@ export const freeItemCampaignFromRow = (
   active: r.active,
   maxFreeQty: Number(r.max_free_qty),
   eligible: parseFreeItemEligible(r.eligible),
+});
+
+/**
+ * Maps a `pwp_rules` row to the camelCase domain shape (0186). `trigger_targets`
+ * / `reward_targets` jsonb are cleaned via `parseRuleTargets` (drops malformed
+ * entries; `[]` = the whole category — intentional for PWP); `qty_per_trigger`
+ * is Postgres integer → `Number()` (PostgREST may serialize it as a string).
+ * P8d (0188): `carry_forward` defaults to `true` and `carry_forward_days` to
+ * `null` so a pre-0188 row / a test mock that omits them still maps cleanly.
+ */
+export const pwpRuleFromRow = (r: DB.PwpRuleRow): D.PwpRule => ({
+  id: r.id,
+  type: r.type,
+  triggerCategory: r.trigger_category,
+  triggerTargets: parseRuleTargets(r.trigger_targets),
+  rewardCategory: r.reward_category,
+  rewardTargets: parseRuleTargets(r.reward_targets),
+  qtyPerTrigger: Number(r.qty_per_trigger),
+  active: r.active,
+  // P8d (0188) — carry-forward defaults: a pre-0188 row / mock reads true / null.
+  carryForward: r.carry_forward ?? true,
+  carryForwardDays: r.carry_forward_days ?? null,
+});
+
+/**
+ * Maps a `pwp_codes` row to the camelCase domain shape (0187 ledger + 0188 P8d
+ * cross-order binding). `reward_targets` jsonb is cleaned via `parseRuleTargets`
+ * (drops malformed entries; `[]` = the whole category — the snapshot of the
+ * rule's reward scope). All other columns are direct snake→camel. The P8d binding
+ * fields (`bound_customer_phone` / `owner_dealer_id` / `expires_at`) default to
+ * null so a pre-0188 row / mock maps cleanly. OWNER-SCOPED USE ONLY — this carries
+ * `boundCustomerPhone`; cross-order discovery uses `pwpDiscoverFromRow` (stripped,
+ * no PII). DORMANT.
+ */
+export const pwpCodeFromRow = (r: DB.PwpCodeRow): D.PwpCode => ({
+  code: r.code,
+  ruleId: r.rule_id,
+  type: r.type,
+  rewardCategory: r.reward_category,
+  rewardTargets: parseRuleTargets(r.reward_targets),
+  status: r.status,
+  ownerStaffId: r.owner_staff_id,
+  cartLineKey: r.cart_line_key,
+  triggerItemCode: r.trigger_item_code,
+  claimGroup: r.claim_group,
+  redeemedOrderId: r.redeemed_order_id,
+  redeemedItemSku: r.redeemed_item_sku,
+  sourceOrderId: r.source_order_id,
+  customerId: r.customer_id,
+  // P8d (0188) — cross-order carry-forward binding (default null pre-0188).
+  boundCustomerPhone: r.bound_customer_phone ?? null,
+  ownerDealerId: r.owner_dealer_id ?? null,
+  expiresAt: r.expires_at ?? null,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+/**
+ * Maps a `pwp_discover_available` row (0188) to the camelCase domain shape. The
+ * STRIPPED projection — NO bound phone / owner / trigger sku / customer id; the
+ * phone match is the server-computed `phone_matches` boolean. `reward_targets`
+ * jsonb is cleaned via `parseRuleTargets`. This is the ONLY pwp_codes-derived
+ * shape a non-owner client ever receives, so it structurally cannot leak PII.
+ */
+export const pwpDiscoverFromRow = (r: DB.PwpDiscoverRow): D.PwpDiscover => ({
+  code: r.code,
+  ruleId: r.rule_id,
+  type: r.type,
+  rewardCategory: r.reward_category,
+  rewardTargets: parseRuleTargets(r.reward_targets),
+  sourceOrderId: r.source_order_id,
+  expiresAt: r.expires_at,
+  phoneMatches: r.phone_matches,
 });
 
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({

@@ -61,6 +61,8 @@ const sampleCombo: SofaComboDto = {
   pricesByHeight: { "28": 2640, "32": 2800 },
   // 0183 — cost benchmark at 28 only: 1980 of 2640 sell → 25.0% margin.
   costByHeight: { "28": 1980 },
+  // 0186 — PWP reward price per height (DORMANT; no combo-as-reward consumer).
+  pwpPricesByHeight: null,
   label: "Corner Set",
   effectiveFrom: "2026-06-21",
   active: true,

@@ -56,6 +56,15 @@ import {
   type ModelDefaultFreeGiftsInput,
   type FreeItemCampaignDto,
   type FreeItemCampaignInput,
+  // 0186 — PWP / Promo rules (Phase 8a, principal-only CRUD).
+  type PwpRuleDto,
+  type PwpRuleInput,
+  // 0187 — PWP voucher codes (Phase 8c, the SAME-CART state machine reserve API).
+  type PwpReserveInput,
+  type PwpCodesResponse,
+  // 0188 — PWP cross-order DISCOVERY (Phase 8d) — the stripped (no PII) AVAILABLE
+  // voucher discovery the POS cross-order affordance reads by phone / code.
+  type PwpDiscoverResponse,
   type AddonCreateInput,
   type AddonPatchInput,
   type AddonDto,
@@ -123,6 +132,17 @@ export const qk = {
   catalog:      () => ["catalog"] as const,
   outlets:      () => ["outlets"] as const,
   salespersons: (outletId?: string) => ["salespersons", outletId ?? null] as const,
+  /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (GET /api/pwp-codes/mine),
+   *  feeding the POS Auto-Fill voucher rail. The reserve/free mutations invalidate
+   *  this so the rail re-reads the live RESERVED set after a trigger change. */
+  pwpCodesMine: () => ["pwp-codes", "mine"] as const,
+  /** 0188 (Phase 8d) — cross-order AVAILABLE voucher DISCOVERY (GET
+   *  /api/pwp-codes/available), keyed by the selector (phone / code) so the POS
+   *  auto-suggest + manual-entry affordance cache distinctly per lookup. The
+   *  stripped (no-PII) DTO. Only enabled when a selector is present + PWP is
+   *  active (DORMANT carts make zero discovery traffic). */
+  pwpAvailable: (sel: { phone?: string | null; code?: string | null }) =>
+    ["pwp-codes", "available", sel.phone ?? null, sel.code ?? null] as const,
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
   // ripples to dealers + dashboard) without touching dealer/order caches.
@@ -910,6 +930,115 @@ export function useOutlets(opts?: Partial<UseQueryOptions<OutletsListResponse>>)
     queryKey: qk.outlets(),
     queryFn: () => apiFetch<OutletsListResponse>("/api/outlets"),
     staleTime: 5 * 60_000,
+    ...opts,
+  });
+}
+
+/* ─── 0187 (Phase 8c) — PWP voucher codes (SAME-CART reserve API) ───────────── */
+
+/**
+ * usePwpCodesMine — GET /api/pwp-codes/mine. The caller's RESERVED pwp_codes,
+ * feeding the POS Auto-Fill voucher rail (the cart binds a RESERVED code onto an
+ * eligible reward line so the order route claims it). Self-heals on the server
+ * (an owner-scoped orphan reaper runs before the read). `enabled` defaults true
+ * but the POS only mounts this when a catalog with ACTIVE pwp_rules is loaded —
+ * DORMANT carts pass `enabled: false` so a no-rules order makes zero reserve
+ * traffic (byte-identical). Short `staleTime` so the rail reflects reserves
+ * promptly; the reserve/free mutations also invalidate it.
+ */
+export function usePwpCodesMine(opts?: Partial<UseQueryOptions<PwpCodesResponse>>) {
+  return useQuery({
+    queryKey: qk.pwpCodesMine(),
+    queryFn: () => apiFetch<PwpCodesResponse>("/api/pwp-codes/mine"),
+    staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/**
+ * useReservePwpCode — POST /api/pwp-codes/reserve. Idempotent (sequential)
+ * reconcile of ONE trigger line's RESERVED set (top-up / trim). On success,
+ * invalidate `pwpCodesMine` so the Auto-Fill rail re-reads the live set. The
+ * reconciler treats this as best-effort — a failed reserve just shows fewer
+ * codes in the rail; it never blocks submit.
+ */
+export function useReservePwpCode(
+  opts?: Partial<UseMutationOptions<PwpCodesResponse, ApiError, PwpReserveInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<PwpCodesResponse, ApiError, PwpReserveInput>({
+    mutationFn: (input) =>
+      apiFetch<PwpCodesResponse>("/api/pwp-codes/reserve", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.pwpCodesMine() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * useFreePwpCode — DELETE /api/pwp-codes/reserve?cartLineKey=… Frees a removed /
+ * zeroed trigger line's RESERVED codes (RESERVED only — never USED). On success,
+ * invalidate `pwpCodesMine`. Best-effort — a missed free is swept by the order
+ * route's Confirm-pass / the RESERVED-orphan cron.
+ */
+export function useFreePwpCode(
+  opts?: Partial<UseMutationOptions<{ ok: boolean }, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, ApiError, string>({
+    mutationFn: (cartLineKey) =>
+      apiFetch<{ ok: boolean }>(
+        `/api/pwp-codes/reserve?cartLineKey=${encodeURIComponent(cartLineKey)}`,
+        { method: "DELETE" },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.pwpCodesMine() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/* ─── 0188 (Phase 8d) — PWP cross-order voucher DISCOVERY ───────────────────── */
+
+/**
+ * usePwpAvailableForPhone — GET /api/pwp-codes/available?phone=…[&code=…]. The
+ * cross-order voucher discovery the POS cross-order affordance reads: the customer
+ * enters / has captured a phone (auto-suggest) OR a salesperson types a voucher
+ * code (manual entry). The route calls the SECURITY DEFINER `pwp_discover_available`
+ * which returns the STRIPPED projection (NO bound phone / owner / trigger sku) +
+ * a server-computed `phoneMatches` boolean — so the raw bound phone is never sent
+ * to the client (no PII / enumeration oracle). PDPA-safe by construction.
+ *
+ * `enabled` is gated by the caller on (PWP active AND a selector is present): with
+ * no phone + no code the query is disabled (the route would 0-row anyway), so a
+ * DORMANT / no-selector cart makes ZERO discovery traffic. Short `staleTime` so a
+ * freshly-redeemed voucher drops out of the suggestion promptly on re-fetch.
+ */
+export function usePwpAvailableForPhone(
+  selector: { phone?: string | null; code?: string | null },
+  opts?: Partial<UseQueryOptions<PwpDiscoverResponse>>,
+) {
+  const phone = (selector.phone ?? "").trim();
+  const code = (selector.code ?? "").trim();
+  return useQuery({
+    queryKey: qk.pwpAvailable({ phone: phone || null, code: code || null }),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (phone) params.set("phone", phone);
+      if (code) params.set("code", code);
+      return apiFetch<PwpDiscoverResponse>(
+        `/api/pwp-codes/available${params.toString() ? `?${params.toString()}` : ""}`,
+      );
+    },
+    // Default off unless a selector exists; the caller AND-gates with PWP-active.
+    enabled: Boolean(phone || code),
+    staleTime: 10_000,
     ...opts,
   });
 }
@@ -5030,6 +5159,43 @@ export function useDeleteFreeItemCampaign() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<{ ok: true }>(`/api/catalog/free-item-campaigns/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0186 — PWP / Promo rules (2990s Products parity Phase 8a). Principal-only on
+// the server (RLS + API gate); the Maintenance UI gate is a friendly read-only
+// veneer. Every mutation invalidates the ['catalog'] tree so the bundle (Promo
+// tab + the POS preview resolver) re-reads. DORMANT — no order-path consumer in
+// P8a; the rule pairs a trigger category/target with a reward category/target,
+// and the reward PRICE lives on product_skus.pwpPrice / sofa_combo_pricing
+// .pwpPricesByHeight (separate principal-locked write paths).
+// ---------------------------------------------------------------------------
+
+export function useCreatePwpRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PwpRuleInput) =>
+      apiFetch<{ pwpRule: PwpRuleDto }>("/api/catalog/pwp-rules", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdatePwpRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<PwpRuleInput> }) =>
+      apiFetch<{ pwpRule: PwpRuleDto }>(`/api/catalog/pwp-rules/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeletePwpRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/pwp-rules/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

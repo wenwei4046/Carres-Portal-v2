@@ -8,6 +8,9 @@ import {
   orderInputToRpcPayload,
   orderSupplierThreadFromRow,
   productSkuFromRow,
+  pwpCodeFromRow,
+  pwpDiscoverFromRow,
+  pwpRuleFromRow,
   sofaComboFromRow,
   sofaCompartmentFromRow,
   specialDeliveryFeeRuleFromRow,
@@ -20,6 +23,9 @@ import type {
   ModelSofaCompartmentRow,
   OrderSupplierThreadRow,
   ProductSkuRow,
+  PwpCodeRow,
+  PwpDiscoverRow,
+  PwpRuleRow,
   SofaComboPricingRow,
   SofaCompartmentRow,
   SpecialDeliveryFeeRuleRow,
@@ -59,6 +65,9 @@ function baseInput(over: Partial<CreateOrderInput> = {}): CreateOrderInput {
     paymentMethod: "online",
     approvalCode: null,
     installmentMonths: null,
+    // 0187 — defaults to [] (DORMANT); set explicitly because `.default([])`
+    // makes it required in the parsed CreateOrderInput (output) type.
+    pwpCartLineKeys: [],
     ...over,
   };
 }
@@ -469,6 +478,12 @@ describe("sofaComboFromRow", () => {
         "28": 1850,
         "30": null,
       },
+      // 0186 — per-height PWP reward price (companion to prices_by_height).
+      pwp_prices_by_height: {
+        "24": "2200.00" as unknown as number,
+        "28": 2300,
+        "30": null,
+      },
       label: "Oslo L-shape",
       effective_from: "2026-06-21",
       active: true,
@@ -499,6 +514,12 @@ describe("sofaComboFromRow", () => {
     expect(typeof out.costByHeight!["24"]).toBe("number");
     expect(out.costByHeight!["28"]).toBe(1850);
     expect(out.costByHeight!["30"]).toBeNull();
+    // 0186 — PWP price map coerces numerics + preserves null, same as prices.
+    expect(out.pwpPricesByHeight).not.toBeNull();
+    expect(out.pwpPricesByHeight!["24"]).toBe(2200);
+    expect(typeof out.pwpPricesByHeight!["24"]).toBe("number");
+    expect(out.pwpPricesByHeight!["28"]).toBe(2300);
+    expect(out.pwpPricesByHeight!["30"]).toBeNull();
     expect(out.label).toBe("Oslo L-shape");
     expect(out.effectiveFrom).toBe("2026-06-21");
     expect(out.active).toBe(true);
@@ -524,6 +545,11 @@ describe("sofaComboFromRow", () => {
     const out = sofaComboFromRow(baseRow({ cost_by_height: null }));
     expect(out.costByHeight).toBeNull();
   });
+
+  it("keeps pwpPricesByHeight null when the column is unset (0186)", () => {
+    const out = sofaComboFromRow(baseRow({ pwp_prices_by_height: null }));
+    expect(out.pwpPricesByHeight).toBeNull();
+  });
 });
 
 describe("productSkuFromRow — 0178 compartmentId", () => {
@@ -541,6 +567,7 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
       pos_active: true,
       description: null,
       compartment_id: "00000000-0000-0000-0000-0000000c0001",
+      pwp_price: null,
       ...over,
     };
   }
@@ -553,6 +580,13 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
   it("nulls compartmentId for a non-compartment SKU", () => {
     const out = productSkuFromRow(baseSkuRow({ compartment_id: null }));
     expect(out.compartmentId).toBeNull();
+  });
+
+  it("maps pwp_price -> pwpPrice, coercing numeric + preserving null (0186)", () => {
+    expect(productSkuFromRow(baseSkuRow({ pwp_price: null })).pwpPrice).toBeNull();
+    const out = productSkuFromRow(baseSkuRow({ pwp_price: "999.00" as unknown as number }));
+    expect(out.pwpPrice).toBe(999);
+    expect(typeof out.pwpPrice).toBe("number");
   });
 });
 
@@ -722,5 +756,205 @@ describe("freeItemCampaignFromRow (0185)", () => {
       }),
     );
     expect(out.eligible).toEqual([{ scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] }]);
+  });
+});
+
+describe("pwpCodeFromRow (0187)", () => {
+  function baseRow(over: Partial<PwpCodeRow> = {}): PwpCodeRow {
+    return {
+      code: "PWP-1234ABCD",
+      rule_id: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      reward_category: "BEDFRAME",
+      reward_targets: [
+        { scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" },
+      ] as unknown as PwpCodeRow["reward_targets"],
+      status: "RESERVED",
+      owner_staff_id: "00000000-0000-0000-0000-0000000aa001",
+      cart_line_key: "line-1",
+      trigger_item_code: "MAT-QUEEN",
+      claim_group: null,
+      redeemed_order_id: null,
+      redeemed_item_sku: null,
+      source_order_id: null,
+      customer_id: null,
+      bound_customer_phone: null,
+      owner_dealer_id: null,
+      expires_at: null,
+      created_at: "2026-06-28T00:00:00Z",
+      updated_at: "2026-06-28T00:00:00Z",
+      ...over,
+    };
+  }
+
+  it("maps every column snake→camel and parses the reward_targets RuleTarget[]", () => {
+    const out = pwpCodeFromRow(baseRow());
+    expect(out).toEqual({
+      code: "PWP-1234ABCD",
+      ruleId: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      rewardCategory: "BEDFRAME",
+      rewardTargets: [{ scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" }],
+      status: "RESERVED",
+      ownerStaffId: "00000000-0000-0000-0000-0000000aa001",
+      cartLineKey: "line-1",
+      triggerItemCode: "MAT-QUEEN",
+      claimGroup: null,
+      redeemedOrderId: null,
+      redeemedItemSku: null,
+      sourceOrderId: null,
+      customerId: null,
+      boundCustomerPhone: null,
+      ownerDealerId: null,
+      expiresAt: null,
+      createdAt: "2026-06-28T00:00:00Z",
+      updatedAt: "2026-06-28T00:00:00Z",
+    });
+  });
+
+  it("(P8d 0188) maps the cross-order carry-forward binding fields on an AVAILABLE voucher", () => {
+    const out = pwpCodeFromRow(
+      baseRow({
+        status: "AVAILABLE",
+        cart_line_key: null,
+        source_order_id: "00000000-0000-0000-0000-0000000d0aa1",
+        bound_customer_phone: "123456789",
+        owner_dealer_id: "00000000-0000-0000-0000-0000000de001",
+        expires_at: "2026-07-28T00:00:00Z",
+      }),
+    );
+    expect(out.status).toBe("AVAILABLE");
+    expect(out.boundCustomerPhone).toBe("123456789");
+    expect(out.ownerDealerId).toBe("00000000-0000-0000-0000-0000000de001");
+    expect(out.expiresAt).toBe("2026-07-28T00:00:00Z");
+    expect(out.sourceOrderId).toBe("00000000-0000-0000-0000-0000000d0aa1");
+  });
+
+  it("(P8d 0188) defaults the binding fields to null when a pre-0188 row omits them", () => {
+    // Simulate a pre-0188 row / mock that has no binding columns at all.
+    const legacy = baseRow();
+    delete (legacy as Partial<PwpCodeRow>).bound_customer_phone;
+    delete (legacy as Partial<PwpCodeRow>).owner_dealer_id;
+    delete (legacy as Partial<PwpCodeRow>).expires_at;
+    const out = pwpCodeFromRow(legacy);
+    expect(out.boundCustomerPhone).toBeNull();
+    expect(out.ownerDealerId).toBeNull();
+    expect(out.expiresAt).toBeNull();
+  });
+
+  it("carries the claimed-stamp fields and a nulled owner (post-redemption audit row)", () => {
+    const out = pwpCodeFromRow(
+      baseRow({
+        status: "USED",
+        owner_staff_id: null,
+        claim_group: "00000000-0000-0000-0000-0000000c6001",
+        redeemed_order_id: "00000000-0000-0000-0000-0000000d0001",
+        redeemed_item_sku: "BED-KING",
+      }),
+    );
+    expect(out.status).toBe("USED");
+    expect(out.ownerStaffId).toBeNull();
+    expect(out.claimGroup).toBe("00000000-0000-0000-0000-0000000c6001");
+    expect(out.redeemedOrderId).toBe("00000000-0000-0000-0000-0000000d0001");
+    expect(out.redeemedItemSku).toBe("BED-KING");
+  });
+
+  it("drops malformed reward_targets entries via parseRuleTargets", () => {
+    const out = pwpCodeFromRow(
+      baseRow({
+        reward_targets: [
+          { scope: "model" }, // no modelId → dropped
+          { scope: "variant", modelId: "m1", sizeCodes: ["queen"] }, // upper-cased
+        ] as unknown as PwpCodeRow["reward_targets"],
+      }),
+    );
+    expect(out.rewardTargets).toEqual([
+      { scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] },
+    ]);
+  });
+});
+
+describe("pwpRuleFromRow (0186 + 0188 carry-forward)", () => {
+  function baseRow(over: Partial<PwpRuleRow> = {}): PwpRuleRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      trigger_category: "MATTRESS",
+      trigger_targets: [] as unknown as PwpRuleRow["trigger_targets"],
+      reward_category: "BEDFRAME",
+      reward_targets: [] as unknown as PwpRuleRow["reward_targets"],
+      qty_per_trigger: 1,
+      active: true,
+      carry_forward: true,
+      carry_forward_days: null,
+      created_at: "2026-06-28T00:00:00Z",
+      updated_at: "2026-06-28T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("maps the carry-forward policy columns", () => {
+    const out = pwpRuleFromRow(baseRow({ carry_forward: false, carry_forward_days: 30 }));
+    expect(out.carryForward).toBe(false);
+    expect(out.carryForwardDays).toBe(30);
+  });
+
+  it("defaults carryForward to true / carryForwardDays to null when a pre-0188 row omits them", () => {
+    const legacy = baseRow();
+    delete (legacy as Partial<PwpRuleRow>).carry_forward;
+    delete (legacy as Partial<PwpRuleRow>).carry_forward_days;
+    const out = pwpRuleFromRow(legacy);
+    expect(out.carryForward).toBe(true);
+    expect(out.carryForwardDays).toBeNull();
+  });
+
+  it("coerces qty_per_trigger via Number() (PostgREST may serialize it as a string)", () => {
+    const out = pwpRuleFromRow(baseRow({ qty_per_trigger: "2" as unknown as number }));
+    expect(out.qtyPerTrigger).toBe(2);
+  });
+});
+
+describe("pwpDiscoverFromRow (0188 — the stripped cross-order DISCOVERY projection)", () => {
+  function baseRow(over: Partial<PwpDiscoverRow> = {}): PwpDiscoverRow {
+    return {
+      code: "PWP-9876ZZZZ",
+      rule_id: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      reward_category: "BEDFRAME",
+      reward_targets: [
+        { scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" },
+      ] as unknown as PwpDiscoverRow["reward_targets"],
+      source_order_id: "00000000-0000-0000-0000-0000000d0aa1",
+      expires_at: null,
+      phone_matches: true,
+      ...over,
+    };
+  }
+
+  it("maps the stripped projection snake→camel and parses reward_targets", () => {
+    const out = pwpDiscoverFromRow(baseRow());
+    expect(out).toEqual({
+      code: "PWP-9876ZZZZ",
+      ruleId: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      rewardCategory: "BEDFRAME",
+      rewardTargets: [{ scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" }],
+      sourceOrderId: "00000000-0000-0000-0000-0000000d0aa1",
+      expiresAt: null,
+      phoneMatches: true,
+    });
+  });
+
+  it("carries the server-computed phoneMatches=false and never any PII field", () => {
+    const out = pwpDiscoverFromRow(baseRow({ phone_matches: false }));
+    expect(out.phoneMatches).toBe(false);
+    // The structural PII guarantee: the discover shape has no bound phone / owner /
+    // trigger sku / customer id / redeemed sku keys.
+    expect(out).not.toHaveProperty("boundCustomerPhone");
+    expect(out).not.toHaveProperty("ownerStaffId");
+    expect(out).not.toHaveProperty("triggerItemCode");
+    expect(out).not.toHaveProperty("redeemedItemSku");
+    expect(out).not.toHaveProperty("customerId");
   });
 });

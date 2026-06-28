@@ -232,6 +232,28 @@ export {
   type ModelDefaultFreeGiftsInput,
   type FreeItemCampaignDto,
   type FreeItemCampaignInput,
+  // 0186 — PWP & Promo rule schemas/inputs/Dtos.
+  pwpRuleSchema,
+  pwpRuleInput,
+  type PwpRuleDto,
+  type PwpRuleInput,
+  // 0187 — PWP voucher ledger (Phase 8c) schemas/inputs/Dtos.
+  pwpCodeStatusSchema,
+  pwpCodeSchema,
+  pwpReserveInputSchema,
+  pwpCodesResponseSchema,
+  attrsPwpMarkerSchema,
+  type PwpCodeStatusValue,
+  type PwpCodeDto,
+  type PwpReserveInput,
+  type PwpCodesResponse,
+  type AttrsPwpMarker,
+  // 0188 — PWP cross-order DISCOVERY (Phase 8d) — the STRIPPED projection
+  // (no PII) the /available route returns.
+  pwpDiscoverDtoSchema,
+  pwpDiscoverResponseSchema,
+  type PwpDiscoverDto,
+  type PwpDiscoverResponse,
 } from "./schemas/catalog";
 
 export {
@@ -604,6 +626,38 @@ export {
 } from "./free-item-campaign";
 export { modelDefaultFreeGiftsFromRow, freeItemCampaignFromRow } from "./adapters";
 export type { ModelDefaultFreeGifts } from "./domain";
+
+// 0186 — 2990s Products parity Phase 8a: PWP & Promo. The PURE engine
+// (`resolvePwp`) — the SOLE source of truth for which reward lines get the PWP/
+// promo price + which trigger they bind to. Will be shared by the POS preview +
+// the Hono server recompute (P8b+) so the figure cannot drift. Reuses the P6
+// RuleTarget matcher for trigger/reward scope. The row→domain adapter
+// (`pwpRuleFromRow`) is surfaced top-level here too (mirrors sofaComboFromRow).
+export {
+  resolvePwp,
+  parsePwpTargets,
+  type PwpRule as PwpRuleEngine,
+  type PwpLineInput,
+  type PwpGrant,
+} from "./pwp";
+export { pwpRuleFromRow } from "./adapters";
+export type { PwpRule } from "./domain";
+
+// 0187 — 2990s Products parity Phase 8c: the PWP voucher LEDGER (SAME-CART state
+// machine). The row→domain adapter (`pwpCodeFromRow`) + the camelCase domain
+// type are surfaced top-level here (mirrors pwpRuleFromRow / sofaComboFromRow);
+// the zod schemas + Dto/input types live in the schemas/catalog export block.
+export { pwpCodeFromRow } from "./adapters";
+export type { PwpCode } from "./domain";
+
+// 0188 — 2990s Products parity Phase 8d: cross-order voucher carry-forward. The
+// MY-aware phone canonicalizer (`phoneKeyMy`, JS twin of the SQL pwp_phone_key) +
+// the legacy digits-only `phoneKey` (promoted from delivery-fee-recompute). The
+// stripped DISCOVERY adapter (`pwpDiscoverFromRow`) + its camelCase domain type —
+// the ONLY pwp_codes-derived shape a non-owner client receives (no PII).
+export { phoneKey, phoneKeyMy } from "./phone";
+export { pwpDiscoverFromRow } from "./adapters";
+export type { PwpDiscover } from "./domain";
 
 // Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo
 // match + explodeSofaBuild). No DB/IO; runs identically on web + (Phase 4) Hono.
