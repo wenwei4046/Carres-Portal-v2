@@ -12,6 +12,32 @@ Read this **first** when opening either session.
 
 ---
 
+## ⚠️ Handoffs (newest first)
+
+### 2026-06-29 — Orders Deadline due-day colour badge: DONE, don't revert
+
+Done by the **Deadline-badge chat** on `feat/orders-drawer-redesign` (Loo signed
+off 2026-06-29). 3 commits:
+
+- `2fb636b` — weekday (Mon/Fri) lines up **under the date**, not under the badge
+- `1e59a96` — **uniform-width** badge (`min-w-[44px]`, centred) so the dates form
+  one straight column
+- `bb2f09b` — Deadline `<col>` width **72 → 130** in the colgroup so the badge +
+  date stop spilling into the ETA column
+
+**Don't redo or revert these.** In `apps/web/src/pages/operation/OperationOrdersControl.tsx`,
+leave alone:
+
+1. the due-badge render inside the Deadline cell — the `flex items-start` block
+   (badge span via `dueBucketOf` + `DUE_TONE`, then the date / weekday column)
+2. the Deadline `<col style={{ width: 130 }} />` entry in the `<colgroup>`
+
+Build on top of them. **Follow-up (#2 flag column) was NOT touched** — it stays
+fully with the orders-drawer chat. Shared worktree: don't both hold uncommitted
+changes to this file at once; the badge chat's tree is clean (all committed).
+
+---
+
 ## Setup for a new UI session (one-time)
 
 The UI session works in a parallel `git worktree` off the same repo so the
