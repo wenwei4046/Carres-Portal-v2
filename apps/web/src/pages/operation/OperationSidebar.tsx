@@ -13,6 +13,9 @@ import {
   BookOpen,
   LifeBuoy,
   Table2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Flame,
   type LucideIcon,
 } from "lucide-react";
 
@@ -157,9 +160,17 @@ function sectionKeys(s: Section): string[] {
 interface Props {
   active: string;
   onChange: (k: string) => void;
+  /** Icon-rail collapse (Jess 2026-06-26) — owned by OperationApp (grid column). */
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export default function OperationSidebar({ active, onChange }: Props) {
+export default function OperationSidebar({
+  active,
+  onChange,
+  collapsed,
+  onToggleCollapse,
+}: Props) {
   const session = useAuth((s) => s.session);
   const email = session?.user?.email ?? "";
   const initials = email.slice(0, 2).toUpperCase();
@@ -199,33 +210,64 @@ export default function OperationSidebar({ active, onChange }: Props) {
   }
 
   return (
-    <aside
-      className="bg-white border-r border-base-200 py-5 flex flex-col h-screen sticky top-0"
-      style={{ width: 232 }}
-    >
-      <div className="px-[22px] pb-[18px]">
-        <button
-          onClick={() => onChange("dashboard")}
-          className="block text-left bg-transparent border-0 p-0 cursor-pointer"
-          title="Back to dashboard"
-        >
-          <CarresLockup showPortal={false} />
-        </button>
-      </div>
+    <aside className="bg-white border-r border-base-200 py-5 flex flex-col h-screen sticky top-0 w-full overflow-hidden">
+      {collapsed ? (
+        <div className="px-2 pb-[18px] flex flex-col items-center gap-2.5">
+          <button
+            onClick={() => onChange("dashboard")}
+            className="grid place-items-center bg-transparent border-0 p-0 cursor-pointer"
+            title="Carres — dashboard"
+          >
+            <Flame size={22} strokeWidth={2} className="text-primary" />
+          </button>
+          <button
+            onClick={onToggleCollapse}
+            title="Show menu"
+            aria-label="Show menu"
+            className="grid place-items-center w-8 h-8 rounded-md text-base-400 hover:bg-base-100 hover:text-base-700"
+          >
+            <PanelLeftOpen size={18} />
+          </button>
+        </div>
+      ) : (
+        <div className="px-[22px] pb-[18px] flex items-center justify-between gap-2">
+          <button
+            onClick={() => onChange("dashboard")}
+            className="block text-left bg-transparent border-0 p-0 cursor-pointer min-w-0"
+            title="Back to dashboard"
+          >
+            <CarresLockup showPortal={false} />
+          </button>
+          <button
+            onClick={onToggleCollapse}
+            title="Hide menu"
+            aria-label="Hide menu"
+            className="shrink-0 grid place-items-center w-8 h-8 rounded-md text-base-400 hover:bg-base-100 hover:text-base-700"
+          >
+            <PanelLeftClose size={18} />
+          </button>
+        </div>
+      )}
 
-      <nav className="flex-1 px-3 pt-3 pb-1 flex flex-col gap-0.5 overflow-auto">
+      <nav className={`flex-1 ${collapsed ? "px-2" : "px-3"} pt-3 pb-1 flex flex-col gap-0.5 overflow-auto`}>
         {SECTIONS.map((s) => {
           const isActiveSection = activeSectionId === s.id;
           const isLeafActive = s.key != null && active === s.key;
-          const baseCls =
-            "relative w-full text-left px-3.5 py-[9px] rounded text-[13px] flex items-center gap-[11px]";
+          const baseCls = collapsed
+            ? "relative w-full px-0 py-[9px] rounded text-[13px] flex items-center justify-center"
+            : "relative w-full text-left px-3.5 py-[9px] rounded text-[13px] flex items-center gap-[11px]";
           const cls =
             isActiveSection
               ? `${baseCls} bg-base-100 text-base-900 font-semibold cursor-pointer`
               : `${baseCls} text-base-600 font-medium hover:bg-base-50 cursor-pointer`;
           return (
             <div key={s.id}>
-              <button type="button" onClick={() => clickSection(s)} className={cls}>
+              <button
+                type="button"
+                onClick={() => clickSection(s)}
+                className={cls}
+                title={collapsed ? s.label : undefined}
+              >
                 {(isActiveSection || isLeafActive) && (
                   <span
                     className="absolute left-0 top-[7px] bottom-[7px] bg-primary rounded-r-sm"
@@ -239,12 +281,17 @@ export default function OperationSidebar({ active, onChange }: Props) {
                     isActiveSection ? "text-primary" : "text-base-400"
                   }`}
                 />
-                <span className="flex-1">{s.label}</span>
-                {s.badge && <NavBadge count={badgeCount[s.badge] ?? 0} label={s.label} />}
+                {!collapsed && <span className="flex-1">{s.label}</span>}
+                {!collapsed && s.badge && (
+                  <NavBadge count={badgeCount[s.badge] ?? 0} label={s.label} />
+                )}
+                {collapsed && s.badge && (badgeCount[s.badge] ?? 0) > 0 && (
+                  <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
+                )}
               </button>
 
-              {/* Children of the active parent section only. */}
-              {isActiveSection && s.children && (
+              {/* Children of the active parent section only (hidden when collapsed). */}
+              {!collapsed && isActiveSection && s.children && (
                 <div className="mt-0.5 mb-1 ml-[26px] flex flex-col gap-px border-l border-base-200 pl-2">
                   {s.children.map((c) => {
                     const childActive = active === c.key;
@@ -272,18 +319,22 @@ export default function OperationSidebar({ active, onChange }: Props) {
 
       <Link
         to="/me"
-        title="Profile · Sign out"
-        className="px-[22px] py-4 border-t border-base-100 flex items-center gap-2.5 hover:bg-base-50 transition-colors"
+        title={collapsed ? `${email} · Profile` : "Profile · Sign out"}
+        className={`py-4 border-t border-base-100 flex items-center hover:bg-base-50 transition-colors ${
+          collapsed ? "justify-center px-2" : "px-[22px] gap-2.5"
+        }`}
       >
-        <div className="w-[34px] h-[34px] rounded-full bg-base-900 text-white grid place-items-center text-[11px] font-semibold">
+        <div className="w-[34px] h-[34px] rounded-full bg-base-900 text-white grid place-items-center text-[11px] font-semibold shrink-0">
           {initials}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[12px] font-semibold text-base-900 truncate">{email}</div>
-          <div className="text-[9.5px] text-base-500 uppercase tracking-[0.1em] mt-px">
-            operation
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-semibold text-base-900 truncate">{email}</div>
+            <div className="text-[9.5px] text-base-500 uppercase tracking-[0.1em] mt-px">
+              operation
+            </div>
           </div>
-        </div>
+        )}
       </Link>
     </aside>
   );

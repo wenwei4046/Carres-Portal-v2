@@ -76,6 +76,26 @@ export default function OperationApp() {
   const isUrlDriven = isProcurementUrl || isOrdersUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
+  // Sidebar collapse (Jess 2026-06-26): hide the left menu to an icon rail for
+  // more table room. Owned here because the layout is a fixed grid column, not
+  // the aside's own width. Remembered across reloads in localStorage.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("ops-sidebar-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleSidebar = () =>
+    setSidebarCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem("ops-sidebar-collapsed", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
   const [movementsPrefill, setMovementsPrefill] = useState<
     Partial<MovementsFilters> | undefined
   >(undefined);
@@ -168,9 +188,17 @@ export default function OperationApp() {
   return (
     <div
       className="h-screen text-base-900 grid"
-      style={{ gridTemplateColumns: "232px minmax(0, 1fr) auto" }}
+      style={{
+        gridTemplateColumns: `${sidebarCollapsed ? 60 : 232}px minmax(0, 1fr) auto`,
+        transition: "grid-template-columns 0.18s ease",
+      }}
     >
-      <OperationSidebar active={activeTab} onChange={changeTab} />
+      <OperationSidebar
+        active={activeTab}
+        onChange={changeTab}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
+      />
       <main className="min-w-0 overflow-auto bg-base-50">
         {isUrlDriven ? (
           // Nested route table for the URL-driven sections.
