@@ -1059,173 +1059,134 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </div>
       </div>
 
-      {/* Filter panel — 2 rows of auto-width groups (Jess 2026-06-26): each group
-          hugs its own chips so it stays ONE line (the equal-5-col grid forced
-          narrow columns → 6-chip groups wrapped to 2 lines). Row 1 = the order
-          filters (Status · Due · Stock · Category) + the "Needs action" group
-          pinned right; row 2 = the delivery filters (Region · Logistic). Needs
-          action ↔ Logistic swapped per Jess. */}
-      <div className="shrink-0 bg-white border border-base-200 rounded-lg shadow-md mb-3 p-2 space-y-1.5">
-        {/* Row 1 — order filters + Needs action (pinned right). */}
-        <div className="flex items-start gap-1.5 flex-wrap">
-          <FilterGroup label="Status">
+      {/* Filter band (Jess 2026-06-29): ONE row of boxed groups. Each dimension
+          is its own bordered box (label on top); chips flow into a FIXED 2-row
+          grid that grows into MORE COLUMNS, never taller — so the band stays ~2
+          chip-rows high however many buckets show. Order: Status · Due · Stock ·
+          Category · Region · Logistic · Needs action. "All" is kept only on
+          Status (an explicit tab); elsewhere clicking the active chip clears. */}
+      <div className="shrink-0 mb-3 flex items-stretch gap-1 flex-wrap">
+        <FilterGroup label="Status">
+          <RegionChip
+            label="All"
+            count={counts.all}
+            active={tab === "all"}
+            title="Every active order"
+            onClick={() => setTab("all")}
+          />
+          {TABS.filter((t) => t.key !== "all").map((t) => (
             <RegionChip
-              label="All"
-              count={counts.all}
-              active={tab === "all"}
-              title="Every active order"
-              onClick={() => setTab("all")}
+              key={t.key}
+              label={t.label}
+              count={counts[t.key]}
+              active={tab === t.key}
+              title={TAB_DESC[t.key as SettledTab]}
+              onClick={() => setTab(t.key)}
             />
-            {TABS.filter((t) => t.key !== "all").map((t) => (
-              <RegionChip
-                key={t.key}
-                label={t.label}
-                count={counts[t.key]}
-                active={tab === t.key}
-                title={TAB_DESC[t.key as SettledTab]}
-                onClick={() => setTab(t.key)}
-              />
-            ))}
-          </FilterGroup>
-          <FilterGroup label="Due">
+          ))}
+        </FilterGroup>
+        <FilterGroup label="Due">
+          {dueEntries.map((e) => (
             <RegionChip
-              label="All"
-              count={tabFiltered.length}
-              active={dueFilter === null}
-              onClick={() => setDueFilter(null)}
+              key={e.bucket}
+              label={e.bucket}
+              count={e.count}
+              active={dueFilter === e.bucket}
+              tone={DUE_TONE[e.bucket]}
+              title={DUE_DESC[e.bucket]}
+              onClick={() => setDueFilter((r) => (r === e.bucket ? null : e.bucket))}
             />
-            {dueEntries.map((e) => (
-              <RegionChip
-                key={e.bucket}
-                label={e.bucket}
-                count={e.count}
-                active={dueFilter === e.bucket}
-                tone={DUE_TONE[e.bucket]}
-                title={DUE_DESC[e.bucket]}
-                onClick={() => setDueFilter((r) => (r === e.bucket ? null : e.bucket))}
-              />
-            ))}
-          </FilterGroup>
-          <FilterGroup label="Stock">
+          ))}
+        </FilterGroup>
+        <FilterGroup label="Stock">
+          {stockEntries.map((e) => (
             <RegionChip
-              label="All"
-              count={tabFiltered.length}
-              active={stockFilter === null}
-              onClick={() => setStockFilter(null)}
+              key={e.bucket}
+              label={e.bucket}
+              count={e.count}
+              active={stockFilter === e.bucket}
+              dot={e.bucket === "Ready" ? "#16A34A" : e.bucket === "Waiting" ? "#D97706" : "#DC2626"}
+              onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
             />
-            {stockEntries.map((e) => (
-              <RegionChip
-                key={e.bucket}
-                label={e.bucket}
-                count={e.count}
-                active={stockFilter === e.bucket}
-                dot={e.bucket === "Ready" ? "#16A34A" : e.bucket === "Waiting" ? "#D97706" : "#DC2626"}
-                onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
-              />
-            ))}
-          </FilterGroup>
-          <FilterGroup label="Category">
+          ))}
+        </FilterGroup>
+        <FilterGroup label="Category">
+          {categoryEntries.map((e) => (
             <RegionChip
-              label="All"
-              count={tabFiltered.length}
-              active={categoryFilter === null}
-              onClick={() => setCategoryFilter(null)}
+              key={e.key}
+              label={e.label}
+              count={e.count}
+              active={categoryFilter === e.key}
+              onClick={() => setCategoryFilter((r) => (r === e.key ? null : e.key))}
             />
-            {categoryEntries.map((e) => (
-              <RegionChip
-                key={e.key}
-                label={e.label}
-                count={e.count}
-                active={categoryFilter === e.key}
-                onClick={() => setCategoryFilter((r) => (r === e.key ? null : e.key))}
-              />
-            ))}
-          </FilterGroup>
-          {/* Needs action — the two action lanes (🚩 Follow-up · ⏫ For Jess) +
-              the two logistic-chase alerts (Unassigned carrier · No ETA), one
-              inline group pinned right (swapped UP from row 2 per Jess 6/26). */}
-          <div className="inline-flex items-center gap-x-1.5 gap-y-1 flex-wrap border border-base-200 rounded-md px-1.5 py-1">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-base-800 border-r border-base-200 pr-1.5 mr-0.5 shrink-0">
-              Needs action
-            </span>
-            <QuickView
-              icon={Flag}
-              label="Follow-up"
-              count={flaggedCount}
-              tone="warning"
-              active={flaggedOnly}
-              title="Team handoff — orders with an open follow-up note for the next operator"
-              onClick={() => setFlaggedOnly((v) => !v)}
-            />
-            <QuickView
-              icon={ChevronsUp}
-              label="For Jess"
-              count={escalateCount}
-              tone="danger"
-              active={escalateOnly}
-              title="Escalated to Jess — orders needing the boss's action"
-              onClick={() => setEscalateOnly((v) => !v)}
-            />
-            <QuickView
-              icon={Truck}
-              label="Unassigned carrier"
-              count={noCarrierCount}
-              tone="danger"
-              active={logisticFilter === NO_CARRIER}
-              title="No logistic partner assigned yet — operation to assign a carrier"
-              onClick={() =>
-                setLogisticFilter((r) => (r === NO_CARRIER ? null : NO_CARRIER))
-              }
-            />
-            <QuickView
-              icon={CalendarClock}
-              label="No ETA"
-              count={etaCount}
-              tone="warning"
-              active={etaOnly}
-              title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
-              onClick={() => setEtaOnly((v) => !v)}
-            />
-          </div>
-        </div>
-        {/* Row 2 — delivery filters (Region + Logistic, swapped DOWN here). */}
-        <div className="flex items-start gap-1.5 flex-wrap">
-          <FilterGroup label="Region">
+          ))}
+        </FilterGroup>
+        <FilterGroup label="Region">
+          {regionEntries.map((e) => (
             <RegionChip
-              label="All"
-              count={tabFiltered.length}
-              active={regionFilter === null}
-              onClick={() => setRegionFilter(null)}
+              key={e.region}
+              label={e.region}
+              count={e.count}
+              active={regionFilter === e.region}
+              onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
             />
-            {regionEntries.map((e) => (
-              <RegionChip
-                key={e.region}
-                label={e.region}
-                count={e.count}
-                active={regionFilter === e.region}
-                onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
-              />
-            ))}
-          </FilterGroup>
-          <FilterGroup label="Logistic">
+          ))}
+        </FilterGroup>
+        <FilterGroup label="Logistic">
+          {logisticEntries.map((e) => (
             <RegionChip
-              label="All"
-              count={tabFiltered.length}
-              active={logisticFilter === null}
-              onClick={() => setLogisticFilter(null)}
+              key={e.carrier}
+              label={e.carrier === NO_CARRIER ? "Unassigned" : e.carrier}
+              count={e.count}
+              active={logisticFilter === e.carrier}
+              title={e.carrier === NO_CARRIER ? "No logistic partner assigned yet — operation to assign / chase" : undefined}
+              onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
             />
-            {logisticEntries.map((e) => (
-              <RegionChip
-                key={e.carrier}
-                label={e.carrier === NO_CARRIER ? "Unassigned" : e.carrier}
-                count={e.count}
-                active={logisticFilter === e.carrier}
-                title={e.carrier === NO_CARRIER ? "No logistic partner assigned yet — operation to assign / chase" : undefined}
-                onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
-              />
-            ))}
-          </FilterGroup>
-        </div>
+          ))}
+        </FilterGroup>
+        {/* Needs action — the two action lanes (Follow-up · For Jess) + the two
+            logistic-chase alerts (Unassigned carrier · No ETA), same boxed
+            2-row grid as the other groups. */}
+        <FilterGroup label="Needs action">
+          <QuickView
+            icon={Flag}
+            label="Follow-up"
+            count={flaggedCount}
+            tone="warning"
+            active={flaggedOnly}
+            title="Team handoff — orders with an open follow-up note for the next operator"
+            onClick={() => setFlaggedOnly((v) => !v)}
+          />
+          <QuickView
+            icon={ChevronsUp}
+            label="For Jess"
+            count={escalateCount}
+            tone="danger"
+            active={escalateOnly}
+            title="Escalated to Jess — orders needing the boss's action"
+            onClick={() => setEscalateOnly((v) => !v)}
+          />
+          <QuickView
+            icon={Truck}
+            label="Unassigned"
+            count={noCarrierCount}
+            tone="danger"
+            active={logisticFilter === NO_CARRIER}
+            title="No logistic partner assigned yet — operation to assign a carrier"
+            onClick={() =>
+              setLogisticFilter((r) => (r === NO_CARRIER ? null : NO_CARRIER))
+            }
+          />
+          <QuickView
+            icon={CalendarClock}
+            label="No ETA"
+            count={etaCount}
+            tone="warning"
+            active={etaOnly}
+            title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
+            onClick={() => setEtaOnly((v) => !v)}
+          />
+        </FilterGroup>
       </div>
 
       {/* Toolbar — result count + bulk actions, between the filter card and the
@@ -1601,9 +1562,10 @@ function RegionChip({
   );
 }
 
-/** Filter-group box — one bordered container per dimension (Jess 2026-06-25): a
- *  dark uppercase label + a hairline + the group's chips, so groups read as
- *  separated units without the height cost of stacking them into columns. */
+/** Filter-group box (Jess 2026-06-29): one bordered box per dimension, label on
+ *  TOP, chips below in a FIXED 2-row grid that flows column-first — so a group
+ *  with more values grows into MORE COLUMNS, never taller. The whole filter band
+ *  therefore stays ~2 chip-rows high no matter how many buckets appear. */
 function FilterGroup({
   label,
   children,
@@ -1613,13 +1575,15 @@ function FilterGroup({
 }) {
   return (
     <div
-      className="inline-flex items-center gap-x-0.5 gap-y-1 flex-wrap border border-base-200 rounded-md px-1 py-1"
+      className="border border-base-200 rounded-md bg-white px-1.5 py-1"
       data-testid={`filter-${label.toLowerCase()}`}
     >
-      <span className="text-[10px] font-semibold uppercase tracking-[0.03em] text-base-800 border-r border-base-200 pr-1 mr-0.5 shrink-0">
+      <div className="text-[9px] font-semibold uppercase tracking-[0.05em] text-base-500 mb-0.5">
         {label}
-      </span>
-      {children}
+      </div>
+      <div className="grid grid-flow-col grid-rows-[auto_auto] gap-x-1 gap-y-1 justify-items-start">
+        {children}
+      </div>
     </div>
   );
 }

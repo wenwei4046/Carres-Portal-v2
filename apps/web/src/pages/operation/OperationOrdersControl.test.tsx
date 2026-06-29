@@ -673,7 +673,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     wrap(<OperationOrdersControl />);
     // 7 orders; D has a carrier via the partner map (NETS), E has TEOW joined →
     // the other 5 have no carrier.
-    const chip = screen.getByRole("button", { name: /Unassigned carrier/ });
+    const chip = within(screen.getByTestId("filter-needs action")).getByRole(
+      "button",
+      { name: /Unassigned/ },
+    );
     expect(chip).toHaveTextContent("5");
     fireEvent.click(chip);
     expect(screen.getAllByTestId("order-row")).toHaveLength(5);
