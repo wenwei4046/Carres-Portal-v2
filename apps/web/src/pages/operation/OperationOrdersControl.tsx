@@ -1282,7 +1282,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 70 }} />
             <col style={{ width: 80 }} />
             <col style={{ width: 132 }} />
-            <col style={{ width: 72 }} />
+            <col style={{ width: 130 }} />
             <col style={{ width: 88 }} />
             <col style={{ width: 96 }} />
             <col style={{ width: 64 }} />
