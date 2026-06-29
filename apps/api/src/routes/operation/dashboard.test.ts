@@ -182,11 +182,16 @@ describe("GET /api/operation/dashboard", () => {
     expect(body.pipeline.confirmed).toBe(999);
   });
 
-  it("returns 403 for principal role (no Supabase round-trip)", async () => {
+  // Unified Internal Portal (2026-06-30): the Operation routes now admit
+  // `principal` alongside `operation` (the boss operates the merged portal).
+  // The guard still rejects every OTHER role — `finance` is the canonical
+  // "internal but not operation" probe proving the gate is operation+principal,
+  // not all-of-is_internal().
+  it("returns 403 for a non-operation role (finance) — no Supabase round-trip", async () => {
     const rpc = vi.fn();
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
 
-    const jwt = await makeJwt("principal");
+    const jwt = await makeJwt("finance");
     const res = await app.fetch(
       new Request("http://t/api/operation/dashboard", {
         headers: { Authorization: `Bearer ${jwt}` },

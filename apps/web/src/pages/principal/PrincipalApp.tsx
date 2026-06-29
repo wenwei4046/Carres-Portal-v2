@@ -1,5 +1,7 @@
-import { useState } from "react";
-import PrincipalSidebar from "./PrincipalSidebar";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+// Unified Internal Portal (2026-06-30) — shared role-aware rail.
+import PortalSidebar from "@/pages/portal/PortalSidebar";
 import PrincipalDashboard from "./PrincipalDashboard";
 import PrincipalApprovals from "./PrincipalApprovals";
 import PrincipalDealers from "./PrincipalDealers";
@@ -11,7 +13,6 @@ import PrincipalOrders from "./PrincipalOrders";
 // 2026-05-19 — Suppliers / Stock moved to Operation sidebar. Orders + a place-
 // order POS (on behalf of a picked dealer) re-added to Principal 2026-06-25.
 import ProductMaintenancePage from "@/pages/catalog/ProductMaintenancePage";
-import { usePrincipalDashboard } from "@/lib/queries";
 
 /**
  * Principal shell — sidebar + main routing area. Mirrors the proto's tab-state
@@ -26,22 +27,26 @@ import { usePrincipalDashboard } from "@/lib/queries";
  */
 export default function PrincipalApp() {
   const [tab, setTab] = useState<string>("dashboard");
-  const { data } = usePrincipalDashboard();
-  const pendingCount = data?.kpis?.pending_approvals ?? 0;
+
+  // Unified Internal Portal — PortalSidebar links to `/principal?tab=<key>`.
+  // Sync the inbound param into local tab state (in-page callbacks like the
+  // dashboard tiles' setTab still drive `tab` directly without a URL write).
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  useEffect(() => {
+    if (urlTab) setTab(urlTab);
+  }, [urlTab]);
 
   return (
     <div
       className="min-h-screen text-base-900 grid"
       style={{
-        gridTemplateColumns: "232px 1fr",
+        // `auto` tracks PortalSidebar's intrinsic width (232px ⇄ 60px collapsed).
+        gridTemplateColumns: "auto 1fr",
         fontFamily: "DM Sans, sans-serif",
       }}
     >
-      <PrincipalSidebar
-        active={tab}
-        onChange={setTab}
-        pendingCount={pendingCount}
-      />
+      <PortalSidebar />
       <main className="min-w-0 overflow-auto bg-base-50">
         {tab === "dashboard" && <PrincipalDashboard setTab={setTab} />}
         {tab === "pos" && <PrincipalPos onExit={() => setTab("orders")} />}

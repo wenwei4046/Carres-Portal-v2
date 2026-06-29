@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useCatalog } from "@/lib/queries";
+import { useAuth } from "@/lib/auth";
 import { PillTabs, type PillTab } from "./components/PillTabs";
 import SkuMasterTab from "./tabs/SkuMasterTab";
 import ModularTab from "./modular/ModularTab";
@@ -26,8 +27,13 @@ import PromoTab from "./tabs/PromoTab";
  * admin bundle includes OFF / discontinued rows the editor needs to see).
  *
  * `isPrincipal` gates the Maintenance delivery-fee editor — floor_config
- * writes are principal-only at the RLS layer (floor_write_principal), so the
- * mounting app passes whether the current user is principal.
+ * writes are principal-only at the RLS layer (floor_write_principal).
+ *
+ * Unified Internal Portal (2026-06-30): catalog is DEDUPED to a single nav
+ * entry (Operations area), reachable by operation AND principal. So instead of
+ * the mounting app passing `isPrincipal`, the page DERIVES it from the live
+ * role — the principal gets the pricing-edit affordances wherever they open it.
+ * The prop is kept as an explicit override (tests / the legacy Principal mount).
  */
 
 type TabKey = "sku" | "modular" | "special" | "maintenance" | "combos" | "promo";
@@ -42,10 +48,13 @@ const TABS: readonly PillTab<TabKey>[] = [
 ];
 
 export default function ProductMaintenancePage({
-  isPrincipal = false,
+  isPrincipal: isPrincipalProp,
 }: {
   isPrincipal?: boolean;
-}) {
+} = {}) {
+  // Derive principal-ness from the live role unless the caller forces it.
+  const role = useAuth((s) => s.role);
+  const isPrincipal = isPrincipalProp ?? role === "principal";
   // admin:true → bundle includes OFF (pos_active=false) + discontinued rows so
   // the editor can toggle them back on. The dealer-facing bundle stays filtered.
   const catalogQ = useCatalog({ admin: true });

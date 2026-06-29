@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-06-30 — unified internal portal (Operation + Principal + Finance)
+
+The three internal portals merged into ONE role-aware portal. **The three
+private sidebars (`OperationSidebar` / `PrincipalSidebar` / `FinanceSidebar`)
+are DELETED** — replaced by `apps/web/src/pages/portal/{portal-nav,PortalSidebar}`
+(one role-filtered area accordion: Operations / Finance / Admin). principal sees
++ operates all three; operation sees Operations; finance sees Finance.
+
+**If your branch predates this and touches any of those 3 sidebars or
+`OperationApp` / `PrincipalApp` / `FinanceApp`:** those files changed shape (now
+mount `<PortalSidebar/>`, grid column is `auto`, Operation/Principal read `?tab=`).
+The 2026-06-29 collapse + real-logo work was **carried into PortalSidebar** (it
+self-owns collapse + the `/carres-logo.png` heart when collapsed) — don't
+re-introduce the old per-area sidebars.
+
+**Backend:** migration **0189** widens `is_operation()` → `('operation',
+'principal')`; `requireOperation` + the inline operation guards now admit
+principal (so does `/operation/*` RequireRole). Operation guard tests probe the
+403 with `finance` now (internal-but-not-operation).
+
+— from the unified-internal-portal session
+
 ## 2026-06-29 — collapsible sidebar + the real CARRES logo (LIVE on main)
 
 `origin/main` @ `586975f` · deployed to <https://carres-portal.pages.dev>.

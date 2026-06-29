@@ -474,7 +474,7 @@ describe("POST /api/operation/pos", () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("principal");
+    const jwt = await makeJwt("finance");
     const res = await app.fetch(
       new Request("http://t/api/operation/pos", {
         method: "POST",
@@ -851,7 +851,7 @@ describe("POST /api/operation/pos/:id/assign-pickup-partner", () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("principal");
+    const jwt = await makeJwt("finance");
     const res = await app.fetch(
       new Request(`http://t/api/operation/pos/${PO_ID}/assign-pickup-partner`, {
         method: "POST",
@@ -1134,7 +1134,7 @@ describe("POST /api/operation/pos/:id/reassign-warehouse", () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("principal");
+    const jwt = await makeJwt("finance");
     const res = await app.fetch(
       new Request(`http://t/api/operation/pos/${PO_ID}/reassign-warehouse`, {
         method: "POST",
