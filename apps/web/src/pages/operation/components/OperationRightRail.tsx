@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Lightbulb, Flag, X, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import type { OpsNote, OpsTask } from "@carres/shared";
 import CalendarPanel from "./rail/CalendarPanel";
 import KeepPanel from "./rail/KeepPanel";
@@ -33,7 +34,15 @@ export default function OperationRightRail() {
     queryFn: () => apiFetch("/api/ops/tasks"),
     refetchInterval: 60_000,
   });
-  const overdue = (tasksData?.tasks ?? []).filter((t) => t.overdue).length;
+  const myId = useAuth((s) => s.session)?.user?.id ?? null;
+  // Personal alert: the Follow-ups badge counts MY open follow-ups (red if any
+  // overdue), so each operator is nudged on their OWN queue (Jess 2026-06-29).
+  const myTasks = (tasksData?.tasks ?? []).filter(
+    (t) =>
+      (t.assignedTo === myId || t.claimedBy === myId) &&
+      (t.status === "open" || t.status === "claimed"),
+  );
+  const myOverdue = myTasks.filter((t) => t.overdue).length;
 
   // Active-notes count — shares the KeepPanel "active" cache; badges the Keep
   // icon with how many notes you've got (Jess ask).
@@ -45,7 +54,8 @@ export default function OperationRightRail() {
 
   // Per-tab badge: Tasks = overdue (red alert), Keep = note count (neutral).
   const badgeFor = (key: Panel): { n: number; tone: string } | null => {
-    if (key === "tasks" && overdue > 0) return { n: overdue, tone: "bg-danger" };
+    if (key === "tasks" && myTasks.length > 0)
+      return { n: myTasks.length, tone: myOverdue > 0 ? "bg-danger" : "bg-base-700" };
     if (key === "keep" && notesCount > 0) return { n: notesCount, tone: "bg-base-700" };
     return null;
   };

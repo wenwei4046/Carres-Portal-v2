@@ -39,6 +39,9 @@ function ago(iso: string): string {
 export default function TasksPanel() {
   const qc = useQueryClient();
   const myId = useAuth((s) => s.session)?.user?.id ?? null;
+  // Mine / All scope (Jess 2026-06-29): with a 3-person team each operator works
+  // their OWN queue by default — "Mine" = assigned to me OR claimed by me.
+  const [scope, setScope] = useState<"mine" | "all">("mine");
 
   const { data, isLoading } = useQuery<{ tasks: OpsTask[] }>({
     queryKey: TASKS_KEY,
@@ -51,8 +54,15 @@ export default function TasksPanel() {
   });
   const tasks = data?.tasks ?? [];
   const members = membersQ.data?.members ?? [];
-  const active = tasks.filter((t) => t.status === "open" || t.status === "claimed");
+  const isMine = (t: OpsTask) => t.assignedTo === myId || t.claimedBy === myId;
+  const showMine = scope === "mine" && !!myId;
+  const active = tasks.filter(
+    (t) => (t.status === "open" || t.status === "claimed") && (!showMine || isMine(t)),
+  );
   const completed = tasks.filter((t) => t.status === "done" || t.status === "cancelled");
+  const mineOpen = tasks.filter(
+    (t) => isMine(t) && (t.status === "open" || t.status === "claimed"),
+  ).length;
 
   const invalidate = () => qc.invalidateQueries({ queryKey: TASKS_KEY });
   const createMut = useMutation({
@@ -88,6 +98,21 @@ export default function TasksPanel() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Mine / All scope — each operator works their own queue by default. */}
+      <div className="flex items-center gap-1 mb-2">
+        {(["mine", "all"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setScope(s)}
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-full ${
+              scope === s ? "bg-base-900 text-white" : "text-base-500 hover:bg-base-100"
+            }`}
+          >
+            {s === "mine" ? `Mine${mineOpen ? ` ${mineOpen}` : ""}` : "All"}
+          </button>
+        ))}
+      </div>
       {/* Composer — Gmail Tasks "+ Add a task" */}
       {!adding ? (
         <button
