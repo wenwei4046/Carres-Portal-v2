@@ -1277,7 +1277,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         >
           <colgroup>
             <col style={{ width: 34 }} />
-            <col style={{ width: 26 }} />
+            <col style={{ width: 78 }} />
             <col style={{ width: 96 }} />
             <col style={{ width: 70 }} />
             <col style={{ width: 80 }} />
@@ -1288,7 +1288,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 64 }} />
             <col style={{ width: 70 }} />
             <col style={{ width: 150 }} />
-            <col style={{ width: 160 }} />
             <col style={{ width: 168 }} />
           </colgroup>
           {/* ONE thin, darker header band so it reads clearly AS the header
@@ -1304,7 +1303,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   className="cursor-pointer accent-base-900 align-middle"
                 />
               </th>
-              <th className="border-r border-base-200" title="Follow-up / escalate flag" />
+              <Th>Follow-up</Th>
               <Th>Status</Th>
               <Th noBorder>Order ID</Th>
               <Th noBorder>Ref No</Th>
@@ -1315,7 +1314,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Carrier</Th>
               <Th>Stock</Th>
               <Th>Items</Th>
-              <Th>Action</Th>
               <Th>Remark</Th>
             </tr>
           </thead>
@@ -1323,7 +1321,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={13}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1919,9 +1917,9 @@ function OrderRow({
           className="cursor-pointer accent-base-900 align-middle"
         />
       </td>
-      {/* (left flag column kept empty — the single status flag now lives in the
-          Follow-up column; remove this column in a later cleanup.) */}
-      <td className="px-1 py-2 border-r border-base-100" />
+      {/* Follow-up — the order's STATUS flag (#2), 2nd column (Jess: left, not a
+          separate empty column). Click opens the side form. */}
+      <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* Status — Q1 (Jess 2026-06-24): a soft coloured pill, colour confined to
           THIS column (his CRM-ref pattern). Completed stays neutral grey. */}
       <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
@@ -1941,7 +1939,7 @@ function OrderRow({
       <td className="px-3 py-2">
         {ref.length > 0 ? (
           <div
-            className="font-mono text-[10px] text-base-800 leading-[1.3]"
+            className="font-mono text-[10px] font-medium text-base-900 leading-[1.3]"
             style={clamp3}
             title={ref.join("\n")}
           >
@@ -1981,31 +1979,33 @@ function OrderRow({
         ) : o.delivery_date ? (
           (() => {
             const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
-            // Short due-day colour badge INLINE before the date (Jess 2026-06-26):
+            // Short due-day colour badge before the date (Jess 2026-06-26):
             // just the day count -2d / today / 2d, coloured by the SAME DUE bucket
             // as the top filter header (reuses dueBucketOf + DUE_TONE → they can
-            // never drift into two systems). Inline so the row doesn't grow taller.
-            // Hidden on completed / TBD / undated.
+            // never drift into two systems). Badge sits LEFT; the date + weekday
+            // stack as a column to its right, so the weekday lines up under the
+            // date (not under the badge — Jess 2026-06-29). Hidden on completed /
+            // TBD / undated.
             const dueBucket = dueBucketOf(o);
             const dd = daysToDue(o);
             const tone = dueBucket ? DUE_TONE[dueBucket] : null;
             const dueShort =
               dd == null ? null : dd < 0 ? `-${-dd}d` : dd === 0 ? "today" : `${dd}d`;
             return (
-              <>
-                <div className="flex items-center gap-1.5 leading-none">
-                  {tone && dueShort && (
-                    <span
-                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums shrink-0"
-                      style={{ background: tone.bg, color: tone.text, border: `0.5px solid ${tone.border}` }}
-                    >
-                      {dueShort}
-                    </span>
-                  )}
-                  <span className="text-[11px] font-medium text-base-900 tabular-nums">{datePart}</span>
+              <div className="flex items-start gap-1.5">
+                {tone && dueShort && (
+                  <span
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums shrink-0"
+                    style={{ background: tone.bg, color: tone.text, border: `0.5px solid ${tone.border}` }}
+                  >
+                    {dueShort}
+                  </span>
+                )}
+                <div className="leading-none">
+                  <div className="text-[11px] font-medium text-base-900 tabular-nums">{datePart}</div>
+                  {dayPart && <div className="text-[10px] tabular-nums text-base-400 mt-0.5">{dayPart}</div>}
                 </div>
-                {dayPart && <div className="text-[10px] tabular-nums text-base-400 mt-0.5">{dayPart}</div>}
-              </>
+              </div>
             );
           })()
         ) : (
@@ -2084,8 +2084,6 @@ function OrderRow({
           </div>
         )}
       </td>
-      {/* Follow-up — the order's status flag (#2); click opens the side form. */}
-      <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* Remark — the 4 operator remarks shown in-cell; click to edit in place. */}
       <RemarkCell order={o} />
     </tr>
@@ -2109,7 +2107,7 @@ function ActionCell({
   const lead = openTaskOf(tasks);
   const u = lead ? taskUrgency(lead) : null;
   return (
-    <td className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
+    <td className="px-2 py-2 border-r border-base-100 align-middle" onClick={(e) => e.stopPropagation()}>
       <button type="button" onClick={() => onFlag(order)} title="Follow-up">
         {!lead ? (
           <span className="inline-flex items-center gap-1 text-[11px] text-base-300 hover:text-warning">
