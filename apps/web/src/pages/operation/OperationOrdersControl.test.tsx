@@ -542,7 +542,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("2× SOF")).toBeInTheDocument();
   });
 
-  it("orders columns: select · flag · Status · Order ID · Ref No · Customer · Deadline · ETA · Location · Carrier · Stock · Items · Action · Remark", () => {
+  it("orders columns: select · Follow-up · Status · Order ID · Ref No · Customer · Deadline · ETA · Location · Carrier · Stock · Items · Remark", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -551,13 +551,13 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       source_ref: ["TCF2024/06-461"],
     });
     wrap(<OperationOrdersControl />);
-    // ONE header row. The old ⭐ star column is gone — the follow-up flag now lives
-    // in the Action column (Jess 2026-06-25), which is the operation team's own
-    // handoff note, distinct from the per-party Remark column.
+    // ONE header row. The follow-up flag = the order's STATUS, in the 2nd column
+    // (Jess 2026-06-26: left, not a separate empty column). The old far-right
+    // Action column is gone — the status flag replaced it.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
-      "", // follow-up / escalate flag (left-edge scan icon)
+      "Follow-up", // the order's status flag (#2)
       "Status",
       "Order ID",
       "Ref No",
@@ -568,7 +568,6 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Carrier",
       "Stock",
       "Items",
-      "Action",
       "Remark",
     ]);
     // Order is split into THREE columns now (Jess): SO# · ref · customer, each
