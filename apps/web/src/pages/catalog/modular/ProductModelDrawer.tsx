@@ -9,8 +9,11 @@ import type {
   SofaFabricDto,
   SofaCompartmentDto,
   ModelSofaCompartmentDto,
+  SpecialAddonDto,
+  CatalogOptionPoolDto,
   FabricTierValue,
 } from "@carres/shared";
+import { deriveSkuCode } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
   useCreateSofaFabric,
@@ -107,6 +110,27 @@ export default function ProductModelDrawer({
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [opts.sizes, skus, extraSizes]);
 
+  // 0182 — curated size SUGGESTIONS from the global option pool, by category.
+  // These only suggest: clicking a chip adds the value into allowed_options.sizes
+  // (the authoritative per-model source). Sofa/accessory/service have no size pool.
+  const sizePoolName =
+    model.category === "mattress"
+      ? "mattress_size"
+      : model.category === "bedframe"
+        ? "bedframe_size"
+        : null;
+  const sizeSuggestions = useMemo<CatalogOptionPoolDto[]>(() => {
+    if (!sizePoolName) return [];
+    return (catalog?.optionPools ?? [])
+      .filter((p) => p.pool === sizePoolName && p.active)
+      .slice()
+      .sort(
+        (a, b) =>
+          a.sortOrder - b.sortOrder ||
+          a.value.localeCompare(b.value, undefined, { numeric: true }),
+      );
+  }, [catalog?.optionPools, sizePoolName]);
+
   return (
     <div
       role="presentation"
@@ -151,6 +175,7 @@ export default function ProductModelDrawer({
                 model={model}
                 universe={sizeUniverse}
                 active={new Set(opts.sizes ?? [])}
+                suggestions={sizeSuggestions}
                 onRegisterSize={(s) =>
                   setExtraSizes((prev) => (prev.includes(s) ? prev : [...prev, s]))
                 }
@@ -184,6 +209,7 @@ export default function ProductModelDrawer({
           {model.category === "sofa" && catalog && (
             <SofaCompartmentsOfferedPanel
               modelId={model.id}
+              modelKey={model.modelKey}
               pool={(catalog.sofaCompartments ?? []).filter((c) => c.active)}
               offered={(catalog.modelSofaCompartments ?? []).filter((o) => o.modelId === model.id)}
               isPrincipal={isPrincipal ?? false}
@@ -198,6 +224,18 @@ export default function ProductModelDrawer({
               offered={(catalog.modelSofaCompartments ?? []).filter((o) => o.modelId === model.id)}
               combos={catalog.sofaCombos ?? []}
               isPrincipal={isPrincipal ?? false}
+            />
+          )}
+
+          {/* Special add-ons offered (0181) — any category. Internal-editable
+              (which add-ons this model offers); the add-ons themselves are
+              principal-authored in the Special Add-ons tab. */}
+          {catalog && (
+            <SpecialAddonsOfferedPanel
+              model={model}
+              pool={(catalog.specialAddons ?? []).filter(
+                (a) => a.active && a.categories.includes(model.category),
+              )}
             />
           )}
 
@@ -350,11 +388,15 @@ function SizeActivePool({
   model,
   universe,
   active,
+  suggestions = [],
   onRegisterSize,
 }: {
   model: ProductModelDto;
   universe: string[];
   active: Set<string>;
+  /** 0182 — curated pool sizes for this model's category, shown as quick-add
+   *  chips. Suggestions only: clicking one writes into allowed_options.sizes. */
+  suggestions?: CatalogOptionPoolDto[];
   onRegisterSize: (size: string) => void;
 }) {
   const toggle = useToggleSizesActive();
@@ -377,15 +419,23 @@ function SizeActivePool({
     setActive(Array.from(next));
   }
 
-  function addSize() {
-    const v = adding.trim();
-    setAdding("");
+  function addSizeValue(raw: string) {
+    const v = raw.trim();
     if (!v) return;
     // Track it locally so it survives a later "All off", then activate it.
     onRegisterSize(v);
     if (active.has(v)) return;
     setActive([...Array.from(active), v]);
   }
+
+  function addSize() {
+    const v = adding;
+    setAdding("");
+    addSizeValue(v);
+  }
+
+  // Pool sizes not already present in the universe — offered as quick-add chips.
+  const availSuggestions = suggestions.filter((s) => !universe.includes(s.value));
 
   return (
     <div>
@@ -449,6 +499,26 @@ function SizeActivePool({
           + Add size
         </button>
       </div>
+      {availSuggestions.length > 0 && (
+        <div className="mt-2" data-testid="size-suggestions">
+          <div className="t-tiny text-base-400 mb-1">Quick add from pool</div>
+          <div className="flex flex-wrap gap-1.5">
+            {availSuggestions.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => addSizeValue(s.value)}
+                disabled={toggle.isPending}
+                title={s.label ?? s.dimensions ?? undefined}
+                className="t-tiny px-2.5 py-1 rounded-full border border-dashed border-base-300 text-base-500 hover:border-base-500 hover:text-base-700 transition-colors disabled:opacity-50"
+                data-testid={`size-suggestion-${s.value}`}
+              >
+                + {s.value}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <p className="t-tiny text-base-400 mt-1.5">
         Turning a size on/off shows or hides every SKU of that size from dealers.
       </p>
@@ -457,6 +527,69 @@ function SizeActivePool({
 }
 
 // ---------------------------------------------------------------------------
+// 0181 — Special add-ons offered: which (principal-authored, category-matching)
+// special add-ons this model offers at POS. Writes allowed_options.specials
+// (codes). Internal-editable (model patch is internal); the add-on defs + prices
+// are principal-only (Special Add-ons tab).
+// ---------------------------------------------------------------------------
+
+function SpecialAddonsOfferedPanel({
+  model,
+  pool,
+}: {
+  model: ProductModelDto;
+  pool: SpecialAddonDto[];
+}) {
+  const patch = usePatchCatalogModel();
+  const offered: string[] = (model.allowedOptions?.specials ?? []) as string[];
+
+  function toggle(code: string) {
+    const next = offered.includes(code) ? offered.filter((c) => c !== code) : [...offered, code];
+    const allowedOptions: AllowedOptions = { ...(model.allowedOptions ?? {}), specials: next };
+    patch.mutate(
+      { id: model.id, patch: { allowedOptions } },
+      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
+    );
+  }
+
+  const fmt = (n: number) => `${n < 0 ? "−" : "+"}RM ${Math.abs(n).toLocaleString("en-MY")}`;
+
+  return (
+    <div>
+      <div className="label mb-1">Special add-ons offered</div>
+      <p className="t-tiny text-base-500 mb-2">
+        Tick which special add-ons this model offers at POS. Author them in the Special Add-ons tab.
+      </p>
+      {pool.length === 0 ? (
+        <p className="t-tiny text-base-400">
+          No special add-ons for {CATEGORY_LABEL[model.category]} yet.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {pool.map((a) => (
+            <label
+              key={a.id}
+              className="flex items-center gap-2 t-small"
+              data-testid={`model-special-${a.code}`}
+            >
+              <input
+                type="checkbox"
+                checked={offered.includes(a.code)}
+                onChange={() => toggle(a.code)}
+              />
+              <span className="text-base-800">{a.label}</span>
+              <span className="t-tiny text-base-400">
+                {fmt(a.sellingPrice)}
+                {a.optionGroups.length > 0 ? ` · ${a.optionGroups.length}Q` : ""}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Generic chip pool (compartments / colours / gaps) — pure allowed_options pool
 // ---------------------------------------------------------------------------
 
@@ -718,11 +851,13 @@ function SofaFabricsPanel({
 
 function SofaCompartmentsOfferedPanel({
   modelId,
+  modelKey,
   pool,
   offered,
   isPrincipal,
 }: {
   modelId: string;
+  modelKey: string;
   pool: SofaCompartmentDto[];
   offered: ModelSofaCompartmentDto[];
   isPrincipal: boolean;
@@ -730,6 +865,13 @@ function SofaCompartmentsOfferedPanel({
   const upsert = useUpsertModelSofaCompartment();
   const del = useDeleteModelSofaCompartment();
   const offeredById = new Map(offered.map((o) => [o.compartmentId, o]));
+
+  // Phase 5 — offering a compartment auto-syncs a real product_skus row whose
+  // sku is the shared `deriveSkuCode(modelKey, code)` (one formula, no drift with
+  // the api mint). It is always pos_active=false, so it never shows in the flat
+  // POS grid. Derived client-side for a read-back so the principal sees the sync
+  // landed — no API round-trip needed.
+  const syncedSku = (code: string) => deriveSkuCode(modelKey, code);
 
   function toggle(comp: SofaCompartmentDto, on: boolean) {
     const opts = {
@@ -798,7 +940,18 @@ function SofaCompartmentsOfferedPanel({
                 data-testid={`offered-check-${comp.code}`}
               />
               <CodeChip>{comp.code}</CodeChip>
-              <span className="t-small text-base-600 truncate">{comp.description ?? "—"}</span>
+              <div className="min-w-0">
+                <span className="t-small text-base-600 truncate block">{comp.description ?? "—"}</span>
+                {isOffered && (
+                  <span
+                    className="font-mono text-[10px] text-base-400 truncate block"
+                    title="Auto-synced catalog SKU (hidden from the POS grid)"
+                    data-testid={`synced-sku-${comp.code}`}
+                  >
+                    → {syncedSku(comp.code)} · pos off
+                  </span>
+                )}
+              </div>
               <input
                 key={`po-${comp.id}-${row?.priceOverride ?? "x"}-${isOffered}`}
                 type="number"

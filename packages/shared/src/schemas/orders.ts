@@ -204,6 +204,32 @@ export const createOrderInputSchema = z.object({
   /** Installment plan months. Only valid when paymentMethod === "installment".
    *  RPC re-checks the cross-field rule and rejects with 22023. */
   installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
+  /** Attribution dealer for an order an INTERNAL role (principal/operation/
+   *  finance/bd) places ON BEHALF OF a dealer it picks. Additive + optional: a
+   *  dealer/salesperson/showroom omits it — the API uses their JWT dealer and
+   *  IGNORES this field (no spoofing); only an internal role with no own
+   *  dealer_id has its value honored. */
+  dealerId: z.string().uuid().optional(),
+  /** 0184 (2990s parity Phase 6) — the operator's free-form additional delivery
+   *  fee (RM, ≥0). OPTIONAL: non-POS callers omit it. The Hono recompute is
+   *  authoritative for the base + cross-category portions; only this additional
+   *  fee + `crossCategorySourceSo` come from the client. */
+  additionalDeliveryFee: z.number().nonnegative().optional(),
+  /** 0184 — the customer's earlier SO this order is a cross-category follow-up
+   *  of (the base was paid on that SO → this order owes only the reduced cross
+   *  rate). OPTIONAL + nullable: non-follow-up orders omit / null it. Hono
+   *  validates the linked SO (exists / same customer / not cancelled / not
+   *  already linked) before booking. */
+  crossCategorySourceSo: z.string().nullable().optional(),
+  /** 0187 (2990s parity Phase 8c) — the trigger cart-line keys whose RESERVED
+   *  pwp_codes belong to THIS submit, so the order-path Confirm-pass can DELETE
+   *  the unclaimed ones. OPTIONAL + default [] (DORMANT). A server-derived
+   *  fallback (the claimed codes' own cart_line_key) cleans claimed triggers'
+   *  siblings even if a client omits this, so correctness never hinges on the
+   *  field; it makes the cleanup COMPLETE (also reaches triggers whose reward was
+   *  never claimed). Mirrors the additionalDeliveryFee / crossCategorySourceSo
+   *  precedent. */
+  pwpCartLineKeys: z.array(z.string()).optional().default([]),
 }).superRefine((data, ctx) => {
   // Phase 11.1 — Proceed date pairs with Delivery date. When the order is NOT
   // marked TBD, both dates are required and proceed date must be on/before the

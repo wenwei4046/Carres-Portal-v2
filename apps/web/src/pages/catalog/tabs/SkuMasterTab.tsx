@@ -15,6 +15,8 @@ import { CategoryChip, CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../compon
 import { skuMargin } from "../margin";
 import NewSkuModal from "./NewSkuModal";
 import EditSkuModal from "./EditSkuModal";
+import ImportSkusDialog from "./ImportSkusDialog";
+import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
 
 /**
  * SKU Master — flat product table with cost + plan-margin visibility for the
@@ -57,10 +59,12 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   // + New SKU as UNPRICED) stays available.
   const isPrincipal = useAuth((s) => s.role) === "principal";
   const [category, setCategory] = useState<CatFilter>("all");
+  const [modelFilter, setModelFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editRow, setEditRow] = useState<FlatRow | null>(null);
 
   const del = useDeleteCatalogSku();
@@ -83,10 +87,28 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     });
   }, [catalog.skus, modelById]);
 
+  // Models available for the model-filter dropdown — scoped to the active
+  // category so the picker isn't a flat 1000-model list (2990s parity).
+  const categoryModels = useMemo(
+    () =>
+      catalog.models
+        .filter((m) => category === "all" || m.category === category)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [catalog.models, category],
+  );
+
+  // Switching category invalidates a model pick from the previous category —
+  // reset synchronously in the same handler so there's no stale-filter frame.
+  function pickCategory(next: CatFilter) {
+    setCategory(next);
+    setModelFilter("all");
+  }
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allRows
       .filter((r) => (category === "all" ? true : r.category === category))
+      .filter((r) => (modelFilter === "all" ? true : r.sku.modelId === modelFilter))
       .filter((r) => {
         if (!q) return true;
         return (
@@ -97,7 +119,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         );
       })
       .sort((a, b) => a.sku.sku.localeCompare(b.sku.sku));
-  }, [allRows, category, search]);
+  }, [allRows, category, modelFilter, search]);
 
   const visible = filtered.slice(0, VISIBLE_CAP);
   const overflow = filtered.length - visible.length;
@@ -152,21 +174,50 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     else toast.error(`${ids.length - failed} done · ${failed} failed`);
   }
 
+  // Export the CURRENTLY FILTERED set (category + search), one row per SKU, in
+  // the round-trippable import format. Stamps the active category into the name.
+  function exportCsv() {
+    if (filtered.length === 0) {
+      toast.error("Nothing to export with the current filter");
+      return;
+    }
+    const csv = buildSkuExportCsv(filtered.map((r) => ({ sku: r.sku, model: r.model })));
+    const tag = category === "all" ? "" : `${category}-`;
+    downloadCsv(`carres-skus-${tag}${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    toast.success(`Exported ${filtered.length} SKU${filtered.length === 1 ? "" : "s"}`);
+  }
+
   return (
     <div>
       {/* Filter + actions */}
       <div className="flex justify-between items-center gap-3 mb-4 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <CategoryChip active={category === "all"} onClick={() => setCategory("all")}>
+          <CategoryChip active={category === "all"} onClick={() => pickCategory("all")}>
             All
           </CategoryChip>
           {PRODUCT_CATEGORIES.map((c) => (
-            <CategoryChip key={c} active={category === c} onClick={() => setCategory(c)}>
+            <CategoryChip key={c} active={category === c} onClick={() => pickCategory(c)}>
               {CATEGORY_LABEL[c]}
             </CategoryChip>
           ))}
         </div>
         <div className="flex items-center gap-2">
+          {categoryModels.length > 1 && (
+            <select
+              value={modelFilter}
+              onChange={(e) => setModelFilter(e.target.value)}
+              aria-label="Filter by model"
+              data-testid="sku-model-filter"
+              className={`${INPUT_CLS} w-44`}
+            >
+              <option value="all">All models</option>
+              {categoryModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          )}
           <input
             type="search"
             value={search}
@@ -205,6 +256,22 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               Prices: Master Admin only
             </span>
           )}
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="btn-secondary text-[12px]"
+            data-testid="sku-export"
+          >
+            Export SKUs
+          </button>
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="btn-secondary text-[12px]"
+            data-testid="sku-import"
+          >
+            Import SKUs
+          </button>
           <button
             type="button"
             onClick={() => setNewOpen(true)}
@@ -272,6 +339,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
       </div>
 
       {newOpen && <NewSkuModal models={catalog.models} onClose={() => setNewOpen(false)} />}
+      {importOpen && <ImportSkusDialog onClose={() => setImportOpen(false)} />}
       {editRow && (
         <EditSkuModal sku={editRow.sku} model={editRow.model} onClose={() => setEditRow(null)} />
       )}

@@ -31,6 +31,7 @@ function catalogWithCombo(): CatalogResponse {
         comboKey: "twin-set",
         name: "Twin Mattress Set",
         comboPrice: 6000,
+        cost: null,
         active: true,
         effectiveFrom: "2026-06-20",
         components: [

@@ -34,19 +34,40 @@ import {
   sofaComboPatchInput,
   canonicalizeSofaSlots,
   SOFA_COMBO_PRICING,
+  specialAddonCreateInput,
+  specialAddonPatchInput,
+  SPECIAL_ADDONS,
+  catalogOptionPoolCreateInput,
+  catalogOptionPoolPatchInput,
+  CATALOG_OPTION_POOLS,
+  deliveryFeeConfigPatchInput,
+  specialDeliveryFeeRuleInput,
+  DELIVERY_FEE_CONFIG,
+  SPECIAL_DELIVERY_FEE_RULES,
+  modelDefaultFreeGiftsInput,
+  freeItemCampaignInput,
+  MODEL_DEFAULT_FREE_GIFTS,
+  FREE_ITEM_CAMPAIGNS,
+  pwpRuleInput,
+  PWP_RULES,
+  deriveSkuCode,
+  skuImportInput,
+  hasPricingIntent,
+  type SkuImportRow,
+  type SkuImportFailure,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
+import { syncCompartmentSku, discontinueCompartmentSku } from "../lib/sofa-compartment-sku";
 import type { AppEnv } from "../types";
 
 const catalogRouter = new Hono<AppEnv>();
 
-// Loo 2026-06-14 — new SKU codes are `{MODEL_KEY}-{variant}` (uppercase, dash),
-// matching the AutoCount-style scheme the 1013 existing SKUs use. NOT the legacy
-// `category:model_key:variant` colon format (which 0148 documented as broken).
-function deriveSkuCode(modelKey: string, variant: string): string {
-  return `${modelKey.toUpperCase()}-${variant}`;
-}
+// SKU codes are `{MODEL_KEY}-{variant}` (uppercase, dash) — the AutoCount-style
+// scheme the 1013 existing SKUs use, NOT the legacy `category:model_key:variant`
+// colon format (0148 documented that as broken). The formula now lives in
+// `@carres/shared` (deriveSkuCode) so the mint + generate-skus + the web
+// read-back can't drift.
 
 // Service/accessory categories carry no supplier (their SKUs are internal:
 // delivery / disposal / labour / pure accessories). The create-SKU supplier
@@ -85,31 +106,34 @@ function principalOnly(
 // early gate just turns the raw 42501 into a clean, friendly 403 before the
 // round-trip. All OTHER catalog edits (pos_active, description, name, modular,
 // add-ons, supplier_id) stay open to internal roles.
+// 0186 — pwp_price joins price + cost under the same principal lock (the DB
+// trigger enforce_sku_price_cost_principal_only was EXTENDED to cover it).
 const SKU_PRICE_COST_ERROR =
-  "Only the principal (Master Admin) can set SKU price or cost";
+  "Only the principal (Master Admin) can set SKU price, cost, or pwp_price";
 
-// POST /skus: a non-principal MAY create an UNPRICED sku (price 0 / cost null);
-// block only when they try to seed a price or cost.
+// POST /skus: a non-principal MAY create an UNPRICED sku (price 0 / cost null /
+// pwp_price null); block only when they try to seed a price, cost, or pwp_price.
 function gateSkuCreatePriceCost(
   c: { var: { auth: { role: string } } },
-  data: { price: number; cost?: number | null },
+  data: { price: number; cost?: number | null; pwpPrice?: number | null },
 ) {
   if (c.var.auth.role === "principal") return;
   const setsPrice = data.price !== 0;
   const setsCost = data.cost !== null && data.cost !== undefined;
-  if (setsPrice || setsCost) {
+  const setsPwpPrice = data.pwpPrice !== null && data.pwpPrice !== undefined;
+  if (setsPrice || setsCost || setsPwpPrice) {
     throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
   }
 }
 
-// PATCH /skus/:id: block when a non-principal includes a price or cost key at
-// all (presence = intent to change; `cost: null` clearing counts as a change).
+// PATCH /skus/:id: block when a non-principal includes a price, cost, or
+// pwp_price key at all (presence = intent to change; a `null` clearing counts).
 function gateSkuPatchPriceCost(
   c: { var: { auth: { role: string } } },
-  data: { price?: number; cost?: number | null },
+  data: { price?: number; cost?: number | null; pwpPrice?: number | null },
 ) {
   if (c.var.auth.role === "principal") return;
-  if (data.price !== undefined || data.cost !== undefined) {
+  if (data.price !== undefined || data.cost !== undefined || data.pwpPrice !== undefined) {
     throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
   }
 }
@@ -159,7 +183,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -186,6 +210,36 @@ catalogRouter.get("/", async (c) => {
     // 0177 combos branch), since non-admin POS consumers must not see retired
     // combos while the maintenance tab (admin=true) must.
     sb.from(SOFA_COMBO_PRICING).select("*"),
+    // 0181 — special add-ons (additive). Fetched unfiltered; active filter
+    // applied client-side below (admin sees retired; POS sees active only).
+    sb.from(SPECIAL_ADDONS).select("*"),
+    // 0182 — global option pools (additive). Fetched UNFILTERED (active AND
+    // inactive): each row carries its own `active`, and the Maintenance editor
+    // must see the inactive ones, so consumers filter client-side. Curated
+    // reference lists only — NOT a source of truth for any order-side consumer.
+    sb.from(CATALOG_OPTION_POOLS).select("*"),
+    // 0184 — delivery TRIP fee config singleton (id=1). maybeSingle so a missing
+    // seed row doesn't throw; we fall back to the dormant {0,0} defaults below.
+    sb.from(DELIVERY_FEE_CONFIG).select("*").eq("id", 1).maybeSingle(),
+    // 0184 — per-RuleTarget special delivery fee rules. Fetched UNFILTERED
+    // (active AND inactive — the Maintenance editor must see retired rows, and
+    // the POS preview / server recompute apply only the matching active ones);
+    // sorted in JS below (active-first, then sort_order) to stay mock-friendly,
+    // mirroring the 0182 option-pools branch.
+    sb.from(SPECIAL_DELIVERY_FEE_RULES).select("*"),
+    // 0185 — Default Free Gifts (per model) + Free Item Campaigns (GWP).
+    // Fetched UNFILTERED: the maintenance editor needs every row (incl. inactive
+    // campaigns + empty gift sets), and the POS preview / Hono server resolver
+    // filter by `active` / `gifts` themselves. Additive — pre-0185 clients ignore
+    // both keys, and with NONE authored the resolver is dormant (zero behaviour
+    // change), so a no-gift order stays byte-identical.
+    sb.from(MODEL_DEFAULT_FREE_GIFTS).select("*"),
+    sb.from(FREE_ITEM_CAMPAIGNS).select("*"),
+    // 0186 — PWP & Promo rules. Fetched UNFILTERED: the maintenance editor needs
+    // every row (incl. inactive rules), and a future order resolver filters by
+    // `active` itself. Additive — pre-0186 clients ignore the key, and with NONE
+    // authored / `active` default false it's dormant (zero behaviour change).
+    sb.from(PWP_RULES).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -198,6 +252,13 @@ catalogRouter.get("/", async (c) => {
   if (sofaCompsR.error) throw new HTTPException(500, { message: sofaCompsR.error.message });
   if (modelSofaCompsR.error) throw new HTTPException(500, { message: modelSofaCompsR.error.message });
   if (sofaCombosR.error) throw new HTTPException(500, { message: sofaCombosR.error.message });
+  if (specialAddonsR.error) throw new HTTPException(500, { message: specialAddonsR.error.message });
+  if (optionPoolsR.error) throw new HTTPException(500, { message: optionPoolsR.error.message });
+  if (deliveryFeeR.error) throw new HTTPException(500, { message: deliveryFeeR.error.message });
+  if (specialDeliveryRulesR.error) throw new HTTPException(500, { message: specialDeliveryRulesR.error.message });
+  if (modelFreeGiftsR.error) throw new HTTPException(500, { message: modelFreeGiftsR.error.message });
+  if (freeItemCampaignsR.error) throw new HTTPException(500, { message: freeItemCampaignsR.error.message });
+  if (pwpRulesR.error) throw new HTTPException(500, { message: pwpRulesR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -252,6 +313,19 @@ catalogRouter.get("/", async (c) => {
     return { ...Adapters.comboFromRow(r), components };
   });
 
+  // 0184 — delivery fee config. The singleton (id=1) is seeded by the migration,
+  // but fall back to the dormant defaults (all fees 0) when the row is absent so a
+  // fresh/empty DB never ships a broken bundle (mirrors the fabric-tier fallback).
+  const deliveryFeeConfig = deliveryFeeR.data
+    ? Adapters.deliveryFeeConfigFromRow(deliveryFeeR.data as DB.DeliveryFeeConfigRow)
+    : {
+        baseFee: 0,
+        crossCategoryFee: 0,
+        chargedCategories: ["sofa", "mattress", "bedframe"],
+        mattressBedframeLeadDays: 14,
+        sofaLeadDays: 21,
+      };
+
   const body = catalogResponseSchema.parse({
     models: (modelsR.data ?? []).map((m) => Adapters.productModelFromRow(m as DB.ProductModelRow)),
     skus: liveSkus.map((s) => Adapters.productSkuFromRow(s as DB.ProductSkuRow)),
@@ -283,7 +357,79 @@ catalogRouter.get("/", async (c) => {
         return r.active === true && r.discontinued_at == null;
       })
       .map((r) => Adapters.sofaComboFromRow(r as DB.SofaComboPricingRow)),
+    // 0181 — special add-ons. POS sees active only; admin (maintenance) sees all.
+    specialAddons: (specialAddonsR.data ?? [])
+      .filter((row) => adminMode || (row as DB.SpecialAddonRow).active === true)
+      .map((r) => Adapters.specialAddonFromRow(r as DB.SpecialAddonRow)),
+    // 0182 — global option pools. Returned in full (active AND inactive — each
+    // row carries its own `active`, so consumers filter client-side), ordered by
+    // (pool, sort_order, value). Sorted in JS to mirror the plain `.select("*")`
+    // fetch (and stay mock-friendly) the way combos sort their components.
+    optionPools: (optionPoolsR.data ?? [])
+      .map((r) => Adapters.catalogOptionPoolFromRow(r as DB.CatalogOptionPoolRow))
+      .sort((a, b) =>
+        a.pool !== b.pool
+          ? a.pool.localeCompare(b.pool)
+          : a.sortOrder !== b.sortOrder
+            ? a.sortOrder - b.sortOrder
+            : a.value.localeCompare(b.value),
+      ),
+    // 0184 — delivery fee config + per-RuleTarget special rules (additive,
+    // optional). Pre-0184 clients that don't read these are wholly unaffected.
+    deliveryFeeConfig,
+    // Active rules first, then ascending sort_order (the maintenance list +
+    // POS preview both want live rules surfaced). Sorted in JS to mirror the
+    // plain `.select("*")` fetch + stay mock-friendly (like option pools).
+    specialDeliveryFeeRules: (specialDeliveryRulesR.data ?? [])
+      .map((r) => Adapters.specialDeliveryFeeRuleFromRow(r as DB.SpecialDeliveryFeeRuleRow))
+      .sort((a, b) =>
+        a.active !== b.active
+          ? Number(b.active) - Number(a.active)
+          : a.sortOrder - b.sortOrder,
+      ),
+    // 0185 — Default Free Gifts (per model) + Free Item Campaigns (additive,
+    // optional). Pre-0185 clients that don't read these are wholly unaffected.
+    // Gift rows map straight through (malformed gift entries dropped in the
+    // adapter). Campaigns are active-first, then ascending created_at — sorted on
+    // the ROW before mapping (created_at isn't on the domain shape), mirroring the
+    // delivery-rules active-first ordering.
+    modelDefaultFreeGifts: (modelFreeGiftsR.data ?? []).map(
+      (r) => Adapters.modelDefaultFreeGiftsFromRow(r as DB.ModelDefaultFreeGiftsRow),
+    ),
+    freeItemCampaigns: (freeItemCampaignsR.data ?? [])
+      .slice()
+      .sort((a, b) => {
+        const ra = a as DB.FreeItemCampaignRow;
+        const rb = b as DB.FreeItemCampaignRow;
+        return ra.active !== rb.active
+          ? Number(rb.active) - Number(ra.active)
+          : String(ra.created_at).localeCompare(String(rb.created_at));
+      })
+      .map((r) => Adapters.freeItemCampaignFromRow(r as DB.FreeItemCampaignRow)),
+    // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients that don't
+    // read this key are wholly unaffected. Active-first, then ascending created_at
+    // — sorted on the ROW before mapping (created_at isn't on the domain shape),
+    // mirroring the free-item-campaigns ordering above.
+    pwpRules: (pwpRulesR.data ?? [])
+      .slice()
+      .sort((a, b) => {
+        const ra = a as DB.PwpRuleRow;
+        const rb = b as DB.PwpRuleRow;
+        return ra.active !== rb.active
+          ? Number(rb.active) - Number(ra.active)
+          : String(ra.created_at).localeCompare(String(rb.created_at));
+      })
+      .map((r) => Adapters.pwpRuleFromRow(r as DB.PwpRuleRow)),
   });
+  // EXPOSURE NOTE (0186): unlike `cost`, the PWP discounted reward price
+  // (product_skus.pwp_price → sku.pwpPrice / sofa_combo_pricing.pwp_prices_by_height
+  // → sofaCombo.pwpPricesByHeight) legitimately needs to reach the POS so the
+  // salesperson can preview a PWP-reward line's discounted price. It therefore
+  // rides in the bundle for ALL roles by design — it is NOT stripped. (The
+  // principal-only WRITE lock still applies: the 0186 trigger + the route gate
+  // block a non-principal from SETTING it.) This is a deliberate read-exposure,
+  // tracked as the `pwp-price-pos-bundle-exposure` carry-forward (companion to
+  // `combo-cost-pos-bundle-exposure`).
 
   // 0074 — was `private, max-age=300` but the browser cache was beating
   // react-query's invalidate-on-write (Loo 2026-05-09: new sofa model
@@ -465,6 +611,8 @@ catalogRouter.post("/skus", async (c) => {
       variant_kind: parsed.data.variantKind,
       price: parsed.data.price,
       cost: parsed.data.cost ?? null,
+      // 0186 — principal-only PWP reward price (companion to cost). null = unset.
+      pwp_price: parsed.data.pwpPrice ?? null,
       supplier_id: supplierId,
       description: parsed.data.description ?? null,
       pos_active: parsed.data.posActive ?? true,
@@ -493,6 +641,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   if (parsed.data.variantKind !== undefined) patch.variant_kind = parsed.data.variantKind;
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;
   if (parsed.data.cost !== undefined) patch.cost = parsed.data.cost;
+  // 0186 — only write pwp_price when present so an unrelated patch doesn't clobber
+  // the benchmark; an explicit null clears it (back to "unset").
+  if (parsed.data.pwpPrice !== undefined) patch.pwp_price = parsed.data.pwpPrice;
   if (parsed.data.supplierId !== undefined) patch.supplier_id = parsed.data.supplierId;
   // 0075 — restore toggle (Loo 2026-05-09).
   if (parsed.data.discontinuedAt !== undefined)
@@ -564,6 +715,246 @@ catalogRouter.delete("/skus/:id", async (c) => {
     return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
   }
   return c.json({ ok: true });
+});
+
+// POST /import-skus — bulk SKU import (2990s Products parity Phase 1). Faithful
+// port of the 2990s batch-import: max 500 rows, **blank cell = preserve** (an
+// omitted field is never written on update, so an export -> edit -> re-import
+// round-trip can't zero a price), per-row failures so one bad row never sinks
+// the batch. Carres divergence: each row resolves/creates a product_model by
+// (category, model_key) FIRST, then upserts a product_sku under it keyed by the
+// derived `{MODEL_KEY}-{variant}` code (the load-bearing order/PO/stock join key).
+//
+// Gating: internalOnly to run at all; principal-only the moment ANY row carries
+// a price/cost (mirrors the 0175 lock — the DB trigger is still the real boundary
+// since we forward the user JWT). Reads are batched; writes are per-row for
+// granular reporting. userClient/RLS only — never service_role.
+catalogRouter.post("/import-skus", async (c) => {
+  internalOnly(c);
+  const parsed = await parseJsonBody(c, skuImportInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const rows = parsed.data.rows;
+
+  if (hasPricingIntent(rows) && c.var.auth.role !== "principal") {
+    return c.json(
+      {
+        error: "forbidden",
+        code: "import_pricing_principal_only",
+        message:
+          "Only the principal (Master Admin) can import SKU price or cost. Remove the price/cost columns, or ask the principal to run the priced import.",
+      },
+      403,
+    );
+  }
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const failures: SkuImportFailure[] = [];
+  const rowKey = (r: SkuImportRow) => deriveSkuCode(r.modelKey, r.variant);
+
+  // ---- (1) Resolve models by (category, model_key); create the missing ones --
+  const modelComposite = (category: string, modelKey: string) => `${category}::${modelKey}`;
+  const wantedModelKeys = Array.from(new Set(rows.map((r) => r.modelKey)));
+  const { data: existingModels, error: modelsErr } = await sb
+    .from("product_models")
+    .select("id, category, model_key")
+    .in("model_key", wantedModelKeys);
+  if (modelsErr) {
+    const m = mapPgError(modelsErr);
+    return c.json(m.body, m.status);
+  }
+  const modelIdByComposite = new Map<string, string>();
+  for (const row of existingModels ?? []) {
+    const mr = row as { id: string; category: string; model_key: string };
+    modelIdByComposite.set(modelComposite(mr.category, mr.model_key), mr.id);
+  }
+
+  // Gather the distinct models we still need to create (name from the first row;
+  // allowed_options.sizes seeded from the row's size variants for Modular parity).
+  const toCreate = new Map<string, { category: string; modelKey: string; name: string; sizes: Set<string> }>();
+  for (const r of rows) {
+    const comp = modelComposite(r.category, r.modelKey);
+    if (modelIdByComposite.has(comp)) continue;
+    let entry = toCreate.get(comp);
+    if (!entry) {
+      entry = { category: r.category, modelKey: r.modelKey, name: r.model, sizes: new Set() };
+      toCreate.set(comp, entry);
+    }
+    if (r.variantKind === "size") entry.sizes.add(r.variant);
+  }
+  let createdModels = 0;
+  for (const [comp, entry] of toCreate) {
+    const allowedOptions = entry.sizes.size > 0 ? { sizes: Array.from(entry.sizes) } : {};
+    const { data: created, error: createErr } = await sb
+      .from("product_models")
+      .insert({
+        category: entry.category,
+        model_key: entry.modelKey,
+        name: entry.name,
+        allowed_options: allowedOptions,
+      })
+      .select("id")
+      .single();
+    if (createErr || !created) {
+      // Every row that needed this model fails (with the same reason).
+      const reason = createErr ? mapPgError(createErr).body.message ?? createErr.message : "model create failed";
+      rows.forEach((r, i) => {
+        if (modelComposite(r.category, r.modelKey) === comp) {
+          failures.push({ row: i + 1, key: rowKey(r), reason: `model "${entry.modelKey}": ${reason}` });
+        }
+      });
+      continue;
+    }
+    modelIdByComposite.set(comp, (created as { id: string }).id);
+    createdModels += 1;
+  }
+
+  // ---- (2) Supplier resolution maps (load all suppliers once) ----------------
+  // .order(slug) so category auto-resolve (first-wins) is deterministic if two
+  // suppliers ever cover the same category.
+  const { data: suppliers, error: supErr } = await sb
+    .from("suppliers")
+    .select("id, slug, name, cat_covered")
+    .order("slug");
+  if (supErr) {
+    const m = mapPgError(supErr);
+    return c.json(m.body, m.status);
+  }
+  const supBySlug = new Map<string, string>();
+  const supByName = new Map<string, string>();
+  const supByCategory = new Map<string, string>();
+  for (const row of suppliers ?? []) {
+    const s = row as { id: string; slug: string | null; name: string | null; cat_covered: string[] | null };
+    if (s.slug) supBySlug.set(s.slug.toLowerCase(), s.id);
+    if (s.name) supByName.set(s.name.toLowerCase(), s.id);
+    for (const cat of s.cat_covered ?? []) {
+      if (!supByCategory.has(cat)) supByCategory.set(cat, s.id);
+    }
+  }
+
+  // ---- (3) Preload existing SKUs by derived code -----------------------------
+  // Carry model_id so a code that already belongs to a DIFFERENT model (a
+  // cross-category {MODEL_KEY}-{variant} collision) is rejected, never silently
+  // re-targeted — the derived code doesn't encode category.
+  const wantedCodes = Array.from(new Set(rows.map(rowKey)));
+  const { data: existingSkus, error: skusErr } = await sb
+    .from("product_skus")
+    .select("id, sku, model_id")
+    .in("sku", wantedCodes);
+  if (skusErr) {
+    const m = mapPgError(skusErr);
+    return c.json(m.body, m.status);
+  }
+  const skuByCode = new Map<string, { id: string; modelId: string }>();
+  for (const row of existingSkus ?? []) {
+    const sr = row as { id: string; sku: string; model_id: string };
+    skuByCode.set(sr.sku, { id: sr.id, modelId: sr.model_id });
+  }
+
+  // ---- (4) Per-row upsert (insert new / update existing, blank = preserve) ----
+  const failedRowKeys = new Set(failures.map((f) => f.key));
+  let upserted = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const code = rowKey(r);
+    // Skip rows whose model could not be created above.
+    if (failedRowKeys.has(code) && !modelIdByComposite.has(modelComposite(r.category, r.modelKey))) {
+      continue;
+    }
+    const modelId = modelIdByComposite.get(modelComposite(r.category, r.modelKey));
+    if (!modelId) continue; // already recorded as a failure during model create
+
+    // A code that already exists under a DIFFERENT model means a cross-category
+    // collision (same {MODEL_KEY}-{variant}, different category). Fail the row
+    // rather than clobber an unrelated SKU.
+    const existing = skuByCode.get(code);
+    if (existing && existing.modelId !== modelId) {
+      failures.push({
+        row: i + 1,
+        key: code,
+        reason: `code ${code} already belongs to another model — pick a distinct model_key`,
+      });
+      continue;
+    }
+    const existingId = existing?.id;
+
+    // Supplier: an explicit column always resolves (and is written on either
+    // path). A NEW sku in a supplier-bearing category must resolve one (else the
+    // row fails). An UPDATE with no explicit supplier preserves the stored one —
+    // so we don't require a covering supplier just to edit a price/description.
+    let supplierId: string | null = null;
+    if (r.supplier) {
+      const found = supBySlug.get(r.supplier.toLowerCase()) ?? supByName.get(r.supplier.toLowerCase());
+      if (!found) {
+        failures.push({ row: i + 1, key: code, reason: `supplier "${r.supplier}" not found` });
+        continue;
+      }
+      supplierId = found;
+    } else if (!existingId && !SUPPLIERLESS_CATEGORIES.has(r.category)) {
+      const auto = supByCategory.get(r.category);
+      if (!auto) {
+        failures.push({ row: i + 1, key: code, reason: `no supplier covers ${r.category}` });
+        continue;
+      }
+      supplierId = auto;
+    }
+
+    if (existingId) {
+      // UPDATE — only present fields (blank cells were omitted upstream so they
+      // preserve the stored value). variant_kind is written ONLY when the row
+      // carried one, so a file that omits the column never re-types an existing
+      // preset/part SKU to 'size'. Never touch sku / model_id.
+      const patch: Record<string, unknown> = { variant: r.variant };
+      if (r.variantKind !== undefined) patch.variant_kind = r.variantKind;
+      if (r.price !== undefined) patch.price = r.price;
+      if (r.cost !== undefined) patch.cost = r.cost;
+      if (r.description !== undefined) patch.description = r.description;
+      if (r.posActive !== undefined) patch.pos_active = r.posActive;
+      if (r.supplier) patch.supplier_id = supplierId;
+      const { error } = await sb.from("product_skus").update(patch).eq("id", existingId);
+      if (error) {
+        failures.push({ row: i + 1, key: code, reason: mapPgError(error).body.message ?? error.message });
+      } else {
+        upserted += 1;
+      }
+    } else {
+      // INSERT — omitted price -> 0, omitted cost -> null, omitted pos_active -> true.
+      const { data: inserted, error } = await sb
+        .from("product_skus")
+        .insert({
+          model_id: modelId,
+          sku: code,
+          variant: r.variant,
+          // Omitted variant_kind defaults to 'size' on a fresh insert.
+          variant_kind: r.variantKind ?? "size",
+          price: r.price ?? 0,
+          cost: r.cost ?? null,
+          supplier_id: supplierId,
+          description: r.description ?? null,
+          pos_active: r.posActive ?? true,
+        })
+        .select("id")
+        .single();
+      if (error || !inserted) {
+        failures.push({
+          row: i + 1,
+          key: code,
+          reason: error ? mapPgError(error).body.message ?? error.message : "insert failed",
+        });
+      } else {
+        upserted += 1;
+        // A later duplicate (model_key, variant) in the same batch now updates
+        // this freshly inserted row (last-wins) instead of colliding.
+        skuByCode.set(code, { id: (inserted as { id: string }).id, modelId });
+      }
+    }
+  }
+
+  return c.json({
+    upserted,
+    createdModels,
+    failed: failures.length,
+    failures: failures.slice(0, 50),
+  });
 });
 
 // ----- Sofa fabrics -----
@@ -960,6 +1351,92 @@ catalogRouter.delete("/addons/:key", async (c) => {
   return c.json({ ok: true });
 });
 
+// ----- Special add-ons (0181, principal-only) -----
+// Per-model SELLING surcharges with one-level follow-up question groups.
+// principalOnly() is the friendly early 403; the RLS policy
+// (special_addons_write_principal) is the real boundary (user JWT forwarded).
+const SPECIAL_ADDON_GATE = "Only the principal (Master Admin) can manage special add-ons";
+
+catalogRouter.post("/special-addons", async (c) => {
+  principalOnly(c, SPECIAL_ADDON_GATE);
+  const parsed = await parseJsonBody(c, specialAddonCreateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SPECIAL_ADDONS)
+    .insert({
+      code: parsed.data.code,
+      label: parsed.data.label,
+      so_description: parsed.data.soDescription ?? "",
+      categories: parsed.data.categories,
+      selling_price: parsed.data.sellingPrice,
+      cost: parsed.data.cost ?? null,
+      option_groups: parsed.data.optionGroups ?? [],
+      active: parsed.data.active ?? true,
+      sort_order: parsed.data.sortOrder ?? 0,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .single();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ specialAddon: Adapters.specialAddonFromRow(data as DB.SpecialAddonRow) }, 201);
+});
+
+catalogRouter.patch("/special-addons/:id", async (c) => {
+  principalOnly(c, SPECIAL_ADDON_GATE);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, specialAddonPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // `code` is intentionally NOT patchable (stable key referenced by
+  // allowed_options.specials + order_lines.attrs).
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.label !== undefined) patch.label = parsed.data.label;
+  if (parsed.data.soDescription !== undefined) patch.so_description = parsed.data.soDescription;
+  if (parsed.data.categories !== undefined) patch.categories = parsed.data.categories;
+  if (parsed.data.sellingPrice !== undefined) patch.selling_price = parsed.data.sellingPrice;
+  if (parsed.data.cost !== undefined) patch.cost = parsed.data.cost;
+  if (parsed.data.optionGroups !== undefined) patch.option_groups = parsed.data.optionGroups;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SPECIAL_ADDONS)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "special add-on not found" }, 404);
+  }
+  return c.json({ specialAddon: Adapters.specialAddonFromRow(data as DB.SpecialAddonRow) });
+});
+
+// Soft-delete (active=false) — preserves the code referenced by existing models'
+// allowed_options.specials + historical order_lines.attrs.
+catalogRouter.delete("/special-addons/:id", async (c) => {
+  principalOnly(c, SPECIAL_ADDON_GATE);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SPECIAL_ADDONS)
+    .update({ active: false })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "special add-on not found" }, 404);
+  }
+  return c.json({ ok: true });
+});
+
 // ---------------------------------------------------------------------------
 // 0176 — Fabric tier pricing admin (principal-only).
 // The DB singleton (fabric_tier_addon_config id=1) holds the global RM deltas
@@ -1083,6 +1560,9 @@ catalogRouter.post("/combos", async (c) => {
       combo_key: comboKey,
       name: parsed.data.name,
       combo_price: parsed.data.comboPrice,
+      // 0183 — principal-only cost benchmark (companion to combo_price). null =
+      // unset; never feeds order/finance/PO — selling stays the only price driver.
+      cost: parsed.data.cost ?? null,
       active: parsed.data.active ?? true,
       updated_at: new Date().toISOString(),
       updated_by: c.var.auth.id,
@@ -1136,6 +1616,9 @@ catalogRouter.patch("/combos/:id", async (c) => {
   const patch: Record<string, unknown> = {};
   if (parsed.data.name !== undefined) patch.name = parsed.data.name;
   if (parsed.data.comboPrice !== undefined) patch.combo_price = parsed.data.comboPrice;
+  // 0183 — only write cost when the key is present so an unrelated patch doesn't
+  // clobber the benchmark; an explicit null clears it (back to "unset").
+  if (parsed.data.cost !== undefined) patch.cost = parsed.data.cost;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
   if (parsed.data.comboKey !== undefined) patch.combo_key = parsed.data.comboKey;
 
@@ -1341,6 +1824,18 @@ catalogRouter.put("/models/:modelId/compartments/:compartmentId", async (c) => {
   const parsed = await parseJsonBody(c, modelSofaCompartmentInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Phase 5 — auto-sync the compartment into a REAL product_skus row BEFORE the
+  // offered row is written, so an offered compartment never exists without its
+  // sellable sku (the explode would otherwise fail closed). Idempotent +
+  // principal-gated (the 0175 price-lock trigger allows the principal's write).
+  const synced = await syncCompartmentSku(sb, {
+    modelId,
+    compartmentId,
+    priceOverride: parsed.data.priceOverride ?? null,
+  });
+  if (!synced.ok) return c.json(synced.body, synced.status);
+
   const { data, error } = await sb
     .from(MODEL_SOFA_COMPARTMENTS)
     .upsert(
@@ -1377,6 +1872,12 @@ catalogRouter.delete("/models/:modelId/compartments/:compartmentId", async (c) =
     .eq("model_id", modelId)
     .eq("compartment_id", compartmentId);
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+
+  // Phase 5 — soft-discontinue the compartment's sku (pos_active=false +
+  // discontinued_at). NEVER delete it: historical order_lines may FK the sku. A
+  // later re-offer re-activates it. Idempotent (0 matched rows = no-op).
+  const disc = await discontinueCompartmentSku(sb, { modelId, compartmentId });
+  if (!disc.ok) return c.json(disc.body, disc.status);
   return c.json({ ok: true });
 });
 
@@ -1407,6 +1908,12 @@ catalogRouter.post("/sofa-combos", async (c) => {
     slots: canonicalizeSofaSlots(parsed.data.slots),
     tier: parsed.data.tier ?? null,
     prices_by_height: parsed.data.pricesByHeight ?? {},
+    // 0183 — principal-only per-seat-height cost benchmark (companion to
+    // prices_by_height). null = unset; never feeds order/finance/PO.
+    cost_by_height: parsed.data.costByHeight ?? null,
+    // 0186 — principal-only per-seat-height PWP reward price (companion to
+    // prices_by_height). null = unset. DORMANT — no order consumer in P8a.
+    pwp_prices_by_height: parsed.data.pwpPricesByHeight ?? null,
     label: parsed.data.label ?? null,
     active: parsed.data.active ?? true,
     updated_at: new Date().toISOString(),
@@ -1441,6 +1948,11 @@ catalogRouter.patch("/sofa-combos/:id", async (c) => {
   if (parsed.data.slots !== undefined) patch.slots = canonicalizeSofaSlots(parsed.data.slots);
   if (parsed.data.tier !== undefined) patch.tier = parsed.data.tier;
   if (parsed.data.pricesByHeight !== undefined) patch.prices_by_height = parsed.data.pricesByHeight;
+  // 0183 — only write cost_by_height when present so an unrelated patch doesn't
+  // clobber the benchmark; an explicit null clears it (back to "unset").
+  if (parsed.data.costByHeight !== undefined) patch.cost_by_height = parsed.data.costByHeight;
+  // 0186 — same for the PWP reward price (present-only write; null clears).
+  if (parsed.data.pwpPricesByHeight !== undefined) patch.pwp_prices_by_height = parsed.data.pwpPricesByHeight;
   if (parsed.data.label !== undefined) patch.label = parsed.data.label;
   if (parsed.data.effectiveFrom !== undefined) patch.effective_from = parsed.data.effectiveFrom;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
@@ -1487,6 +1999,533 @@ catalogRouter.delete("/sofa-combos/:id", async (c) => {
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sofa combo not found" }, 404);
   }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0182 — Global option pools (2990s Products parity Phase 4). One generic table
+// with a `pool` discriminator holding THREE curated reference lists:
+// supplier_category, bedframe_size, mattress_size. These are READ-ONLY reference
+// lists — NOT a source of truth for any order-side consumer (sizes stay per-model
+// in product_models.allowed_options; supplier scope stays in
+// suppliers.cat_covered). All writes are principal-only ("Master Admin"),
+// mirroring the 0177/0178/0181 gate: early friendly 403 here, with RLS
+// (catalog_option_pools_write_principal) the real boundary — we forward the USER
+// JWT (userClient) so RLS runs; NEVER service_role.
+// ---------------------------------------------------------------------------
+
+const OPTION_POOL_MSG = "Only the principal (Master Admin) can manage option pools";
+
+// Friendly 409 for a UNIQUE(pool,value) collision. mapPgError defaults 23505 to
+// a generic 500, so the option-pool writes special-case it here (the maintenance
+// editor surfaces "that value already exists in this pool").
+function optionPoolDuplicate(value?: string, pool?: string) {
+  return {
+    error: "conflict",
+    code: "duplicate_option_pool_value",
+    message:
+      value && pool
+        ? `"${value}" already exists in ${pool}`
+        : "that value already exists in this pool",
+  } as const;
+}
+
+// POST /option-pools — create a pool entry (principal-only).
+catalogRouter.post("/option-pools", async (c) => {
+  principalOnly(c, OPTION_POOL_MSG);
+  const parsed = await parseJsonBody(c, catalogOptionPoolCreateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(CATALOG_OPTION_POOLS)
+    .insert({
+      pool: parsed.data.pool,
+      value: parsed.data.value,
+      label: parsed.data.label ?? null,
+      dimensions: parsed.data.dimensions ?? null,
+      active: parsed.data.active ?? true,
+      sort_order: parsed.data.sortOrder ?? 0,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    if (error.code === "23505") {
+      return c.json(optionPoolDuplicate(parsed.data.value, parsed.data.pool), 409);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "option pool insert returned no row" }, 500);
+  }
+  return c.json({ optionPool: Adapters.catalogOptionPoolFromRow(data as DB.CatalogOptionPoolRow) }, 201);
+});
+
+// PATCH /option-pools/:id — update a pool entry (principal-only); empty → 422.
+// `pool` is intentionally NOT patchable (the schema omits it) — moving an entry
+// between pools would skew the UNIQUE(pool,value) intent; delete + recreate.
+catalogRouter.patch("/option-pools/:id", async (c) => {
+  principalOnly(c, OPTION_POOL_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, catalogOptionPoolPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.value !== undefined) patch.value = parsed.data.value;
+  if (parsed.data.label !== undefined) patch.label = parsed.data.label;
+  if (parsed.data.dimensions !== undefined) patch.dimensions = parsed.data.dimensions;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(CATALOG_OPTION_POOLS)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    // A value-rename can also collide with an existing (pool,value).
+    if (error.code === "23505") {
+      return c.json(optionPoolDuplicate(parsed.data.value), 409);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "option pool not found" }, 404);
+  }
+  return c.json({ optionPool: Adapters.catalogOptionPoolFromRow(data as DB.CatalogOptionPoolRow) });
+});
+
+// DELETE /option-pools/:id — HARD delete (principal-only). Nothing FKs to this
+// table (curated reference list, no order-side consumer), so deletion is safe.
+// The soft-hide path is `active=false` via PATCH. Idempotent: a missing id is a
+// no-op that still returns ok (mirrors the un-offer route).
+catalogRouter.delete("/option-pools/:id", async (c) => {
+  principalOnly(c, OPTION_POOL_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(CATALOG_OPTION_POOLS).delete().eq("id", id);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0184 — Delivery TRIP fee (2990s Products parity Phase 6). The principal-owned
+// config singleton (a flat trip fee + a sofa × mattress/bedframe cross-category
+// surcharge + the principal-selected charged-category set) + per-RuleTarget
+// special overrides. DORMANT by default (seeds 0/0 → byte-identical order totals
+// until the principal sets rates). The floor STAIR surcharge (floor_config) is
+// KEPT + coexists — the delivery fee is ADDITIVE. All writes are principal-only
+// ("Master Admin"), mirroring the 0177/0178/0181/0182 gate: early friendly 403
+// here, with RLS (delivery_fee_config_write_principal /
+// special_delivery_fee_rules_write_principal) the real boundary — we forward the
+// USER JWT (userClient) so RLS runs; NEVER service_role.
+// ---------------------------------------------------------------------------
+
+const DELIVERY_FEE_MSG = "Only the principal (Master Admin) can manage delivery fees";
+
+// Patch variant of the rule input: every field optional (empty → 422 below). A
+// present `target` still requires ≥1 entry (the .min(1) carries through .partial).
+const specialDeliveryFeeRulePatchInput = specialDeliveryFeeRuleInput.partial();
+
+// PATCH /delivery-fee-config — update the singleton (id=1); empty body → 422.
+catalogRouter.patch("/delivery-fee-config", async (c) => {
+  principalOnly(c, DELIVERY_FEE_MSG);
+  const parsed = await parseJsonBody(c, deliveryFeeConfigPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.baseFee !== undefined) patch.base_fee = parsed.data.baseFee;
+  if (parsed.data.crossCategoryFee !== undefined) patch.cross_category_fee = parsed.data.crossCategoryFee;
+  if (parsed.data.chargedCategories !== undefined) patch.charged_categories = parsed.data.chargedCategories;
+  if (parsed.data.mattressBedframeLeadDays !== undefined)
+    patch.mattress_bedframe_lead_days = parsed.data.mattressBedframeLeadDays;
+  if (parsed.data.sofaLeadDays !== undefined) patch.sofa_lead_days = parsed.data.sofaLeadDays;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(DELIVERY_FEE_CONFIG)
+    .update(patch)
+    .eq("id", 1)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "delivery_fee_config row missing" },
+      404,
+    );
+  }
+  return c.json({ deliveryFeeConfig: Adapters.deliveryFeeConfigFromRow(data as DB.DeliveryFeeConfigRow) });
+});
+
+// POST /special-delivery-fee-rules — create a per-RuleTarget override (principal-only).
+catalogRouter.post("/special-delivery-fee-rules", async (c) => {
+  principalOnly(c, DELIVERY_FEE_MSG);
+  const parsed = await parseJsonBody(c, specialDeliveryFeeRuleInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SPECIAL_DELIVERY_FEE_RULES)
+    .insert({
+      // `target` is RuleTarget[] jsonb (re-parsed on read via parseRuleTargets).
+      target: parsed.data.target,
+      standalone_fee: parsed.data.standaloneFee,
+      cross_cat_followup_fee: parsed.data.crossCategoryFollowupFee,
+      label: parsed.data.label ?? null,
+      active: parsed.data.active ?? true,
+      sort_order: parsed.data.sortOrder ?? 0,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "rpc_failed", code: "rpc_failed", message: "special delivery fee rule insert returned no row" },
+      500,
+    );
+  }
+  return c.json(
+    { specialDeliveryFeeRule: Adapters.specialDeliveryFeeRuleFromRow(data as DB.SpecialDeliveryFeeRuleRow) },
+    201,
+  );
+});
+
+// PATCH /special-delivery-fee-rules/:id — partial update (principal-only); empty → 422.
+catalogRouter.patch("/special-delivery-fee-rules/:id", async (c) => {
+  principalOnly(c, DELIVERY_FEE_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, specialDeliveryFeeRulePatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.target !== undefined) patch.target = parsed.data.target;
+  if (parsed.data.standaloneFee !== undefined) patch.standalone_fee = parsed.data.standaloneFee;
+  if (parsed.data.crossCategoryFollowupFee !== undefined)
+    patch.cross_cat_followup_fee = parsed.data.crossCategoryFollowupFee;
+  if (parsed.data.label !== undefined) patch.label = parsed.data.label;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SPECIAL_DELIVERY_FEE_RULES)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "special delivery fee rule not found" },
+      404,
+    );
+  }
+  return c.json({ specialDeliveryFeeRule: Adapters.specialDeliveryFeeRuleFromRow(data as DB.SpecialDeliveryFeeRuleRow) });
+});
+
+// DELETE /special-delivery-fee-rules/:id — HARD delete (principal-only). Nothing
+// FKs to this table, so deletion is safe; the soft-hide path is `active=false`
+// via PATCH. Idempotent: a missing id is a no-op that still returns ok (mirrors
+// the option-pools un-author route).
+catalogRouter.delete("/special-delivery-fee-rules/:id", async (c) => {
+  principalOnly(c, DELIVERY_FEE_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(SPECIAL_DELIVERY_FEE_RULES).delete().eq("id", id);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0185 — Default Free Gifts (per model) + Free Item Campaigns (2990s Products
+// parity Phase 7, GWP). A free gift is a DETERMINISTIC accessory @ RM0 the
+// server APPENDS for a qualifying paid line; a free item campaign lets a
+// salesperson "Make Free" an ELIGIBLE existing line. Both are principal-owned
+// ("Master Admin"): early friendly 403 here, with RLS
+// (model_default_free_gifts_write_principal / free_item_campaigns_write_principal)
+// the real boundary — we forward the USER JWT (userClient) so RLS runs; NEVER
+// service_role. NO order-side change here — create_order / order_lines / the
+// free-line enforcement live elsewhere; this is the config/CRUD surface only.
+// ---------------------------------------------------------------------------
+
+const FREE_GIFT_MSG = "Only the principal (Master Admin) can manage free gifts";
+
+// Patch variant of the campaign input: every field optional (empty → 422 below).
+// A present `eligible` still requires ≥1 entry (the .min(1) carries through).
+const freeItemCampaignPatchInput = freeItemCampaignInput.partial();
+
+// PUT /model-free-gifts/:modelId — REPLACE a model's whole default-gift set
+// (principal-only). An empty `gifts` clears the config (the row is deleted, so
+// the model triggers no gift). A non-empty set upserts on model_id.
+catalogRouter.put("/model-free-gifts/:modelId", async (c) => {
+  principalOnly(c, FREE_GIFT_MSG);
+  const modelId = c.req.param("modelId");
+  const parsed = await parseJsonBody(c, modelDefaultFreeGiftsInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // Empty set = clear: delete the row (the GET resolver then returns nothing for
+  // this model). Return the cleared shape so the client can update its cache.
+  if (parsed.data.gifts.length === 0) {
+    const { error } = await sb
+      .from(MODEL_DEFAULT_FREE_GIFTS)
+      .delete()
+      .eq("model_id", modelId);
+    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    return c.json({ modelDefaultFreeGifts: { modelId, gifts: [] } });
+  }
+
+  const { data, error } = await sb
+    .from(MODEL_DEFAULT_FREE_GIFTS)
+    .upsert(
+      {
+        model_id: modelId,
+        // `gifts` is DefaultFreeGift[] jsonb (re-parsed on read via
+        // parseDefaultFreeGifts, which drops any malformed entry).
+        gifts: parsed.data.gifts,
+        updated_at: new Date().toISOString(),
+        updated_by: c.var.auth.id,
+      },
+      { onConflict: "model_id" },
+    )
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "upsert returned no row" },
+      404,
+    );
+  }
+  return c.json({
+    modelDefaultFreeGifts: Adapters.modelDefaultFreeGiftsFromRow(
+      data as DB.ModelDefaultFreeGiftsRow,
+    ),
+  });
+});
+
+// DELETE /model-free-gifts/:modelId — drop a model's gift config (principal-only).
+// Idempotent: a missing row is a no-op that still returns ok.
+catalogRouter.delete("/model-free-gifts/:modelId", async (c) => {
+  principalOnly(c, FREE_GIFT_MSG);
+  const modelId = c.req.param("modelId");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb
+    .from(MODEL_DEFAULT_FREE_GIFTS)
+    .delete()
+    .eq("model_id", modelId);
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ ok: true });
+});
+
+// POST /free-item-campaigns — create a GWP campaign (principal-only). `eligible`
+// requires ≥1 target; `active` defaults false (a campaign is dormant until the
+// principal flips it on); `maxFreeQty` defaults 1.
+catalogRouter.post("/free-item-campaigns", async (c) => {
+  principalOnly(c, FREE_GIFT_MSG);
+  const parsed = await parseJsonBody(c, freeItemCampaignInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(FREE_ITEM_CAMPAIGNS)
+    .insert({
+      name: parsed.data.name,
+      active: parsed.data.active ?? false,
+      max_free_qty: parsed.data.maxFreeQty ?? 1,
+      // `eligible` is RuleTarget[] jsonb (re-parsed on read via parseRuleTargets).
+      eligible: parsed.data.eligible,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "rpc_failed", code: "rpc_failed", message: "free item campaign insert returned no row" },
+      500,
+    );
+  }
+  return c.json(
+    { freeItemCampaign: Adapters.freeItemCampaignFromRow(data as DB.FreeItemCampaignRow) },
+    201,
+  );
+});
+
+// PATCH /free-item-campaigns/:id — partial update (principal-only); empty → 422.
+catalogRouter.patch("/free-item-campaigns/:id", async (c) => {
+  principalOnly(c, FREE_GIFT_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, freeItemCampaignPatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.name !== undefined) patch.name = parsed.data.name;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  if (parsed.data.maxFreeQty !== undefined) patch.max_free_qty = parsed.data.maxFreeQty;
+  if (parsed.data.eligible !== undefined) patch.eligible = parsed.data.eligible;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(FREE_ITEM_CAMPAIGNS)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "free item campaign not found" },
+      404,
+    );
+  }
+  return c.json({ freeItemCampaign: Adapters.freeItemCampaignFromRow(data as DB.FreeItemCampaignRow) });
+});
+
+// DELETE /free-item-campaigns/:id — HARD delete (principal-only). Nothing FKs to
+// this table, so deletion is safe; the soft-hide path is `active=false` via PATCH.
+catalogRouter.delete("/free-item-campaigns/:id", async (c) => {
+  principalOnly(c, FREE_GIFT_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(FREE_ITEM_CAMPAIGNS).delete().eq("id", id);
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// 0186 — PWP & Promo RULES (2990s Products parity Phase 8a). A rule unlocks a
+// reward category/scope when a trigger category/scope is in the cart, at the
+// ratio qty_per_trigger. type 'pwp' = the reward is sold at its per-SKU
+// pwp_price; 'promo' = the reward is FREE. The reward PRICE is NOT on the rule —
+// it lives per-SKU (product_skus.pwp_price) / per-sofa-combo
+// (sofa_combo_pricing.pwp_prices_by_height). All writes are principal-owned
+// ("Master Admin"): early friendly 403 here, with RLS (pwp_rules_write_principal)
+// the real boundary — we forward the USER JWT (userClient) so RLS runs; NEVER
+// service_role. DORMANT in P8a — NO order-side consumer; create_order /
+// order_lines are untouched, so orders stay byte-identical. CRUD surface only.
+// Mirrors the 0185 free-item-campaigns routes EXACTLY.
+// ---------------------------------------------------------------------------
+
+const PWP_RULE_MSG = "Only the principal (Master Admin) can manage PWP rules";
+
+// Patch variant of the rule input: every field optional (empty body → 422 below).
+const pwpRulePatchInput = pwpRuleInput.partial();
+
+// POST /pwp-rules — create a PWP/Promo rule (principal-only). `triggerTargets` /
+// `rewardTargets` ALLOW empty ([] = the whole category); `qtyPerTrigger` defaults
+// 1; `active` defaults false (a rule is dormant until the principal flips it on).
+catalogRouter.post("/pwp-rules", async (c) => {
+  principalOnly(c, PWP_RULE_MSG);
+  const parsed = await parseJsonBody(c, pwpRuleInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(PWP_RULES)
+    .insert({
+      type: parsed.data.type,
+      trigger_category: parsed.data.triggerCategory,
+      // `trigger_targets` / `reward_targets` are RuleTarget[] jsonb.
+      trigger_targets: parsed.data.triggerTargets,
+      reward_category: parsed.data.rewardCategory,
+      reward_targets: parsed.data.rewardTargets,
+      qty_per_trigger: parsed.data.qtyPerTrigger ?? 1,
+      active: parsed.data.active ?? false,
+      // P8d (0188) — per-rule cross-order carry-forward policy. `carry_forward`
+      // defaults true (the DB default); `carry_forward_days` NULL = perpetual.
+      carry_forward: parsed.data.carryForward ?? true,
+      carry_forward_days: parsed.data.carryForwardDays ?? null,
+      updated_at: new Date().toISOString(),
+      updated_by: c.var.auth.id,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "rpc_failed", code: "rpc_failed", message: "pwp rule insert returned no row" },
+      500,
+    );
+  }
+  return c.json(
+    { pwpRule: Adapters.pwpRuleFromRow(data as DB.PwpRuleRow) },
+    201,
+  );
+});
+
+// PATCH /pwp-rules/:id — partial update (principal-only); empty → 422.
+catalogRouter.patch("/pwp-rules/:id", async (c) => {
+  principalOnly(c, PWP_RULE_MSG);
+  const id = c.req.param("id");
+  const parsed = await parseJsonBody(c, pwpRulePatchInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.type !== undefined) patch.type = parsed.data.type;
+  if (parsed.data.triggerCategory !== undefined) patch.trigger_category = parsed.data.triggerCategory;
+  if (parsed.data.triggerTargets !== undefined) patch.trigger_targets = parsed.data.triggerTargets;
+  if (parsed.data.rewardCategory !== undefined) patch.reward_category = parsed.data.rewardCategory;
+  if (parsed.data.rewardTargets !== undefined) patch.reward_targets = parsed.data.rewardTargets;
+  if (parsed.data.qtyPerTrigger !== undefined) patch.qty_per_trigger = parsed.data.qtyPerTrigger;
+  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  // P8d (0188) — per-rule cross-order carry-forward policy round-trips through PATCH.
+  if (parsed.data.carryForward !== undefined) patch.carry_forward = parsed.data.carryForward;
+  if (parsed.data.carryForwardDays !== undefined)
+    patch.carry_forward_days = parsed.data.carryForwardDays;
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
+  }
+  patch.updated_at = new Date().toISOString();
+  patch.updated_by = c.var.auth.id;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(PWP_RULES)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json(
+      { error: "not_found", code: "not_found", message: "pwp rule not found" },
+      404,
+    );
+  }
+  return c.json({ pwpRule: Adapters.pwpRuleFromRow(data as DB.PwpRuleRow) });
+});
+
+// DELETE /pwp-rules/:id — HARD delete (principal-only). Nothing FKs to this
+// table, so deletion is safe; the soft-hide path is `active=false` via PATCH.
+catalogRouter.delete("/pwp-rules/:id", async (c) => {
+  principalOnly(c, PWP_RULE_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(PWP_RULES).delete().eq("id", id);
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   return c.json({ ok: true });
 });
 

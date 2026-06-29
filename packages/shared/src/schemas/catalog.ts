@@ -35,6 +35,8 @@ export const allowedOptionsSchema = z
     compartments: z.array(z.string()).optional(),
     colors: z.array(z.string()).optional(),
     gaps: z.array(z.string()).optional(),
+    // 0181 — special add-on codes this model offers (per-model attach).
+    specials: z.array(z.string()).optional(),
   })
   .passthrough();
 export type AllowedOptions = z.infer<typeof allowedOptionsSchema>;
@@ -83,6 +85,11 @@ export const productSkuSchema = z.object({
   // 0178 (sofa engine Phase 1) — nullable link to a sofa compartment type.
   // Additive/optional: pre-0178 serialized SKUs that don't carry it stay valid.
   compartmentId: z.string().uuid().nullable().optional(),
+  // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (the price a
+  // PWP-rule reward line is sold at). Mirrors `cost`: economic, nullable
+  // (null = no PWP price set). Additive/optional so pre-0186 serialized SKUs
+  // stay valid. DORMANT — no order consumer yet.
+  pwpPrice: z.number().nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
 
@@ -120,6 +127,65 @@ export const addonSchema = z.object({
   serviceSku: serviceSkuCodeSchema.nullable().optional(),
 });
 export type AddonDto = z.infer<typeof addonSchema>;
+
+// 0181 — Special Add-ons: per-model SELLING surcharges with one-level follow-up
+// question groups (group → choices, each choice carries an `extra`). Surcharges
+// (base + extras) may be NEGATIVE (a deduction). Principal-owned; folds into the
+// product line's unitPrice (no separate SKU). The ±1M bound keeps a typo out of
+// the numeric(12,2) column while leaving plenty of room for real surcharges.
+const SPECIAL_MONEY = z.number().gte(-1_000_000).lte(1_000_000);
+export const specialAddonChoiceSchema = z.object({
+  label: z.string().trim().min(1).max(60),
+  extra: SPECIAL_MONEY,
+});
+export const specialAddonOptionGroupSchema = z.object({
+  label: z.string().trim().min(1).max(60),
+  required: z.boolean(),
+  choices: z.array(specialAddonChoiceSchema).min(1).max(20),
+});
+export type SpecialAddonOptionGroupDto = z.infer<typeof specialAddonOptionGroupSchema>;
+
+export const specialAddonSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  label: z.string(),
+  soDescription: z.string(),
+  categories: z.array(productCategorySchema),
+  sellingPrice: z.number(),
+  cost: z.number().nullable(),
+  optionGroups: z.array(specialAddonOptionGroupSchema),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type SpecialAddonDto = z.infer<typeof specialAddonSchema>;
+
+// ---------------------------------------------------------------------------
+// 0182 — global option pools (2990s Products parity Phase 4). Principal-owned
+// curated reference lists. One schema, two consumers (§9.5): the API validates
+// these and the Maintenance UI reuses the exact same shapes.
+// ---------------------------------------------------------------------------
+
+/** The three curated pools (branding dropped — every Carres product is one brand). */
+export const CATALOG_OPTION_POOL_NAMES = [
+  "supplier_category",
+  "bedframe_size",
+  "mattress_size",
+] as const;
+export const catalogOptionPoolNameSchema = z.enum(CATALOG_OPTION_POOL_NAMES);
+export type CatalogOptionPoolName = z.infer<typeof catalogOptionPoolNameSchema>;
+
+/** One pool entry (mirrors the domain `CatalogOptionPool` / a row, camelCased).
+ *  `label` + `dimensions` are populated for size pools only (null otherwise). */
+export const catalogOptionPoolSchema = z.object({
+  id: z.string().uuid(),
+  pool: catalogOptionPoolNameSchema,
+  value: z.string(),
+  label: z.string().nullable(),
+  dimensions: z.string().nullable(),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type CatalogOptionPoolDto = z.infer<typeof catalogOptionPoolSchema>;
 
 export const floorConfigSchema = z.object({
   id: z.number().int(),
@@ -172,6 +238,8 @@ export const comboSchema = z.object({
   comboKey: z.string(),
   name: z.string(),
   comboPrice: z.number(),
+  // 0183 — principal-only cost benchmark companion to comboPrice; null = unset.
+  cost: z.number().nullable(),
   active: z.boolean(),
   effectiveFrom: z.string(),
   components: z.array(comboComponentSchema),
@@ -187,6 +255,8 @@ export const comboCreateInput = z
   .object({
     name: z.string().trim().min(2).max(80),
     comboPrice: z.number().nonnegative(),
+    // 0183 — optional cost benchmark (principal-only). null/omit = unset.
+    cost: z.number().nonnegative().nullable().optional(),
     comboKey: z
       .string()
       .trim()
@@ -312,6 +382,12 @@ export const sofaComboSchema = z.object({
   slots: z.array(z.array(z.string())),
   tier: fabricTierSchema.nullable(),
   pricesByHeight: z.record(z.string(), z.union([z.number(), z.null()])),
+  // 0183 — per-seat-height cost benchmark (same shape); null = unset.
+  costByHeight: z.record(z.string(), z.union([z.number(), z.null()])).nullable(),
+  // 0186 (PWP Phase 8a) — per-seat-height PWP reward price (same shape as
+  // pricesByHeight); null = unset. The price a PWP-rule reward sofa-combo is
+  // sold at. DORMANT — no order consumer yet.
+  pwpPricesByHeight: z.record(z.string(), z.union([z.number(), z.null()])).nullable(),
   label: z.string().nullable(),
   effectiveFrom: z.string(),
   active: z.boolean(),
@@ -330,6 +406,12 @@ export const sofaComboCreateInput = z
     slots: sofaComboSlotsSchema,
     tier: fabricTierSchema.nullable().optional(),
     pricesByHeight: sofaComboPricesByHeightSchema.optional(),
+    // 0183 — optional per-height cost benchmark (principal-only); same
+    // SOFA_HEIGHTS-keyed shape as pricesByHeight. null/omit = unset.
+    costByHeight: sofaComboPricesByHeightSchema.nullable().optional(),
+    // 0186 — optional per-height PWP reward price (principal-only); same
+    // SOFA_HEIGHTS-keyed shape as pricesByHeight. null/omit = unset.
+    pwpPricesByHeight: sofaComboPricesByHeightSchema.nullable().optional(),
     label: z.string().trim().max(200).nullable().optional(),
     effectiveFrom: z.string().optional(),
     active: z.boolean().optional(),
@@ -340,6 +422,326 @@ export type SofaComboCreateInput = z.infer<typeof sofaComboCreateInput>;
 /** Patch a sofa combo — every field of create is optional. */
 export const sofaComboPatchInput = sofaComboCreateInput.partial().strict();
 export type SofaComboPatchInput = z.infer<typeof sofaComboPatchInput>;
+
+// ---------------------------------------------------------------------------
+// 0184 — delivery TRIP fee subsystem (2990s Products parity Phase 6). The
+// principal-owned config singleton + per-RuleTarget special overrides.
+// Principal-only writes. One schema, two consumers (§9.5): the API validates
+// these and the Maintenance UI reuses the exact same shapes. The floor STAIR
+// surcharge (floorConfig) is KEPT + coexists; the delivery fee is ADDITIVE.
+// ---------------------------------------------------------------------------
+
+/** The `delivery_fee_config` singleton DTO (camelCased; the `id` is dropped, the
+ *  shape doubles as the pure `computeDeliveryFee` config). */
+export const deliveryFeeConfigSchema = z.object({
+  baseFee: z.number().nonnegative(),
+  crossCategoryFee: z.number().nonnegative(),
+  chargedCategories: z.array(z.string()),
+  mattressBedframeLeadDays: z.number().int().nonnegative(),
+  sofaLeadDays: z.number().int().nonnegative(),
+});
+export type DeliveryFeeConfigDto = z.infer<typeof deliveryFeeConfigSchema>;
+
+/** Patch the config singleton — every field optional + nonnegative. The PATCH
+ *  input CONSTRAINS `chargedCategories` to the product category enum (the DTO
+ *  above stays `z.array(z.string())` for read-tolerance of legacy rows): an
+ *  unknown category never matches a cart line, so a typo/casing would silently
+ *  disable base billing — 422 it instead. */
+export const deliveryFeeConfigPatchInput = deliveryFeeConfigSchema
+  .partial()
+  .extend({
+    chargedCategories: z.array(productCategorySchema).optional(),
+  })
+  .strict();
+export type DeliveryFeeConfigPatchInput = z.infer<typeof deliveryFeeConfigPatchInput>;
+
+/** RuleTarget scope enum (mirrors the `RuleTargetScope` union). */
+export const ruleTargetScopeSchema = z.enum(["model", "variant", "combo", "compartment"]);
+export type RuleTargetScopeValue = z.infer<typeof ruleTargetScopeSchema>;
+
+/** One RuleTarget entry (mirrors the `RuleTarget` shared type). `modelId` may be
+ *  '' for a model-agnostic combo entry; the refinement lists are OR'd within. */
+export const ruleTargetSchema = z.object({
+  scope: ruleTargetScopeSchema,
+  modelId: z.string(),
+  sizeCodes: z.array(z.string()).optional(),
+  comboIds: z.array(z.string()).optional(),
+  compartments: z.array(z.string()).optional(),
+});
+export type RuleTargetDto = z.infer<typeof ruleTargetSchema>;
+
+/** A `special_delivery_fee_rules` row DTO (mirrors `SpecialDeliveryFeeRule`). */
+export const specialDeliveryFeeRuleSchema = z.object({
+  id: z.string().uuid(),
+  target: z.array(ruleTargetSchema),
+  standaloneFee: z.number(),
+  crossCategoryFollowupFee: z.number(),
+  label: z.string().nullable(),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type SpecialDeliveryFeeRuleDto = z.infer<typeof specialDeliveryFeeRuleSchema>;
+
+/** Create / patch a special delivery fee rule. `target` requires ≥1 entry; fees
+ *  are nonnegative; `label` / `active` / `sortOrder` are optional. */
+export const specialDeliveryFeeRuleInput = z
+  .object({
+    target: z.array(ruleTargetSchema).min(1),
+    standaloneFee: z.number().nonnegative(),
+    crossCategoryFollowupFee: z.number().nonnegative(),
+    label: z.string().trim().max(200).nullable().optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type SpecialDeliveryFeeRuleInput = z.infer<typeof specialDeliveryFeeRuleInput>;
+
+// ---------------------------------------------------------------------------
+// 0185 — Default Free Gifts + Free Item Campaigns (2990s Products parity Phase
+// 7, GWP). Principal-owned. One schema, two consumers (§9.5): the API validates
+// these and the Maintenance UI reuses the exact same shapes. Free lines book as
+// RM0 order_lines with attrs markers — create_order / order_lines untouched.
+// ---------------------------------------------------------------------------
+
+/** A P6 `TargetRefinement` WITHOUT a modelId (a default-gift condition is scoped
+ *  to its own model already). Mirrors the shared `TargetRefinement` type. */
+export const targetRefinementSchema = z.object({
+  scope: ruleTargetScopeSchema,
+  sizeCodes: z.array(z.string()).optional(),
+  comboIds: z.array(z.string()).optional(),
+  compartments: z.array(z.string()).optional(),
+});
+export type TargetRefinementDto = z.infer<typeof targetRefinementSchema>;
+
+/** One configured default free gift (mirrors the shared `DefaultFreeGift`). */
+export const defaultFreeGiftSchema = z.object({
+  giftSku: z.string(),
+  qty: z.number().int().positive(),
+  label: z.string().optional(),
+  condition: targetRefinementSchema.optional(),
+});
+export type DefaultFreeGiftDto = z.infer<typeof defaultFreeGiftSchema>;
+
+/** A `model_default_free_gifts` row DTO (mirrors `ModelDefaultFreeGifts`). */
+export const modelDefaultFreeGiftsSchema = z.object({
+  modelId: z.string().uuid(),
+  gifts: z.array(defaultFreeGiftSchema),
+});
+export type ModelDefaultFreeGiftsDto = z.infer<typeof modelDefaultFreeGiftsSchema>;
+
+/** Upsert a model's gift set (the PUT body for
+ *  /models/:id/default-free-gifts). `giftSku` non-empty + `qty` >= 1; the
+ *  optional `condition` reuses the P6 refinement. Replaces the whole set (an
+ *  empty `gifts` clears it). */
+export const modelDefaultFreeGiftsInput = z
+  .object({
+    gifts: z.array(
+      z
+        .object({
+          giftSku: z.string().trim().min(1),
+          qty: z.number().int().positive(),
+          label: z.string().trim().max(120).optional(),
+          condition: targetRefinementSchema.optional(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type ModelDefaultFreeGiftsInput = z.infer<typeof modelDefaultFreeGiftsInput>;
+
+/** A `free_item_campaigns` row DTO (mirrors the shared `FreeItemCampaign`). */
+export const freeItemCampaignSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  active: z.boolean(),
+  maxFreeQty: z.number().int().positive(),
+  eligible: z.array(ruleTargetSchema),
+});
+export type FreeItemCampaignDto = z.infer<typeof freeItemCampaignSchema>;
+
+/** Create / patch a free item campaign. `eligible` requires >=1 target (an
+ *  EMPTY eligible covers nothing — see `campaignsCoveringLine`); `maxFreeQty`
+ *  >= 1 (optional; server defaults to 1). `active` defaults false server-side. */
+export const freeItemCampaignInput = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    active: z.boolean().optional(),
+    maxFreeQty: z.number().int().positive().optional(),
+    eligible: z.array(ruleTargetSchema).min(1),
+  })
+  .strict();
+export type FreeItemCampaignInput = z.infer<typeof freeItemCampaignInput>;
+
+// ---------------------------------------------------------------------------
+// 0186 — PWP & Promo RULES (2990s Products parity Phase 8a). Principal-owned.
+// A rule maps a trigger category/scope → a reward category/scope at a ratio
+// qtyPerTrigger. type 'pwp' = the reward is sold at its per-SKU pwp_price;
+// 'promo' = the reward is FREE. The reward PRICE is NOT on the rule — it lives
+// per-SKU (product_skus.pwp_price) / per-sofa-combo
+// (sofa_combo_pricing.pwp_prices_by_height). One schema, two consumers (§9.5):
+// the API validates these and the Maintenance UI reuses the exact same shapes.
+// DORMANT (active default false; no order consumer in P8a).
+// ---------------------------------------------------------------------------
+
+/** A `pwp_rules` row DTO (mirrors the engine's `PwpRule`, with a row `id` +
+ *  `active`). Trigger/reward scope are P6 RuleTarget[] (`[]` = the whole
+ *  category — the 2990s semantic; NO `.min(1)`, empty-within-a-category is
+ *  intentional for PWP). */
+export const pwpRuleSchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(["pwp", "promo"]),
+  triggerCategory: productCategorySchema,
+  triggerTargets: z.array(ruleTargetSchema),
+  rewardCategory: productCategorySchema,
+  rewardTargets: z.array(ruleTargetSchema),
+  qtyPerTrigger: z.number().int().positive(),
+  active: z.boolean(),
+  // P8d (0188) — cross-order carry-forward policy. `carryForward` true (default)
+  // = an unclaimed RESERVED voucher minted by this rule carries forward to the
+  // customer's next order; false = same-cart delete (P8c). `carryForwardDays` =
+  // optional expiry window (null = perpetual).
+  carryForward: z.boolean(),
+  carryForwardDays: z.number().int().positive().nullable(),
+});
+export type PwpRuleDto = z.infer<typeof pwpRuleSchema>;
+
+/** Create / patch a PWP rule. `triggerTargets` / `rewardTargets` ALLOW empty (an
+ *  empty target list = the whole category — do NOT add `.min(1)`).
+ *  `qtyPerTrigger` optional (server defaults to 1); `active` defaults false
+ *  server-side. P8d (0188): `carryForward` optional (server defaults true) +
+ *  `carryForwardDays` optional/nullable (null = perpetual). */
+export const pwpRuleInput = z
+  .object({
+    type: z.enum(["pwp", "promo"]),
+    triggerCategory: productCategorySchema,
+    triggerTargets: z.array(ruleTargetSchema),
+    rewardCategory: productCategorySchema,
+    rewardTargets: z.array(ruleTargetSchema),
+    qtyPerTrigger: z.number().int().positive().optional(),
+    active: z.boolean().optional(),
+    // P8d (0188) — both optional; the server defaults carryForward true.
+    carryForward: z.boolean().optional(),
+    carryForwardDays: z.number().int().positive().nullable().optional(),
+  })
+  .strict();
+export type PwpRuleInput = z.infer<typeof pwpRuleInput>;
+
+// ---------------------------------------------------------------------------
+// 0187 — PWP voucher LEDGER (2990s Products parity Phase 8c, SAME-CART state
+// machine). The pwp_codes DTO (the reconciler's read shape) + the reserve
+// request/response + the extended `attrs.pwp` reward-line marker. One schema,
+// two consumers (§9.5): the API validates these and the POS reuses the exact
+// same shapes. DORMANT — no codes minted until the principal authors active
+// pwp_rules. (The order-path claim runs as a separate post-P8b stage; the price
+// stays P8b-authoritative — see the design plan §0.)
+// ---------------------------------------------------------------------------
+
+/** The voucher status machine: RESERVED (minted on a cart trigger) → USED
+ *  (claimed at Confirm). 'AVAILABLE' ships for the P8d cross-order carry-forward
+ *  (written by nobody in P8c). */
+export const pwpCodeStatusSchema = z.enum(["RESERVED", "USED", "AVAILABLE"]);
+export type PwpCodeStatusValue = z.infer<typeof pwpCodeStatusSchema>;
+
+/** A `pwp_codes` row DTO (mirrors the `PwpCode` domain type, camelCased). The
+ *  reconciler (`GET /mine`) + the reserve endpoint return arrays of these.
+ *  `rewardTargets` is the rule's reward-scope snapshot ([] = whole category).
+ *  OWNER-SCOPED USE ONLY — this carries `boundCustomerPhone` (the bound customer's
+ *  PII). Cross-order discovery uses the stripped `pwpDiscoverDtoSchema` instead, so
+ *  a non-owner never receives a phone. P8d (0188) adds the cross-order binding
+ *  fields (`boundCustomerPhone` / `ownerDealerId` / `expiresAt`); `customerId`
+ *  remains permanently null (a P8c dormant artifact — the binding uses
+ *  `boundCustomerPhone`, not `customerId`; CF `pwp-customer-id-dead-column`). */
+export const pwpCodeSchema = z.object({
+  code: z.string(),
+  ruleId: z.string().uuid().nullable(),
+  type: z.enum(["pwp", "promo"]),
+  rewardCategory: z.string(),
+  rewardTargets: z.array(ruleTargetSchema),
+  status: pwpCodeStatusSchema,
+  ownerStaffId: z.string().uuid().nullable(),
+  cartLineKey: z.string().nullable(),
+  triggerItemCode: z.string().nullable(),
+  claimGroup: z.string().uuid().nullable(),
+  redeemedOrderId: z.string().uuid().nullable(),
+  redeemedItemSku: z.string().nullable(),
+  // P8d cross-order columns.
+  sourceOrderId: z.string().uuid().nullable(),
+  // Permanently null — the binding uses boundCustomerPhone, not customerId.
+  customerId: z.string().uuid().nullable(),
+  // P8d (0188) — cross-order carry-forward binding (owner-scoped read only).
+  boundCustomerPhone: z.string().nullable(),
+  ownerDealerId: z.string().uuid().nullable(),
+  expiresAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type PwpCodeDto = z.infer<typeof pwpCodeSchema>;
+
+/** The STRIPPED cross-order DISCOVERY DTO (P8d, 0188) — the `/available` route's
+ *  return shape, mapped from `pwp_discover_available`. It deliberately OMITS
+ *  `boundCustomerPhone` / `ownerStaffId` / `triggerItemCode` / `redeemedItemSku` /
+ *  `customerId` — the structural guarantee that discovery cannot leak another
+ *  customer's PII. The phone match is the server-computed `phoneMatches` boolean,
+ *  so the stored phone is never returned (killing the `?code=` enumeration/PII
+ *  oracle). */
+export const pwpDiscoverDtoSchema = z.object({
+  code: z.string(),
+  ruleId: z.string().uuid().nullable(),
+  type: z.enum(["pwp", "promo"]),
+  rewardCategory: z.string(),
+  rewardTargets: z.array(ruleTargetSchema),
+  sourceOrderId: z.string().uuid().nullable(),
+  expiresAt: z.string().nullable(),
+  phoneMatches: z.boolean(),
+});
+export type PwpDiscoverDto = z.infer<typeof pwpDiscoverDtoSchema>;
+
+/** `GET /api/pwp-codes/available` response — the discovered AVAILABLE vouchers
+ *  (stripped). No selector (no phone + no code) => `{ vouchers: [] }`. */
+export const pwpDiscoverResponseSchema = z.object({
+  vouchers: z.array(pwpDiscoverDtoSchema),
+});
+export type PwpDiscoverResponse = z.infer<typeof pwpDiscoverResponseSchema>;
+
+/** POST /api/pwp-codes/reserve input — the trigger cart line just added/changed.
+ *  The route reconciles (top-up / trim) the RESERVED set this line owns. */
+export const pwpReserveInputSchema = z
+  .object({
+    cartLineKey: z.string().min(1),
+    sku: z.string().min(1),
+    qty: z.number().int().positive(),
+  })
+  .strict();
+export type PwpReserveInput = z.infer<typeof pwpReserveInputSchema>;
+
+/** Reserve / `GET /mine` response — the FULL current RESERVED set (no match =>
+ *  `{ codes: [] }`). Keyed client-side by `cartLineKey`. */
+export const pwpCodesResponseSchema = z.object({
+  codes: z.array(pwpCodeSchema),
+});
+export type PwpCodesResponse = z.infer<typeof pwpCodesResponseSchema>;
+
+/** The reward-line `attrs.pwp` marker shape — EXTENDED for P8c. P8b canonicalises
+ *  the marker to `{ ruleId, type?, triggerRef? }`; P8c adds two OPTIONAL fields a
+ *  reward line may carry: `code` (the RESERVED voucher the POS bound to this
+ *  reward, claimed RESERVED→USED at Confirm) + `claimGroup` (the per-submit
+ *  correlation uuid). Both optional — a DORMANT / P8b-only line carries neither,
+ *  so the marker stays byte-identical when no voucher is in play. `.passthrough()`
+ *  keeps P8b's `type` / `triggerRef` fields (this schema only PINS the P8c/P8d
+ *  additions; the order-path claim reads `code` + `claimGroup` + `crossOrder`).
+ *  P8d (0188) adds `crossOrder` (optional): when true, the bound `code` is an
+ *  AVAILABLE carry-forward voucher claimed via `pwp_claim_available_code` (phone-
+ *  bound), not a same-cart RESERVED code. Omitted/false => same-cart (byte-
+ *  identical to a P8c marker). */
+export const attrsPwpMarkerSchema = z
+  .object({
+    ruleId: z.string(),
+    code: z.string().optional(),
+    claimGroup: z.string().optional(),
+    crossOrder: z.boolean().optional(),
+  })
+  .passthrough();
+export type AttrsPwpMarker = z.infer<typeof attrsPwpMarkerSchema>;
 
 export const catalogResponseSchema = z.object({
   models: z.array(productModelSchema),
@@ -360,6 +762,20 @@ export const catalogResponseSchema = z.object({
   modelSofaCompartments: z.array(modelSofaCompartmentSchema).optional(),
   // 0179 — sofa combo pricing (additive, OPTIONAL). Pre-0179 clients unaffected.
   sofaCombos: z.array(sofaComboSchema).optional(),
+  // 0181 — special add-ons (additive, OPTIONAL). Pre-0181 clients unaffected.
+  specialAddons: z.array(specialAddonSchema).optional(),
+  // 0182 — global option pools (additive, OPTIONAL). Pre-0182 clients unaffected.
+  optionPools: z.array(catalogOptionPoolSchema).optional(),
+  // 0184 — delivery fee config + special rules (additive, OPTIONAL). Pre-0184
+  // clients that don't read these are wholly unaffected.
+  deliveryFeeConfig: deliveryFeeConfigSchema.optional(),
+  specialDeliveryFeeRules: z.array(specialDeliveryFeeRuleSchema).optional(),
+  // 0185 — Default Free Gifts + Free Item Campaigns (additive, OPTIONAL).
+  // Pre-0185 clients that don't read these are wholly unaffected.
+  modelDefaultFreeGifts: z.array(modelDefaultFreeGiftsSchema).optional(),
+  freeItemCampaigns: z.array(freeItemCampaignSchema).optional(),
+  // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients unaffected.
+  pwpRules: z.array(pwpRuleSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 
@@ -454,6 +870,11 @@ export const productSkuCreateInput = z
     supplierId: z.string().uuid().nullable().optional(),
     description: z.string().trim().max(200).nullable().optional(),
     posActive: z.boolean().optional(),
+    // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (the price a
+    // PWP-rule reward line is sold at). Mirrors `cost`: economic, nullable.
+    // The route gate (gateSkuCreatePriceCost) + the DB trigger enforce
+    // principal-only; null/omit = unset.
+    pwpPrice: z.number().nonnegative().nullable().optional(),
   })
   .strict();
 export type ProductSkuCreateInput = z.infer<typeof productSkuCreateInput>;
@@ -470,6 +891,9 @@ export const productSkuPatchInput = z
     // 0170 — Edit-Prices / Modular toggle / inline description edit.
     posActive: z.boolean().optional(),
     description: z.string().trim().max(200).nullable().optional(),
+    // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (mirrors `cost`).
+    // Presence = intent to change → gated to principal in the route.
+    pwpPrice: z.number().nonnegative().nullable().optional(),
   })
   .strict();
 export type ProductSkuPatchInput = z.infer<typeof productSkuPatchInput>;
@@ -578,3 +1002,70 @@ export const addonPatchInput = z
   })
   .strict();
 export type AddonPatchInput = z.infer<typeof addonPatchInput>;
+
+/** Special Add-ons CRUD (0181, principal-only). `code` is the stable key
+ *  referenced from allowed_options.specials + order_lines.attrs — set on create,
+ *  NEVER patched (a rename would orphan those references). selling_price/extra
+ *  may be negative. */
+export const specialAddonCreateInput = z
+  .object({
+    // Stable cross-reference key (allowed_options.specials + order_lines.attrs);
+    // kebab-case like comboKey/addon.key so it stays clean as a jsonb key.
+    code: z.string().trim().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/, "code must be kebab-case (a-z, 0-9, dash)"),
+    label: z.string().trim().min(1).max(80),
+    soDescription: z.string().trim().max(200).optional(),
+    categories: z.array(productCategorySchema).max(5),
+    sellingPrice: SPECIAL_MONEY,
+    cost: z.number().nonnegative().nullable().optional(),
+    optionGroups: z.array(specialAddonOptionGroupSchema).max(20).optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type SpecialAddonCreateInput = z.infer<typeof specialAddonCreateInput>;
+
+export const specialAddonPatchInput = z
+  .object({
+    label: z.string().trim().min(1).max(80).optional(),
+    soDescription: z.string().trim().max(200).optional(),
+    categories: z.array(productCategorySchema).max(5).optional(),
+    sellingPrice: SPECIAL_MONEY.optional(),
+    cost: z.number().nonnegative().nullable().optional(),
+    optionGroups: z.array(specialAddonOptionGroupSchema).max(20).optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type SpecialAddonPatchInput = z.infer<typeof specialAddonPatchInput>;
+
+// ---------------------------------------------------------------------------
+// 0182 — global option pool create / patch inputs (principal-gated).
+// ---------------------------------------------------------------------------
+
+/** Create a pool entry. `pool` + `value` required; `label`/`dimensions` apply
+ *  to the size pools (free to send null/omit for supplier_category). */
+export const catalogOptionPoolCreateInput = z
+  .object({
+    pool: catalogOptionPoolNameSchema,
+    value: z.string().trim().min(1).max(60),
+    label: z.string().trim().max(60).nullable().optional(),
+    dimensions: z.string().trim().max(60).nullable().optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type CatalogOptionPoolCreateInput = z.infer<typeof catalogOptionPoolCreateInput>;
+
+/** Patch a pool entry — every field optional EXCEPT `pool`, which is never
+ *  patched (moving an entry between pools would skew the UNIQUE(pool,value)
+ *  intent; delete + recreate instead). */
+export const catalogOptionPoolPatchInput = z
+  .object({
+    value: z.string().trim().min(1).max(60).optional(),
+    label: z.string().trim().max(60).nullable().optional(),
+    dimensions: z.string().trim().max(60).nullable().optional(),
+    active: z.boolean().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type CatalogOptionPoolPatchInput = z.infer<typeof catalogOptionPoolPatchInput>;

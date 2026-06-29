@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/api";
 import { useCreateCombo, useDeleteCombo, useUpdateCombo } from "@/lib/queries";
 import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
+import { skuMargin } from "../margin";
 
 /**
  * Combos (套餐) — the 4th Product & Maintenance tab. A combo is a fixed-set
@@ -39,6 +40,15 @@ import { CodeChip } from "../components/atoms";
 
 function fmtRM(n: number): string {
   return n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// 0183 — DISPLAY-ONLY gross margin off the principal cost benchmark. Reuses the
+// canonical `skuMargin` (catalog/margin.ts) so SKU, combo, and sofa-combo margin
+// share ONE source of truth. Returns null (render "—") when cost is unset or the
+// sell price isn't positive. Cost NEVER feeds order / finance / PO pricing.
+function comboMargin(sell: number, cost: number | null) {
+  if (!Number.isFinite(sell) || sell <= 0) return null;
+  return skuMargin(sell, cost != null && Number.isFinite(cost) ? cost : null);
 }
 
 export default function CombosTab({
@@ -98,10 +108,11 @@ export default function CombosTab({
       <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
         <div
           className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
-          style={{ gridTemplateColumns: "minmax(160px,1.4fr) 120px minmax(180px,1.6fr) 90px 120px" }}
+          style={{ gridTemplateColumns: "minmax(150px,1.3fr) 120px 76px minmax(160px,1.5fr) 84px 108px" }}
         >
           <div className="label">Name</div>
           <div className="label text-right">Combo price</div>
+          <div className="label text-right">Margin</div>
           <div className="label">Components</div>
           <div className="label">Status</div>
           <div className="label text-right">{isPrincipal ? "Actions" : ""}</div>
@@ -167,13 +178,16 @@ function ComboRow({
     0,
   );
   const saves = componentsTotal - combo.comboPrice;
+  // 0183 — display-only margin off the principal cost benchmark. null = no
+  // cost authored (or a zero combo price) → render an em-dash, never a number.
+  const margin = comboMargin(combo.comboPrice, combo.cost);
 
   return (
     <div
       className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 ${
         combo.active ? "" : "opacity-50"
       }`}
-      style={{ gridTemplateColumns: "minmax(160px,1.4fr) 120px minmax(180px,1.6fr) 90px 120px" }}
+      style={{ gridTemplateColumns: "minmax(150px,1.3fr) 120px 76px minmax(160px,1.5fr) 84px 108px" }}
       data-testid={`combo-row-${combo.id}`}
     >
       <div>
@@ -184,9 +198,18 @@ function ComboRow({
       </div>
       <div className="text-right font-mono text-[12px] text-base-800">
         RM {fmtRM(combo.comboPrice)}
+        {combo.cost != null && (
+          <div className="t-tiny text-base-400 font-sans">cost RM {fmtRM(combo.cost)}</div>
+        )}
         {saves > 0 && (
           <div className="t-tiny text-base-400 font-sans">saves RM {fmtRM(saves)}</div>
         )}
+      </div>
+      <div
+        className={`text-right font-mono text-[12px] ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-700"}`}
+        data-testid={`combo-margin-${combo.id}`}
+      >
+        {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : "—"}
       </div>
       <div className="t-tiny text-base-600">{componentSummary(combo.components)}</div>
       <div>
@@ -463,6 +486,8 @@ function ComboEditor({
 
   const [name, setName] = useState(combo?.name ?? "");
   const [price, setPrice] = useState(combo ? String(combo.comboPrice) : "");
+  // 0183 — optional principal-only cost benchmark. "" = unset (→ null payload).
+  const [cost, setCost] = useState(combo?.cost != null ? String(combo.cost) : "");
   const [active, setActive] = useState(combo?.active ?? true);
   const [rows, setRows] = useState<DraftRow[]>(
     combo
@@ -476,6 +501,15 @@ function ComboEditor({
   const priceBySku = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of catalog.skus) m.set(s.sku, s.price);
+    return m;
+  }, [catalog.skus]);
+
+  // sku → catalog cost benchmark (admin bundle carries product_skus.cost; null =
+  // unset). Drives the display-only "Σ component cost" hint so the principal can
+  // sanity-set the combo cost. Cost is a benchmark only — never feeds pricing.
+  const costBySku = useMemo(() => {
+    const m = new Map<string, number | null>();
+    for (const s of catalog.skus) m.set(s.sku, s.cost);
     return m;
   }, [catalog.skus]);
 
@@ -513,6 +547,18 @@ function ComboEditor({
   const savesPct =
     priceValid && componentsTotal > 0 ? (saves / componentsTotal) * 100 : 0;
 
+  // --- cost benchmark (0183, principal-only, display-only) ----------------
+  const costRaw = cost.trim();
+  const costNum = costRaw === "" ? null : Number(costRaw);
+  // Σ of each component's catalog cost × qty — a hint to anchor the combo cost.
+  const componentCostTotal = components.reduce(
+    (sum, c) => sum + (costBySku.get(c.sku) ?? 0) * c.qty,
+    0,
+  );
+  const anyMissingCost = components.some((c) => costBySku.get(c.sku) == null);
+  // Margin of the combo's selling price vs the typed cost; null = can't compute.
+  const margin = priceValid && priceNum > 0 ? comboMargin(priceNum, costNum) : null;
+
   // --- sofa-mutex author warning -----------------------------------------
   const hasSofa = components.some((c) => categoryBySku.get(c.sku) === "sofa");
   const hasMutexPartner = components.some((c) => {
@@ -525,6 +571,7 @@ function ComboEditor({
   const candidate = {
     name: name.trim(),
     comboPrice: priceNum,
+    cost: costNum,
     active,
     components: components.map((c) => ({ sku: c.sku, qty: c.qty, sortOrder: c.sortOrder })),
   };
@@ -549,6 +596,8 @@ function ComboEditor({
     const payload: ComboCreateInput = {
       name: candidate.name,
       comboPrice: candidate.comboPrice,
+      // Always send cost (null when unset) so clearing it on edit clears the DB.
+      cost: candidate.cost,
       active: candidate.active,
       components: candidate.components,
     };
@@ -592,6 +641,23 @@ function ComboEditor({
               className={`${INPUT_CLS} w-40`}
               data-testid="combo-price"
             />
+          </label>
+          <label className="block">
+            <span className="label block mb-1">Cost benchmark (RM)</span>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              placeholder="optional"
+              className={`${INPUT_CLS} w-40`}
+              data-testid="combo-cost"
+            />
+            <span className="block t-tiny text-base-400 mt-0.5" data-testid="combo-cost-hint">
+              Σ component cost RM {fmtRM(componentCostTotal)}
+              {anyMissingCost && " (some unset)"}
+            </span>
           </label>
           <label className="inline-flex items-center gap-2 pb-2 select-none cursor-pointer">
             <input
@@ -739,6 +805,15 @@ function ComboEditor({
               A component has no catalog price — treated as RM 0 in this readout.
             </span>
           )}
+          <span className="block t-tiny text-base-500 mt-1" data-testid="combo-margin-readout">
+            Margin vs cost benchmark{" "}
+            <b className={`font-mono ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-700"}`}>
+              {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : "—"}
+            </b>
+            {costNum == null && (
+              <span className="text-base-400"> (no cost set)</span>
+            )}
+          </span>
         </div>
 
         {/* Footer */}

@@ -46,6 +46,16 @@ const mockPatchMutate = vi.fn();
 const mockPatchMutateAsync = vi.fn();
 const mockDeleteMutate = vi.fn();
 const mockCreateSkuMutateAsync = vi.fn();
+const mockImportMutateAsync = vi.fn();
+// vi.hoisted so the const exists before the (hoisted) vi.mock factory runs.
+const mockDownloadCsv = vi.hoisted(() => vi.fn());
+
+// Keep the real export builder; spy only the DOM download (jsdom has no
+// URL.createObjectURL).
+vi.mock("@/lib/sku-csv", async (orig) => {
+  const actual = await orig<typeof import("@/lib/sku-csv")>();
+  return { ...actual, downloadCsv: mockDownloadCsv };
+});
 
 vi.mock("@/lib/queries", () => ({
   usePatchCatalogSku: () => ({
@@ -71,6 +81,11 @@ vi.mock("@/lib/queries", () => ({
   useCreateCatalogSku: () => ({
     mutate: vi.fn(),
     mutateAsync: mockCreateSkuMutateAsync,
+    isPending: false,
+  }),
+  useImportSkus: () => ({
+    mutate: vi.fn(),
+    mutateAsync: mockImportMutateAsync,
     isPending: false,
   }),
 }));
@@ -156,6 +171,9 @@ beforeEach(() => {
   mockPatchMutateAsync.mockReset();
   mockCreateSkuMutateAsync.mockReset();
   mockCreateSkuMutateAsync.mockResolvedValue({ sku: { id: "s-new" } });
+  mockImportMutateAsync.mockReset();
+  mockImportMutateAsync.mockResolvedValue({ upserted: 0, createdModels: 0, failed: 0, failures: [] });
+  mockDownloadCsv.mockReset();
   // Default every test to the Master Admin (principal) — the price/cost lock
   // tests below override this to a non-principal role.
   mockRole = "principal";
@@ -374,6 +392,52 @@ describe("EditSkuModal — cost field + margin round-trip", () => {
     const args = mockPatchMutateAsync.mock.calls[0][0];
     expect(args.patch.cost).toBe(1800);
   });
+
+  // 0186 — PWP reward price round-trip, same gate/shape as cost.
+  it("renders the PWP price field for a principal (blank when unset)", () => {
+    mockRole = "principal";
+    render(wrap(<EditSkuModal sku={SKU_COST_NULL} model={MODEL_MAT} onClose={() => {}} />));
+    const pwpInput = screen.getByTestId("edit-sku-pwp-price") as HTMLInputElement;
+    expect(pwpInput).toBeInTheDocument();
+    expect(pwpInput.value).toBe("");
+  });
+
+  it("sends pwpPrice: number when the PWP price field is set and Save is clicked", async () => {
+    mockRole = "principal";
+    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_NULL });
+    render(wrap(<EditSkuModal sku={SKU_COST_NULL} model={MODEL_MAT} onClose={vi.fn()} />));
+    fireEvent.change(screen.getByTestId("edit-sku-pwp-price"), { target: { value: "999" } });
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
+    const args = mockPatchMutateAsync.mock.calls[0][0];
+    expect(args.patch.pwpPrice).toBe(999);
+  });
+
+  it("does NOT send pwpPrice when it is left unchanged", async () => {
+    mockRole = "principal";
+    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_NULL });
+    render(wrap(<EditSkuModal sku={SKU_COST_NULL} model={MODEL_MAT} onClose={vi.fn()} />));
+    // change only the description; pwpPrice untouched (was null → stays unset)
+    fireEvent.change(screen.getByTestId("edit-sku-description"), { target: { value: "x" } });
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
+    const args = mockPatchMutateAsync.mock.calls[0][0];
+    expect(args.patch).not.toHaveProperty("pwpPrice");
+  });
+
+  it("non-principal gets a read-only PWP price (no input) + never sends it", async () => {
+    mockRole = "operation";
+    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_SET });
+    const skuWithPwp: ProductSkuDto = { ...SKU_COST_SET, pwpPrice: 1500 };
+    render(wrap(<EditSkuModal sku={skuWithPwp} model={MODEL_MAT} onClose={vi.fn()} />));
+    expect(screen.queryByTestId("edit-sku-pwp-price")).not.toBeInTheDocument();
+    expect(screen.getByTestId("edit-sku-pwp-price-readonly").textContent).toContain("1,500");
+    fireEvent.change(screen.getByTestId("edit-sku-description"), { target: { value: "y" } });
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
+    const args = mockPatchMutateAsync.mock.calls[0][0];
+    expect(args.patch).not.toHaveProperty("pwpPrice");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -460,5 +524,69 @@ describe("0175 — price/cost lock (non-principal read-only)", () => {
     const args = mockCreateSkuMutateAsync.mock.calls[0][0];
     expect(args.price).toBe(2990);
     expect(args.cost).toBe(1800);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2990s Products parity Phase 1 — Export / Import toolbar buttons.
+// ---------------------------------------------------------------------------
+describe("SkuMasterTab — Export / Import buttons", () => {
+  it("renders Export + Import buttons", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    expect(screen.getByTestId("sku-export")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-import")).toBeInTheDocument();
+  });
+
+  it("Export builds a CSV of the filtered rows and triggers a download", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
+    fireEvent.click(screen.getByTestId("sku-export"));
+    expect(mockDownloadCsv).toHaveBeenCalledOnce();
+    const [filename, csv] = mockDownloadCsv.mock.calls[0];
+    expect(filename).toMatch(/^carres-skus-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(csv).toContain("CLOUD-KING");
+    expect(csv).toContain("LUNA-3S");
+  });
+
+  it("Export stamps the active category into the filename", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
+    fireEvent.click(screen.getByRole("button", { name: "Sofa" })); // category chip
+    fireEvent.click(screen.getByTestId("sku-export"));
+    const [filename, csv] = mockDownloadCsv.mock.calls[0];
+    expect(filename).toMatch(/^carres-skus-sofa-/);
+    expect(csv).toContain("LUNA-3S");
+    expect(csv).not.toContain("CLOUD-KING"); // mattress filtered out
+  });
+
+  it("Import button opens the dialog", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    fireEvent.click(screen.getByTestId("sku-import"));
+    expect(screen.getByTestId("import-pick-file")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2990s Products parity Phase 2 — model filter in SKU Master.
+// ---------------------------------------------------------------------------
+describe("SkuMasterTab — model filter", () => {
+  it("shows a model dropdown when >1 model is in scope, and filters by it", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
+    const select = screen.getByTestId("sku-model-filter");
+    expect(select).toBeInTheDocument();
+    // both models' SKUs visible initially
+    expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-cost-LUNA-3S")).toBeInTheDocument();
+    // pick the sofa model → only its SKU remains
+    fireEvent.change(select, { target: { value: "m-sofa" } });
+    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sku-cost-LUNA-3S")).toBeInTheDocument();
+  });
+
+  it("resets the model filter when the category changes", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
+    fireEvent.change(screen.getByTestId("sku-model-filter"), { target: { value: "m-sofa" } });
+    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    // switch to the Mattress category — model filter should reset to "all"
+    fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
+    expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
   });
 });

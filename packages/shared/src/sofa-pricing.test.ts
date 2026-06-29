@@ -7,6 +7,9 @@ import {
   pickSofaCombo,
   computeSofaPrice,
   explodeSofaBuild,
+  explodeSofaBuildToOrderLines,
+  sofaPriceWithinTolerance,
+  SOFA_PRICE_DRIFT_TOLERANCE,
   type SofaBuild,
   type SofaPricingSnapshot,
   type SofaComboLike,
@@ -629,5 +632,164 @@ describe("explodeSofaBuild", () => {
 
   it("empty cells → empty output", () => {
     expect(explodeSofaBuild(build({ cells: [] }), 0, lookup)).toEqual([]);
+  });
+});
+
+/* ─── explodeSofaBuildToOrderLines (Phase 5) ───────────────────────────── */
+
+describe("explodeSofaBuildToOrderLines", () => {
+  const price = (code: string): number =>
+    ({ "2A(LHF)": 1000, "L(RHF)": 800 } as Record<string, number>)[code] ?? 0;
+  // model's compartment code → real synced product_skus.sku.
+  const sku = (code: string): string | null =>
+    ({ "2A(LHF)": "OHANA-2A(LHF)", "L(RHF)": "OHANA-L(RHF)" } as Record<string, string>)[
+      code
+    ] ?? null;
+
+  it("one line per cell, each carrying its real synced sku", () => {
+    const b = build({
+      buildKey: "bk-1",
+      cells: [{ moduleCode: "2A(LHF)" }, { moduleCode: "L(RHF)" }],
+    });
+    const lines = explodeSofaBuildToOrderLines(b, 1800, { priceLookup: price, codeToSku: sku });
+    expect(lines).toHaveLength(2);
+    expect(lines.map((l) => l.sku)).toEqual(["OHANA-2A(LHF)", "OHANA-L(RHF)"]);
+    expect(lines.map((l) => l.moduleCode)).toEqual(["2A(LHF)", "L(RHF)"]);
+  });
+
+  it("Σ(unitPrice × qty) === total exactly (split survives the mapping)", () => {
+    const b = build({ cells: [{ moduleCode: "2A(LHF)" }, { moduleCode: "L(RHF)" }] });
+    const lines = explodeSofaBuildToOrderLines(b, 2750, { priceLookup: price, codeToSku: sku });
+    const sum = lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+    expect(Number(sum.toFixed(2))).toBe(2750);
+  });
+
+  it("attrs carries sofa_build_key + cell_index + cell geometry", () => {
+    const b = build({
+      buildKey: "bk-9",
+      cells: [
+        { moduleCode: "2A(LHF)", x: 0, y: 0, rot: 0 },
+        { moduleCode: "L(RHF)", x: 120, y: 0, rot: 90 },
+      ],
+    });
+    const lines = explodeSofaBuildToOrderLines(b, 1800, { priceLookup: price, codeToSku: sku });
+    expect(lines[0].attrs).toMatchObject({
+      sofa_build_key: "bk-9",
+      cell_index: 0,
+      module_code: "2A(LHF)",
+      x: 0,
+      y: 0,
+      rot: 0,
+    });
+    expect(lines[1].attrs).toMatchObject({ cell_index: 1, module_code: "L(RHF)", x: 120, y: 0, rot: 90 });
+  });
+
+  it("fabric attrs are stamped on EVERY line (structural keys win)", () => {
+    const b = build({ cells: [{ moduleCode: "2A(LHF)" }, { moduleCode: "L(RHF)" }] });
+    const fabricAttrs = {
+      fabric_id: "fab-1",
+      fabric_name: "Velvet Teal",
+      fabric_surcharge: 0,
+      fabric_tier: "PRICE_1",
+    };
+    const lines = explodeSofaBuildToOrderLines(b, 1800, {
+      priceLookup: price,
+      codeToSku: sku,
+      fabricAttrs,
+    });
+    for (const l of lines) {
+      expect(l.attrs).toMatchObject(fabricAttrs);
+      expect(l.attrs.sofa_build_key).toBeDefined();
+    }
+  });
+
+  it("a fabric key cannot clobber a structural attr key", () => {
+    const b = build({ buildKey: "bk-real", cells: [{ moduleCode: "2A(LHF)" }] });
+    const lines = explodeSofaBuildToOrderLines(b, 1000, {
+      priceLookup: price,
+      codeToSku: sku,
+      // a hostile/stray fabric key that collides with a structural key
+      fabricAttrs: { sofa_build_key: "HIJACK", cell_index: 999 },
+    });
+    expect(lines[0].attrs.sofa_build_key).toBe("bk-real");
+    expect(lines[0].attrs.cell_index).toBe(0);
+  });
+
+  it("unmapped compartment code → sku null (caller fails closed), line NOT dropped", () => {
+    const b = build({
+      cells: [{ moduleCode: "2A(LHF)" }, { moduleCode: "GHOST" }],
+    });
+    const lines = explodeSofaBuildToOrderLines(b, 1000, { priceLookup: price, codeToSku: sku });
+    expect(lines).toHaveLength(2); // never silently dropped
+    expect(lines[1].sku).toBeNull();
+    expect(lines[1].moduleCode).toBe("GHOST");
+    // total still exact even with an unmapped (0-weight) cell
+    const sum = lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+    expect(Number(sum.toFixed(2))).toBe(1000);
+  });
+
+  it("missing geometry → x/y/rot null on the line", () => {
+    const b = build({ cells: [{ moduleCode: "2A(LHF)" }] });
+    const lines = explodeSofaBuildToOrderLines(b, 1000, { priceLookup: price, codeToSku: sku });
+    expect(lines[0].attrs).toMatchObject({ x: null, y: null, rot: null });
+  });
+
+  it("empty cells → empty output", () => {
+    expect(
+      explodeSofaBuildToOrderLines(build({ cells: [] }), 0, {
+        priceLookup: price,
+        codeToSku: sku,
+      }),
+    ).toEqual([]);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * sofaPriceWithinTolerance (Phase 4 server-recompute drift gate)
+ * The anti-price-fudge check: |client − server| / server <= 0.5%.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+describe("sofaPriceWithinTolerance", () => {
+  it("tolerance constant is 0.5%", () => {
+    expect(SOFA_PRICE_DRIFT_TOLERANCE).toBe(0.005);
+  });
+
+  it("exact match passes", () => {
+    expect(sofaPriceWithinTolerance(5000, 5000)).toBe(true);
+  });
+
+  it("drift just under 0.5% passes (RM 5000 ± 25)", () => {
+    expect(sofaPriceWithinTolerance(5024.99, 5000)).toBe(true);
+    expect(sofaPriceWithinTolerance(4975.01, 5000)).toBe(true);
+  });
+
+  it("drift exactly 0.5% passes (boundary inclusive)", () => {
+    expect(sofaPriceWithinTolerance(5025, 5000)).toBe(true);
+  });
+
+  it("drift over 0.5% fails (tampered client price)", () => {
+    expect(sofaPriceWithinTolerance(5026, 5000)).toBe(false);
+    expect(sofaPriceWithinTolerance(4000, 5000)).toBe(false);
+    expect(sofaPriceWithinTolerance(6000, 5000)).toBe(false);
+  });
+
+  it("server 0 + client 0 → passes (genuine free build)", () => {
+    expect(sofaPriceWithinTolerance(0, 0)).toBe(true);
+  });
+
+  it("server 0 + client > 0 → fails (model can't justify any price)", () => {
+    expect(sofaPriceWithinTolerance(1500, 0)).toBe(false);
+    expect(sofaPriceWithinTolerance(0.01, 0)).toBe(false);
+  });
+
+  it("sub-cent client residue against server 0 still passes", () => {
+    // A 0-priced build the client also computed as ~0 (floating residue).
+    expect(sofaPriceWithinTolerance(0.004, 0)).toBe(true);
+  });
+
+  it("negative / non-finite inputs fail closed (never silently accept)", () => {
+    expect(sofaPriceWithinTolerance(NaN, 5000)).toBe(false);
+    expect(sofaPriceWithinTolerance(5000, NaN)).toBe(false);
+    expect(sofaPriceWithinTolerance(5000, -5000)).toBe(false);
   });
 });

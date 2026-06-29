@@ -59,6 +59,10 @@ const sampleCombo: SofaComboDto = {
   slots: [["2A(LHF)", "2A(RHF)"], ["L(LHF)"]],
   tier: "PRICE_1",
   pricesByHeight: { "28": 2640, "32": 2800 },
+  // 0183 — cost benchmark at 28 only: 1980 of 2640 sell → 25.0% margin.
+  costByHeight: { "28": 1980 },
+  // 0186 — PWP reward price per height (DORMANT; no combo-as-reward consumer).
+  pwpPricesByHeight: null,
   label: "Corner Set",
   effectiveFrom: "2026-06-21",
   active: true,
@@ -254,6 +258,71 @@ describe("SofaCombosPanel — edit", () => {
     // height 28 priced 2640 → markup of 440 vs 2200 baseline
     const implied28 = screen.getByTestId("sofa-combo-implied-28");
     expect(implied28.textContent).toContain("440.00");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cost-by-height (0183) — principal-only benchmark, display-only margin
+// ---------------------------------------------------------------------------
+describe("SofaCombosPanel — cost / margin", () => {
+  it("create: a per-height cost rides costByHeight (blanks null) + margin renders", async () => {
+    renderPanel({ isPrincipal: true });
+    fireEvent.click(screen.getByTestId("sofa-combo-add"));
+
+    // a filled slot so the zod gate opens
+    fireEvent.click(screen.getByTestId("sofa-combo-slot-0-opt-2A(LHF)"));
+    // price + cost at height 28
+    fireEvent.change(screen.getByTestId("sofa-combo-price-28"), { target: { value: "2640" } });
+    fireEvent.change(screen.getByTestId("sofa-combo-cost-28"), { target: { value: "1980" } });
+
+    // margin = (2640 − 1980) / 2640 = 25.0%
+    expect(screen.getByTestId("sofa-combo-margin-28").textContent).toContain("25.0%");
+    // a height with no price/cost shows an em-dash margin
+    expect(screen.getByTestId("sofa-combo-margin-24").textContent).toBe("—");
+
+    fireEvent.click(screen.getByTestId("sofa-combo-save"));
+    await waitFor(() => expect(mockCreateMutateAsync).toHaveBeenCalledOnce());
+    const payload = mockCreateMutateAsync.mock.calls[0][0];
+    expect(payload.costByHeight).not.toBeNull();
+    expect(payload.costByHeight["28"]).toBe(1980);
+    expect(payload.costByHeight["24"]).toBeNull();
+    expect(payload.costByHeight["32"]).toBeNull();
+  });
+
+  it("create: NO cost at any height → costByHeight is null (unset)", async () => {
+    renderPanel({ isPrincipal: true });
+    fireEvent.click(screen.getByTestId("sofa-combo-add"));
+    fireEvent.click(screen.getByTestId("sofa-combo-slot-0-opt-2A(LHF)"));
+    fireEvent.change(screen.getByTestId("sofa-combo-price-28"), { target: { value: "2640" } });
+
+    fireEvent.click(screen.getByTestId("sofa-combo-save"));
+    await waitFor(() => expect(mockCreateMutateAsync).toHaveBeenCalledOnce());
+    expect(mockCreateMutateAsync.mock.calls[0][0].costByHeight).toBeNull();
+  });
+
+  it("edit: cost pre-fills from costByHeight + margin renders vs the height price", () => {
+    renderPanel({ isPrincipal: true, combos: [sampleCombo] });
+    fireEvent.click(screen.getByTestId("sofa-combo-edit-sc-1"));
+    expect((screen.getByTestId("sofa-combo-cost-28") as HTMLInputElement).value).toBe("1980");
+    expect((screen.getByTestId("sofa-combo-cost-32") as HTMLInputElement).value).toBe("");
+    // 28: (2640 − 1980)/2640 = 25.0%; 32 has price but no cost → em-dash
+    expect(screen.getByTestId("sofa-combo-margin-28").textContent).toContain("25.0%");
+    expect(screen.getByTestId("sofa-combo-margin-32").textContent).toBe("—");
+  });
+
+  it("edit: clearing the only cost → costByHeight null in the payload", async () => {
+    renderPanel({ isPrincipal: true, combos: [sampleCombo] });
+    fireEvent.click(screen.getByTestId("sofa-combo-edit-sc-1"));
+    fireEvent.change(screen.getByTestId("sofa-combo-cost-28"), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("sofa-combo-save"));
+
+    await waitFor(() => expect(mockUpdateMutateAsync).toHaveBeenCalledOnce());
+    expect(mockUpdateMutateAsync.mock.calls[0][0].patch.costByHeight).toBeNull();
+  });
+
+  it("non-principal: cost inputs are never mounted (read-only)", () => {
+    renderPanel({ isPrincipal: false, combos: [sampleCombo] });
+    expect(screen.queryByTestId("sofa-combo-cost-28")).not.toBeInTheDocument();
   });
 });
 

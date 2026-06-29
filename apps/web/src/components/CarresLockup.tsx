@@ -7,27 +7,30 @@ interface Props {
 }
 
 /**
- * Brand lockup — heart-pulse mark + "Carres." wordmark in DM Sans bold,
- * terracotta. Mirrors `reference/shared/brand.jsx CarresLockup` so every
- * shell that mounted that proto component (dealer / principal / finance /
- * operation / partner / bd) renders the same mark in v2.
+ * Brand lockup — heart-pulse mark + the official CARRES wordmark image (Jess
+ * 2026-06-29: the mark is correct, but the old DM-Sans "Carres." text wordmark
+ * was wrong → replaced with the real wordmark asset). Used by every role shell
+ * (dealer / principal / finance / operation / partner / bd) + the login page.
  */
 export default function CarresLockup({ showPortal = false, size = 26 }: Props) {
   return (
     <span className="inline-flex items-center gap-2.5 leading-none">
       <img
         src="/carres-logo.png"
-        alt="Carres"
+        alt=""
         width={size}
         height={size}
         className="block object-contain"
       />
-      <span className="font-display text-[18px] font-semibold tracking-[-0.015em] text-primary">
-        Carres<span className="text-primary">.</span>
-        {showPortal && (
-          <span className="ml-1.5 font-medium text-base-500 text-[13px]">Portal</span>
-        )}
-      </span>
+      <img
+        src="/carres-wordmark.webp"
+        alt="Carres"
+        className="block object-contain w-auto"
+        style={{ height: Math.round(size * 0.62) }}
+      />
+      {showPortal && (
+        <span className="font-medium text-base-500 text-[13px]">Portal</span>
+      )}
     </span>
   );
 }

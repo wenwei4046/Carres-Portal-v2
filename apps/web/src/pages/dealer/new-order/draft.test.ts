@@ -513,6 +513,7 @@ describe("comboToDraftLines — explode a 套餐 into component DraftLines", () 
       comboKey: "bedroom-set",
       name: "Bedroom Set",
       comboPrice: 5000,
+      cost: null,
       active: true,
       effectiveFrom: "2026-06-20",
       components: [

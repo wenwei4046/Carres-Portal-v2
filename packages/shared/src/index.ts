@@ -187,6 +187,73 @@ export {
   type SofaComboDto,
   type SofaComboCreateInput,
   type SofaComboPatchInput,
+  // 0181 — special add-ons schemas + input/Dto types.
+  specialAddonSchema,
+  specialAddonOptionGroupSchema,
+  specialAddonCreateInput,
+  specialAddonPatchInput,
+  type SpecialAddonDto,
+  type SpecialAddonOptionGroupDto,
+  type SpecialAddonCreateInput,
+  type SpecialAddonPatchInput,
+  // 0182 — global option pool schemas + input/Dto types.
+  CATALOG_OPTION_POOL_NAMES,
+  catalogOptionPoolNameSchema,
+  catalogOptionPoolSchema,
+  catalogOptionPoolCreateInput,
+  catalogOptionPoolPatchInput,
+  type CatalogOptionPoolName,
+  type CatalogOptionPoolDto,
+  type CatalogOptionPoolCreateInput,
+  type CatalogOptionPoolPatchInput,
+  // 0184 — delivery fee config + special rules + RuleTarget schemas/inputs.
+  deliveryFeeConfigSchema,
+  deliveryFeeConfigPatchInput,
+  ruleTargetScopeSchema,
+  ruleTargetSchema,
+  specialDeliveryFeeRuleSchema,
+  specialDeliveryFeeRuleInput,
+  type DeliveryFeeConfigDto,
+  type DeliveryFeeConfigPatchInput,
+  type RuleTargetScopeValue,
+  type RuleTargetDto,
+  type SpecialDeliveryFeeRuleDto,
+  type SpecialDeliveryFeeRuleInput,
+  // 0185 — Default Free Gifts + Free Item Campaigns (GWP) schemas/inputs/Dtos.
+  targetRefinementSchema,
+  defaultFreeGiftSchema,
+  modelDefaultFreeGiftsSchema,
+  modelDefaultFreeGiftsInput,
+  freeItemCampaignSchema,
+  freeItemCampaignInput,
+  type TargetRefinementDto,
+  type DefaultFreeGiftDto,
+  type ModelDefaultFreeGiftsDto,
+  type ModelDefaultFreeGiftsInput,
+  type FreeItemCampaignDto,
+  type FreeItemCampaignInput,
+  // 0186 — PWP & Promo rule schemas/inputs/Dtos.
+  pwpRuleSchema,
+  pwpRuleInput,
+  type PwpRuleDto,
+  type PwpRuleInput,
+  // 0187 — PWP voucher ledger (Phase 8c) schemas/inputs/Dtos.
+  pwpCodeStatusSchema,
+  pwpCodeSchema,
+  pwpReserveInputSchema,
+  pwpCodesResponseSchema,
+  attrsPwpMarkerSchema,
+  type PwpCodeStatusValue,
+  type PwpCodeDto,
+  type PwpReserveInput,
+  type PwpCodesResponse,
+  type AttrsPwpMarker,
+  // 0188 — PWP cross-order DISCOVERY (Phase 8d) — the STRIPPED projection
+  // (no PII) the /available route returns.
+  pwpDiscoverDtoSchema,
+  pwpDiscoverResponseSchema,
+  type PwpDiscoverDto,
+  type PwpDiscoverResponse,
 } from "./schemas/catalog";
 
 export {
@@ -455,6 +522,9 @@ export {
   type DecideStorageWaiverInput,
 } from "./schemas/ops-order-control";
 export * from "./schemas/ops-cockpit";
+// Sofa engine Phase 4 — build-line attrs schema + guard (server-recompute trust
+// gate re-parses the build out of order_lines.attrs free jsonb before pricing).
+export * from "./schemas/sofa-build";
 
 // Migration 0184 — order payment ledger (balance job foundation).
 export {
@@ -505,7 +575,116 @@ export type { SofaCompartment, ModelSofaCompartment } from "./domain";
 // SofaCompartment surfacing above so the API + web can import it directly.
 export type { SofaCombo } from "./domain";
 export { sofaComboFromRow } from "./adapters";
+
+// 0181 — Special Add-ons: the pure surcharge resolver (shared by the POS picker
+// + the Hono server-recompute) + the domain type. Schemas live in the
+// schemas/catalog export block; the adapter is reached via Adapters.specialAddonFromRow.
+export {
+  resolveSpecialAddonSurcharge,
+  resolveSpecialsTotal,
+  specialPickComplete,
+  type SpecialAddonChoice,
+  type SpecialAddonOptionGroup,
+  type SpecialAddonDef,
+  type SpecialAddonPick,
+  type ResolvedSpecialLine,
+  type SpecialsTotalResult,
+} from "./special-addons";
+export type { SpecialAddon } from "./domain";
+// 0182 — global option pool domain type (the name union is re-exported from the
+// schemas/catalog block above as CatalogOptionPoolName).
+export type { CatalogOptionPool } from "./domain";
 export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
+
+// 0184 — 2990s Products parity Phase 6: the unified RuleTarget matcher (PURE,
+// shared by the delivery-fee subsystem and any future rule consumer). Combo
+// subset-matching delegates to the existing `matchSofaCombo`; compartment
+// normalization to the existing `normalizeCompartmentCode`.
+export {
+  parseRuleTargets,
+  parseTargetRefinement,
+  refinementMatchesLine,
+  lineMatchesTarget,
+  lineMatchesTargets,
+  type RuleTargetScope,
+  type TargetRefinement,
+  type RuleTarget,
+  type RuleLineInput,
+} from "./rule-target";
+
+// 0184 — the PURE delivery TRIP fee engine + the special-rule matcher. The POS
+// preview and the Hono server-recompute import the SAME `computeDeliveryFee`.
+// `DeliveryFeeConfig` is the domain config (re-exported from delivery-fee, which
+// pulls it from ./domain — single source of truth, no duplicate export).
+export {
+  computeDeliveryFee,
+  specialModelsForLines,
+  type DeliveryFeeConfig,
+  type SpecialModelDeliveryFee,
+  type DeliveryFeeInput,
+  type DeliveryFeeResult,
+  type SpecialDeliveryRule,
+} from "./delivery-fee";
+
+// 0184 — the special-delivery-rule domain row type (camelCased). The config
+// domain type ships from the delivery-fee block above; the row→domain adapters
+// (deliveryFeeConfigFromRow / specialDeliveryFeeRuleFromRow) are reached via
+// `Adapters.*` like comboFromRow.
+export type { SpecialDeliveryFeeRule } from "./domain";
+
+// 0185 — 2990s Products parity Phase 7: Default Free Gifts + Free Item Campaigns
+// (GWP). PURE resolvers shared by the POS preview + the Hono server-side
+// SO-create resolver/validator (honest-pricing: same matching both sides). Both
+// reuse the P6 RuleTarget matcher. A free line books as an RM0 order_line with an
+// attrs marker — create_order / order_lines / DraftLine are UNTOUCHED. The
+// row→domain adapters (modelDefaultFreeGiftsFromRow / freeItemCampaignFromRow)
+// are surfaced top-level here too (mirrors sofaComboFromRow).
+export {
+  parseDefaultFreeGifts,
+  resolveDefaultFreeGifts,
+  type DefaultFreeGift,
+  type DesiredFreeGift,
+  type FreeGiftLineInput,
+} from "./free-gift";
+export {
+  campaignsCoveringLine,
+  parseFreeItemEligible,
+  type FreeItemCampaign,
+} from "./free-item-campaign";
+export { modelDefaultFreeGiftsFromRow, freeItemCampaignFromRow } from "./adapters";
+export type { ModelDefaultFreeGifts } from "./domain";
+
+// 0186 — 2990s Products parity Phase 8a: PWP & Promo. The PURE engine
+// (`resolvePwp`) — the SOLE source of truth for which reward lines get the PWP/
+// promo price + which trigger they bind to. Will be shared by the POS preview +
+// the Hono server recompute (P8b+) so the figure cannot drift. Reuses the P6
+// RuleTarget matcher for trigger/reward scope. The row→domain adapter
+// (`pwpRuleFromRow`) is surfaced top-level here too (mirrors sofaComboFromRow).
+export {
+  resolvePwp,
+  parsePwpTargets,
+  type PwpRule as PwpRuleEngine,
+  type PwpLineInput,
+  type PwpGrant,
+} from "./pwp";
+export { pwpRuleFromRow } from "./adapters";
+export type { PwpRule } from "./domain";
+
+// 0187 — 2990s Products parity Phase 8c: the PWP voucher LEDGER (SAME-CART state
+// machine). The row→domain adapter (`pwpCodeFromRow`) + the camelCase domain
+// type are surfaced top-level here (mirrors pwpRuleFromRow / sofaComboFromRow);
+// the zod schemas + Dto/input types live in the schemas/catalog export block.
+export { pwpCodeFromRow } from "./adapters";
+export type { PwpCode } from "./domain";
+
+// 0188 — 2990s Products parity Phase 8d: cross-order voucher carry-forward. The
+// MY-aware phone canonicalizer (`phoneKeyMy`, JS twin of the SQL pwp_phone_key) +
+// the legacy digits-only `phoneKey` (promoted from delivery-fee-recompute). The
+// stripped DISCOVERY adapter (`pwpDiscoverFromRow`) + its camelCase domain type —
+// the ONLY pwp_codes-derived shape a non-owner client receives (no PII).
+export { phoneKey, phoneKeyMy } from "./phone";
+export { pwpDiscoverFromRow } from "./adapters";
+export type { PwpDiscover } from "./domain";
 
 // Sofa engine Phase 2 — the PURE pricing engine (computeSofaPrice + Kuhn combo
 // match + explodeSofaBuild). No DB/IO; runs identically on web + (Phase 4) Hono.
@@ -517,6 +696,9 @@ export {
   pickSofaCombo,
   computeSofaPrice,
   explodeSofaBuild,
+  explodeSofaBuildToOrderLines,
+  sofaPriceWithinTolerance,
+  SOFA_PRICE_DRIFT_TOLERANCE,
   type SofaComboLike,
   type PickSofaComboArgs,
   type SofaComboPick,
@@ -526,7 +708,35 @@ export {
   type SofaPriceBasis,
   type SofaPriceResult,
   type ExplodedSofaLine,
+  type ExplodedSofaOrderLine,
+  type ExplodeSofaToLinesOpts,
 } from "./sofa-pricing";
+
+// The one derived-sku formula ({MODEL_KEY}-{variant}) shared by the api mint +
+// generate-skus + the web maintenance read-back (no triplicated copies).
+export { deriveSkuCode } from "./sku-code";
+
+// 2990s Products parity Phase 1 — SKU Import: the one record->row mapper + zod
+// shared by the staged-preview client and the import endpoint.
+export {
+  parseMoney,
+  deriveModelKey,
+  normalizeCategory,
+  normalizeVariantKind,
+  parseBoolish,
+  csvRecordToImportRow,
+  skuImportRowSchema,
+  skuImportInput,
+  hasPricingIntent,
+  MAX_IMPORT_MONEY,
+  type MoneyParse,
+  type SkuImportRow,
+  type ImportRowResult,
+  type SkuImportRowParsed,
+  type SkuImportInput,
+  type SkuImportFailure,
+  type SkuImportResult,
+} from "./sku-import";
 
 // Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /
 // arm-cap closure). No DOM/React; cm-space math reused by the web builder + P4

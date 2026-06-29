@@ -4,6 +4,9 @@
 import type * as DB from "./db-types";
 import type * as D from "./domain";
 import type { CreateOrderInput } from "./schemas/orders";
+import { parseDefaultFreeGifts } from "./free-gift";
+import { parseFreeItemEligible } from "./free-item-campaign";
+import { parseRuleTargets } from "./rule-target";
 
 export const dealerFromRow = (r: DB.DealerRow): D.Dealer => ({
   id: r.id,
@@ -69,6 +72,9 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   // 0178 — nullable link to a sofa compartment type (additive, null on every
   // existing SKU).
   compartmentId: r.compartment_id ?? null,
+  // 0186 — principal-only PWP reward price; null stays null (not coerced to 0)
+  // so "unset" is distinct from "zero PWP price".
+  pwpPrice: r.pwp_price == null ? null : Number(r.pwp_price),
 });
 
 export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
@@ -116,10 +122,75 @@ export const addonFromRow = (r: DB.AddonRow): D.Addon => ({
   serviceSku: r.service_sku ?? null,
 });
 
+// 0181 — special add-on (per-model selling surcharge + jsonb option groups).
+export const specialAddonFromRow = (r: DB.SpecialAddonRow): D.SpecialAddon => ({
+  id: r.id,
+  code: r.code,
+  label: r.label,
+  soDescription: r.so_description ?? "",
+  categories: r.categories ?? [],
+  sellingPrice: Number(r.selling_price),
+  cost: r.cost == null ? null : Number(r.cost),
+  optionGroups: (r.option_groups ?? []).map((g) => ({
+    label: g.label,
+    required: !!g.required,
+    choices: (g.choices ?? []).map((c) => ({ label: c.label, extra: Number(c.extra) })),
+  })),
+  active: r.active,
+  sortOrder: r.sort_order,
+});
+
 export const floorConfigFromRow = (r: DB.FloorConfigRow): D.FloorConfig => ({
   id: r.id,
   freeUpToFloor: r.free_up_to_floor,
   perFloorPerItem: Number(r.per_floor_per_item),
+});
+
+/**
+ * Maps a `delivery_fee_config` row to the camelCase domain shape (0184). Fees
+ * are Postgres numeric — `Number()` normalises the string|number PostgREST
+ * surfaces them as. The singleton `id` is dropped (the domain shape doubles as
+ * the pure `computeDeliveryFee` config); `charged_categories` + lead days pass
+ * through. Lead days are integers, also `Number()`-coerced for parity.
+ */
+export const deliveryFeeConfigFromRow = (
+  r: DB.DeliveryFeeConfigRow,
+): D.DeliveryFeeConfig => ({
+  baseFee: Number(r.base_fee),
+  crossCategoryFee: Number(r.cross_category_fee),
+  chargedCategories: r.charged_categories ?? [],
+  mattressBedframeLeadDays: Number(r.mattress_bedframe_lead_days),
+  sofaLeadDays: Number(r.sofa_lead_days),
+});
+
+/**
+ * Maps a `special_delivery_fee_rules` row to the camelCase domain shape (0184).
+ * `target` jsonb is cleaned via `parseRuleTargets` (drops malformed entries);
+ * fees are Postgres numeric → `Number()`. `label` stays null when unset.
+ */
+export const specialDeliveryFeeRuleFromRow = (
+  r: DB.SpecialDeliveryFeeRuleRow,
+): D.SpecialDeliveryFeeRule => ({
+  id: r.id,
+  target: parseRuleTargets(r.target),
+  standaloneFee: Number(r.standalone_fee),
+  crossCategoryFollowupFee: Number(r.cross_cat_followup_fee),
+  label: r.label ?? null,
+  active: r.active,
+  sortOrder: Number(r.sort_order),
+});
+
+// 0182 — global option pool entry (supplier_category / bedframe_size /
+// mattress_size). `label` + `dimensions` are nullable (size pools only) and
+// stay null; `sort_order` is Postgres integer normalised via Number().
+export const catalogOptionPoolFromRow = (r: DB.CatalogOptionPoolRow): D.CatalogOptionPool => ({
+  id: r.id,
+  pool: r.pool,
+  value: r.value,
+  label: r.label ?? null,
+  dimensions: r.dimensions ?? null,
+  active: r.active,
+  sortOrder: Number(r.sort_order),
 });
 
 /**
@@ -143,6 +214,9 @@ export const comboFromRow = (r: DB.ComboRow): D.Combo => ({
   comboKey: r.combo_key,
   name: r.name,
   comboPrice: Number(r.combo_price),
+  // 0183 — cost benchmark; null stays null (not coerced to 0) so "unset" is
+  // distinct from "zero cost".
+  cost: r.cost == null ? null : Number(r.cost),
   active: r.active,
   effectiveFrom: r.effective_from,
   components: [],
@@ -188,24 +262,134 @@ export const modelSofaCompartmentFromRow = (
  * (PostgREST may serialize jsonb numerics as strings) while a `null` price is
  * preserved (null = the combo does not apply at that height).
  */
-export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
-  const rawPrices = r.prices_by_height ?? {};
-  const pricesByHeight: Record<string, number | null> = {};
-  for (const [height, price] of Object.entries(rawPrices)) {
-    pricesByHeight[height] = price == null ? null : Number(price);
+const coerceHeightMap = (raw: Record<string, number | null> | null | undefined) => {
+  const out: Record<string, number | null> = {};
+  for (const [height, price] of Object.entries(raw ?? {})) {
+    out[height] = price == null ? null : Number(price);
   }
+  return out;
+};
+
+export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
   return {
     id: r.id,
     modelId: r.model_id,
     slots: r.slots ?? [],
     tier: (r.tier ?? null) as D.SofaCombo["tier"],
-    pricesByHeight,
+    pricesByHeight: coerceHeightMap(r.prices_by_height),
+    // 0183 — cost benchmark; null (column unset) stays null so the UI can tell
+    // "no cost authored" from "{}", while present maps coerce numerics.
+    costByHeight: r.cost_by_height == null ? null : coerceHeightMap(r.cost_by_height),
+    // 0186 — PWP reward price; same null-preserving treatment as costByHeight.
+    pwpPricesByHeight:
+      r.pwp_prices_by_height == null ? null : coerceHeightMap(r.pwp_prices_by_height),
     label: r.label ?? null,
     effectiveFrom: r.effective_from,
     active: r.active,
     discontinuedAt: r.discontinued_at ?? null,
   };
 };
+
+/**
+ * Maps a `model_default_free_gifts` row to the camelCase domain shape (0185).
+ * `gifts` jsonb is cleaned via `parseDefaultFreeGifts` (drops malformed entries
+ * — bad giftSku/qty, and a 'model'-scope condition collapses to no condition).
+ */
+export const modelDefaultFreeGiftsFromRow = (
+  r: DB.ModelDefaultFreeGiftsRow,
+): D.ModelDefaultFreeGifts => ({
+  modelId: r.model_id,
+  gifts: parseDefaultFreeGifts(r.gifts),
+});
+
+/**
+ * Maps a `free_item_campaigns` row to the camelCase domain shape (0185).
+ * `eligible` jsonb is cleaned via `parseFreeItemEligible` (a parseRuleTargets
+ * wrapper); `max_free_qty` is Postgres integer → `Number()` (PostgREST may
+ * serialize it as a string).
+ */
+export const freeItemCampaignFromRow = (
+  r: DB.FreeItemCampaignRow,
+): D.FreeItemCampaign => ({
+  id: r.id,
+  name: r.name,
+  active: r.active,
+  maxFreeQty: Number(r.max_free_qty),
+  eligible: parseFreeItemEligible(r.eligible),
+});
+
+/**
+ * Maps a `pwp_rules` row to the camelCase domain shape (0186). `trigger_targets`
+ * / `reward_targets` jsonb are cleaned via `parseRuleTargets` (drops malformed
+ * entries; `[]` = the whole category — intentional for PWP); `qty_per_trigger`
+ * is Postgres integer → `Number()` (PostgREST may serialize it as a string).
+ * P8d (0188): `carry_forward` defaults to `true` and `carry_forward_days` to
+ * `null` so a pre-0188 row / a test mock that omits them still maps cleanly.
+ */
+export const pwpRuleFromRow = (r: DB.PwpRuleRow): D.PwpRule => ({
+  id: r.id,
+  type: r.type,
+  triggerCategory: r.trigger_category,
+  triggerTargets: parseRuleTargets(r.trigger_targets),
+  rewardCategory: r.reward_category,
+  rewardTargets: parseRuleTargets(r.reward_targets),
+  qtyPerTrigger: Number(r.qty_per_trigger),
+  active: r.active,
+  // P8d (0188) — carry-forward defaults: a pre-0188 row / mock reads true / null.
+  carryForward: r.carry_forward ?? true,
+  carryForwardDays: r.carry_forward_days ?? null,
+});
+
+/**
+ * Maps a `pwp_codes` row to the camelCase domain shape (0187 ledger + 0188 P8d
+ * cross-order binding). `reward_targets` jsonb is cleaned via `parseRuleTargets`
+ * (drops malformed entries; `[]` = the whole category — the snapshot of the
+ * rule's reward scope). All other columns are direct snake→camel. The P8d binding
+ * fields (`bound_customer_phone` / `owner_dealer_id` / `expires_at`) default to
+ * null so a pre-0188 row / mock maps cleanly. OWNER-SCOPED USE ONLY — this carries
+ * `boundCustomerPhone`; cross-order discovery uses `pwpDiscoverFromRow` (stripped,
+ * no PII). DORMANT.
+ */
+export const pwpCodeFromRow = (r: DB.PwpCodeRow): D.PwpCode => ({
+  code: r.code,
+  ruleId: r.rule_id,
+  type: r.type,
+  rewardCategory: r.reward_category,
+  rewardTargets: parseRuleTargets(r.reward_targets),
+  status: r.status,
+  ownerStaffId: r.owner_staff_id,
+  cartLineKey: r.cart_line_key,
+  triggerItemCode: r.trigger_item_code,
+  claimGroup: r.claim_group,
+  redeemedOrderId: r.redeemed_order_id,
+  redeemedItemSku: r.redeemed_item_sku,
+  sourceOrderId: r.source_order_id,
+  customerId: r.customer_id,
+  // P8d (0188) — cross-order carry-forward binding (default null pre-0188).
+  boundCustomerPhone: r.bound_customer_phone ?? null,
+  ownerDealerId: r.owner_dealer_id ?? null,
+  expiresAt: r.expires_at ?? null,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+/**
+ * Maps a `pwp_discover_available` row (0188) to the camelCase domain shape. The
+ * STRIPPED projection — NO bound phone / owner / trigger sku / customer id; the
+ * phone match is the server-computed `phone_matches` boolean. `reward_targets`
+ * jsonb is cleaned via `parseRuleTargets`. This is the ONLY pwp_codes-derived
+ * shape a non-owner client ever receives, so it structurally cannot leak PII.
+ */
+export const pwpDiscoverFromRow = (r: DB.PwpDiscoverRow): D.PwpDiscover => ({
+  code: r.code,
+  ruleId: r.rule_id,
+  type: r.type,
+  rewardCategory: r.reward_category,
+  rewardTargets: parseRuleTargets(r.reward_targets),
+  sourceOrderId: r.source_order_id,
+  expiresAt: r.expires_at,
+  phoneMatches: r.phone_matches,
+});
 
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({
   id: r.id,

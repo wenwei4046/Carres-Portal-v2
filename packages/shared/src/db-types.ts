@@ -3,6 +3,9 @@
  * These are snake_case (Postgres convention). Use the camelCase domain types in
  * `domain.ts` for UI code.
  */
+import type { DefaultFreeGift } from "./free-gift";
+import type { RuleTarget } from "./rule-target";
+
 export type Role =
   | "principal" | "dealer" | "salesperson" | "showroom"
   | "operation" | "supplier" | "partner" | "finance" | "bd";
@@ -151,6 +154,10 @@ export interface ProductSkuRow {
   // Only future generated compartment SKUs set it; links a compartment SKU to
   // its pool type. NULL for every existing (non-compartment) SKU.
   compartment_id: string | null;
+  // 0186 (PWP Phase 8a) — principal-only per-SKU PWP reward price. NULL = "no
+  // PWP price set" (mirrors `cost`). Economic field; the 0175 trigger is
+  // extended to lock it to the principal. DORMANT — no order consumer yet.
+  pwp_price: number | null;
 }
 
 export interface SofaFabricRow {
@@ -204,6 +211,42 @@ export interface AddonRow {
   service_sku: string | null;
 }
 
+/** `special_addons` (migration 0181). Per-model selling surcharge + one-level
+ *  follow-up question groups (jsonb). selling_price/extra may be negative. */
+export interface SpecialAddonRow {
+  id: string;
+  code: string;
+  label: string;
+  so_description: string;
+  categories: string[];
+  selling_price: number;
+  cost: number | null;
+  option_groups: { label: string; required: boolean; choices: { label: string; extra: number }[] }[];
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/** `catalog_option_pools` (migration 0182, 2990s Products parity Phase 4). One
+ *  GENERIC table for the principal-curated Maintenance pools, discriminated by
+ *  `pool`. `value` is the canonical code (unique within its pool); `label` +
+ *  `dimensions` are populated for the size pools only (null for
+ *  supplier_category). Read-only reference list — no order-side consumer. */
+export interface CatalogOptionPoolRow {
+  id: string;
+  pool: "supplier_category" | "bedframe_size" | "mattress_size";
+  value: string;
+  label: string | null;
+  dimensions: string | null;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
 /**
  * `combos` (migration 0177). A fixed-set bundle (套餐) sold at one
  * `combo_price`. Components live in `combo_components`. `combo_key` is the
@@ -215,6 +258,9 @@ export interface ComboRow {
   combo_key: string;
   name: string;
   combo_price: number;
+  // 0183 — principal-only cost benchmark (RM) companion to combo_price.
+  // null = unset. Benchmark only — never charged, no order/finance/PO consumer.
+  cost: number | null;
   active: boolean;
   effective_from: string;
   discontinued_at: string | null;
@@ -286,6 +332,13 @@ export interface SofaComboPricingRow {
   slots: string[][];
   tier: string | null;
   prices_by_height: Record<string, number | null>;
+  // 0183 — principal-only per-seat-height cost benchmark, same shape as
+  // prices_by_height. null (or absent keys) = unset. Benchmark only.
+  cost_by_height: Record<string, number | null> | null;
+  // 0186 — principal-only per-seat-height PWP reward price, same shape as
+  // prices_by_height. null (or absent keys) = unset. DORMANT — no order
+  // consumer yet.
+  pwp_prices_by_height: Record<string, number | null> | null;
   label: string | null;
   effective_from: string;
   active: boolean;
@@ -300,6 +353,179 @@ export interface FloorConfigRow {
   free_up_to_floor: number;
   per_floor_per_item: number;
   updated_at: string;
+}
+
+/**
+ * `delivery_fee_config` (migration 0184, 2990s Products parity Phase 6). The
+ * principal-owned delivery TRIP fee singleton (`id` always 1). `base_fee` is
+ * charged once per order with ≥1 charged-category line; `cross_category_fee` is
+ * added once for a sofa × (mattress|bedframe) cart; `charged_categories` selects
+ * which categories incur the base fee. Numeric MYR (Postgres numeric → `Number()`
+ * in the adapter). Seeds 0/0 → dormant.
+ */
+export interface DeliveryFeeConfigRow {
+  id: number;
+  base_fee: number;
+  cross_category_fee: number;
+  charged_categories: string[];
+  mattress_bedframe_lead_days: number;
+  sofa_lead_days: number;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `special_delivery_fee_rules` (migration 0184). A per-RuleTarget override of the
+ * base delivery fee. `target` is a RuleTarget[] jsonb (scopes
+ * model|variant|combo|compartment); the adapter runs `parseRuleTargets` to drop
+ * malformed entries. Fees are numeric MYR. Principal-owned; `active` + `sort_order`
+ * mirror the catalog convention.
+ */
+export interface SpecialDeliveryFeeRuleRow {
+  id: string;
+  target: RuleTarget[];
+  standalone_fee: number;
+  cross_cat_followup_fee: number;
+  label: string | null;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `model_default_free_gifts` (migration 0185, 2990s Products parity Phase 7).
+ * Per-model deterministic free gift(s). PK is `model_id`. `gifts` is a jsonb
+ * array of `DefaultFreeGift` ({ giftSku, qty, label?, condition? }); the adapter
+ * runs `parseDefaultFreeGifts` to drop malformed entries. Principal-owned.
+ */
+export interface ModelDefaultFreeGiftsRow {
+  model_id: string;
+  gifts: DefaultFreeGift[];
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `free_item_campaigns` (migration 0185). A named GWP campaign: a salesperson
+ * "Make Free"s an ELIGIBLE cart line (up to `max_free_qty`). `eligible` is a
+ * RuleTarget[] jsonb (scopes model|variant|combo|compartment); the adapter runs
+ * `parseFreeItemEligible` to drop malformed entries. `active` defaults false.
+ * Principal-owned; `created_at` / `updated_at` / `updated_by` mirror the catalog
+ * convention.
+ */
+export interface FreeItemCampaignRow {
+  id: string;
+  name: string;
+  active: boolean;
+  max_free_qty: number;
+  eligible: RuleTarget[];
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `pwp_rules` (migration 0186, 2990s Products parity Phase 8a). A principal-owned
+ * PWP/Promo RULE: a trigger category/scope unlocks a reward category/scope at the
+ * ratio `qty_per_trigger`. `type` 'pwp' = the reward is sold at its per-SKU
+ * pwp_price; 'promo' = the reward is FREE. `trigger_targets` / `reward_targets`
+ * are RuleTarget[] jsonb (scopes model|variant|combo|compartment); the adapter
+ * runs `parseRuleTargets` to drop malformed entries ([] = the whole category).
+ * The reward PRICE is NOT on the row (it lives on product_skus.pwp_price /
+ * sofa_combo_pricing.pwp_prices_by_height). `active` defaults false. DORMANT.
+ *
+ * P8d (0188) adds `carry_forward` (default true — when an unclaimed RESERVED
+ * voucher minted by this rule reaches Confirm it flips to AVAILABLE for the
+ * customer's next order instead of being deleted) + `carry_forward_days` (optional
+ * expiry window, NULL = perpetual). `pwpRuleFromRow` reads them with defaults so a
+ * pre-0188 row / mock still maps cleanly.
+ */
+export interface PwpRuleRow {
+  id: string;
+  type: "pwp" | "promo";
+  trigger_category: string;
+  trigger_targets: RuleTarget[];
+  reward_category: string;
+  reward_targets: RuleTarget[];
+  qty_per_trigger: number;
+  active: boolean;
+  // ── P8d (0188) cross-order carry-forward policy ──
+  carry_forward: boolean;
+  carry_forward_days: number | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/**
+ * `pwp_codes` (migration 0187, 2990s Products parity Phase 8c). One row = one
+ * reserved/claimed PWP voucher slot — the SAME-CART redemption LEDGER on top of
+ * P8b's stateless pricing. `code` is the PK ("occupy-the-number" guarantee: two
+ * carts can never reserve the same string). `status` machine: RESERVED → USED
+ * (claim via pwp_claim_code) | DELETE (free); 'AVAILABLE' is in the CHECK but
+ * written by NOBODY in P8c (it + source_order_id + customer_id ship dormant so
+ * the P8d cross-order carry-forward needs no migration). `claim_group` is the
+ * per-order correlation uuid the POS mints — the cancel/recovery join key that
+ * exists at claim time (vs. redeemed_order_id, stamped only after create_order
+ * returns). Owner-scoped RLS (`owner_staff_id` NULLABLE + ON DELETE SET NULL so
+ * a deleted staff's USED-audit rows survive). `pwpCodeFromRow` maps it. DORMANT.
+ *
+ * P8d (0188) turns ON the cross-order path: an unclaimed RESERVED voucher carries
+ * forward to AVAILABLE, bound to the carrying order's CANONICAL customer phone
+ * (`bound_customer_phone` = pwp_phone_key, the MY-aware digits/strip-60/strip-0
+ * key) + the minting salesperson's `owner_dealer_id` (dealer-scope snapshot for
+ * the same-dealer AVAILABLE RLS clause) + an optional `expires_at`. The cross-
+ * order claim asserts the redeeming order's canonical phone matches. These three
+ * are NULL for every RESERVED / same-cart USED code. `bound_customer_phone` is
+ * NEVER returned to a non-owner client (discovery uses the stripped PwpDiscoverRow
+ * with a server-side phone match). `customer_id` (uuid) stays permanently unused.
+ */
+export interface PwpCodeRow {
+  code: string;
+  rule_id: string | null;
+  type: "pwp" | "promo";
+  reward_category: string;
+  reward_targets: RuleTarget[];
+  status: "RESERVED" | "USED" | "AVAILABLE";
+  owner_staff_id: string | null;
+  cart_line_key: string | null;
+  trigger_item_code: string | null;
+  claim_group: string | null;
+  redeemed_order_id: string | null;
+  redeemed_item_sku: string | null;
+  // ── P8d cross-order columns ──
+  source_order_id: string | null;
+  /** Permanently unused (P8c dormant artifact; the phone binding uses
+   *  `bound_customer_phone`). CF `pwp-customer-id-dead-column`. */
+  customer_id: string | null;
+  // ── P8d (0188) cross-order carry-forward binding ──
+  bound_customer_phone: string | null;
+  owner_dealer_id: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * `pwp_discover_available(text,text)` RETURNS-TABLE row (migration 0188, the P8d
+ * cross-order DISCOVERY read). The STRIPPED projection: it deliberately carries NO
+ * `bound_customer_phone` / `owner_staff_id` / `trigger_item_code` /
+ * `redeemed_item_sku` / `customer_id` — the structural guarantee that discovery
+ * cannot leak another customer's PII. The phone match is computed SERVER-SIDE
+ * (`phone_matches` boolean) so the stored phone is never returned, killing the
+ * `?code=` enumeration/PII oracle. `pwpDiscoverFromRow` maps it.
+ */
+export interface PwpDiscoverRow {
+  code: string;
+  rule_id: string | null;
+  type: "pwp" | "promo";
+  reward_category: string;
+  reward_targets: RuleTarget[];
+  source_order_id: string | null;
+  expires_at: string | null;
+  phone_matches: boolean;
 }
 
 export interface WarehouseRow {

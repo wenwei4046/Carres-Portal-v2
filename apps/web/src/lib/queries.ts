@@ -22,6 +22,14 @@ import {
   type ProductModelPatchInput,
   type ProductSkuCreateInput,
   type ProductSkuPatchInput,
+  type SkuImportRow,
+  type SkuImportResult,
+  type SpecialAddonDto,
+  type SpecialAddonCreateInput,
+  type SpecialAddonPatchInput,
+  type CatalogOptionPoolDto,
+  type CatalogOptionPoolCreateInput,
+  type CatalogOptionPoolPatchInput,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
   type ComboDto,
@@ -38,6 +46,25 @@ import {
   type SizesActiveInput,
   type GenerateSkusInput,
   type FloorConfigPatchInput,
+  // 0184 — delivery TRIP fee config + per-RuleTarget special rules.
+  type DeliveryFeeConfigDto,
+  type DeliveryFeeConfigPatchInput,
+  type SpecialDeliveryFeeRuleDto,
+  type SpecialDeliveryFeeRuleInput,
+  // 0185 — Default Free Gifts (per model) + Free Item Campaigns (GWP).
+  type ModelDefaultFreeGiftsDto,
+  type ModelDefaultFreeGiftsInput,
+  type FreeItemCampaignDto,
+  type FreeItemCampaignInput,
+  // 0186 — PWP / Promo rules (Phase 8a, principal-only CRUD).
+  type PwpRuleDto,
+  type PwpRuleInput,
+  // 0187 — PWP voucher codes (Phase 8c, the SAME-CART state machine reserve API).
+  type PwpReserveInput,
+  type PwpCodesResponse,
+  // 0188 — PWP cross-order DISCOVERY (Phase 8d) — the stripped (no PII) AVAILABLE
+  // voucher discovery the POS cross-order affordance reads by phone / code.
+  type PwpDiscoverResponse,
   type AddonCreateInput,
   type AddonPatchInput,
   type AddonDto,
@@ -110,6 +137,17 @@ export const qk = {
   catalog:      () => ["catalog"] as const,
   outlets:      () => ["outlets"] as const,
   salespersons: (outletId?: string) => ["salespersons", outletId ?? null] as const,
+  /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (GET /api/pwp-codes/mine),
+   *  feeding the POS Auto-Fill voucher rail. The reserve/free mutations invalidate
+   *  this so the rail re-reads the live RESERVED set after a trigger change. */
+  pwpCodesMine: () => ["pwp-codes", "mine"] as const,
+  /** 0188 (Phase 8d) — cross-order AVAILABLE voucher DISCOVERY (GET
+   *  /api/pwp-codes/available), keyed by the selector (phone / code) so the POS
+   *  auto-suggest + manual-entry affordance cache distinctly per lookup. The
+   *  stripped (no-PII) DTO. Only enabled when a selector is present + PWP is
+   *  active (DORMANT carts make zero discovery traffic). */
+  pwpAvailable: (sel: { phone?: string | null; code?: string | null }) =>
+    ["pwp-codes", "available", sel.phone ?? null, sel.code ?? null] as const,
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
   // ripples to dealers + dashboard) without touching dealer/order caches.
@@ -901,6 +939,115 @@ export function useOutlets(opts?: Partial<UseQueryOptions<OutletsListResponse>>)
     queryKey: qk.outlets(),
     queryFn: () => apiFetch<OutletsListResponse>("/api/outlets"),
     staleTime: 5 * 60_000,
+    ...opts,
+  });
+}
+
+/* ─── 0187 (Phase 8c) — PWP voucher codes (SAME-CART reserve API) ───────────── */
+
+/**
+ * usePwpCodesMine — GET /api/pwp-codes/mine. The caller's RESERVED pwp_codes,
+ * feeding the POS Auto-Fill voucher rail (the cart binds a RESERVED code onto an
+ * eligible reward line so the order route claims it). Self-heals on the server
+ * (an owner-scoped orphan reaper runs before the read). `enabled` defaults true
+ * but the POS only mounts this when a catalog with ACTIVE pwp_rules is loaded —
+ * DORMANT carts pass `enabled: false` so a no-rules order makes zero reserve
+ * traffic (byte-identical). Short `staleTime` so the rail reflects reserves
+ * promptly; the reserve/free mutations also invalidate it.
+ */
+export function usePwpCodesMine(opts?: Partial<UseQueryOptions<PwpCodesResponse>>) {
+  return useQuery({
+    queryKey: qk.pwpCodesMine(),
+    queryFn: () => apiFetch<PwpCodesResponse>("/api/pwp-codes/mine"),
+    staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/**
+ * useReservePwpCode — POST /api/pwp-codes/reserve. Idempotent (sequential)
+ * reconcile of ONE trigger line's RESERVED set (top-up / trim). On success,
+ * invalidate `pwpCodesMine` so the Auto-Fill rail re-reads the live set. The
+ * reconciler treats this as best-effort — a failed reserve just shows fewer
+ * codes in the rail; it never blocks submit.
+ */
+export function useReservePwpCode(
+  opts?: Partial<UseMutationOptions<PwpCodesResponse, ApiError, PwpReserveInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<PwpCodesResponse, ApiError, PwpReserveInput>({
+    mutationFn: (input) =>
+      apiFetch<PwpCodesResponse>("/api/pwp-codes/reserve", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.pwpCodesMine() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * useFreePwpCode — DELETE /api/pwp-codes/reserve?cartLineKey=… Frees a removed /
+ * zeroed trigger line's RESERVED codes (RESERVED only — never USED). On success,
+ * invalidate `pwpCodesMine`. Best-effort — a missed free is swept by the order
+ * route's Confirm-pass / the RESERVED-orphan cron.
+ */
+export function useFreePwpCode(
+  opts?: Partial<UseMutationOptions<{ ok: boolean }, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, ApiError, string>({
+    mutationFn: (cartLineKey) =>
+      apiFetch<{ ok: boolean }>(
+        `/api/pwp-codes/reserve?cartLineKey=${encodeURIComponent(cartLineKey)}`,
+        { method: "DELETE" },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.pwpCodesMine() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/* ─── 0188 (Phase 8d) — PWP cross-order voucher DISCOVERY ───────────────────── */
+
+/**
+ * usePwpAvailableForPhone — GET /api/pwp-codes/available?phone=…[&code=…]. The
+ * cross-order voucher discovery the POS cross-order affordance reads: the customer
+ * enters / has captured a phone (auto-suggest) OR a salesperson types a voucher
+ * code (manual entry). The route calls the SECURITY DEFINER `pwp_discover_available`
+ * which returns the STRIPPED projection (NO bound phone / owner / trigger sku) +
+ * a server-computed `phoneMatches` boolean — so the raw bound phone is never sent
+ * to the client (no PII / enumeration oracle). PDPA-safe by construction.
+ *
+ * `enabled` is gated by the caller on (PWP active AND a selector is present): with
+ * no phone + no code the query is disabled (the route would 0-row anyway), so a
+ * DORMANT / no-selector cart makes ZERO discovery traffic. Short `staleTime` so a
+ * freshly-redeemed voucher drops out of the suggestion promptly on re-fetch.
+ */
+export function usePwpAvailableForPhone(
+  selector: { phone?: string | null; code?: string | null },
+  opts?: Partial<UseQueryOptions<PwpDiscoverResponse>>,
+) {
+  const phone = (selector.phone ?? "").trim();
+  const code = (selector.code ?? "").trim();
+  return useQuery({
+    queryKey: qk.pwpAvailable({ phone: phone || null, code: code || null }),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (phone) params.set("phone", phone);
+      if (code) params.set("code", code);
+      return apiFetch<PwpDiscoverResponse>(
+        `/api/pwp-codes/available${params.toString() ? `?${params.toString()}` : ""}`,
+      );
+    },
+    // Default off unless a selector exists; the caller AND-gates with PWP-active.
+    enabled: Boolean(phone || code),
+    staleTime: 10_000,
     ...opts,
   });
 }
@@ -4688,6 +4835,82 @@ export function useDeleteCatalogSku() {
   });
 }
 
+// 2990s Products parity Phase 1 — bulk SKU import. Sends the staged + validated
+// rows; the server resolves/creates models, upserts SKUs (blank=preserve), and
+// returns a per-row result. Invalidates the catalog bundle on success.
+export function useImportSkus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rows: SkuImportRow[]) =>
+      apiFetch<SkuImportResult>("/api/catalog/import-skus", catalogJson("POST", { rows })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// 0181 — Special Add-ons CRUD (principal-only on the server; the catalog bundle
+// invalidates so the Maintenance tab + per-model attach + POS picker all refresh).
+export function useCreateSpecialAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SpecialAddonCreateInput) =>
+      apiFetch<{ specialAddon: SpecialAddonDto }>("/api/catalog/special-addons", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function usePatchSpecialAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: SpecialAddonPatchInput }) =>
+      apiFetch<{ specialAddon: SpecialAddonDto }>(`/api/catalog/special-addons/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteSpecialAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/special-addons/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// 0182 — Global option pools (2990s Products parity Phase 4). Three curated
+// READ-ONLY reference lists (supplier_category / bedframe_size / mattress_size).
+// Not a source of truth for any order-side consumer — sizes only SUGGEST in the
+// per-model size picker; product_models.allowed_options.sizes stays authoritative.
+// CRUD mirrors the special-addon hooks; all invalidate ['catalog'] so the
+// Maintenance tab + per-model size picker refresh (pools ride in the catalog
+// bundle — no dedicated query key needed). Principal-only at the API/RLS layer;
+// the UI gate in OptionPoolEditor is a friendly read-only veneer.
+export function useCreateOptionPoolEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CatalogOptionPoolCreateInput) =>
+      apiFetch<{ optionPool: CatalogOptionPoolDto }>("/api/catalog/option-pools", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function usePatchOptionPoolEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: CatalogOptionPoolPatchInput }) =>
+      apiFetch<{ optionPool: CatalogOptionPoolDto }>(`/api/catalog/option-pools/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteOptionPoolEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/option-pools/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
 export function useCreateSofaFabric() {
   const qc = useQueryClient();
   return useMutation({
@@ -4986,6 +5209,165 @@ export function usePatchFloorConfig() {
         "/api/catalog/floor-config",
         catalogJson("PATCH", input),
       ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0184 — delivery TRIP fee (2990s Products parity Phase 6). The principal-owned
+// config singleton + per-RuleTarget special overrides. All four mutations
+// invalidate the ['catalog'] tree so the bundle (Maintenance + the POS preview)
+// re-reads. Principal-only on the server (RLS + API gate); the Maintenance UI
+// gate is a friendly read-only veneer. The floor STAIR surcharge stays separate.
+// ---------------------------------------------------------------------------
+
+/** PATCH /api/catalog/delivery-fee-config — update the singleton (base/cross
+ *  fee, charged categories, lead days). Principal-only on the server. */
+export function useUpdateDeliveryFeeConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DeliveryFeeConfigPatchInput) =>
+      apiFetch<{ deliveryFeeConfig: DeliveryFeeConfigDto }>(
+        "/api/catalog/delivery-fee-config",
+        catalogJson("PATCH", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useCreateSpecialDeliveryFeeRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SpecialDeliveryFeeRuleInput) =>
+      apiFetch<{ specialDeliveryFeeRule: SpecialDeliveryFeeRuleDto }>(
+        "/api/catalog/special-delivery-fee-rules",
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateSpecialDeliveryFeeRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<SpecialDeliveryFeeRuleInput> }) =>
+      apiFetch<{ specialDeliveryFeeRule: SpecialDeliveryFeeRuleDto }>(
+        `/api/catalog/special-delivery-fee-rules/${id}`,
+        catalogJson("PATCH", patch),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteSpecialDeliveryFeeRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/special-delivery-fee-rules/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0185 — Default Free Gifts (per model) + Free Item Campaigns (2990s Products
+// parity Phase 7, GWP). Principal-only on the server (RLS + API gate); the
+// Maintenance UI gate is a friendly read-only veneer. Every mutation invalidates
+// the ['catalog'] tree so the bundle (Promo tab + the POS preview resolver)
+// re-reads. Free lines book as RM0 order_lines with attrs markers — the order
+// submit pipeline (create_order / order_lines / DraftLine) is untouched.
+// ---------------------------------------------------------------------------
+
+/** PUT /api/catalog/model-free-gifts/:modelId — REPLACE a model's whole gift
+ *  set (an empty `gifts` clears it server-side). Principal-only on the server. */
+export function useUpsertModelFreeGifts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modelId, input }: { modelId: string; input: ModelDefaultFreeGiftsInput }) =>
+      apiFetch<{ modelDefaultFreeGifts: ModelDefaultFreeGiftsDto }>(
+        `/api/catalog/model-free-gifts/${modelId}`,
+        catalogJson("PUT", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** DELETE /api/catalog/model-free-gifts/:modelId — drop a model's gift config
+ *  (idempotent; a missing row is a no-op). Principal-only on the server. */
+export function useDeleteModelFreeGifts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (modelId: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/model-free-gifts/${modelId}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useCreateFreeItemCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: FreeItemCampaignInput) =>
+      apiFetch<{ freeItemCampaign: FreeItemCampaignDto }>(
+        "/api/catalog/free-item-campaigns",
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdateFreeItemCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<FreeItemCampaignInput> }) =>
+      apiFetch<{ freeItemCampaign: FreeItemCampaignDto }>(
+        `/api/catalog/free-item-campaigns/${id}`,
+        catalogJson("PATCH", patch),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteFreeItemCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/free-item-campaigns/${id}`, catalogJson("DELETE")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 0186 — PWP / Promo rules (2990s Products parity Phase 8a). Principal-only on
+// the server (RLS + API gate); the Maintenance UI gate is a friendly read-only
+// veneer. Every mutation invalidates the ['catalog'] tree so the bundle (Promo
+// tab + the POS preview resolver) re-reads. DORMANT — no order-path consumer in
+// P8a; the rule pairs a trigger category/target with a reward category/target,
+// and the reward PRICE lives on product_skus.pwpPrice / sofa_combo_pricing
+// .pwpPricesByHeight (separate principal-locked write paths).
+// ---------------------------------------------------------------------------
+
+export function useCreatePwpRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PwpRuleInput) =>
+      apiFetch<{ pwpRule: PwpRuleDto }>("/api/catalog/pwp-rules", catalogJson("POST", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useUpdatePwpRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<PwpRuleInput> }) =>
+      apiFetch<{ pwpRule: PwpRuleDto }>(`/api/catalog/pwp-rules/${id}`, catalogJson("PATCH", patch)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeletePwpRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/catalog/pwp-rules/${id}`, catalogJson("DELETE")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

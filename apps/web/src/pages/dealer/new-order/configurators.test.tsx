@@ -12,8 +12,9 @@ import type {
 } from "@carres/shared";
 import type { DraftLine } from "./draft";
 import { lockedCategoriesFor, ConfiguratorForModel } from "./configurators";
-import { SofaConfigurator } from "./configurators";
+import { SofaConfigurator, MattressConfigurator } from "./configurators";
 import ConfigureDrawer from "../pos/ConfigureDrawer";
+import type { SpecialAddonDto } from "@carres/shared";
 
 /**
  * Sofa-mutex rule (Loo 2026-05-11, migration 0089): the picker disables
@@ -376,5 +377,86 @@ describe("ConfiguratorForModel — Phase 3 builder gate", () => {
     );
     expect(screen.queryByTestId("sofa-open-builder")).toBeNull();
     expect(screen.getByText("Walnut")).toBeTruthy();
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 0181 — special add-ons fold into the line price + gate on required answers.
+// -----------------------------------------------------------------------------
+function mattressModelWithSpecials(): ProductModelDto {
+  return {
+    id: "m-akka",
+    category: "mattress",
+    modelKey: "akka",
+    name: "Akka",
+    blurb: null,
+    colors: null,
+    gaps: null,
+    sofaMode: null,
+    allowedOptions: { specials: ["right-drawer"] },
+  };
+}
+function mattressSku(): ProductSkuDto {
+  return { id: "sku-k", modelId: "m-akka", sku: "AKKA-K", variant: "K", variantKind: "size", price: 2000, cost: null, supplierId: null };
+}
+const RIGHT_DRAWER: SpecialAddonDto = {
+  id: "sa1",
+  code: "right-drawer",
+  label: "Right Drawer",
+  soDescription: "Right pull-out drawer",
+  categories: ["mattress"],
+  sellingPrice: 50,
+  cost: null,
+  optionGroups: [
+    { label: "Thickness", required: true, choices: [{ label: '10"', extra: 0 }, { label: '8"', extra: -10 }] },
+  ],
+  active: true,
+  sortOrder: 0,
+};
+
+describe("MattressConfigurator — special add-ons", () => {
+  it("folds the chosen surcharge into unitPrice + writes attrs.specials, gating on required answers", () => {
+    const onAdd = vi.fn();
+    render(<MattressConfigurator model={mattressModelWithSpecials()} skus={[mattressSku()]} specialAddons={[RIGHT_DRAWER]} onAdd={onAdd} />);
+    // pick the size
+    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "sku-k" } });
+    // tick the special add-on → its required Thickness question appears
+    fireEvent.click(screen.getByTestId("pick-special-right-drawer"));
+    // required not answered yet → Add is disabled
+    expect(screen.getByText("+ Add").closest("button")).toBeDisabled();
+    // answer 8" (−RM10) → 50 - 10 = 40 surcharge
+    fireEvent.change(screen.getByTestId("pick-choice-right-drawer-0"), { target: { value: '8"' } });
+    fireEvent.click(screen.getByText("+ Add"));
+    expect(onAdd).toHaveBeenCalledOnce();
+    const ln = onAdd.mock.calls[0][0] as DraftLine;
+    expect(ln.unitPrice).toBe(2040); // 2000 + 40
+    const attrs = ln.attrs as { specials_total: number; specials: { code: string; surcharge: number }[] };
+    expect(attrs.specials_total).toBe(40);
+    expect(attrs.specials[0]).toMatchObject({ code: "right-drawer", surcharge: 40 });
+  });
+
+  it("adds with attrs:null + base price when no special is picked", () => {
+    const onAdd = vi.fn();
+    render(<MattressConfigurator model={mattressModelWithSpecials()} skus={[mattressSku()]} specialAddons={[RIGHT_DRAWER]} onAdd={onAdd} />);
+    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "sku-k" } });
+    fireEvent.click(screen.getByText("+ Add"));
+    const ln = onAdd.mock.calls[0][0] as DraftLine;
+    expect(ln.unitPrice).toBe(2000);
+    expect(ln.attrs).toBeNull();
+  });
+
+  it("renders no picker when the model offers no specials", () => {
+    const onAdd = vi.fn();
+    const model = { ...mattressModelWithSpecials(), allowedOptions: {} };
+    render(<MattressConfigurator model={model} skus={[mattressSku()]} specialAddons={[RIGHT_DRAWER]} onAdd={onAdd} />);
+    expect(screen.queryByTestId("special-addons-picker")).toBeNull();
+  });
+
+  it("drops an offered special whose categories don't include the model category", () => {
+    const onAdd = vi.fn();
+    // Model offers 'right-drawer' but the def is sofa-only while the model is mattress.
+    const sofaOnly = { ...RIGHT_DRAWER, categories: ["sofa"] as ProductCategory[] };
+    render(<MattressConfigurator model={mattressModelWithSpecials()} skus={[mattressSku()]} specialAddons={[sofaOnly]} onAdd={onAdd} />);
+    expect(screen.queryByTestId("special-addons-picker")).toBeNull();
   });
 });

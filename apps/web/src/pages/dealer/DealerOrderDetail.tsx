@@ -11,6 +11,8 @@ import { useAuth } from "@/lib/auth";
 import { proceedBlockers } from "@/lib/order-blockers";
 import { useCatalog, useOrder, useProceedOrder } from "@/lib/queries";
 import { orderTotal, lineSubtotal, addonSubtotal, floorSurcharge } from "@/lib/order-totals";
+import { groupSofaBuildLines } from "@/lib/sofa-build-display";
+import { SpecialsSummary } from "./new-order/special-addons-picker";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import AddAddressModal from "./order-actions/AddAddressModal";
 import CancelOrderDialog from "./order-actions/CancelOrderDialog";
@@ -18,7 +20,36 @@ import ConfirmDateModal from "./order-actions/ConfirmDateModal";
 import EditOrderModal from "./order-actions/EditOrderModal";
 import TopUpDepositModal from "./order-actions/TopUpDepositModal";
 
-export default function DealerOrderDetail({ id, onClose }: { id: string; onClose: () => void }) {
+/** 0184 — friendly labels for the delivery TRIP fee addons the Hono recompute
+ *  appends (keys seeded by migration 0184). Unknown keys fall back to the raw
+ *  addon key (disposal addons etc. render as before). */
+const DELIVERY_ADDON_LABELS: Record<string, string> = {
+  DELIVERY: "Delivery fee",
+  DELIVERY_CROSS: "Cross-category delivery",
+  DELIVERY_ADD: "Additional delivery fee",
+};
+
+/** 0185 — a free order_line carries either an appended default-gift marker
+ *  (`attrs.free_gift`) or a freed existing line marker (`attrs.free_item`).
+ *  Returns a short tag to render alongside the line + "FREE" instead of RM0. */
+function freeLineTag(attrs: Record<string, unknown> | null): string | null {
+  if (!attrs) return null;
+  if (attrs.free_gift) return "Free gift";
+  if (attrs.free_item) return "Free item";
+  return null;
+}
+
+export default function DealerOrderDetail({
+  id,
+  onClose,
+  readOnly = false,
+}: {
+  id: string;
+  onClose: () => void;
+  /** Trace-only view (principal): hide the dealer Edit/Cancel + the Proceed
+   *  action panel. Default false → the dealer's full interactive detail. */
+  readOnly?: boolean;
+}) {
   const { data: order, isPending, error } = useOrder(id);
   const { data: catalog } = useCatalog();
   const role = useAuth((s) => s.role);
@@ -67,7 +98,7 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
                 variant="secondary"
               />
             )}
-            {order?.status === "place" && (
+            {!readOnly && order?.status === "place" && (
               <>
                 <button
                   type="button"
@@ -103,7 +134,7 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
               {(error as Error).message}
             </p>
           )}
-          {order && catalog && <OrderBody order={order} floorConfig={catalog.floorConfig} />}
+          {order && catalog && <OrderBody order={order} floorConfig={catalog.floorConfig} readOnly={readOnly} />}
           {order && !catalog && <p className="text-sm text-base-500">Loading totals…</p>}
         </div>
       </div>
@@ -124,9 +155,11 @@ export default function DealerOrderDetail({ id, onClose }: { id: string; onClose
 function OrderBody({
   order,
   floorConfig,
+  readOnly = false,
 }: {
   order: Order;
   floorConfig: FloorConfigDto;
+  readOnly?: boolean;
 }) {
   const total = orderTotal(order, floorConfig);
   const sub = lineSubtotal(order);
@@ -170,8 +203,9 @@ function OrderBody({
         ))}
       </div>
 
-      {/* Action panel — Place→Proceed transition or status info */}
-      <ActionPanel order={order} />
+      {/* Action panel — Place→Proceed transition or status info. Hidden in the
+       *  principal trace-only view (read access without dealer mutations). */}
+      {!readOnly && <ActionPanel order={order} />}
 
       {/* Customer */}
       <p className="label mb-2">Customer details</p>
@@ -184,15 +218,40 @@ function OrderBody({
         <KV label="Proceed" value={order.delivery.dateTbd ? "TBD" : (order.delivery.proceedDate ?? "—")} />
       </div>
 
-      {/* Items */}
+      {/* Items — exploded sofa-build lines (sharing a sofa_build_key) collapse
+       *  into one "Sofa" row for the customer view; every flat line renders
+       *  exactly as before (groupSofaBuildLines is a no-op for keyless lines). */}
       <p className="label mb-2">Items</p>
       <div className="rounded border border-base-900/10 mb-4 overflow-hidden">
-        {(order.lines ?? []).map((l, i) => (
-          <div key={l.id} className={`flex justify-between px-3.5 py-2.5 text-sm ${i ? "border-t border-base-100" : ""}`}>
-            <span className="font-mono">{l.sku} × {l.qty}</span>
-            <span className="font-mono">RM {(l.unitPrice * l.qty).toLocaleString()}</span>
-          </div>
-        ))}
+        {groupSofaBuildLines(order.lines ?? []).map((row, i) =>
+          row.kind === "sofa_build" ? (
+            <div key={row.buildKey} className={`flex justify-between px-3.5 py-2.5 text-sm ${i ? "border-t border-base-100" : ""}`}>
+              <span className="font-mono">
+                Sofa · {row.summary} × {row.qty}
+              </span>
+              <span className="font-mono">RM {row.totalPrice.toLocaleString()}</span>
+            </div>
+          ) : (
+            <div key={row.line.id} className={`px-3.5 py-2.5 text-sm ${i ? "border-t border-base-100" : ""}`}>
+              <div className="flex justify-between">
+                <span className="font-mono">
+                  {row.line.sku} × {row.line.qty}
+                  {freeLineTag(row.line.attrs) && (
+                    <span className="ml-2 pill pill-confirmed align-middle">
+                      {freeLineTag(row.line.attrs)}
+                    </span>
+                  )}
+                </span>
+                <span className="font-mono">
+                  {freeLineTag(row.line.attrs)
+                    ? "FREE"
+                    : `RM ${(row.line.unitPrice * row.line.qty).toLocaleString()}`}
+                </span>
+              </div>
+              <SpecialsSummary attrs={row.line.attrs} className="mt-1 ml-0.5 flex flex-col gap-0.5" />
+            </div>
+          ),
+        )}
         {(order.addons ?? []).map((a, i) => {
           // 2026-05-19 (migration 0133) — disposal addons carry an attrs.size
           // tag set by the wizard. Render it next to the addon key so the
@@ -203,11 +262,22 @@ function OrderBody({
             typeof (a.attrs as { size?: unknown }).size === "string"
               ? ((a.attrs as { size: string }).size)
               : null;
+          // 0184 — delivery trip fee addons (appended by the Hono recompute)
+          // render with a friendly label; the base line may carry the linked
+          // source SO when it's a cross-category follow-up.
+          const deliveryLabel = DELIVERY_ADDON_LABELS[a.addonKey] ?? null;
+          const sourceSo =
+            typeof a.attrs === "object" &&
+            a.attrs !== null &&
+            typeof (a.attrs as { cross_category_source_so?: unknown }).cross_category_source_so === "string"
+              ? ((a.attrs as { cross_category_source_so: string }).cross_category_source_so)
+              : null;
           return (
             <div key={a.id} className={`flex justify-between px-3.5 py-2.5 text-sm text-base-600 ${(order.lines?.length ?? 0) + i > 0 ? "border-t border-base-100" : ""}`}>
               <span className="font-mono">
-                + {a.addonKey}
+                + {deliveryLabel ?? a.addonKey}
                 {size && <span className="text-base-700"> · {size}</span>}
+                {sourceSo && <span className="text-base-700"> · ↳ {sourceSo}</span>}
                 {" "}× {a.qty}
               </span>
               <span className="font-mono">RM {(a.unitPrice * a.qty).toLocaleString()}</span>

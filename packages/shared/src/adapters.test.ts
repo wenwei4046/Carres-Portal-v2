@@ -1,18 +1,34 @@
 import { describe, expect, it } from "vitest";
 import {
+  catalogOptionPoolFromRow,
+  deliveryFeeConfigFromRow,
+  freeItemCampaignFromRow,
+  modelDefaultFreeGiftsFromRow,
   modelSofaCompartmentFromRow,
   orderInputToRpcPayload,
   orderSupplierThreadFromRow,
   productSkuFromRow,
+  pwpCodeFromRow,
+  pwpDiscoverFromRow,
+  pwpRuleFromRow,
   sofaComboFromRow,
   sofaCompartmentFromRow,
+  specialDeliveryFeeRuleFromRow,
 } from "./adapters";
 import type {
+  CatalogOptionPoolRow,
+  DeliveryFeeConfigRow,
+  FreeItemCampaignRow,
+  ModelDefaultFreeGiftsRow,
   ModelSofaCompartmentRow,
   OrderSupplierThreadRow,
   ProductSkuRow,
+  PwpCodeRow,
+  PwpDiscoverRow,
+  PwpRuleRow,
   SofaComboPricingRow,
   SofaCompartmentRow,
+  SpecialDeliveryFeeRuleRow,
 } from "./db-types";
 import type { CreateOrderInput } from "./schemas/orders";
 
@@ -49,6 +65,9 @@ function baseInput(over: Partial<CreateOrderInput> = {}): CreateOrderInput {
     paymentMethod: "online",
     approvalCode: null,
     installmentMonths: null,
+    // 0187 — defaults to [] (DORMANT); set explicitly because `.default([])`
+    // makes it required in the parsed CreateOrderInput (output) type.
+    pwpCartLineKeys: [],
     ...over,
   };
 }
@@ -396,6 +415,47 @@ describe("modelSofaCompartmentFromRow", () => {
   });
 });
 
+describe("catalogOptionPoolFromRow", () => {
+  function baseRow(over: Partial<CatalogOptionPoolRow> = {}): CatalogOptionPoolRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000a0001",
+      pool: "mattress_size",
+      value: "K",
+      label: "6FT",
+      dimensions: "183X190CM",
+      // Postgres integer arrives fine, but exercise the Number() coercion anyway.
+      sort_order: "3" as unknown as number,
+      active: true,
+      created_at: "2026-06-26T08:00:00.000Z",
+      updated_at: "2026-06-26T08:00:00.000Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("snake->camel + coerces sort_order; keeps label/dimensions for size pools", () => {
+    const out = catalogOptionPoolFromRow(baseRow());
+    expect(out.id).toBe("00000000-0000-0000-0000-0000000a0001");
+    expect(out.pool).toBe("mattress_size");
+    expect(out.value).toBe("K");
+    expect(out.label).toBe("6FT");
+    expect(out.dimensions).toBe("183X190CM");
+    expect(out.sortOrder).toBe(3);
+    expect(typeof out.sortOrder).toBe("number");
+    expect(out.active).toBe(true);
+  });
+
+  it("keeps null label/dimensions (supplier_category has neither) — not coerced to empty", () => {
+    const out = catalogOptionPoolFromRow(
+      baseRow({ pool: "supplier_category", value: "sofa", label: null, dimensions: null }),
+    );
+    expect(out.pool).toBe("supplier_category");
+    expect(out.value).toBe("sofa");
+    expect(out.label).toBeNull();
+    expect(out.dimensions).toBeNull();
+  });
+});
+
 describe("sofaComboFromRow", () => {
   function baseRow(over: Partial<SofaComboPricingRow> = {}): SofaComboPricingRow {
     return {
@@ -410,6 +470,18 @@ describe("sofaComboFromRow", () => {
       prices_by_height: {
         "24": "2640.00" as unknown as number,
         "28": 2750,
+        "30": null,
+      },
+      // 0183 — per-height cost benchmark (companion to prices_by_height).
+      cost_by_height: {
+        "24": "1800.00" as unknown as number,
+        "28": 1850,
+        "30": null,
+      },
+      // 0186 — per-height PWP reward price (companion to prices_by_height).
+      pwp_prices_by_height: {
+        "24": "2200.00" as unknown as number,
+        "28": 2300,
         "30": null,
       },
       label: "Oslo L-shape",
@@ -436,6 +508,18 @@ describe("sofaComboFromRow", () => {
     expect(typeof out.pricesByHeight["24"]).toBe("number");
     expect(out.pricesByHeight["28"]).toBe(2750);
     expect(out.pricesByHeight["30"]).toBeNull();
+    // 0183 — cost map coerces numerics + preserves null, same as prices.
+    expect(out.costByHeight).not.toBeNull();
+    expect(out.costByHeight!["24"]).toBe(1800);
+    expect(typeof out.costByHeight!["24"]).toBe("number");
+    expect(out.costByHeight!["28"]).toBe(1850);
+    expect(out.costByHeight!["30"]).toBeNull();
+    // 0186 — PWP price map coerces numerics + preserves null, same as prices.
+    expect(out.pwpPricesByHeight).not.toBeNull();
+    expect(out.pwpPricesByHeight!["24"]).toBe(2200);
+    expect(typeof out.pwpPricesByHeight!["24"]).toBe("number");
+    expect(out.pwpPricesByHeight!["28"]).toBe(2300);
+    expect(out.pwpPricesByHeight!["30"]).toBeNull();
     expect(out.label).toBe("Oslo L-shape");
     expect(out.effectiveFrom).toBe("2026-06-21");
     expect(out.active).toBe(true);
@@ -456,6 +540,16 @@ describe("sofaComboFromRow", () => {
     expect(out.tier).toBeNull();
     expect(out.label).toBeNull();
   });
+
+  it("keeps costByHeight null when the column is unset (distinct from {})", () => {
+    const out = sofaComboFromRow(baseRow({ cost_by_height: null }));
+    expect(out.costByHeight).toBeNull();
+  });
+
+  it("keeps pwpPricesByHeight null when the column is unset (0186)", () => {
+    const out = sofaComboFromRow(baseRow({ pwp_prices_by_height: null }));
+    expect(out.pwpPricesByHeight).toBeNull();
+  });
 });
 
 describe("productSkuFromRow — 0178 compartmentId", () => {
@@ -473,6 +567,7 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
       pos_active: true,
       description: null,
       compartment_id: "00000000-0000-0000-0000-0000000c0001",
+      pwp_price: null,
       ...over,
     };
   }
@@ -485,5 +580,381 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
   it("nulls compartmentId for a non-compartment SKU", () => {
     const out = productSkuFromRow(baseSkuRow({ compartment_id: null }));
     expect(out.compartmentId).toBeNull();
+  });
+
+  it("maps pwp_price -> pwpPrice, coercing numeric + preserving null (0186)", () => {
+    expect(productSkuFromRow(baseSkuRow({ pwp_price: null })).pwpPrice).toBeNull();
+    const out = productSkuFromRow(baseSkuRow({ pwp_price: "999.00" as unknown as number }));
+    expect(out.pwpPrice).toBe(999);
+    expect(typeof out.pwpPrice).toBe("number");
+  });
+});
+
+describe("deliveryFeeConfigFromRow (0184)", () => {
+  function baseRow(over: Partial<DeliveryFeeConfigRow> = {}): DeliveryFeeConfigRow {
+    return {
+      id: 1,
+      // PostgREST serializes numeric as a string — Number() must normalise it.
+      base_fee: "50.00" as unknown as number,
+      cross_category_fee: "30.00" as unknown as number,
+      charged_categories: ["sofa", "mattress", "bedframe"],
+      mattress_bedframe_lead_days: 14,
+      sofa_lead_days: 21,
+      updated_at: "2026-06-26T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("coerces numeric fees + lead days and passes charged categories through; drops id", () => {
+    const out = deliveryFeeConfigFromRow(baseRow());
+    expect(out).toEqual({
+      baseFee: 50,
+      crossCategoryFee: 30,
+      chargedCategories: ["sofa", "mattress", "bedframe"],
+      mattressBedframeLeadDays: 14,
+      sofaLeadDays: 21,
+    });
+    // no singleton id leaks into the domain shape
+    expect(out).not.toHaveProperty("id");
+  });
+
+  it("defaults a null charged_categories to []", () => {
+    const out = deliveryFeeConfigFromRow(
+      baseRow({ charged_categories: null as unknown as string[] }),
+    );
+    expect(out.chargedCategories).toEqual([]);
+  });
+});
+
+describe("specialDeliveryFeeRuleFromRow (0184)", () => {
+  function baseRow(over: Partial<SpecialDeliveryFeeRuleRow> = {}): SpecialDeliveryFeeRuleRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000de001",
+      target: [
+        { scope: "model", modelId: "00000000-0000-0000-0000-00000000000a" },
+      ] as unknown as SpecialDeliveryFeeRuleRow["target"],
+      standalone_fee: "500.00" as unknown as number,
+      cross_cat_followup_fee: "300.00" as unknown as number,
+      label: "Full-latex transport",
+      active: true,
+      sort_order: 0,
+      created_at: "2026-06-26T00:00:00Z",
+      updated_at: "2026-06-26T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("parses the RuleTarget[] and coerces numeric fees", () => {
+    const out = specialDeliveryFeeRuleFromRow(baseRow());
+    expect(out.id).toBe("00000000-0000-0000-0000-0000000de001");
+    expect(out.target).toEqual([
+      { scope: "model", modelId: "00000000-0000-0000-0000-00000000000a" },
+    ]);
+    expect(out.standaloneFee).toBe(500);
+    expect(out.crossCategoryFollowupFee).toBe(300);
+    expect(out.label).toBe("Full-latex transport");
+    expect(out.active).toBe(true);
+    expect(out.sortOrder).toBe(0);
+  });
+
+  it("drops malformed target entries via parseRuleTargets and nulls a missing label", () => {
+    const out = specialDeliveryFeeRuleFromRow(
+      baseRow({
+        // a non-combo entry with no modelId is unusable → dropped
+        target: [
+          { scope: "model" },
+          { scope: "variant", modelId: "m1", sizeCodes: ["queen"] },
+        ] as unknown as SpecialDeliveryFeeRuleRow["target"],
+        label: null,
+      }),
+    );
+    expect(out.target).toEqual([{ scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] }]);
+    expect(out.label).toBeNull();
+  });
+});
+
+describe("modelDefaultFreeGiftsFromRow (0185)", () => {
+  function baseRow(over: Partial<ModelDefaultFreeGiftsRow> = {}): ModelDefaultFreeGiftsRow {
+    return {
+      model_id: "00000000-0000-0000-0000-00000000000a",
+      gifts: [
+        { giftSku: "ACC-PILLOW", qty: 1, label: "Free pillow" },
+      ] as unknown as ModelDefaultFreeGiftsRow["gifts"],
+      updated_at: "2026-06-26T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("maps model_id → modelId and parses the gifts jsonb", () => {
+    const out = modelDefaultFreeGiftsFromRow(baseRow());
+    expect(out).toEqual({
+      modelId: "00000000-0000-0000-0000-00000000000a",
+      gifts: [{ giftSku: "ACC-PILLOW", qty: 1, label: "Free pillow" }],
+    });
+  });
+
+  it("drops malformed gift entries + collapses a 'model'-scope condition via parseDefaultFreeGifts", () => {
+    const out = modelDefaultFreeGiftsFromRow(
+      baseRow({
+        gifts: [
+          { giftSku: "", qty: 1 }, // empty sku → dropped
+          { giftSku: "ACC-A", qty: 0 }, // qty < 1 → dropped
+          { giftSku: "ACC-B", qty: 2, condition: { scope: "model" } }, // condition collapses
+        ] as unknown as ModelDefaultFreeGiftsRow["gifts"],
+      }),
+    );
+    expect(out.gifts).toEqual([{ giftSku: "ACC-B", qty: 2 }]);
+  });
+
+  it("defaults a null gifts column to []", () => {
+    const out = modelDefaultFreeGiftsFromRow(
+      baseRow({ gifts: null as unknown as ModelDefaultFreeGiftsRow["gifts"] }),
+    );
+    expect(out.gifts).toEqual([]);
+  });
+});
+
+describe("freeItemCampaignFromRow (0185)", () => {
+  function baseRow(over: Partial<FreeItemCampaignRow> = {}): FreeItemCampaignRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000ca001",
+      name: "Pillow giveaway",
+      active: true,
+      // PostgREST may serialize integer as a string — Number() must normalise it.
+      max_free_qty: "2" as unknown as number,
+      eligible: [
+        { scope: "model", modelId: "00000000-0000-0000-0000-00000000000a" },
+      ] as unknown as FreeItemCampaignRow["eligible"],
+      created_at: "2026-06-26T00:00:00Z",
+      updated_at: "2026-06-26T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("maps fields, coerces max_free_qty, and parses the eligible RuleTarget[]", () => {
+    const out = freeItemCampaignFromRow(baseRow());
+    expect(out).toEqual({
+      id: "00000000-0000-0000-0000-0000000ca001",
+      name: "Pillow giveaway",
+      active: true,
+      maxFreeQty: 2,
+      eligible: [{ scope: "model", modelId: "00000000-0000-0000-0000-00000000000a" }],
+    });
+  });
+
+  it("drops malformed eligible entries via parseFreeItemEligible", () => {
+    const out = freeItemCampaignFromRow(
+      baseRow({
+        eligible: [
+          { scope: "model" }, // no modelId → dropped
+          { scope: "variant", modelId: "m1", sizeCodes: ["queen"] }, // upper-cased
+        ] as unknown as FreeItemCampaignRow["eligible"],
+      }),
+    );
+    expect(out.eligible).toEqual([{ scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] }]);
+  });
+});
+
+describe("pwpCodeFromRow (0187)", () => {
+  function baseRow(over: Partial<PwpCodeRow> = {}): PwpCodeRow {
+    return {
+      code: "PWP-1234ABCD",
+      rule_id: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      reward_category: "BEDFRAME",
+      reward_targets: [
+        { scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" },
+      ] as unknown as PwpCodeRow["reward_targets"],
+      status: "RESERVED",
+      owner_staff_id: "00000000-0000-0000-0000-0000000aa001",
+      cart_line_key: "line-1",
+      trigger_item_code: "MAT-QUEEN",
+      claim_group: null,
+      redeemed_order_id: null,
+      redeemed_item_sku: null,
+      source_order_id: null,
+      customer_id: null,
+      bound_customer_phone: null,
+      owner_dealer_id: null,
+      expires_at: null,
+      created_at: "2026-06-28T00:00:00Z",
+      updated_at: "2026-06-28T00:00:00Z",
+      ...over,
+    };
+  }
+
+  it("maps every column snake→camel and parses the reward_targets RuleTarget[]", () => {
+    const out = pwpCodeFromRow(baseRow());
+    expect(out).toEqual({
+      code: "PWP-1234ABCD",
+      ruleId: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      rewardCategory: "BEDFRAME",
+      rewardTargets: [{ scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" }],
+      status: "RESERVED",
+      ownerStaffId: "00000000-0000-0000-0000-0000000aa001",
+      cartLineKey: "line-1",
+      triggerItemCode: "MAT-QUEEN",
+      claimGroup: null,
+      redeemedOrderId: null,
+      redeemedItemSku: null,
+      sourceOrderId: null,
+      customerId: null,
+      boundCustomerPhone: null,
+      ownerDealerId: null,
+      expiresAt: null,
+      createdAt: "2026-06-28T00:00:00Z",
+      updatedAt: "2026-06-28T00:00:00Z",
+    });
+  });
+
+  it("(P8d 0188) maps the cross-order carry-forward binding fields on an AVAILABLE voucher", () => {
+    const out = pwpCodeFromRow(
+      baseRow({
+        status: "AVAILABLE",
+        cart_line_key: null,
+        source_order_id: "00000000-0000-0000-0000-0000000d0aa1",
+        bound_customer_phone: "123456789",
+        owner_dealer_id: "00000000-0000-0000-0000-0000000de001",
+        expires_at: "2026-07-28T00:00:00Z",
+      }),
+    );
+    expect(out.status).toBe("AVAILABLE");
+    expect(out.boundCustomerPhone).toBe("123456789");
+    expect(out.ownerDealerId).toBe("00000000-0000-0000-0000-0000000de001");
+    expect(out.expiresAt).toBe("2026-07-28T00:00:00Z");
+    expect(out.sourceOrderId).toBe("00000000-0000-0000-0000-0000000d0aa1");
+  });
+
+  it("(P8d 0188) defaults the binding fields to null when a pre-0188 row omits them", () => {
+    // Simulate a pre-0188 row / mock that has no binding columns at all.
+    const legacy = baseRow();
+    delete (legacy as Partial<PwpCodeRow>).bound_customer_phone;
+    delete (legacy as Partial<PwpCodeRow>).owner_dealer_id;
+    delete (legacy as Partial<PwpCodeRow>).expires_at;
+    const out = pwpCodeFromRow(legacy);
+    expect(out.boundCustomerPhone).toBeNull();
+    expect(out.ownerDealerId).toBeNull();
+    expect(out.expiresAt).toBeNull();
+  });
+
+  it("carries the claimed-stamp fields and a nulled owner (post-redemption audit row)", () => {
+    const out = pwpCodeFromRow(
+      baseRow({
+        status: "USED",
+        owner_staff_id: null,
+        claim_group: "00000000-0000-0000-0000-0000000c6001",
+        redeemed_order_id: "00000000-0000-0000-0000-0000000d0001",
+        redeemed_item_sku: "BED-KING",
+      }),
+    );
+    expect(out.status).toBe("USED");
+    expect(out.ownerStaffId).toBeNull();
+    expect(out.claimGroup).toBe("00000000-0000-0000-0000-0000000c6001");
+    expect(out.redeemedOrderId).toBe("00000000-0000-0000-0000-0000000d0001");
+    expect(out.redeemedItemSku).toBe("BED-KING");
+  });
+
+  it("drops malformed reward_targets entries via parseRuleTargets", () => {
+    const out = pwpCodeFromRow(
+      baseRow({
+        reward_targets: [
+          { scope: "model" }, // no modelId → dropped
+          { scope: "variant", modelId: "m1", sizeCodes: ["queen"] }, // upper-cased
+        ] as unknown as PwpCodeRow["reward_targets"],
+      }),
+    );
+    expect(out.rewardTargets).toEqual([
+      { scope: "variant", modelId: "m1", sizeCodes: ["QUEEN"] },
+    ]);
+  });
+});
+
+describe("pwpRuleFromRow (0186 + 0188 carry-forward)", () => {
+  function baseRow(over: Partial<PwpRuleRow> = {}): PwpRuleRow {
+    return {
+      id: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      trigger_category: "MATTRESS",
+      trigger_targets: [] as unknown as PwpRuleRow["trigger_targets"],
+      reward_category: "BEDFRAME",
+      reward_targets: [] as unknown as PwpRuleRow["reward_targets"],
+      qty_per_trigger: 1,
+      active: true,
+      carry_forward: true,
+      carry_forward_days: null,
+      created_at: "2026-06-28T00:00:00Z",
+      updated_at: "2026-06-28T00:00:00Z",
+      updated_by: null,
+      ...over,
+    };
+  }
+
+  it("maps the carry-forward policy columns", () => {
+    const out = pwpRuleFromRow(baseRow({ carry_forward: false, carry_forward_days: 30 }));
+    expect(out.carryForward).toBe(false);
+    expect(out.carryForwardDays).toBe(30);
+  });
+
+  it("defaults carryForward to true / carryForwardDays to null when a pre-0188 row omits them", () => {
+    const legacy = baseRow();
+    delete (legacy as Partial<PwpRuleRow>).carry_forward;
+    delete (legacy as Partial<PwpRuleRow>).carry_forward_days;
+    const out = pwpRuleFromRow(legacy);
+    expect(out.carryForward).toBe(true);
+    expect(out.carryForwardDays).toBeNull();
+  });
+
+  it("coerces qty_per_trigger via Number() (PostgREST may serialize it as a string)", () => {
+    const out = pwpRuleFromRow(baseRow({ qty_per_trigger: "2" as unknown as number }));
+    expect(out.qtyPerTrigger).toBe(2);
+  });
+});
+
+describe("pwpDiscoverFromRow (0188 — the stripped cross-order DISCOVERY projection)", () => {
+  function baseRow(over: Partial<PwpDiscoverRow> = {}): PwpDiscoverRow {
+    return {
+      code: "PWP-9876ZZZZ",
+      rule_id: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      reward_category: "BEDFRAME",
+      reward_targets: [
+        { scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" },
+      ] as unknown as PwpDiscoverRow["reward_targets"],
+      source_order_id: "00000000-0000-0000-0000-0000000d0aa1",
+      expires_at: null,
+      phone_matches: true,
+      ...over,
+    };
+  }
+
+  it("maps the stripped projection snake→camel and parses reward_targets", () => {
+    const out = pwpDiscoverFromRow(baseRow());
+    expect(out).toEqual({
+      code: "PWP-9876ZZZZ",
+      ruleId: "00000000-0000-0000-0000-0000000ee001",
+      type: "pwp",
+      rewardCategory: "BEDFRAME",
+      rewardTargets: [{ scope: "model", modelId: "00000000-0000-0000-0000-00000000000b" }],
+      sourceOrderId: "00000000-0000-0000-0000-0000000d0aa1",
+      expiresAt: null,
+      phoneMatches: true,
+    });
+  });
+
+  it("carries the server-computed phoneMatches=false and never any PII field", () => {
+    const out = pwpDiscoverFromRow(baseRow({ phone_matches: false }));
+    expect(out.phoneMatches).toBe(false);
+    // The structural PII guarantee: the discover shape has no bound phone / owner /
+    // trigger sku / customer id / redeemed sku keys.
+    expect(out).not.toHaveProperty("boundCustomerPhone");
+    expect(out).not.toHaveProperty("ownerStaffId");
+    expect(out).not.toHaveProperty("triggerItemCode");
+    expect(out).not.toHaveProperty("redeemedItemSku");
+    expect(out).not.toHaveProperty("customerId");
   });
 });
