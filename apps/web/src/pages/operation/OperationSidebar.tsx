@@ -15,7 +15,6 @@ import {
   Table2,
   PanelLeftClose,
   PanelLeftOpen,
-  Flame,
   type LucideIcon,
 } from "lucide-react";
 
@@ -218,7 +217,13 @@ export default function OperationSidebar({
             className="grid place-items-center bg-transparent border-0 p-0 cursor-pointer"
             title="Carres — dashboard"
           >
-            <Flame size={22} strokeWidth={2} className="text-primary" />
+            <img
+              src="/carres-logo.png"
+              alt="Carres"
+              width={26}
+              height={26}
+              className="block object-contain"
+            />
           </button>
           <button
             onClick={onToggleCollapse}
