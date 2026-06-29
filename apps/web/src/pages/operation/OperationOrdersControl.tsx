@@ -1267,8 +1267,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
           {/* ONE thin, darker header band so it reads clearly AS the header
               (Jess 2026-06-24: header darker, no column shade, less thick). */}
           <thead>
-            <tr className="bg-base-200 border-b border-base-400">
-              <th className="px-3 py-1.5 border-r border-base-200">
+            <tr className="bg-base-800 border-b border-base-900">
+              <th className="px-3 py-1.5 border-r border-base-700">
                 <input
                   type="checkbox"
                   checked={allPagedSelected}
@@ -1278,10 +1278,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 />
               </th>
               <th
-                className="px-1 py-1.5 text-center border-r border-base-200"
+                className="px-1 py-1.5 text-center border-r border-base-700"
                 title="Follow-up"
               >
-                <Flag size={13} strokeWidth={2} className="inline text-base-900" aria-label="Follow-up" />
+                <Flag size={13} strokeWidth={2} className="inline text-white" aria-label="Follow-up" />
               </th>
               <Th>Status</Th>
               <Th noBorder>Order ID</Th>
@@ -1663,10 +1663,18 @@ function QuickView({
 // Follow-up column (internal ops note) + the Payment panel. The 3 party remarks
 // stay; "Action" → "Logistic" so the wording aligns with the Logistic column.
 const REMARK_FIELDS = [
-  { key: "action_for_logistic", label: "Logistic" },
-  { key: "warehouse_remark", label: "WH" },
-  { key: "customer_request", label: "Cust" },
+  { key: "action_for_logistic", label: "Logistic", tone: "info" },
+  { key: "warehouse_remark", label: "WH", tone: "warning" },
+  { key: "customer_request", label: "Cust", tone: "success" },
 ] as const;
+
+// Small colour-coded pill per remark party so the 3 lines read at a glance
+// (Jess 2026-06-29): Logistic = blue · WH = amber · Cust = green.
+const REMARK_TONE: Record<string, string> = {
+  info: "bg-info/10 text-info",
+  warning: "bg-warning/10 text-warning",
+  success: "bg-success/10 text-success",
+};
 function RemarkCell({ order }: { order: operationOrderListRow }) {
   const ovlRaw = order.ops_order_control;
   const ovl = Array.isArray(ovlRaw) ? ovlRaw[0] : ovlRaw;
@@ -1744,8 +1752,12 @@ function RemarkCell({ order }: { order: operationOrderListRow }) {
         <div className="leading-[1.3]">
           {filled.map((f) => (
             <div key={f.key} className="truncate text-[10px]">
-              <span className="font-semibold text-base-500">{f.label}:</span>{" "}
-              <span className="text-base-700">{vals[f.key]}</span>
+              <span
+                className={`inline-block text-[8px] font-bold uppercase tracking-wide px-1 py-px rounded mr-1 align-middle ${REMARK_TONE[f.tone]}`}
+              >
+                {f.label}
+              </span>
+              <span className="text-base-700 align-middle">{vals[f.key]}</span>
             </div>
           ))}
         </div>
@@ -2198,8 +2210,8 @@ function Th({
 }) {
   return (
     <th
-      className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.02em] text-base-900 text-left ${
-        noBorder ? "" : "border-r border-base-200"
+      className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.02em] text-white text-left ${
+        noBorder ? "" : "border-r border-base-700"
       }`}
     >
       {children}
