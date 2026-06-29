@@ -21,12 +21,13 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
  * All children are stubbed so we test routing only; child suites cover their
  * own renders.
  */
-vi.mock("./OperationSidebar", () => ({
-  default: ({ active }: { active: string }) => (
-    <div data-testid="sidebar-stub" data-active={active}>
-      sidebar
-    </div>
-  ),
+// Unified Internal Portal (2026-06-30) — the merged PortalSidebar replaced the
+// private OperationSidebar. It self-fetches badges via react-query, so stub it;
+// this suite tests OperationApp's descendant routing, not the rail. Active-tab
+// highlight moved into PortalSidebar (URL-derived) and is covered by its own
+// suite, so the old `data-active` prop assertions are gone.
+vi.mock("@/pages/portal/PortalSidebar", () => ({
+  default: () => <div data-testid="sidebar-stub">sidebar</div>,
 }));
 vi.mock("./OperationDashboard", () => ({
   default: () => <div data-testid="dashboard-stub">dashboard</div>,
@@ -82,21 +83,5 @@ describe("OperationApp — procurement descendant routing", () => {
     expect(
       screen.queryByTestId("procurement-shell-stub"),
     ).not.toBeInTheDocument();
-  });
-
-  it("sidebar `active` flips to `procurement` when URL is in procurement section", () => {
-    renderApp("/operation/procurement/nice-future");
-    expect(screen.getByTestId("sidebar-stub")).toHaveAttribute(
-      "data-active",
-      "procurement",
-    );
-  });
-
-  it("sidebar `active` is `dashboard` when URL is not procurement", () => {
-    renderApp("/operation");
-    expect(screen.getByTestId("sidebar-stub")).toHaveAttribute(
-      "data-active",
-      "dashboard",
-    );
   });
 });

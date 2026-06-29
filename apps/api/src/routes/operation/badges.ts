@@ -45,7 +45,7 @@ const EPOCH = "1970-01-01T00:00:00Z";
 
 operationBadgesRouter.get("/", async (c) => {
   const auth = c.var.auth;
-  if (auth.role !== "operation") {
+  if (auth.role !== "operation" && auth.role !== "principal") {
     throw new HTTPException(403, { message: "operation only" });
   }
 
@@ -151,7 +151,7 @@ const seenInput = z.object({
 
 operationBadgesRouter.post("/seen", async (c) => {
   const auth = c.var.auth;
-  if (auth.role !== "operation") {
+  if (auth.role !== "operation" && auth.role !== "principal") {
     throw new HTTPException(403, { message: "operation only" });
   }
   const raw = await c.req.json().catch(() => ({}));

@@ -90,7 +90,11 @@ export default function App() {
           path="/operation/*"
           element={
             <RequireAuth>
-              <RequireRole roles={["operation"]}>
+              {/* Unified Internal Portal (2026-06-30) — principal admitted
+                  alongside operation so the merged PortalSidebar's Operations
+                  area is reachable by the boss. DB twin: migration 0189 widens
+                  is_operation(); API twin: requireOperation admits principal. */}
+              <RequireRole roles={["operation", "principal"]}>
                 <OperationApp />
               </RequireRole>
             </RequireAuth>

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import FinanceSidebar from "./FinanceSidebar";
+// Unified Internal Portal (2026-06-30) — shared role-aware rail.
+import PortalSidebar from "@/pages/portal/PortalSidebar";
 import FinanceDashboard from "./FinanceDashboard";
 import FinanceAR from "./FinanceAR";
 import FinanceAP from "./FinanceAP";
@@ -26,8 +27,8 @@ import FinanceReports from "./FinanceReports";
 export default function FinanceApp() {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      <FinanceSidebar />
-      <main className="ml-[240px] flex-1 min-w-0">
+      <PortalSidebar />
+      <main className="flex-1 min-w-0">
         <Routes>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<FinanceDashboard />} />

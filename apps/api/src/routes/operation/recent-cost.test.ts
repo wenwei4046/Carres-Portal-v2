@@ -142,11 +142,14 @@ describe("GET /api/operation/skus/:sku/recent-cost", () => {
     expect(m.from).not.toHaveBeenCalled();
   });
 
-  it("rejects principal with 403 (HTTP route narrower than RLS — same gate as T18/T19)", async () => {
+  // Unified Internal Portal (2026-06-30): operation routes now admit
+  // operation + principal. `finance` is the still-rejected probe (internal but
+  // not operation), proving the gate isn't all-of-is_internal().
+  it("rejects a non-operation role (finance) with 403", async () => {
     const m = makeChain({ data: null });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ from: m.from } as any);
-    const jwt = await makeJwt("principal");
+    const jwt = await makeJwt("finance");
     const res = await app.fetch(
       new Request(URL, { headers: { Authorization: `Bearer ${jwt}` } }),
       env,

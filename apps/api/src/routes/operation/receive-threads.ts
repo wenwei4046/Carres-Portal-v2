@@ -56,7 +56,7 @@ const operationReceiveThreadsRouter = new Hono<AppEnv>();
  */
 operationReceiveThreadsRouter.get("/:poId/threads", async (c) => {
   const auth = c.var.auth;
-  if (auth.role !== "operation") {
+  if (auth.role !== "operation" && auth.role !== "principal") {
     throw new HTTPException(403, { message: "operation role required" });
   }
   const poId = c.req.param("poId");
@@ -109,7 +109,7 @@ operationReceiveThreadsRouter.get("/:poId/threads", async (c) => {
 
 operationReceiveThreadsRouter.post("/:poId/receive-threads", async (c) => {
   const auth = c.var.auth;
-  if (auth.role !== "operation") {
+  if (auth.role !== "operation" && auth.role !== "principal") {
     throw new HTTPException(403, { message: "operation role required" });
   }
   const poId = c.req.param("poId");

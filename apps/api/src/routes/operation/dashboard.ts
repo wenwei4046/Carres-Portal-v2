@@ -25,7 +25,7 @@ const operationDashboardRouter = new Hono<AppEnv>();
 
 operationDashboardRouter.get("/", async (c) => {
   const auth = c.var.auth;
-  if (auth.role !== "operation") {
+  if (auth.role !== "operation" && auth.role !== "principal") {
     throw new HTTPException(403, { message: "operation only" });
   }
 

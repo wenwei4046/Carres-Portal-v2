@@ -64,7 +64,7 @@ const thresholdsRouter = new Hono<AppEnv>();
 
 thresholdsRouter.post("/warehouses/:warehouseId/skus/:sku/threshold", async (c) => {
   const auth = c.var.auth;
-  if (auth.role !== "operation") {
+  if (auth.role !== "operation" && auth.role !== "principal") {
     throw new HTTPException(403, { message: "operation only" });
   }
 

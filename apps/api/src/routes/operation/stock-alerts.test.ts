@@ -114,11 +114,13 @@ describe("GET /api/operation/stock-alerts", () => {
     expect(sb.rpc).toHaveBeenCalledWith("operation_stock_alerts");
   });
 
-  it("rejects principal with 403 (HTTP route narrower than RPC role gate)", async () => {
+  // Unified Internal Portal (2026-06-30): operation routes now admit
+  // operation + principal. `finance` is the still-rejected probe.
+  it("rejects a non-operation role (finance) with 403", async () => {
     const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
-    const jwt = await makeJwt("principal");
+    const jwt = await makeJwt("finance");
     const res = await app.fetch(
       new Request("http://t/api/operation/stock-alerts", {
         headers: { Authorization: `Bearer ${jwt}` },
