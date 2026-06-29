@@ -1993,13 +1993,17 @@ function OrderRow({
               dd == null ? null : dd < 0 ? `-${-dd}d` : dd === 0 ? "today" : `${dd}d`;
             return (
               <div className="flex items-start gap-1.5">
-                {tone && dueShort && (
+                {tone && dueShort ? (
                   <span
-                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums shrink-0"
+                    className="min-w-[44px] text-center text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums shrink-0"
                     style={{ background: tone.bg, color: tone.text, border: `0.5px solid ${tone.border}` }}
                   >
                     {dueShort}
                   </span>
+                ) : (
+                  // No bucket (completed / undated): reserve the same-width slot so
+                  // every date in the column lines up, badge or not.
+                  <span className="min-w-[44px] shrink-0" aria-hidden="true" />
                 )}
                 <div className="leading-none">
                   <div className="text-[11px] font-medium text-base-900 tabular-nums">{datePart}</div>
