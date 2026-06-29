@@ -68,6 +68,23 @@ export const opsStockUpdateConditionInputSchema = z.object({
 });
 export type OpsStockUpdateConditionInput = z.infer<typeof opsStockUpdateConditionInputSchema>;
 
+/** POST /api/ops/stock — book in a new unit (or N identical units) at the
+ *  warehouse (GRN-in / "+ Add stock"). Jess 2026-06-29: operation needs to add
+ *  newly-arrived stock without a SQL run. status limited to free|reserved (you
+ *  receive physical, available stock; sold/voided are lifecycle states). */
+export const opsStockCreateInputSchema = z.object({
+  sku: z.string().trim().min(1),
+  condition: opsStockConditionSchema.default("new"),
+  status: z.enum(["free", "reserved"]).default("free"),
+  reservedRef: z.string().trim().optional(),
+  supplier: z.string().trim().optional(),
+  poNo: z.string().trim().optional(),
+  sourceRef: z.string().trim().optional(),
+  qty: z.coerce.number().int().min(1).max(200).default(1),
+  warehouseId: z.string().uuid().optional(),
+});
+export type OpsStockCreateInput = z.infer<typeof opsStockCreateInputSchema>;
+
 /** Row returned by /api/ops/stock GET endpoints (filtered subsets). */
 export const opsStockItemSchema = z.object({
   id: z.string().uuid(),

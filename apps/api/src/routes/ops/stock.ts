@@ -7,6 +7,7 @@ import {
   opsStockTakeoutInputSchema,
   opsStockFlagRepairInputSchema,
   opsStockUpdateConditionInputSchema,
+  opsStockCreateInputSchema,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
@@ -175,6 +176,54 @@ opsStockRouter.post("/flag-repair", requireOperationOrPrincipal, async (c) => {
     throw new HTTPException(404, { message: "Item not found" });
   }
   return c.json({ itemId: data });
+});
+
+// POST / — "+ Add stock": book in a new unit (or N identical units) at the
+// warehouse (GRN-in). Direct insert via the user session (RLS), mirroring the
+// /condition PATCH; no RPC needed (Jess 2026-06-29). Defaults to Carres Klang.
+opsStockRouter.post("/", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, opsStockCreateInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  let whId = parsed.warehouseId ?? null;
+  if (!whId) {
+    const { data: wh } = await sb
+      .from("warehouses")
+      .select("id")
+      .ilike("name", "%klang%")
+      .limit(1)
+      .maybeSingle();
+    whId = (wh as { id: string } | null)?.id ?? null;
+  }
+  if (!whId) {
+    throw new HTTPException(400, { message: "Carres Klang warehouse not found" });
+  }
+
+  const reservedRef = parsed.status === "reserved" ? parsed.reservedRef ?? null : null;
+  const rows = Array.from({ length: parsed.qty }, () => ({
+    sku: parsed.sku,
+    warehouse_id: whId,
+    condition: parsed.condition,
+    status: parsed.status,
+    reserved_ref: reservedRef,
+    supplier: parsed.supplier ?? null,
+    po_no: parsed.poNo ?? null,
+    source_ref: parsed.sourceRef ?? null,
+  }));
+
+  const { data, error } = await sb.from("ops_stock_items").insert(rows).select("id");
+  if (error) throw mapErr(error);
+  return c.json({ created: (data ?? []).length }, 201);
+});
+
+// DELETE /:itemId — remove a mis-keyed unit (hard delete). For fixing a wrong
+// entry; selling/transferring goes through /takeout, not this.
+opsStockRouter.delete("/:itemId", requireOperationOrPrincipal, async (c) => {
+  const itemId = c.req.param("itemId");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from("ops_stock_items").delete().eq("id", itemId);
+  if (error) throw mapErr(error);
+  return c.json({ itemId });
 });
 
 // =====================================================================

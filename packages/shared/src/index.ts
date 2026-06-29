@@ -371,6 +371,7 @@ export {
   opsStockTakeoutInputSchema,
   opsStockFlagRepairInputSchema,
   opsStockUpdateConditionInputSchema,
+  opsStockCreateInputSchema,
   opsStockItemSchema,
   opsStockListResponseSchema,
   type OpsStockCondition,
@@ -381,6 +382,7 @@ export {
   type OpsStockTakeoutInput,
   type OpsStockFlagRepairInput,
   type OpsStockUpdateConditionInput,
+  type OpsStockCreateInput,
   type OpsStockItem,
   type OpsStockListResponse,
 } from "./schemas/ops-stock";

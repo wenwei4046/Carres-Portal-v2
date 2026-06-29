@@ -79,6 +79,8 @@ const ALL_ACTIONS = [
   "reassign",
   "takeout",
   "flag-repair",
+  "add",
+  "remove",
 ] as const;
 
 export default function OperationStockOnHand() {

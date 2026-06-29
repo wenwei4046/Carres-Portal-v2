@@ -18,7 +18,9 @@ type Action =
   | "release"
   | "reassign"
   | "takeout"
-  | "flag-repair";
+  | "flag-repair"
+  | "add"
+  | "remove";
 
 interface Props {
   /** "/ready" | "/reserved" | "/repair" | "/inventory" */
@@ -116,6 +118,17 @@ export default function OpsStockListView(props: Props) {
       }),
     onSuccess: invalidateAll,
   });
+  // "+ Add stock" (GRN-in) + per-row Remove (Jess 2026-06-29).
+  const createMut = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      apiFetch(`/api/ops/stock`, { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: invalidateAll,
+  });
+  const deleteMut = useMutation({
+    mutationFn: (itemId: string) =>
+      apiFetch(`/api/ops/stock/${itemId}`, { method: "DELETE" }),
+    onSuccess: invalidateAll,
+  });
 
   const rows: OpsStockItem[] = props.rows ?? listQ.data?.items ?? [];
   const loading = props.rows === undefined && listQ.isLoading;
@@ -125,6 +138,39 @@ export default function OpsStockListView(props: Props) {
   // matching SKU automatically.
   const [reserveSku, setReserveSku] = useState("");
   const [reserveRef, setReserveRef] = useState("");
+
+  // "+ Add stock" form state.
+  const EMPTY_ADD = {
+    sku: "",
+    condition: "new",
+    status: "free",
+    reservedRef: "",
+    supplier: "",
+    poNo: "",
+    sourceRef: "",
+    qty: "1",
+  };
+  const [showAdd, setShowAdd] = useState(false);
+  const [add, setAdd] = useState(EMPTY_ADD);
+  function submitAdd() {
+    const body: Record<string, unknown> = {
+      sku: add.sku.trim(),
+      condition: add.condition,
+      status: add.status,
+      qty: add.qty,
+    };
+    if (add.status === "reserved" && add.reservedRef.trim())
+      body.reservedRef = add.reservedRef.trim();
+    if (add.supplier.trim()) body.supplier = add.supplier.trim();
+    if (add.poNo.trim()) body.poNo = add.poNo.trim();
+    if (add.sourceRef.trim()) body.sourceRef = add.sourceRef.trim();
+    createMut.mutate(body, {
+      onSuccess: () => {
+        setAdd(EMPTY_ADD);
+        setShowAdd(false);
+      },
+    });
+  }
 
   return (
     <div className={props.embedded ? "" : "p-8 max-w-7xl mx-auto"}>
@@ -137,6 +183,121 @@ export default function OpsStockListView(props: Props) {
           <p className="text-sm text-base-600 mt-2">{props.blurb}</p>
         </div>
       )}
+
+      {props.actions.includes("add") ? (
+        <section className="rounded border border-base-200 bg-white p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-base-900">
+              Add stock (receive new units)
+            </h2>
+            <button
+              type="button"
+              className="text-xs font-medium text-primary hover:underline"
+              onClick={() => setShowAdd((s) => !s)}
+            >
+              {showAdd ? "Cancel" : "+ Add stock"}
+            </button>
+          </div>
+          {showAdd ? (
+            <div className="mt-3 flex flex-wrap gap-2 items-end">
+              <label className="text-xs">
+                <span className="block text-base-500 mb-1">SKU (Item Code)</span>
+                <input
+                  className="rounded border border-base-300 px-2 py-1.5 text-sm w-56"
+                  value={add.sku}
+                  onChange={(e) => setAdd((a) => ({ ...a, sku: e.target.value }))}
+                  placeholder="1007-K BEDFRAME"
+                  autoFocus
+                />
+              </label>
+              <label className="text-xs">
+                <span className="block text-base-500 mb-1">Condition</span>
+                <select
+                  className="rounded border border-base-300 px-2 py-1.5 text-sm"
+                  value={add.condition}
+                  onChange={(e) => setAdd((a) => ({ ...a, condition: e.target.value }))}
+                >
+                  {Object.entries(CONDITION_LABEL).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs">
+                <span className="block text-base-500 mb-1">Status</span>
+                <select
+                  className="rounded border border-base-300 px-2 py-1.5 text-sm"
+                  value={add.status}
+                  onChange={(e) => setAdd((a) => ({ ...a, status: e.target.value }))}
+                >
+                  <option value="free">Free</option>
+                  <option value="reserved">Reserved</option>
+                </select>
+              </label>
+              {add.status === "reserved" ? (
+                <label className="text-xs">
+                  <span className="block text-base-500 mb-1">Reserved ref</span>
+                  <input
+                    className="rounded border border-base-300 px-2 py-1.5 text-sm w-32"
+                    value={add.reservedRef}
+                    onChange={(e) => setAdd((a) => ({ ...a, reservedRef: e.target.value }))}
+                    placeholder="SO-1001"
+                  />
+                </label>
+              ) : null}
+              <label className="text-xs">
+                <span className="block text-base-500 mb-1">Supplier</span>
+                <input
+                  className="rounded border border-base-300 px-2 py-1.5 text-sm w-28"
+                  value={add.supplier}
+                  onChange={(e) => setAdd((a) => ({ ...a, supplier: e.target.value }))}
+                  placeholder="NF"
+                />
+              </label>
+              <label className="text-xs">
+                <span className="block text-base-500 mb-1">PO No.</span>
+                <input
+                  className="rounded border border-base-300 px-2 py-1.5 text-sm w-32"
+                  value={add.poNo}
+                  onChange={(e) => setAdd((a) => ({ ...a, poNo: e.target.value }))}
+                  placeholder="PO/2604-042"
+                />
+              </label>
+              <label className="text-xs">
+                <span className="block text-base-500 mb-1">Source ref</span>
+                <input
+                  className="rounded border border-base-300 px-2 py-1.5 text-sm w-28"
+                  value={add.sourceRef}
+                  onChange={(e) => setAdd((a) => ({ ...a, sourceRef: e.target.value }))}
+                  placeholder="CR0973"
+                />
+              </label>
+              <label className="text-xs">
+                <span className="block text-base-500 mb-1">Qty</span>
+                <input
+                  type="number"
+                  min={1}
+                  className="rounded border border-base-300 px-2 py-1.5 text-sm w-16"
+                  value={add.qty}
+                  onChange={(e) => setAdd((a) => ({ ...a, qty: e.target.value }))}
+                />
+              </label>
+              <button
+                type="button"
+                className="rounded bg-base-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-base-800 disabled:opacity-50"
+                disabled={!add.sku.trim() || createMut.isPending}
+                onClick={submitAdd}
+              >
+                {createMut.isPending ? "Adding…" : "Add"}
+              </button>
+            </div>
+          ) : null}
+          {createMut.isError ? (
+            <p className="mt-2 text-xs text-error-700">
+              {(createMut.error as { message?: string })?.message ?? "add failed"}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {props.actions.includes("reserve") ? (
         <section className="rounded border border-base-200 bg-white p-4 mb-4">
@@ -242,12 +403,22 @@ export default function OpsStockListView(props: Props) {
                   onFlagRepair={(flag) =>
                     flagRepairMut.mutate({ itemId: r.id, flag })
                   }
+                  onRemove={() => {
+                    if (
+                      window.confirm(
+                        `Remove unit ${r.sku} from stock? This deletes a mis-keyed entry (use Takeout for a sale).`,
+                      )
+                    ) {
+                      deleteMut.mutate(r.id);
+                    }
+                  }}
                   busy={
                     releaseMut.isPending ||
                     reassignMut.isPending ||
                     takeoutMut.isPending ||
                     flagRepairMut.isPending ||
-                    conditionMut.isPending
+                    conditionMut.isPending ||
+                    deleteMut.isPending
                   }
                 />
               ))}
@@ -274,6 +445,7 @@ function RowItem({
   onReassign,
   onTakeout,
   onFlagRepair,
+  onRemove,
   busy,
 }: {
   row: OpsStockItem;
@@ -283,6 +455,7 @@ function RowItem({
   onReassign: (newRef: string) => void;
   onTakeout: () => void;
   onFlagRepair: (flag: boolean) => void;
+  onRemove: () => void;
   busy: boolean;
 }) {
   const [showReassign, setShowReassign] = useState(false);
@@ -382,6 +555,9 @@ function RowItem({
               onClick={() => onFlagRepair(!row.needsRepair)}
               disabled={busy}
             />
+          ) : null}
+          {actions.includes("remove") ? (
+            <ActionBtn label="Remove" onClick={onRemove} disabled={busy} />
           ) : null}
         </div>
       </td>
