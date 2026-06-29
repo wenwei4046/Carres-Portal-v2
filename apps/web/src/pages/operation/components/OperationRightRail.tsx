@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Lightbulb, SquareCheck, X, type LucideIcon } from "lucide-react";
+import { CalendarDays, Lightbulb, Flag, X, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { OpsNote, OpsTask } from "@carres/shared";
 import CalendarPanel from "./rail/CalendarPanel";
@@ -9,17 +9,19 @@ import TasksPanel, { TASKS_KEY } from "./rail/TasksPanel";
 
 /**
  * OperationRightRail — Gmail-style collapsible right rail (Jess COO ask).
- * A 52px icon strip (Calendar / Keep notes / Tasks) that expands a 320px panel.
- * The Tasks icon carries a red badge = count of overdue tasks (open past the
- * 60-min SLA) so the team is nudged to take action within the hour.
+ * A 52px icon strip (Calendar / Keep notes / Follow-ups) that expands a 320px panel.
+ * The Follow-ups icon carries a red badge = count of overdue tasks (open past the
+ * 60-min SLA) so the team is nudged to take action within the hour. Follow-ups is
+ * the same ops_tasks data the Orders list flag column drives.
  */
 type Panel = "calendar" | "keep" | "tasks";
-// Gmail-style icons + per-app active colour (v17 tokens): Calendar blue,
-// Keep amber, Tasks blue — mirrors Google's side rail.
+// Calendar (blue) · Notes (amber) · Follow-ups — the Follow-ups rail is the SAME
+// flag system as the Orders list flag column (both ops_tasks), so it uses the
+// Flag icon + the flag's amber, reading as one feature (Jess 2026-06-29).
 const TABS: { key: Panel; label: string; icon: LucideIcon; active: string }[] = [
   { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
   { key: "keep", label: "Notes", icon: Lightbulb, active: "bg-warning-soft text-warning" },
-  { key: "tasks", label: "Tasks", icon: SquareCheck, active: "bg-info-soft text-info" },
+  { key: "tasks", label: "Follow-ups", icon: Flag, active: "bg-warning-soft text-warning" },
 ];
 
 export default function OperationRightRail() {
