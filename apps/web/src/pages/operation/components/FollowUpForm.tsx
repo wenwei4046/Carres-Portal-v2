@@ -1,27 +1,23 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, Flag, ChevronsUp, AlertTriangle } from "lucide-react";
+import { X, Flag, AlertTriangle } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import {
-  ESCALATE_REASONS,
-  type EscalateReason,
-  type CreateOpsTaskInput,
-  type OpsTeamMember,
-} from "@carres/shared";
+import type { CreateOpsTaskInput, OpsTeamMember } from "@carres/shared";
 import { TASKS_KEY } from "./rail/TasksPanel";
 
 /**
  * FollowUpForm — the Orders follow-up composer (#2). A follow-up IS an ops_task
- * linked to an order: pick a preset action (the team's English is poor, so a
- * dropdown), FORCE-assign one person, set a due date, optionally mark Urgent, and
- * optionally Escalate to the principal (Jess) with a reason + a short report.
+ * linked to an order. Slides in from the RIGHT (a side panel, checklist style —
+ * Jess: not a centre modal): pick a preset action (the team is Malay, English UI,
+ * so a dropdown), FORCE-assign one person, set when to finish, optionally Urgent.
  *
- * Opened from the Orders table action flag and the order drawer. On submit it
- * POSTs /api/ops/tasks with related_order_id = this order, so it shows up in the
- * right-rail Tasks board + this order's Action column.
+ * Escalate-to-Jess is NOT here — it lives in the order's Activity timeline
+ * (separate entry). On submit it POSTs /api/ops/tasks with related_order_id =
+ * this order, so it lands in the right-rail Tasks board (the side menu everyone
+ * sees) + lights this order's flag.
  */
 
-/** Preset follow-ups — UI-only starter list (Jess to edit freely). */
+/** Preset follow-ups — UI-only starter list, all English (Jess to edit freely). */
 const PRESET_FOLLOWUPS = [
   "Call customer — confirm delivery date",
   "Chase logistic for ETA",
@@ -40,14 +36,7 @@ const DUE_PRESETS = [
 ] as const;
 type DueKey = (typeof DUE_PRESETS)[number]["key"];
 
-const ESCALATE_LABELS: Record<EscalateReason, string> = {
-  discount: "Customer wants a discount",
-  refund: "Customer wants a refund",
-  question: "A question only Jess can answer",
-  other: "Other",
-};
-
-/** A local date at 18:00 → ISO. `addDays` shifts the day first. */
+/** A local date at 18:00 → ISO; the day shifts first for tomorrow / in-3. */
 function dueAtFor(key: DueKey, pick: string): string | null {
   const d = new Date();
   d.setHours(18, 0, 0, 0);
@@ -56,8 +45,7 @@ function dueAtFor(key: DueKey, pick: string): string | null {
   else if (key === "pick") {
     if (!pick) return null;
     const [y, m, day] = pick.split("-").map(Number);
-    const p = new Date(y, m - 1, day, 18, 0, 0, 0);
-    return p.toISOString();
+    return new Date(y, m - 1, day, 18, 0, 0, 0).toISOString();
   }
   return d.toISOString();
 }
@@ -96,14 +84,10 @@ export default function FollowUpForm({
   const [dueKey, setDueKey] = useState<DueKey>("today6");
   const [duePick, setDuePick] = useState("");
   const [urgent, setUrgent] = useState(false);
-  const [escalate, setEscalate] = useState(false);
-  const [escReason, setEscReason] = useState<EscalateReason>("question");
-  const [escNote, setEscNote] = useState("");
 
   const title = preset === "__other__" ? freeTitle.trim() : preset;
   const dueMissing = dueKey === "pick" && !duePick;
-  const canSubmit =
-    !!title && !!assignTo && !dueMissing && (!escalate || !!escNote.trim()) && !createMut.isPending;
+  const canSubmit = !!title && !!assignTo && !dueMissing && !createMut.isPending;
 
   function submit() {
     if (!canSubmit) return;
@@ -114,8 +98,6 @@ export default function FollowUpForm({
       priority: urgent ? "urgent" : "normal",
       dueAt: dueAtFor(dueKey, duePick),
       relatedOrderId: orderId,
-      escalateReason: escalate ? escReason : null,
-      escalateNote: escalate ? escNote.trim() : null,
     });
   }
 
@@ -124,16 +106,13 @@ export default function FollowUpForm({
   const labelCls = "block t-micro text-base-500 mb-1";
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 bg-black/30 flex justify-end" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-auto"
+        className="bg-white shadow-2xl w-full max-w-sm h-full overflow-auto flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-base-100">
+        <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-base-100">
           <div className="flex items-center gap-2">
             <Flag size={16} className="text-primary" />
             <h2 className="t-h4">New follow-up</h2>
@@ -150,7 +129,7 @@ export default function FollowUpForm({
         </div>
 
         {/* Body */}
-        <div className="px-4 py-3 space-y-3">
+        <div className="flex-1 overflow-auto px-4 py-3 space-y-3">
           {/* Title — preset dropdown (+ free text on Other) */}
           <div>
             <label className={labelCls}>What to follow up</label>
@@ -227,47 +206,6 @@ export default function FollowUpForm({
             />
           </div>
 
-          {/* Escalate to Jess — click to reveal */}
-          <div className="rounded-md border border-base-200">
-            <button
-              type="button"
-              onClick={() => setEscalate((v) => !v)}
-              className={`w-full flex items-center gap-2 px-2.5 py-2 text-[13px] font-medium rounded-md ${
-                escalate ? "text-danger" : "text-base-600"
-              }`}
-            >
-              <ChevronsUp size={15} />
-              Escalate to Jess
-              <span className="ml-auto t-tiny text-base-400">{escalate ? "on" : "needs the boss?"}</span>
-            </button>
-            {escalate && (
-              <div className="px-2.5 pb-2.5 space-y-2 border-t border-base-100 pt-2">
-                <div>
-                  <label className={labelCls}>Reason</label>
-                  <select
-                    value={escReason}
-                    onChange={(e) => setEscReason(e.target.value as EscalateReason)}
-                    className={fieldCls}
-                  >
-                    {ESCALATE_REASONS.map((r) => (
-                      <option key={r} value={r}>{ESCALATE_LABELS[r]}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelCls}>Report to Jess (required)</label>
-                  <textarea
-                    value={escNote}
-                    onChange={(e) => setEscNote(e.target.value)}
-                    rows={2}
-                    placeholder="Briefly: what happened + what you need from Jess…"
-                    className={`${fieldCls} resize-none`}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
           {createMut.isError && (
             <div className="flex items-center gap-1.5 t-tiny text-danger">
               <AlertTriangle size={13} /> Couldn’t save — try again.
@@ -276,7 +214,7 @@ export default function FollowUpForm({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-base-100">
+        <div className="shrink-0 flex items-center justify-end gap-2 px-4 py-3 border-t border-base-100">
           <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
           <button type="button" onClick={submit} disabled={!canSubmit} className="btn-hero disabled:opacity-40">
             {createMut.isPending ? "Saving…" : "Create follow-up"}

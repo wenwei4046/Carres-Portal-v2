@@ -39,9 +39,6 @@ import {
   X,
   Flag,
   ChevronsUp,
-  Check,
-  Hand,
-  Plus,
   CalendarClock,
   Printer,
   type LucideIcon,
@@ -632,6 +629,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
+  // The order whose follow-up form is open in the side panel (#2); null = closed.
+  const [composeOrder, setComposeOrder] = useState<{
+    id: string;
+    so: number | null;
+    refNo: string | null;
+  } | null>(null);
   // Fixed at 15 rows (Jess 2026-06-25: stick to 15, no selector). The listing is
   // a fixed box that auto-scales (CSS zoom) so the 15 rows always fit, no scroll.
   const [pageSize] = useState<number | "all">(15);
@@ -725,6 +728,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const hasOpenTask = (o: operationOrderListRow) => tasksByOrder.has(o.id);
   const hasEscalatedTask = (o: operationOrderListRow) =>
     orderTasks(o).some((t) => t.escalatedAt);
+  const openFollowUp = (o: operationOrderListRow) =>
+    setComposeOrder({
+      id: o.id,
+      so: o.so,
+      refNo: (o.source_ref ?? []).filter(Boolean)[0] ?? null,
+    });
 
   const orders = useMemo(() => data?.orders ?? [], [data]);
 
@@ -1333,6 +1342,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 selected={selected.has(o.id)}
                 onToggle={() => toggleOne(o.id)}
                 onOpen={() => setOpenOrderId(o.id)}
+                onFlag={openFollowUp}
               />
             ))}
           </tbody>
@@ -1343,6 +1353,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
         <OrderDetailDrawer
           orderId={openOrderId}
           onClose={() => setOpenOrderId(null)}
+        />
+      )}
+
+      {/* Follow-up form — slides in from the right (#2); opened by an order's flag. */}
+      {composeOrder && (
+        <FollowUpForm
+          orderId={composeOrder.id}
+          so={composeOrder.so}
+          refNo={composeOrder.refNo}
+          onClose={() => setComposeOrder(null)}
         />
       )}
 
@@ -1835,6 +1855,7 @@ function OrderRow({
   selected,
   onToggle,
   onOpen,
+  onFlag,
 }: {
   o: operationOrderListRow;
   idx: number;
@@ -1848,6 +1869,8 @@ function OrderRow({
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
+  /** Open the side follow-up form for this order (#2). */
+  onFlag: (o: operationOrderListRow) => void;
 }) {
   const ct = controlTabOf(o);
   const urg = urgencyColor(o, ct);
@@ -1857,7 +1880,6 @@ function OrderRow({
   const tags = itemTags(lines);
   const stock = stockReadiness(o, availableBySku);
   const loc = locationForAddress(o.customer_address ?? null);
-  const leadTask = openTaskOf(tasks);
 
   // Logistic: prefer the formal LP (joined name), fall back to the Inbox-triage
   // assignment resolved via the partners map.
@@ -1897,31 +1919,9 @@ function OrderRow({
           className="cursor-pointer accent-base-900 align-middle"
         />
       </td>
-      {/* Action-lane flag (#2): a left-edge scan icon from the order's lead
-          follow-up task — ChevronsUp (red) escalated · Flag (red) overdue · Flag
-          (amber) in-progress — lit only when an open task exists. The task detail
-          + Take-it live in the Action column + the right-rail board. */}
-      <td className="px-1 py-2 text-center border-r border-base-100">
-        {(() => {
-          if (!leadTask) return null;
-          const u = taskUrgency(leadTask);
-          return u === "escalated" ? (
-            <ChevronsUp
-              size={14}
-              strokeWidth={2.5}
-              className="text-destructive inline align-middle"
-              aria-label="Escalated to Jess"
-            />
-          ) : (
-            <Flag
-              size={13}
-              strokeWidth={2}
-              className={`fill-current inline align-middle ${u === "overdue" ? "text-destructive" : "text-warning"}`}
-              aria-label={u === "overdue" ? "Overdue follow-up" : "Open follow-up"}
-            />
-          );
-        })()}
-      </td>
+      {/* (left flag column kept empty — the single status flag now lives in the
+          Follow-up column; remove this column in a later cleanup.) */}
+      <td className="px-1 py-2 border-r border-base-100" />
       {/* Status — Q1 (Jess 2026-06-24): a soft coloured pill, colour confined to
           THIS column (his CRM-ref pattern). Completed stays neutral grey. */}
       <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
@@ -2084,102 +2084,45 @@ function OrderRow({
           </div>
         )}
       </td>
-      {/* Action — the order's follow-up task(s): a follow-up IS an ops_task
-          (#2), so this cell + the right-rail board are the same data. */}
-      <ActionCell order={o} tasks={tasks} />
+      {/* Follow-up — the order's status flag (#2); click opens the side form. */}
+      <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* Remark — the 4 operator remarks shown in-cell; click to edit in place. */}
       <RemarkCell order={o} />
     </tr>
   );
 }
 
-/** Action cell (#2) — the order's follow-up task(s). A follow-up IS an ops_task
- *  (related_order_id), so this cell + the right-rail Tasks board are the SAME
- *  data. Shows the lead open task (icon by urgency · title · who's on it · Take
- *  it / Done) + a flag that opens the FollowUpForm; an empty cell's "Flag" opens
- *  it too. Escalate + the structured report live in the form. */
-function ActionCell({ order, tasks }: { order: operationOrderListRow; tasks: OpsTask[] }) {
+/** Action cell (#2) — the order's follow-up FLAG, STATUS ONLY (no name, Jess
+ *  2026-06-26). Empty → faint "Flag". Open + on time → amber flag, no word.
+ *  Overdue → red flag + "Late" (the one short word — colour-blind safe). Click →
+ *  opens the side follow-up form. Who / what / Take-it / Done live in the form +
+ *  the right-rail Tasks board (the side menu everyone sees). */
+function ActionCell({
+  order,
+  tasks,
+  onFlag,
+}: {
+  order: operationOrderListRow;
+  tasks: OpsTask[];
+  onFlag: (o: operationOrderListRow) => void;
+}) {
   const lead = openTaskOf(tasks);
-  const qc = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
-  const actMut = useMutation({
-    mutationFn: (v: { id: string; action: "claim" | "done" }) =>
-      apiFetch(`/api/ops/tasks/${v.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ action: v.action }),
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: TASKS_KEY }),
-    onError: () => toast.error("Couldn't update — retry"),
-  });
-  const refNo = (order.source_ref ?? []).filter(Boolean)[0] ?? null;
   const u = lead ? taskUrgency(lead) : null;
   return (
     <td className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
-      {lead ? (
-        <div className="flex items-start gap-1.5">
-          {u === "escalated" ? (
-            <ChevronsUp size={13} strokeWidth={2.5} className="text-destructive shrink-0 mt-px" aria-label="Escalated to Jess" />
-          ) : (
-            <Flag
-              size={12}
-              strokeWidth={2}
-              className={`fill-current shrink-0 mt-px ${u === "overdue" ? "text-destructive" : "text-warning"}`}
-              aria-label="Follow up"
-            />
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] leading-[1.3] text-base-700 line-clamp-2" title={lead.title}>
-              {lead.title}
-            </div>
-            <div className="mt-0.5 flex items-center gap-x-1.5 gap-y-0.5 text-[9px] text-base-400 flex-wrap">
-              {lead.status === "open" ? (
-                <>
-                  <button
-                    type="button"
-                    disabled={actMut.isPending}
-                    onClick={() => actMut.mutate({ id: lead.id, action: "claim" })}
-                    className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline disabled:opacity-50"
-                  >
-                    <Hand size={10} /> Take it
-                  </button>
-                  {lead.assignedToName && <span>→ {lead.assignedToName}</span>}
-                </>
-              ) : (
-                <span>{lead.claimedByName ?? "Someone"} on it</span>
-              )}
-              <button
-                type="button"
-                disabled={actMut.isPending}
-                onClick={() => actMut.mutate({ id: lead.id, action: "done" })}
-                className="inline-flex items-center gap-0.5 hover:text-success disabled:opacity-50"
-              >
-                <Check size={10} strokeWidth={2.5} /> Done
-              </button>
-              {tasks.length > 1 && <span className="text-base-300">+{tasks.length - 1} more</span>}
-              <button
-                type="button"
-                onClick={() => setShowForm(true)}
-                className="text-base-300 hover:text-warning"
-                aria-label="Add another follow-up"
-              >
-                <Plus size={11} />
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          title="Add a follow-up for this order"
-          className="inline-flex items-center gap-1 text-[10px] text-base-300 hover:text-warning"
-        >
-          <Flag size={11} strokeWidth={2} /> Flag
-        </button>
-      )}
-      {showForm && (
-        <FollowUpForm orderId={order.id} so={order.so} refNo={refNo} onClose={() => setShowForm(false)} />
-      )}
+      <button type="button" onClick={() => onFlag(order)} title="Follow-up">
+        {!lead ? (
+          <span className="inline-flex items-center gap-1 text-[11px] text-base-300 hover:text-warning">
+            <Flag size={12} strokeWidth={2} /> Flag
+          </span>
+        ) : u === "overdue" ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-error-soft text-danger">
+            <Flag size={12} strokeWidth={2} className="fill-current" /> Late
+          </span>
+        ) : (
+          <Flag size={15} strokeWidth={2} className="fill-current text-warning" aria-label="Follow-up" />
+        )}
+      </button>
     </td>
   );
 }
