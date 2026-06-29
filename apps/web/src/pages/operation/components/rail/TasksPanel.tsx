@@ -39,9 +39,10 @@ function ago(iso: string): string {
 export default function TasksPanel() {
   const qc = useQueryClient();
   const myId = useAuth((s) => s.session)?.user?.id ?? null;
-  // Mine / All scope (Jess 2026-06-29): with a 3-person team each operator works
-  // their OWN queue by default — "Mine" = assigned to me OR claimed by me.
-  const [scope, setScope] = useState<"mine" | "all">("mine");
+  // Mine / All scope (Jess 2026-06-29): the team is NOT siloed — everyone sees +
+  // acts on ALL follow-ups, so the DEFAULT is "All". "Assign" only marks the MAIN
+  // responsible person; "Mine" is an optional focus filter, not a lock.
+  const [scope, setScope] = useState<"mine" | "all">("all");
 
   const { data, isLoading } = useQuery<{ tasks: OpsTask[] }>({
     queryKey: TASKS_KEY,
