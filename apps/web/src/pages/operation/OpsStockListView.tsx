@@ -363,19 +363,19 @@ export default function OpsStockListView(props: Props) {
         </div>
       ) : (
         <div className="rounded border border-base-200 bg-white overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-base-50 text-xs uppercase tracking-wider text-base-500">
+          <table className="w-full text-sm [&_tbody_tr:nth-child(even)]:bg-base-50/60">
+            <thead className="bg-base-800 text-[11px] uppercase tracking-[0.02em] text-white">
               <tr>
-                <th className="text-left px-3 py-2 font-medium">Unit ID</th>
-                <th className="text-left px-3 py-2 font-medium">SKU</th>
-                <th className="text-left px-3 py-2 font-medium">Condition</th>
-                <th className="text-left px-3 py-2 font-medium">Status</th>
-                <th className="text-left px-3 py-2 font-medium">Reserved for</th>
-                <th className="text-left px-3 py-2 font-medium">History</th>
-                <th className="text-left px-3 py-2 font-medium">PO No.</th>
-                <th className="text-left px-3 py-2 font-medium">Source Ref</th>
-                <th className="text-left px-3 py-2 font-medium">Date in</th>
-                <th className="text-right px-3 py-2 font-medium">Actions</th>
+                <th className="text-left px-3 py-2 font-bold">Unit ID</th>
+                <th className="text-left px-3 py-2 font-bold">SKU</th>
+                <th className="text-left px-3 py-2 font-bold">Condition</th>
+                <th className="text-left px-3 py-2 font-bold">Status</th>
+                <th className="text-left px-3 py-2 font-bold">Reserved for</th>
+                <th className="text-left px-3 py-2 font-bold">History</th>
+                <th className="text-left px-3 py-2 font-bold">PO No.</th>
+                <th className="text-left px-3 py-2 font-bold">Source Ref</th>
+                <th className="text-left px-3 py-2 font-bold">Date in</th>
+                <th className="text-right px-3 py-2 font-bold">Actions</th>
               </tr>
             </thead>
             <tbody>
