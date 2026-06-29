@@ -1540,7 +1540,7 @@ function RegionChip({
           ? "bg-base-900 text-white font-semibold"
           : tinted
             ? "font-medium hover:brightness-95"
-            : "bg-base-100 text-base-600 font-medium hover:bg-base-200"
+            : "text-base-600 font-medium hover:bg-base-100"
       }`}
     >
       {dot && (
