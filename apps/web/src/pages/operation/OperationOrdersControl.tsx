@@ -1578,7 +1578,7 @@ function FilterGroup({
       className="border border-base-200 rounded-md bg-white px-1.5 py-1"
       data-testid={`filter-${label.toLowerCase()}`}
     >
-      <div className="text-[9px] font-semibold uppercase tracking-[0.05em] text-base-500 mb-0.5">
+      <div className="text-[9px] font-semibold uppercase tracking-[0.05em] text-base-600 mb-0.5">
         {label}
       </div>
       <div className="grid grid-flow-col grid-rows-[auto_auto] gap-x-1 gap-y-1 justify-items-start">
@@ -1608,8 +1608,13 @@ function QuickView({
   title: string;
   onClick: () => void;
 }) {
-  const cls =
-    tone === "danger"
+  // A zero count is not an alert — keep it a quiet ghost chip (no loud colour /
+  // border) so "For Jess 0" / "Unassigned 0" don't cry wolf; the alert styling
+  // only kicks in once there's actually something to act on (Jess 2026-06-29).
+  const quiet = count === 0 && !active;
+  const cls = quiet
+    ? "text-base-400 hover:bg-base-100"
+    : tone === "danger"
       ? active
         ? "bg-destructive text-white"
         : "border border-destructive/40 text-destructive hover:bg-destructive/5"
