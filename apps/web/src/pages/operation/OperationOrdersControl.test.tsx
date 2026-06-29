@@ -202,13 +202,11 @@ beforeEach(() => {
 });
 
 describe("OperationOrdersControl", () => {
-  it("renders the 7 status chips (Open + All meta + 5 stages) with correct counts", () => {
+  it("renders the 6 status chips (5 stages + All) with correct per-tab counts", () => {
     wrap(<OperationOrdersControl />);
     const g = statusGroup();
-    expect(g.getAllByRole("button")).toHaveLength(7);
-    // counts: Open 6 (non-completed), All 7, Placed 1, Proceed 2, Pending 1,
-    // Scheduled 2, Completed 1.
-    expect(g.getByRole("button", { name: /Open\s*6/ })).toBeInTheDocument();
+    expect(g.getAllByRole("button")).toHaveLength(6);
+    // counts: All 7, Placed 1, Proceed 2, Pending 1, Scheduled 2, Completed 1.
     expect(g.getByRole("button", { name: /All\s*7/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Placed\s*1/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Proceed\s*2/ })).toBeInTheDocument();
@@ -217,18 +215,14 @@ describe("OperationOrdersControl", () => {
     expect(g.getByRole("button", { name: /Completed\s*1/ })).toBeInTheDocument();
   });
 
-  it("defaults to the Open tab — hides completed; All shows every order", () => {
+  it("defaults to All and shows every order (completed 1007 sorts to the bottom)", () => {
     wrap(<OperationOrdersControl />);
-    // Default Open: 1001-1006 visible, the completed 1007 hidden.
     expect(rowsBySo()).toEqual(
-      expect.arrayContaining(["1001", "1002", "1003", "1004", "1005", "1006"]),
+      expect.arrayContaining(["1001", "1002", "1003", "1004", "1005", "1006", "1007"]),
     );
-    expect(rowsBySo()).not.toContain("1007");
-    expect(rowsBySo()).toHaveLength(6);
-    // Clicking All brings the completed order back.
-    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*7/ }));
     expect(rowsBySo()).toHaveLength(7);
-    expect(rowsBySo()).toContain("1007");
+    // The completed order is last (live work shows first).
+    expect(rowsBySo()[rowsBySo().length - 1]).toBe("1007");
   });
 
   it("entry rule: AutoCount placed → Proceed, native placed → Placed", () => {

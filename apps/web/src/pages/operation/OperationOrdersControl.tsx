@@ -77,7 +77,6 @@ import {
  */
 
 type ControlTab =
-  | "open"
   | "placed"
   | "proceed"
   | "pending"
@@ -85,11 +84,10 @@ type ControlTab =
   | "completed"
   | "all";
 
-// "Open" (every non-completed order) is the DEFAULT view (Jess 2026-06-29):
-// daily ops cares about live work, not the 69 completed AutoCount history rows.
-// "All" (history included) + "Completed" stay one click away.
+// The 5 pipeline stages + "All". Default = All, but completed orders sort to the
+// bottom (see compareByDeadline), so the live work shows first WITHOUT a separate
+// "Open" tab (Jess 2026-06-29: dropped the Open meta-tab — it confused him).
 const TABS: { key: ControlTab; label: string }[] = [
-  { key: "open", label: "Open" },
   { key: "placed", label: "Placed" },
   { key: "proceed", label: "Proceed" },
   { key: "pending", label: "Pending" },
@@ -98,11 +96,10 @@ const TABS: { key: ControlTab; label: string }[] = [
   { key: "all", label: "All" },
 ];
 
-/** Tooltip for the two meta tabs (Open / All) — the five pipeline stages get
- *  theirs from TAB_DESC below. */
+/** Tooltip for the "All" meta tab — the five pipeline stages get theirs from
+ *  TAB_DESC below. */
 const STATUS_META_DESC: Partial<Record<ControlTab, string>> = {
-  open: "Every order still in play — not yet completed (the daily work)",
-  all: "Every active order, completed history included",
+  all: "Every order — live work first, completed history at the bottom",
 };
 
 type SettledTab = Exclude<ControlTab, "all">;
@@ -347,6 +344,11 @@ function compareByDeadline(
   a: operationOrderListRow,
   b: operationOrderListRow,
 ): number {
+  // Completed orders sink to the bottom (Jess 2026-06-29): the work-in-progress
+  // shows first on the default "All" view; finished history sits at the end.
+  const ca = controlTabOf(a) === "completed" ? 1 : 0;
+  const cb = controlTabOf(b) === "completed" ? 1 : 0;
+  if (ca !== cb) return ca - cb;
   const da = !a.delivery_date_tbd && a.delivery_date ? a.delivery_date : null;
   const db = !b.delivery_date_tbd && b.delivery_date ? b.delivery_date : null;
   if (da && db && da !== db) return da < db ? -1 : 1; // ISO dates compare lexically
@@ -637,7 +639,7 @@ function openPrint(html: string) {
 export default function OperationOrdersControl({ onImport }: Props) {
   const params = useParams<{ stage?: string }>();
   const [tab, setTab] = useState<ControlTab>(
-    () => tabFromStageParam(params.stage) ?? "open",
+    () => tabFromStageParam(params.stage) ?? "all",
   );
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
@@ -751,7 +753,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   const counts = useMemo(() => {
     const c: Record<ControlTab, number> = {
-      open: 0,
       placed: 0,
       proceed: 0,
       pending: 0,
@@ -760,8 +761,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
       all: orders.length,
     };
     for (const o of orders) c[controlTabOf(o)] += 1;
-    // "Open" = everything that isn't completed (computed, not a stage of its own).
-    c.open = c.placed + c.proceed + c.pending + c.scheduled;
     return c;
   }, [orders]);
 
@@ -769,12 +768,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // stackable). The chip/region counts are computed over the tab-filtered set
   // so they reflect the current view.
   const tabFiltered = useMemo(
-    () =>
-      tab === "all"
-        ? orders
-        : tab === "open"
-          ? orders.filter((o) => controlTabOf(o) !== "completed")
-          : orders.filter((o) => controlTabOf(o) === tab),
+    () => (tab === "all" ? orders : orders.filter((o) => controlTabOf(o) === tab)),
     [orders, tab],
   );
   const flaggedCount = useMemo(() => tabFiltered.filter(hasOpenTask).length, [tabFiltered, tasksByOrder]);
