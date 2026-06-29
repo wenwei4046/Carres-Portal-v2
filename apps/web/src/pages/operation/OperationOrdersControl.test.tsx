@@ -565,7 +565,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
-      "Follow-up", // the order's status flag (#2)
+      "", // follow-up flag — icon-only header now (Jess 2026-06-29)
       "Status",
       "Order ID",
       "Ref No",
@@ -573,7 +573,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Deadline",
       "ETA",
       "Location",
-      "Carrier",
+      "Logistic", // was "Carrier" — wording aligned to the Logistic filter
       "Stock",
       "Items",
       "Remark",

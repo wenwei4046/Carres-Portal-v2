@@ -1251,7 +1251,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         >
           <colgroup>
             <col style={{ width: 34 }} />
-            <col style={{ width: 78 }} />
+            <col style={{ width: 40 }} />
             <col style={{ width: 96 }} />
             <col style={{ width: 70 }} />
             <col style={{ width: 80 }} />
@@ -1267,7 +1267,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           {/* ONE thin, darker header band so it reads clearly AS the header
               (Jess 2026-06-24: header darker, no column shade, less thick). */}
           <thead>
-            <tr className="bg-base-100 border-b border-base-300">
+            <tr className="bg-base-200 border-b border-base-400">
               <th className="px-3 py-1.5 border-r border-base-200">
                 <input
                   type="checkbox"
@@ -1277,7 +1277,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   className="cursor-pointer accent-base-900 align-middle"
                 />
               </th>
-              <Th>Follow-up</Th>
+              <th
+                className="px-1 py-1.5 text-center border-r border-base-200"
+                title="Follow-up"
+              >
+                <Flag size={13} strokeWidth={2} className="inline text-base-900" aria-label="Follow-up" />
+              </th>
               <Th>Status</Th>
               <Th noBorder>Order ID</Th>
               <Th noBorder>Ref No</Th>
@@ -1285,7 +1290,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Deadline</Th>
               <Th>ETA</Th>
               <Th>Location</Th>
-              <Th>Carrier</Th>
+              <Th>Logistic</Th>
               <Th>Stock</Th>
               <Th>Items</Th>
               <Th>Remark</Th>
@@ -1588,7 +1593,7 @@ function FilterGroup({
 }) {
   return (
     <div
-      className="border border-base-200 rounded-md bg-white px-1.5 py-1"
+      className="grow border border-base-200 rounded-md bg-white px-1.5 py-1"
       data-testid={`filter-${label.toLowerCase()}`}
     >
       <div className="text-[9px] font-semibold uppercase tracking-[0.05em] text-base-600 mb-0.5">
@@ -1654,9 +1659,11 @@ function QuickView({
 /** Remark cell — shows the 4 operator remarks (Carres / Action / WH / Cust) IN
  *  the cell and edits them IN PLACE on click (Jess 2026-06-24: no popup modal).
  *  Saves via the order-control overlay PUT, which also refreshes the list. */
+// Carres-remark dropped from the list (Jess 2026-06-29): it overlapped the
+// Follow-up column (internal ops note) + the Payment panel. The 3 party remarks
+// stay; "Action" → "Logistic" so the wording aligns with the Logistic column.
 const REMARK_FIELDS = [
-  { key: "carres_remark", label: "Carres" },
-  { key: "action_for_logistic", label: "Action" },
+  { key: "action_for_logistic", label: "Logistic" },
   { key: "warehouse_remark", label: "WH" },
   { key: "customer_request", label: "Cust" },
 ] as const;
@@ -1665,7 +1672,6 @@ function RemarkCell({ order }: { order: operationOrderListRow }) {
   const ovl = Array.isArray(ovlRaw) ? ovlRaw[0] : ovlRaw;
   const [editing, setEditing] = useState(false);
   const [vals, setVals] = useState({
-    carres_remark: ovl?.carres_remark ?? "",
     action_for_logistic: ovl?.action_for_logistic ?? "",
     warehouse_remark: ovl?.warehouse_remark ?? "",
     customer_request: ovl?.customer_request ?? "",
@@ -1707,7 +1713,6 @@ function RemarkCell({ order }: { order: operationOrderListRow }) {
               disabled={save.isPending}
               onClick={() =>
                 save.mutate({
-                  carres_remark: vals.carres_remark.trim() || null,
                   action_for_logistic: vals.action_for_logistic.trim() || null,
                   warehouse_remark: vals.warehouse_remark.trim() || null,
                   customer_request: vals.customer_request.trim() || null,
@@ -2093,18 +2098,29 @@ function ActionCell({
   const lead = openTaskOf(tasks);
   const u = lead ? taskUrgency(lead) : null;
   return (
-    <td className="px-2 py-2 border-r border-base-100 align-middle" onClick={(e) => e.stopPropagation()}>
-      <button type="button" onClick={() => onFlag(order)} title="Follow-up">
+    <td className="px-1 py-2 border-r border-base-100 align-middle text-center" onClick={(e) => e.stopPropagation()}>
+      {/* Icon-only follow-up flag (Jess 2026-06-29): no "Flag" / "Late" text — the
+          colour carries the state so the column stays narrow + scannable.
+          faint = none · amber = open · red = overdue. */}
+      <button
+        type="button"
+        onClick={() => onFlag(order)}
+        title={
+          !lead
+            ? "Flag for follow-up"
+            : u === "overdue"
+              ? "Follow-up overdue"
+              : "Follow-up open"
+        }
+        aria-label={!lead ? "Flag for follow-up" : u === "overdue" ? "Follow-up overdue" : "Follow-up open"}
+        className="inline-flex"
+      >
         {!lead ? (
-          <span className="inline-flex items-center gap-1 text-[11px] text-base-300 hover:text-warning">
-            <Flag size={12} strokeWidth={2} /> Flag
-          </span>
+          <Flag size={15} strokeWidth={2} className="text-base-300 hover:text-warning" />
         ) : u === "overdue" ? (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-error-soft text-danger">
-            <Flag size={12} strokeWidth={2} className="fill-current" /> Late
-          </span>
+          <Flag size={15} strokeWidth={2.5} className="fill-current text-danger" />
         ) : (
-          <Flag size={15} strokeWidth={2} className="fill-current text-warning" aria-label="Follow-up" />
+          <Flag size={15} strokeWidth={2} className="fill-current text-warning" />
         )}
       </button>
     </td>
