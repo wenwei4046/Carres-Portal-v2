@@ -202,11 +202,13 @@ beforeEach(() => {
 });
 
 describe("OperationOrdersControl", () => {
-  it("renders the 6 status chips with correct per-tab counts", () => {
+  it("renders the 7 status chips (Open + All meta + 5 stages) with correct counts", () => {
     wrap(<OperationOrdersControl />);
     const g = statusGroup();
-    expect(g.getAllByRole("button")).toHaveLength(6);
-    // counts: All 7, Placed 1, Proceed 2, Pending 1, Scheduled 2, Completed 1
+    expect(g.getAllByRole("button")).toHaveLength(7);
+    // counts: Open 6 (non-completed), All 7, Placed 1, Proceed 2, Pending 1,
+    // Scheduled 2, Completed 1.
+    expect(g.getByRole("button", { name: /Open\s*6/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /All\s*7/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Placed\s*1/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Proceed\s*2/ })).toBeInTheDocument();
@@ -215,12 +217,18 @@ describe("OperationOrdersControl", () => {
     expect(g.getByRole("button", { name: /Completed\s*1/ })).toBeInTheDocument();
   });
 
-  it("defaults to the All tab and shows every order", () => {
+  it("defaults to the Open tab — hides completed; All shows every order", () => {
     wrap(<OperationOrdersControl />);
+    // Default Open: 1001-1006 visible, the completed 1007 hidden.
     expect(rowsBySo()).toEqual(
-      expect.arrayContaining(["1001", "1002", "1003", "1004", "1005", "1006", "1007"]),
+      expect.arrayContaining(["1001", "1002", "1003", "1004", "1005", "1006"]),
     );
+    expect(rowsBySo()).not.toContain("1007");
+    expect(rowsBySo()).toHaveLength(6);
+    // Clicking All brings the completed order back.
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*7/ }));
     expect(rowsBySo()).toHaveLength(7);
+    expect(rowsBySo()).toContain("1007");
   });
 
   it("entry rule: AutoCount placed → Proceed, native placed → Placed", () => {
@@ -671,6 +679,8 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
 
   it("surfaces an Unassigned-carrier alert (no-carrier count) and filters on click", () => {
     wrap(<OperationOrdersControl />);
+    // Count over the full set (the default Open tab hides the completed 1007).
+    fireEvent.click(statusGroup().getByRole("button", { name: /All\s*7/ }));
     // 7 orders; D has a carrier via the partner map (NETS), E has TEOW joined →
     // the other 5 have no carrier.
     const chip = within(screen.getByTestId("filter-needs action")).getByRole(
