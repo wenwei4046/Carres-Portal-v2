@@ -1261,7 +1261,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           {/* ONE thin, darker header band so it reads clearly AS the header
               (Jess 2026-06-24: header darker, no column shade, less thick). */}
           <thead>
-            <tr className="bg-base-700 border-b border-base-800">
+            <tr className="bg-base-700 border-b-2 border-primary">
               <th className="px-3 py-1.5 border-r border-base-600">
                 <input
                   type="checkbox"
@@ -1893,7 +1893,11 @@ function OrderRow({
     <tr
       onClick={onOpen}
       className={`border-t border-base-200 hover:bg-info-soft/50 cursor-pointer align-top ${
-        selected ? "bg-primary/5" : idx % 2 ? "bg-base-100/70" : "bg-white"
+        selected
+          ? "bg-primary/15 shadow-[inset_3px_0_0_#C44D2B]"
+          : idx % 2
+            ? "bg-base-100/70"
+            : "bg-white"
       }`}
       data-testid="order-row"
     >
