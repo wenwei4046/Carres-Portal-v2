@@ -574,19 +574,28 @@ function DrawerBody({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {pickerSku !== null && (
-        <ReserveStockDialog
-          sku={pickerSku}
-          soRef={soRef}
-          need={orderedLines.find((l) => l.sku === pickerSku)?.qty ?? 1}
-          units={freeUnitsByKey.get(normalizeSkuKey(pickerSku)) ?? []}
-          onClose={() => setPickerSku(null)}
-          onReserved={() => {
-            void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
-            void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
-          }}
-        />
-      )}
+      {pickerSku !== null &&
+        (() => {
+          // Auto-matched units for this line; if none, fall back to ALL free
+          // warehouse stock so the operator can always open the picker and
+          // reserve manually (overridable default).
+          const matched = freeUnitsByKey.get(normalizeSkuKey(pickerSku)) ?? [];
+          const exact = matched.length > 0;
+          return (
+            <ReserveStockDialog
+              sku={pickerSku}
+              soRef={soRef}
+              need={orderedLines.find((l) => l.sku === pickerSku)?.qty ?? 1}
+              units={exact ? matched : freeUnits}
+              exact={exact}
+              onClose={() => setPickerSku(null)}
+              onReserved={() => {
+                void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
+                void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+              }}
+            />
+          );
+        })()}
       {/* No separate top bar — the ⋮ actions menu + close moved into the Order
           section header next to the status chip (Jess: save a row). Backdrop
           click still closes the drawer. */}
@@ -717,12 +726,12 @@ function DrawerBody({
                     >
                       {isService ? (
                         <span className="text-base-300">—</span>
-                      ) : matchUnits.length > 0 && stage !== "delivered" ? (
+                      ) : stage !== "delivered" ? (
                         <button
                           type="button"
                           onClick={() => setPickerSku(l.sku)}
                           className="underline decoration-dotted underline-offset-2 hover:text-primary cursor-pointer"
-                          title="Pick which ready unit(s) to reserve for this order"
+                          title="Pick ready stock to reserve for this order (or browse all warehouse stock)"
                           data-testid={`ready-pick-${l.sku}`}
                         >
                           {ready}

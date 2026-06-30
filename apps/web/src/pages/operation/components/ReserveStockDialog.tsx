@@ -34,8 +34,12 @@ interface Props {
   soRef: string;
   /** Line qty — used only to pre-tick that many of the oldest units. */
   need: number;
-  /** Free units already matched to this line by normalizeSkuKey. */
+  /** Units to show. When `exact`, these are the units matched to this line by
+   *  normalizeSkuKey; otherwise it's ALL free warehouse stock (manual fallback). */
   units: ReserveFreeUnit[];
+  /** true = `units` auto-matched this item; false = nothing matched, so we show
+   *  all warehouse stock for a manual pick (operator override). */
+  exact: boolean;
   onClose: () => void;
   /** Called after a successful reserve so the parent can invalidate. */
   onReserved: () => void;
@@ -53,13 +57,19 @@ export default function ReserveStockDialog({
   soRef,
   need,
   units,
+  exact,
   onClose,
   onReserved,
 }: Props) {
-  // Pre-tick the oldest `need` units so the common "reserve what's needed" case
-  // is one click; the operator can re-tick to swap in an Exhibition piece etc.
+  // When auto-matched, pre-tick the oldest `need` units so the common case is
+  // one click. When NOT matched (manual fallback over all warehouse stock), tick
+  // nothing — the operator must deliberately choose, since these aren't a known
+  // match for the item.
   const [checked, setChecked] = useState<Set<string>>(
-    () => new Set(units.slice(0, Math.max(0, need)).map((u) => u.id)),
+    () =>
+      exact
+        ? new Set(units.slice(0, Math.max(0, need)).map((u) => u.id))
+        : new Set(),
   );
   const [submitting, setSubmitting] = useState(false);
 
@@ -125,10 +135,18 @@ export default function ReserveStockDialog({
         <div className="px-5 py-3.5 border-b border-base-100">
           <div className="kicker">Reserve ready stock → {soRef}</div>
           <div className="t-h4 font-display mt-1 break-all">{sku}</div>
-          <div className="text-[12px] text-base-500 mt-0.5">
-            {units.length} free unit{units.length === 1 ? "" : "s"} at the
-            warehouse · tick which to use for this order
-          </div>
+          {exact ? (
+            <div className="text-[12px] text-base-500 mt-0.5">
+              {units.length} free unit{units.length === 1 ? "" : "s"} match this
+              item · tick which to use for this order
+            </div>
+          ) : (
+            <div className="text-[12px] text-warning mt-0.5">
+              No stock auto-matched this item. Showing all {units.length} free
+              unit{units.length === 1 ? "" : "s"} in the warehouse — pick manually
+              only if you know it&rsquo;s the right one.
+            </div>
+          )}
         </div>
 
         <div className="overflow-auto px-2 py-2">
@@ -168,7 +186,7 @@ export default function ReserveStockDialog({
           })}
           {units.length === 0 && (
             <div className="p-8 text-center text-[12px] text-base-500">
-              No free units match this item.
+              No free stock in the warehouse right now.
             </div>
           )}
         </div>
