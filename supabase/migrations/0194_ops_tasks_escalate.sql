@@ -7,9 +7,9 @@
 -- tasks without a due date.
 
 alter table ops_tasks
-  add column escalated_at    timestamptz,
-  add column escalate_reason text check (escalate_reason in ('discount','refund','question','other')),
-  add column escalate_note   text;
+  add column if not exists escalated_at    timestamptz,
+  add column if not exists escalate_reason text check (escalate_reason in ('discount','refund','question','other')),
+  add column if not exists escalate_note   text;
 
 comment on column ops_tasks.escalated_at    is 'when this task was escalated to the principal (Jess); null = not escalated';
 comment on column ops_tasks.escalate_reason is 'why it needs the boss: discount | refund | question | other';
@@ -18,6 +18,9 @@ comment on column ops_tasks.escalate_note   is 'the operator''s short report to 
 -- ── recreate the read feed: + escalate cols, + due-aware overdue ─────────────
 -- overdue (= the red ⚠ signal) now fires when EITHER nobody claimed it past the
 -- SLA, OR it's claimed/open and past its hard due_at. The rest is 0162 verbatim.
+-- DROP first: CREATE OR REPLACE cannot change a function's return type (the feed
+-- gains the escalate_* OUT columns), so the existing 0162 function must be dropped.
+drop function if exists public.ops_tasks_feed();
 create or replace function ops_tasks_feed()
 returns table (
   id uuid, title text, detail text, status text, priority text,
