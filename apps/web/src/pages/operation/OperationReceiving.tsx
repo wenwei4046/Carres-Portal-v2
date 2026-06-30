@@ -252,11 +252,11 @@ export default function OperationReceiving() {
       {/* Table */}
       <div className="bg-white border border-base-200 rounded overflow-auto">
         <table
-          className="w-full border-collapse text-[13px]"
+          className="w-full border-collapse text-[13px] [&_tbody_tr:nth-child(even)]:bg-base-100/70"
           style={{ minWidth: 920 }}
         >
-          <thead>
-            <tr className="bg-base-50 border-b border-base-200">
+          <thead className="bg-base-700 border-b-2 border-primary text-white">
+            <tr>
               <Th>PO</Th>
               <Th>Supplier</Th>
               <Th>Warehouse</Th>
@@ -285,7 +285,7 @@ export default function OperationReceiving() {
               return (
                 <tr
                   key={po.id}
-                  className="border-t border-base-100 align-top"
+                  className="border-t border-base-100 align-top hover:bg-primary/5"
                   data-testid="receiving-row"
                 >
                   <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-base-900">
@@ -355,7 +355,7 @@ export default function OperationReceiving() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-base-500 text-left">
+    <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.02em] text-white text-left">
       {children}
     </th>
   );

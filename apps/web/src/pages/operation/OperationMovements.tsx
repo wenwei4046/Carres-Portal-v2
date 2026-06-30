@@ -733,18 +733,19 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
 const ROW_GRID = "120px 70px 1.6fr 1fr 90px 1.6fr 100px";
 
 function MovementTableHeader() {
+  const h = "text-[11px] font-bold uppercase tracking-[0.02em] text-white";
   return (
     <div
-      className="grid items-center px-[18px] py-2.5 bg-base-50 border-b border-base-200 gap-2.5"
+      className="grid items-center px-[18px] py-2.5 bg-base-700 border-b-2 border-primary gap-2.5"
       style={{ gridTemplateColumns: ROW_GRID }}
     >
-      <div className="label">When</div>
-      <div className="label">Kind</div>
-      <div className="label">SKU</div>
-      <div className="label">Warehouse</div>
-      <div className="label text-right">Qty</div>
-      <div className="label">Ref / note</div>
-      <div className="label">By</div>
+      <div className={h}>When</div>
+      <div className={h}>Kind</div>
+      <div className={h}>SKU</div>
+      <div className={h}>Warehouse</div>
+      <div className={`${h} text-right`}>Qty</div>
+      <div className={h}>Ref / note</div>
+      <div className={h}>By</div>
     </div>
   );
 }
