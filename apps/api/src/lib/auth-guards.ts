@@ -24,9 +24,26 @@ import type { AppEnv } from "../types";
  *   operationPosRouter.get("/", requireOperation, async (c) => { ... });
  *   operationPosRouter.post("/:id/cancel", requireOperation, async (c) => { ... });
  */
+/**
+ * Admits `operation` OR `principal`.
+ *
+ * Unified Internal Portal (2026-06-30, Loo): the Operation / Principal /
+ * Finance portals merged into one role-aware portal where the principal
+ * (Chairman, de-facto super-admin) can see AND operate every Operation
+ * feature. This guard is the API twin of migration 0189 widening
+ * `public.is_operation()` to admit principal — both layers now let the
+ * principal through. `requireFinance` (below) already admitted principal
+ * the same way since Phase 5.
+ *
+ * Historical note: this used to be operation-only. It is named
+ * `requireOperation` (not `requireOperationOrPrincipal`) because every
+ * call-site is an Operation route; the principal is an additional admit,
+ * not a different surface.
+ */
 export const requireOperation: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (c.var.auth?.role !== "operation") {
-    throw new HTTPException(403, { message: "operation only" });
+  const role = c.var.auth?.role;
+  if (role !== "operation" && role !== "principal") {
+    throw new HTTPException(403, { message: "operation or Principal only" });
   }
   await next();
 };

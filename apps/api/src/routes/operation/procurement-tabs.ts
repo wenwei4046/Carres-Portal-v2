@@ -43,7 +43,7 @@ const procurementTabsRouter = new Hono<AppEnv>();
 // Inline operation-only guard — fast 403 before any Supabase round-trip.
 procurementTabsRouter.use("*", async (c, next) => {
   const role = c.var.auth?.role;
-  if (role !== "operation") {
+  if (role !== "operation" && role !== "principal") {
     throw new HTTPException(403, { message: "operation only" });
   }
   await next();

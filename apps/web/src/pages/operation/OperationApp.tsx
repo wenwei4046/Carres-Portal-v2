@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
-import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import OperationSidebar from "./OperationSidebar";
+import {
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
+// Unified Internal Portal (2026-06-30) — the three private rails (Operation /
+// Principal / Finance) merged into ONE role-aware PortalSidebar.
+import PortalSidebar from "@/pages/portal/PortalSidebar";
 import OperationDashboard from "./OperationDashboard";
 // Jess redesign step 2 (2026-06-08) — the Orders tab is now the unified control
 // table (merges the old kanban + Inbox + All-orders). The legacy kanban
@@ -76,26 +84,10 @@ export default function OperationApp() {
   const isUrlDriven = isProcurementUrl || isOrdersUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
-  // Sidebar collapse (Jess 2026-06-26): hide the left menu to an icon rail for
-  // more table room. Owned here because the layout is a fixed grid column, not
-  // the aside's own width. Remembered across reloads in localStorage.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("ops-sidebar-collapsed") === "1";
-    } catch {
-      return false;
-    }
-  });
-  const toggleSidebar = () =>
-    setSidebarCollapsed((c) => {
-      const next = !c;
-      try {
-        localStorage.setItem("ops-sidebar-collapsed", next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+  // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
+  // 2026-06-30) — it self-owns the collapsed state + localStorage so every area
+  // (Operations / Finance / Admin) collapses consistently. The grid column is
+  // now `auto`, tracking the rail's intrinsic width.
   const [movementsPrefill, setMovementsPrefill] = useState<
     Partial<MovementsFilters> | undefined
   >(undefined);
@@ -104,6 +96,25 @@ export default function OperationApp() {
   const [warehousePrefill, setWarehousePrefill] = useState<
     { alert?: boolean } | undefined
   >(undefined);
+
+  // Unified Internal Portal — the merged PortalSidebar links to
+  // `/operation?tab=<key>`, so cross-area deep links (e.g. principal jumping in
+  // from the Finance area) and within-area clicks both arrive as a `?tab=`
+  // change. Sync it into the local tab state. Procurement / Orders stay
+  // path-driven (`/operation/procurement|orders`, no `?tab=`), so this is a
+  // no-op while inside them. In-page callbacks (goWarehouse / goMovements /
+  // dashboard tiles) still drive `tab` directly and don't touch the URL, so a
+  // stale `?tab=` never overrides them (the effect only refires when the param
+  // actually changes).
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  useEffect(() => {
+    if (!urlTab || isProcurementUrl || isOrdersUrl) return;
+    setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
+    setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
+    setTab(urlTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlTab, isProcurementUrl, isOrdersUrl]);
 
   // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/operation`), make sure the local tab state has a sensible value so
@@ -177,28 +188,16 @@ export default function OperationApp() {
     }
   }
 
-  // The sidebar highlight follows the URL when we're in a URL-driven section;
-  // for every other slot it follows the local tab state.
-  const activeTab = isProcurementUrl
-    ? "procurement"
-    : isOrdersUrl
-      ? "orders"
-      : tab;
-
   return (
     <div
       className="h-screen text-base-900 grid"
       style={{
-        gridTemplateColumns: `${sidebarCollapsed ? 60 : 232}px minmax(0, 1fr) auto`,
-        transition: "grid-template-columns 0.18s ease",
+        // PortalSidebar owns its own collapse state + intrinsic width (232px
+        // expanded ⇄ icon rail collapsed), so the grid column just follows it.
+        gridTemplateColumns: "auto minmax(0, 1fr) auto",
       }}
     >
-      <OperationSidebar
-        active={activeTab}
-        onChange={changeTab}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={toggleSidebar}
-      />
+      <PortalSidebar />
       <main className="min-w-0 overflow-auto bg-base-50">
         {isUrlDriven ? (
           // Nested route table for the URL-driven sections.

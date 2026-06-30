@@ -61,7 +61,7 @@ const recentCostRouter = new Hono<AppEnv>();
 
 recentCostRouter.get("/:sku/recent-cost", async (c) => {
   const auth = c.var.auth;
-  if (auth.role !== "operation") {
+  if (auth.role !== "operation" && auth.role !== "principal") {
     throw new HTTPException(403, { message: "operation only" });
   }
 
