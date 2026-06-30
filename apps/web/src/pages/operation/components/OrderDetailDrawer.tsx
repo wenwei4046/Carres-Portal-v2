@@ -1020,6 +1020,11 @@ function DrawerBody({
                 hasMsbf={hasMsbf}
                 hasSof={hasSof}
                 orderId={order.id}
+                meta={{
+                  orderCode: `SO-${order.so}`,
+                  customerName: order.customer_name ?? "",
+                  customerPhone: order.customer_phone ?? "",
+                }}
               />
             </FieldGrid>
           </div>

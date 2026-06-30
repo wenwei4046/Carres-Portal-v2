@@ -19,9 +19,11 @@ import { DoTemplate } from "./do-template";
 import { PoTemplate } from "./po-template";
 import { PickupEventTemplate } from "./pickup-event-template";
 import { ReceiptTemplate } from "./receipt-template";
+import { ExtensionAgreementTemplate } from "./extension-agreement-template";
 import { registerNotoSansSC } from "./fonts/noto";
 import type {
   DoTemplateData,
+  ExtensionAgreementTemplateData,
   InvoiceTemplateData,
   PoTemplateData,
   ReceiptTemplateData,
@@ -47,6 +49,14 @@ export function renderInvoicePdf(data: InvoiceTemplateData): Promise<Blob> {
  *  on-demand from the order_payments row + order (no bucket persistence yet). */
 export function renderReceiptPdf(data: ReceiptTemplateData): Promise<Blob> {
   return toBlob(ReceiptTemplate(data));
+}
+
+/** Migration 0196 — storage delivery-extension agreement (the two Google Forms).
+ *  Rendered on-demand from the ops_order_control extension_* fields + order. */
+export function renderExtensionAgreementPdf(
+  data: ExtensionAgreementTemplateData,
+): Promise<Blob> {
+  return toBlob(ExtensionAgreementTemplate(data));
 }
 
 export function renderDoPdf(data: DoTemplateData): Promise<Blob> {

@@ -31,7 +31,7 @@ import {
   useExtendStorage,
 } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
-import { renderReceiptPdf } from "@/lib/pdf/render";
+import { renderReceiptPdf, renderExtensionAgreementPdf } from "@/lib/pdf/render";
 import { areaForAddress, suggestCarrier } from "@/lib/region";
 
 /**
@@ -831,11 +831,13 @@ export function StorageControlFields({
   hasMsbf = false,
   hasSof = false,
   orderId,
+  meta,
 }: {
   form: OrderControlForm;
   hasMsbf?: boolean;
   hasSof?: boolean;
   orderId?: string;
+  meta?: { orderCode: string; customerName: string; customerPhone: string };
 }) {
   const { draft, set } = form;
   const today = new Date().toISOString().slice(0, 10);
@@ -999,7 +1001,13 @@ export function StorageControlFields({
             />
           )}
           {orderId && (
-            <StorageExtensionRow orderId={orderId} control={form.control} />
+            <StorageExtensionRow
+              orderId={orderId}
+              control={form.control}
+              hasMsbf={hasMsbf}
+              hasSof={hasSof}
+              meta={meta}
+            />
           )}
         </>
       )}
@@ -1014,14 +1022,57 @@ export function StorageControlFields({
 function StorageExtensionRow({
   orderId,
   control,
+  hasMsbf = false,
+  hasSof = false,
+  meta,
 }: {
   orderId: string;
   control: OpsOrderControl | null;
+  hasMsbf?: boolean;
+  hasSof?: boolean;
+  meta?: { orderCode: string; customerName: string; customerPhone: string };
 }) {
   const role = useAuth((s) => s.role);
   const isPrincipal = role === "principal";
   const count = control?.extension_count ?? 0;
   const extended = count >= 1;
+
+  // Open the one-time extension agreement (the Google-Form replacement) as a PDF.
+  // Policy lines are category-specific (the two forms): MS/BF 24 working days
+  // free → RM150/month; Sofa 14 working days free → flat RM200/order.
+  const exportAgreement = async () => {
+    try {
+      const policy: string[] = [];
+      if (hasMsbf)
+        policy.push(
+          "Mattress / bed frame: up to 24 working days of free storage from the original requested delivery date; a storage fee of RM150 per month applies thereafter.",
+        );
+      if (hasSof)
+        policy.push(
+          "Sofa: up to 14 working days of free storage from the original requested delivery date; a one-time storage fee of RM200 per order applies thereafter.",
+        );
+      if (policy.length === 0)
+        policy.push(
+          "Storage fees, where applicable, apply after the free storage window from the original requested delivery date.",
+        );
+      const reasonText =
+        control?.extension_reason === "Others" && control?.extension_note
+          ? `Others — ${control.extension_note}`
+          : control?.extension_reason ?? "—";
+      const blob = await renderExtensionAgreementPdf({
+        order_code: meta?.orderCode ?? "—",
+        issue_date: (control?.extension_acknowledged_at ?? control?.extended_at ?? "").slice(0, 10),
+        customer: { name: meta?.customerName ?? "", phone: meta?.customerPhone ?? "" },
+        original_date: control?.extension_original_date ?? "",
+        new_date: control?.extension_new_date ?? "",
+        reason: reasonText,
+        policy_lines: policy,
+      });
+      window.open(URL.createObjectURL(blob), "_blank");
+    } catch (e) {
+      toast.error(`Couldn't open agreement — ${(e as Error).message}`);
+    }
+  };
 
   const extend = useExtendStorage(orderId, {
     onSuccess: () => {
@@ -1057,15 +1108,26 @@ function StorageExtensionRow({
               · {control?.extension_reason ?? "—"} · free from {fmt(control?.extension_original_date)}
             </span>
           </div>
-          {isPrincipal ? (
+          <div className="mt-1 flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setOpen(true)}
-              className="mt-1 text-[11px] text-primary hover:underline"
+              onClick={() => void exportAgreement()}
+              className="text-[11px] text-primary hover:underline inline-flex items-center gap-1"
             >
-              + Extend again (principal)
+              <Receipt size={12} strokeWidth={2} />
+              Export agreement (PDF)
             </button>
-          ) : (
+            {isPrincipal && (
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="text-[11px] text-primary hover:underline"
+              >
+                + Extend again
+              </button>
+            )}
+          </div>
+          {!isPrincipal && (
             <div className="mt-0.5 text-[11px] text-base-400">
               One-time extension used — a further extension needs principal approval.
             </div>

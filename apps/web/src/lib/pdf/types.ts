@@ -43,6 +43,19 @@ export type ReceiptTemplateData = {
   currency: string;
 };
 
+/** Storage delivery-EXTENSION agreement (migration 0196; the two Delivery-
+ *  Extension Google Forms, Jess 2026-06-30). The PDF that replaces the Google
+ *  Form — exported from the order detail to send the customer. */
+export type ExtensionAgreementTemplateData = {
+  order_code: string; // SO-123
+  issue_date: string; // acknowledged date (yyyy-mm-dd)
+  customer: { name: string; phone: string };
+  original_date: string; // the original requested delivery date
+  new_date: string; // the new requested delivery date
+  reason: string; // reason (+ free-text detail when "Others")
+  policy_lines: readonly string[]; // the one-time storage policy per category
+};
+
 export type InvoiceTemplateData = {
   invoice_no: string;
   issue_date: string;
