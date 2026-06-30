@@ -1261,8 +1261,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
           {/* ONE thin, darker header band so it reads clearly AS the header
               (Jess 2026-06-24: header darker, no column shade, less thick). */}
           <thead>
-            <tr className="bg-base-800 border-b border-base-900">
-              <th className="px-3 py-1.5 border-r border-base-700">
+            <tr className="bg-base-700 border-b border-base-800">
+              <th className="px-3 py-1.5 border-r border-base-600">
                 <input
                   type="checkbox"
                   checked={allPagedSelected}
@@ -1272,7 +1272,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 />
               </th>
               <th
-                className="px-1 py-1.5 text-center border-r border-base-700"
+                className="px-1 py-1.5 text-center border-r border-base-600"
                 title="Follow-up"
               >
                 <Flag size={13} strokeWidth={2} className="inline text-white" aria-label="Follow-up" />
@@ -2205,7 +2205,7 @@ function Th({
   return (
     <th
       className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.02em] text-white text-left ${
-        noBorder ? "" : "border-r border-base-700"
+        noBorder ? "" : "border-r border-base-600"
       }`}
     >
       {children}

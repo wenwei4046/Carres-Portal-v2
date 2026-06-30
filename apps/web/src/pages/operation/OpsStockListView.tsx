@@ -364,7 +364,7 @@ export default function OpsStockListView(props: Props) {
       ) : (
         <div className="rounded border border-base-200 bg-white overflow-x-auto">
           <table className="w-full text-sm [&_tbody_tr:nth-child(even)]:bg-base-50/60">
-            <thead className="bg-base-800 text-[11px] uppercase tracking-[0.02em] text-white">
+            <thead className="bg-base-700 text-[11px] uppercase tracking-[0.02em] text-white">
               <tr>
                 <th className="text-left px-3 py-2 font-bold">Unit ID</th>
                 <th className="text-left px-3 py-2 font-bold">SKU</th>
