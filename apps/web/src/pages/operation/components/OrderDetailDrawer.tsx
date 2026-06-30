@@ -608,10 +608,10 @@ function DrawerBody({
       <div
         className="flex-1 min-h-0 overflow-auto px-5 py-3 grid gap-3 content-start"
         style={{
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: "1fr 1fr 1fr",
           gridTemplateRows: "auto auto auto minmax(0,1fr) auto",
           gridTemplateAreas:
-            '"banner banner" "order order" "ctrl pay" "items items" "activity activity"',
+            '"banner banner banner" "header header header" "cust ctrl pay" "items items items" "activity activity activity"',
         }}
       >
         {/* Needs-action banner — the "action for logistic" note surfaced at the
@@ -630,45 +630,56 @@ function DrawerBody({
             </span>
           </div>
         )}
-        {/* 1 · Order — SO# + status live in the header (Jess: save a row, more
-            obvious); the grid holds customer / phone / address. */}
-        <div style={{ gridArea: "order", minWidth: 0 }}>
-        <DrawerSection
-          icon={<ClipboardList className="w-4 h-4" />}
-          title="Order"
-          titleExtra={
+        {/* Header bar — status FIRST · Order # · customer name on the left;
+            flag / actions / close on the right. Full width above the 3 meta
+            columns (Jess Option 1). */}
+        <div
+          style={{ gridArea: "header" }}
+          className="flex items-center justify-between gap-3 min-w-0"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <StageChip stage={stage} />
+            <ClipboardList className="w-4 h-4 text-base-400 shrink-0" />
+            <span className="font-display t-h4 text-base-900">Order</span>
             <span className="font-mono t-h3 font-bold text-base-900 leading-none">
               #{order.so}
             </span>
-          }
-          headerRight={
-            <span className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={onFollowUpClick}
-                aria-label="Add follow-up"
-                title="Add a follow-up (write the issue + assign)"
-                className="p-1 rounded hover:bg-base-100 text-base-400 hover:text-primary shrink-0"
-              >
-                <Flag className="w-[18px] h-[18px]" />
-              </button>
-              <StageChip stage={stage} />
-              <ActionsMenu
-                order={order}
-                lines={lines}
-                stage={stage}
-                onServiceNoteClick={onServiceNoteClick}
-              />
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close drawer"
-                className="p-1 text-[18px] text-base-700 hover:text-base-900 leading-none shrink-0"
-              >
-                ×
-              </button>
+            <span className="t-small text-base-500 truncate">
+              · {order.customer_name}
             </span>
-          }
+          </div>
+          <span className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={onFollowUpClick}
+              aria-label="Add follow-up"
+              title="Add a follow-up (write the issue + assign)"
+              className="p-1 rounded hover:bg-base-100 text-base-400 hover:text-primary"
+            >
+              <Flag className="w-[18px] h-[18px]" />
+            </button>
+            <ActionsMenu
+              order={order}
+              lines={lines}
+              stage={stage}
+              onServiceNoteClick={onServiceNoteClick}
+            />
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close drawer"
+              className="p-1 text-[18px] text-base-700 hover:text-base-900 leading-none"
+            >
+              ×
+            </button>
+          </span>
+        </div>
+
+        {/* Customer — its own column in the 3-up meta row. */}
+        <div style={{ gridArea: "cust", minWidth: 0 }}>
+        <DrawerSection
+          icon={<ClipboardList className="w-4 h-4" />}
+          title="Customer"
           accent="neutral"
           summary={order.customer_name}
           defaultOpen
