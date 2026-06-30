@@ -627,7 +627,7 @@ function DrawerBody({
           top · Delivery | Payment as two columns · Items & stock the full-width
           work area (only it scrolls) · Activity at the bottom. */}
       <div
-        className="flex-1 min-h-0 overflow-auto px-5 py-3 grid gap-3 content-start"
+        className="flex-1 min-h-0 overflow-hidden px-5 py-3 grid gap-3"
         style={{
           gridTemplateColumns: "1fr 1fr 1fr",
           gridTemplateRows: "auto auto auto minmax(0,1fr)",
