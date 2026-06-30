@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -99,6 +99,26 @@ export default function ReserveStockDialog({
   const [cat, setCat] = useState<Category | "All">("All");
   const [size, setSize] = useState<Size | "All">("All");
 
+  // Draggable by the header (Jess: "make it can move" — drag aside to read the
+  // order behind). pos is an offset from the centered position.
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+  function onDragStart(e: React.PointerEvent) {
+    drag.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function onDragMove(e: React.PointerEvent) {
+    if (!drag.current) return;
+    setPos({
+      x: drag.current.ox + (e.clientX - drag.current.sx),
+      y: drag.current.oy + (e.clientY - drag.current.sy),
+    });
+  }
+  function onDragEnd(e: React.PointerEvent) {
+    drag.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  }
+
   // Decorate once: derive category + size per unit, sort same products together.
   const rows = useMemo(
     () =>
@@ -184,19 +204,27 @@ export default function ReserveStockDialog({
       onClick={onClose}
       role="presentation"
       className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-      style={{ background: "rgba(34,31,32,0.55)" }}
+      style={{ background: "rgba(34,31,32,0.25)" }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label="Reserve ready stock"
-        className="bg-white border border-base-200 rounded-md flex flex-col max-h-[86vh] w-[880px] max-w-full"
+        className="bg-white border border-base-200 rounded-md shadow-2xl flex flex-col max-h-[86vh] w-[880px] max-w-full"
+        style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
         data-testid="reserve-stock-dialog"
       >
-        {/* Header */}
-        <div className="px-5 py-3.5 border-b border-base-100">
-          <div className="kicker">Reserve ready stock → {soRef}</div>
+        {/* Header — drag handle (move the panel aside to read the order). */}
+        <div
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          className="px-5 py-3.5 border-b border-base-100 cursor-move select-none touch-none"
+        >
+          <div className="kicker flex items-center gap-1.5">
+            <span className="text-base-300">⠿</span> Reserve ready stock → {soRef}
+          </div>
           <div className="t-h4 font-display mt-1 break-all">{sku}</div>
           <div className={`text-[12px] mt-0.5 ${exact ? "text-base-500" : "text-warning"}`}>
             {exact
