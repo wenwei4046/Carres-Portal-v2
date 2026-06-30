@@ -6,6 +6,7 @@ import {
   collectStorageInput,
   requestStorageWaiverInput,
   decideStorageWaiverInput,
+  recordStorageExtensionInput,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -280,6 +281,93 @@ orderPaymentsRouter.post("/:id/storage/waiver/decide", async (c) => {
     );
   }
   return c.json({ control: data });
+});
+
+// ── Storage delivery-extension (the two Google Forms, Jess 2026-06-30) ───────
+const CONTROL_EXTENSION_COLS =
+  "order_id, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, updated_at";
+
+// POST /:id/storage/extend — record a one-time customer delivery-extension. The
+// storage free-window basis (extension_original_date) is snapshotted from the
+// order's CURRENT delivery_date on the FIRST extension and never overwritten, so
+// the original basis survives the target date moving. ONE-TIME: operation may
+// take extension_count 0 -> 1; a 2nd+ extension is principal-only (mirrors the
+// waiver decide gate — Jess IS the principal, so it never gates him). The new
+// requested date is recorded as extension_new_date only; the actual
+// orders.delivery_date stays under its own RPC (set_order_date) — not touched
+// here, so this endpoint has no side effect on dispatch/logistics scheduling.
+orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const orderId = idCheck.data;
+
+  const parsed = await parseJsonBody(c, recordStorageExtensionInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, auth.jwt);
+
+  // Read the current extension state (count + original-date snapshot) and the
+  // order's delivery date (the basis to snapshot on the first extension).
+  const { data: order, error: ordErr } = await sb
+    .from("orders")
+    .select("id, delivery_date, ops_order_control(extension_count, extension_original_date)")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (ordErr) {
+    const m = mapPgError(ordErr);
+    return c.json(m.body, m.status);
+  }
+  if (!order) throw new HTTPException(404, { message: "Order not found" });
+
+  const ctrl = Array.isArray(order.ops_order_control)
+    ? order.ops_order_control[0] ?? null
+    : (order.ops_order_control as { extension_count?: number; extension_original_date?: string | null } | null);
+  const count = ctrl?.extension_count ?? 0;
+
+  // One-time gate: operation gets a single extension; a 2nd+ needs a principal.
+  if (count >= 1 && auth.role !== "principal") {
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "extension_used",
+        message:
+          "This order's one-time storage extension is already used — a further extension needs principal approval.",
+      },
+      403,
+    );
+  }
+
+  // Snapshot the original delivery date once (first extension); keep it after.
+  const originalDate = ctrl?.extension_original_date ?? order.delivery_date ?? null;
+  const now = new Date().toISOString();
+
+  const { data, error } = await sb
+    .from("ops_order_control")
+    .upsert(
+      {
+        order_id: orderId,
+        extension_original_date: originalDate,
+        extension_new_date: parsed.data.newDeliveryDate,
+        extension_reason: parsed.data.reason,
+        extension_note: parsed.data.note ?? null,
+        extension_acknowledged_at: now,
+        extended_at: now,
+        extended_by: auth.id,
+        extension_count: count + 1,
+        updated_by: auth.id,
+      },
+      { onConflict: "order_id" },
+    )
+    .select(CONTROL_EXTENSION_COLS)
+    .single();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ control: data }, 201);
 });
 
 /** Build the next receipt number for an order: `R{so}-{n}` where n is the

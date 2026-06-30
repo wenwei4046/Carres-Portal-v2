@@ -515,6 +515,8 @@ export {
   opsOrderControlResponseSchema,
   requestStorageWaiverInput,
   decideStorageWaiverInput,
+  STORAGE_EXTENSION_REASONS,
+  recordStorageExtensionInput,
   type OpsOrderControl,
   type UpdateOpsOrderControlInput,
   type OpsOrderControlResponse,
@@ -522,6 +524,8 @@ export {
   type StorageCategory,
   type RequestStorageWaiverInput,
   type DecideStorageWaiverInput,
+  type StorageExtensionReason,
+  type RecordStorageExtensionInput,
 } from "./schemas/ops-order-control";
 export * from "./schemas/ops-cockpit";
 // Sofa engine Phase 4 — build-line attrs schema + guard (server-recompute trust

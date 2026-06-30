@@ -31,6 +31,7 @@ interface RawCtrl {
   balance_due_date: string | null;
   storage_collected_at: string | null;
   storage_waiver_status: string | null;
+  extension_original_date: string | null;
 }
 interface RawLedgerEntry {
   amount: number | string;
@@ -148,9 +149,10 @@ export default function OperationPayments() {
       const hasSof = lines.some((l) => catOf(l.sku) === "sof");
       const storageFrom = ctrl?.storage_from ?? null;
       const storageOverride = num(ctrl?.storage_fee_override);
-      // Storage accrues from the manual start, else the order ETA; freezes at
-      // delivery (use delivered_at as the clock end once delivered).
-      const start = storageFrom ?? r.delivery_date;
+      // Storage free-window basis: a recorded extension's snapshotted original
+      // delivery date (migration 0196), else the manual start, else the order
+      // delivery date; freezes at delivery (delivered_at as the clock end).
+      const start = ctrl?.extension_original_date ?? storageFrom ?? r.delivery_date;
       const asOf = r.delivered_at ? r.delivered_at.slice(0, 10) : today;
       const storage = computeStorageFee({ startDate: start, asOf, hasMsbf, hasSof });
       const effectiveStorage = storageOverride ?? storage.total;

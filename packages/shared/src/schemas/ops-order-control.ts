@@ -118,6 +118,22 @@ export const opsOrderControlSchema = z.object({
   storage_waiver_requested_by: z.string().uuid().nullable().default(null),
   storage_waiver_decided_by: z.string().uuid().nullable().default(null),
   storage_waiver_decided_at: z.string().nullable().default(null),
+  /** Storage delivery-extension (migration 0196). A one-time customer extension:
+   *  `extension_original_date` snapshots the delivery date at the first extension
+   *  (the storage free-window basis, so it survives the target date moving);
+   *  `extension_new_date` is the new requested delivery date; reason + note +
+   *  acknowledgement record the agreement. `extension_count` is the one-time
+   *  guard (0 = none; operation may take it to 1; a 2nd needs a principal). These
+   *  are READ-only on the overlay — written only by the dedicated /storage/extend
+   *  endpoint, never the generic control PUT. */
+  extension_original_date: isoDate.nullable().default(null),
+  extension_new_date: isoDate.nullable().default(null),
+  extension_reason: z.string().nullable().default(null),
+  extension_note: z.string().nullable().default(null),
+  extension_acknowledged_at: z.string().nullable().default(null),
+  extended_at: z.string().nullable().default(null),
+  extended_by: z.string().uuid().nullable().default(null),
+  extension_count: z.number().int().default(0),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
 });
@@ -373,3 +389,34 @@ export const decideStorageWaiverInput = z.object({
   note: z.string().trim().max(500).nullish(),
 });
 export type DecideStorageWaiverInput = z.infer<typeof decideStorageWaiverInput>;
+
+// ── Storage delivery-extension input (the two Google Forms, Jess 2026-06-30) ──
+/** Reason for the delivery delay / extension — the dropdown on both forms. */
+export const STORAGE_EXTENSION_REASONS = [
+  "Renovation",
+  "Traveling",
+  "Others",
+] as const;
+export type StorageExtensionReason = (typeof STORAGE_EXTENSION_REASONS)[number];
+
+/**
+ * Record a one-time storage delivery-extension. POST /:id/storage/extend.
+ * `acknowledged` must be true (the customer-acknowledgement checkbox is
+ * mandatory on the form); `note` is required when the reason is "Others" (the
+ * free-text detail). The new date must be a valid future-ish delivery date — we
+ * only shape-check here (yyyy-mm-dd); the route snapshots the original date.
+ */
+export const recordStorageExtensionInput = z
+  .object({
+    newDeliveryDate: isoDate,
+    reason: z.enum(STORAGE_EXTENSION_REASONS),
+    note: z.string().trim().max(500).nullish(),
+    acknowledged: z.literal(true, {
+      errorMap: () => ({ message: "customer acknowledgement is required" }),
+    }),
+  })
+  .refine((v) => v.reason !== "Others" || !!v.note?.trim(), {
+    message: "a note is required when the reason is Others",
+    path: ["note"],
+  });
+export type RecordStorageExtensionInput = z.infer<typeof recordStorageExtensionInput>;

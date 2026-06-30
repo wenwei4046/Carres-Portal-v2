@@ -7,6 +7,7 @@ import {
   computeOrderStorage,
   requestStorageWaiverInput,
   decideStorageWaiverInput,
+  recordStorageExtensionInput,
 } from "./ops-order-control";
 
 /**
@@ -215,5 +216,28 @@ describe("storage waiver inputs", () => {
     expect(decideStorageWaiverInput.safeParse({ decision: "rejected", note: "no" }).success).toBe(true);
     expect(decideStorageWaiverInput.safeParse({ decision: "requested" }).success).toBe(false);
     expect(decideStorageWaiverInput.safeParse({ decision: "none" }).success).toBe(false);
+  });
+});
+
+describe("recordStorageExtensionInput", () => {
+  const base = { newDeliveryDate: "2026-08-01", reason: "Renovation", acknowledged: true } as const;
+
+  it("accepts a valid extension", () => {
+    expect(recordStorageExtensionInput.safeParse(base).success).toBe(true);
+  });
+
+  it("requires the customer acknowledgement (must be true)", () => {
+    expect(recordStorageExtensionInput.safeParse({ ...base, acknowledged: false }).success).toBe(false);
+    expect(recordStorageExtensionInput.safeParse({ newDeliveryDate: "2026-08-01", reason: "Renovation" }).success).toBe(false);
+  });
+
+  it("rejects an unknown reason + a malformed date", () => {
+    expect(recordStorageExtensionInput.safeParse({ ...base, reason: "Holiday" }).success).toBe(false);
+    expect(recordStorageExtensionInput.safeParse({ ...base, newDeliveryDate: "01/08/2026" }).success).toBe(false);
+  });
+
+  it("requires a note when the reason is Others", () => {
+    expect(recordStorageExtensionInput.safeParse({ ...base, reason: "Others" }).success).toBe(false);
+    expect(recordStorageExtensionInput.safeParse({ ...base, reason: "Others", note: "moving house" }).success).toBe(true);
   });
 });

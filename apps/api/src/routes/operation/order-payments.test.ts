@@ -385,6 +385,125 @@ describe("storage waiver", () => {
 });
 
 // =====================================================================
+// POST /:id/storage/extend — one-time delivery extension (migration 0196)
+// =====================================================================
+describe("POST /:id/storage/extend", () => {
+  it("403 for dealer", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDeliveryDate: "2026-08-01", reason: "Renovation", acknowledged: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("422 without the customer acknowledgement", async () => {
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDeliveryDate: "2026-08-01", reason: "Renovation", acknowledged: false }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("201 — first extension snapshots the original delivery date + sets count 1", async () => {
+    const sb = makeSb({
+      orders: {
+        maybeSingle: {
+          data: { id: ORDER_ID, delivery_date: "2026-07-15", ops_order_control: { extension_count: 0, extension_original_date: null } },
+          error: null,
+        },
+      },
+      ops_order_control: {
+        single: { data: { order_id: ORDER_ID, extension_count: 1, extension_original_date: "2026-07-15" }, error: null },
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDeliveryDate: "2026-08-20", reason: "Traveling", acknowledged: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(sb.calls.upserts[0]).toMatchObject({
+      order_id: ORDER_ID,
+      extension_original_date: "2026-07-15",
+      extension_new_date: "2026-08-20",
+      extension_reason: "Traveling",
+      extension_count: 1,
+      extended_by: "u1",
+    });
+    expect((sb.calls.upserts[0] as { extension_acknowledged_at?: string }).extension_acknowledged_at).toBeTruthy();
+  });
+
+  it("403 extension_used — operation cannot record a 2nd extension", async () => {
+    const sb = makeSb({
+      orders: {
+        maybeSingle: {
+          data: { id: ORDER_ID, delivery_date: "2026-07-15", ops_order_control: { extension_count: 1, extension_original_date: "2026-07-15" } },
+          error: null,
+        },
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDeliveryDate: "2026-09-01", reason: "Others", note: "again", acknowledged: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("extension_used");
+    expect(sb.calls.upserts).toHaveLength(0);
+  });
+
+  it("201 — a principal CAN record a 2nd extension (keeps the original date)", async () => {
+    const sb = makeSb({
+      orders: {
+        maybeSingle: {
+          data: { id: ORDER_ID, delivery_date: "2026-08-20", ops_order_control: { extension_count: 1, extension_original_date: "2026-07-15" } },
+          error: null,
+        },
+      },
+      ops_order_control: {
+        single: { data: { order_id: ORDER_ID, extension_count: 2, extension_original_date: "2026-07-15" }, error: null },
+      },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/extend`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ newDeliveryDate: "2026-09-15", reason: "Others", note: "second delay", acknowledged: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(sb.calls.upserts[0]).toMatchObject({
+      extension_original_date: "2026-07-15", // unchanged
+      extension_count: 2,
+    });
+  });
+});
+
+// =====================================================================
 // Delivery gate — POST /:id/assign-partner is blocked by an uncollected fee
 // =====================================================================
 describe("assign-partner storage gate", () => {

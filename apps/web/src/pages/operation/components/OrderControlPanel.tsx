@@ -7,7 +7,9 @@ import {
   PAYMENT_STATUSES,
   PAYMENT_METHODS,
   PAYMENT_KINDS,
+  STORAGE_EXTENSION_REASONS,
   summarizePayments,
+  type StorageExtensionReason,
   type UpdateOpsOrderControlInput,
   type OpsOrderControl,
   type OrderPaymentRow,
@@ -26,6 +28,7 @@ import {
   useCollectStorage,
   useRequestStorageWaiver,
   useDecideStorageWaiver,
+  useExtendStorage,
 } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { renderReceiptPdf } from "@/lib/pdf/render";
@@ -840,8 +843,12 @@ export function StorageControlFields({
   // committed ETA (when it'll leave), else today (still accruing). Auto-shown but
   // editable — set it to freeze the fee on the actual collection/delivery date.
   const endEff = draft.storage_to.trim() || draft.logistic_eta.trim() || today;
+  // Storage free-window basis: once a one-time extension is recorded, it's the
+  // snapshotted ORIGINAL delivery date (migration 0196) so the free window holds
+  // even after the target date moves; otherwise the operator's manual From date.
+  const storageBasis = form.control?.extension_original_date ?? form.storageFrom;
   const storage = computeStorageFee({
-    startDate: form.storageFrom,
+    startDate: storageBasis,
     asOf: endEff,
     hasMsbf,
     hasSof,
@@ -991,9 +998,176 @@ export function StorageControlFields({
               charge={draft.storage_fee_override.trim() ? Number(draft.storage_fee_override) : storage.total}
             />
           )}
+          {orderId && (
+            <StorageExtensionRow orderId={orderId} control={form.control} />
+          )}
         </>
       )}
     </>
+  );
+}
+
+/** One-time storage delivery-extension (migration 0196; the two Delivery-
+ *  Extension Google Forms, Jess 2026-06-30). Operation may record ONE extension;
+ *  a 2nd needs a principal (the route 403s `extension_used`). The free storage
+ *  window recomputes from the snapshotted original delivery date. */
+function StorageExtensionRow({
+  orderId,
+  control,
+}: {
+  orderId: string;
+  control: OpsOrderControl | null;
+}) {
+  const role = useAuth((s) => s.role);
+  const isPrincipal = role === "principal";
+  const count = control?.extension_count ?? 0;
+  const extended = count >= 1;
+
+  const extend = useExtendStorage(orderId, {
+    onSuccess: () => {
+      toast.success("Storage extension recorded");
+      setOpen(false);
+    },
+    onError: (e) => toast.error(`Couldn't extend — ${e.message}`),
+  });
+
+  const [open, setOpen] = useState(false);
+  const [newDate, setNewDate] = useState("");
+  const [reason, setReason] = useState<StorageExtensionReason>("Renovation");
+  const [note, setNote] = useState("");
+  const [ack, setAck] = useState(false);
+
+  const fmt = (iso: string | null | undefined) =>
+    iso
+      ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "2-digit",
+        })
+      : "—";
+
+  // Already extended → readout. A principal can still record a further one.
+  if (extended && !open) {
+    return (
+      <FieldRow label="Extension">
+        <div className="px-2 py-1.5 text-[12px] w-full">
+          <div className="font-semibold text-base-900">
+            → {fmt(control?.extension_new_date)}
+            <span className="ml-1 text-[11px] font-normal text-base-500">
+              · {control?.extension_reason ?? "—"} · free from {fmt(control?.extension_original_date)}
+            </span>
+          </div>
+          {isPrincipal ? (
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="mt-1 text-[11px] text-primary hover:underline"
+            >
+              + Extend again (principal)
+            </button>
+          ) : (
+            <div className="mt-0.5 text-[11px] text-base-400">
+              One-time extension used — a further extension needs principal approval.
+            </div>
+          )}
+        </div>
+      </FieldRow>
+    );
+  }
+
+  if (!open) {
+    return (
+      <FieldRow label="Extension">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="px-2 py-1.5 text-[12px] text-primary hover:underline inline-flex items-center gap-1"
+        >
+          <Plus size={13} strokeWidth={2.5} />
+          Extend storage
+        </button>
+      </FieldRow>
+    );
+  }
+
+  const canSubmit =
+    !!newDate && ack && (reason !== "Others" || !!note.trim()) && !extend.isPending;
+
+  return (
+    <FieldRow label="Extension">
+      <div className="px-1.5 py-1.5 w-full space-y-1.5 border border-base-200 rounded-[3px] bg-base-50">
+        <div className="grid grid-cols-2 gap-1.5">
+          <label className="text-[10px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
+            New delivery date
+            <input
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              aria-label="New delivery date"
+              className={CELL}
+            />
+          </label>
+          <label className="text-[10px] text-base-500 uppercase tracking-wide flex flex-col gap-0.5">
+            Reason
+            <select
+              value={reason}
+              onChange={(e) => setReason(e.target.value as StorageExtensionReason)}
+              aria-label="Extension reason"
+              className={CELL}
+            >
+              {STORAGE_EXTENSION_REASONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {reason === "Others" && (
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Reason detail (required)"
+            aria-label="Extension note"
+            className={CELL + " w-full"}
+          />
+        )}
+        <label className="flex items-start gap-1.5 text-[11px] text-base-700">
+          <input
+            type="checkbox"
+            checked={ack}
+            onChange={(e) => setAck(e.target.checked)}
+            className="mt-0.5"
+          />
+          Customer acknowledges this is a one-time extension and the storage-fee policy.
+        </label>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!canSubmit}
+            onClick={() =>
+              extend.mutate({
+                newDeliveryDate: newDate,
+                reason,
+                note: reason === "Others" ? note.trim() : note.trim() || null,
+                acknowledged: true,
+              })
+            }
+            className="btn-primary text-[11px] px-2 py-1 disabled:opacity-40"
+          >
+            {extend.isPending ? "Saving…" : "Record extension"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="text-[11px] text-base-500 hover:text-base-900"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </FieldRow>
   );
 }
 

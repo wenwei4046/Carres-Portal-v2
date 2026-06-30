@@ -119,6 +119,7 @@ import {
   type CollectStorageInput,
   type RequestStorageWaiverInput,
   type DecideStorageWaiverInput,
+  type RecordStorageExtensionInput,
   type SetOpsAssignedLogisticInput,
   type SoGridResponse,
   type SoGridConfig,
@@ -2914,6 +2915,28 @@ export function useDecideStorageWaiver(
     mutationFn: (input) =>
       apiFetch<{ control: OpsOrderControl }>(
         `/api/operation/orders/${orderId}/storage/waiver/decide`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateOrderMoney(qc, orderId);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Record a one-time storage delivery-extension (new date + reason +
+ *  acknowledgement; migration 0196). A 2nd+ extension is principal-only (the
+ *  route 403s `extension_used` for operation). */
+export function useExtendStorage(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ control: OpsOrderControl }, ApiError, RecordStorageExtensionInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ control: OpsOrderControl }, ApiError, RecordStorageExtensionInput>({
+    mutationFn: (input) =>
+      apiFetch<{ control: OpsOrderControl }>(
+        `/api/operation/orders/${orderId}/storage/extend`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     ...opts,
