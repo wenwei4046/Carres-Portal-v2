@@ -168,6 +168,7 @@ function makeDetail(): operationOrderDetailResponse {
     stockBalances: [
       { sku: "SOFA-NORD-3S", warehouse_id: "wh-1", qty: 5, reserved: 0 },
     ],
+    freeUnits: [],
     pos: [],
     history: [
       { text: "Order placed", by_role: "dealer", occurred_at: "2026-04-28T08:00:00Z" },

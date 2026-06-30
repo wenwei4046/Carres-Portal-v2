@@ -17,7 +17,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { STOCK_LOCATIONS, updateOrderInputSchema } from "@carres/shared";
+import { STOCK_LOCATIONS, normalizeSkuKey, updateOrderInputSchema } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { renderDoPdf } from "@/lib/pdf/render";
 import type { DoTemplateData } from "@/lib/pdf/types";
@@ -63,6 +63,7 @@ import DOAttachModal from "./DOAttachModal";
 import AbandonOrderModal from "./AbandonOrderModal";
 import ConfirmProceedDialog from "./ConfirmProceedDialog";
 import TransferReadyDialog from "./TransferReadyDialog";
+import ReserveStockDialog from "./ReserveStockDialog";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -495,6 +496,21 @@ function DrawerBody({
   onServiceNoteClick,
 }: DrawerBodyProps) {
   const { order, lines, addons, total, warehouse, stockBalances, pos, threads } = data;
+  // Defensive default: an API build that predates freeUnits (web can deploy
+  // ahead of the Worker) must not crash the drawer — just no picker until then.
+  const freeUnits = data.freeUnits ?? [];
+  const qc = useQueryClient();
+  // Ready picker (Jess 2026-06-30): which line's reserve dialog is open + the
+  // free units grouped by normalized key, so each line resolves its real
+  // available units across the order/warehouse naming drift.
+  const [pickerSku, setPickerSku] = useState<string | null>(null);
+  const freeUnitsByKey = new Map<string, typeof freeUnits>();
+  for (const u of freeUnits) {
+    const k = normalizeSkuKey(u.sku);
+    (freeUnitsByKey.get(k) ?? freeUnitsByKey.set(k, []).get(k)!).push(u);
+  }
+  // reserved_ref written when the operator picks a unit for this order.
+  const soRef = `SO-${order.so}`;
   // Phase 4.5 Chunk 2 (T9) — partner-assignment hint sourced from threads
   // (`order_supplier_threads.delivery_partner_id`) rather than the order-level
   // column, per design spec §CQ1 option (b). True when ANY thread has a
@@ -558,6 +574,19 @@ function DrawerBody({
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      {pickerSku !== null && (
+        <ReserveStockDialog
+          sku={pickerSku}
+          soRef={soRef}
+          need={orderedLines.find((l) => l.sku === pickerSku)?.qty ?? 1}
+          units={freeUnitsByKey.get(normalizeSkuKey(pickerSku)) ?? []}
+          onClose={() => setPickerSku(null)}
+          onReserved={() => {
+            void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
+            void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+          }}
+        />
+      )}
       {/* No separate top bar — the ⋮ actions menu + close moved into the Order
           section header next to the status chip (Jess: save a row). Backdrop
           click still closes the drawer. */}
@@ -651,11 +680,13 @@ function DrawerBody({
             </thead>
             <tbody>
               {orderedLines.map((l) => {
-                const bal = stockBalances.find((b) => b.sku === l.sku);
-                const have = bal
-                  ? Math.max(0, Number(bal.qty) - Number(bal.reserved))
-                  : 0;
-                const ok = have >= l.qty;
+                // Real availability: match free per-unit stock by normalized key.
+                // The catalog is empty so the old exact-sku stockBalances join
+                // always missed (showed 0); normalizeSkuKey bridges the
+                // order/warehouse naming drift (project-catalog-empty-sku-naming).
+                const matchUnits = freeUnitsByKey.get(normalizeSkuKey(l.sku)) ?? [];
+                const ready = matchUnits.length;
+                const ok = ready >= l.qty;
                 // Per-item stock location (migration 0168): service charges
                 // (No Lift / Disposal) carry none; goods default by category
                 // (accessories → warehouse, core → supplier) and are overridable.
@@ -684,7 +715,21 @@ function DrawerBody({
                     <td
                       className={`border border-base-200 px-2 py-1 text-right font-mono text-[11px] align-top ${stage === "delivered" ? "text-base-400" : ok ? "text-success" : "text-warning"}`}
                     >
-                      {isService ? <span className="text-base-300">—</span> : have}
+                      {isService ? (
+                        <span className="text-base-300">—</span>
+                      ) : matchUnits.length > 0 && stage !== "delivered" ? (
+                        <button
+                          type="button"
+                          onClick={() => setPickerSku(l.sku)}
+                          className="underline decoration-dotted underline-offset-2 hover:text-primary cursor-pointer"
+                          title="Pick which ready unit(s) to reserve for this order"
+                          data-testid={`ready-pick-${l.sku}`}
+                        >
+                          {ready}
+                        </button>
+                      ) : (
+                        ready
+                      )}
                     </td>
                     {isService ? (
                       <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">

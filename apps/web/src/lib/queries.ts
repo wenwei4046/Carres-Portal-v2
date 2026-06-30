@@ -2004,6 +2004,20 @@ export interface operationOrderDetailPoLine {
   qty: number;
   received_qty: number;
 }
+/** A free per-unit stock item at the order's warehouse (Jess 2026-06-30). The
+ *  drawer matches these to each line by normalizeSkuKey (the catalog is empty,
+ *  so order_lines.sku ↔ ops_stock_items.sku only match after normalisation) and
+ *  lets the operator reserve the chosen unit(s) to the order's SO. */
+export interface operationOrderDetailFreeUnit {
+  id: string;
+  unitCode: string | null;
+  sku: string;
+  warehouseId: string;
+  condition: "new" | "exhibition" | "old" | "damaged";
+  poNo: string | null;
+  sourceRef: string | null;
+  dateIn: string | null;
+}
 export interface operationOrderDetailPo {
   id: string;
   supplier_id: string;
@@ -2022,6 +2036,7 @@ export interface operationOrderDetailResponse {
   total: number;
   warehouse: operationOrderDetailWarehouse | null;
   stockBalances: operationOrderDetailStockBalance[];
+  freeUnits: operationOrderDetailFreeUnit[];
   pos: operationOrderDetailPo[];
   history: operationOrderDetailHistoryRow[];
   /** Phase 4.5 Chunk 2 (T9) — per-supplier thread rows carrying customer-leg
