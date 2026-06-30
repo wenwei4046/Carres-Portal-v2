@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Lightbulb, Flag, X, type LucideIcon } from "lucide-react";
+import { CalendarDays, Lightbulb, Flag, ScrollText, X, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useActiveOrder } from "@/lib/active-order";
 import type { OpsNote, OpsTask } from "@carres/shared";
 import CalendarPanel from "./rail/CalendarPanel";
 import KeepPanel from "./rail/KeepPanel";
 import TasksPanel, { TASKS_KEY } from "./rail/TasksPanel";
+import AnnotationTimeline from "./AnnotationTimeline";
 
 /**
  * OperationRightRail — Gmail-style collapsible right rail (Jess COO ask).
@@ -15,7 +17,7 @@ import TasksPanel, { TASKS_KEY } from "./rail/TasksPanel";
  * 60-min SLA) so the team is nudged to take action within the hour. Follow-ups is
  * the same ops_tasks data the Orders list flag column drives.
  */
-type Panel = "calendar" | "keep" | "tasks";
+type Panel = "calendar" | "keep" | "tasks" | "activity";
 // Calendar (blue) · Notes (amber) · Follow-ups — the Follow-ups rail is the SAME
 // flag system as the Orders list flag column (both ops_tasks), so it uses the
 // Flag icon + the flag's amber, reading as one feature (Jess 2026-06-29).
@@ -23,10 +25,14 @@ const TABS: { key: Panel; label: string; icon: LucideIcon; active: string }[] = 
   { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
   { key: "keep", label: "Notes", icon: Lightbulb, active: "bg-warning-soft text-warning" },
   { key: "tasks", label: "Follow-ups", icon: Flag, active: "bg-warning-soft text-warning" },
+  // Activity = the open order's history timeline (Jess 2026-06-30: moved off the
+  // page into the rail, after the flag). Shows only when an order is open.
+  { key: "activity", label: "Activity", icon: ScrollText, active: "bg-base-100 text-base-700" },
 ];
 
 export default function OperationRightRail() {
   const [active, setActive] = useState<Panel | null>(null);
+  const activeOrderId = useActiveOrder((s) => s.orderId);
 
   // Overdue count — shares the TasksPanel cache (single fetch), drives the badge.
   const { data: tasksData } = useQuery<{ tasks: OpsTask[] }>({
@@ -82,6 +88,14 @@ export default function OperationRightRail() {
             {active === "calendar" && <CalendarPanel />}
             {active === "keep" && <KeepPanel />}
             {active === "tasks" && <TasksPanel />}
+            {active === "activity" &&
+              (activeOrderId ? (
+                <AnnotationTimeline orderId={activeOrderId} />
+              ) : (
+                <p className="t-small text-base-400">
+                  Open an order to see its activity here.
+                </p>
+              ))}
           </div>
         </div>
       )}

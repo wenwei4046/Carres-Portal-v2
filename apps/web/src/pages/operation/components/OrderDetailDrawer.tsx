@@ -12,7 +12,6 @@ import {
   Package,
   Pencil,
   RotateCcw,
-  StickyNote,
   Truck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -41,7 +40,6 @@ import {
   defaultLineLocation,
 } from "@/lib/line-category";
 import { useAuth } from "@/lib/auth";
-import AnnotationTimeline from "./AnnotationTimeline";
 import DeliveryChain from "./DeliveryChain";
 import {
   useOrderControlForm,
@@ -593,9 +591,9 @@ function DrawerBody({
         className="flex-1 min-h-0 overflow-auto px-5 py-3 grid gap-3 content-start"
         style={{
           gridTemplateColumns: "1fr 1fr 1fr",
-          gridTemplateRows: "auto auto auto minmax(0,1fr) auto",
+          gridTemplateRows: "auto auto auto minmax(0,1fr)",
           gridTemplateAreas:
-            '"banner banner banner" "header header header" "cust ctrl pay" "items items items" "activity activity activity"',
+            '"banner banner banner" "header header header" "cust ctrl pay" "items items items"',
         }}
       >
         {/* Needs-action banner — the "action for logistic" note surfaced at the
@@ -970,18 +968,6 @@ function DrawerBody({
         </DrawerSection>
         </div>
 
-        <div style={{ gridArea: "activity", minWidth: 0 }}>
-        {/* 5 · Activity — last, expandable to see the full history. */}
-        <DrawerSection
-          icon={<StickyNote className="w-4 h-4" />}
-          title="Activity"
-          accent="neutral"
-        >
-          <div className="max-h-[360px] overflow-auto pr-1 -mr-1">
-            <AnnotationTimeline orderId={order.id} />
-          </div>
-        </DrawerSection>
-        </div>
       </div>
 
       {/* Pinned action bar — stage actions + the control-draft Save, always

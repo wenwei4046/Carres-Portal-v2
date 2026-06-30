@@ -9,6 +9,7 @@ import {
   useSaveOrderControl,
   type operationOrderListRow,
 } from "@/lib/queries";
+import { useActiveOrder } from "@/lib/active-order";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { cjkClassName } from "@/lib/cjk";
 import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
@@ -643,6 +644,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
   const [search, setSearch] = useState("");
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
+  // Share the open order with the global right rail so its Activity panel shows
+  // THIS order's history (Jess 2026-06-30: Activity moved off the page).
+  useEffect(() => {
+    useActiveOrder.getState().set(openOrderId);
+    return () => useActiveOrder.getState().set(null);
+  }, [openOrderId]);
   // The order whose follow-up form is open in the side panel (#2); null = closed.
   const [composeOrder, setComposeOrder] = useState<{
     id: string;
