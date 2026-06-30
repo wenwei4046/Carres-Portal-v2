@@ -72,6 +72,24 @@ export default function ReserveStockDialog({
         : new Set(),
   );
   const [submitting, setSubmitting] = useState(false);
+  const [q, setQ] = useState("");
+
+  // Same products grouped together; the search box narrows a long fallback list
+  // (e.g. all 70 warehouse units) down to the few that matter.
+  const view = (() => {
+    const sorted = [...units].sort(
+      (a, b) =>
+        a.sku.localeCompare(b.sku) ||
+        (a.dateIn ?? "").localeCompare(b.dateIn ?? ""),
+    );
+    const needle = q.trim().toLowerCase();
+    if (!needle) return sorted;
+    return sorted.filter((u) =>
+      [u.sku, u.unitCode, u.poNo, u.sourceRef]
+        .filter((s): s is string => Boolean(s))
+        .some((s) => s.toLowerCase().includes(needle)),
+    );
+  })();
 
   function toggle(id: string) {
     setChecked((prev) => {
@@ -118,18 +136,15 @@ export default function ReserveStockDialog({
   }
 
   return (
-    <div
-      onClick={onClose}
-      role="presentation"
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-      style={{ background: "rgba(34,31,32,0.55)" }}
-    >
+    <>
+      {/* Transparent catcher: closes on an outside click but keeps the order
+          drawer visible behind, so the operator can cross-check the order. */}
+      <div onClick={onClose} role="presentation" className="fixed inset-0 z-[60]" />
       <div
-        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label="Reserve ready stock"
-        className="bg-white border border-base-200 rounded-md flex flex-col max-h-[80vh] w-[560px] max-w-full"
+        className="fixed inset-y-0 left-0 z-[61] w-[460px] max-w-full bg-white border-r border-base-200 shadow-2xl flex flex-col"
         data-testid="reserve-stock-dialog"
       >
         <div className="px-5 py-3.5 border-b border-base-100">
@@ -137,20 +152,32 @@ export default function ReserveStockDialog({
           <div className="t-h4 font-display mt-1 break-all">{sku}</div>
           {exact ? (
             <div className="text-[12px] text-base-500 mt-0.5">
-              {units.length} free unit{units.length === 1 ? "" : "s"} match this
-              item · tick which to use for this order
+              {view.length} of {units.length} free unit
+              {units.length === 1 ? "" : "s"} match this item
             </div>
           ) : (
             <div className="text-[12px] text-warning mt-0.5">
-              No stock auto-matched this item. Showing all {units.length} free
-              unit{units.length === 1 ? "" : "s"} in the warehouse — pick manually
-              only if you know it&rsquo;s the right one.
+              No exact match — {view.length} of {units.length} warehouse unit
+              {units.length === 1 ? "" : "s"}. Search to narrow, then pick manually.
             </div>
           )}
         </div>
 
-        <div className="overflow-auto px-2 py-2">
-          {units.map((u) => {
+        {units.length > 6 && (
+          <div className="px-4 pt-3">
+            <input
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search name / PO / ref…"
+              className="w-full px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-primary"
+              data-testid="reserve-stock-search"
+            />
+          </div>
+        )}
+
+        <div className="flex-1 overflow-auto px-2 py-2">
+          {view.map((u) => {
             const on = checked.has(u.id);
             const isExhibition = u.condition === "exhibition";
             return (
@@ -184,9 +211,11 @@ export default function ReserveStockDialog({
               </label>
             );
           })}
-          {units.length === 0 && (
+          {view.length === 0 && (
             <div className="p-8 text-center text-[12px] text-base-500">
-              No free stock in the warehouse right now.
+              {units.length === 0
+                ? "No free stock in the warehouse right now."
+                : "No units match your search."}
             </div>
           )}
         </div>
@@ -208,6 +237,6 @@ export default function ReserveStockDialog({
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
