@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { GripVertical, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -8,16 +9,16 @@ import { fmtDate } from "@/lib/fmt-date";
  *
  * The catalog (product_skus) is empty, so an order line and the warehouse's
  * per-unit stock both carry the product NAME as their sku and match only under
- * `normalizeSkuKey` (see project-catalog-empty-sku-naming). The drawer matches
- * each line to the free units and opens this dialog; the operator ticks the
- * exact physical unit(s) to use for THIS order, and we reserve each to the
- * order's SO via POST /api/ops/stock/reserve-item (free→reserved, reserved_ref
- * = soRef). When nothing auto-matches we show ALL free warehouse stock so the
- * operator can always pick manually (overridable default).
+ * `normalizeSkuKey` (project-catalog-empty-sku-naming). The drawer matches each
+ * line to the free units and opens this dialog; the operator ticks the exact
+ * physical unit(s) and we reserve each to the order's SO via POST
+ * /api/ops/stock/reserve-item. When nothing auto-matches we show ALL free
+ * warehouse stock so the operator can always pick manually.
  *
- * UI (Jess critique): a proper Google-Sheet-style TABLE — one clean centered
- * surface (not a skinny side strip), columns + Category / Size filter chips +
- * search, dark-slate header + zebra, so a 70-row fallback is actually readable.
+ * UI = the approved AutoCount/DataGrid look (Jess critique): fixed column-by-
+ * column layout, a per-column filter row (type to narrow, no scrolling), v17
+ * type scale, dark-slate header + zebra, Lucide icons (no emoji), draggable.
+ * Columns: ☐ · Date in · Category · Item · Size · PO · Old ref · Condition.
  */
 
 export interface ReserveFreeUnit {
@@ -31,20 +32,12 @@ export interface ReserveFreeUnit {
 }
 
 interface Props {
-  /** The order line sku (for the dialog title). */
   sku: string;
-  /** What gets written to reserved_ref, e.g. "SO-1234". */
   soRef: string;
-  /** Line qty — used only to pre-tick that many of the oldest units. */
   need: number;
-  /** Units to show. When `exact`, these are the units matched to this line by
-   *  normalizeSkuKey; otherwise it's ALL free warehouse stock (manual fallback). */
   units: ReserveFreeUnit[];
-  /** true = `units` auto-matched this item; false = nothing matched, so we show
-   *  all warehouse stock for a manual pick (operator override). */
   exact: boolean;
   onClose: () => void;
-  /** Called after a successful reserve so the parent can invalidate. */
   onReserved: () => void;
 }
 
@@ -58,8 +51,6 @@ const CONDITION_LABEL: Record<string, string> = {
 type Category = "Mattress" | "Bedframe" | "Sofa" | "Other";
 type Size = "King" | "Queen" | "Other";
 
-/** Derive a coarse category from the warehouse product NAME (best-effort — the
- *  catalog has no real rows to look it up, so we read keywords off the label). */
 function unitCategory(sku: string): Category {
   const s = sku.toLowerCase();
   if (/\bbedframe\b|divan|\bframe\b/.test(s)) return "Bedframe";
@@ -68,13 +59,21 @@ function unitCategory(sku: string): Category {
     return "Mattress";
   return "Other";
 }
-
-/** Derive King / Queen from the product NAME (trailing size token). */
 function unitSize(sku: string): Size {
   const s = sku.toLowerCase();
   if (/queen|[-(\s]q(\)|\b|$)/.test(s)) return "Queen";
   if (/king|[-(\s]k(\)|\b|$)/.test(s)) return "King";
   return "Other";
+}
+
+// ☐ · Date in · Category · Item · Size · PO · Old ref · Condition
+const GRID = "34px 86px 96px minmax(200px,1fr) 62px 116px 96px 104px";
+
+interface Row extends ReserveFreeUnit {
+  cat: Category;
+  size: Size;
+  cond: string;
+  dateLabel: string;
 }
 
 export default function ReserveStockDialog({
@@ -86,8 +85,6 @@ export default function ReserveStockDialog({
   onClose,
   onReserved,
 }: Props) {
-  // When auto-matched, pre-tick the oldest `need` units so the common case is
-  // one click. When NOT matched (manual fallback), tick nothing.
   const [checked, setChecked] = useState<Set<string>>(
     () =>
       exact
@@ -95,35 +92,25 @@ export default function ReserveStockDialog({
         : new Set(),
   );
   const [submitting, setSubmitting] = useState(false);
-  const [q, setQ] = useState("");
-  const [cat, setCat] = useState<Category | "All">("All");
-  const [size, setSize] = useState<Size | "All">("All");
+  // Per-column filter values (empty string = no filter on that column).
+  const [f, setF] = useState<Record<string, string>>({});
+  const setFilter = (k: string, v: string) =>
+    setF((p) => ({ ...p, [k]: v }));
 
-  // Draggable by the header (Jess: "make it can move" — drag aside to read the
-  // order behind). pos is an offset from the centered position.
+  // Drag-to-move by the header (Jess).
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
-  function onDragStart(e: React.PointerEvent) {
-    drag.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  }
-  function onDragMove(e: React.PointerEvent) {
-    if (!drag.current) return;
-    setPos({
-      x: drag.current.ox + (e.clientX - drag.current.sx),
-      y: drag.current.oy + (e.clientY - drag.current.sy),
-    });
-  }
-  function onDragEnd(e: React.PointerEvent) {
-    drag.current = null;
-    e.currentTarget.releasePointerCapture(e.pointerId);
-  }
 
-  // Decorate once: derive category + size per unit, sort same products together.
-  const rows = useMemo(
+  const rows: Row[] = useMemo(
     () =>
       [...units]
-        .map((u) => ({ ...u, cat: unitCategory(u.sku), size: unitSize(u.sku) }))
+        .map((u) => ({
+          ...u,
+          cat: unitCategory(u.sku),
+          size: unitSize(u.sku),
+          cond: CONDITION_LABEL[u.condition] ?? u.condition,
+          dateLabel: u.dateIn ? fmtDate(u.dateIn) : "",
+        }))
         .sort(
           (a, b) =>
             a.sku.localeCompare(b.sku) ||
@@ -132,34 +119,45 @@ export default function ReserveStockDialog({
     [units],
   );
 
-  const catCounts = useMemo(() => {
-    const m = new Map<Category, number>();
-    for (const r of rows) m.set(r.cat, (m.get(r.cat) ?? 0) + 1);
-    return m;
-  }, [rows]);
-  const sizeCounts = useMemo(() => {
-    const m = new Map<Size, number>();
-    for (const r of rows) m.set(r.size, (m.get(r.size) ?? 0) + 1);
-    return m;
+  const opts = useMemo(() => {
+    const uniq = (xs: string[]) => [...new Set(xs)].sort();
+    return {
+      cat: uniq(rows.map((r) => r.cat)),
+      size: uniq(rows.map((r) => r.size)),
+      cond: uniq(rows.map((r) => r.cond)),
+    };
   }, [rows]);
 
   const view = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (cat !== "All" && r.cat !== cat) return false;
-      if (size !== "All" && r.size !== size) return false;
-      if (!needle) return true;
-      return [r.sku, r.unitCode, r.poNo, r.sourceRef]
-        .filter((s): s is string => Boolean(s))
-        .some((s) => s.toLowerCase().includes(needle));
-    });
-  }, [rows, q, cat, size]);
+    const has = (val: string, q: string) =>
+      val.toLowerCase().includes(q.trim().toLowerCase());
+    return rows.filter(
+      (r) =>
+        (!f.dateIn || has(r.dateLabel, f.dateIn)) &&
+        (!f.cat || r.cat === f.cat) &&
+        (!f.sku || has(r.sku, f.sku)) &&
+        (!f.size || r.size === f.size) &&
+        (!f.poNo || has(r.poNo ?? "", f.poNo)) &&
+        (!f.sourceRef || has(r.sourceRef ?? "", f.sourceRef)) &&
+        (!f.cond || r.cond === f.cond),
+    );
+  }, [rows, f]);
+
+  const allViewChecked = view.length > 0 && view.every((r) => checked.has(r.id));
 
   function toggle(id: string) {
     setChecked((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }
+  function toggleAllView() {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (allViewChecked) view.forEach((r) => next.delete(r.id));
+      else view.forEach((r) => next.add(r.id));
       return next;
     });
   }
@@ -211,139 +209,178 @@ export default function ReserveStockDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Reserve ready stock"
-        className="bg-white border border-base-200 rounded-md shadow-2xl flex flex-col max-h-[86vh] w-[880px] max-w-full"
+        className="bg-white border border-base-200 rounded-md shadow-2xl flex flex-col max-h-[86vh] w-[940px] max-w-full"
         style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
         data-testid="reserve-stock-dialog"
       >
-        {/* Header — drag handle (move the panel aside to read the order). */}
+        {/* Header — drag handle */}
         <div
-          onPointerDown={onDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={onDragEnd}
-          className="px-5 py-3.5 border-b border-base-100 cursor-move select-none touch-none"
+          onPointerDown={(e) => {
+            drag.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y };
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            if (!drag.current) return;
+            setPos({
+              x: drag.current.ox + (e.clientX - drag.current.sx),
+              y: drag.current.oy + (e.clientY - drag.current.sy),
+            });
+          }}
+          onPointerUp={(e) => {
+            drag.current = null;
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          }}
+          className="flex items-start gap-2 px-4 py-3 border-b border-base-100 cursor-move select-none touch-none"
         >
-          <div className="kicker flex items-center gap-1.5">
-            <span className="text-base-300">⠿</span> Reserve ready stock → {soRef}
+          <GripVertical className="w-4 h-4 text-base-300 mt-0.5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="t-micro text-base-400">Reserve ready stock → {soRef}</div>
+            <div className="t-h4 font-display mt-0.5 truncate">{sku}</div>
           </div>
-          <div className="t-h4 font-display mt-1 break-all">{sku}</div>
-          <div className={`text-[12px] mt-0.5 ${exact ? "text-base-500" : "text-warning"}`}>
-            {exact
-              ? "Free units matching this item — tick which to use for this order."
-              : "No exact match — showing all warehouse stock. Filter / search, then pick manually."}
-          </div>
+          {!exact && (
+            <span className="pill pill-warning shrink-0 mt-0.5">No exact match</span>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 text-base-400 hover:text-base-700 shrink-0"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Filter bar */}
-        <div className="px-5 py-3 border-b border-base-100 flex flex-wrap items-center gap-x-5 gap-y-2">
-          <FilterChips
-            label="Category"
-            value={cat}
-            counts={catCounts}
-            options={["Mattress", "Bedframe", "Sofa", "Other"]}
-            onPick={(v) => setCat(v as Category | "All")}
-          />
-          <FilterChips
-            label="Size"
-            value={size}
-            counts={sizeCounts}
-            options={["King", "Queen", "Other"]}
-            onPick={(v) => setSize(v as Size | "All")}
-          />
-          <input
-            type="search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name / PO / ref…"
-            className="ml-auto w-[220px] px-3 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-primary"
-            data-testid="reserve-stock-search"
-          />
-        </div>
-
-        {/* Table */}
+        {/* Grid */}
         <div className="flex-1 overflow-auto">
-          <table className="w-full text-[13px] border-collapse [&_tbody_tr:nth-child(even)]:bg-base-100/70">
-            <thead className="bg-base-700 border-b-2 border-primary text-white sticky top-0">
-              <tr className="text-[11px] uppercase tracking-[0.02em]">
-                <th className="px-3 py-2 w-9" />
-                <th className="px-3 py-2 text-left font-bold">Item</th>
-                <th className="px-3 py-2 text-left font-bold w-24">Category</th>
-                <th className="px-3 py-2 text-left font-bold w-16">Size</th>
-                <th className="px-3 py-2 text-left font-bold w-24">Condition</th>
-                <th className="px-3 py-2 text-left font-bold w-32">PO</th>
-                <th className="px-3 py-2 text-left font-bold w-24">Date in</th>
-              </tr>
-            </thead>
-            <tbody>
-              {view.map((u) => {
-                const on = checked.has(u.id);
-                return (
-                  <tr
-                    key={u.id}
-                    onClick={() => toggle(u.id)}
-                    className={`border-t border-base-100 cursor-pointer ${on ? "!bg-primary/15 shadow-[inset_3px_0_0_#C44D2B]" : "hover:bg-primary/5"}`}
+          <div className="min-w-[760px]">
+            {/* Header row */}
+            <div
+              className="grid sticky top-0 z-20 bg-base-700 border-b-2 border-primary text-white"
+              style={{ gridTemplateColumns: GRID }}
+            >
+              <div className="px-2 py-2 flex items-center justify-center">
+                <input
+                  type="checkbox"
+                  checked={allViewChecked}
+                  onChange={toggleAllView}
+                  className="accent-primary w-3.5 h-3.5"
+                  aria-label="Select all shown"
+                />
+              </div>
+              {(
+                [
+                  ["Date in", "left"],
+                  ["Category", "left"],
+                  ["Item", "left"],
+                  ["Size", "left"],
+                  ["PO", "left"],
+                  ["Old ref", "left"],
+                  ["Condition", "left"],
+                ] as const
+              ).map(([label]) => (
+                <div
+                  key={label}
+                  className="px-2.5 py-2 text-[11px] font-bold uppercase tracking-[0.02em] truncate"
+                >
+                  {label}
+                </div>
+              ))}
+            </div>
+
+            {/* Filter row */}
+            <div
+              className="grid sticky top-[33px] z-10 bg-base-50 border-b border-base-200"
+              style={{ gridTemplateColumns: GRID }}
+            >
+              <div className="px-1 py-1" />
+              <FilterText value={f.dateIn} onChange={(v) => setFilter("dateIn", v)} />
+              <FilterSelect value={f.cat} options={opts.cat} onChange={(v) => setFilter("cat", v)} />
+              <FilterText value={f.sku} onChange={(v) => setFilter("sku", v)} placeholder="name…" />
+              <FilterSelect value={f.size} options={opts.size} onChange={(v) => setFilter("size", v)} />
+              <FilterText value={f.poNo} onChange={(v) => setFilter("poNo", v)} />
+              <FilterText value={f.sourceRef} onChange={(v) => setFilter("sourceRef", v)} />
+              <FilterSelect value={f.cond} options={opts.cond} onChange={(v) => setFilter("cond", v)} />
+            </div>
+
+            {/* Body */}
+            {view.map((r, i) => {
+              const on = checked.has(r.id);
+              return (
+                <div
+                  key={r.id}
+                  onClick={() => toggle(r.id)}
+                  className={`grid items-center border-b border-base-100 cursor-pointer ${
+                    on
+                      ? "bg-primary/15 shadow-[inset_3px_0_0_#C44D2B]"
+                      : i % 2
+                        ? "bg-base-100/60 hover:bg-primary/5"
+                        : "bg-white hover:bg-primary/5"
+                  }`}
+                  style={{ gridTemplateColumns: GRID }}
+                  data-testid="reserve-stock-row"
+                >
+                  <div className="px-2 py-1.5 flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => toggle(r.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="accent-primary w-3.5 h-3.5"
+                    />
+                  </div>
+                  <div className="px-2.5 py-1.5 t-tiny text-base-500 truncate">
+                    {r.dateLabel || "—"}
+                  </div>
+                  <div className="px-2.5 py-1.5 t-tiny text-base-600 truncate">{r.cat}</div>
+                  <div
+                    className="px-2.5 py-1.5 font-mono text-[12px] text-base-900 truncate"
+                    title={r.sku}
                   >
-                    <td className="px-3 py-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={on}
-                        onChange={() => toggle(u.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="accent-primary w-4 h-4 align-middle"
-                      />
-                    </td>
-                    <td className="px-3 py-2 font-mono text-[12px] text-base-900">
-                      {u.sku}
-                      {u.sourceRef ? (
-                        <span className="text-base-400"> · {u.sourceRef}</span>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-2 text-base-600">{u.cat}</td>
-                    <td className="px-3 py-2 text-base-600">
-                      {u.size === "Other" ? "—" : u.size}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`pill ${u.condition === "exhibition" ? "pill-warning" : "pill-confirmed"}`}
-                      >
-                        {CONDITION_LABEL[u.condition] ?? u.condition}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-[11px] font-mono text-base-600">
-                      {u.poNo ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-[11px] text-base-500">
-                      {u.dateIn ? fmtDate(u.dateIn) : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-              {view.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-10 text-center text-[12px] text-base-500">
-                    {rows.length === 0
-                      ? "No free stock in the warehouse right now."
-                      : "No units match these filters."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    {r.sku}
+                  </div>
+                  <div className="px-2.5 py-1.5 t-tiny text-base-600">
+                    {r.size === "Other" ? "—" : r.size}
+                  </div>
+                  <div className="px-2.5 py-1.5 t-tiny font-mono text-base-600 truncate" title={r.poNo ?? ""}>
+                    {r.poNo ?? "—"}
+                  </div>
+                  <div className="px-2.5 py-1.5 t-tiny font-mono text-base-500 truncate" title={r.sourceRef ?? ""}>
+                    {r.sourceRef ?? "—"}
+                  </div>
+                  <div className="px-2.5 py-1.5">
+                    <span
+                      className={`pill ${r.condition === "exhibition" ? "pill-warning" : "pill-confirmed"}`}
+                    >
+                      {r.cond}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            {view.length === 0 && (
+              <div className="px-3 py-10 text-center t-small text-base-400">
+                {rows.length === 0
+                  ? "No free stock in the warehouse right now."
+                  : "No units match these filters."}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-base-100 flex items-center justify-between gap-3">
-          <div className="text-[12px] text-base-500">
+        <div className="px-4 py-2.5 border-t border-base-200 bg-base-50/50 flex items-center justify-between gap-3">
+          <span className="t-tiny text-base-500">
             {view.length} of {rows.length} shown · {checked.size} selected
-          </div>
+          </span>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onClose} className="btn-ghost text-[12px] py-1.5 px-3">
+            <button type="button" onClick={onClose} className="btn-ghost t-tiny py-1.5 px-3">
               Cancel
             </button>
             <button
               type="button"
               onClick={reserve}
               disabled={submitting || checked.size === 0}
-              className="btn-primary text-[12px] py-1.5 px-4"
+              className="btn-primary t-tiny py-1.5 px-4"
               data-testid="reserve-stock-confirm"
             >
               {submitting ? "Reserving…" : `Reserve ${checked.size} to ${soRef}`}
@@ -355,48 +392,50 @@ export default function ReserveStockDialog({
   );
 }
 
-/** A labelled "All + options" ghost-pill chip row for a single filter dimension. */
-function FilterChips<T extends string>({
-  label,
+function FilterText({
   value,
-  counts,
-  options,
-  onPick,
+  onChange,
+  placeholder = "filter…",
 }: {
-  label: string;
-  value: T | "All";
-  counts: Map<T, number>;
-  options: T[];
-  onPick: (v: T | "All") => void;
+  value: string | undefined;
+  onChange: (v: string) => void;
+  placeholder?: string;
 }) {
-  // Only show options that actually have stock, so the bar stays tight.
-  const present = options.filter((o) => (counts.get(o) ?? 0) > 0);
-  const total = present.reduce((s, o) => s + (counts.get(o) ?? 0), 0);
-  const chip = (key: T | "All", text: string, n: number) => {
-    const active = value === key;
-    return (
-      <button
-        key={key}
-        type="button"
-        onClick={() => onPick(key)}
-        className={`px-2.5 py-1 rounded-full text-[12px] border transition-colors ${
-          active
-            ? "bg-primary text-white border-primary"
-            : "bg-white text-base-600 border-base-200 hover:border-base-400"
-        }`}
-      >
-        {text}
-        <span className={`ml-1 ${active ? "text-white/70" : "text-base-400"}`}>{n}</span>
-      </button>
-    );
-  };
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-base-400 mr-0.5">
-        {label}
-      </span>
-      {chip("All", "All", total)}
-      {present.map((o) => chip(o, o, counts.get(o) ?? 0))}
+    <div className="px-1 py-1">
+      <input
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-1.5 py-1 t-tiny border border-base-200 rounded bg-white outline-none focus:border-primary"
+      />
+    </div>
+  );
+}
+
+function FilterSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string | undefined;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="px-1 py-1">
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-1 py-1 t-tiny border border-base-200 rounded bg-white outline-none focus:border-primary"
+      >
+        <option value="">All</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
