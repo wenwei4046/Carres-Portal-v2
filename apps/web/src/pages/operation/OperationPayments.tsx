@@ -264,8 +264,8 @@ export default function OperationPayments() {
       </div>
       <p className="t-small text-base-500 mb-4">
         Outstanding balance + storage fees per order — the Master Sheet&rsquo;s Balance tab. Storage:
-        mattress/bed frame {STORAGE_RATES.msbf.label}, sofa {STORAGE_RATES.sof.label}, accruing from the
-        ETA (editable).
+        mattress/bed frame {STORAGE_RATES.msbf.label} (24 working days free), sofa{" "}
+        {STORAGE_RATES.sof.label} (14 working days free), from the original delivery date (editable).
       </p>
 
       {/* Summary strip */}

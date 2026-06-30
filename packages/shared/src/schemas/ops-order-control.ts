@@ -125,11 +125,12 @@ export type OpsOrderControl = z.infer<typeof opsOrderControlSchema>;
 
 // ── Storage fees ───────────────────────────────────────────────────────────
 /** Storage-fee rates (Jess 2026-06-12): mattress/bed frame RM150 per month,
- *  sofa RM200 per 2 weeks. Accrual starts at the order ETA (or a manual
- *  storage_from) and is charged per COMMENCED period. */
+ *  sofa a flat RM200 per order. Each category gets a FREE window of WORKING DAYS
+ *  from the ORIGINAL delivery date (MS/BF 24, Sofa 14); the fee accrues only
+ *  after that window (Jess 2026-06-30, the two Delivery-Extension forms). */
 export const STORAGE_RATES = {
-  msbf: { amount: 150, periodDays: 30, label: "RM150 / month" },
-  sof: { amount: 200, periodDays: 14, label: "RM200 / 2 weeks" },
+  msbf: { amount: 150, periodDays: 30, freeWorkingDays: 24, label: "RM150 / month" },
+  sof: { amount: 200, freeWorkingDays: 14, label: "RM200 / order" },
 } as const;
 
 function daysBetween(fromIso: string, toIso: string): number {
@@ -139,26 +140,102 @@ function daysBetween(fromIso: string, toIso: string): number {
   return Math.floor((b - a) / 86_400_000);
 }
 
+/** The date `n` working days (Mon–Fri; weekends skipped, public holidays NOT
+ *  excluded in v1) after `fromIso`. The basis date itself is day 0, so the
+ *  returned date is the LAST free day — storage is free through it and accrues
+ *  the day after. */
+function addWorkingDays(fromIso: string, n: number): string {
+  const s = fromIso.slice(0, 10);
+  const [y, m, dd] = s.split("-").map(Number);
+  // UTC throughout so toISOString() doesn't shift the date across the local
+  // (MYT, UTC+8) offset.
+  const d = new Date(Date.UTC(y, (m ?? 1) - 1, dd ?? 1));
+  if (Number.isNaN(d.getTime())) return s;
+  let added = 0;
+  while (added < n) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const dow = d.getUTCDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
 /**
- * Storage fee accrued from `startDate` (ETA, or a manual storage_from) to
- * `asOf`, charged per commenced period — mattress/bed frame RM150 per 30 days,
- * sofa RM200 per 14 days. An order can carry both (the Master Sheet has
- * separate MS/BF + SOF columns), so they sum. 0 before the start date.
+ * Storage fee owed as of `asOf`, given `startDate` = the order's ORIGINAL
+ * delivery date (basis), per the two Delivery-Extension forms (Jess 2026-06-30):
+ *
+ *  - Each category is FREE for a window of WORKING DAYS from `startDate`
+ *    (MS/BF 24, Sofa 14) — `freeUntilMsbf` / `freeUntilSof` are the last free day.
+ *  - After the window, MS/BF bills RM150 per commenced 30-day month counted from
+ *    the free-until date (`msbfMonths` = how many).
+ *  - After the window, Sofa bills a flat ONE-TIME RM200 per order (never recurs;
+ *    `sofCharged` flags it).
+ *
+ * An order can carry both (separate MS/BF + SOF columns on the Master Sheet), so
+ * they sum. 0 before the basis date or while still inside a free window.
  */
 export function computeStorageFee(opts: {
   startDate: string | null;
   asOf: string;
   hasMsbf: boolean;
   hasSof: boolean;
-}): { msbf: number; sof: number; total: number; days: number } {
+}): {
+  msbf: number;
+  sof: number;
+  total: number;
+  days: number;
+  freeUntilMsbf: string | null;
+  freeUntilSof: string | null;
+  msbfMonths: number;
+  sofCharged: boolean;
+} {
   const { startDate, asOf, hasMsbf, hasSof } = opts;
-  if (!startDate) return { msbf: 0, sof: 0, total: 0, days: 0 };
+  const empty = {
+    msbf: 0,
+    sof: 0,
+    total: 0,
+    days: 0,
+    freeUntilMsbf: null as string | null,
+    freeUntilSof: null as string | null,
+    msbfMonths: 0,
+    sofCharged: false,
+  };
+  if (!startDate) return empty;
   const days = daysBetween(startDate, asOf);
-  if (days <= 0) return { msbf: 0, sof: 0, total: 0, days: 0 };
-  const periods = (p: number) => Math.ceil(days / p);
-  const msbf = hasMsbf ? periods(STORAGE_RATES.msbf.periodDays) * STORAGE_RATES.msbf.amount : 0;
-  const sof = hasSof ? periods(STORAGE_RATES.sof.periodDays) * STORAGE_RATES.sof.amount : 0;
-  return { msbf, sof, total: msbf + sof, days };
+
+  let msbf = 0;
+  let msbfMonths = 0;
+  let freeUntilMsbf: string | null = null;
+  if (hasMsbf) {
+    freeUntilMsbf = addWorkingDays(startDate, STORAGE_RATES.msbf.freeWorkingDays);
+    const overdueDays = daysBetween(freeUntilMsbf, asOf);
+    if (overdueDays > 0) {
+      msbfMonths = Math.ceil(overdueDays / STORAGE_RATES.msbf.periodDays);
+      msbf = msbfMonths * STORAGE_RATES.msbf.amount;
+    }
+  }
+
+  let sof = 0;
+  let sofCharged = false;
+  let freeUntilSof: string | null = null;
+  if (hasSof) {
+    freeUntilSof = addWorkingDays(startDate, STORAGE_RATES.sof.freeWorkingDays);
+    if (daysBetween(freeUntilSof, asOf) > 0) {
+      sof = STORAGE_RATES.sof.amount;
+      sofCharged = true;
+    }
+  }
+
+  return {
+    msbf,
+    sof,
+    total: msbf + sof,
+    days,
+    freeUntilMsbf,
+    freeUntilSof,
+    msbfMonths,
+    sofCharged,
+  };
 }
 
 /**

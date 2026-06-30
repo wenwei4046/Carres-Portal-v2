@@ -3,7 +3,6 @@ import { AlertTriangle, Plus, Trash2, ShieldCheck, Receipt } from "lucide-react"
 import { toast } from "sonner";
 import {
   computeStorageFee,
-  STORAGE_RATES,
   DELIVERY_TIME_SLOTS,
   PAYMENT_STATUSES,
   PAYMENT_METHODS,
@@ -847,12 +846,18 @@ export function StorageControlFields({
     hasMsbf,
     hasSof,
   });
-  // Commenced periods since the From date — MS/BF bills per month, Sofa per
-  // 2 weeks (Jess). Shown so the operator sees HOW the auto fee was reached.
-  const msbfPeriods =
-    storage.days > 0 ? Math.ceil(storage.days / STORAGE_RATES.msbf.periodDays) : 0;
-  const sofPeriods =
-    storage.days > 0 ? Math.ceil(storage.days / STORAGE_RATES.sof.periodDays) : 0;
+  // Each category is free for a working-day window from the basis (original
+  // delivery) date; the fee accrues only after it (Jess 2026-06-30). Shown so
+  // the operator sees WHY the auto fee is what it is — "free until X" or the
+  // chargeable months / flat sofa fee.
+  const fmtShort = (iso: string | null) =>
+    iso
+      ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "2-digit",
+        })
+      : "—";
   const incurred = draft.storage_from.trim() !== "";
   // Storage alert (Jess) — countdown to the To date, SAME pills as the Deadline
   // column (amber pill-warning / red pill-overdue + ⚠), NOT emoji. Shows only
@@ -935,7 +940,9 @@ export function StorageControlFields({
               <div className="px-2 py-1.5 text-[12px] font-semibold text-base-900">
                 RM {storage.msbf.toLocaleString()}
                 <span className="ml-1 text-[11px] font-normal text-base-500">
-                  · {msbfPeriods} mth × RM150
+                  {storage.msbf > 0
+                    ? `· ${storage.msbfMonths} mth × RM150`
+                    : `· free until ${fmtShort(storage.freeUntilMsbf)}`}
                 </span>
               </div>
             </FieldRow>
@@ -945,7 +952,9 @@ export function StorageControlFields({
               <div className="px-2 py-1.5 text-[12px] font-semibold text-base-900">
                 RM {storage.sof.toLocaleString()}
                 <span className="ml-1 text-[11px] font-normal text-base-500">
-                  · {sofPeriods} × 2wk × RM200
+                  {storage.sofCharged
+                    ? "· flat RM200 / order"
+                    : `· free until ${fmtShort(storage.freeUntilSof)}`}
                 </span>
               </div>
             </FieldRow>
