@@ -5,6 +5,7 @@ import {
   createPoInput,
   createPosBatchInput,
   listPurchaseOrdersQuery,
+  normalizeSkuKey,
   reassignPoWarehouseInput,
   receivePoWithDoInput,
   type AwaitingStockShortageResponse,
@@ -863,8 +864,107 @@ operationPosRouter.post("/:id/receive", requireOperation, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
+  // Auto-reserve the received goods to the PO's source order (Jess 2026-06-30).
+  // Once a PO is received its units are free stock; if the PO was raised for an
+  // order, reserve matching free units to that order's SO so the operator doesn't
+  // have to. Best-effort + fail-safe: the receive already committed, so a hiccup
+  // here is logged and swallowed (the order-drawer Ready picker is the fallback).
+  try {
+    await autoReserveReceivedToSourceOrder(sb, c.req.param("id"));
+  } catch (e) {
+    console.error("post-receive auto-reserve failed (non-fatal):", e);
+  }
   return c.json(data);
 });
+
+/**
+ * Reserve free warehouse units to the PO's source order after a receive.
+ *
+ * Matching uses normalizeSkuKey because the catalog is empty — order_lines.sku
+ * and ops_stock_items.sku both carry the product NAME with cosmetic drift (see
+ * project-catalog-empty-sku-naming). For each product the source order still
+ * needs, we reserve that many free units (oldest first); we cap at need MINUS
+ * what is already reserved to this SO, so a partial / repeat receive can never
+ * over-reserve. The operator can release any of it from On Hand.
+ */
+async function autoReserveReceivedToSourceOrder(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  poId: string,
+): Promise<void> {
+  const { data: po } = await sb
+    .from("purchase_orders")
+    .select("so, warehouse_id")
+    .eq("id", poId)
+    .maybeSingle();
+  if (!po?.so) return; // stockpile PO (no source order) — nothing to reserve to.
+  const soRef = `SO-${po.so}`;
+
+  const { data: ord } = await sb
+    .from("orders")
+    .select("id")
+    .eq("so", po.so)
+    .maybeSingle();
+  if (!ord?.id) return;
+
+  const { data: oLines } = await sb
+    .from("order_lines")
+    .select("sku, qty")
+    .eq("order_id", ord.id);
+  if (!oLines || oLines.length === 0) return;
+
+  // Needed qty per normalized product key (combine duplicate lines).
+  const needByKey = new Map<string, number>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const l of oLines as any[]) {
+    const k = normalizeSkuKey(l.sku);
+    if (!k) continue;
+    needByKey.set(k, (needByKey.get(k) ?? 0) + Number(l.qty || 0));
+  }
+  if (needByKey.size === 0) return;
+
+  // Already reserved to this SO (so a repeat receive doesn't double-up).
+  const { data: mine } = await sb
+    .from("ops_stock_items")
+    .select("sku")
+    .eq("status", "reserved")
+    .eq("reserved_ref", soRef);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (mine ?? []) as any[]) {
+    const k = normalizeSkuKey(r.sku);
+    if (needByKey.has(k)) needByKey.set(k, needByKey.get(k)! - 1);
+  }
+
+  // Free units to draw from (scope to the PO's warehouse when set).
+  let freeQ = sb
+    .from("ops_stock_items")
+    .select("id, sku")
+    .eq("status", "free")
+    .eq("needs_repair", false)
+    .order("date_in", { ascending: true, nullsFirst: false });
+  if (po.warehouse_id) freeQ = freeQ.eq("warehouse_id", po.warehouse_id);
+  const { data: freeUnits } = await freeQ;
+  if (!freeUnits || freeUnits.length === 0) return;
+
+  // Pick the unit ids to reserve, honoring the remaining need per product.
+  const idsToReserve: string[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const u of freeUnits as any[]) {
+    const k = normalizeSkuKey(u.sku);
+    const remaining = needByKey.get(k) ?? 0;
+    if (remaining > 0) {
+      idsToReserve.push(u.id);
+      needByKey.set(k, remaining - 1);
+    }
+  }
+  if (idsToReserve.length === 0) return;
+
+  await sb
+    .from("ops_stock_items")
+    .update({ status: "reserved", reserved_ref: soRef, updated_at: new Date().toISOString() })
+    .in("id", idsToReserve)
+    .eq("status", "free"); // guard: skip any that got grabbed concurrently.
+}
 
 // ----- POST /:id/cancel -----
 operationPosRouter.post("/:id/cancel", requireOperation, async (c) => {
