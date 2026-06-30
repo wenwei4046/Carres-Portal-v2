@@ -137,6 +137,7 @@ function makeDetail(): operationOrderDetailResponse {
     order: {
       id: "ord-1",
       so: 9001,
+      source_ref: ["DL0584"],
       status: "proceed_order",
       operation_stage: "ready_to_dispatch",
       warehouse_id: "wh-1",

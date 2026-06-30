@@ -29,6 +29,7 @@ import {
   type operationOrderDetailLine,
   type operationOrderDetailPo,
   type operationOrderDetailStockBalance,
+  type operationPoListRow,
 } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
@@ -63,6 +64,7 @@ import ConfirmProceedDialog from "./ConfirmProceedDialog";
 import TransferReadyDialog from "./TransferReadyDialog";
 import StockPickerGrid from "./StockPickerGrid";
 import FollowUpForm from "./FollowUpForm";
+import ReceivePOModal from "./ReceivePOModal";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -505,6 +507,8 @@ function DrawerBody({
   // free units grouped by normalized key, so each line resolves its real
   // available units across the order/warehouse naming drift.
   const [pickerSku, setPickerSku] = useState<string | null>(null);
+  // GRN — receive an open linked PO right here (Jess: receive in the order).
+  const [receivePo, setReceivePo] = useState<operationOrderDetailPo | null>(null);
   const freeUnitsByKey = new Map<string, typeof freeUnits>();
   for (const u of freeUnits) {
     const k = normalizeSkuKey(u.sku);
@@ -573,6 +577,17 @@ function DrawerBody({
     : order.delivery_date
       ? fmtDate(order.delivery_date)
       : "no date";
+  // Contact-by basis (Jess): operation must reach the customer 1–3 days BEFORE
+  // the deadline to confirm stock + timing. Shown as a readout here (default
+  // deadline − 2 days); the auto-task that fires on this date is the backend P2.
+  const contactByLabel =
+    !order.delivery_date_tbd && order.delivery_date
+      ? fmtDate(
+          new Date(new Date(order.delivery_date).getTime() - 2 * 86_400_000)
+            .toISOString()
+            .slice(0, 10),
+        )
+      : null;
   const paymentSummary = !hasTotal
     ? `${RM(Number(order.paid || 0))} paid`
     : outstanding <= 0
@@ -581,6 +596,30 @@ function DrawerBody({
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      {receivePo && (
+        <ReceivePOModal
+          po={{
+            id: receivePo.id,
+            supplier_id: receivePo.supplier_id,
+            warehouse_id: receivePo.warehouse_id,
+            status: receivePo.status as operationPoListRow["status"],
+            sup_status: receivePo.sup_status,
+            so: receivePo.so,
+            so_refs: receivePo.so_refs,
+            eta_date: receivePo.eta_date,
+            placed_at: "",
+            purchase_order_lines: receivePo.lines.map((l) => ({
+              id: l.id,
+              sku: l.sku,
+              qty: l.qty,
+              received_qty: l.received_qty,
+            })),
+          }}
+          supplier={undefined}
+          warehouse={warehouse ?? undefined}
+          onClose={() => setReceivePo(null)}
+        />
+      )}
       {/* No separate top bar — the ⋮ actions menu + close moved into the Order
           section header next to the status chip (Jess: save a row). Backdrop
           click still closes the drawer. */}
@@ -626,6 +665,11 @@ function DrawerBody({
             <span className="font-mono t-h3 font-bold text-base-900 leading-none">
               #{order.so}
             </span>
+            {order.source_ref?.[0] && (
+              <span className="t-small text-base-500 font-mono shrink-0">
+                · Ref {order.source_ref[0]}
+              </span>
+            )}
             <span className="t-small text-base-500 truncate">
               · {order.customer_name}
             </span>
@@ -825,7 +869,7 @@ function DrawerBody({
               <div className="label mb-1">Linked POs</div>
               <div className="border border-base-100 rounded-[4px]">
                 {pos.map((po, i) => (
-                  <PoRow key={po.id} po={po} divider={i > 0} />
+                  <PoRow key={po.id} po={po} divider={i > 0} onReceive={setReceivePo} />
                 ))}
               </div>
             </div>
@@ -918,6 +962,20 @@ function DrawerBody({
               />
             </FieldGrid>
           </div>
+          {/* Contact-by — reach the customer BEFORE the deadline (Jess: 1–3 days
+              ahead) to confirm stock + timing; default deadline − 2 days. */}
+          {contactByLabel && (
+            <div className="mt-2.5 flex items-center gap-2 rounded-[4px] bg-info-soft/60 px-3 py-1.5 text-[11.5px]">
+              <span className="font-semibold uppercase tracking-[0.04em] text-[10px] text-info">
+                Contact by
+              </span>
+              <span className="font-medium text-base-800">{contactByLabel}</span>
+              <span className="text-base-400">
+                · call to confirm stock + timing (deadline − 2 days)
+              </span>
+            </div>
+          )}
+
           {/* Delivery ROUTE — surfaced (not hidden under "Advanced"): Carres'
               whole model is outsourced coordination, so every stop's location +
               ETA + status is front-and-centre (Jess 2026-06-30). */}
@@ -1562,7 +1620,15 @@ function ActionBar({
   );
 }
 
-function PoRow({ po, divider }: { po: operationOrderDetailPo; divider: boolean }) {
+function PoRow({
+  po,
+  divider,
+  onReceive,
+}: {
+  po: operationOrderDetailPo;
+  divider: boolean;
+  onReceive: (po: operationOrderDetailPo) => void;
+}) {
   const totalQty = po.lines.reduce((s, l) => s + Number(l.qty || 0), 0);
   const got = po.lines.reduce((s, l) => s + Number(l.received_qty || 0), 0);
   const stColor =
@@ -1589,11 +1655,23 @@ function PoRow({ po, divider }: { po: operationOrderDetailPo; divider: boolean }
           ETA {po.eta_date ?? "—"} · Σ {got}/{totalQty}
         </div>
       </div>
-      <span
-        className={`text-[9px] font-bold uppercase tracking-[0.12em] py-[3px] px-[7px] border rounded-[3px] ${stColor}`}
-      >
-        {po.status}
-      </span>
+      <div className="flex flex-col items-end gap-1.5">
+        <span
+          className={`text-[9px] font-bold uppercase tracking-[0.12em] py-[3px] px-[7px] border rounded-[3px] ${stColor}`}
+        >
+          {po.status}
+        </span>
+        {po.status !== "received" && po.status !== "cancelled" && (
+          <button
+            type="button"
+            onClick={() => onReceive(po)}
+            className="btn-primary text-[10px] py-1 px-2.5 whitespace-nowrap"
+            title="Receive this PO's goods (GRN) — books them in as ready stock"
+          >
+            Receive (GRN)
+          </button>
+        )}
+      </div>
     </div>
   );
 }

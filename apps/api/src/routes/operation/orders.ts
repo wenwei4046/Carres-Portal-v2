@@ -186,7 +186,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
       // 2026-06-09 (Jess P2) — ops_assigned_logistic surfaced so the drawer's
       // OrderControlPanel can show + inline-edit the planned carrier (region
       // default, overridable) on status='place' orders.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, proceed_date, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
+      "id, so, source_ref, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_address_unknown, delivery_date, delivery_date_tbd, proceed_date, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, dealers(name), outlets(name)",
     )
     .eq("id", id)
     .maybeSingle();

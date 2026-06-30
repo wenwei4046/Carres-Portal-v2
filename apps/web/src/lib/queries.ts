@@ -1916,6 +1916,8 @@ export interface operationOrdersListResponse {
 export interface operationOrderDetailOrder {
   id: string;
   so: number;
+  /** Customer/source reference(s), e.g. ["DL0584"] — shown next to the SO. */
+  source_ref: string[] | null;
   status: string;
   operation_stage:
     | "placed"
@@ -1999,6 +2001,7 @@ export interface operationOrderDetailStockBalance {
   reserved: number;
 }
 export interface operationOrderDetailPoLine {
+  id: string;
   po_id: string;
   sku: string;
   qty: number;
