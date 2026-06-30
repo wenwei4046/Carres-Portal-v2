@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Download,
   FileText,
+  Flag,
   MoreVertical,
   Package,
   Pencil,
@@ -42,7 +43,6 @@ import {
 import { useAuth } from "@/lib/auth";
 import AnnotationTimeline from "./AnnotationTimeline";
 import DeliveryChain from "./DeliveryChain";
-import FollowUpStar from "./FollowUpStar";
 import {
   useOrderControlForm,
   RoutingFields,
@@ -64,6 +64,7 @@ import AbandonOrderModal from "./AbandonOrderModal";
 import ConfirmProceedDialog from "./ConfirmProceedDialog";
 import TransferReadyDialog from "./TransferReadyDialog";
 import ReserveStockDialog from "./ReserveStockDialog";
+import FollowUpForm from "./FollowUpForm";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
 /**
@@ -125,6 +126,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
   const [showTransferReady, setShowTransferReady] = useState(false);
   const [showTopUp, setShowTopUp] = useState(false);
   const [showServiceNote, setShowServiceNote] = useState(false);
+  const [showFollowUp, setShowFollowUp] = useState(false);
 
   // Esc-to-close listener at the drawer level. Modals install their own Esc
   // handlers; while a modal is open we let it consume the key first by gating
@@ -246,6 +248,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
               onTransferReadyClick={() => setShowTransferReady(true)}
               onTopUpClick={() => setShowTopUp(true)}
               onServiceNoteClick={() => setShowServiceNote(true)}
+              onFollowUpClick={() => setShowFollowUp(true)}
             />
             {showDispatch && (
               <DispatchModal
@@ -309,6 +312,14 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
                   setShowServiceNote(false);
                   toast.success("Service note created");
                 }}
+              />
+            )}
+            {showFollowUp && (
+              <FollowUpForm
+                orderId={data.order.id}
+                so={data.order.so}
+                refNo={null}
+                onClose={() => setShowFollowUp(false)}
               />
             )}
           </>
@@ -392,6 +403,7 @@ interface DrawerBodyProps {
   onConfirmProceedClick: () => void;
   onTransferReadyClick: () => void;
   onTopUpClick: () => void;
+  onFollowUpClick: () => void;
 }
 
 /** Collapsible drawer section — title + leading icon + a summary value that
@@ -484,6 +496,7 @@ function DrawerBody({
   onTransferReadyClick,
   onTopUpClick,
   onServiceNoteClick,
+  onFollowUpClick,
 }: DrawerBodyProps) {
   const { order, lines, addons, total, warehouse, stockBalances, pos, threads } = data;
   // Defensive default: an API build that predates freeUnits (web can deploy
@@ -630,7 +643,15 @@ function DrawerBody({
           }
           headerRight={
             <span className="flex items-center gap-1">
-              <FollowUpStar orderId={order.id} />
+              <button
+                type="button"
+                onClick={onFollowUpClick}
+                aria-label="Add follow-up"
+                title="Add a follow-up (write the issue + assign)"
+                className="p-1 rounded hover:bg-base-100 text-base-400 hover:text-primary shrink-0"
+              >
+                <Flag className="w-[18px] h-[18px]" />
+              </button>
               <StageChip stage={stage} />
               <ActionsMenu
                 order={order}
@@ -870,21 +891,22 @@ function DrawerBody({
               />
             </FieldGrid>
           </div>
-          <details className="mt-2.5" open={(order.delivery_stops?.length ?? 0) > 0}>
-            <summary className="label cursor-pointer select-none">
-              Advanced · multi-leg route{" "}
+          {/* Delivery ROUTE — surfaced (not hidden under "Advanced"): Carres'
+              whole model is outsourced coordination, so every stop's location +
+              ETA + status is front-and-centre (Jess 2026-06-30). */}
+          <div className="mt-3 pt-2.5 border-t border-base-100">
+            <div className="label mb-1.5">
+              Delivery route{" "}
               <span className="text-[10px] font-normal normal-case tracking-normal text-base-400">
-                (cross-state / cross-border only)
+                · per-stop location · ETA · status (outsourced — tracked tightly)
               </span>
-            </summary>
-            <div className="mt-2">
-              <DeliveryChain
-                orderId={order.id}
-                stops={order.delivery_stops}
-                fallbackPartnerId={order.delivery_partner_id}
-              />
             </div>
-          </details>
+            <DeliveryChain
+              orderId={order.id}
+              stops={order.delivery_stops}
+              fallbackPartnerId={order.delivery_partner_id}
+            />
+          </div>
         </DrawerSection>
         </div>
 
@@ -895,6 +917,7 @@ function DrawerBody({
           title="Payment"
           accent="info"
           summary={paymentSummary}
+          defaultOpen
         >
           <div className="grid grid-cols-2 gap-2 items-start">
             <FieldGrid>
