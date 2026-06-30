@@ -220,20 +220,11 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
 
   return (
     <div
-      onClick={onClose}
-      role="presentation"
-      className="fixed inset-0 z-50 flex justify-end"
-      style={{ background: "rgba(34,31,32,0.55)" }}
+      role="region"
+      aria-label="Order detail"
+      className="bg-card text-card-foreground flex flex-col h-full w-full min-w-0"
+      data-testid="order-detail-drawer"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Order detail"
-        className="bg-card text-card-foreground border border-base-200 rounded-none flex flex-col h-screen"
-        style={{ width: 920, maxWidth: "100vw" }}
-        data-testid="order-detail-drawer"
-      >
         {isLoading && <DrawerSkeleton onClose={onClose} />}
         {!isLoading && isError && (
           <DrawerError
@@ -322,7 +313,6 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
             )}
           </>
         )}
-      </div>
     </div>
   );
 }

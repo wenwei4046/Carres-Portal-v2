@@ -1005,6 +1005,18 @@ export default function OperationOrdersControl({ onImport }: Props) {
     }
   }
 
+  // Full-page order detail (Jess 2026-06-30) — renders IN PLACE of the list,
+  // inside the operation shell, so the sidebar + right rail stay visible (no
+  // overlay). Close (✕) clears openOrderId → back to the list (filters preserved).
+  if (openOrderId) {
+    return (
+      <OrderDetailDrawer
+        orderId={openOrderId}
+        onClose={() => setOpenOrderId(null)}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="px-9 py-8 pb-14">
@@ -1319,13 +1331,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
           </tbody>
         </table>
       </div>
-
-      {openOrderId && (
-        <OrderDetailDrawer
-          orderId={openOrderId}
-          onClose={() => setOpenOrderId(null)}
-        />
-      )}
 
       {/* Follow-up form — slides in from the right (#2); opened by an order's flag. */}
       {composeOrder && (
