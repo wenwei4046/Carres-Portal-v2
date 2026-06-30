@@ -63,7 +63,7 @@ import DOAttachModal from "./DOAttachModal";
 import AbandonOrderModal from "./AbandonOrderModal";
 import ConfirmProceedDialog from "./ConfirmProceedDialog";
 import TransferReadyDialog from "./TransferReadyDialog";
-import ReserveStockDialog from "./ReserveStockDialog";
+import StockPickerGrid from "./StockPickerGrid";
 import FollowUpForm from "./FollowUpForm";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
 
@@ -552,6 +552,12 @@ function DrawerBody({
       return acc;
     }, {}),
   ).sort((a, b) => lineSortRank(a.sku) - lineSortRank(b.sku));
+  // The line whose stock shows in the right pane — the clicked one, else the
+  // first non-service line so the grid isn't empty on open (Jess: embed stock).
+  const activeLineSku =
+    pickerSku ??
+    orderedLines.find((l) => lineKind(l.sku) !== "service")?.sku ??
+    null;
   // Per-item ETA defaults to the linked PO's delivery date (Jess), overridable
   // via line_etas. First PO carrying the SKU wins.
   const poEtaBySku = new Map<string, string>();
@@ -577,28 +583,6 @@ function DrawerBody({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {pickerSku !== null &&
-        (() => {
-          // Auto-matched units for this line; if none, fall back to ALL free
-          // warehouse stock so the operator can always open the picker and
-          // reserve manually (overridable default).
-          const matched = freeUnitsByKey.get(normalizeSkuKey(pickerSku)) ?? [];
-          const exact = matched.length > 0;
-          return (
-            <ReserveStockDialog
-              sku={pickerSku}
-              soRef={soRef}
-              need={orderedLines.find((l) => l.sku === pickerSku)?.qty ?? 1}
-              units={exact ? matched : freeUnits}
-              exact={exact}
-              onClose={() => setPickerSku(null)}
-              onReserved={() => {
-                void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
-                void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
-              }}
-            />
-          );
-        })()}
       {/* No separate top bar — the ⋮ actions menu + close moved into the Order
           section header next to the status chip (Jess: save a row). Backdrop
           click still closes the drawer. */}
@@ -697,6 +681,13 @@ function DrawerBody({
           summary={`${totalItems(lines)} item${totalItems(lines) === 1 ? "" : "s"}${shortages.length ? ` · ${shortages.length} short` : ""}`}
           defaultOpen
         >
+          {/* 2-pane work area: LEFT = order lines (click one) · RIGHT = its stock
+              grid embedded inline (Jess agreed mockup — not a modal). */}
+          <div
+            className="grid gap-3 items-start"
+            style={{ gridTemplateColumns: "minmax(0,42%) minmax(0,58%)" }}
+          >
+          <div className="min-w-0">
           <table className="w-full border-collapse">
             <thead>
               <tr>
@@ -747,7 +738,11 @@ function DrawerBody({
                   form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
                 // One row per SKU (duplicate lines combined above) → key on SKU.
                 return (
-                  <tr key={l.sku}>
+                  <tr
+                    key={l.sku}
+                    onClick={() => setPickerSku(l.sku)}
+                    className={`cursor-pointer ${l.sku === activeLineSku ? "bg-primary/10" : "hover:bg-base-50"}`}
+                  >
                     <td className="border border-base-200 px-2 py-1 font-mono text-[11px] align-top break-all">
                       {l.sku}
                     </td>
@@ -837,6 +832,29 @@ function DrawerBody({
               </div>
             </div>
           )}
+          </div>
+
+          {/* RIGHT pane — stock grid for the selected line (embedded, ranked
+              best-match-first; falls back to all free units). */}
+          <div className="min-w-0 h-[460px]">
+            {activeLineSku && stage !== "delivered" ? (
+              <StockPickerGrid
+                sku={activeLineSku}
+                soRef={soRef}
+                need={orderedLines.find((l) => l.sku === activeLineSku)?.qty ?? 1}
+                units={freeUnits}
+                onReserved={() => {
+                  void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
+                  void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+                }}
+              />
+            ) : (
+              <div className="h-full grid place-items-center border border-dashed border-base-200 rounded-[4px] t-tiny text-base-400">
+                {stage === "delivered" ? "Delivered — stock settled." : "Pick an item on the left to see its stock."}
+              </div>
+            )}
+          </div>
+          </div>
         </DrawerSection>
         </div>
 
