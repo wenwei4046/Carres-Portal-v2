@@ -714,7 +714,9 @@ export {
 
 // The one derived-sku formula ({MODEL_KEY}-{variant}) shared by the api mint +
 // generate-skus + the web maintenance read-back (no triplicated copies).
-export { deriveSkuCode } from "./sku-code";
+// `normalizeSkuKey` matches order_lines.sku ↔ ops_stock_items.sku across the
+// cosmetic case/separator drift (the catalog is empty) — the ops stock-reserve link.
+export { deriveSkuCode, normalizeSkuKey } from "./sku-code";
 
 // 2990s Products parity Phase 1 — SKU Import: the one record->row mapper + zod
 // shared by the staged-preview client and the import endpoint.
