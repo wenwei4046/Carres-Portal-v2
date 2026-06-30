@@ -252,6 +252,38 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     }
   }
 
+  // Free per-unit stock for the Ready picker (Jess 2026-06-30). The catalog is
+  // empty, so order_lines.sku ↔ ops_stock_items.sku match only under
+  // normalizeSkuKey — we can't filter by sku in SQL, so we return the free units
+  // and the drawer matches each line by normalized key, then reserves the chosen
+  // unit(s) to the order's SO. Scope to the order's warehouse when set; imported
+  // orders often lack one, so fall back to all free units (Carres Klang is the
+  // only own warehouse today). See project-catalog-empty-sku-naming.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let freeUnits: any[] = [];
+  {
+    let q = sb
+      .from("ops_stock_items")
+      .select("id, unit_code, sku, warehouse_id, condition, po_no, source_ref, date_in")
+      .eq("status", "free")
+      .eq("needs_repair", false)
+      .order("date_in", { ascending: true, nullsFirst: false });
+    if (order.warehouse_id) q = q.eq("warehouse_id", order.warehouse_id);
+    const { data: fu, error: e_fu } = await q;
+    if (e_fu) { const m = mapPgError(e_fu); return c.json(m.body, m.status); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    freeUnits = (fu ?? []).map((r: any) => ({
+      id: r.id,
+      unitCode: r.unit_code,
+      sku: r.sku,
+      warehouseId: r.warehouse_id,
+      condition: r.condition,
+      poNo: r.po_no,
+      sourceRef: r.source_ref,
+      dateIn: r.date_in,
+    }));
+  }
+
   // Linked POs (own so OR within so_refs[]).
   const { data: pos, error: e_pos } = await sb
     .from("purchase_orders")
@@ -284,6 +316,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     total,
     warehouse,
     stockBalances,
+    freeUnits,
     pos: posWithLines,
     history: historyRes.data ?? [],
     threads: threadsRes.data ?? [],

@@ -49,6 +49,16 @@ export const opsStockReassignInputSchema = z.object({
 });
 export type OpsStockReassignInput = z.infer<typeof opsStockReassignInputSchema>;
 
+/** POST /api/ops/stock/reserve-item — reserve ONE specific free unit to a
+ *  customer ref (the order-drawer Ready picker, Jess 2026-06-30). The operator
+ *  picked the exact unit (matched to the order line via normalizeSkuKey), so we
+ *  target by id rather than ops_stock_reserve's pick-oldest-by-sku. */
+export const opsStockReserveItemInputSchema = z.object({
+  itemId: z.string().uuid(),
+  ref: z.string().trim().min(1),
+});
+export type OpsStockReserveItemInput = z.infer<typeof opsStockReserveItemInputSchema>;
+
 /** POST /api/ops/stock/takeout */
 export const opsStockTakeoutInputSchema = z.object({
   itemId: z.string().uuid(),

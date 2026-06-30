@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
   opsStockReserveInputSchema,
+  opsStockReserveItemInputSchema,
   opsStockReleaseInputSchema,
   opsStockReassignInputSchema,
   opsStockTakeoutInputSchema,
@@ -104,6 +105,38 @@ opsStockRouter.post("/reserve", requireOperationOrPrincipal, async (c) => {
     });
   }
   return c.json({ itemId: data });
+});
+
+// /reserve-item — reserve ONE specific free unit to a customer ref (the
+// order-drawer Ready picker, Jess 2026-06-30). The operator picked the exact
+// unit (matched to the order line via normalizeSkuKey on the client), so we
+// target by id and flip free→reserved directly under RLS — mirroring the
+// /condition PATCH + the "+ Add stock" insert (no RPC; reserve writes no
+// rollup, same as ops_stock_reserve). The status='free' guard makes it a
+// no-op-safe claim: a unit grabbed by someone else returns 409, not a silent
+// over-reserve.
+opsStockRouter.post("/reserve-item", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, opsStockReserveItemInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("ops_stock_items")
+    .update({
+      status: "reserved",
+      reserved_ref: parsed.ref,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", parsed.itemId)
+    .eq("status", "free")
+    .eq("needs_repair", false)
+    .select("id")
+    .maybeSingle();
+  if (error) throw mapErr(error);
+  if (!data) {
+    throw new HTTPException(409, {
+      message: "Unit is no longer free (already reserved / sold / flagged)",
+    });
+  }
+  return c.json({ itemId: (data as { id: string }).id });
 });
 
 opsStockRouter.post("/release", requireOperationOrPrincipal, async (c) => {
