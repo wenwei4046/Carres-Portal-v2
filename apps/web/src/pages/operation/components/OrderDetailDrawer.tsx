@@ -589,12 +589,22 @@ function DrawerBody({
       {/* No separate top bar — the ⋮ actions menu + close moved into the Order
           section header next to the status chip (Jess: save a row). Backdrop
           click still closes the drawer. */}
-      {/* Scrolling section stack — 5 sections, one category each (P5). */}
-      <div className="flex-1 min-h-0 overflow-auto px-5 py-4 pt-3">
+      {/* Option-1 full-page grid (Jess 2026-06-30): Order/customer full-width on
+          top · Delivery | Payment as two columns · Items & stock the full-width
+          work area (only it scrolls) · Activity at the bottom. */}
+      <div
+        className="flex-1 min-h-0 overflow-auto px-5 py-3 grid gap-3 content-start"
+        style={{
+          gridTemplateColumns: "1fr 1fr",
+          gridTemplateRows: "auto auto auto minmax(0,1fr) auto",
+          gridTemplateAreas:
+            '"banner banner" "order order" "ctrl pay" "items items" "activity activity"',
+        }}
+      >
         {/* Needs-action banner — the "action for logistic" note surfaced at the
             top so it can't be missed (Jess). */}
         {form.draft.action_for_logistic.trim() && (
-          <div className="mb-2 flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">
+          <div className="flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]" style={{ gridArea: "banner" }}>
             <AlertCircle
               className="w-4 h-4 shrink-0 mt-0.5 text-warning"
               aria-hidden="true"
@@ -609,6 +619,7 @@ function DrawerBody({
         )}
         {/* 1 · Order — SO# + status live in the header (Jess: save a row, more
             obvious); the grid holds customer / phone / address. */}
+        <div style={{ gridArea: "order", minWidth: 0 }}>
         <DrawerSection
           icon={<ClipboardList className="w-4 h-4" />}
           title="Order"
@@ -643,10 +654,10 @@ function DrawerBody({
         >
           <OrderCustomerCard order={order} />
         </DrawerSection>
+        </div>
 
-        {/* 2 · Items & stock — full-width, directly after the address (Jess:
-            "item listing put after address"). Each line carries its own stock
-            location since products can sit in different warehouses. */}
+        {/* 2 · Items & stock — the full-width work area (only it scrolls). */}
+        <div style={{ gridArea: "items", minWidth: 0, minHeight: 0, overflow: "auto" }}>
         <DrawerSection
           icon={<Package className="w-4 h-4" />}
           title="Items & stock"
@@ -795,7 +806,9 @@ function DrawerBody({
             </div>
           )}
         </DrawerSection>
+        </div>
 
+        <div style={{ gridArea: "ctrl", minWidth: 0 }}>
         {/* 3 · Delivery & control — carrier/date/slot + control remarks +
             multi-leg (Jess: all control lives with delivery). */}
         <DrawerSection
@@ -873,7 +886,9 @@ function DrawerBody({
             </div>
           </details>
         </DrawerSection>
+        </div>
 
+        <div style={{ gridArea: "pay", minWidth: 0 }}>
         {/* 4 · Payment — every money fact in one place (collapsed by default) */}
         <DrawerSection
           icon={<Banknote className="w-4 h-4" />}
@@ -901,7 +916,9 @@ function DrawerBody({
             </FieldGrid>
           </div>
         </DrawerSection>
+        </div>
 
+        <div style={{ gridArea: "activity", minWidth: 0 }}>
         {/* 5 · Activity — last, expandable to see the full history. */}
         <DrawerSection
           icon={<StickyNote className="w-4 h-4" />}
@@ -912,6 +929,7 @@ function DrawerBody({
             <AnnotationTimeline orderId={order.id} />
           </div>
         </DrawerSection>
+        </div>
       </div>
 
       {/* Pinned action bar — stage actions + the control-draft Save, always
