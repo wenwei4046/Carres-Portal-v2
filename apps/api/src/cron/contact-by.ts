@@ -23,3 +23,27 @@ export async function runContactByCron(env: Bindings): Promise<number> {
   console.log(`contact-by cron: created ${created} contact-by task(s)`);
   return created;
 }
+
+/**
+ * Follow-up P2 daily maintenance (migration 0198): reassign unacknowledged
+ * assigned tasks back to the creator, roll overdue claimed tasks to the next
+ * working day, and spawn a chase task for anything stalled 3+ days. Each is an
+ * idempotent cron-only RPC. Failures are logged but don't abort the others (nor
+ * the Contact-by run) — the cron is best-effort daily housekeeping.
+ */
+export async function runFollowUpMaintenanceCron(env: Bindings): Promise<void> {
+  const sb = adminClient(env);
+  const jobs = [
+    "ops_tasks_reassign_unacknowledged",
+    "ops_tasks_rollover_overdue",
+    "ops_tasks_flag_stalled",
+  ] as const;
+  for (const fn of jobs) {
+    const { data, error } = await sb.rpc(fn);
+    if (error) {
+      console.error(`${fn} failed:`, error.message);
+    } else {
+      console.log(`${fn}: ${typeof data === "number" ? data : 0} task(s)`);
+    }
+  }
+}

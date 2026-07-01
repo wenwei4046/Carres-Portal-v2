@@ -67,7 +67,9 @@ export const opsTaskSchema = z.object({
   detail: z.string().nullable(),
   status: z.enum(TASK_STATUSES),
   priority: z.enum(TASK_PRIORITIES),
-  createdBy: z.string().uuid(),
+  // Nullable since migration 0197 — a system-generated task (the Contact-by cron)
+  // has no human author (created_by is null).
+  createdBy: z.string().uuid().nullable(),
   createdByName: z.string().nullable(),
   assignedTo: z.string().uuid().nullable(),
   assignedToName: z.string().nullable(),
