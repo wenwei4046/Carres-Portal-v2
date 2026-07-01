@@ -1111,6 +1111,7 @@ export function OrderCustomerCard({
     customer_name: string | null;
     customer_phone: string | null;
     customer_address: string | null;
+    placed_at?: string | null;
   };
 }) {
   const qc = useQueryClient();
@@ -1210,66 +1211,55 @@ export function OrderCustomerCard({
     );
   }
 
+  // Compact read-mode (Jess 4-col): label-above-value rows, no bordered table;
+  // click Edit to change (place-status only). Ordered date anchored to the
+  // card bottom so the column aligns with its siblings.
   return (
-    <div>
-      {editable && (
-        <div className="flex justify-end">
+    <div className="flex flex-col h-full text-[12px]">
+      <CompactField label="Name">
+        <span className={`font-medium ${cjkClassName(order.customer_name)}`}>
+          {order.customer_name || <span className="text-base-400">—</span>}
+        </span>
+      </CompactField>
+      <CompactField label="Phone">
+        {order.customer_phone || <span className="text-base-400">—</span>}
+      </CompactField>
+      <CompactField label="Address">
+        <span className="leading-snug text-base-600">
+          {order.customer_address || <span className="text-base-400">—</span>}
+        </span>
+      </CompactField>
+      <div className="mt-auto pt-2 border-t border-base-100 flex items-center justify-between">
+        <span className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-[0.04em] text-base-400">Ordered</span>
+          <span className="font-medium text-base-800">
+            {order.placed_at ? fmtDate(order.placed_at) : "—"}
+          </span>
+        </span>
+        {editable && (
           <button
             type="button"
             onClick={start}
-            className="inline-flex items-center gap-1 text-[11px] text-base-500 hover:text-base-900"
+            className="inline-flex items-center gap-1 text-[11px] text-base-500 hover:text-primary"
           >
             <Pencil className="w-3 h-3" /> Edit
           </button>
-        </div>
-      )}
-      <table className="w-full border-collapse">
-        <tbody>
-          <tr>
-            <Kc>Customer</Kc>
-            <Vc>
-              <span className={cjkClassName(order.customer_name)}>
-                {order.customer_name}
-              </span>
-            </Vc>
-            <Kc>Phone</Kc>
-            <Vc>{order.customer_phone ?? <em className="text-base-500">—</em>}</Vc>
-          </tr>
-          <tr>
-            <Kc>Address</Kc>
-            <Vc colSpan={3}>
-              {order.customer_address ?? <em className="text-base-500">—</em>}
-            </Vc>
-          </tr>
-        </tbody>
-      </table>
+        )}
+      </div>
     </div>
   );
 }
 
-function Kc({ children }: { children: ReactNode }) {
+/** Compact label-above-value read row (Jess 4-col redesign). */
+function CompactField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <td className="border border-base-200 bg-base-50 text-base-700 text-[10px] font-semibold uppercase tracking-[0.04em] px-2 py-1 align-top whitespace-nowrap">
-      {children}
-    </td>
+    <div className="mb-2">
+      <div className="text-[10px] uppercase tracking-[0.04em] text-base-400">{label}</div>
+      <div className="text-base-900">{children}</div>
+    </div>
   );
 }
-function Vc({
-  children,
-  colSpan,
-}: {
-  children: ReactNode;
-  colSpan?: number;
-}) {
-  return (
-    <td
-      colSpan={colSpan}
-      className="border border-base-200 text-[12px] text-base-900 font-body px-2 py-1 align-top break-words"
-    >
-      {children}
-    </td>
-  );
-}
+
 /** Storage-scope category (mirrors OperationPayments.catOf): MS/BF vs SOF. */
 /** Client-side CSV (opens in Excel) of the order — the ⋮ Download Excel item. */
 function downloadOrderCsv(
