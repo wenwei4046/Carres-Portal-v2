@@ -1506,15 +1506,38 @@ export function RemarkControlField({
   label: string;
   placeholder?: string;
 }) {
+  const [editing, setEditing] = useState(false);
+  const val = form.draft[field];
+  // Compact read-first (Jess one-screen fit): empty remarks collapse to a single
+  // "+ add" line; a filled remark shows on one line; click expands the textarea.
+  if (editing) {
+    return (
+      <FieldRow label={label}>
+        <textarea
+          rows={2}
+          autoFocus
+          value={val}
+          onChange={(e) => form.set(field, e.target.value)}
+          onBlur={() => setEditing(false)}
+          placeholder={placeholder}
+          className={CELL + " resize-y block py-1"}
+        />
+      </FieldRow>
+    );
+  }
   return (
     <FieldRow label={label}>
-      <textarea
-        rows={2}
-        value={form.draft[field]}
-        onChange={(e) => form.set(field, e.target.value)}
-        placeholder={placeholder}
-        className={CELL + " resize-y block py-1"}
-      />
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="w-full text-left px-1 py-0.5 rounded hover:bg-white hover:border hover:border-base-200 truncate text-[12px]"
+      >
+        {val.trim() ? (
+          <span className="text-base-900">{val}</span>
+        ) : (
+          <span className="text-base-400">+ add</span>
+        )}
+      </button>
     </FieldRow>
   );
 }

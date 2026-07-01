@@ -928,29 +928,23 @@ function DrawerBody({
           {/* 2-col compact (Jess): LEFT = what operation sets (region / carrier /
               deadline / call gate); RIGHT = what the logistic updates back
               (their committed ETA + time slot). Remarks span full width below. */}
-          <div className="grid grid-cols-2 gap-2 items-start">
-            <div>
-              <div className="label mb-1">Operation</div>
-              <FieldGrid>
-                <RoutingFields
-                  orderId={order.id}
-                  customerAddress={order.customer_address ?? null}
-                  deliveryDate={order.delivery_date}
-                  proceedDate={order.proceed_date ?? null}
-                  opsAssignedLogistic={order.ops_assigned_logistic ?? null}
-                  form={form}
-                />
-              </FieldGrid>
-            </div>
-            <div>
-              <div className="label mb-1">Logistic updates</div>
-              <FieldGrid>
-                <LogisticEtaField form={form} />
-                <DeliveryTimeSlotField form={form} />
-              </FieldGrid>
-            </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0 items-start">
+            <FieldGrid>
+              <RoutingFields
+                orderId={order.id}
+                customerAddress={order.customer_address ?? null}
+                deliveryDate={order.delivery_date}
+                proceedDate={order.proceed_date ?? null}
+                opsAssignedLogistic={order.ops_assigned_logistic ?? null}
+                form={form}
+              />
+            </FieldGrid>
+            <FieldGrid>
+              <LogisticEtaField form={form} />
+              <DeliveryTimeSlotField form={form} />
+            </FieldGrid>
           </div>
-          <div className="mt-2">
+          <div className="mt-1.5">
             <FieldGrid>
               <RemarkControlField
                 form={form}
