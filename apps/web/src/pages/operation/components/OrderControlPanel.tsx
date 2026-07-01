@@ -63,6 +63,7 @@ interface Draft {
   storage_fee_override: string;
   balance: string;
   balance_due_date: string;
+  contact_by_days: string;
   logistic_eta: string;
   paid_amount: string;
   storage_paid: string;
@@ -85,6 +86,7 @@ const EMPTY: Draft = {
   storage_fee_override: "",
   balance: "",
   balance_due_date: "",
+  contact_by_days: "",
   logistic_eta: "",
   paid_amount: "",
   storage_paid: "",
@@ -184,6 +186,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
         c.storage_fee_override != null ? String(c.storage_fee_override) : "",
       balance: c.balance != null ? String(c.balance) : "",
       balance_due_date: c.balance_due_date ?? "",
+      contact_by_days: c.contact_by_days != null ? String(c.contact_by_days) : "",
       logistic_eta: c.logistic_eta ?? "",
       paid_amount: c.paid_amount != null ? String(c.paid_amount) : "",
       storage_paid: c.storage_paid ?? "",
@@ -229,6 +232,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
         : null,
       balance: draft.balance.trim() ? Number(draft.balance) : null,
       balance_due_date: draft.balance_due_date.trim() ? draft.balance_due_date.trim() : null,
+      contact_by_days: draft.contact_by_days.trim() ? Number(draft.contact_by_days) : null,
       logistic_eta: draft.logistic_eta.trim() ? draft.logistic_eta.trim() : null,
       paid_amount: draft.paid_amount.trim() ? Number(draft.paid_amount) : null,
       storage_paid: draft.storage_paid.trim() ? draft.storage_paid.trim() : null,

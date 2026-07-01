@@ -134,6 +134,12 @@ export const opsOrderControlSchema = z.object({
   extended_at: z.string().nullable().default(null),
   extended_by: z.string().uuid().nullable().default(null),
   extension_count: z.number().int().default(0),
+  /** Contact-by auto follow-up (migration 0197). `contact_by_days` = how many
+   *  days before the delivery deadline to reach the customer (null = default 3;
+   *  editable per order). `contact_by_task_at` is the idempotency stamp the cron
+   *  sets when it creates the task — READ-only here (system-written). */
+  contact_by_days: z.number().int().nullable().default(null),
+  contact_by_task_at: z.string().nullable().default(null),
   updated_at: z.string().nullable(),
   updated_by: z.string().uuid().nullable(),
 });
@@ -286,6 +292,9 @@ export const updateOpsOrderControlInput = z
     // through the dedicated collect / waiver endpoints (a waiver approval must
     // be principal-gated, so it can't ride the generic operator PUT).
     balance_due_date: isoDate.nullable(),
+    // Contact-by (migration 0197) — per-order override of the default 3-day
+    // pre-deadline reminder. contact_by_task_at is system-written (cron), not here.
+    contact_by_days: z.number().int().min(0).max(60).nullable(),
   })
   .partial()
   .strict();

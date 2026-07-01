@@ -577,13 +577,17 @@ function DrawerBody({
     : order.delivery_date
       ? fmtDate(order.delivery_date)
       : "no date";
-  // Contact-by basis (Jess): operation must reach the customer 1–3 days BEFORE
-  // the deadline to confirm stock + timing. Shown as a readout here (default
-  // deadline − 2 days); the auto-task that fires on this date is the backend P2.
+  // Contact-by basis (Jess): operation must reach the customer N days BEFORE the
+  // deadline to confirm stock + timing. N = ops_order_control.contact_by_days
+  // (default 3, editable per order); a daily cron (migration 0197) drops the
+  // "Contact customer · SO-x" task on this date.
+  const contactByDays = form.draft.contact_by_days.trim()
+    ? Number(form.draft.contact_by_days)
+    : form.control?.contact_by_days ?? 3;
   const contactByLabel =
     !order.delivery_date_tbd && order.delivery_date
       ? fmtDate(
-          new Date(new Date(order.delivery_date).getTime() - 2 * 86_400_000)
+          new Date(new Date(order.delivery_date).getTime() - contactByDays * 86_400_000)
             .toISOString()
             .slice(0, 10),
         )
@@ -962,17 +966,27 @@ function DrawerBody({
               />
             </FieldGrid>
           </div>
-          {/* Contact-by — reach the customer BEFORE the deadline (Jess: 1–3 days
-              ahead) to confirm stock + timing; default deadline − 2 days. */}
+          {/* Contact-by — reach the customer BEFORE the deadline (Jess) to confirm
+              stock + timing. A daily cron auto-drops the task on this date; the
+              lead days (default 3) are editable per order. */}
           {contactByLabel && (
             <div className="mt-2.5 flex items-center gap-2 rounded-[4px] bg-info-soft/60 px-3 py-1.5 text-[11.5px]">
               <span className="font-semibold uppercase tracking-[0.04em] text-[10px] text-info">
                 Contact by
               </span>
               <span className="font-medium text-base-800">{contactByLabel}</span>
-              <span className="text-base-400">
-                · call to confirm stock + timing (deadline − 2 days)
-              </span>
+              <span className="text-base-400">· call to confirm stock + timing · deadline −</span>
+              <input
+                type="number"
+                min={0}
+                max={60}
+                value={form.draft.contact_by_days}
+                onChange={(e) => form.set("contact_by_days", e.target.value)}
+                placeholder="3"
+                aria-label="Contact-by lead days before the deadline"
+                className="w-12 rounded border border-base-200 bg-white px-1.5 py-0.5 text-[11.5px] text-center outline-none focus:border-primary"
+              />
+              <span className="text-base-400">days</span>
             </div>
           )}
 

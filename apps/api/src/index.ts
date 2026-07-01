@@ -70,7 +70,8 @@ import opsNotesRouter from "./routes/ops/notes";
 import opsTasksRouter from "./routes/ops/tasks";
 // Phase B (migration 0138) — order annotations + activity timeline.
 import annotationsRouter, { escalationsRouter } from "./routes/operation/annotations";
-import type { AppEnv } from "./types";
+import { runContactByCron } from "./cron/contact-by";
+import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>();
 
@@ -166,4 +167,11 @@ api.route("/operation/escalations", escalationsRouter);
 
 app.route("/api", api);
 
-export default app;
+// Cloudflare entry — HTTP via Hono + a daily Contact-by cron (migration 0197).
+// The cron schedule is declared in wrangler.toml ("0 1 * * *" = 09:00 MYT).
+export default {
+  fetch: app.fetch,
+  scheduled: (_event: ScheduledController, env: Bindings, ctx: ExecutionContext) => {
+    ctx.waitUntil(runContactByCron(env));
+  },
+};
