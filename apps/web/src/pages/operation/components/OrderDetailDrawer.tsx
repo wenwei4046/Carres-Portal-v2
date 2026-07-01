@@ -448,7 +448,7 @@ function DrawerSection({
   const a = SECTION_ACCENT[accent];
   return (
     <div
-      className="border border-base-200 rounded-[8px] bg-white overflow-hidden"
+      className="border border-base-200 rounded-[12px] bg-white overflow-hidden"
     >
       <div
         className="w-full flex items-center justify-between gap-3 px-3 py-1.5 border-b border-base-100"
@@ -670,21 +670,18 @@ function DrawerBody({
           style={{ gridArea: "header" }}
           className="flex items-center justify-between gap-3 min-w-0"
         >
-          <div className="flex items-center gap-2 min-w-0">
+          {/* Status · boxed order # · grey Ref — NO customer name (it lives in
+              the Customer card; Jess: don't repeat it here). */}
+          <div className="flex items-center gap-2.5 min-w-0">
             <StageChip stage={stage} />
-            <ClipboardList className="w-4 h-4 text-base-400 shrink-0" />
-            <span className="font-display t-h4 text-base-900">Order</span>
-            <span className="font-mono t-h3 font-bold text-base-900 leading-none">
+            <span className="font-mono font-semibold text-base-900 border border-base-300 rounded-md px-2 py-0.5 bg-white shrink-0">
               #{order.so}
             </span>
             {order.source_ref?.[0] && (
-              <span className="t-small text-base-500 font-mono shrink-0">
-                · Ref {order.source_ref[0]}
+              <span className="t-small text-base-400 font-mono shrink-0 uppercase">
+                Ref {order.source_ref[0]}
               </span>
             )}
-            <span className="t-small text-base-500 truncate">
-              · {order.customer_name}
-            </span>
           </div>
           <span className="flex items-center gap-1 shrink-0">
             <button
@@ -1259,12 +1256,12 @@ export function OrderCustomerCard({
   );
 }
 
-/** Compact label-above-value read row (Jess 4-col redesign). */
+/** Compact label-left / value-right read row (Jess: match the clean mockup). */
 function CompactField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="mb-2">
-      <div className="text-[10px] uppercase tracking-[0.04em] text-base-400">{label}</div>
-      <div className="text-base-900">{children}</div>
+    <div className="flex items-baseline justify-between gap-3 py-[3px] border-b border-base-100/70 last:border-b-0">
+      <span className="text-[11px] text-base-400 shrink-0">{label}</span>
+      <span className="min-w-0 text-right text-base-900">{children}</span>
     </div>
   );
 }

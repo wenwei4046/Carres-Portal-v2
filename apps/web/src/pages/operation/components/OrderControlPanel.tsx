@@ -118,11 +118,11 @@ export function FieldRow({
   children: ReactNode;
 }) {
   return (
-    <div className="mb-1.5 last:mb-0 min-w-0">
-      <div className="text-[10px] uppercase tracking-[0.04em] text-base-400 leading-none mb-0.5">
-        {label}
+    <div className="flex items-center justify-between gap-2 min-w-0 py-[3px] border-b border-base-100/70 last:border-b-0">
+      <span className="text-[11px] text-base-400 shrink-0">{label}</span>
+      <div className="min-w-0 flex-1 flex items-center justify-end text-right">
+        {children}
       </div>
-      <div className="min-w-0 flex items-center">{children}</div>
     </div>
   );
 }
