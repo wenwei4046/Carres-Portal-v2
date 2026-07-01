@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Filter, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -8,8 +9,9 @@ import type { ReserveFreeUnit } from "./ReserveStockDialog";
  * StockPickerGrid — the EMBEDDED stock-reserve grid (Jess 2026-06-30) that lives
  * in the right pane of the order's "Items & stock" work area. The operator picks
  * a line on the left; this grid shows the warehouse's free units, ranked so the
- * ones most like that line surface first, with a per-column filter row. Tick the
- * physical unit(s) → reserve to the order's SO (POST /api/ops/stock/reserve-item).
+ * ones most like that line surface first, with a Google-sheets-style funnel
+ * filter in each header cell. Tick the physical unit(s) → reserve to the order's
+ * SO (POST /api/ops/stock/reserve-item).
  *
  * The product NAME is the only shared key (the catalog is empty — see
  * project-catalog-empty-sku-naming), so "best matches first" = a token-overlap
@@ -67,11 +69,35 @@ interface Props {
 // ☐ · Date in · Category · Item · Size · PO · Old ref · Condition
 const GRID = "30px 78px 88px minmax(160px,1fr) 56px 104px 84px 92px";
 
+/** Filterable columns (the ☐ checkbox column has no filter). `kind` picks the
+ *  funnel menu: `text` = a contains-box, `select` = a distinct-value list whose
+ *  options come from `optKey` on the computed `opts`. */
+type FilterKind = "text" | "select";
+const COLS: {
+  key: string;
+  label: string;
+  kind: FilterKind;
+  optKey?: "cat" | "size" | "cond";
+  placeholder?: string;
+}[] = [
+  { key: "dateIn", label: "Date", kind: "text", placeholder: "date…" },
+  { key: "cat", label: "Category", kind: "select", optKey: "cat" },
+  { key: "sku", label: "Item", kind: "text", placeholder: "name…" },
+  { key: "size", label: "Size", kind: "select", optKey: "size" },
+  { key: "poNo", label: "PO", kind: "text", placeholder: "PO…" },
+  { key: "sourceRef", label: "Old ref", kind: "text", placeholder: "ref…" },
+  { key: "cond", label: "Cond", kind: "select", optKey: "cond" },
+];
+
 export default function StockPickerGrid({ sku, soRef, need, units, onReserved }: Props) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [f, setF] = useState<Record<string, string>>({});
   const setFilter = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
+  // Which column's funnel menu is open + where to anchor it (fixed-positioned so
+  // it isn't clipped by the grid's own scroll container).
+  const [menu, setMenu] = useState<{ key: string; x: number; y: number } | null>(null);
+  const activeFilters = Object.values(f).filter((v) => v && v.trim()).length;
 
   // Rank by token-overlap with the order line (best matches first), then name.
   const rows = useMemo(() => {
@@ -172,40 +198,57 @@ export default function StockPickerGrid({ sku, soRef, need, units, onReserved }:
           Stock · <span className="font-mono text-base-900">{sku}</span>
           <span className="text-base-400"> — best matches first</span>
         </div>
-        <div className="t-tiny text-base-400">
-          {view.length}/{rows.length} · {checked.size} picked
+        <div className="t-tiny text-base-400 flex items-center gap-2">
+          <span>
+            {view.length}/{rows.length} · {checked.size} picked
+          </span>
+          {activeFilters > 0 && (
+            <button
+              type="button"
+              onClick={() => setF({})}
+              title="Clear all column filters"
+              className="text-primary hover:underline inline-flex items-center gap-0.5"
+            >
+              <X size={11} strokeWidth={2.5} /> {activeFilters} filter{activeFilters === 1 ? "" : "s"}
+            </button>
+          )}
         </div>
       </div>
 
       <div className="flex-1 overflow-auto min-h-0">
         <div className="min-w-[640px]">
-          {/* header */}
+          {/* header — Google-sheets funnel filter per column (no filter row) */}
           <div
             className="grid sticky top-0 z-20 bg-base-700 border-b-2 border-primary text-white text-[10px] uppercase tracking-[0.02em] font-bold"
             style={{ gridTemplateColumns: GRID }}
           >
             <div className="px-1.5 py-1.5" />
-            <div className="px-2 py-1.5">Date</div>
-            <div className="px-2 py-1.5">Category</div>
-            <div className="px-2 py-1.5">Item</div>
-            <div className="px-2 py-1.5">Size</div>
-            <div className="px-2 py-1.5">PO</div>
-            <div className="px-2 py-1.5">Old ref</div>
-            <div className="px-2 py-1.5">Cond</div>
-          </div>
-          {/* filter row */}
-          <div
-            className="grid sticky top-[27px] z-10 bg-base-50 border-b border-base-200"
-            style={{ gridTemplateColumns: GRID }}
-          >
-            <div className="px-1 py-1" />
-            <FilterText value={f.dateIn} onChange={(v) => setFilter("dateIn", v)} />
-            <FilterSelect value={f.cat} options={opts.cat} onChange={(v) => setFilter("cat", v)} />
-            <FilterText value={f.sku} onChange={(v) => setFilter("sku", v)} placeholder="name…" />
-            <FilterSelect value={f.size} options={opts.size} onChange={(v) => setFilter("size", v)} />
-            <FilterText value={f.poNo} onChange={(v) => setFilter("poNo", v)} />
-            <FilterText value={f.sourceRef} onChange={(v) => setFilter("sourceRef", v)} />
-            <FilterSelect value={f.cond} options={opts.cond} onChange={(v) => setFilter("cond", v)} />
+            {COLS.map((col) => {
+              const active = !!f[col.key]?.trim();
+              return (
+                <button
+                  key={col.key}
+                  type="button"
+                  onClick={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setMenu((m) =>
+                      m?.key === col.key
+                        ? null
+                        : { key: col.key, x: Math.min(r.left, window.innerWidth - 194), y: r.bottom },
+                    );
+                  }}
+                  title={active ? `Filtering: ${f[col.key]}` : `Filter ${col.label}`}
+                  className="px-2 py-1.5 flex items-center justify-between gap-1 text-left hover:bg-base-600 transition-colors"
+                >
+                  <span className="truncate">{col.label}</span>
+                  <Filter
+                    size={11}
+                    strokeWidth={2.5}
+                    className={active ? "text-primary fill-primary shrink-0" : "text-white/40 shrink-0"}
+                  />
+                </button>
+              );
+            })}
           </div>
           {/* body */}
           {view.map((r, i) => {
@@ -273,54 +316,127 @@ export default function StockPickerGrid({ sku, soRef, need, units, onReserved }:
           {submitting ? "Reserving…" : `Reserve ${checked.size} to ${soRef}`}
         </button>
       </div>
+
+      {/* Funnel filter menu (fixed-positioned so the grid's scroll never clips it) */}
+      {menu &&
+        (() => {
+          const col = COLS.find((c) => c.key === menu.key);
+          if (!col) return null;
+          const options = col.optKey ? opts[col.optKey] : [];
+          return (
+            <FilterMenu
+              col={col}
+              value={f[col.key]}
+              options={options}
+              x={menu.x}
+              y={menu.y}
+              onChange={(v) => setFilter(col.key, v)}
+              onClose={() => setMenu(null)}
+            />
+          );
+        })()}
     </div>
   );
 }
 
-function FilterText({
-  value,
-  onChange,
-  placeholder = "filter…",
-}: {
-  value: string | undefined;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <div className="px-1 py-1">
-      <input
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-1.5 py-0.5 text-[11px] border border-base-200 rounded bg-white outline-none focus:border-primary"
-      />
-    </div>
-  );
-}
-
-function FilterSelect({
+/** The per-column funnel menu (Google-sheets style): a contains-box for text
+ *  columns, a distinct-value list for select columns. Fixed-positioned at the
+ *  funnel; a transparent backdrop + Esc close it. */
+function FilterMenu({
+  col,
   value,
   options,
+  x,
+  y,
   onChange,
+  onClose,
 }: {
+  col: { key: string; label: string; kind: FilterKind; placeholder?: string };
   value: string | undefined;
   options: string[];
+  x: number;
+  y: number;
   onChange: (v: string) => void;
+  onClose: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    inputRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div
+        className="fixed z-50 w-[184px] bg-white border border-base-200 rounded-[5px] shadow-lg overflow-hidden"
+        style={{ left: x, top: y + 2 }}
+      >
+        <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-base-100 bg-base-50">
+          <span className="t-micro text-base-500">{col.label}</span>
+          {value?.trim() ? (
+            <button
+              type="button"
+              onClick={() => {
+                onChange("");
+                onClose();
+              }}
+              className="t-micro text-primary hover:underline inline-flex items-center gap-0.5"
+            >
+              <X size={10} strokeWidth={2.5} /> Clear
+            </button>
+          ) : null}
+        </div>
+
+        {col.kind === "text" ? (
+          <div className="p-2">
+            <input
+              ref={inputRef}
+              value={value ?? ""}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onClose()}
+              placeholder={col.placeholder ?? "contains…"}
+              className="w-full px-2 py-1 text-[12px] border border-base-200 rounded bg-white outline-none focus:border-primary"
+            />
+          </div>
+        ) : (
+          <div className="max-h-[220px] overflow-auto py-1">
+            <MenuOption label="All" selected={!value} onClick={() => { onChange(""); onClose(); }} />
+            {options.map((o) => (
+              <MenuOption
+                key={o}
+                label={o}
+                selected={value === o}
+                onClick={() => { onChange(o); onClose(); }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function MenuOption({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="px-1 py-1">
-      <select
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full px-1 py-0.5 text-[11px] border border-base-200 rounded bg-white outline-none focus:border-primary"
-      >
-        <option value="">All</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left px-2.5 py-1 text-[12px] hover:bg-primary/5 ${
+        selected ? "text-primary font-semibold bg-primary/10" : "text-base-700"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
