@@ -1,19 +1,13 @@
 import { type ReactNode, useEffect, useState } from "react";
 import {
   AlertCircle,
-  Banknote,
-  ChevronDown,
   ChevronRight,
-  ClipboardList,
   Download,
   FileText,
   Flag,
   MoreVertical,
-  Package,
   Pencil,
   RotateCcw,
-  Truck,
-  Route,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -94,10 +88,6 @@ const RM = (n: number) =>
 interface Props {
   orderId: string;
   onClose: () => void;
-}
-
-function totalItems(lines: operationOrderDetailLine[]): number {
-  return lines.reduce((s, l) => s + Number(l.qty || 0), 0);
 }
 
 function calcShortages(
@@ -407,86 +397,114 @@ interface DrawerBodyProps {
   onFollowUpClick: () => void;
 }
 
-/** Collapsible drawer section — title + leading icon + a summary value that
- *  shows when collapsed, so a folded section still reads at a glance (P5). */
-// Clean, monochrome cards (Jess: the coloured accents read as "五颜六色" /
-// garish — the agreed mockup is a plain white card + hairline border + neutral
-// header). Accent kept in the API so callers don't change, but every card now
-// renders the same clean style.
-const SECTION_ACCENT: Record<
-  string,
-  { bar: string; icon: string; head: string }
-> = {
-  neutral: { bar: "", icon: "text-base-400", head: "" },
-  warning: { bar: "", icon: "text-base-400", head: "" },
-  success: { bar: "", icon: "text-base-400", head: "" },
-  info: { bar: "", icon: "text-base-400", head: "" },
-};
-
-function DrawerSection({
-  icon,
+/**
+ * Panel — the LOCKED design-system Card (Jess 2026-07-01, one-screen order
+ * detail): white surface · cool-grey hairline · 12px round · a header with a
+ * bottom rule and a SUMMARY badge pinned to the right so the card reads at a
+ * glance. NOT collapsible (the page is a fixed one-screen layout). `grow` fills
+ * leftover column height so the left + right columns' bottoms line up (Jess: no
+ * 高高低低). The caller supplies the body (each panel scrolls / pads its own way).
+ */
+function Panel({
   title,
-  titleExtra,
-  headerRight,
   summary,
-  accent = "neutral",
-  defaultOpen = false,
+  grow,
+  className,
   children,
 }: {
-  icon: ReactNode;
   title: string;
-  /** Rendered right after the title (e.g. the SO number in the Order header). */
-  titleExtra?: ReactNode;
-  /** Pinned to the header's right edge, ALWAYS visible (e.g. the status chip). */
-  headerRight?: ReactNode;
+  /** Pinned to the header's right edge — the at-a-glance status badge. */
   summary?: ReactNode;
-  accent?: keyof typeof SECTION_ACCENT;
-  defaultOpen?: boolean;
+  grow?: boolean;
+  className?: string;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const a = SECTION_ACCENT[accent];
   return (
-    <div
-      className="border border-base-200 rounded-[12px] bg-white overflow-hidden"
+    <section
+      className={`border border-base-200 rounded-[12px] bg-white overflow-hidden flex flex-col min-h-0 ${grow ? "flex-1" : ""} ${className ?? ""}`}
     >
-      <div
-        className="w-full flex items-center justify-between gap-3 px-3 py-1.5 border-b border-base-100"
-      >
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          className="flex items-center gap-2 min-w-0 flex-1 text-left hover:brightness-[0.97]"
-        >
-          <span className={`${a.icon} shrink-0`}>{icon}</span>
-          <span className="t-h4 text-base-900">{title}</span>
-          {titleExtra}
-        </button>
-        <span className="flex items-center gap-2 shrink-0">
-          {!open && summary != null && (
-            <span className="text-[11px] text-base-500 truncate max-w-[180px]">
-              {summary}
-            </span>
-          )}
-          {headerRight}
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-label={open ? "Collapse section" : "Expand section"}
-          >
-            <ChevronDown
-              className={`w-4 h-4 text-base-400 transition-transform ${open ? "rotate-180" : ""}`}
-            />
-          </button>
-        </span>
-      </div>
-      {open && (
-        <div className="px-3 pb-2.5 pt-1.5 border-t border-base-100">
-          {children}
-        </div>
+      <header className="flex items-center justify-between gap-3 px-3 py-2 border-b border-base-100 shrink-0">
+        <span className="t-h4 text-base-900 truncate">{title}</span>
+        {summary != null && (
+          <span className="shrink-0 flex items-center gap-1.5">{summary}</span>
+        )}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/** A sub-header for a split card's inner column (Customer | Balance): the column
+ *  name on the left + its own summary badge on the right, its own bottom rule. */
+function SplitHead({ title, summary }: { title: string; summary?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-base-100">
+      <span className="t-h4 text-base-900 shrink-0">{title}</span>
+      {summary != null && (
+        <span className="min-w-0 flex justify-end">{summary}</span>
       )}
     </div>
+  );
+}
+
+/** Tiny status counter for a panel header — tighter than the full `.pill` so up
+ *  to three fit on one header row. Colours track the locked stock vocab. */
+function MiniBadge({
+  tone,
+  children,
+}: {
+  tone: "nopo" | "waiting" | "ready" | "kv" | "outstation" | "muted";
+  children: ReactNode;
+}) {
+  const TONE: Record<string, string> = {
+    nopo: "bg-base-100 text-base-600",
+    waiting: "bg-[#FEF3C7] text-[#92400E]",
+    ready: "bg-[#DCFCE7] text-[#166534]",
+    kv: "bg-[#DCFCE7] text-[#166534]",
+    outstation: "bg-[#FEF3C7] text-[#92400E]",
+    muted: "bg-base-100 text-base-500",
+  };
+  return (
+    <span
+      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${TONE[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Items-ordered header readiness — shows only the states present (No PO grey →
+ *  Waiting amber → Ready green), each counted against the total goods lines. */
+function ReadinessBadge({
+  nopo,
+  waiting,
+  ready,
+  total,
+}: {
+  nopo: number;
+  waiting: number;
+  ready: number;
+  total: number;
+}) {
+  if (total === 0) return <MiniBadge tone="muted">no goods</MiniBadge>;
+  return (
+    <>
+      {nopo > 0 && (
+        <MiniBadge tone="nopo">
+          No PO {nopo}/{total}
+        </MiniBadge>
+      )}
+      {waiting > 0 && (
+        <MiniBadge tone="waiting">
+          Waiting {waiting}/{total}
+        </MiniBadge>
+      )}
+      {ready > 0 && (
+        <MiniBadge tone="ready">
+          Ready {ready}/{total}
+        </MiniBadge>
+      )}
+    </>
   );
 }
 
@@ -577,11 +595,6 @@ function DrawerBody({
     return c === "mattress" || c === "bedframe";
   });
   const hasSof = lines.some((l) => lineCategory(l.sku) === "sofa");
-  const deadlineSummary = order.delivery_date_tbd
-    ? "TBD"
-    : order.delivery_date
-      ? fmtDate(order.delivery_date)
-      : "no date";
   // Contact-by basis (Jess): operation must reach the customer N days BEFORE the
   // deadline to confirm stock + timing. N = ops_order_control.contact_by_days
   // (default 3, editable per order); a daily cron (migration 0197) drops the
@@ -602,6 +615,24 @@ function DrawerBody({
     : outstanding <= 0
       ? "Settled"
       : `${RM(outstanding)} owing`;
+
+  // Readiness per goods line (locked vocab): Ready (free stock ≥ qty) → Waiting
+  // (a PO is raised for the sku) → No PO (nothing yet). Service lines carry no
+  // stock, so they're excluded from the count. The panel header badge tallies
+  // goods lines by state.
+  const poSkus = new Set<string>();
+  for (const po of pos)
+    for (const pl of po.lines) poSkus.add(normalizeSkuKey(pl.sku));
+  const goodsLines = orderedLines.filter((l) => lineKind(l.sku) !== "service");
+  const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" => {
+    const free = (freeUnitsByKey.get(normalizeSkuKey(sku)) ?? []).length;
+    if (free >= qty) return "ready";
+    if (poSkus.has(normalizeSkuKey(sku))) return "waiting";
+    return "nopo";
+  };
+  const readyN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "ready").length;
+  const waitingN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "waiting").length;
+  const nopoN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "nopo").length;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -636,12 +667,13 @@ function DrawerBody({
           top · Delivery | Payment as two columns · Items & stock the full-width
           work area (only it scrolls) · Activity at the bottom. */}
       <div
-        className="flex-1 min-h-0 overflow-hidden px-5 py-3 grid gap-2.5"
+        className="flex-1 min-h-0 overflow-hidden px-5 py-3 grid gap-2.5 items-stretch"
         style={{
-          // Standard order-detail pattern (Jess-approved, Shopify/Stripe): a big
-          // Items & stock work area on the LEFT (main), a stacked card sidebar on
-          // the RIGHT (Customer · Delivery · [Route] · Balance · [Storage]).
-          gridTemplateColumns: "1.62fr 1fr",
+          // Locked one-screen layout (Jess 2026-07-01): LEFT (~1.05fr) = two
+          // listing panels (Items ordered · Warehouse stock); RIGHT (~0.95fr) =
+          // stacked cards (Customer|Balance · Delivery). align-items:stretch →
+          // both columns EQUAL height, bottoms line up (no 高高低低).
+          gridTemplateColumns: "1.05fr 0.95fr",
           gridTemplateRows: "auto auto minmax(0,1fr)",
           gridTemplateAreas:
             '"banner banner" "header header" "main side"',
@@ -710,169 +742,190 @@ function DrawerBody({
           </span>
         </div>
 
-        {/* Main work area — Items & stock (the left column). */}
-        <div style={{ gridArea: "main", minWidth: 0, minHeight: 0, overflow: "auto" }}>
-        <DrawerSection
-          icon={<Package className="w-4 h-4" />}
-          title="Items & stock"
-          accent="warning"
-          summary={`${totalItems(lines)} item${totalItems(lines) === 1 ? "" : "s"}${shortages.length ? ` · ${shortages.length} short` : ""}`}
-          defaultOpen
+        {/* LEFT column — the two locked listing panels: Items ordered (fixed
+            scroll table, ≤8 rows) on top · Warehouse stock (the reserve grid,
+            grows to fill so the column bottom lines up with the right side). */}
+        <div
+          style={{ gridArea: "main" }}
+          className="flex flex-col gap-2.5 min-w-0 min-h-0"
         >
-          {/* Stacked work area (Jess): Items ordered on TOP · its warehouse stock
-              grid BELOW (not side-by-side) — each gets the full main width. */}
-          <div className="grid grid-cols-1 gap-3 items-start">
-          <div className="min-w-0">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1">
-                  Item
-                </th>
-                <th className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-10">
-                  Qty
-                </th>
-                <th
-                  className="border border-base-200 bg-base-50 text-right text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-16"
-                  title="Free ready stock at the warehouse for this item — pick Carres Klang in Location to fulfil from it"
-                >
-                  Ready
-                </th>
-                <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-36">
-                  Location
-                </th>
-                <th className="border border-base-200 bg-base-50 text-left text-[10px] uppercase tracking-[0.04em] font-medium text-base-700 px-2 py-1 w-32">
-                  ETA
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {orderedLines.map((l) => {
-                // Real availability: match free per-unit stock by normalized key.
-                // The catalog is empty so the old exact-sku stockBalances join
-                // always missed (showed 0); normalizeSkuKey bridges the
-                // order/warehouse naming drift (project-catalog-empty-sku-naming).
-                const matchUnits = freeUnitsByKey.get(normalizeSkuKey(l.sku)) ?? [];
-                const ready = matchUnits.length;
-                const ok = ready >= l.qty;
-                // Per-item stock location (migration 0168): service charges
-                // (No Lift / Disposal) carry none; goods default by category
-                // (accessories → warehouse, core → supplier) and are overridable.
-                // savedLoc===undefined → never touched → show the default; an
-                // explicit [] (operator picked "—") shows blank, not the default.
-                const isService = lineKind(l.sku) === "service";
-                const savedLoc = form.draft.line_locations[l.sku];
-                const locValue =
-                  savedLoc !== undefined
-                    ? (savedLoc[0] ?? "")
-                    : (defaultLineLocation(l.sku) ?? "");
-                // Per-item stock ETA (migration 0170) — products don't all arrive
-                // on the same date. Defaults to the linked PO's delivery date,
-                // overridable via line_etas.
-                const etaValue =
-                  form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
-                // One row per SKU (duplicate lines combined above) → key on SKU.
-                return (
-                  <tr
-                    key={l.sku}
-                    onClick={() => setPickerSku(l.sku)}
-                    className={`cursor-pointer ${l.sku === activeLineSku ? "bg-primary/10" : "hover:bg-base-50"}`}
-                  >
-                    <td className="border border-base-200 px-2 py-1 font-mono text-[11px] align-top break-all">
-                      {l.sku}
-                    </td>
-                    <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
-                      {l.qty}
-                    </td>
-                    <td
-                      className={`border border-base-200 px-2 py-1 text-right font-mono text-[11px] align-top ${stage === "delivered" ? "text-base-400" : ok ? "text-success" : "text-warning"}`}
-                    >
-                      {isService ? (
-                        <span className="text-base-300">—</span>
-                      ) : stage !== "delivered" ? (
-                        <button
-                          type="button"
-                          onClick={() => setPickerSku(l.sku)}
-                          className="underline decoration-dotted underline-offset-2 hover:text-primary cursor-pointer"
-                          title="Pick ready stock to reserve for this order (or browse all warehouse stock)"
-                          data-testid={`ready-pick-${l.sku}`}
-                        >
-                          {ready}
-                        </button>
-                      ) : (
-                        ready
-                      )}
-                    </td>
-                    {isService ? (
-                      <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
-                        N/A
-                      </td>
-                    ) : (
-                      <td className="border border-base-200 px-1 py-0.5 align-top">
-                        <select
-                          value={locValue}
-                          onChange={(e) =>
-                            form.setLineLocation(
-                              l.sku,
-                              e.target.value ? [e.target.value] : [],
-                            )
-                          }
-                          className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-                        >
-                          <option value="">—</option>
-                          {STOCK_LOCATIONS.map((locOpt) => (
-                            <option key={locOpt} value={locOpt}>
-                              {locOpt}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    )}
-                    {isService ? (
-                      <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
-                        N/A
-                      </td>
-                    ) : (
-                      <td className="border border-base-200 px-1 py-0.5 align-top">
-                        <input
-                          type="date"
-                          value={etaValue}
-                          onChange={(e) => form.setLineEta(l.sku, e.target.value)}
-                          className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-                        />
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <div className="mt-2">
-            <FieldGrid>
-              <RemarkControlField
-                form={form}
-                field="warehouse_remark"
-                label="Warehouse remark"
-                placeholder="Note for the warehouse team"
+          {/* Panel 1 — Items ordered. Header badge = readiness (No PO / Waiting /
+              Ready), counted over the goods lines. Dark-slate pinned header;
+              only the rows scroll (up to ~8, then inside the box). */}
+          <Panel
+            title="Items ordered"
+            summary={
+              <ReadinessBadge
+                nopo={nopoN}
+                waiting={waitingN}
+                ready={readyN}
+                total={goodsLines.length}
               />
-            </FieldGrid>
-          </div>
-          {pos.length > 0 && (
-            <div className="mt-2.5">
-              <div className="label mb-1">Linked POs</div>
-              <div className="border border-base-100 rounded-[4px]">
-                {pos.map((po, i) => (
-                  <PoRow key={po.id} po={po} divider={i > 0} onReceive={setReceivePo} />
-                ))}
-              </div>
+            }
+          >
+            <div className="overflow-auto min-h-0" style={{ maxHeight: 268 }}>
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-base-700 text-white">
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-base-600">
+                      Item
+                    </th>
+                    <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-base-600">
+                      Qty
+                    </th>
+                    <th
+                      className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-16 border-r border-base-600"
+                      title="Free ready stock at the warehouse for this item — pick a unit in Warehouse stock below to reserve it"
+                    >
+                      Ready
+                    </th>
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-36 border-r border-base-600">
+                      Location
+                    </th>
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-32">
+                      ETA
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orderedLines.map((l) => {
+                    // Real availability: match free per-unit stock by normalized
+                    // key. The catalog is empty so the old exact-sku stockBalances
+                    // join always missed (showed 0); normalizeSkuKey bridges the
+                    // order/warehouse naming drift (project-catalog-empty-sku-naming).
+                    const matchUnits = freeUnitsByKey.get(normalizeSkuKey(l.sku)) ?? [];
+                    const ready = matchUnits.length;
+                    const isService = lineKind(l.sku) === "service";
+                    // Locked vocab tone: ready green · waiting amber · no-PO grey.
+                    const rd = isService ? null : readinessOf(l.sku, l.qty);
+                    const readyTone =
+                      stage === "delivered"
+                        ? "text-base-400"
+                        : rd === "ready"
+                          ? "text-success"
+                          : rd === "waiting"
+                            ? "text-warning"
+                            : "text-base-400";
+                    // Per-item stock location (migration 0168): service charges
+                    // (No Lift / Disposal) carry none; goods default by category
+                    // (accessories → warehouse, core → supplier) and are overridable.
+                    // savedLoc===undefined → never touched → show the default; an
+                    // explicit [] (operator picked "—") shows blank, not the default.
+                    const savedLoc = form.draft.line_locations[l.sku];
+                    const locValue =
+                      savedLoc !== undefined
+                        ? (savedLoc[0] ?? "")
+                        : (defaultLineLocation(l.sku) ?? "");
+                    // Per-item stock ETA (migration 0170) — products don't all
+                    // arrive on the same date. Defaults to the linked PO's
+                    // delivery date, overridable via line_etas.
+                    const etaValue =
+                      form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
+                    // One row per SKU (duplicate lines combined above) → key on SKU.
+                    return (
+                      <tr
+                        key={l.sku}
+                        onClick={() => setPickerSku(l.sku)}
+                        className={`cursor-pointer ${l.sku === activeLineSku ? "bg-primary/10" : "hover:bg-base-50"}`}
+                      >
+                        <td className="border border-base-200 px-2 py-1 font-mono text-[11px] align-top break-all">
+                          {l.sku}
+                        </td>
+                        <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
+                          {l.qty}
+                        </td>
+                        <td
+                          className={`border border-base-200 px-2 py-1 text-right font-mono text-[11px] align-top ${readyTone}`}
+                        >
+                          {isService ? (
+                            <span className="text-base-300">—</span>
+                          ) : stage !== "delivered" ? (
+                            <button
+                              type="button"
+                              onClick={() => setPickerSku(l.sku)}
+                              className="underline decoration-dotted underline-offset-2 hover:text-primary cursor-pointer"
+                              title="Pick ready stock to reserve for this order (or browse all warehouse stock)"
+                              data-testid={`ready-pick-${l.sku}`}
+                            >
+                              {ready}
+                            </button>
+                          ) : (
+                            ready
+                          )}
+                        </td>
+                        {isService ? (
+                          <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
+                            N/A
+                          </td>
+                        ) : (
+                          <td className="border border-base-200 px-1 py-0.5 align-top">
+                            <select
+                              value={locValue}
+                              onChange={(e) =>
+                                form.setLineLocation(
+                                  l.sku,
+                                  e.target.value ? [e.target.value] : [],
+                                )
+                              }
+                              className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                            >
+                              <option value="">—</option>
+                              {STOCK_LOCATIONS.map((locOpt) => (
+                                <option key={locOpt} value={locOpt}>
+                                  {locOpt}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        )}
+                        {isService ? (
+                          <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
+                            N/A
+                          </td>
+                        ) : (
+                          <td className="border border-base-200 px-1 py-0.5 align-top">
+                            <input
+                              type="date"
+                              value={etaValue}
+                              onChange={(e) => form.setLineEta(l.sku, e.target.value)}
+                              className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                            />
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-          </div>
+            {/* Panel footer (doesn't scroll): linked POs (GRN) + warehouse remark. */}
+            <div className="border-t border-base-100 px-3 py-2 space-y-2 shrink-0">
+              {pos.length > 0 && (
+                <div>
+                  <div className="label mb-1">Linked POs</div>
+                  <div className="border border-base-100 rounded-[6px]">
+                    {pos.map((po, i) => (
+                      <PoRow key={po.id} po={po} divider={i > 0} onReceive={setReceivePo} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              <FieldGrid>
+                <RemarkControlField
+                  form={form}
+                  field="warehouse_remark"
+                  label="Warehouse remark"
+                  placeholder="Note for the warehouse team"
+                />
+              </FieldGrid>
+            </div>
+          </Panel>
 
-          {/* RIGHT pane — stock grid for the selected line (embedded, ranked
-              best-match-first; falls back to all free units). */}
-          <div className="min-w-0 h-[460px]">
-            {activeLineSku && stage !== "delivered" ? (
+          {/* Panel 2 — Warehouse stock. StockPickerGrid owns its own dark-slate
+              pinned header + funnel filters + Reserve, styled as a 12px card; it
+              grows to fill the leftover height. No active line → a placeholder. */}
+          {activeLineSku && stage !== "delivered" ? (
+            <div className="flex-1 min-h-0 flex flex-col">
               <StockPickerGrid
                 sku={activeLineSku}
                 soRef={soRef}
@@ -883,187 +936,206 @@ function DrawerBody({
                   void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
                 }}
               />
-            ) : (
-              <div className="h-full grid place-items-center border border-dashed border-base-200 rounded-[4px] t-tiny text-base-400">
-                {stage === "delivered" ? "Delivered — stock settled." : "Pick an item on the left to see its stock."}
+            </div>
+          ) : (
+            <Panel title="Warehouse stock" grow summary={<MiniBadge tone="muted">—</MiniBadge>}>
+              <div className="flex-1 grid place-items-center t-tiny text-base-400 p-6">
+                {stage === "delivered"
+                  ? "Delivered — stock settled."
+                  : "Pick an item above to see its warehouse stock."}
+              </div>
+            </Panel>
+          )}
+        </div>
+
+        {/* RIGHT column — the two locked cards: a combined Customer | Balance
+            split card (+ conditional Storage strip), then a Delivery card that
+            grows to fill so both columns' bottoms line up. */}
+        <div
+          style={{ gridArea: "side" }}
+          className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-auto"
+        >
+          {/* Card A — Customer | Balance split in ONE card (each half its own
+              sub-header + summary), with a Storage strip at the bottom for a
+              storage-eligible order. */}
+          <section className="border border-base-200 rounded-[12px] bg-white overflow-hidden shrink-0">
+            <div className="grid grid-cols-2">
+              <div className="border-r border-base-100 flex flex-col min-w-0">
+                <SplitHead
+                  title="Customer"
+                  summary={
+                    loc.label ? (
+                      <span
+                        title={loc.label}
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-base-100 text-base-500 max-w-[120px] truncate"
+                      >
+                        {loc.label}
+                      </span>
+                    ) : null
+                  }
+                />
+                <div className="p-3 flex-1">
+                  <OrderCustomerCard order={order} />
+                </div>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <SplitHead
+                  title="Balance"
+                  summary={
+                    <MiniBadge
+                      tone={hasTotal && outstanding > 0 ? "outstation" : "muted"}
+                    >
+                      {paymentSummary}
+                    </MiniBadge>
+                  }
+                />
+                <div className="p-3 flex-1">
+                  <PaymentControlFields
+                    form={form}
+                    paid={Number(order.paid || 0)}
+                    total={grandTotal}
+                    orderId={order.id}
+                    receiptMeta={{
+                      orderCode: `SO-${order.so}`,
+                      customerName: order.customer_name ?? "",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            {(hasMsbf || hasSof) && (
+              <div className="border-t border-base-100">
+                <SplitHead
+                  title="Storage"
+                  summary={<MiniBadge tone="muted">fee if held</MiniBadge>}
+                />
+                <div className="p-3">
+                  <StorageControlFields
+                    form={form}
+                    hasMsbf={hasMsbf}
+                    hasSof={hasSof}
+                    orderId={order.id}
+                    meta={{
+                      orderCode: `SO-${order.so}`,
+                      customerName: order.customer_name ?? "",
+                      customerPhone: order.customer_phone ?? "",
+                    }}
+                  />
+                </div>
               </div>
             )}
-          </div>
-          </div>
-        </DrawerSection>
-        </div>
+          </section>
 
-        {/* Right sidebar — stacked cards (Jess-approved order-detail pattern):
-            Customer · Delivery · [Route] · Balance · [Storage]. Only this column
-            + the main work area scroll. */}
-        <div
-          style={{ gridArea: "side", minWidth: 0, minHeight: 0 }}
-          className="flex flex-col gap-2.5 overflow-auto"
-        >
-        <div className="min-w-0">
-        <DrawerSection
-          icon={<ClipboardList className="w-4 h-4" />}
-          title="Customer"
-          accent="neutral"
-          summary={order.customer_name}
-          defaultOpen
-        >
-          <OrderCustomerCard order={order} />
-        </DrawerSection>
-        </div>
-
-        <div className="min-w-0">
-        {/* Delivery — carrier/date/slot + control remarks + contact-by. */}
-        <DrawerSection
-          icon={<Truck className="w-4 h-4" />}
-          title="Delivery"
-          accent="success"
-          summary={
-            deadlineSummary +
-            (form.remarkCount
-              ? ` · ${form.remarkCount} note${form.remarkCount === 1 ? "" : "s"}`
-              : "")
-          }
-          defaultOpen
-        >
-          {/* 2-col compact (Jess): LEFT = what operation sets (region / carrier /
-              deadline / call gate); RIGHT = what the logistic updates back
-              (their committed ETA + time slot). Remarks span full width below. */}
-          <div className="grid grid-cols-2 gap-x-3 gap-y-0 items-start">
-            <FieldGrid>
-              <RoutingFields
-                orderId={order.id}
-                customerAddress={order.customer_address ?? null}
-                deliveryDate={order.delivery_date}
-                proceedDate={order.proceed_date ?? null}
-                opsAssignedLogistic={order.ops_assigned_logistic ?? null}
-                form={form}
-              />
-            </FieldGrid>
-            <FieldGrid>
-              <LogisticEtaField form={form} />
-              <DeliveryTimeSlotField form={form} />
-            </FieldGrid>
-          </div>
-          <div className="mt-1.5">
-            <FieldGrid>
-              <RemarkControlField
-                form={form}
-                field="customer_request"
-                label="Customer request"
-                placeholder="e.g. postponed to end of May"
-              />
-              <RemarkControlField
-                form={form}
-                field="action_for_logistic"
-                label="Action for logistic"
-                placeholder="e.g. call customer before delivery"
-              />
-              <RemarkControlField
-                form={form}
-                field="carres_remark"
-                label="Carres remark"
-                placeholder="Internal note"
-              />
-            </FieldGrid>
-          </div>
-          {/* Contact-by — reach the customer BEFORE the deadline (Jess) to confirm
-              stock + timing. A daily cron auto-drops the task on this date; the
-              lead days (default 3) are editable per order. */}
-          {contactByLabel && (
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
-              <span
-                className="text-[11px] font-medium text-info shrink-0"
-                title="Call the customer this many days before the deadline"
-              >
-                Contact by
-              </span>
-              <span className="flex items-center gap-1 text-[11.5px] whitespace-nowrap">
-                <span className="font-medium text-base-800">{contactByLabel}</span>
-                <span className="text-base-400">· −</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={60}
-                  value={form.draft.contact_by_days}
-                  onChange={(e) => form.set("contact_by_days", e.target.value)}
-                  placeholder="3"
-                  aria-label="Contact-by lead days before the deadline"
-                  className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[11.5px] text-center outline-none focus:border-primary"
-                />
-                <span className="text-base-400">d</span>
-              </span>
+          {/* Card B — Delivery. Header badge = region. Body split Original |
+              Logistic update; then the 3 remark rows; then a Route section only
+              for a cross-border / multi-leg order. Grows to fill the column. */}
+          <Panel
+            title="Delivery"
+            grow
+            summary={
+              loc.area === "KV" ? (
+                <MiniBadge tone="kv">Klang Valley</MiniBadge>
+              ) : loc.area === "Outstation" ? (
+                <MiniBadge tone="outstation">Outstation</MiniBadge>
+              ) : (
+                <MiniBadge tone="muted">Area —</MiniBadge>
+              )
+            }
+          >
+            <div className="p-3 min-h-0 overflow-auto space-y-2 flex-1">
+              {/* Original (what operation sets) | Logistic update (what the
+                  carrier commits back). */}
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0 items-start">
+                <div className="min-w-0">
+                  <div className="t-micro text-base-400 mb-1">Original</div>
+                  <FieldGrid>
+                    <RoutingFields
+                      orderId={order.id}
+                      customerAddress={order.customer_address ?? null}
+                      deliveryDate={order.delivery_date}
+                      proceedDate={order.proceed_date ?? null}
+                      opsAssignedLogistic={order.ops_assigned_logistic ?? null}
+                      form={form}
+                    />
+                  </FieldGrid>
+                </div>
+                <div className="min-w-0">
+                  <div className="t-micro text-base-400 mb-1">Logistic update</div>
+                  <FieldGrid>
+                    <LogisticEtaField form={form} />
+                    <DeliveryTimeSlotField form={form} />
+                  </FieldGrid>
+                  {/* Contact-by — reach the customer BEFORE the deadline to confirm
+                      stock + timing; a daily cron drops the task on this date. */}
+                  {contactByLabel && (
+                    <div className="mt-1.5 flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
+                      <span
+                        className="text-[11px] font-medium text-info shrink-0"
+                        title="Call the customer this many days before the deadline"
+                      >
+                        Contact by
+                      </span>
+                      <span className="flex items-center gap-1 text-[11.5px] whitespace-nowrap">
+                        <span className="font-medium text-base-800">{contactByLabel}</span>
+                        <span className="text-base-400">· −</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={60}
+                          value={form.draft.contact_by_days}
+                          onChange={(e) => form.set("contact_by_days", e.target.value)}
+                          placeholder="3"
+                          aria-label="Contact-by lead days before the deadline"
+                          className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[11.5px] text-center outline-none focus:border-primary"
+                        />
+                        <span className="text-base-400">d</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* 3 remark rows (span full width). */}
+              <div className="border-t border-base-100 pt-2">
+                <FieldGrid>
+                  <RemarkControlField
+                    form={form}
+                    field="customer_request"
+                    label="Customer request"
+                    placeholder="e.g. postponed to end of May"
+                  />
+                  <RemarkControlField
+                    form={form}
+                    field="action_for_logistic"
+                    label="Action for logistic"
+                    placeholder="e.g. call customer before delivery"
+                  />
+                  <RemarkControlField
+                    form={form}
+                    field="carres_remark"
+                    label="Carrier's remark"
+                    placeholder="Internal note"
+                  />
+                </FieldGrid>
+              </div>
+              {/* Route — only for a cross-border / multi-leg order. */}
+              {order.delivery_stops?.length ? (
+                <div className="border-t border-base-100 pt-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="t-micro text-base-400">Route</span>
+                    <MiniBadge tone="muted">
+                      {order.delivery_stops.length} stops
+                    </MiniBadge>
+                  </div>
+                  <DeliveryChain
+                    orderId={order.id}
+                    stops={order.delivery_stops}
+                    fallbackPartnerId={order.delivery_partner_id}
+                  />
+                </div>
+              ) : null}
             </div>
-          )}
-
-        </DrawerSection>
-        </div>
-
-        {/* Route — a conditional card, only for a cross-border / multi-leg order
-            (Jess). A normal single trip is managed by the carrier in Delivery. */}
-        {order.delivery_stops?.length ? (
-          <div className="min-w-0">
-          <DrawerSection
-            icon={<Route className="w-4 h-4" />}
-            title="Route"
-            accent="neutral"
-            summary={`${order.delivery_stops.length} stops`}
-            defaultOpen
-          >
-            <DeliveryChain
-              orderId={order.id}
-              stops={order.delivery_stops}
-              fallbackPartnerId={order.delivery_partner_id}
-            />
-          </DrawerSection>
-          </div>
-        ) : null}
-
-        {/* Balance — the invoice balance (Jess renamed Payment → Balance). */}
-        <div className="min-w-0">
-        <DrawerSection
-          icon={<Banknote className="w-4 h-4" />}
-          title="Balance"
-          accent="info"
-          summary={paymentSummary}
-          defaultOpen
-        >
-          <PaymentControlFields
-            form={form}
-            paid={Number(order.paid || 0)}
-            total={grandTotal}
-            orderId={order.id}
-            receiptMeta={{ orderCode: `SO-${order.so}`, customerName: order.customer_name ?? "" }}
-          />
-        </DrawerSection>
-        </div>
-
-        {/* Storage — a conditional card, only when the order carries a
-            storage-eligible item (mattress / bed frame / sofa). */}
-        {(hasMsbf || hasSof) && (
-          <div className="min-w-0">
-          <DrawerSection
-            icon={<Package className="w-4 h-4" />}
-            title="Storage"
-            accent="warning"
-            summary="storage fee"
-            defaultOpen
-          >
-            <StorageControlFields
-              form={form}
-              hasMsbf={hasMsbf}
-              hasSof={hasSof}
-              orderId={order.id}
-              meta={{
-                orderCode: `SO-${order.so}`,
-                customerName: order.customer_name ?? "",
-                customerPhone: order.customer_phone ?? "",
-              }}
-            />
-          </DrawerSection>
-          </div>
-        )}
-        </div>{/* /right sidebar */}
+          </Panel>
+        </div>{/* /right column */}
 
       </div>
 

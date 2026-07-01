@@ -192,15 +192,18 @@ export default function StockPickerGrid({ sku, soRef, need, units, onReserved }:
   // units on top.)
 
   return (
-    <div className="flex flex-col h-full min-h-0 border border-base-200 rounded-[4px] overflow-hidden bg-white">
-      <div className="px-3 py-2 border-b border-base-100 flex items-center justify-between gap-2">
-        <div className="t-tiny text-base-600 truncate">
-          Stock · <span className="font-mono text-base-900">{sku}</span>
-          <span className="text-base-400"> — best matches first</span>
+    <div className="flex flex-col h-full min-h-0 border border-base-200 rounded-[12px] overflow-hidden bg-white">
+      <div className="px-3 py-2 border-b border-base-100 flex items-center justify-between gap-2 shrink-0">
+        <div className="min-w-0">
+          <span className="t-h4 text-base-900">Warehouse stock</span>
+          <span className="ml-1.5 t-tiny text-base-400 truncate">
+            · <span className="font-mono">{sku}</span> — best match first
+          </span>
         </div>
-        <div className="t-tiny text-base-400 flex items-center gap-2">
-          <span>
-            {view.length}/{rows.length} · {checked.size} picked
+        <div className="t-tiny text-base-500 flex items-center gap-2 shrink-0">
+          <span className="whitespace-nowrap">
+            {rows.length} free · {checked.size} picked
+            {activeFilters > 0 ? ` · ${view.length} shown` : ""}
           </span>
           {activeFilters > 0 && (
             <button
@@ -209,7 +212,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, onReserved }:
               title="Clear all column filters"
               className="text-primary hover:underline inline-flex items-center gap-0.5"
             >
-              <X size={11} strokeWidth={2.5} /> {activeFilters} filter{activeFilters === 1 ? "" : "s"}
+              <X size={11} strokeWidth={2.5} /> clear
             </button>
           )}
         </div>
