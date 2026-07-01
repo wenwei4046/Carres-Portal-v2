@@ -13,6 +13,7 @@ import {
   Pencil,
   RotateCcw,
   Truck,
+  Route,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -631,12 +632,14 @@ function DrawerBody({
           top · Delivery | Payment as two columns · Items & stock the full-width
           work area (only it scrolls) · Activity at the bottom. */}
       <div
-        className="flex-1 min-h-0 overflow-hidden px-5 py-3 grid gap-3"
+        className="flex-1 min-h-0 overflow-hidden px-5 py-3 grid gap-2.5"
         style={{
-          gridTemplateColumns: "1fr 1fr 1fr",
+          // 4-column meta row with hierarchy (Jess-approved): Customer (slim) ·
+          // Delivery (wide) · Payment = Balance+Storage (wide) · Route (slim).
+          gridTemplateColumns: "0.8fr 1.2fr 1.3fr 0.75fr",
           gridTemplateRows: "auto auto auto minmax(0,1fr)",
           gridTemplateAreas:
-            '"banner banner banner" "header header header" "cust ctrl pay" "items items items"',
+            '"banner banner banner banner" "header header header header" "cust ctrl pay route" "items items items items"',
         }}
       >
         {/* Needs-action banner — the "action for logistic" note surfaced at the
@@ -909,7 +912,7 @@ function DrawerBody({
             multi-leg (Jess: all control lives with delivery). */}
         <DrawerSection
           icon={<Truck className="w-4 h-4" />}
-          title="Delivery & control"
+          title="Delivery"
           accent="success"
           summary={
             deadlineSummary +
@@ -990,22 +993,28 @@ function DrawerBody({
             </div>
           )}
 
-          {/* Delivery ROUTE — surfaced (not hidden under "Advanced"): Carres'
-              whole model is outsourced coordination, so every stop's location +
-              ETA + status is front-and-centre (Jess 2026-06-30). */}
-          <div className="mt-3 pt-2.5 border-t border-base-100">
-            <div className="label mb-1.5">
-              Delivery route{" "}
-              <span className="text-[10px] font-normal normal-case tracking-normal text-base-400">
-                · per-stop location · ETA · status (outsourced — tracked tightly)
-              </span>
-            </div>
-            <DeliveryChain
-              orderId={order.id}
-              stops={order.delivery_stops}
-              fallbackPartnerId={order.delivery_partner_id}
-            />
-          </div>
+        </DrawerSection>
+        </div>
+
+        {/* Route — its own slim column (Jess-approved 4-col). Single trip shows a
+            few lines; "+ Add stop" expands into multi-leg with per-stop ETA. */}
+        <div style={{ gridArea: "route", minWidth: 0 }}>
+        <DrawerSection
+          icon={<Route className="w-4 h-4" />}
+          title="Route"
+          accent="neutral"
+          summary={
+            order.delivery_stops?.length
+              ? `${order.delivery_stops.length} stops`
+              : "Single trip"
+          }
+          defaultOpen
+        >
+          <DeliveryChain
+            orderId={order.id}
+            stops={order.delivery_stops}
+            fallbackPartnerId={order.delivery_partner_id}
+          />
         </DrawerSection>
         </div>
 
