@@ -102,10 +102,11 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** Editable control inside a grid cell — a visible bordered box so the operator
  *  can tell at a glance the cell is editable (Jess: every cell should look
  *  editable). Selects keep their native arrow. */
-// Read-first cell (Jess 4-col compact): looks like plain text, reveals a border
-// on hover, becomes a full input on focus — "click any value to edit".
+// Lined field cell (Jess: the borderless version read as a "ghost box" — fields
+// must clearly look like fields). A visible hairline box on white, flame ring on
+// focus — clean but structured.
 const CELL =
-  "w-full border border-transparent rounded-[3px] bg-transparent px-1 py-0.5 text-[12px] text-base-900 outline-none hover:border-base-200 hover:bg-white focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary/20 transition-colors";
+  "w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-[12px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors";
 
 /** One spreadsheet row — label cell + value/control cell, fully bordered.
  *  Field groups render FieldRows; the panel wraps them in a FieldGrid so every
@@ -1530,7 +1531,7 @@ export function RemarkControlField({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="w-full text-left px-1 py-0.5 rounded hover:bg-white hover:border hover:border-base-200 truncate text-[12px]"
+        className="w-full text-left border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 hover:border-base-400 truncate text-[12px]"
       >
         {val.trim() ? (
           <span className="text-base-900">{val}</span>
