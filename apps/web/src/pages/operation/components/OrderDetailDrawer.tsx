@@ -409,14 +409,18 @@ interface DrawerBodyProps {
 
 /** Collapsible drawer section — title + leading icon + a summary value that
  *  shows when collapsed, so a folded section still reads at a glance (P5). */
+// Clean, monochrome cards (Jess: the coloured accents read as "五颜六色" /
+// garish — the agreed mockup is a plain white card + hairline border + neutral
+// header). Accent kept in the API so callers don't change, but every card now
+// renders the same clean style.
 const SECTION_ACCENT: Record<
   string,
   { bar: string; icon: string; head: string }
 > = {
-  neutral: { bar: "border-l-base-300", icon: "text-base-400", head: "bg-base-50" },
-  warning: { bar: "border-l-warning", icon: "text-warning", head: "bg-warning/10" },
-  success: { bar: "border-l-success", icon: "text-success", head: "bg-success/10" },
-  info: { bar: "border-l-info", icon: "text-info", head: "bg-info/10" },
+  neutral: { bar: "", icon: "text-base-400", head: "" },
+  warning: { bar: "", icon: "text-base-400", head: "" },
+  success: { bar: "", icon: "text-base-400", head: "" },
+  info: { bar: "", icon: "text-base-400", head: "" },
 };
 
 function DrawerSection({
@@ -444,10 +448,10 @@ function DrawerSection({
   const a = SECTION_ACCENT[accent];
   return (
     <div
-      className={`border border-base-200 border-l-[3px] ${a.bar} rounded-[4px] bg-white mb-2 overflow-hidden`}
+      className="border border-base-200 rounded-[8px] bg-white overflow-hidden"
     >
       <div
-        className={`w-full flex items-center justify-between gap-3 px-3 py-2 ${a.head}`}
+        className="w-full flex items-center justify-between gap-3 px-3 py-1.5 border-b border-base-100"
       >
         <button
           type="button"
