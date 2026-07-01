@@ -61,6 +61,22 @@ const fmtAt = (iso: string | null | undefined) => {
   }
 };
 
+/** A leg's scheduled_at (ISO datetime) ↔ a `<input type="date">` value
+ *  (yyyy-mm-dd). Stored at NOON local so the date never flips across the MYT
+ *  (+8) offset when it round-trips through UTC. */
+function isoToDateInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function dateInputToIso(v: string): string {
+  return new Date(`${v}T12:00:00`).toISOString();
+}
+
 interface Props {
   orderId: string;
   stops: DeliveryStop[] | null;
@@ -218,9 +234,18 @@ interface StopRowProps {
 function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [noteDraft, setNoteDraft] = useState(stop.notes ?? "");
+  const [editingEta, setEditingEta] = useState(false);
+  const [etaDraft, setEtaDraft] = useState(isoToDateInput(stop.scheduled_at));
 
   const stamp = stop.delivered_at ?? stop.handed_off_at ?? stop.picked_up_at ?? null;
   const stampLabel = stamp ? fmtAt(stamp) : null;
+  const etaLabel = stop.scheduled_at
+    ? new Date(stop.scheduled_at).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "2-digit",
+      })
+    : null;
 
   // Next status in the natural flow: pending → picked_up → handed_off (or
   // delivered for the last leg) → delivered. Issue is set manually.
@@ -262,6 +287,53 @@ function StopRow({ stop, isLast, onPatch, patchPending, onRemove }: StopRowProps
         >
           ✕
         </button>
+      </div>
+
+      {/* Stop ETA (scheduled_at) — inline-editable per leg */}
+      <div className="mt-2 text-xs">
+        {editingEta ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              className="rounded border border-base-300 px-2 py-1 text-xs"
+              value={etaDraft}
+              onChange={(e) => setEtaDraft(e.target.value)}
+            />
+            <button
+              type="button"
+              className="rounded bg-base-900 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-base-800 disabled:opacity-50"
+              disabled={patchPending}
+              onClick={() => {
+                onPatch({ scheduled_at: etaDraft ? dateInputToIso(etaDraft) : null });
+                setEditingEta(false);
+              }}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              className="text-[11px] text-base-500"
+              onClick={() => {
+                setEtaDraft(isoToDateInput(stop.scheduled_at));
+                setEditingEta(false);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="text-[11px] text-base-500 hover:text-base-700"
+            onClick={() => setEditingEta(true)}
+          >
+            {etaLabel ? (
+              <span className="text-base-700">🕑 ETA {etaLabel}</span>
+            ) : (
+              <span>+ Set stop ETA</span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Notes — inline-editable */}
