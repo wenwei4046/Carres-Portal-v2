@@ -634,12 +634,13 @@ function DrawerBody({
       <div
         className="flex-1 min-h-0 overflow-hidden px-5 py-3 grid gap-2.5"
         style={{
-          // 4-column meta row with hierarchy (Jess-approved): Customer (slim) ·
-          // Delivery (wide) · Payment = Balance+Storage (wide) · Route (slim).
-          gridTemplateColumns: "0.8fr 1.2fr 1.3fr 0.75fr",
-          gridTemplateRows: "auto auto auto minmax(0,1fr)",
+          // Standard order-detail pattern (Jess-approved, Shopify/Stripe): a big
+          // Items & stock work area on the LEFT (main), a stacked card sidebar on
+          // the RIGHT (Customer · Delivery · [Route] · Balance · [Storage]).
+          gridTemplateColumns: "1.62fr 1fr",
+          gridTemplateRows: "auto auto minmax(0,1fr)",
           gridTemplateAreas:
-            '"banner banner banner banner" "header header header header" "cust ctrl pay route" "items items items items"',
+            '"banner banner" "header header" "main side"',
         }}
       >
         {/* Needs-action banner — the "action for logistic" note surfaced at the
@@ -708,21 +709,8 @@ function DrawerBody({
           </span>
         </div>
 
-        {/* Customer — its own column in the 3-up meta row. */}
-        <div style={{ gridArea: "cust", minWidth: 0 }}>
-        <DrawerSection
-          icon={<ClipboardList className="w-4 h-4" />}
-          title="Customer"
-          accent="neutral"
-          summary={order.customer_name}
-          defaultOpen
-        >
-          <OrderCustomerCard order={order} />
-        </DrawerSection>
-        </div>
-
-        {/* 2 · Items & stock — the full-width work area (only it scrolls). */}
-        <div style={{ gridArea: "items", minWidth: 0, minHeight: 0, overflow: "auto" }}>
+        {/* Main work area — Items & stock (the left column). */}
+        <div style={{ gridArea: "main", minWidth: 0, minHeight: 0, overflow: "auto" }}>
         <DrawerSection
           icon={<Package className="w-4 h-4" />}
           title="Items & stock"
@@ -730,12 +718,9 @@ function DrawerBody({
           summary={`${totalItems(lines)} item${totalItems(lines) === 1 ? "" : "s"}${shortages.length ? ` · ${shortages.length} short` : ""}`}
           defaultOpen
         >
-          {/* 2-pane work area: LEFT = order lines (click one) · RIGHT = its stock
-              grid embedded inline (Jess agreed mockup — not a modal). */}
-          <div
-            className="grid gap-3 items-start"
-            style={{ gridTemplateColumns: "minmax(0,42%) minmax(0,58%)" }}
-          >
+          {/* Stacked work area (Jess): Items ordered on TOP · its warehouse stock
+              grid BELOW (not side-by-side) — each gets the full main width. */}
+          <div className="grid grid-cols-1 gap-3 items-start">
           <div className="min-w-0">
           <table className="w-full border-collapse">
             <thead>
@@ -907,9 +892,27 @@ function DrawerBody({
         </DrawerSection>
         </div>
 
-        <div style={{ gridArea: "ctrl", minWidth: 0 }}>
-        {/* 3 · Delivery & control — carrier/date/slot + control remarks +
-            multi-leg (Jess: all control lives with delivery). */}
+        {/* Right sidebar — stacked cards (Jess-approved order-detail pattern):
+            Customer · Delivery · [Route] · Balance · [Storage]. Only this column
+            + the main work area scroll. */}
+        <div
+          style={{ gridArea: "side", minWidth: 0, minHeight: 0 }}
+          className="flex flex-col gap-2.5 overflow-auto"
+        >
+        <div className="min-w-0">
+        <DrawerSection
+          icon={<ClipboardList className="w-4 h-4" />}
+          title="Customer"
+          accent="neutral"
+          summary={order.customer_name}
+          defaultOpen
+        >
+          <OrderCustomerCard order={order} />
+        </DrawerSection>
+        </div>
+
+        <div className="min-w-0">
+        {/* Delivery — carrier/date/slot + control remarks + contact-by. */}
         <DrawerSection
           icon={<Truck className="w-4 h-4" />}
           title="Delivery"
@@ -998,7 +1001,7 @@ function DrawerBody({
 
         {/* Route — its own slim column (Jess-approved 4-col). Single trip shows a
             few lines; "+ Add stop" expands into multi-leg with per-stop ETA. */}
-        <div style={{ gridArea: "route", minWidth: 0 }}>
+        <div className="min-w-0">
         <DrawerSection
           icon={<Route className="w-4 h-4" />}
           title="Route"
@@ -1018,7 +1021,7 @@ function DrawerBody({
         </DrawerSection>
         </div>
 
-        <div style={{ gridArea: "pay", minWidth: 0 }}>
+        <div className="min-w-0">
         {/* 4 · Payment — every money fact in one place (collapsed by default) */}
         <DrawerSection
           icon={<Banknote className="w-4 h-4" />}
@@ -1053,6 +1056,7 @@ function DrawerBody({
           </div>
         </DrawerSection>
         </div>
+        </div>{/* /right sidebar */}
 
       </div>
 
