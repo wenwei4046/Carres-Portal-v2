@@ -102,8 +102,10 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** Editable control inside a grid cell — a visible bordered box so the operator
  *  can tell at a glance the cell is editable (Jess: every cell should look
  *  editable). Selects keep their native arrow. */
+// Read-first cell (Jess 4-col compact): looks like plain text, reveals a border
+// on hover, becomes a full input on focus — "click any value to edit".
 const CELL =
-  "w-full border border-base-300 rounded-[3px] bg-white px-2 py-1 text-[12px] text-base-900 outline-none hover:border-base-400 focus:border-primary focus:ring-1 focus:ring-primary/20";
+  "w-full border border-transparent rounded-[3px] bg-transparent px-1 py-0.5 text-[12px] text-base-900 outline-none hover:border-base-200 hover:bg-white focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary/20 transition-colors";
 
 /** One spreadsheet row — label cell + value/control cell, fully bordered.
  *  Field groups render FieldRows; the panel wraps them in a FieldGrid so every
@@ -116,8 +118,8 @@ export function FieldRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[110px_1fr] border-b border-base-200 last:border-b-0">
-      <div className="bg-base-50 text-base-700 text-[10px] font-semibold uppercase tracking-[0.04em] px-2 py-1.5 border-r border-base-200">
+    <div className="mb-1.5 last:mb-0 min-w-0">
+      <div className="text-[10px] uppercase tracking-[0.04em] text-base-400 leading-none mb-0.5">
         {label}
       </div>
       <div className="min-w-0 flex items-center">{children}</div>
@@ -125,13 +127,10 @@ export function FieldRow({
   );
 }
 
-/** Bordered wrapper turning a set of FieldRows into one grid block. */
+/** Compact wrapper for a set of FieldRows (Jess 4-col: no heavy border box —
+ *  the fields read as plain label · value until clicked). */
 export function FieldGrid({ children }: { children: ReactNode }) {
-  return (
-    <div className="border border-base-200 rounded-[3px] overflow-hidden">
-      {children}
-    </div>
-  );
+  return <div className="min-w-0">{children}</div>;
 }
 
 /** Shared ops_order_control form state — call ONCE in the drawer, then hand the
