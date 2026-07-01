@@ -971,23 +971,28 @@ function DrawerBody({
               stock + timing. A daily cron auto-drops the task on this date; the
               lead days (default 3) are editable per order. */}
           {contactByLabel && (
-            <div className="mt-2.5 flex items-center gap-2 rounded-[4px] bg-info-soft/60 px-3 py-1.5 text-[11.5px]">
-              <span className="font-semibold uppercase tracking-[0.04em] text-[10px] text-info">
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
+              <span
+                className="text-[11px] font-medium text-info shrink-0"
+                title="Call the customer this many days before the deadline"
+              >
                 Contact by
               </span>
-              <span className="font-medium text-base-800">{contactByLabel}</span>
-              <span className="text-base-400">· call to confirm stock + timing · deadline −</span>
-              <input
-                type="number"
-                min={0}
-                max={60}
-                value={form.draft.contact_by_days}
-                onChange={(e) => form.set("contact_by_days", e.target.value)}
-                placeholder="3"
-                aria-label="Contact-by lead days before the deadline"
-                className="w-12 rounded border border-base-200 bg-white px-1.5 py-0.5 text-[11.5px] text-center outline-none focus:border-primary"
-              />
-              <span className="text-base-400">days</span>
+              <span className="flex items-center gap-1 text-[11.5px] whitespace-nowrap">
+                <span className="font-medium text-base-800">{contactByLabel}</span>
+                <span className="text-base-400">· −</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={60}
+                  value={form.draft.contact_by_days}
+                  onChange={(e) => form.set("contact_by_days", e.target.value)}
+                  placeholder="3"
+                  aria-label="Contact-by lead days before the deadline"
+                  className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[11.5px] text-center outline-none focus:border-primary"
+                />
+                <span className="text-base-400">d</span>
+              </span>
             </div>
           )}
 
