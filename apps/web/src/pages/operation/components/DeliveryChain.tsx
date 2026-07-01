@@ -110,48 +110,56 @@ export default function DeliveryChain({
 
   const [showAddLeg, setShowAddLeg] = useState(false);
 
-  // --- "No chain yet" view ---------------------------------------------------
+  // --- "No chain yet" view — compact single-trip read-out (Jess 4-col) --------
+  // A normal order is a single trip via the carrier picked in Delivery. Adding a
+  // stop opens the pick-partner form directly (previously "Set up multi-leg
+  // route" seeded an EMPTY chain when no carrier was assigned → a dead no-op).
   if (!hasChain) {
     return (
-      <div className="rounded border border-base-200 bg-base-50 p-3 text-xs">
-        <div className="flex items-center justify-between">
-          <div className="text-base-700">
-            <span className="font-semibold">Single-leg delivery</span>
+      <div className="text-xs">
+        <div className="mb-1.5">
+          <div className="text-[10px] uppercase tracking-[0.04em] text-base-400">Type</div>
+          <div className="font-medium text-base-900">Single trip</div>
+        </div>
+        <div className="mb-1.5">
+          <div className="text-[10px] uppercase tracking-[0.04em] text-base-400">Carrier</div>
+          <div className="text-base-900">
             {fallbackPartnerName ? (
-              <> · via <span className="font-mono">{fallbackPartnerName}</span></>
+              <span className="font-medium">{fallbackPartnerName}</span>
             ) : (
-              <> · no partner assigned yet</>
+              <span className="text-base-400">— set in Delivery</span>
             )}
           </div>
+        </div>
+        {showAddLeg ? (
+          <AddLegForm
+            nextLeg={1}
+            partners={partners}
+            previousToLoc="Carres warehouse"
+            onCancel={() => setShowAddLeg(false)}
+            onSubmit={(newStop) =>
+              setChain.mutate(
+                { stops: [newStop] },
+                { onSuccess: () => setShowAddLeg(false) },
+              )
+            }
+            pending={setChain.isPending}
+          />
+        ) : (
           <button
             type="button"
-            className="rounded border border-primary px-2 py-1 text-[11px] font-medium text-primary hover:bg-primary/5"
-            onClick={() => {
-              // Seed leg 1 from the existing single-leg partner so operation
-              // doesn't have to re-pick what they already chose.
-              const seed: DeliveryStop[] = fallbackPartnerId
-                ? [
-                    {
-                      leg: 1,
-                      partner_id: fallbackPartnerId,
-                      partner_name: fallbackPartnerName ?? "",
-                      from_loc: "Carres warehouse",
-                      to_loc: "(set destination)",
-                      status: "pending",
-                    },
-                  ]
-                : [];
-              setChain.mutate({ stops: seed });
-            }}
-            disabled={setChain.isPending}
+            className="mt-1 text-[11px] font-medium text-primary hover:underline"
+            onClick={() => setShowAddLeg(true)}
           >
-            {setChain.isPending ? "Setting up…" : "+ Set up multi-leg route"}
+            + Add stop (multi-leg)
           </button>
-        </div>
-        <p className="mt-2 text-[11px] text-base-500">
-          For cross-state / cross-border deliveries you can split into N legs
-          (NETS → TEOW → EU etc.) — each gets its own status, partner + POD.
-        </p>
+        )}
+        {!showAddLeg && (
+          <p className="mt-1.5 text-[11px] text-base-400 leading-snug">
+            Cross-state / border? Split into legs (NETS → TEOW → EU) — each with its
+            own status, ETA + POD.
+          </p>
+        )}
       </div>
     );
   }
