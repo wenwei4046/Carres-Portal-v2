@@ -999,63 +999,70 @@ function DrawerBody({
         </DrawerSection>
         </div>
 
-        {/* Route — its own slim column (Jess-approved 4-col). Single trip shows a
-            few lines; "+ Add stop" expands into multi-leg with per-stop ETA. */}
-        <div className="min-w-0">
-        <DrawerSection
-          icon={<Route className="w-4 h-4" />}
-          title="Route"
-          accent="neutral"
-          summary={
-            order.delivery_stops?.length
-              ? `${order.delivery_stops.length} stops`
-              : "Single trip"
-          }
-          defaultOpen
-        >
-          <DeliveryChain
-            orderId={order.id}
-            stops={order.delivery_stops}
-            fallbackPartnerId={order.delivery_partner_id}
-          />
-        </DrawerSection>
-        </div>
+        {/* Route — a conditional card, only for a cross-border / multi-leg order
+            (Jess). A normal single trip is managed by the carrier in Delivery. */}
+        {order.delivery_stops?.length ? (
+          <div className="min-w-0">
+          <DrawerSection
+            icon={<Route className="w-4 h-4" />}
+            title="Route"
+            accent="neutral"
+            summary={`${order.delivery_stops.length} stops`}
+            defaultOpen
+          >
+            <DeliveryChain
+              orderId={order.id}
+              stops={order.delivery_stops}
+              fallbackPartnerId={order.delivery_partner_id}
+            />
+          </DrawerSection>
+          </div>
+        ) : null}
 
+        {/* Balance — the invoice balance (Jess renamed Payment → Balance). */}
         <div className="min-w-0">
-        {/* 4 · Payment — every money fact in one place (collapsed by default) */}
         <DrawerSection
           icon={<Banknote className="w-4 h-4" />}
-          title="Payment"
+          title="Balance"
           accent="info"
           summary={paymentSummary}
           defaultOpen
         >
-          <div className="grid grid-cols-2 gap-2 items-start">
-            <FieldGrid>
-              <PaymentControlFields
-                form={form}
-                paid={Number(order.paid || 0)}
-                total={grandTotal}
-                orderId={order.id}
-                receiptMeta={{ orderCode: `SO-${order.so}`, customerName: order.customer_name ?? "" }}
-              />
-            </FieldGrid>
-            <FieldGrid>
-              <StorageControlFields
-                form={form}
-                hasMsbf={hasMsbf}
-                hasSof={hasSof}
-                orderId={order.id}
-                meta={{
-                  orderCode: `SO-${order.so}`,
-                  customerName: order.customer_name ?? "",
-                  customerPhone: order.customer_phone ?? "",
-                }}
-              />
-            </FieldGrid>
-          </div>
+          <PaymentControlFields
+            form={form}
+            paid={Number(order.paid || 0)}
+            total={grandTotal}
+            orderId={order.id}
+            receiptMeta={{ orderCode: `SO-${order.so}`, customerName: order.customer_name ?? "" }}
+          />
         </DrawerSection>
         </div>
+
+        {/* Storage — a conditional card, only when the order carries a
+            storage-eligible item (mattress / bed frame / sofa). */}
+        {(hasMsbf || hasSof) && (
+          <div className="min-w-0">
+          <DrawerSection
+            icon={<Package className="w-4 h-4" />}
+            title="Storage"
+            accent="warning"
+            summary="storage fee"
+            defaultOpen
+          >
+            <StorageControlFields
+              form={form}
+              hasMsbf={hasMsbf}
+              hasSof={hasSof}
+              orderId={order.id}
+              meta={{
+                orderCode: `SO-${order.so}`,
+                customerName: order.customer_name ?? "",
+                customerPhone: order.customer_phone ?? "",
+              }}
+            />
+          </DrawerSection>
+          </div>
+        )}
         </div>{/* /right sidebar */}
 
       </div>
