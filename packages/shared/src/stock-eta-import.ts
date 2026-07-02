@@ -52,6 +52,23 @@ export function parseEtaCell(raw: string | number | undefined | null): string | 
   return null;
 }
 
+/** The per-line readiness a Master "Stock Status" (col Z) maps to. */
+export type LineStockStatus = "ready" | "waiting" | "nopo";
+
+/** Map a Master "Stock Status" cell to the portal's readiness vocab:
+ *  Received → ready · Pending → waiting · No Stock / No PO → nopo. Anything else
+ *  (or blank) → null (no status to import). */
+export function normalizeMasterStockStatus(
+  raw: string | undefined | null,
+): LineStockStatus | null {
+  const s = (raw ?? "").trim().toLowerCase();
+  if (s === "") return null;
+  if (s.startsWith("receiv")) return "ready";
+  if (s.startsWith("pend")) return "waiting";
+  if (s.startsWith("no stock") || s === "no po" || s === "nopo") return "nopo";
+  return null;
+}
+
 /** Split a product name into match tokens: lower-case, break letter/digit runs
  *  ("1013Jager" → 1013, jager), drop tokens < 2 chars. Mirrors the stock-picker
  *  ranking so the importer and the panel "feel" the same. */
@@ -75,9 +92,9 @@ export interface StockEtaImportRow {
   sku: string;
   /** ISO `yyyy-mm-dd` when the stock arrives; omitted for received/blank. */
   eta?: string;
-  /** Master "Stock Status" verbatim (Received / Pending / No Stock) — carried for
-   *  future use; the ETA is what this import writes. */
-  status?: string;
+  /** Readiness from the Master "Stock Status" col (Received/Pending/No Stock →
+   *  ready/waiting/nopo); omitted when the cell is blank/unmapped. */
+  stockStatus?: LineStockStatus;
 }
 
 export type StockRowResult =
@@ -85,9 +102,9 @@ export type StockRowResult =
   | { ok: false; reason: string };
 
 /** Map ONE raw Master "Ops" record (header => cell) to an import row. Header
- *  lookup is case-insensitive + trimmed. Requires a PO + Item Detail; a blank
- *  ETA is allowed (received lines have none) but such a row is only useful for a
- *  future status import, so we skip it here to keep the ETA batch tight. */
+ *  lookup is case-insensitive + trimmed. Requires a PO + Item Detail, and at
+ *  least one of a Stock ETA (Pending lines) or a mappable Stock Status (Received
+ *  → ready etc.) — a row with neither carries nothing to import. */
 export function masterRecordToStockRow(
   rec: Record<string, string | number>,
 ): StockRowResult {
@@ -101,12 +118,14 @@ export function masterRecordToStockRow(
   if (!sku) return { ok: false, reason: "missing Item Detail" };
 
   const eta = parseEtaCell(norm["stock eta"] as string | number | undefined);
-  const status = str("stock status");
-  if (!eta) return { ok: false, reason: "no Stock ETA (received / blank)" };
+  const stockStatus = normalizeMasterStockStatus(str("stock status"));
+  if (!eta && !stockStatus) {
+    return { ok: false, reason: "no Stock ETA or Status to import" };
+  }
 
   const row: StockEtaImportRow = { po, sku };
-  row.eta = eta;
-  if (status) row.status = status;
+  if (eta) row.eta = eta;
+  if (stockStatus) row.stockStatus = stockStatus;
   return { ok: true, row };
 }
 
@@ -125,7 +144,8 @@ export interface OrderLineRef {
 export interface StockEtaMatch {
   orderId: string;
   sku: string;
-  eta: string;
+  eta?: string;
+  stockStatus?: LineStockStatus;
 }
 
 export interface StockMatchOutcome {
@@ -156,7 +176,7 @@ export function matchStockRows(
   const unmatched: { po: string; sku: string; reason: string }[] = [];
 
   for (const r of rows) {
-    if (!r.eta) continue;
+    if (!r.eta && !r.stockStatus) continue;
     const candidates = byPo.get(normalizePoKey(r.po));
     if (!candidates || candidates.length === 0) {
       unmatched.push({ po: r.po, sku: r.sku, reason: "PO not found in any order" });
@@ -176,7 +196,10 @@ export function matchStockRows(
     // A single-line PO matches even at score 0 (no ambiguity); a multi-line PO
     // needs at least one shared token so we don't stamp the wrong size.
     if (best && (candidates.length === 1 || bestScore > 0)) {
-      matched.push({ orderId: best.orderId, sku: best.sku, eta: r.eta });
+      const m: StockEtaMatch = { orderId: best.orderId, sku: best.sku };
+      if (r.eta) m.eta = r.eta;
+      if (r.stockStatus) m.stockStatus = r.stockStatus;
+      matched.push(m);
     } else {
       unmatched.push({ po: r.po, sku: r.sku, reason: "no matching line in PO" });
     }
@@ -197,7 +220,7 @@ export const stockEtaImportRowSchema = z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "eta must be yyyy-mm-dd")
       .optional(),
-    status: z.string().trim().max(40).optional(),
+    stockStatus: z.enum(["ready", "waiting", "nopo"]).optional(),
   })
   .strict();
 export type StockEtaImportRowParsed = z.infer<typeof stockEtaImportRowSchema>;

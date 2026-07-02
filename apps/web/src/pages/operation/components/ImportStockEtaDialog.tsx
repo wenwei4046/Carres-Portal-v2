@@ -71,7 +71,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
       const parsed = await readMasterOpsRows(file);
       if (parsed.length === 0) {
         setParseError(
-          "No rows with a Stock ETA found. The sheet needs a PO, Item Detail, and Stock ETA per row.",
+          "No rows with a Stock ETA or Status found. The sheet needs a PO + Item Detail per row.",
         );
         return;
       }
@@ -99,7 +99,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
       setResult(res);
       setStage("result");
       toast.success(
-        `Set Stock ETA on ${res.written} line${res.written === 1 ? "" : "s"} across ${res.orders} order${res.orders === 1 ? "" : "s"}`,
+        `Updated ${res.written} line${res.written === 1 ? "" : "s"} (ETA / status) across ${res.orders} order${res.orders === 1 ? "" : "s"}`,
       );
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Import failed");
@@ -107,19 +107,20 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
   }
 
   return (
-    <Modal title="Import stock ETA" onClose={onClose}>
+    <Modal title="Import from Master sheet" onClose={onClose}>
       {stage === "pick" && (
         <div className="flex flex-col gap-3">
           <p className="t-small text-base-600">
             Upload your <span className="font-semibold">Master</span> file (.xlsx). We read the{" "}
             <span className="font-mono t-tiny">Ops</span> sheet and fill each order line's{" "}
-            <span className="font-semibold">Stock ETA</span> from the{" "}
-            <span className="font-mono t-tiny">Stock ETA</span> column, matched to the order by{" "}
+            <span className="font-semibold">Stock ETA</span> +{" "}
+            <span className="font-semibold">Stock status</span> (Received → Ready · Pending →
+            Waiting · No Stock → No PO), matched to the order by{" "}
             <span className="font-mono t-tiny">PO</span> + item name.
           </p>
           <p className="t-tiny text-base-500">
-            Received / blank rows are skipped (nothing to schedule). You'll see how many rows match
-            before anything is written.
+            Rows with neither an ETA nor a status are skipped. You'll see how many rows match before
+            anything is written.
           </p>
           <div>
             <button

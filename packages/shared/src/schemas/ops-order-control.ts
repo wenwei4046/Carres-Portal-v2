@@ -102,6 +102,12 @@ export const opsOrderControlSchema = z.object({
   /** Per-line stock ETA { <sku>: "yyyy-mm-dd" } — products don't all arrive on
    *  the same date (migration 0170, Jess). */
   line_etas: z.record(z.string(), z.string()).nullable(),
+  /** Per-line stock STATUS override { <sku>: "ready"|"waiting"|"nopo" } — from the
+   *  Master-sheet import or keyed per line; the readiness badge PREFERS it over
+   *  the derived free-stock value (migration 0199, Jess 2026-07-02). */
+  line_stock_status: z
+    .record(z.string(), z.enum(["ready", "waiting", "nopo"]))
+    .nullable(),
   called_customer: z.boolean().default(false),
   /** Balance job (migration 0184) — when the customer's balance is due. Key-in;
    *  the Payments panel + drawer flag overdue (due < today AND outstanding > 0).
@@ -286,6 +292,9 @@ export const updateOpsOrderControlInput = z
     storage_paid: z.string().max(100).nullable(),
     line_locations: z.record(z.string(), z.array(z.string())).nullable(),
     line_etas: z.record(z.string(), z.string()).nullable(),
+    line_stock_status: z
+      .record(z.string(), z.enum(["ready", "waiting", "nopo"]))
+      .nullable(),
     called_customer: z.boolean(),
     // Balance job (migration 0184) — payment due date. The storage_collected_at
     // / storage_waiver_* columns are intentionally NOT writable here: those go

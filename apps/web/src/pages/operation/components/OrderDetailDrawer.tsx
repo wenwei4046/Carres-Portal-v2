@@ -1,6 +1,7 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, type MouseEvent, useEffect, useState } from "react";
 import {
   AlertCircle,
+  ChevronDown,
   ChevronRight,
   Download,
   FileText,
@@ -12,7 +13,12 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { STOCK_LOCATIONS, normalizeSkuKey, updateOrderInputSchema } from "@carres/shared";
+import {
+  STOCK_LOCATIONS,
+  normalizeSkuKey,
+  updateOrderInputSchema,
+  type LineStockStatus,
+} from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { renderDoPdf } from "@/lib/pdf/render";
 import type { DoTemplateData } from "@/lib/pdf/types";
@@ -662,12 +668,17 @@ function DrawerBody({
     return poSkus.has(k) || soPoBySku.has(k);
   };
   const goodsLines = orderedLines.filter((l) => lineKind(l.sku) !== "service");
-  const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" => {
+  const derivedReadiness = (sku: string, qty: number): "ready" | "waiting" | "nopo" => {
     const free = (freeUnitsByKey.get(stockMatchKey(sku)) ?? []).length;
     if (free >= qty) return "ready";
     if (hasPoForSku(sku)) return "waiting";
     return "nopo";
   };
+  // Per-line override (Master-sheet import or keyed in the Stock cell) wins over
+  // the derived free-stock value (migration 0199) — AutoCount receipts live in
+  // the sheet, not the portal, so the derived value alone never shows Ready.
+  const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" =>
+    form.draft.line_stock_status[sku] ?? derivedReadiness(sku, qty);
   const readyN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "ready").length;
   const waitingN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "waiting").length;
   const nopoN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "nopo").length;
@@ -870,12 +881,8 @@ function DrawerBody({
                     // Pending (PO placed, waiting — show Stock ETA) · No PO (nothing
                     // raised). Derived from same-model+size free stock + PO existence.
                     const rd = isService ? null : readinessOf(l.sku, l.qty);
-                    const status =
-                      rd === "ready"
-                        ? { t: "Ready", c: "bg-[#DCFCE7] text-[#166534]" }
-                        : rd === "waiting"
-                          ? { t: "Waiting", c: "bg-[#FEF3C7] text-[#92400E]" }
-                          : { t: "No PO", c: "bg-[#DC2626] text-white" };
+                    const isStatusOverride =
+                      form.draft.line_stock_status[l.sku] !== undefined;
                     // PO number for the PO column — the AutoCount source_po
                     // (real PO like "PO/2603-065") wins; else a portal PO id.
                     const poNo =
@@ -906,18 +913,16 @@ function DrawerBody({
                         className={`cursor-pointer ${l.sku === activeLineSku ? "bg-primary/10" : "hover:bg-base-50"}`}
                       >
                         <td className="border border-base-200 px-1.5 py-1 align-top">
-                          {isService ? (
+                          {isService || !rd ? (
                             <span className="text-base-300 text-[11px]">—</span>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => setPickerSku(l.sku)}
-                              title="Received / Pending (waiting on PO) / No PO — click to pick or reserve warehouse stock"
-                              data-testid={`ready-pick-${l.sku}`}
-                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${status.c}`}
-                            >
-                              {status.t}
-                            </button>
+                            <StockStatusCell
+                              sku={l.sku}
+                              status={rd}
+                              isOverride={isStatusOverride}
+                              onSet={(s) => form.setLineStockStatus(l.sku, s)}
+                              onPick={() => setPickerSku(l.sku)}
+                            />
                           )}
                         </td>
                         {isService ? (
@@ -1927,5 +1932,94 @@ function PrintDoButton({
       </span>
       {pending ? "Opening…" : "Print DO"}
     </button>
+  );
+}
+
+/** Readiness pill label + colour by status (locked vocab: No PO red · Waiting
+ *  amber · Ready green). */
+const STOCK_STATUS_META: Record<LineStockStatus, { t: string; c: string }> = {
+  ready: { t: "Ready", c: "bg-[#DCFCE7] text-[#166534]" },
+  waiting: { t: "Waiting", c: "bg-[#FEF3C7] text-[#92400E]" },
+  nopo: { t: "No PO", c: "bg-[#DC2626] text-white" },
+};
+
+/**
+ * The Stock cell in the Items panel: shows the readiness pill AND lets the
+ * operator set it per line (Jess 2026-07-02 — "update the stock GRN each item").
+ * Click → a tiny menu: Ready / Waiting / No PO (a manual override stored in
+ * ops_order_control.line_stock_status), "Auto" to clear it back to the derived
+ * free-stock value, and "Pick / reserve stock" to open the warehouse picker. A
+ * "•" marks a manual override so it's distinct from the auto-derived value.
+ */
+function StockStatusCell({
+  sku: _sku,
+  status,
+  isOverride,
+  onSet,
+  onPick,
+}: {
+  sku: string;
+  status: LineStockStatus;
+  isOverride: boolean;
+  onSet: (s: LineStockStatus | null) => void;
+  onPick: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const meta = STOCK_STATUS_META[status];
+  const stop = (e: MouseEvent) => e.stopPropagation();
+  return (
+    <div className="relative" onClick={stop}>
+      <button
+        type="button"
+        onClick={(e) => {
+          stop(e);
+          setOpen((v) => !v);
+        }}
+        title="Set stock status (Received / Pending / No PO) or pick warehouse stock"
+        data-testid={`stock-status-${_sku}`}
+        className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${meta.c}`}
+      >
+        {meta.t}
+        {isOverride && <span title="Manual override">•</span>}
+        <ChevronDown size={10} strokeWidth={2.5} className="opacity-70" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={(e) => { stop(e); setOpen(false); }} />
+          <div className="absolute z-50 mt-1 left-0 w-[168px] bg-white border border-base-200 rounded-[6px] shadow-lg overflow-hidden py-1">
+            {(["ready", "waiting", "nopo"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={(e) => { stop(e); onSet(s); setOpen(false); }}
+                className={`w-full text-left px-2.5 py-1 text-[12px] hover:bg-primary/5 flex items-center gap-2 ${
+                  status === s ? "font-semibold" : ""
+                }`}
+              >
+                <span className={`inline-block w-2 h-2 rounded-full ${
+                  s === "ready" ? "bg-[#16A34A]" : s === "waiting" ? "bg-[#D97706]" : "bg-[#DC2626]"
+                }`} />
+                {STOCK_STATUS_META[s].t}
+              </button>
+            ))}
+            <div className="border-t border-base-100 my-1" />
+            <button
+              type="button"
+              onClick={(e) => { stop(e); onSet(null); setOpen(false); }}
+              className="w-full text-left px-2.5 py-1 text-[12px] text-base-500 hover:bg-primary/5"
+            >
+              Auto (from stock)
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { stop(e); onPick(); setOpen(false); }}
+              className="w-full text-left px-2.5 py-1 text-[12px] text-primary hover:bg-primary/5"
+            >
+              Pick / reserve stock →
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

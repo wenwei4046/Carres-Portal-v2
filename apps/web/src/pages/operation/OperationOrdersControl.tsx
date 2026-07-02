@@ -1094,9 +1094,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
             type="button"
             onClick={() => setEtaImportOpen(true)}
             className="btn-secondary text-[12px] whitespace-nowrap"
-            title="Fill each order line's Stock ETA from your Master sheet"
+            title="Fill each order line's Stock ETA + status from your Master sheet"
           >
-            Import stock ETA
+            Import from Master
           </button>
           {onImport && (
             <button

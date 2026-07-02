@@ -12,6 +12,7 @@ import {
   type StorageExtensionReason,
   type UpdateOpsOrderControlInput,
   type OpsOrderControl,
+  type LineStockStatus,
   type OrderPaymentRow,
   type OrderPaymentMethod,
   type PaymentKind,
@@ -69,6 +70,7 @@ interface Draft {
   storage_paid: string;
   line_locations: Record<string, string[]>;
   line_etas: Record<string, string>;
+  line_stock_status: Record<string, LineStockStatus>;
   called_customer: boolean;
 }
 
@@ -92,6 +94,7 @@ const EMPTY: Draft = {
   storage_paid: "",
   line_locations: {},
   line_etas: {},
+  line_stock_status: {},
   called_customer: false,
 };
 
@@ -152,6 +155,9 @@ export interface OrderControlForm {
   /** Set the stock ETA for one order line (per-SKU; migration 0170 — products
    *  don't all arrive on the same date, Jess). */
   setLineEta: (sku: string, eta: string) => void;
+  /** Override one line's readiness (per-SKU; migration 0199). null = clear the
+   *  override → the badge falls back to the derived free-stock value. */
+  setLineStockStatus: (sku: string, status: LineStockStatus | null) => void;
   /** Storage-fee inputs from the control overlay (migration 0165). */
   storageFrom: string | null;
   storageOverride: number | null;
@@ -192,6 +198,7 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
       storage_paid: c.storage_paid ?? "",
       line_locations: c.line_locations ?? {},
       line_etas: c.line_etas ?? {},
+      line_stock_status: c.line_stock_status ?? {},
       called_customer: c.called_customer ?? false,
     };
   }, [data]);
@@ -242,6 +249,10 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
           : null,
       line_etas:
         Object.keys(draft.line_etas).length > 0 ? draft.line_etas : null,
+      line_stock_status:
+        Object.keys(draft.line_stock_status).length > 0
+          ? draft.line_stock_status
+          : null,
       called_customer: draft.called_customer,
     };
     save.mutate(payload);
@@ -274,6 +285,13 @@ export function useOrderControlForm(orderId: string): OrderControlForm {
         ...d,
         line_etas: { ...d.line_etas, [sku]: eta },
       })),
+    setLineStockStatus: (sku, status) =>
+      setDraft((d) => {
+        const next = { ...d.line_stock_status };
+        if (status === null) delete next[sku];
+        else next[sku] = status;
+        return { ...d, line_stock_status: next };
+      }),
     storageFrom: draft.storage_from.trim() ? draft.storage_from : null,
     storageOverride: draft.storage_fee_override.trim()
       ? Number(draft.storage_fee_override)

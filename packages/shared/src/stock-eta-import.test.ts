@@ -3,6 +3,7 @@ import {
   excelSerialToISO,
   normalizePoKey,
   parseEtaCell,
+  normalizeMasterStockStatus,
   masterRecordToStockRow,
   matchStockRows,
   type OrderLineRef,
@@ -56,22 +57,44 @@ describe("masterRecordToStockRow", () => {
         po: "PO/2605-058",
         sku: 'HK5531/24" (2 Seater + Lshape)',
         eta: "2026-06-20",
-        status: "Pending",
+        stockStatus: "waiting",
       },
     });
   });
-  it("skips a received row with no ETA", () => {
+  it("keeps a received row (no ETA) and maps its status to ready", () => {
     const r = masterRecordToStockRow({
       PO: "PO/2603-065",
       "Item Detail": "1013Jager/Fab3-King",
       "Stock ETA": "",
       "Stock Status": "Received",
     });
+    expect(r).toEqual({
+      ok: true,
+      row: { po: "PO/2603-065", sku: "1013Jager/Fab3-King", stockStatus: "ready" },
+    });
+  });
+  it("skips a row with neither an ETA nor a mappable status", () => {
+    const r = masterRecordToStockRow({
+      PO: "PO/1",
+      "Item Detail": "x",
+      "Stock ETA": "",
+      "Stock Status": "",
+    });
     expect(r.ok).toBe(false);
   });
   it("skips a row missing the PO", () => {
     const r = masterRecordToStockRow({ "Item Detail": "x", "Stock ETA": 46193 });
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("normalizeMasterStockStatus", () => {
+  it("maps the Master Stock Status vocab to portal readiness", () => {
+    expect(normalizeMasterStockStatus("Received")).toBe("ready");
+    expect(normalizeMasterStockStatus("Pending")).toBe("waiting");
+    expect(normalizeMasterStockStatus("No Stock")).toBe("nopo");
+    expect(normalizeMasterStockStatus("")).toBeNull();
+    expect(normalizeMasterStockStatus("something else")).toBeNull();
   });
 });
 
@@ -100,6 +123,16 @@ describe("matchStockRows", () => {
     const out = matchStockRows(rows, lines);
     expect(out.matched).toEqual([
       { orderId: "o2", sku: 'HK5531/24" (2 Seater + Lshape)/COL:M2', eta: "2026-06-20" },
+    ]);
+  });
+
+  it("carries a status-only row (Received, no ETA) through the match", () => {
+    const rows: StockEtaImportRow[] = [
+      { po: "PO/2603-065", sku: "1013Jager/Fab3-King", stockStatus: "ready" },
+    ];
+    const out = matchStockRows(rows, lines);
+    expect(out.matched).toEqual([
+      { orderId: "o1", sku: "1013Jager/Fab3-King/COL:PC15", stockStatus: "ready" },
     ]);
   });
 

@@ -177,51 +177,77 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
 
   const { matched, unmatched } = matchStockRows(rows, lines);
 
-  // Group the matched ETAs by order → { exact order_lines.sku : eta }.
-  const byOrder = new Map<string, Record<string, string>>();
+  // Group by order → the ETA and/or the readiness STATUS for each matched line,
+  // keyed by the exact order_lines.sku (the line_etas / line_stock_status key).
+  const etaByOrder = new Map<string, Record<string, string>>();
+  const statusByOrder = new Map<string, Record<string, string>>();
+  const touchedOrders = new Set<string>();
   for (const m of matched) {
-    const cur = byOrder.get(m.orderId) ?? {};
-    cur[m.sku] = m.eta;
-    byOrder.set(m.orderId, cur);
+    touchedOrders.add(m.orderId);
+    if (m.eta) {
+      const cur = etaByOrder.get(m.orderId) ?? {};
+      cur[m.sku] = m.eta;
+      etaByOrder.set(m.orderId, cur);
+    }
+    if (m.stockStatus) {
+      const cur = statusByOrder.get(m.orderId) ?? {};
+      cur[m.sku] = m.stockStatus;
+      statusByOrder.set(m.orderId, cur);
+    }
   }
 
   const result: StockEtaImportResult = {
     matched: matched.length,
     unmatched: unmatched.length,
-    orders: byOrder.size,
+    orders: touchedOrders.size,
     written: 0,
     sampleUnmatched: unmatched.slice(0, 20),
     dryRun,
   };
 
-  if (dryRun || byOrder.size === 0) {
+  if (dryRun || touchedOrders.size === 0) {
     return c.json({ result });
   }
 
-  // Merge into each order's existing line_etas (never clobber other lines).
-  const orderIds = [...byOrder.keys()];
+  // Merge into each order's existing line_etas + line_stock_status (never clobber
+  // other lines).
+  const orderIds = [...touchedOrders];
   const { data: existing, error: exErr } = await sb
     .from("ops_order_control")
-    .select("order_id, line_etas")
+    .select("order_id, line_etas, line_stock_status")
     .in("order_id", orderIds);
   if (exErr) {
     const m = mapPgError(exErr);
     return c.json(m.body, m.status);
   }
   const existingEtas = new Map<string, Record<string, string>>();
+  const existingStatus = new Map<string, Record<string, string>>();
   for (const row of existing ?? []) {
     existingEtas.set(
       row.order_id as string,
       (row.line_etas as Record<string, string> | null) ?? {},
     );
+    existingStatus.set(
+      row.order_id as string,
+      (row.line_stock_status as Record<string, string> | null) ?? {},
+    );
   }
 
   let written = 0;
   const upsertRows = orderIds.map((orderId) => {
-    const incoming = byOrder.get(orderId)!;
-    written += Object.keys(incoming).length;
-    const merged = { ...(existingEtas.get(orderId) ?? {}), ...incoming };
-    return { order_id: orderId, line_etas: merged, updated_by: auth.id };
+    const eta = etaByOrder.get(orderId);
+    const status = statusByOrder.get(orderId);
+    written += Object.keys({ ...eta, ...status }).length;
+    const row: {
+      order_id: string;
+      updated_by: string;
+      line_etas?: Record<string, string>;
+      line_stock_status?: Record<string, string>;
+    } = { order_id: orderId, updated_by: auth.id };
+    if (eta) row.line_etas = { ...(existingEtas.get(orderId) ?? {}), ...eta };
+    if (status)
+      row.line_stock_status = { ...(existingStatus.get(orderId) ?? {}), ...status };
+    return row;
   });
 
   const { error: upErr } = await sb

@@ -168,4 +168,31 @@ describe("POST /api/operation/orders/import-stock-eta", () => {
     expect(arg[0].line_etas["Other Item"]).toBe("2026-01-01");
     expect(arg[0].line_etas["1013Jager/Queen/COL:PC15"]).toBe("2026-06-24");
   });
+
+  it("writes line_stock_status for a received (status-only) row", async () => {
+    const jwt = await makeJwt("operation");
+    const sb = makeSb({
+      lines: [{ order_id: "o1", sku: "1013Jager/King/COL:PC15", source_po: "PO/2603-065" }],
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          rows: [{ po: "PO/2603-065", sku: "1013Jager/King", stockStatus: "ready" }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const { result } = (await res.json()) as { result: { written: number } };
+    expect(result.written).toBe(1);
+    const arg = sb.upsert.mock.calls[0]![0] as unknown as {
+      line_stock_status?: Record<string, string>;
+      line_etas?: Record<string, string>;
+    }[];
+    expect(arg[0].line_stock_status?.["1013Jager/King/COL:PC15"]).toBe("ready");
+    expect(arg[0].line_etas).toBeUndefined();
+  });
 });
