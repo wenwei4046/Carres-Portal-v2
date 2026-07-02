@@ -207,7 +207,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // 2026-05-10 (Loo) — also pull `attrs` so the OrderDetailDrawer's
     // "+ Issue POs" navigate-to-procurement flow can carry color/gap/fabric
     // into CreatePOModal's cascade picker without a second round-trip.
-    sb.from("order_lines").select("sku, qty, unit_price, attrs").eq("order_id", id),
+    sb.from("order_lines").select("sku, qty, unit_price, attrs, source_po").eq("order_id", id),
     sb.from("order_addons").select("addon_key, qty, unit_price").eq("order_id", id),
     sb.from("order_history").select("text, by_role, occurred_at").eq("order_id", id).order("occurred_at", { ascending: true }),
     sb

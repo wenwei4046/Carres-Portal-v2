@@ -1979,6 +1979,9 @@ export interface operationOrderDetailLine {
   // attached to the new PO line. Null for mattress lines (no extras) and
   // pre-cascade legacy data.
   attrs?: Record<string, unknown> | null;
+  /** AutoCount PO number carried on the imported line (order_lines.source_po).
+   *  Present ⇒ the order already has a PO — do NOT show "No PO" for it. */
+  source_po?: string | null;
 }
 export interface operationOrderDetailAddon {
   addon_key: string;

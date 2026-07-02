@@ -644,11 +644,24 @@ function DrawerBody({
   const poSkus = new Set<string>();
   for (const po of pos)
     for (const pl of po.lines) poSkus.add(normalizeSkuKey(pl.sku));
+  // AutoCount-imported orders carry their PO on each line (order_lines.source_po),
+  // NOT as a portal purchase_order — so "has a PO" must check BOTH, else every
+  // imported order wrongly reads "No PO" (Jess 2026-07-02).
+  const soPoBySku = new Map<string, string>();
+  for (const l of lines) {
+    if (!l.source_po) continue;
+    const k = normalizeSkuKey(l.sku);
+    if (!soPoBySku.has(k)) soPoBySku.set(k, l.source_po);
+  }
+  const hasPoForSku = (sku: string) => {
+    const k = normalizeSkuKey(sku);
+    return poSkus.has(k) || soPoBySku.has(k);
+  };
   const goodsLines = orderedLines.filter((l) => lineKind(l.sku) !== "service");
   const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" => {
     const free = (freeUnitsByKey.get(normalizeSkuKey(sku)) ?? []).length;
     if (free >= qty) return "ready";
-    if (poSkus.has(normalizeSkuKey(sku))) return "waiting";
+    if (hasPoForSku(sku)) return "waiting";
     return "nopo";
   };
   const readyN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "ready").length;
@@ -859,14 +872,18 @@ function DrawerBody({
                         : rd === "waiting"
                           ? { t: "Waiting", c: "bg-[#FEF3C7] text-[#92400E]" }
                           : { t: "No PO", c: "bg-[#FEE2E2] text-[#991B1B]" };
-                    // PO number carrying this sku (first wins), for the PO column.
-                    const poNo = pos
-                      .find((p) =>
-                        p.lines.some(
-                          (pl) => normalizeSkuKey(pl.sku) === normalizeSkuKey(l.sku),
-                        ),
-                      )
-                      ?.id.slice(0, 8);
+                    // PO number for the PO column — the AutoCount source_po
+                    // (real PO like "PO/2603-065") wins; else a portal PO id.
+                    const poNo =
+                      soPoBySku.get(normalizeSkuKey(l.sku)) ??
+                      pos
+                        .find((p) =>
+                          p.lines.some(
+                            (pl) =>
+                              normalizeSkuKey(pl.sku) === normalizeSkuKey(l.sku),
+                          ),
+                        )
+                        ?.id.slice(0, 8);
                     // Per-item stock location (migration 0168) — overridable default.
                     const savedLoc = form.draft.line_locations[l.sku];
                     const locValue =
