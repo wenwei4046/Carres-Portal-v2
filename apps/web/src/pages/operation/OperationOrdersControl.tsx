@@ -674,7 +674,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [stockFilter, setStockFilter] = useState<StockBucket | null>(null);
   const [logisticFilter, setLogisticFilter] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  // Multi-select (Jess 2026-07-02): pick more than one category pill; an order
+  // matches if it hits ANY selected category (OR). Empty set = no filter.
+  const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
   // Two action lanes (Jess 2026-06-25): 🚩 Follow-up = team handoff (follow_up
   // annotations) · ⏫ For Jess = escalations needing the boss (escalate). Each is
   // a derived open-annotation state with its own quick-view filter; the per-row
@@ -862,9 +864,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
     if (stockFilter) r = r.filter((o) => stockBucketOf(o, availableBySku) === stockFilter);
     if (logisticFilter)
       r = r.filter((o) => (logisticOf(o, partnerName) ?? NO_CARRIER) === logisticFilter);
-    if (categoryFilter) {
-      const opt = CATEGORY_OPTS.find((c) => c.key === categoryFilter);
-      if (opt) r = r.filter(opt.match);
+    if (categoryFilter.size > 0) {
+      const opts = CATEGORY_OPTS.filter((c) => categoryFilter.has(c.key));
+      r = r.filter((o) => opts.some((c) => c.match(o)));
     }
     return [...r].sort(compareByDeadline);
   }, [tabFiltered, flaggedOnly, escalateOnly, etaOnly, dueFilter, regionFilter, stockFilter, logisticFilter, categoryFilter, availableBySku, partnerName, tasksByOrder]);
@@ -1158,8 +1160,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
               key={e.key}
               label={e.label}
               count={e.count}
-              active={categoryFilter === e.key}
-              onClick={() => setCategoryFilter((r) => (r === e.key ? null : e.key))}
+              active={categoryFilter.has(e.key)}
+              onClick={() =>
+                setCategoryFilter((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(e.key)) next.delete(e.key);
+                  else next.add(e.key);
+                  return next;
+                })
+              }
             />
           ))}
         </FilterGroup>
