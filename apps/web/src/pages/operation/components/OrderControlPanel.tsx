@@ -292,6 +292,7 @@ export function RoutingFields({
   proceedDate,
   opsAssignedLogistic,
   form,
+  hideRegion = false,
 }: {
   orderId: string;
   customerAddress: string | null;
@@ -302,6 +303,9 @@ export function RoutingFields({
   proceedDate: string | null;
   opsAssignedLogistic: string | null;
   form: OrderControlForm;
+  /** Delivery card shows the region once in its header — hide the duplicate
+   *  Region row here (Jess: no repeated region). */
+  hideRegion?: boolean;
 }) {
   const { data: partnersData } = useDeliveryPartners();
   const partners = useMemo(
@@ -328,11 +332,13 @@ export function RoutingFields({
 
   return (
     <>
-      <FieldRow label="Region">
-        <div className="px-2 py-1.5">
-          <AreaBadge area={area} />
-        </div>
-      </FieldRow>
+      {!hideRegion && (
+        <FieldRow label="Region">
+          <div className="px-2 py-1.5">
+            <AreaBadge area={area} />
+          </div>
+        </FieldRow>
+      )}
 
       <FieldRow label="Logistic">
         <div className="flex items-center gap-2 flex-wrap w-full px-1">
@@ -348,7 +354,6 @@ export function RoutingFields({
             {partners.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
-                {p.zones ? ` · ${p.zones}` : ""}
               </option>
             ))}
           </select>

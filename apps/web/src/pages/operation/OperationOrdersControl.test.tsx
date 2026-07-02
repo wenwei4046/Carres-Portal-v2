@@ -249,7 +249,7 @@ describe("OperationOrdersControl", () => {
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1002"))!;
     // 2 + 1 = 3 goods units → red "Not set 3" (AutoCount free-text SKU).
-    expect(within(row).getByText("Not set 3")).toBeInTheDocument();
+    expect(within(row).getByText("No PO 3")).toBeInTheDocument();
     // the CR/TCF ref now has its OWN column (Jess: Order split into 3).
     expect(row).toHaveTextContent("CR0418");
   });
@@ -380,7 +380,7 @@ describe("OperationOrdersControl · Stock column", () => {
     const row = screen.getByTestId("order-row");
     expect(row.querySelector('[data-stock-state="unknown"]')).toBeTruthy();
     // free-text SKU → red "Not set 1" (alert: a human must set readiness).
-    expect(within(row).getByText("Not set 1")).toBeInTheDocument();
+    expect(within(row).getByText("No PO 1")).toBeInTheDocument();
     expect(within(row).queryByText(/^Ready/)).not.toBeInTheDocument();
     expect(within(row).queryByText(/^Waiting/)).not.toBeInTheDocument();
   });
@@ -451,7 +451,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
     // Goods-unit total 2+1+3+1 = 7 (Disposal service NOT counted) → "Not set 7".
-    expect(within(row).getByText("Not set 7")).toBeInTheDocument();
+    expect(within(row).getByText("No PO 7")).toBeInTheDocument();
     // Master-Sheet short codes (MS/BF/SOF) as a 2-line summary; MONOCHROME tiers
     // by LINE: core goods dark (text-base-800), accessories/services dim
     // (text-base-400). The colour sits on the line, not the individual tag.
@@ -540,7 +540,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     const row = screen.getByTestId("order-row");
     // Qty total (2) now in the Stock · qty badge ("Not set 2" — free-text SKU);
     // the Items tag still carries its own qty + size ("2× SOF").
-    expect(within(row).getByText("Not set 2")).toBeInTheDocument();
+    expect(within(row).getByText("No PO 2")).toBeInTheDocument();
     expect(within(row).getByText("2× SOF")).toBeInTheDocument();
   });
 

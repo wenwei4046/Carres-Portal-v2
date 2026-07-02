@@ -225,7 +225,7 @@ function stockReadiness(
 /** Three-state stock bucket for the header filter — collapses the 5 internal
  *  StockStates into the same Ready / Waiting / Not set the Stock column shows
  *  (Jess: filter the list by stock too, not just status + region). */
-const STOCK_BUCKETS = ["Ready", "Waiting", "Not set"] as const;
+const STOCK_BUCKETS = ["Ready", "Waiting", "No PO"] as const;
 type StockBucket = (typeof STOCK_BUCKETS)[number];
 function stockBucketOf(
   o: operationOrderListRow,
@@ -234,7 +234,7 @@ function stockBucketOf(
   const s = stockReadiness(o, availableBySku).state;
   if (s === "ready" || s === "in_stock") return "Ready";
   if (s === "need_po" || s === "awaiting") return "Waiting";
-  return "Not set";
+  return "No PO";
 }
 
 /** Left-edge urgency accent per row (Jess 2026-06-24, his CRM-sample "priority
@@ -2160,9 +2160,9 @@ function StockCell({ info, qty }: { info: StockInfo; qty: number }) {
   let title: string;
   switch (info.state) {
     case "unknown":
-      label = `Not set${n}`;
-      pill = "pill-overdue"; // red — readiness unknown, a human must set it
-      title = "Stock not auto-checked (free-text SKU) — open the order to set it";
+      label = `No PO${n}`;
+      pill = "pill-overdue"; // red — no PO raised yet, operation must act
+      title = "No PO raised yet — open the order to reserve stock or raise a PO";
       break;
     case "ready":
       label = `Ready${n}`;

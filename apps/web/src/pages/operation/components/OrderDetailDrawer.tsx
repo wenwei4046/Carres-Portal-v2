@@ -456,8 +456,10 @@ function MiniBadge({
   tone: "nopo" | "waiting" | "ready" | "kv" | "outstation" | "muted";
   children: ReactNode;
 }) {
+  // App-wide colour rule (Jess 2026-07-02): red = action / blocks · amber = warning
+  // · green = ok. No PO is RED (must raise a PO), not grey.
   const TONE: Record<string, string> = {
-    nopo: "bg-base-100 text-base-600",
+    nopo: "bg-[#FEE2E2] text-[#991B1B]",
     waiting: "bg-[#FEF3C7] text-[#92400E]",
     ready: "bg-[#DCFCE7] text-[#166534]",
     kv: "bg-[#DCFCE7] text-[#166534]",
@@ -471,6 +473,25 @@ function MiniBadge({
       {children}
     </span>
   );
+}
+
+/** The collect-before-delivery gate badge (Jess 2026-07-02): amber "Collect
+ *  before delivery" (warning, ETA still >1 day off) → red "Hold delivery" (block,
+ *  from ETA−1 if uncollected). Renders on the Bill + Storage panel headers. */
+function GateBadge({ gate }: { gate: "hold" | "warn" | null }) {
+  if (gate === "hold")
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEE2E2] text-[#991B1B] whitespace-nowrap">
+        <AlertCircle size={10} strokeWidth={2.5} /> Hold delivery
+      </span>
+    );
+  if (gate === "warn")
+    return (
+      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] whitespace-nowrap">
+        Collect before delivery
+      </span>
+    );
+  return null;
 }
 
 /** Items-ordered header readiness — shows only the states present (No PO grey →
@@ -634,6 +655,33 @@ function DrawerBody({
   const waitingN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "waiting").length;
   const nopoN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "nopo").length;
 
+  // Collect-before-delivery gate (Jess 2026-07-02), keyed to the Logistic ETA
+  // (delivery date). Two stages: amber "Collect before delivery" while the ETA
+  // is still >1 day away; red "Hold Delivery" from ETA−1 if still uncollected.
+  // Applies to BOTH the goods balance and the storage fee; the header rolls up
+  // the red (blocking) ones into one HOLD DELIVERY status.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const daysToDelivery =
+    !order.delivery_date_tbd && order.delivery_date
+      ? Math.round(
+          (new Date(`${order.delivery_date}T00:00:00`).getTime() -
+            new Date(`${todayIso}T00:00:00`).getTime()) /
+            86_400_000,
+        )
+      : null;
+  const pastLastCall = daysToDelivery !== null && daysToDelivery <= 1;
+  const balanceOwing = hasTotal && outstanding > 0;
+  const storageIncurred =
+    !!(form.control?.storage_from ?? "").trim() || !!form.draft.storage_from.trim();
+  const storageCleared =
+    !!form.control?.storage_collected_at ||
+    form.control?.storage_waiver_status === "approved";
+  const storageOwing = storageIncurred && !storageCleared;
+  // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
+  const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
+  const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
+  const holdCount = (balanceGate === "hold" ? 1 : 0) + (storageGate === "hold" ? 1 : 0);
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {receivePo && (
@@ -714,6 +762,14 @@ function DrawerBody({
                 Ref {order.source_ref[0]}
               </span>
             )}
+            {holdCount > 0 && (
+              <span
+                title="Delivery is blocked — clear the reasons in the Bill / Storage panels below"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#FEE2E2] text-[#991B1B] shrink-0"
+              >
+                <AlertCircle size={12} strokeWidth={2.5} /> HOLD DELIVERY ({holdCount})
+              </span>
+            )}
           </div>
           <span className="flex items-center gap-1 shrink-0">
             <button
@@ -767,58 +823,58 @@ function DrawerBody({
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-base-700 text-white">
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-base-600">
-                      Item
+                    <th
+                      className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-base-600"
+                      title="Has this item's stock been received? Received / Pending (waiting on PO) / No PO"
+                    >
+                      Stock
+                    </th>
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-28 border-r border-base-600">
+                      Stock ETA
                     </th>
                     <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-base-600">
                       Qty
                     </th>
-                    <th
-                      className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-16 border-r border-base-600"
-                      title="Free ready stock at the warehouse for this item — pick a unit in Warehouse stock below to reserve it"
-                    >
-                      Ready
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-base-600">
+                      Model
                     </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-36 border-r border-base-600">
-                      Location
+                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-base-600">
+                      PO
                     </th>
                     <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-32">
-                      ETA
+                      Location
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {orderedLines.map((l) => {
-                    // Real availability: match free per-unit stock by normalized
-                    // key. The catalog is empty so the old exact-sku stockBalances
-                    // join always missed (showed 0); normalizeSkuKey bridges the
-                    // order/warehouse naming drift (project-catalog-empty-sku-naming).
-                    const matchUnits = freeUnitsByKey.get(normalizeSkuKey(l.sku)) ?? [];
-                    const ready = matchUnits.length;
                     const isService = lineKind(l.sku) === "service";
-                    // Locked vocab tone: ready green · waiting amber · no-PO grey.
+                    // Per-item Stock Status (Jess sheet col Z): Received (stock in) ·
+                    // Pending (PO placed, waiting — show Stock ETA) · No PO (nothing
+                    // raised). Derived from same-model+size free stock + PO existence.
                     const rd = isService ? null : readinessOf(l.sku, l.qty);
-                    const readyTone =
-                      stage === "delivered"
-                        ? "text-base-400"
-                        : rd === "ready"
-                          ? "text-success"
-                          : rd === "waiting"
-                            ? "text-warning"
-                            : "text-base-400";
-                    // Per-item stock location (migration 0168): service charges
-                    // (No Lift / Disposal) carry none; goods default by category
-                    // (accessories → warehouse, core → supplier) and are overridable.
-                    // savedLoc===undefined → never touched → show the default; an
-                    // explicit [] (operator picked "—") shows blank, not the default.
+                    const status =
+                      rd === "ready"
+                        ? { t: "Ready", c: "bg-[#DCFCE7] text-[#166534]" }
+                        : rd === "waiting"
+                          ? { t: "Waiting", c: "bg-[#FEF3C7] text-[#92400E]" }
+                          : { t: "No PO", c: "bg-[#FEE2E2] text-[#991B1B]" };
+                    // PO number carrying this sku (first wins), for the PO column.
+                    const poNo = pos
+                      .find((p) =>
+                        p.lines.some(
+                          (pl) => normalizeSkuKey(pl.sku) === normalizeSkuKey(l.sku),
+                        ),
+                      )
+                      ?.id.slice(0, 8);
+                    // Per-item stock location (migration 0168) — overridable default.
                     const savedLoc = form.draft.line_locations[l.sku];
                     const locValue =
                       savedLoc !== undefined
                         ? (savedLoc[0] ?? "")
                         : (defaultLineLocation(l.sku) ?? "");
-                    // Per-item stock ETA (migration 0170) — products don't all
-                    // arrive on the same date. Defaults to the linked PO's
-                    // delivery date, overridable via line_etas.
+                    // Per-item Stock ETA (migration 0170) — when the item's stock
+                    // arrives; defaults to the linked PO's date, overridable.
                     const etaValue =
                       form.draft.line_etas[l.sku] ?? poEtaBySku.get(l.sku) ?? "";
                     // One row per SKU (duplicate lines combined above) → key on SKU.
@@ -828,29 +884,51 @@ function DrawerBody({
                         onClick={() => setPickerSku(l.sku)}
                         className={`cursor-pointer ${l.sku === activeLineSku ? "bg-primary/10" : "hover:bg-base-50"}`}
                       >
-                        <td className="border border-base-200 px-2 py-1 font-mono text-[11px] align-top break-all">
-                          {l.sku}
-                        </td>
-                        <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
-                          {l.qty}
-                        </td>
-                        <td
-                          className={`border border-base-200 px-2 py-1 text-right font-mono text-[11px] align-top ${readyTone}`}
-                        >
+                        <td className="border border-base-200 px-1.5 py-1 align-top">
                           {isService ? (
-                            <span className="text-base-300">—</span>
-                          ) : stage !== "delivered" ? (
+                            <span className="text-base-300 text-[11px]">—</span>
+                          ) : (
                             <button
                               type="button"
                               onClick={() => setPickerSku(l.sku)}
-                              className="underline decoration-dotted underline-offset-2 hover:text-primary cursor-pointer"
-                              title="Pick ready stock to reserve for this order (or browse all warehouse stock)"
+                              title="Received / Pending (waiting on PO) / No PO — click to pick or reserve warehouse stock"
                               data-testid={`ready-pick-${l.sku}`}
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${status.c}`}
                             >
-                              {ready}
+                              {status.t}
                             </button>
+                          )}
+                        </td>
+                        {isService ? (
+                          <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
+                            N/A
+                          </td>
+                        ) : (
+                          <td className="border border-base-200 px-1 py-0.5 align-top">
+                            <input
+                              type="date"
+                              value={etaValue}
+                              onChange={(e) => form.setLineEta(l.sku, e.target.value)}
+                              className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                            />
+                          </td>
+                        )}
+                        <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
+                          {l.qty}
+                        </td>
+                        <td className="border border-base-200 px-2 py-1 align-middle">
+                          <div
+                            className="font-mono text-[11px] truncate max-w-[150px]"
+                            title={l.sku}
+                          >
+                            {l.sku}
+                          </div>
+                        </td>
+                        <td className="border border-base-200 px-2 py-1 font-mono text-[10px] align-middle">
+                          {poNo ? (
+                            <span className="text-primary">{poNo}</span>
                           ) : (
-                            ready
+                            <span className="text-base-300">—</span>
                           )}
                         </td>
                         {isService ? (
@@ -876,20 +954,6 @@ function DrawerBody({
                                 </option>
                               ))}
                             </select>
-                          </td>
-                        )}
-                        {isService ? (
-                          <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
-                            N/A
-                          </td>
-                        ) : (
-                          <td className="border border-base-200 px-1 py-0.5 align-top">
-                            <input
-                              type="date"
-                              value={etaValue}
-                              onChange={(e) => form.setLineEta(l.sku, e.target.value)}
-                              className="w-full border border-base-300 rounded-[3px] bg-white px-1.5 py-0.5 text-[11px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-                            />
                           </td>
                         )}
                       </tr>
@@ -982,11 +1046,11 @@ function DrawerBody({
                 <SplitHead
                   title="Balance"
                   summary={
-                    <MiniBadge
-                      tone={hasTotal && outstanding > 0 ? "outstation" : "muted"}
-                    >
-                      {paymentSummary}
-                    </MiniBadge>
+                    balanceGate ? (
+                      <GateBadge gate={balanceGate} />
+                    ) : (
+                      <MiniBadge tone="muted">{paymentSummary}</MiniBadge>
+                    )
                   }
                 />
                 <div className="p-3 flex-1">
@@ -1003,28 +1067,35 @@ function DrawerBody({
                 </div>
               </div>
             </div>
-            {(hasMsbf || hasSof) && (
-              <div className="border-t border-base-100">
-                <SplitHead
-                  title="Storage"
-                  summary={<MiniBadge tone="muted">fee if held</MiniBadge>}
-                />
-                <div className="p-3">
-                  <StorageControlFields
-                    form={form}
-                    hasMsbf={hasMsbf}
-                    hasSof={hasSof}
-                    orderId={order.id}
-                    meta={{
-                      orderCode: `SO-${order.so}`,
-                      customerName: order.customer_name ?? "",
-                      customerPhone: order.customer_phone ?? "",
-                    }}
-                  />
-                </div>
-              </div>
-            )}
           </section>
+
+          {/* Storage — its OWN panel now (Jess: not merged with Customer/Balance). */}
+          {(hasMsbf || hasSof) && (
+            <Panel
+              title="Storage"
+              summary={
+                storageGate ? (
+                  <GateBadge gate={storageGate} />
+                ) : (
+                  <MiniBadge tone="muted">fee if held</MiniBadge>
+                )
+              }
+            >
+              <div className="p-3">
+                <StorageControlFields
+                  form={form}
+                  hasMsbf={hasMsbf}
+                  hasSof={hasSof}
+                  orderId={order.id}
+                  meta={{
+                    orderCode: `SO-${order.so}`,
+                    customerName: order.customer_name ?? "",
+                    customerPhone: order.customer_phone ?? "",
+                  }}
+                />
+              </div>
+            </Panel>
+          )}
 
           {/* Card B — Delivery. Header badge = region. Body split Original |
               Logistic update; then the 3 remark rows; then a Route section only
@@ -1047,7 +1118,6 @@ function DrawerBody({
                   carrier commits back). */}
               <div className="grid grid-cols-2 gap-x-3 gap-y-0 items-start">
                 <div className="min-w-0">
-                  <div className="t-micro text-base-400 mb-1">Original</div>
                   <FieldGrid>
                     <RoutingFields
                       orderId={order.id}
@@ -1056,6 +1126,7 @@ function DrawerBody({
                       proceedDate={order.proceed_date ?? null}
                       opsAssignedLogistic={order.ops_assigned_logistic ?? null}
                       form={form}
+                      hideRegion
                     />
                   </FieldGrid>
                 </div>
