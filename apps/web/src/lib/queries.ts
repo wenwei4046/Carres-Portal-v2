@@ -1864,7 +1864,7 @@ export interface operationOrderListRow {
    *  name client-side. Shown in the 物流 cell when no formal LP is set yet. */
   ops_assigned_logistic?: string | null;
   /** Compact line embed for the 货品 items summary (control table only). */
-  order_lines?: { sku: string; qty: number }[];
+  order_lines?: { sku: string; qty: number; source_po?: string | null }[];
   delivery_partner_id: string | null;
   /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
    *  state. Set by `operation_confirm_proceed_request_v3` when Operation

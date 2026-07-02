@@ -197,16 +197,21 @@ function stockReadiness(
   // Early stages: real free-stock check, only when the live map is present AND
   // every line SKU is a known catalog SKU (else we can't honestly compute it).
   const lines = o.order_lines ?? [];
-  if (!availableBySku || lines.length === 0) return { state: "unknown" };
+  // An AutoCount-imported line carries its PO in source_po (not a portal PO), so
+  // "has a PO" ⇒ at least Waiting, never "No PO" — keeps the list STOCK pill in
+  // sync with the order-detail readiness (Jess 2026-07-02, inside/outside tally).
+  const hasPo = lines.some((l) => !!l.source_po);
+  const noStock: StockInfo = hasPo ? { state: "awaiting" } : { state: "unknown" };
+  if (!availableBySku || lines.length === 0) return noStock;
 
   const needBySku = new Map<string, number>();
   for (const l of lines) {
     const q = Number(l.qty || 0);
     if (q > 0) needBySku.set(l.sku, (needBySku.get(l.sku) ?? 0) + q);
   }
-  if (needBySku.size === 0) return { state: "unknown" };
+  if (needBySku.size === 0) return noStock;
   for (const sku of needBySku.keys())
-    if (!availableBySku.has(sku)) return { state: "unknown" };
+    if (!availableBySku.has(sku)) return noStock;
 
   let need = 0;
   let have = 0;
