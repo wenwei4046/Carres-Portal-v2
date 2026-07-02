@@ -752,6 +752,7 @@ export {
 export {
   excelSerialToISO,
   normalizePoKey,
+  splitPoKeys,
   parseEtaCell,
   normalizeMasterStockStatus,
   tokenizeName,

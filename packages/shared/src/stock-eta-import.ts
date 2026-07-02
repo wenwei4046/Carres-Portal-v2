@@ -37,6 +37,21 @@ export function normalizePoKey(po: string | undefined | null): string {
   return (po ?? "").replace(/\s+/g, "").toUpperCase();
 }
 
+/** A Master PO cell may list SEVERAL POs (e.g. "PO/2603-065, PO/2603-066" — ~1 in
+ *  6 rows do). Split on comma / semicolon / slash-space into individual normalized
+ *  PO keys so the row can match ANY of its POs, not a joined string that matches
+ *  nothing. */
+export function splitPoKeys(po: string | undefined | null): string[] {
+  return [
+    ...new Set(
+      (po ?? "")
+        .split(/[,;]/)
+        .map((p) => normalizePoKey(p))
+        .filter((p) => p.length > 0),
+    ),
+  ];
+}
+
 /** A Stock-ETA cell can arrive as an Excel serial (raw xlsx read), an ISO date,
  *  or a d-Mon-yy display string. Normalize to ISO `yyyy-mm-dd`, or null if blank
  *  / unparseable. */
@@ -167,9 +182,10 @@ export function matchStockRows(
 ): StockMatchOutcome {
   const byPo = new Map<string, OrderLineRef[]>();
   for (const l of lines) {
-    if (!l.sourcePo) continue;
-    const k = normalizePoKey(l.sourcePo);
-    (byPo.get(k) ?? byPo.set(k, []).get(k)!).push(l);
+    // A line's source_po can itself list >1 PO — register under each key.
+    for (const k of splitPoKeys(l.sourcePo)) {
+      (byPo.get(k) ?? byPo.set(k, []).get(k)!).push(l);
+    }
   }
 
   const matched: StockEtaMatch[] = [];
@@ -177,8 +193,19 @@ export function matchStockRows(
 
   for (const r of rows) {
     if (!r.eta && !r.stockStatus) continue;
-    const candidates = byPo.get(normalizePoKey(r.po));
-    if (!candidates || candidates.length === 0) {
+    // The row's PO cell may list several POs — gather candidates across all of
+    // them (deduped), so a "PO/a, PO/b" cell matches whichever order exists.
+    const seen = new Set<OrderLineRef>();
+    const candidates: OrderLineRef[] = [];
+    for (const k of splitPoKeys(r.po)) {
+      for (const c of byPo.get(k) ?? []) {
+        if (!seen.has(c)) {
+          seen.add(c);
+          candidates.push(c);
+        }
+      }
+    }
+    if (candidates.length === 0) {
       unmatched.push({ po: r.po, sku: r.sku, reason: "PO not found in any order" });
       continue;
     }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   excelSerialToISO,
   normalizePoKey,
+  splitPoKeys,
   parseEtaCell,
   normalizeMasterStockStatus,
   masterRecordToStockRow,
@@ -27,6 +28,16 @@ describe("normalizePoKey", () => {
   it("collapses whitespace + case so a leading-space PO still matches", () => {
     expect(normalizePoKey(" PO/2603-065")).toBe("PO/2603-065");
     expect(normalizePoKey("po/2603-065")).toBe("PO/2603-065");
+  });
+});
+
+describe("splitPoKeys", () => {
+  it("splits a multi-PO cell into normalized keys", () => {
+    expect(splitPoKeys("PO/2603-065, PO/2603-066")).toEqual(["PO/2603-065", "PO/2603-066"]);
+  });
+  it("returns one key for a single PO and none for blank", () => {
+    expect(splitPoKeys(" po/2603-065 ")).toEqual(["PO/2603-065"]);
+    expect(splitPoKeys("")).toEqual([]);
   });
 });
 
@@ -134,6 +145,17 @@ describe("matchStockRows", () => {
     expect(out.matched).toEqual([
       { orderId: "o1", sku: "1013Jager/Fab3-King/COL:PC15", stockStatus: "ready" },
     ]);
+  });
+
+  it("matches a row whose PO cell lists TWO POs (comma-separated)", () => {
+    const rows: StockEtaImportRow[] = [
+      { po: "PO/9999-999, PO/2605-058", sku: 'HK5531/24"', eta: "2026-06-20" },
+    ];
+    const out = matchStockRows(rows, lines);
+    expect(out.matched).toEqual([
+      { orderId: "o2", sku: 'HK5531/24" (2 Seater + Lshape)/COL:M2', eta: "2026-06-20" },
+    ]);
+    expect(out.unmatched).toHaveLength(0);
   });
 
   it("reports an unknown PO as unmatched", () => {
