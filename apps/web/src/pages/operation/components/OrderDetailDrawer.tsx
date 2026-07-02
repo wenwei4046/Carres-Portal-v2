@@ -933,9 +933,9 @@ function DrawerBody({
                         <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
                           {l.qty}
                         </td>
-                        <td className="border border-base-200 px-2 py-1 align-middle">
+                        <td className="border border-base-200 px-2 py-1 align-top">
                           <div
-                            className="font-mono text-[11px] truncate max-w-[150px]"
+                            className="font-mono text-[10px] leading-tight break-words"
                             title={l.sku}
                           >
                             {l.sku}
