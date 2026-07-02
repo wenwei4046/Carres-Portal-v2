@@ -24,6 +24,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import FollowUpForm from "./components/FollowUpForm";
+import ImportStockEtaDialog from "./components/ImportStockEtaDialog";
 import { TASKS_KEY } from "./components/rail/TasksPanel";
 import type { OpsTask, OpsTasksListResponse } from "@carres/shared";
 import type { OperationStage } from "./components/StageChip";
@@ -683,6 +684,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // No-ETA quick-view (Jess 2026-06-25): open orders the logistic hasn't given a
   // delivery ETA for, with a near deadline — the chase list.
   const [etaOnly, setEtaOnly] = useState(false);
+  // Import stock ETA from the Master "Ops" sheet (fills each line's Stock ETA).
+  const [etaImportOpen, setEtaImportOpen] = useState(false);
 
   // Server applies the search; we always fetch the full list and bucket
   // client-side so every tab shows its true count.
@@ -1085,6 +1088,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
             placeholder="SO number or customer…"
             className="w-[230px] px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
           />
+          <button
+            type="button"
+            onClick={() => setEtaImportOpen(true)}
+            className="btn-secondary text-[12px] whitespace-nowrap"
+            title="Fill each order line's Stock ETA from your Master sheet"
+          >
+            Import stock ETA
+          </button>
           {onImport && (
             <button
               type="button"
@@ -1345,6 +1356,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
       </div>
 
       {/* Follow-up form — slides in from the right (#2); opened by an order's flag. */}
+      {etaImportOpen && <ImportStockEtaDialog onClose={() => setEtaImportOpen(false)} />}
+
       {composeOrder && (
         <FollowUpForm
           orderId={composeOrder.id}
