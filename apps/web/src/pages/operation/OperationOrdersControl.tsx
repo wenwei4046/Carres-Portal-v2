@@ -2166,7 +2166,7 @@ function StockCell({ info, qty }: { info: StockInfo; qty: number }) {
   switch (info.state) {
     case "unknown":
       label = `No PO${n}`;
-      pill = "pill-overdue"; // red — no PO raised yet, operation must act
+      pill = "bg-[#DC2626] text-white"; // vivid red — no PO raised, operation must act
       title = "No PO raised yet — open the order to reserve stock or raise a PO";
       break;
     case "ready":

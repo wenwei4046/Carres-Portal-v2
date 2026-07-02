@@ -459,7 +459,7 @@ function MiniBadge({
   // App-wide colour rule (Jess 2026-07-02): red = action / blocks · amber = warning
   // · green = ok. No PO is RED (must raise a PO), not grey.
   const TONE: Record<string, string> = {
-    nopo: "bg-[#FEE2E2] text-[#991B1B]",
+    nopo: "bg-[#DC2626] text-white",
     waiting: "bg-[#FEF3C7] text-[#92400E]",
     ready: "bg-[#DCFCE7] text-[#166534]",
     kv: "bg-[#DCFCE7] text-[#166534]",
@@ -871,7 +871,7 @@ function DrawerBody({
                         ? { t: "Ready", c: "bg-[#DCFCE7] text-[#166534]" }
                         : rd === "waiting"
                           ? { t: "Waiting", c: "bg-[#FEF3C7] text-[#92400E]" }
-                          : { t: "No PO", c: "bg-[#FEE2E2] text-[#991B1B]" };
+                          : { t: "No PO", c: "bg-[#DC2626] text-white" };
                     // PO number for the PO column — the AutoCount source_po
                     // (real PO like "PO/2603-065") wins; else a portal PO id.
                     const poNo =
