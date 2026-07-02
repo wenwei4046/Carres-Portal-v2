@@ -746,6 +746,28 @@ export {
   type SkuImportResult,
 } from "./sku-import";
 
+// Stock-ETA import: parse Jess's Master "Ops" sheet (Stock ETA col AA + Stock
+// Status col Z) and fuzzy-join each row to a portal order line by PO + name.
+// Shared by the staged-preview client (ImportStockEtaDialog) + the endpoint.
+export {
+  excelSerialToISO,
+  normalizePoKey,
+  parseEtaCell,
+  tokenizeName,
+  masterRecordToStockRow,
+  matchStockRows,
+  stockEtaImportRowSchema,
+  stockEtaImportInput,
+  type StockEtaImportRow,
+  type StockRowResult,
+  type OrderLineRef,
+  type StockEtaMatch,
+  type StockMatchOutcome,
+  type StockEtaImportRowParsed,
+  type StockEtaImportInput,
+  type StockEtaImportResult,
+} from "./stock-eta-import";
+
 // Sofa engine Phase 3 — the PURE plan-view geometry (footprint / snap / group /
 // arm-cap closure). No DOM/React; cm-space math reused by the web builder + P4
 // explode. `mirrorCode` / `computeSofaPrice` are NOT re-exported here — they

@@ -24,6 +24,8 @@ import {
   type ProductSkuPatchInput,
   type SkuImportRow,
   type SkuImportResult,
+  type StockEtaImportRow,
+  type StockEtaImportResult,
   type SpecialAddonDto,
   type SpecialAddonCreateInput,
   type SpecialAddonPatchInput,
@@ -4888,6 +4890,24 @@ export function useImportSkus() {
     mutationFn: (rows: SkuImportRow[]) =>
       apiFetch<SkuImportResult>("/api/catalog/import-skus", catalogJson("POST", { rows })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// Stock-ETA import — bulk-fill per-line Stock ETA from the Master "Ops" sheet.
+// dryRun previews the match rate (writes nothing); a real run merges the ETAs
+// into ops_order_control.line_etas, so every operation orders/detail view
+// refreshes.
+export function useImportStockEta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { rows: StockEtaImportRow[]; dryRun?: boolean }) =>
+      apiFetch<{ result: StockEtaImportResult }>(
+        "/api/operation/orders/import-stock-eta",
+        catalogJson("POST", input),
+      ).then((r) => r.result),
+    onSuccess: (_res, vars) => {
+      if (!vars.dryRun) void qc.invalidateQueries({ queryKey: ["operation"] });
+    },
   });
 }
 

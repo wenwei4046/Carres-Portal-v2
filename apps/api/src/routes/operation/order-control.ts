@@ -1,7 +1,13 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { updateOpsOrderControlInput } from "@carres/shared";
+import {
+  updateOpsOrderControlInput,
+  stockEtaImportInput,
+  matchStockRows,
+  type OrderLineRef,
+  type StockEtaImportResult,
+} from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -118,6 +124,116 @@ orderControlRouter.put("/:id/control", async (c) => {
   }
 
   return c.json({ control: data });
+});
+
+// POST /import-stock-eta — bulk-fill per-line Stock ETA from Jess's Master "Ops"
+// sheet. AutoCount orders never carried Stock ETA, so the detail's ETA box was
+// blank; this joins each sheet row to an order line by PO (order_lines.source_po)
+// + product name (fuzzy, colour-code tolerant) and merges the ETA into
+// ops_order_control.line_etas. `dryRun` computes the match rate + writes nothing
+// (the client shows it as a preview before committing). Operation/principal only;
+// userClient/RLS is the security boundary.
+orderControlRouter.post("/import-stock-eta", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = stockEtaImportInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const path = issue && issue.path.length > 0 ? issue.path.join(".") : "<root>";
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: `Invalid stock-eta import at ${path}: ${issue?.message ?? "validation failed"}`,
+      },
+      422,
+    );
+  }
+  const { rows, dryRun = false } = parsed.data;
+
+  const sb = userClient(c.env, auth.jwt);
+
+  // All order lines that carry a source PO — the join universe.
+  const { data: lineData, error: lineErr } = await sb
+    .from("order_lines")
+    .select("order_id, sku, source_po")
+    .not("source_po", "is", null);
+  if (lineErr) {
+    const m = mapPgError(lineErr);
+    return c.json(m.body, m.status);
+  }
+  const lines: OrderLineRef[] = (lineData ?? []).map((l) => ({
+    orderId: l.order_id as string,
+    sku: l.sku as string,
+    sourcePo: (l.source_po as string | null) ?? null,
+  }));
+
+  const { matched, unmatched } = matchStockRows(rows, lines);
+
+  // Group the matched ETAs by order → { exact order_lines.sku : eta }.
+  const byOrder = new Map<string, Record<string, string>>();
+  for (const m of matched) {
+    const cur = byOrder.get(m.orderId) ?? {};
+    cur[m.sku] = m.eta;
+    byOrder.set(m.orderId, cur);
+  }
+
+  const result: StockEtaImportResult = {
+    matched: matched.length,
+    unmatched: unmatched.length,
+    orders: byOrder.size,
+    written: 0,
+    sampleUnmatched: unmatched.slice(0, 20),
+    dryRun,
+  };
+
+  if (dryRun || byOrder.size === 0) {
+    return c.json({ result });
+  }
+
+  // Merge into each order's existing line_etas (never clobber other lines).
+  const orderIds = [...byOrder.keys()];
+  const { data: existing, error: exErr } = await sb
+    .from("ops_order_control")
+    .select("order_id, line_etas")
+    .in("order_id", orderIds);
+  if (exErr) {
+    const m = mapPgError(exErr);
+    return c.json(m.body, m.status);
+  }
+  const existingEtas = new Map<string, Record<string, string>>();
+  for (const row of existing ?? []) {
+    existingEtas.set(
+      row.order_id as string,
+      (row.line_etas as Record<string, string> | null) ?? {},
+    );
+  }
+
+  let written = 0;
+  const upsertRows = orderIds.map((orderId) => {
+    const incoming = byOrder.get(orderId)!;
+    written += Object.keys(incoming).length;
+    const merged = { ...(existingEtas.get(orderId) ?? {}), ...incoming };
+    return { order_id: orderId, line_etas: merged, updated_by: auth.id };
+  });
+
+  const { error: upErr } = await sb
+    .from("ops_order_control")
+    .upsert(upsertRows, { onConflict: "order_id" });
+  if (upErr) {
+    const m = mapPgError(upErr);
+    return c.json(m.body, m.status);
+  }
+
+  result.written = written;
+  return c.json({ result });
 });
 
 export default orderControlRouter;
