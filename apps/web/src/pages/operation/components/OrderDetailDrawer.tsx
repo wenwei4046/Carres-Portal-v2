@@ -34,6 +34,7 @@ import {
   lineKind,
   lineSortRank,
   defaultLineLocation,
+  stockMatchKey,
 } from "@/lib/line-category";
 import { useAuth } from "@/lib/auth";
 import DeliveryChain from "./DeliveryChain";
@@ -553,9 +554,12 @@ function DrawerBody({
   const [pickerSku, setPickerSku] = useState<string | null>(null);
   // GRN — receive an open linked PO right here (Jess: receive in the order).
   const [receivePo, setReceivePo] = useState<operationOrderDetailPo | null>(null);
+  // Group free units by the stock MATCH key (same model + canonical size), the
+  // exact rule the Warehouse-stock panel filters by — so the readiness count the
+  // badge shows can never disagree with the units the panel lists.
   const freeUnitsByKey = new Map<string, typeof freeUnits>();
   for (const u of freeUnits) {
-    const k = normalizeSkuKey(u.sku);
+    const k = stockMatchKey(u.sku);
     (freeUnitsByKey.get(k) ?? freeUnitsByKey.set(k, []).get(k)!).push(u);
   }
   // reserved_ref written when the operator picks a unit for this order.
@@ -659,7 +663,7 @@ function DrawerBody({
   };
   const goodsLines = orderedLines.filter((l) => lineKind(l.sku) !== "service");
   const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" => {
-    const free = (freeUnitsByKey.get(normalizeSkuKey(sku)) ?? []).length;
+    const free = (freeUnitsByKey.get(stockMatchKey(sku)) ?? []).length;
     if (free >= qty) return "ready";
     if (hasPoForSku(sku)) return "waiting";
     return "nopo";
@@ -1012,6 +1016,7 @@ function DrawerBody({
                 soRef={soRef}
                 need={orderedLines.find((l) => l.sku === activeLineSku)?.qty ?? 1}
                 units={freeUnits}
+                isSofa={lineCategory(activeLineSku) === "sofa"}
                 onReserved={() => {
                   void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
                   void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });

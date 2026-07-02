@@ -12,7 +12,7 @@
  * past category bugs came from exactly that drift. Importing from this lib also
  * breaks the would-be circular import (the grid renders the drawer).
  */
-import { STOCK_LOCATIONS } from "@carres/shared";
+import { STOCK_LOCATIONS, normalizeSkuKey } from "@carres/shared";
 
 export type CoreCat = "mattress" | "bedframe" | "sofa";
 
@@ -57,6 +57,41 @@ export function lineSize(sku: string): string | null {
   if (/\b(?:super\s*)?single\b/.test(s)) return "S";
   const m = sku.match(/-([kqs])(?=$|[/\s)])/i);
   return m ? m[1].toUpperCase() : null;
+}
+
+/**
+ * The stock MATCH key for a line/unit — the single rule that links an order line
+ * to warehouse free stock (Jess 2026-07-01 locked spec: "same MODEL + same SIZE,
+ * -Q = Queen count as the same size"). Built on `normalizeSkuKey` (case +
+ * punctuation drift) but with the size token CANONICALIZED via `lineSize`, so a
+ * line written "…-Q" and a unit written "…Queen" resolve to ONE key instead of
+ * two — fixing the split that `normalizeSkuKey` alone leaves. Fabric / ref codes
+ * stay in the key (a sofa in fabric A ≠ fabric B); cross-fabric fulfilment is the
+ * "Loan any sofa" escape hatch, not a silent match.
+ *
+ * Used by BOTH the readiness badge (OrderDetailDrawer) and the Warehouse-stock
+ * panel filter (StockPickerGrid) so the count they show can never disagree.
+ */
+export function stockMatchKey(sku: string): string {
+  const s = sku.toLowerCase();
+  // Detect the size in any written form (tolerant on purpose — the whole point
+  // is to survive drift): the words Queen / King / (Super) Single, OR a
+  // standalone K/Q/S delimited by a hyphen OR space ("-Q", "- Q", " Q").
+  let size = "";
+  if (/\bqueen\b/.test(s)) size = "Q";
+  else if (/\bking\b/.test(s)) size = "K";
+  else if (/\b(?:super\s*)?single\b/.test(s)) size = "S";
+  else {
+    const m = s.match(/[-\s]([kqs])(?=$|[/\s)])/);
+    if (m) size = m[1].toUpperCase();
+  }
+  // Strip whichever size form appears so it can't fragment the model key.
+  const withoutSize = s
+    .replace(/\b(?:super\s*)?single\b/g, " ")
+    .replace(/\bqueen\b/g, " ")
+    .replace(/\bking\b/g, " ")
+    .replace(/[-\s]([kqs])(?=$|[/\s)])/g, " ");
+  return normalizeSkuKey(withoutSize) + (size ? `|${size}` : "");
 }
 
 /** Short proper TYPE name for a non-core line — the list shows these instead of

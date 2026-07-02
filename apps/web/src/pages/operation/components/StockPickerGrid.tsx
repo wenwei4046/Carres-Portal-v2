@@ -1,21 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Filter, X } from "lucide-react";
+import { Filter, X, Handshake } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import { lineCategory, stockMatchKey } from "@/lib/line-category";
 import type { ReserveFreeUnit } from "./ReserveStockDialog";
 
 /**
  * StockPickerGrid — the EMBEDDED stock-reserve grid (Jess 2026-06-30) that lives
  * in the right pane of the order's "Items & stock" work area. The operator picks
- * a line on the left; this grid shows the warehouse's free units, ranked so the
- * ones most like that line surface first, with a Google-sheets-style funnel
- * filter in each header cell. Tick the physical unit(s) → reserve to the order's
- * SO (POST /api/ops/stock/reserve-item).
+ * a line on the left; this grid shows the warehouse's free units for THAT line,
+ * with a Google-sheets-style funnel filter in each header cell. Tick the physical
+ * unit(s) → reserve to the order's SO (POST /api/ops/stock/reserve-item).
+ *
+ * Scope (Jess 2026-07-01 locked): the panel lists ONLY the units that match the
+ * order line — same model + size via `stockMatchKey`, the SAME rule the readiness
+ * badge counts by, so "N free" here always equals the badge. Unrelated stock
+ * lives in Stock · On Hand, not here. For a sofa line, a "Loan any sofa" toggle
+ * widens the view to EVERY free sofa (any model/fabric) so the operator can pick
+ * a loaner when the exact model isn't ready.
  *
  * The product NAME is the only shared key (the catalog is empty — see
- * project-catalog-empty-sku-naming), so "best matches first" = a token-overlap
- * score between the order line sku and each unit sku.
+ * project-catalog-empty-sku-naming); within the loan view, a token-overlap score
+ * surfaces the closest sofas first.
  */
 
 const CONDITION_LABEL: Record<string, string> = {
@@ -60,8 +67,10 @@ interface Props {
   soRef: string;
   /** Line qty — used only to pre-tick that many of the top units. */
   need: number;
-  /** ALL free warehouse units (the grid ranks + filters them). */
+  /** ALL free warehouse units (the grid scopes them to the line / loan set). */
   units: ReserveFreeUnit[];
+  /** True when the active line is a sofa — enables the "Loan any sofa" toggle. */
+  isSofa: boolean;
   /** Called after a successful reserve so the parent can invalidate. */
   onReserved: () => void;
 }
@@ -89,7 +98,7 @@ const COLS: {
   { key: "cond", label: "Cond", kind: "select", optKey: "cond" },
 ];
 
-export default function StockPickerGrid({ sku, soRef, need, units, onReserved }: Props) {
+export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved }: Props) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [f, setF] = useState<Record<string, string>>({});
@@ -97,12 +106,31 @@ export default function StockPickerGrid({ sku, soRef, need, units, onReserved }:
   // Which column's funnel menu is open + where to anchor it (fixed-positioned so
   // it isn't clipped by the grid's own scroll container).
   const [menu, setMenu] = useState<{ key: string; x: number; y: number } | null>(null);
+  // Loan view (Jess 2026-07-01): a sofa line can loan ANY free sofa, so this
+  // toggle drops the same-model filter and shows every free sofa instead.
+  const [loanMode, setLoanMode] = useState(false);
   const activeFilters = Object.values(f).filter((v) => v && v.trim()).length;
 
-  // Rank by token-overlap with the order line (best matches first), then name.
+  // Reset the picker whenever the operator switches to a different order line —
+  // ticks, column filters, and the loan view all belong to the previous line.
+  useEffect(() => {
+    setChecked(new Set());
+    setF({});
+    setMenu(null);
+    setLoanMode(false);
+  }, [sku]);
+
+  const matchKey = stockMatchKey(sku);
+
+  // Scope to this line: default = same model + size (stockMatchKey, the rule the
+  // readiness badge counts by). Loan view = every free sofa, ranked by
+  // token-overlap so the closest models surface first.
   const rows = useMemo(() => {
     const want = new Set(tokenize(sku));
-    return [...units]
+    return units
+      .filter((u) =>
+        loanMode ? lineCategory(u.sku) === "sofa" : stockMatchKey(u.sku) === matchKey,
+      )
       .map((u) => {
         const ut = tokenize(u.sku);
         let score = 0;
@@ -117,7 +145,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, onReserved }:
         };
       })
       .sort((a, b) => b.score - a.score || a.sku.localeCompare(b.sku));
-  }, [units, sku]);
+  }, [units, sku, matchKey, loanMode]);
 
   const opts = useMemo(() => {
     const uniq = (xs: string[]) => [...new Set(xs)].sort();
@@ -168,8 +196,8 @@ export default function StockPickerGrid({ sku, soRef, need, units, onReserved }:
     const failed = results.length - ok;
     if (ok > 0) {
       toast.success(
-        `Reserved ${ok} unit${ok === 1 ? "" : "s"} to ${soRef}` +
-          (failed ? ` · ${failed} could not be reserved` : ""),
+        `${loanMode ? "Loaned" : "Reserved"} ${ok} unit${ok === 1 ? "" : "s"} to ${soRef}` +
+          (failed ? ` · ${failed} could not be ${loanMode ? "loaned" : "reserved"}` : ""),
       );
       setChecked(new Set());
       onReserved();
@@ -197,10 +225,36 @@ export default function StockPickerGrid({ sku, soRef, need, units, onReserved }:
         <div className="min-w-0">
           <span className="t-h4 text-base-900">Warehouse stock</span>
           <span className="ml-1.5 t-tiny text-base-400 truncate">
-            · <span className="font-mono">{sku}</span> — best match first
+            {loanMode ? "· any sofa — loan" : "· same model + size"}
           </span>
         </div>
         <div className="t-tiny text-base-500 flex items-center gap-2 shrink-0">
+          {isSofa && (
+            <button
+              type="button"
+              onClick={() => setLoanMode((v) => !v)}
+              title={
+                loanMode
+                  ? "Back to this line's exact model + size"
+                  : "Show every free sofa so you can loan one (any model / fabric)"
+              }
+              className={`inline-flex items-center gap-1 rounded-[5px] border px-2 py-0.5 transition-colors ${
+                loanMode
+                  ? "border-primary bg-primary/10 text-primary font-semibold"
+                  : "border-base-200 text-base-600 hover:border-primary hover:text-primary"
+              }`}
+            >
+              {loanMode ? (
+                <>
+                  <X size={11} strokeWidth={2.5} /> Same model only
+                </>
+              ) : (
+                <>
+                  <Handshake size={11} strokeWidth={2.5} /> Loan any sofa
+                </>
+              )}
+            </button>
+          )}
           <span className="whitespace-nowrap">
             {rows.length} free · {checked.size} picked
             {activeFilters > 0 ? ` · ${view.length} shown` : ""}
@@ -300,7 +354,13 @@ export default function StockPickerGrid({ sku, soRef, need, units, onReserved }:
           })}
           {view.length === 0 && (
             <div className="px-3 py-8 text-center t-tiny text-base-400">
-              {rows.length === 0 ? "No free stock for this item." : "No units match these filters."}
+              {rows.length > 0
+                ? "No units match these filters."
+                : loanMode
+                  ? "No free sofas in stock to loan."
+                  : isSofa
+                    ? "No same-model sofa ready — try “Loan any sofa”."
+                    : "No same-model free stock — raise a PO."}
             </div>
           )}
         </div>
@@ -316,7 +376,11 @@ export default function StockPickerGrid({ sku, soRef, need, units, onReserved }:
           disabled={submitting || checked.size === 0}
           className="btn-primary t-tiny py-1.5 px-4"
         >
-          {submitting ? "Reserving…" : `Reserve ${checked.size} to ${soRef}`}
+          {submitting
+            ? loanMode
+              ? "Loaning…"
+              : "Reserving…"
+            : `${loanMode ? "Loan" : "Reserve"} ${checked.size} to ${soRef}`}
         </button>
       </div>
 
