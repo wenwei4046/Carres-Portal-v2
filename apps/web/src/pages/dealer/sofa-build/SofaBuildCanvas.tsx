@@ -101,6 +101,8 @@ export default function SofaBuildCanvas({
   sofaFabrics,
   onAddBuild,
   onClose,
+  embedded = false,
+  initialCells,
 }: {
   model: ProductModelDto;
   /** The model's SKUs — reserved for Task 4's representative-sku DraftLine map
@@ -120,6 +122,14 @@ export default function SofaBuildCanvas({
   sofaFabrics: SofaFabricDto[];
   onAddBuild: (payload: SofaBuildAddPayload) => void;
   onClose: () => void;
+  /** POS-parity (sofa configure page) — render as a FILL panel inside a parent
+   *  page (no fixed overlay, no own header; the page owns the chrome). The
+   *  default portal-overlay mode is byte-identical to before. */
+  embedded?: boolean;
+  /** Pre-placed modules (a Quick Pick loaded onto the canvas). Read ONCE at
+   *  mount — the parent remounts (key) to load a different pick. Ids are
+   *  minted here so callers pass pure geometry. */
+  initialCells?: Array<{ moduleCode: string; x: number; y: number; rot: Rot }>;
 }) {
   /* ─── Catalog lookups ────────────────────────────────────────────── */
 
@@ -160,7 +170,9 @@ export default function SofaBuildCanvas({
 
   /* ─── Build state ────────────────────────────────────────────────── */
 
-  const [cells, setCells] = useState<GeoCell[]>([]);
+  const [cells, setCells] = useState<GeoCell[]>(() =>
+    (initialCells ?? []).map((c) => ({ ...c, id: nextCellId() })),
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [height, setHeight] = useState<string>(SOFA_HEIGHTS.includes("24") ? "24" : SOFA_HEIGHTS[0]);
   const [fabricId, setFabricId] = useState<string>(sofaFabrics[0]?.id ?? "");
@@ -405,27 +417,33 @@ export default function SofaBuildCanvas({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-base-50"
+      className={
+        embedded
+          ? "relative flex h-full min-h-0 flex-col bg-base-50"
+          : "fixed inset-0 z-50 flex flex-col bg-base-50"
+      }
       data-testid="sofa-build-canvas"
-      role="dialog"
+      role={embedded ? undefined : "dialog"}
       aria-label={`Build a sofa — ${model.name}`}
     >
-      {/* Header */}
-      <header className="flex shrink-0 items-center justify-between border-b border-base-200 bg-white px-5 py-3">
-        <div className="min-w-0">
-          <div className="t-micro text-base-400">Build your sofa</div>
-          <h2 className="t-h3 truncate text-base-900">{model.name}</h2>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="btn-ghost flex h-9 w-9 items-center justify-center"
-          aria-label="Close builder"
-          data-testid="sofa-build-close"
-        >
-          <X size={18} />
-        </button>
-      </header>
+      {/* Header — the embedding page owns the chrome, so skip it there. */}
+      {!embedded && (
+        <header className="flex shrink-0 items-center justify-between border-b border-base-200 bg-white px-5 py-3">
+          <div className="min-w-0">
+            <div className="t-micro text-base-400">Build your sofa</div>
+            <h2 className="t-h3 truncate text-base-900">{model.name}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-ghost flex h-9 w-9 items-center justify-center"
+            aria-label="Close builder"
+            data-testid="sofa-build-close"
+          >
+            <X size={18} />
+          </button>
+        </header>
+      )}
 
       {/* Body: palette | room */}
       <div className="flex min-h-0 flex-1">
