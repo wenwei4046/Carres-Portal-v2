@@ -17,6 +17,7 @@ import PosSidebar, { type RailEntry, type RailKey } from "./PosSidebar";
 import ProductCard from "./ProductCard";
 import ComboCard from "./ComboCard";
 import ConfigureDrawer from "./ConfigureDrawer";
+import SofaConfigurePage from "./SofaConfigurePage";
 import CartDrawer from "./CartDrawer";
 import AddonsPanel from "./AddonsPanel";
 import FloatingCartButton from "./FloatingCartButton";
@@ -339,22 +340,49 @@ export default function CatalogStep({
         onClick={() => onCartOpenChange(true)}
       />
 
-      {configureModel && (
-        <ConfigureDrawer
-          model={configureModel}
-          meta={index.meta.get(configureModel.id)}
-          skus={index.skusByModel.get(configureModel.id) ?? []}
-          fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
-          fabricTierConfig={catalog.fabricTierConfig}
-          modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-          sofaCompartments={catalog.sofaCompartments}
-          modelSofaCompartments={catalog.modelSofaCompartments}
-          sofaCombos={catalog.sofaCombos}
-          specialAddons={catalog.specialAddons}
-          onAdd={addLine}
-          onClose={() => setConfigureModelId(null)}
-        />
-      )}
+      {configureModel &&
+        (() => {
+          // POS-parity (Loo 2026-07-04) — a MODULAR sofa (offers compartments)
+          // jumps STRAIGHT into the full-page configurator (Quick pick +
+          // Customize tabs), no drawer hop. Every other model (mattress /
+          // bedframe / accessory / dropdown-sofa) keeps the drawer.
+          const offered = (catalog.modelSofaCompartments ?? []).filter(
+            (mc) => mc.modelId === configureModel.id,
+          );
+          if (configureModel.category === "sofa" && offered.length > 0) {
+            return (
+              <SofaConfigurePage
+                model={configureModel}
+                meta={index.meta.get(configureModel.id)}
+                skus={index.skusByModel.get(configureModel.id) ?? []}
+                fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
+                fabricTierConfig={catalog.fabricTierConfig}
+                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+                sofaCompartments={catalog.sofaCompartments ?? []}
+                modelCompartments={offered}
+                sofaCombos={catalog.sofaCombos ?? []}
+                onAdd={addLine}
+                onClose={() => setConfigureModelId(null)}
+              />
+            );
+          }
+          return (
+            <ConfigureDrawer
+              model={configureModel}
+              meta={index.meta.get(configureModel.id)}
+              skus={index.skusByModel.get(configureModel.id) ?? []}
+              fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
+              fabricTierConfig={catalog.fabricTierConfig}
+              modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+              sofaCompartments={catalog.sofaCompartments}
+              modelSofaCompartments={catalog.modelSofaCompartments}
+              sofaCombos={catalog.sofaCombos}
+              specialAddons={catalog.specialAddons}
+              onAdd={addLine}
+              onClose={() => setConfigureModelId(null)}
+            />
+          );
+        })()}
 
       {cartOpen && (
         <CartDrawer
