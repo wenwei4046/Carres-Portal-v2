@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-07-03 — POS 2990s-parity program (branch `feat/pos-2990s-parity`, PR #47)
+
+Five slices, one branch. **⚠ migration 0200 must be applied BEFORE this deploys**
+(orders += customer_email/race/gender/birthday + create_order re-issue).
+
+1. **POS shell**: `PosSidebar` (sectioned: Categories/Quick/**MAINTAIN
+   principal-only**/pricing footer) replaced `CategoryRail` (deleted); single
+   "CARRES" series group in the grid; topbar = 01 CART/02 CUSTOMER/03 CONFIRMED
+   + Quotes + My orders + cart chip + staff chip. **`PrincipalPos` (dealer
+   pre-pick page) is DELETED** — principal `?tab=pos` mounts `DealerPos`
+   directly; the dealer is picked IN-FLOW at the CUSTOMER step
+   (`draft.actingDealerId`).
+2. **MAINTAIN → New Order**: `POST /api/orders/raw` (principal/operation; same
+   create_order RPC, NO POS gates/recomputes) + `PrincipalNewOrder`
+   (`?tab=new-order`).
+3. **CUSTOMER step (Image-#4 parity)**: **`Step1Customer` is DELETED** —
+   absorbed into the rebuilt `CustomerStep` (4 section chips + sticky
+   `OrderSummaryRail`); EMAIL/RACE/GENDER/BIRTHDAY now **POS-required**
+   (step1 gate — dealers included), server stays lenient. New
+   `GET /api/orders/customer-type?phone=` probe.
+4. **Sales analysis**: `GET /api/analytics/sales` + `lib/sales-analysis.ts`
+   summarizers + `PrincipalSalesAnalysis` (`?tab=sales-analysis`).
+5. **Quotes**: device-local saved quotes (`pos/quotes.ts`, sanitized lines) +
+   `QuotesDrawer` + CartDrawer "Save as quote".
+
+If your branch touches `DealerPos` / `CatalogStep` / `CustomerStep` /
+`PrincipalApp` / `portal-nav`: rebase and take this branch's shapes; don't
+re-introduce `CategoryRail` / `Step1Customer` / `PrincipalPos`.
+
+— from the POS-parity session
+
 ## 2026-06-30 — unified internal portal (Operation + Principal + Finance)
 
 The three internal portals merged into ONE role-aware portal. **The three
