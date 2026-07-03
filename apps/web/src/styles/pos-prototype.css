@@ -530,7 +530,8 @@
 /* =====================================================================
    HANDOVER (02 Customer) + CONFIRM & PAY (03) + CONFIRMATION + SUMMARY
    — extracted verbatim from prototype/pos-styles.css (sections 539-911,
-   974-1035, 2336-2522); icon selectors converted to svg for lucide-react.
+   974-1035, 2336-2522); theme variants + one orphaned block dropped; icon
+   selectors converted to svg for lucide-react.
    ===================================================================== */
 /* ========= HANDOVER ========= */
 .handover {
@@ -917,11 +918,6 @@
   padding: 14px 16px;
   text-align: left;
   width: 100%;
-}
-  background: var(--pos-panel, #fff);
-  border: 1.5px solid var(--line);
-  border-radius: 12px;
-  text-align: left;
 }
 .addon-card__head { cursor: pointer; }
 .addon-card__head:hover .addon-card__label { color: var(--c-burnt); }
