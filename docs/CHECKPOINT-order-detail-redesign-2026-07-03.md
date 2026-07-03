@@ -52,7 +52,7 @@ to show. Preview servers die often — start fresh on a new port/name if dead.
 ---
 
 ## 1. CURRENT LIVE STATE (all deployed to carres-portal.pages.dev)
-- **main tip = `8ba027c`** (branch = same). web Pages `f519d9e3` · API Worker `c9117f89`.
+- **main tip = `f7e0150`** (branch = same). web Pages `d4d9849b` · API Worker `c9117f89`.
 - **Latest migration applied to prod = `0199`** (`ops_order_control.line_stock_status`).
   Jess runs migrations himself in Supabase SQL Editor — give him the SQL.
 - **Prod data settled this session:** stock ETA/status import driven to **100%**
@@ -72,18 +72,19 @@ Jess reviewed visualize mockups panel-by-panel and said "ok proceed". Build in
   `in_production`, show real actions. Fixed the detail-order API select (was missing
   `source_system`) + the stage derivation + the in_production 0-shortage copy.
 
-### ⏭️ CONTINUE HERE — P1b (next, WEB-ONLY)
+### P1b — balance job DONE; restack + delivery-dedup remain
+2. ✅ **Balance = OUTSTANDING ONLY — DONE + LIVE (`f7e0150`, web `d4d9849b`).**
+   `PaymentControlFields`/`PaymentLedger`: "Bill" input → "Owing (RM)" (the imported
+   `ops_order_control.balance`; no total fallback); Outstanding headline + auto status
+   pill (Paid/Partial/Owing/—); "Add payment" → "Record payment"; the header summary no
+   longer shows the misleading "RM 0 paid" (shows owing / "No balance"). Tests updated.
+   **Small follow-up:** Collect-by(ETA−7d) / Last-call(ETA−1d) readouts (the ETA−1 Hold
+   gate already exists, so this is just the two reminder readouts).
+### ⏭️ CONTINUE HERE — rest of P1b (WEB-ONLY)
 1. **Right column restack** — `OrderDetailDrawer.tsx` "side" column (~line 1052):
    the Customer|Balance 2-col split "Card A" → make Customer and Balance **SEPARATE
    stacked Panels** (vertical stack Customer → Balance → Storage → Delivery). Storage
    + Delivery are already separate.
-2. **Balance = OUTSTANDING ONLY** — `OrderControlPanel.tsx` `PaymentControlFields`:
-   Jess: **operation has NO Bill/Total** (AutoCount+Master carry only the outstanding
-   `ops_order_control.balance` if any; the total bill will show in a FUTURE non-operation
-   panel). DROP the "Bill" input framing; show the imported `balance` as the
-   **Outstanding** headline; "Record payment" reduces it; auto Status pill
-   (Owing/Partial/Paid/**On hold**); Collect-by = ETA−7d / Last-call = ETA−1d. Also fix
-   the wrong "RM x paid" header summary (it shows owing as paid).
 3. **Delivery dedup** — region shown ONCE (header badge only); logistic select
    **name-only**; support MULTIPLE carriers per order; rework "Contact by" into an
    obvious "call customer by <date>".
