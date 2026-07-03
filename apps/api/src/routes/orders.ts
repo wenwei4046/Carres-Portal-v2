@@ -181,6 +181,25 @@ ordersRouter.get("/inbox", async (c) => {
 });
 
 /**
+ * GET /api/orders/customer-type?phone= — POS-parity "CUSTOMER TYPE (AUTO)".
+ * Does any RLS-visible order already carry this phone? (Dealer sees own orders;
+ * internal roles see all — the answer is scoped accordingly, by design.)
+ * HEAD+count only — no rows, no PII, cheap on the customer_phone equality.
+ */
+ordersRouter.get("/customer-type", async (c) => {
+  const phone = (new URL(c.req.url).searchParams.get("phone") ?? "").trim();
+  if (phone.length < 8) return c.json({ existing: false, matches: 0 });
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { count, error } = await sb
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("customer_phone", phone);
+  if (error) throw new HTTPException(500, { message: error.message });
+  const matches = count ?? 0;
+  return c.json({ existing: matches > 0, matches });
+});
+
+/**
  * POST /api/orders — atomic create via RPC `create_order(payload jsonb)`.
  *
  * Flow:

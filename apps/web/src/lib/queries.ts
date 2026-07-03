@@ -662,6 +662,28 @@ export function useCreateOrder(
 }
 
 /**
+ * useCustomerTypeProbe — GET /api/orders/customer-type?phone= (POS-parity
+ * "CUSTOMER TYPE (AUTO)"). Answers whether any RLS-visible order already
+ * carries this phone. Disabled until the phone looks dial-able.
+ */
+export function useCustomerTypeProbe(
+  phone: string,
+  opts?: Partial<UseQueryOptions<{ existing: boolean; matches: number }>>,
+) {
+  const trimmed = phone.trim();
+  return useQuery<{ existing: boolean; matches: number }>({
+    queryKey: ["orders", "customer-type", trimmed],
+    queryFn: () =>
+      apiFetch<{ existing: boolean; matches: number }>(
+        `/api/orders/customer-type?phone=${encodeURIComponent(trimmed)}`,
+      ),
+    enabled: trimmed.length >= 8,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/**
  * useRawCreateOrder — POST /api/orders/raw (POS-parity, MAINTAIN → New Order).
  * Internal-only raw creation: free-form line skus + prices, no POS gates.
  * Same Order response contract as useCreateOrder.

@@ -420,6 +420,12 @@ export default function DealerPos({
           billing: draft.customer.billingSame ? null : draft.customer.billing,
           billingSame: draft.customer.billingSame,
           emergency: composeEmergency(draft.customer),
+          // 0200 — POS-parity demographics (POS-required via step1 gate;
+          // trimmed-empty → null keeps the wire shape lenient).
+          email: draft.customer.email.trim() || null,
+          race: draft.customer.race || null,
+          gender: draft.customer.gender || null,
+          birthday: draft.customer.birthday || null,
         },
         delivery: {
           date: draft.delivery.dateTbd ? null : draft.delivery.date,
@@ -693,6 +699,7 @@ export default function DealerPos({
                 salespersons={salespersons}
                 catalog={catalogQ.data}
                 minLeadDays={minLeadDays}
+                onBackToCart={() => setStep(1)}
                 dealerPick={
                   internalPicksDealer
                     ? {

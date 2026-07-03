@@ -519,6 +519,11 @@ export interface Order {
     billing: string | null;
     billingSame: boolean;
     emergency: string | null;
+    /** 0200 — POS-parity demographics (POS-required, server-lenient). */
+    email: string | null;
+    race: string | null;
+    gender: string | null;
+    birthday: string | null;
   };
 
   delivery: {

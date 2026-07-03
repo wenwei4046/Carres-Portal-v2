@@ -173,6 +173,12 @@ export interface WizardDraft {
     emergencyPhone: string;
     emergencyRelationship: string;
     emergencyRelationshipOther: string;
+    /** 0200 — POS-parity demographics (2990s customer step). POS-required
+     *  (step1 gate), server-lenient. Stored as strings; "" = not filled. */
+    email: string;
+    race: string;
+    gender: string;
+    birthday: string;
   };
   delivery: {
     date: string;
@@ -244,6 +250,10 @@ export function emptyDraft(): WizardDraft {
       emergencyPhone: "",
       emergencyRelationship: "",
       emergencyRelationshipOther: "",
+      email: "",
+      race: "",
+      gender: "",
+      birthday: "",
     },
     delivery: { date: "", proceedDate: "", dateTbd: false, floor: 1, hasLift: false, stairItems: null, asap: false },
     lines: [],
@@ -358,6 +368,7 @@ export function clearDraft(): void {
  *   - outletId + salespersonId both set
  */
 const PHONE_RE = /^[0-9-+\s]{8,}/;
+const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
 export function step1Valid(d: WizardDraft): boolean {
   return step1FirstIssue(d) === null;
@@ -380,6 +391,11 @@ export function step1FirstIssue(d: WizardDraft): string | null {
   if (!d.salespersonId)   return "Sale info — pick a Salesperson";
   if (c.name.trim().length < 2)   return "Customer — full name (≥2 chars)";
   if (!PHONE_RE.test(c.phone))    return "Customer — phone (≥8 digits)";
+  // 0200 — POS-parity demographics (2990s: POS-required, server-lenient).
+  if (!EMAIL_RE.test(c.email.trim())) return "Customer — email";
+  if (!c.race)                    return "Customer — race";
+  if (!c.gender)                  return "Customer — gender";
+  if (!c.birthday)                return "Customer — birthday";
   if (c.emergencyName.trim().length < 2)   return "Emergency Contact — name";
   if (!PHONE_RE.test(c.emergencyPhone))    return "Emergency Contact — phone";
   if (!c.emergencyRelationship)            return "Emergency Contact — relationship";

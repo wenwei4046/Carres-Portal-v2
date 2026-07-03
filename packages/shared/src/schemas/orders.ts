@@ -75,6 +75,12 @@ export const orderSchema = z.object({
     billing: z.string().nullable(),
     billingSame: z.boolean(),
     emergency: z.string().nullable(),
+    // 0200 — POS-parity demographics. `.optional()` keeps rows fetched before
+    // the migration parse-safe (adapter coalesces to null).
+    email: z.string().nullable().optional(),
+    race: z.string().nullable().optional(),
+    gender: z.string().nullable().optional(),
+    birthday: z.string().nullable().optional(),
   }),
   delivery: z.object({
     date: z.string().nullable(),
@@ -172,6 +178,17 @@ export const createOrderInputSchema = z.object({
     billing: z.string().nullable(),
     billingSame: z.boolean(),
     emergency: z.string().min(1),
+    // 0200 — POS-parity demographics. The POS front-end gates requiredness;
+    // the server stays LENIENT (nullable/optional) so non-POS callers and
+    // in-flight drafts keep submitting (2990s precedent).
+    email: z.string().nullable().optional(),
+    race: z.string().nullable().optional(),
+    gender: z.string().nullable().optional(),
+    birthday: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable()
+      .optional(),
   }),
   delivery: z.object({
     date: z.string().nullable(),
