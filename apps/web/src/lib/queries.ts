@@ -77,6 +77,7 @@ import {
   type LpRejectOrderInput,
   type ReselectPartnerInput,
   type CreateOrderInput,
+  type RawCreateOrderInput,
   type CreatePoInput,
   type CreatePosBatchInput,
   type CreatePosBatchResponse,
@@ -655,6 +656,30 @@ export function useCreateOrder(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       // Forward to caller's onSuccess if provided. Spread keeps us
       // signature-agnostic across TanStack versions.
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * useRawCreateOrder — POST /api/orders/raw (POS-parity, MAINTAIN → New Order).
+ * Internal-only raw creation: free-form line skus + prices, no POS gates.
+ * Same Order response contract as useCreateOrder.
+ */
+export function useRawCreateOrder(
+  opts?: Partial<UseMutationOptions<Order, Error, RawCreateOrderInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, Error, RawCreateOrderInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>("/api/orders/raw", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(order.id), order);
+      void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

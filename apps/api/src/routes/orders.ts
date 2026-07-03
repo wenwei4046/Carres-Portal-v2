@@ -8,6 +8,7 @@ import {
   autocountImportResponseSchema,
   cancelOrderInputSchema,
   createOrderInputSchema,
+  rawCreateOrderInputSchema,
   isProceedBlockerCode,
   orderSchema,
   ordersListResponseSchema,
@@ -629,6 +630,128 @@ ordersRouter.post("/", async (c) => {
   if (carryForwardWarning) {
     c.header("X-Pwp-Carry-Forward-Warning", encodeURIComponent(carryForwardWarning));
   }
+  return c.json(orderSchema.parse(order), 201);
+});
+
+// ---------------------------------------------------------------------------
+// RAW create door — POST /api/orders/raw (POS-parity, MAINTAIN → New Order)
+// The 2990s-Backend-style creation path for INTERNAL roles: no signature, no
+// terms, no payment method, no emergency contact, NO lead-time floor, and NONE
+// of the POS recompute engines (sofa/PWP/free-gift/special/delivery) — the
+// operator's line skus + prices are persisted exactly as entered; that is the
+// point of this path. Lines are stamped attrs=null so no downstream engine
+// ever recognises them as marker lines. The create_order RPC still enforces:
+// dealer required, ≥1 line, the sofa ↔ mattress/bed-frame composition rule,
+// and the internal-role gate (SECURITY DEFINER re-check).
+// ---------------------------------------------------------------------------
+
+const ORDER_RAW_CREATE_ROLES = new Set<string>(["principal", "operation"]);
+
+ordersRouter.post("/raw", async (c) => {
+  const auth = c.var.auth;
+  if (!ORDER_RAW_CREATE_ROLES.has(auth.role)) {
+    throw new HTTPException(403, { message: "Raw order creation is internal-only" });
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = rawCreateOrderInputSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid order input: " + parsed.error.issues[0]?.message,
+    });
+  }
+  const input = parsed.data;
+
+  // deposit_pct only feeds the RPC's order_history line — derive it so the
+  // timeline text matches what the operator saw.
+  const total = input.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+  const depositPct =
+    total > 0 ? Math.min(100, Math.max(0, Math.round((input.paid / total) * 100))) : 0;
+
+  const payload: Record<string, unknown> = {
+    dealer_id: input.dealerId,
+    outlet_id: input.outletId ?? null,
+    salesperson_id: input.salespersonId ?? null,
+    customer_name: input.customer.name,
+    customer_phone: input.customer.phone ?? null,
+    customer_address: input.customer.address ?? null,
+    customer_address_unknown: !input.customer.address,
+    customer_billing: null,
+    customer_billing_same: true,
+    customer_emergency: null,
+    delivery_date: input.deliveryDate ?? null,
+    proceed_date: null,
+    delivery_date_tbd: !input.deliveryDate,
+    delivery_floor: 1,
+    delivery_has_lift: false,
+    delivery_stair_items: null,
+    paid: input.paid,
+    signature_url: null,
+    payment_slip_url: null,
+    terms_accepted: false,
+    payment_method: null,
+    approval_code: null,
+    installment_months: null,
+    lines: input.lines.map((l) => ({
+      sku: l.sku,
+      qty: l.qty,
+      attrs: null,
+      unit_price: l.unitPrice,
+    })),
+    addons: [],
+    deposit_pct: depositPct,
+  };
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data: created, error } = await sb.rpc("create_order", { payload });
+  if (error) {
+    if (error.code === "42501" || /forbidden/i.test(error.message ?? "")) {
+      throw new HTTPException(403, { message: "Forbidden" });
+    }
+    if (error.code === "22023") {
+      const detail = (error as { details?: string }).details;
+      if (detail === "mixed_category_lines") {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "mixed_category_lines",
+            message:
+              "Sofa cannot mix with mattress or bed frame in the same order. Please place them as separate Sales Orders.",
+          },
+          422,
+        );
+      }
+      throw new HTTPException(400, { message: error.message });
+    }
+    throw new HTTPException(500, { message: error.message });
+  }
+  const { id } = (created ?? {}) as { id?: string };
+  if (!id) throw new HTTPException(500, { message: "Order create returned no id" });
+
+  // Same response contract as POST / — the full order, so the client can show
+  // the SO number + land on the standard order shape without a second GET.
+  const { data: full, error: fetchErr } = await sb
+    .from("orders")
+    .select("*, order_lines(*), order_addons(*), order_history(*)")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchErr) throw new HTTPException(500, { message: fetchErr.message });
+  if (!full) throw new HTTPException(500, { message: "Order created but not readable" });
+  const row = full as DB.OrderRow & {
+    order_lines?: DB.OrderLineRow[];
+    order_addons?: DB.OrderAddonRow[];
+    order_history?: DB.OrderHistoryRow[];
+  };
+  const order = Adapters.orderFromRow(row, {
+    lines: row.order_lines ?? [],
+    addons: row.order_addons ?? [],
+    history: row.order_history ?? [],
+  });
   return c.json(orderSchema.parse(order), 201);
 });
 

@@ -126,10 +126,10 @@ export default function PosSidebar({
       {showMaintain && (
         <nav aria-label="Maintain" className="flex flex-col gap-0.5 mt-5" data-testid="pos-maintain">
           <p className="label px-3 mb-2">Maintain</p>
-          {/* New Order + Sales analysis ship in the next slices of the POS-parity
-              program — rendered as "Soon" until their pages land, mirroring the
-              2990s TBC pattern, so this sidebar is deployable standalone. */}
-          <SideSoon icon={Plus} label="New Order" />
+          {/* Sales analysis ships in a later slice of the POS-parity program —
+              rendered as "Soon" until its page lands, mirroring the 2990s TBC
+              pattern, so this sidebar is deployable standalone. */}
+          <SideLink icon={Plus} label="New Order" to="/principal?tab=new-order" />
           <SideLink icon={Package} label="Products" to="/principal?tab=catalog" />
           <SideLink
             icon={Settings}
