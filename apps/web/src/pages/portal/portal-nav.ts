@@ -17,7 +17,7 @@ import {
   Scale,
   BarChart3,
   BadgeCheck,
-  PlusCircle,
+  LayoutGrid,
   Users,
   Network,
   ScrollText,
@@ -194,7 +194,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
     items: [
       { key: "dashboard", label: "Overview", icon: LayoutDashboard },
       { key: "approvals", label: "Approvals", icon: BadgeCheck, pendingPill: true },
-      { key: "pos", label: "New order", icon: PlusCircle },
+      // POS-parity (Loo 2026-07-03): the entry opens the POS *catalog* — named
+      // like 2990s (the POS home IS the catalog), not "New order".
+      { key: "pos", label: "Catalog", icon: LayoutGrid },
       { key: "orders", label: "Orders", icon: ClipboardList },
       { key: "dealers", label: "Dealers", icon: Users },
       { key: "partners", label: "Partners", icon: Network },
