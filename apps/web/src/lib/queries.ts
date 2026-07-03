@@ -26,6 +26,8 @@ import {
   type SkuImportResult,
   type StockEtaImportRow,
   type StockEtaImportResult,
+  type AutocountImportInput,
+  type AutocountImportResponse,
   type SpecialAddonDto,
   type SpecialAddonCreateInput,
   type SpecialAddonPatchInput,
@@ -4890,6 +4892,20 @@ export function useImportSkus() {
     mutationFn: (rows: SkuImportRow[]) =>
       apiFetch<SkuImportResult>("/api/catalog/import-skus", catalogJson("POST", { rows })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+// Orders import (AutoCount RPC) — reused by the Master combined import to create
+// the missing orders before setting their stock. Idempotent by ref server-side.
+export function useImportOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AutocountImportInput) =>
+      apiFetch<AutocountImportResponse>("/api/orders/import", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["operation"] }),
   });
 }
 

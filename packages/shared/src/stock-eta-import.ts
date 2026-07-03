@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+import {
+  autocountImportRowSchema,
+  type AutocountImportRow,
+} from "./schemas/autocount-import";
+
+/** Item names that are charges / discounts, not stockable goods — no Stock ETA
+ *  or status applies, and they never match a warehouse line. */
+const NON_STOCK_RE =
+  /\bdiscount\b|transport\s*fee|no\s*lift|per\s*floor|delivery\s*charge|install(ation)?\s*(fee|charge)|handling\s*fee|\brebate\b/i;
+
 /**
  * Stock-ETA import — the one parser + matcher shared by the staged-preview client
  * (apps/web ImportStockEtaDialog) and the server (POST
@@ -131,6 +141,12 @@ export function masterRecordToStockRow(
   const sku = str("item detail") || str("item");
   if (!po) return { ok: false, reason: "missing PO" };
   if (!sku) return { ok: false, reason: "missing Item Detail" };
+  // Non-stock lines (discounts, transport / lift / service charges) carry no
+  // warehouse stock, so a Stock ETA / status is meaningless — skip them so they
+  // don't sit in the "unmatched" bucket forever.
+  if (NON_STOCK_RE.test(sku)) {
+    return { ok: false, reason: "non-stock line (discount / service charge)" };
+  }
 
   const eta = parseEtaCell(norm["stock eta"] as string | number | undefined);
   const stockStatus = normalizeMasterStockStatus(str("stock status"));
@@ -142,6 +158,67 @@ export function masterRecordToStockRow(
   if (eta) row.eta = eta;
   if (stockStatus) row.stockStatus = stockStatus;
   return { ok: true, row };
+}
+
+// ---------------------------------------------------------------------------
+// Master row -> an AutoCount-style ORDER row (so the missing orders can be
+// created from the Master before the stock ETA/status is set on them). Reuses
+// the proven /api/orders/import RPC (idempotent by ref).
+// ---------------------------------------------------------------------------
+
+export type OrderRowResult =
+  | { ok: true; row: AutocountImportRow }
+  | { ok: false; reason: string };
+
+/** Map ONE raw Master "Ops" record to the AutoCount import-row shape. The Master
+ *  is a superset of the AutoCount listing — only the column NAMES differ, so we
+ *  remap by header. A row missing an order-identity field (Ref / Item Group /
+ *  Qty / Item Detail / Customer) is skipped, mirroring the AutoCount importer. */
+export function masterRecordToOrderRow(
+  rec: Record<string, string | number>,
+): OrderRowResult {
+  const norm: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(rec)) norm[k.trim().toLowerCase()] = v;
+  const str = (k: string) => String(norm[k] ?? "").trim();
+
+  const ref = str("ref");
+  const itemGroup = str("item group");
+  const detailDescription = str("item detail") || str("item");
+  const debtorName = str("customer") || str("debtor name");
+  const qtyRaw = norm["qty"];
+  const qty =
+    typeof qtyRaw === "number" ? Math.round(qtyRaw) : parseInt(str("qty"), 10);
+
+  if (!ref) return { ok: false, reason: "missing Ref" };
+  if (!itemGroup) return { ok: false, reason: "missing Item Group" };
+  if (!detailDescription) return { ok: false, reason: "missing Item Detail" };
+  if (!debtorName) return { ok: false, reason: "missing Customer" };
+  if (!Number.isFinite(qty) || qty <= 0) return { ok: false, reason: "bad Qty" };
+
+  // G (header "ETA") is the requested delivery date (a raw Excel serial).
+  const deliveryDate = parseEtaCell(norm["eta"] as string | number | undefined);
+
+  const row = {
+    ref,
+    itemGroup,
+    qty,
+    detailDescription,
+    debtorName,
+    deliveryLocation: str("delivery location") || null,
+    deliveryDate: deliveryDate ?? null,
+    poDocNo: str("po") || null,
+    phone: str("phone") || null,
+    addr1: str("add 1") || null,
+    addr2: str("add 2") || null,
+    addr3: str("add 3") || null,
+    addr4: str("add 4") || null,
+    balance: str("balance") || null,
+  };
+  const parsed = autocountImportRowSchema.safeParse(row);
+  if (!parsed.success) {
+    return { ok: false, reason: parsed.error.issues[0]?.message ?? "invalid row" };
+  }
+  return { ok: true, row: parsed.data };
 }
 
 // ---------------------------------------------------------------------------

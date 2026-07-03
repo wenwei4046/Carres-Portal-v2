@@ -6,6 +6,7 @@ import {
   parseEtaCell,
   normalizeMasterStockStatus,
   masterRecordToStockRow,
+  masterRecordToOrderRow,
   matchStockRows,
   type OrderLineRef,
   type StockEtaImportRow,
@@ -96,6 +97,45 @@ describe("masterRecordToStockRow", () => {
   it("skips a row missing the PO", () => {
     const r = masterRecordToStockRow({ "Item Detail": "x", "Stock ETA": 46193 });
     expect(r.ok).toBe(false);
+  });
+  it("skips non-stock charge / discount lines", () => {
+    for (const name of ["Discount 3000", "Transport Fees", "No Lift Per Floor Charge"]) {
+      const r = masterRecordToStockRow({
+        PO: "PO/1",
+        "Item Detail": name,
+        "Stock Status": "Received",
+      });
+      expect(r.ok, name).toBe(false);
+    }
+  });
+});
+
+describe("masterRecordToOrderRow", () => {
+  it("maps a Master Ops row to the AutoCount order-row shape", () => {
+    const r = masterRecordToOrderRow({
+      Ref: "CR1052",
+      "Delivery Location": "Kuala Lumpur",
+      ETA: 46107,
+      "Item Group": "Bed Fram",
+      Qty: 1,
+      "Item Detail": "1013Jager/Fab3-King/PC151-02",
+      PO: "PO/2603-065",
+      Customer: "Yip Chung Sien",
+      Phone: "010-9738523",
+      "Add 1": "B-20-05",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.row.ref).toBe("CR1052");
+      expect(r.row.poDocNo).toBe("PO/2603-065");
+      expect(r.row.debtorName).toBe("Yip Chung Sien");
+      expect(r.row.qty).toBe(1);
+      expect(r.row.deliveryDate).toBe("2026-03-26");
+    }
+  });
+  it("skips a row with no Item Group or no Customer", () => {
+    expect(masterRecordToOrderRow({ Ref: "x", Qty: 1, "Item Detail": "y", Customer: "z" }).ok).toBe(false);
+    expect(masterRecordToOrderRow({ Ref: "x", "Item Group": "Sofa", Qty: 1, "Item Detail": "y" }).ok).toBe(false);
   });
 });
 
