@@ -750,9 +750,9 @@ function DrawerBody({
           // stacked cards (Customer|Balance · Delivery). align-items:stretch →
           // both columns EQUAL height, bottoms line up (no 高高低低).
           gridTemplateColumns: "1.05fr 0.95fr",
-          gridTemplateRows: "auto auto minmax(0,1fr)",
+          gridTemplateRows: "auto auto auto minmax(0,1fr)",
           gridTemplateAreas:
-            '"banner banner" "header header" "main side"',
+            '"banner banner" "header header" "actions actions" "main side"',
         }}
       >
         {/* Needs-action banner — the "action for logistic" note surfaced at the
@@ -824,6 +824,33 @@ function DrawerBody({
               ×
             </button>
           </span>
+        </div>
+
+        {/* Action strip — the stage actions live at the TOP now (Jess 2026-07-02:
+            "bottom shouldn't be there, put top"), right under the header where the
+            operator lands, not buried at the drawer bottom. */}
+        <div
+          style={{ gridArea: "actions" }}
+          className="flex items-center justify-between gap-3 rounded-[8px] bg-base-50 border border-base-100 px-3 py-2 min-w-0"
+        >
+          <ActionBar
+            stage={stage}
+            orderId={order.id}
+            so={order.so}
+            warehouseName={warehouse?.name ?? null}
+            shortageCount={shortages.length}
+            partnerAssigned={anyThreadPartnerAssigned}
+            doNumber={order.do_number}
+            onDispatchClick={onDispatchClick}
+            onDOClick={onDOClick}
+            onIssuePOsClick={onIssuePOsClick}
+            onAbandonClick={onAbandonClick}
+            onConfirmProceedClick={onConfirmProceedClick}
+            onTransferReadyClick={onTransferReadyClick}
+            onTopUpClick={onTopUpClick}
+            proceedBlocked={loc.area === "Outstation" && !form.draft.called_customer}
+          />
+          <OrderControlSaveBar form={form} />
         </div>
 
         {/* LEFT column — the two locked listing panels: Items ordered (fixed
@@ -1015,7 +1042,7 @@ function DrawerBody({
               pinned header + funnel filters + Reserve, styled as a 12px card; it
               grows to fill the leftover height. No active line → a placeholder. */}
           {activeLineSku && stage !== "delivered" ? (
-            <div className="flex-1 min-h-0 flex flex-col">
+            <div className="h-[340px] min-h-0 flex flex-col shrink-0">
               <StockPickerGrid
                 sku={activeLineSku}
                 soRef={soRef}
@@ -1029,7 +1056,7 @@ function DrawerBody({
               />
             </div>
           ) : (
-            <Panel title="Warehouse stock" grow summary={<MiniBadge tone="muted">—</MiniBadge>}>
+            <Panel title="Warehouse stock" summary={<MiniBadge tone="muted">—</MiniBadge>}>
               <div className="flex-1 grid place-items-center t-tiny text-base-400 p-6">
                 {stage === "delivered"
                   ? "Delivered — stock settled."
@@ -1235,29 +1262,6 @@ function DrawerBody({
           </Panel>
         </div>{/* /right column */}
 
-      </div>
-
-      {/* Pinned action bar — stage actions + the control-draft Save, always
-          reachable at the drawer bottom (P5). */}
-      <div className="px-5 py-3 bg-base-50 border-t border-base-100 shrink-0 flex items-center justify-between gap-3">
-        <ActionBar
-          stage={stage}
-          orderId={order.id}
-          so={order.so}
-          warehouseName={warehouse?.name ?? null}
-          shortageCount={shortages.length}
-          partnerAssigned={anyThreadPartnerAssigned}
-          doNumber={order.do_number}
-          onDispatchClick={onDispatchClick}
-          onDOClick={onDOClick}
-          onIssuePOsClick={onIssuePOsClick}
-          onAbandonClick={onAbandonClick}
-          onConfirmProceedClick={onConfirmProceedClick}
-          onTransferReadyClick={onTransferReadyClick}
-          onTopUpClick={onTopUpClick}
-          proceedBlocked={loc.area === "Outstation" && !form.draft.called_customer}
-        />
-        <OrderControlSaveBar form={form} />
       </div>
     </div>
   );
