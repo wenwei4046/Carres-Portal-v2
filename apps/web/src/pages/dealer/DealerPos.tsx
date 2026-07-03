@@ -31,16 +31,15 @@ import {
   emptyDraft,
   loadDraft,
   saveDraft,
-  step1FirstIssue,
   step1Valid,
   step3DateValid,
-  step3DateFirstIssue,
   step4Valid,
 } from "./new-order/draft";
 import Step3SignaturePayment from "./new-order/Step3SignaturePayment";
 import ThankYou from "./new-order/ThankYou";
 import CatalogStep from "./pos/CatalogStep";
 import CustomerStep from "./pos/CustomerStep";
+import OrderSummaryRail from "./pos/OrderSummaryRail";
 import QuotesDrawer from "./pos/QuotesDrawer";
 import { quoteToDraftLines, type SavedQuote } from "./pos/quotes";
 import { cartItemCount, cartTotalExStair } from "./pos/cart";
@@ -717,17 +716,15 @@ export default function DealerPos({
       {/* Body */}
       <main className="flex-1 min-h-0 overflow-hidden">
         {submitted ? (
-          <div className="h-full overflow-auto">
-            <div className="mx-auto max-w-xl w-full">
-              <ThankYou
-                order={submitted}
-                onNewOrder={startAnotherOrder}
-                onClose={() => {
-                  clearDraft();
-                  (onExit ?? (() => navigate("/dealer/orders")))();
-                }}
-              />
-            </div>
+          <div className="page-shell h-full overflow-hidden">
+            <ThankYou
+              order={submitted}
+              onNewOrder={startAnotherOrder}
+              onClose={() => {
+                clearDraft();
+                (onExit ?? (() => navigate("/dealer/orders")))();
+              }}
+            />
           </div>
         ) : !catalogQ.data ? (
           <CenterMessage>
@@ -755,7 +752,7 @@ export default function DealerPos({
             />
           </div>
         ) : step === 2 ? (
-          <div key={2} className="animate-page-enter h-full overflow-auto">
+          <div key={2} className="page-shell h-full overflow-hidden">
             {outletsQ.data && salespersonsQ.data ? (
               <CustomerStep
                 draft={draft}
@@ -765,6 +762,7 @@ export default function DealerPos({
                 catalog={catalogQ.data}
                 minLeadDays={minLeadDays}
                 onBackToCart={() => setStep(1)}
+                onProceed={() => customerReady && setStep(3)}
                 dealerPick={
                   internalPicksDealer
                     ? {
@@ -787,9 +785,26 @@ export default function DealerPos({
             )}
           </div>
         ) : (
-          <div key={3} className="animate-page-enter h-full overflow-auto">
-            <div className="mx-auto max-w-3xl w-full px-6 py-8">
-              <Step3SignaturePayment draft={draft} onChange={setDraft} catalog={catalogQ.data} />
+          /* 03 — Confirm & pay, prototype .handover Phase 2 layout: left = phase
+             banner + the existing payment/signature form; right = summary rail. */
+          <div key={3} className="page-shell h-full overflow-hidden">
+            <div className="handover">
+              <div className="handover__left">
+                <div className="handover__title-row">
+                  <div>
+                    <span className="phase-banner">
+                      <span className="phase-banner__dot" />
+                      Phase 2 of 2 · Confirm &amp; pay
+                    </span>
+                    <h1 className="handover__title">Confirm &amp; payment</h1>
+                  </div>
+                </div>
+                <p className="handover__sub">
+                  Record payment, then capture the customer signature to complete the order.
+                </p>
+                <Step3SignaturePayment draft={draft} onChange={setDraft} catalog={catalogQ.data} />
+              </div>
+              <OrderSummaryRail draft={draft} catalog={catalogQ.data} />
             </div>
           </div>
         )}
@@ -803,55 +818,66 @@ export default function DealerPos({
         />
       )}
 
-      {/* Footer — steps 2 + 3 only (step 1 advances via the cart). */}
-      {!submitted && step !== 1 && (
-        <footer className="shrink-0 border-t border-base-200 bg-base-50 px-5 py-3 flex flex-col gap-2">
+      {/* Footer — step 3 only (step 1 advances via the cart; step 2's wizard
+          owns its own Back/Next). Prototype-styled bar: ghost Back · Total ·
+          primary Complete order. */}
+      {!submitted && step === 3 && (
+        <footer
+          className="shrink-0"
+          style={{
+            borderTop: "1px solid var(--line)",
+            background: "var(--pos-panel)",
+            padding: "12px 20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
           {submitError && (
-            <p className="text-xs text-destructive bg-destructive/5 border border-destructive/30 rounded px-3 py-1.5">
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--c-burnt)",
+                background: "color-mix(in oklab, var(--c-orange) 8%, transparent)",
+                border: "1px solid var(--line)",
+                borderRadius: 10,
+                padding: "6px 12px",
+              }}
+            >
               {submitError}
             </p>
           )}
-          <div className="flex items-center justify-between gap-4">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <button
-              onClick={() => setStep((step - 1) as 1 | 2 | 3)}
-              className="btn-ghost"
+              type="button"
+              onClick={() => setStep(2)}
+              className="btn btn--ghost"
               disabled={uploading || createOrder.isPending}
             >
               ← Back
             </button>
-            <div className="flex items-center gap-4">
-              <span className="text-[13px] text-base-700">
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
                 Total{" "}
-                <span className="font-mono font-semibold text-base-900">{rm(footerTotal)}</span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-mark)",
+                    fontWeight: 900,
+                    fontSize: 18,
+                    color: "var(--c-burnt)",
+                  }}
+                >
+                  {rm(footerTotal)}
+                </span>
               </span>
-              {step === 2 ? (
-                <div className="flex flex-col items-end gap-1">
-                  <button
-                    onClick={() => customerReady && setStep(3)}
-                    disabled={!customerReady}
-                    className="btn-primary"
-                  >
-                    Continue →
-                  </button>
-                  {!customerReady && (
-                    <span className="text-[11px] text-base-500 italic">
-                      {!effectiveDealerId
-                        ? "Missing: Sale info — pick a Dealer"
-                        : step1Valid(draft)
-                          ? step3DateFirstIssue(draft, minLeadDays)
-                          : `Missing: ${step1FirstIssue(draft)}`}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <button onClick={handleSubmit} disabled={submitDisabled} className="btn-hero">
-                  {uploading
-                    ? "Uploading…"
-                    : createOrder.isPending
-                      ? "Submitting…"
-                      : "Submit order"}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitDisabled}
+                className="btn btn--primary btn--lg"
+              >
+                {uploading ? "Uploading…" : createOrder.isPending ? "Submitting…" : "Complete order"}
+              </button>
             </div>
           </div>
         </footer>

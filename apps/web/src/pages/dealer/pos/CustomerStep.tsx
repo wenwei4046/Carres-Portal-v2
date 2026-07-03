@@ -1,11 +1,11 @@
-import { useRef, useState } from "react";
-import { CalendarDays, MapPin, Shield, User, type LucideIcon } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import type { CatalogResponse, OutletDto, SalespersonDto } from "@carres/shared";
 import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useCustomerTypeProbe } from "@/lib/queries";
-import type { WizardDraft } from "../new-order/draft";
+import { step3DateValid, type WizardDraft } from "../new-order/draft";
 import Step3Delivery from "../new-order/Step3Delivery";
 import StairCarryFields from "./StairCarryFields";
 import OrderSummaryRail from "./OrderSummaryRail";
@@ -25,6 +25,9 @@ const RELATIONSHIPS = [
 const RACE_OPTIONS = ["Malay", "Chinese", "Indian", "Other"] as const;
 const GENDER_OPTIONS = ["Female", "Male"] as const;
 
+const PHONE_RE = /^[0-9-+\s]{8,}/;
+const EMAIL_RE = /^\S+@\S+\.\S+$/;
+
 /** In-flow dealer pick (internal operator placing on behalf of a dealer).
  *  Absent for dealer-side logins — their JWT dealer is the order's dealer. */
 export interface DealerPick {
@@ -34,28 +37,21 @@ export interface DealerPick {
   onPick: (id: string, name: string) => void;
 }
 
-const CHIPS: Array<{ n: 1 | 2 | 3 | 4; label: string; icon: LucideIcon }> = [
-  { n: 1, label: "Customer", icon: User },
-  { n: 2, label: "Address", icon: MapPin },
-  { n: 3, label: "Emergency", icon: Shield },
-  { n: 4, label: "Target date", icon: CalendarDays },
-];
+const PHASE1_STEPS = ["Customer", "Address", "Emergency", "Target date"] as const;
 
 /**
- * Step 02 — CUSTOMER (2990s Image-#4 parity). Header eyebrow "Phase 1 of 2 ·
- * Additional info" + Back-to-cart, a 4-chip section nav (Customer / Address /
- * Emergency / Target date) that scrolls to each card, the form column, and the
- * sticky right Order-summary rail. The Customer card gains EMAIL / CUSTOMER
- * TYPE (AUTO, probe by phone) / RACE / GENDER / BIRTHDAY (0200 demographics —
- * POS-required via the step1 gate, server-lenient).
+ * Step 02 — CUSTOMER, prototype skin (`.handover` Phase 1, Loo's Claude
+ * Design 2026-07-04): two-column layout — left = phase banner ("Phase 1 of
+ * 2 · Additional info") + step-pill nav + ONE sub-step per screen (Customer /
+ * Address / Emergency / Target date) + ghost-Back / primary-Next footer;
+ * right = the live `.summary` Order-summary rail.
  *
- * Absorbs the legacy Step1Customer form verbatim (sale info / customer /
- * address / emergency / billing — validation + composeAddress unchanged);
- * Step3Delivery + StairCarryFields render inside the Target-date card.
- *
- * POS-parity — when `dealerPick` is provided (internal operator), a Dealer card
- * leads the column; the rest of the form appears only after a dealer is chosen
- * (outlets + salespersons belong to that dealer).
+ * All Carres functionality is carried over unchanged: in-flow dealer pick
+ * (internal operators), outlet/salesperson, EMAIL + CUSTOMER TYPE (AUTO
+ * probe) + RACE/GENDER/BIRTHDAY (0200), MY cascading address + billing,
+ * emergency contact, Step3Delivery date rules (lead time / TBD / ASAP /
+ * proceed date) and stair-carry. The final Next calls `onProceed` — DealerPos
+ * still holds the authoritative customerReady gate.
  */
 export default function CustomerStep({
   draft,
@@ -66,6 +62,7 @@ export default function CustomerStep({
   minLeadDays,
   dealerPick,
   onBackToCart,
+  onProceed,
 }: {
   draft: WizardDraft;
   onChange: (next: WizardDraft) => void;
@@ -75,15 +72,10 @@ export default function CustomerStep({
   minLeadDays: number;
   dealerPick?: DealerPick;
   onBackToCart?: () => void;
+  onProceed?: () => void;
 }) {
   const c = draft.customer;
-  const [activeChip, setActiveChip] = useState<1 | 2 | 3 | 4>(1);
-  const sectionRefs = {
-    1: useRef<HTMLElement>(null),
-    2: useRef<HTMLElement>(null),
-    3: useRef<HTMLElement>(null),
-    4: useRef<HTMLElement>(null),
-  };
+  const [stepIdx, setStepIdx] = useState<0 | 1 | 2 | 3>(0);
 
   // CUSTOMER TYPE (AUTO) — probe visible orders by the (debounced) phone.
   const debouncedPhone = useDebouncedValue(c.phone.trim(), 400);
@@ -116,74 +108,92 @@ export default function CustomerStep({
     ? salespersons.filter((sp) => sp.outletId === draft.outletId)
     : salespersons;
 
-  function goTo(n: 1 | 2 | 3 | 4) {
-    setActiveChip(n);
-    sectionRefs[n].current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
   const dealerPending = !!dealerPick && !dealerPick.value;
   const todayIso = new Date().toISOString().slice(0, 10);
 
+  // Per-sub-step advance gates (mirror draft.ts step1FirstIssue's groups).
+  function canAdvance(): boolean {
+    if (dealerPending) return false;
+    if (stepIdx === 0) {
+      return (
+        !!draft.outletId &&
+        !!draft.salespersonId &&
+        c.name.trim().length >= 2 &&
+        PHONE_RE.test(c.phone) &&
+        EMAIL_RE.test(c.email.trim()) &&
+        !!c.race &&
+        !!c.gender &&
+        !!c.birthday
+      );
+    }
+    if (stepIdx === 1) {
+      const addressOk =
+        c.addressUnknown ||
+        (c.addressLine1.trim().length >= 5 &&
+          !!c.addressState &&
+          !!c.addressCity &&
+          !!c.addressPostcode);
+      const billingOk = c.billingSame || c.billing.trim().length >= 5;
+      return addressOk && billingOk;
+    }
+    if (stepIdx === 2) {
+      return (
+        c.emergencyName.trim().length >= 2 &&
+        PHONE_RE.test(c.emergencyPhone) &&
+        !!c.emergencyRelationship &&
+        (c.emergencyRelationship !== "__OTHER__" ||
+          c.emergencyRelationshipOther.trim().length >= 2)
+      );
+    }
+    return step3DateValid(draft, minLeadDays);
+  }
+
+  function next() {
+    if (!canAdvance()) return;
+    if (stepIdx < 3) setStepIdx((stepIdx + 1) as 0 | 1 | 2 | 3);
+    else onProceed?.();
+  }
+
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-6 animate-page-enter">
-      {/* Header row — phase eyebrow + Back to cart (2990s parity) */}
-      <div className="flex items-center justify-between mb-4">
-        <p className="t-micro text-primary flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" aria-hidden="true" />
-          Phase 1 of 2 · Additional info
+    <div className="handover">
+      {/* ── Left: phase banner + step pills + one sub-step per screen ── */}
+      <div className="handover__left">
+        <div className="handover__title-row">
+          <div>
+            <span className="phase-banner">
+              <span className="phase-banner__dot" />
+              Phase 1 of 2 · Additional info
+            </span>
+            <h1 className="handover__title">Customer additional info</h1>
+          </div>
+        </div>
+        <p className="handover__sub">
+          Hand the tablet to the customer to fill in their details. Quote items have been carried
+          over — no re-entry needed.
         </p>
-        {onBackToCart && (
-          <button type="button" onClick={onBackToCart} className="btn-secondary text-[12px]">
-            ← Back to cart
-          </button>
-        )}
-      </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] items-start">
-        <div className="flex flex-col gap-6 min-w-0">
-          {/* Section chip nav */}
-          <ol className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {CHIPS.map(({ n, label, icon: Icon }) => {
-              const active = activeChip === n;
-              return (
-                <li key={n}>
-                  <button
-                    type="button"
-                    onClick={() => goTo(n)}
-                    aria-current={active ? "step" : undefined}
-                    data-testid={`pos-customer-chip-${n}`}
-                    className={[
-                      "w-full flex items-center gap-2 rounded-xl border px-3.5 py-3 transition-colors text-left",
-                      active
-                        ? "border-primary bg-primary/5 text-primary"
-                        : "border-base-200 bg-white text-base-600 hover:border-base-300",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={[
-                        "grid place-items-center w-6 h-6 rounded-full text-[11px] font-semibold",
-                        active ? "bg-primary text-white" : "bg-base-100 text-base-500",
-                      ].join(" ")}
-                    >
-                      {n}
-                    </span>
-                    <Icon size={15} strokeWidth={1.75} />
-                    <span className="t-small font-semibold truncate">{label}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
+        <div className="steps">
+          {PHASE1_STEPS.map((label, i) => (
+            <div
+              key={label}
+              className={`step-pill ${stepIdx === i ? "is-active" : ""} ${stepIdx > i ? "is-done" : ""}`}
+              data-testid={`pos-customer-chip-${i + 1}`}
+            >
+              <span className="step-pill__num">
+                {stepIdx > i ? <Check size={11} strokeWidth={3} /> : i + 1}
+              </span>
+              <span className="step-pill__label">{label}</span>
+            </div>
+          ))}
+        </div>
 
-          {/* Dealer card — internal operator picks who this sale belongs to. */}
-          {dealerPick && (
-            <div className="pos-card p-6">
-              <p className="t-micro text-base-400">Sale info</p>
-              <h3 className="t-h4 mt-0.5">Dealer</h3>
-              <p className="t-small text-base-500 mt-1">
-                Pick the dealer this sale belongs to. The order, outlet and salesperson are
-                recorded under that dealer; the activity log keeps your name as who placed it.
-              </p>
+        {/* Dealer card — internal operator picks who this sale belongs to. */}
+        {dealerPick && stepIdx === 0 && (
+          <div className="fade-in" style={{ marginBottom: 22 }}>
+            <div className="field">
+              <span className="field__label">
+                Dealer <span style={{ color: "var(--c-orange)" }}>*</span>
+              </span>
               <select
                 value={dealerPick.value ?? ""}
                 onChange={(e) => {
@@ -192,7 +202,6 @@ export default function CustomerStep({
                 }}
                 disabled={dealerPick.loading || dealerPick.dealers.length === 0}
                 data-testid="pos-dealer-pick"
-                className="mt-3 w-full max-w-sm rounded-md border border-base-300 bg-white px-3 py-2 t-body disabled:opacity-50"
               >
                 <option value="">
                   {dealerPick.loading
@@ -207,122 +216,104 @@ export default function CustomerStep({
                   </option>
                 ))}
               </select>
+              <span className="field__hint">
+                The order, outlet and salesperson are recorded under this dealer; the activity log
+                keeps your name as who placed it.
+              </span>
             </div>
-          )}
+          </div>
+        )}
 
-          {dealerPending ? (
-            <p className="t-small text-base-500 text-center py-4">
-              Pick a dealer to continue — the outlet and salesperson lists follow the dealer.
-            </p>
-          ) : (
-            <>
-              {/* ── 1 · Customer additional info ── */}
-              <section ref={sectionRefs[1]} className="pos-card p-6 scroll-mt-4">
-                <h3 className="t-h3">Customer additional info</h3>
-                <p className="t-small text-base-500 mt-1 mb-5">
-                  Hand the tablet to the customer to fill in their details.
-                </p>
-
-                {/* Sale info */}
-                <SectionBlock title="Sale info" hint="Manage outlets & salespersons in Settings">
-                  {outlets.length === 0 ? (
-                    <div className="rounded bg-warning-soft text-warning px-3 py-2.5 text-xs font-body">
-                      ⚠ No outlets yet — add one in <strong>Settings</strong> before creating an
-                      order.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3.5">
-                      <Field label="Outlet *">
-                        <select
-                          value={draft.outletId ?? ""}
-                          onChange={(e) => setOutlet(e.target.value)}
-                          className={inputClass()}
-                        >
-                          <option value="">— pick outlet —</option>
-                          {outlets.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.name}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Salesperson *">
-                        <select
-                          value={draft.salespersonId ?? ""}
-                          onChange={(e) =>
-                            onChange({ ...draft, salespersonId: e.target.value || null })
-                          }
-                          disabled={visibleSPs.length === 0}
-                          className={inputClass({ disabled: visibleSPs.length === 0 })}
-                        >
-                          <option value="">
-                            {visibleSPs.length === 0
-                              ? "— none in this outlet —"
-                              : "— pick salesperson —"}
-                          </option>
-                          {visibleSPs.map((sp) => (
-                            <option key={sp.id} value={sp.id}>
-                              {sp.name}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    </div>
-                  )}
-                </SectionBlock>
-
-                {/* Identity */}
-                <div className="mt-5 grid grid-cols-2 gap-3.5">
-                  <Field label="Full name *">
+        {dealerPending ? (
+          <p style={{ fontSize: 13, color: "var(--fg-muted)" }}>
+            Pick a dealer to continue — the outlet and salesperson lists follow the dealer.
+          </p>
+        ) : (
+          <>
+            {/* ── 1 · Customer ── */}
+            {stepIdx === 0 && (
+              <div className="fade-in">
+                <div className="form-grid">
+                  <div className="field">
+                    <span className="field__label">Outlet *</span>
+                    <select value={draft.outletId ?? ""} onChange={(e) => setOutlet(e.target.value)}>
+                      <option value="">— pick outlet —</option>
+                      {outlets.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <span className="field__label">Salesperson *</span>
+                    <select
+                      value={draft.salespersonId ?? ""}
+                      onChange={(e) =>
+                        onChange({ ...draft, salespersonId: e.target.value || null })
+                      }
+                      disabled={visibleSPs.length === 0}
+                    >
+                      <option value="">
+                        {visibleSPs.length === 0
+                          ? "— none in this outlet —"
+                          : "— pick salesperson —"}
+                      </option>
+                      {visibleSPs.map((sp) => (
+                        <option key={sp.id} value={sp.id}>
+                          {sp.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <span className="field__label">Full name *</span>
                     <input
-                      type="text"
                       value={c.name}
                       placeholder="e.g. Tan Mei Ling, 陈志强, Ahmad bin Yusof"
                       onChange={(e) => setC({ name: e.target.value })}
-                      className={inputClass()}
                     />
-                  </Field>
-                  <Field label="Phone *">
+                  </div>
+                  <div className="field">
+                    <span className="field__label">Phone *</span>
                     <input
-                      type="text"
                       value={c.phone}
                       placeholder="012-3456789"
                       onChange={(e) => setC({ phone: e.target.value })}
-                      className={inputClass()}
                     />
-                  </Field>
-                  <Field label="Email *">
+                  </div>
+                  <div className="field field--span">
+                    <span className="field__label">
+                      Email <span style={{ color: "var(--c-orange)" }}>*</span>
+                    </span>
                     <input
                       type="email"
                       value={c.email}
                       placeholder="customer@example.com — for receipt & order updates"
                       onChange={(e) => setC({ email: e.target.value })}
-                      className={inputClass()}
                     />
-                  </Field>
-                  <Field label="Customer type (auto)">
+                  </div>
+                  <div className="field">
+                    <span className="field__label">Customer type (auto)</span>
                     <input
-                      type="text"
                       value={customerType}
                       readOnly
                       disabled
                       data-testid="pos-customer-type"
-                      className={inputClass({ disabled: true })}
+                      style={{
+                        background: "var(--pos-rail)",
+                        color: "var(--fg-muted)",
+                        cursor: "not-allowed",
+                      }}
                     />
-                    <span className="t-tiny text-base-400 mt-1 block">
-                      Auto-detected from past orders (phone)
-                    </span>
-                  </Field>
-                </div>
-
-                {/* Demographics — 0200 */}
-                <div className="mt-3.5 grid grid-cols-2 gap-3.5">
-                  <Field label="Race *">
+                    <span className="field__hint">Auto-detected from past orders (phone)</span>
+                  </div>
+                  <div className="field">
+                    <span className="field__label">Race *</span>
                     <select
                       value={c.race}
                       onChange={(e) => setC({ race: e.target.value })}
                       data-testid="pos-customer-race"
-                      className={inputClass()}
                     >
                       <option value="">— select —</option>
                       {RACE_OPTIONS.map((r) => (
@@ -331,13 +322,13 @@ export default function CustomerStep({
                         </option>
                       ))}
                     </select>
-                  </Field>
-                  <Field label="Gender *">
+                  </div>
+                  <div className="field">
+                    <span className="field__label">Gender *</span>
                     <select
                       value={c.gender}
                       onChange={(e) => setC({ gender: e.target.value })}
                       data-testid="pos-customer-gender"
-                      className={inputClass()}
                     >
                       <option value="">— select —</option>
                       {GENDER_OPTIONS.map((g) => (
@@ -346,34 +337,34 @@ export default function CustomerStep({
                         </option>
                       ))}
                     </select>
-                  </Field>
-                  <Field label="Birthday *">
+                  </div>
+                  <div className="field">
+                    <span className="field__label">Birthday *</span>
                     <input
                       type="date"
                       value={c.birthday}
                       max={todayIso}
                       onChange={(e) => setC({ birthday: e.target.value })}
                       data-testid="pos-customer-birthday"
-                      className={inputClass()}
                     />
-                  </Field>
+                  </div>
                 </div>
-              </section>
+              </div>
+            )}
 
-              {/* ── 2 · Address ── */}
-              <section ref={sectionRefs[2]} className="pos-card p-6 scroll-mt-4">
-                <h3 className="t-h4 mb-4">Address</h3>
-                <div className="flex items-center justify-between mb-2.5">
-                  <span className="label">Delivery address {!c.addressUnknown && "*"}</span>
-                  <InlineCheckbox
-                    label="Customer hasn't provided yet"
+            {/* ── 2 · Address ── */}
+            {stepIdx === 1 && (
+              <div className="fade-in">
+                <label className={`addr-toggle ${c.addressUnknown ? "is-on" : ""}`}>
+                  <input
+                    type="checkbox"
                     checked={c.addressUnknown}
-                    onChange={(v) =>
+                    onChange={(e) =>
                       setC({
-                        addressUnknown: v,
+                        addressUnknown: e.target.checked,
                         // Wipe structured fields when toggled on so a later
                         // un-toggle doesn't surface stale data.
-                        ...(v
+                        ...(e.target.checked
                           ? {
                               addressLine1: "",
                               addressLine2: "",
@@ -385,34 +376,54 @@ export default function CustomerStep({
                       })
                     }
                   />
-                </div>
-                {c.addressUnknown ? (
-                  <div className="rounded bg-base-50 border border-dashed border-base-200 px-3 py-2.5 text-xs font-body text-base-500">
-                    Address will be required before this order can move to operation.
+                  <span className="addr-toggle__box">
+                    {c.addressUnknown && <Check size={12} strokeWidth={3} />}
+                  </span>
+                  <span>
+                    <strong>Fill in address later</strong>
+                    <span className="addr-toggle__hint">
+                      Customer hasn't confirmed the delivery address yet — it's required before
+                      the order can move to operation.
+                    </span>
+                  </span>
+                </label>
+
+                {!c.addressUnknown && (
+                  <div style={{ marginTop: 22 }}>
+                    <div
+                      style={{
+                        marginBottom: 14,
+                        fontFamily: "var(--font-button)",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Delivery address
+                    </div>
+                    <MYAddressFields
+                      data={{
+                        addressLine1: c.addressLine1,
+                        addressLine2: c.addressLine2,
+                        addressState: c.addressState,
+                        addressCity: c.addressCity,
+                        addressPostcode: c.addressPostcode,
+                      }}
+                      onChange={(patch) => setC(patch)}
+                    />
                   </div>
-                ) : (
-                  <MYAddressFields
-                    data={{
-                      addressLine1: c.addressLine1,
-                      addressLine2: c.addressLine2,
-                      addressState: c.addressState,
-                      addressCity: c.addressCity,
-                      addressPostcode: c.addressPostcode,
-                    }}
-                    onChange={(patch) => setC(patch)}
-                  />
                 )}
 
-                {/* Billing */}
-                <div className="mt-5">
-                  <span className="label block mb-1.5">Billing address</span>
-                  <InlineCheckbox
-                    label="Same as delivery address"
+                <label
+                  className={`addr-toggle ${c.billingSame ? "is-on" : ""}`}
+                  style={{ marginTop: 22 }}
+                >
+                  <input
+                    type="checkbox"
                     checked={c.billingSame}
-                    onChange={(v) =>
+                    onChange={(e) =>
                       setC({
-                        billingSame: v,
-                        billing: v
+                        billingSame: e.target.checked,
+                        billing: e.target.checked
                           ? composeAddress({
                               line1: c.addressLine1,
                               line2: c.addressLine2,
@@ -424,166 +435,144 @@ export default function CustomerStep({
                       })
                     }
                   />
-                  {!c.billingSame && (
-                    <textarea
-                      rows={2}
-                      value={c.billing}
-                      placeholder="Billing address"
-                      onChange={(e) => setC({ billing: e.target.value })}
-                      className={`${inputClass()} mt-2.5`}
+                  <span className="addr-toggle__box">
+                    {c.billingSame && <Check size={12} strokeWidth={3} />}
+                  </span>
+                  <span>
+                    <strong>Billing address same as delivery address</strong>
+                    <span className="addr-toggle__hint">
+                      Uncheck if the invoice should be issued to a different address.
+                    </span>
+                  </span>
+                </label>
+
+                {!c.billingSame && (
+                  <div className="form-grid" style={{ marginTop: 22 }}>
+                    <div className="field field--span">
+                      <span className="field__label">Billing address</span>
+                      <textarea
+                        rows={2}
+                        value={c.billing}
+                        placeholder="Unit, street, area"
+                        onChange={(e) => setC({ billing: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── 3 · Emergency ── */}
+            {stepIdx === 2 && (
+              <div className="fade-in">
+                <p style={{ fontSize: 12, color: "var(--fg-muted)", marginBottom: 16 }}>
+                  Used only if we cannot reach the customer on delivery day.
+                </p>
+                <div className="form-grid">
+                  <div className="field">
+                    <span className="field__label">Contact name *</span>
+                    <input
+                      value={c.emergencyName}
+                      placeholder="Name"
+                      onChange={(e) => setC({ emergencyName: e.target.value })}
                     />
-                  )}
-                  {c.billingSame && !c.addressUnknown && c.addressLine1 && (
-                    <div className="rounded bg-base-50 border border-dashed border-base-200 px-3 py-2.5 text-xs font-body text-base-700 mt-2">
-                      ↳ Bills will be sent to:{" "}
-                      <strong className="text-base-900">
-                        {composeAddress({
-                          line1: c.addressLine1,
-                          line2: c.addressLine2,
-                          state: c.addressState,
-                          city: c.addressCity,
-                          postcode: c.addressPostcode,
-                        })}
-                      </strong>
+                  </div>
+                  <div className="field">
+                    <span className="field__label">Relationship *</span>
+                    <select
+                      value={c.emergencyRelationship}
+                      onChange={(e) =>
+                        setC({
+                          emergencyRelationship: e.target.value,
+                          emergencyRelationshipOther:
+                            e.target.value === "__OTHER__" ? c.emergencyRelationshipOther : "",
+                        })
+                      }
+                    >
+                      <option value="">— Relationship —</option>
+                      {RELATIONSHIPS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                      <option value="__OTHER__">Others (type below)</option>
+                    </select>
+                  </div>
+                  <div className="field field--span">
+                    <span className="field__label">Phone *</span>
+                    <input
+                      value={c.emergencyPhone}
+                      placeholder="012-9988776"
+                      onChange={(e) => setC({ emergencyPhone: e.target.value })}
+                    />
+                  </div>
+                  {c.emergencyRelationship === "__OTHER__" && (
+                    <div className="field field--span">
+                      <span className="field__label">Specify relationship *</span>
+                      <input
+                        value={c.emergencyRelationshipOther}
+                        placeholder="Specify relationship"
+                        onChange={(e) => setC({ emergencyRelationshipOther: e.target.value })}
+                      />
                     </div>
                   )}
                 </div>
-              </section>
+              </div>
+            )}
 
-              {/* ── 3 · Emergency ── */}
-              <section ref={sectionRefs[3]} className="pos-card p-6 scroll-mt-4">
-                <h3 className="t-h4 mb-4">Emergency contact *</h3>
-                <div className="grid grid-cols-3 gap-2.5">
-                  <input
-                    type="text"
-                    value={c.emergencyName}
-                    placeholder="Name"
-                    onChange={(e) => setC({ emergencyName: e.target.value })}
-                    className={inputClass()}
-                  />
-                  <input
-                    type="text"
-                    value={c.emergencyPhone}
-                    placeholder="012-9988776"
-                    onChange={(e) => setC({ emergencyPhone: e.target.value })}
-                    className={inputClass()}
-                  />
-                  <select
-                    value={c.emergencyRelationship}
-                    onChange={(e) =>
-                      setC({
-                        emergencyRelationship: e.target.value,
-                        emergencyRelationshipOther:
-                          e.target.value === "__OTHER__" ? c.emergencyRelationshipOther : "",
-                      })
-                    }
-                    className={inputClass()}
-                  >
-                    <option value="">— Relationship —</option>
-                    {RELATIONSHIPS.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                    <option value="__OTHER__">Others (type below)</option>
-                  </select>
-                </div>
-                {c.emergencyRelationship === "__OTHER__" && (
-                  <input
-                    type="text"
-                    value={c.emergencyRelationshipOther}
-                    placeholder="Specify relationship"
-                    onChange={(e) => setC({ emergencyRelationshipOther: e.target.value })}
-                    className={`${inputClass()} mt-1.5`}
-                  />
-                )}
-              </section>
-
-              {/* ── 4 · Target date + delivery access ── */}
-              <section ref={sectionRefs[4]} className="pos-card p-6 scroll-mt-4">
+            {/* ── 4 · Target date + delivery access ── */}
+            {stepIdx === 3 && (
+              <div className="fade-in">
                 <Step3Delivery
                   draft={draft}
                   onChange={onChange}
                   catalog={catalog}
                   minLeadDays={minLeadDays}
                 />
-                <div className="border-t border-base-100 mt-6 pt-6">
+                <div style={{ borderTop: "1px solid var(--line)", marginTop: 24, paddingTop: 24 }}>
                   <StairCarryFields draft={draft} onChange={onChange} cfg={catalog.floorConfig} />
                 </div>
-              </section>
-            </>
-          )}
-        </div>
+              </div>
+            )}
+          </>
+        )}
 
-        {/* Right rail — sticky Order summary (lg+) */}
-        <div className="hidden lg:block sticky top-4">
-          <OrderSummaryRail draft={draft} catalog={catalog} />
+        {/* Footer nav — ghost Back / primary Next (last step → Continue) */}
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            marginTop: 32,
+            paddingTop: 20,
+            borderTop: "1px solid var(--line)",
+          }}
+        >
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() =>
+              stepIdx === 0 ? onBackToCart?.() : setStepIdx((stepIdx - 1) as 0 | 1 | 2 | 3)
+            }
+          >
+            <ArrowLeft size={14} strokeWidth={1.75} />
+            {stepIdx === 0 ? "Back to cart" : "Previous"}
+          </button>
+          <span style={{ flex: 1 }} />
+          <button
+            type="button"
+            className="btn btn--primary btn--lg"
+            disabled={!canAdvance()}
+            onClick={next}
+            data-testid="pos-customer-next"
+          >
+            {stepIdx < 3 ? "Next" : "Continue to confirm"}
+            <ArrowRight size={14} strokeWidth={1.75} />
+          </button>
         </div>
       </div>
+
+      {/* ── Right: live order summary rail ── */}
+      <OrderSummaryRail draft={draft} catalog={catalog} />
     </div>
   );
-}
-
-// --- small UI atoms (carried over from the retired Step1Customer) ---
-
-function SectionBlock({
-  title,
-  hint,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section>
-      <div className="flex items-baseline justify-between mb-3">
-        <h3 className="kicker">{title}</h3>
-        {hint && <p className="text-[11px] text-base-500">{hint}</p>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="label block mb-1.5">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function InlineCheckbox({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-base-700 font-body">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-3.5 h-3.5"
-      />
-      {label}
-    </label>
-  );
-}
-
-function inputClass({ disabled }: { disabled?: boolean } = {}) {
-  // Two-tone gating cue: active fields are pure WHITE (next to fill, draws
-  // the eye); disabled / waiting-on-prerequisite fields fall back to the
-  // body cream so the form's filling order reads at a glance.
-  // 2990s re-skin: rounded-xl, 1.5px border, flame focus ring.
-  if (disabled) {
-    return "w-full px-3 py-2.5 text-sm font-body rounded-xl border-[1.5px] border-base-300 bg-base-50 text-base-500 cursor-not-allowed outline-none";
-  }
-  return "w-full px-3 py-2.5 text-sm font-body rounded-xl border-[1.5px] border-base-200 bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors";
 }

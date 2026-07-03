@@ -5,11 +5,12 @@ import type { WizardDraft } from "../new-order/draft";
 import { cartTotalExStair } from "./cart";
 
 /**
- * Right-hand Order summary rail on the CUSTOMER step — 2990s parity:
- * SO-XXXX · date header, ITEMS (thumb + label + qty + price), CUSTOMER,
- * DELIVERY, PAYMENT ("Pending" until captured), TOTALS, and a bottom total
- * strip. Pure presentation over the live WizardDraft — updates as the form
- * fills. The SO number is minted at submit, so it reads "SO-XXXX" here.
+ * Right-hand Order summary rail (02 Customer + 03 Confirm) — prototype skin
+ * (`.summary`, Loo's Claude Design 2026-07-04): SO-XXXX · date head, ITEMS
+ * (photo + label + qty + price), ADD-ONS, CUSTOMER, EMERGENCY, DELIVERY,
+ * PAYMENT ("Pending" until captured), TOTALS sections, Bodoni total foot.
+ * Pure presentation over the live WizardDraft — updates as the form fills.
+ * The SO number is minted at submit, so it reads "SO-XXXX" here.
  */
 export default function OrderSummaryRail({
   draft,
@@ -36,104 +37,199 @@ export default function OrderSummaryRail({
   const itemsSubtotal = cartTotalExStair(draft.lines, draft.addons);
   const c = draft.customer;
   const customerCaptured = c.name.trim().length > 0 || c.phone.trim().length > 0;
-
-  const deliveryLabel = draft.delivery.dateTbd
-    ? "To be confirmed"
-    : draft.delivery.date
-      ? draft.delivery.date
-      : "Pending";
-  const paymentLabel = draft.paid > 0 ? `${rm(draft.paid)} received` : "Pending";
+  const itemCount = draft.lines.reduce((s, l) => s + l.qty, 0);
 
   return (
-    <aside
-      className="bg-card border border-base-200 rounded-lg shadow-sm overflow-hidden flex flex-col"
-      data-testid="pos-order-summary"
-    >
-      <div className="p-5 pb-4">
-        <p className="t-tiny text-base-400 font-mono">SO-XXXX · {today}</p>
-        <h2 className="t-h3 mt-0.5">Order summary</h2>
+    <aside className="summary" data-testid="pos-order-summary">
+      <div className="summary__head">
+        <div className="summary__order">SO-XXXX · {today}</div>
+        <div className="summary__title">Order summary</div>
       </div>
 
-      <div className="px-5 flex flex-col divide-y divide-base-100">
+      <div className="summary__body">
         {/* Items */}
-        <section className="py-4">
-          <p className="t-micro text-base-400 mb-2.5">Items · {draft.lines.length}</p>
+        <div className="summary__section">
+          <div className="summary__section-label">Items · {itemCount}</div>
           {draft.lines.length === 0 ? (
-            <p className="t-small text-base-400 italic">Cart is empty</p>
+            <div style={{ fontSize: 12, color: "var(--fg-muted)", fontStyle: "italic" }}>
+              Cart is empty
+            </div>
           ) : (
-            <ul className="flex flex-col gap-3">
+            <div className="summary__items">
               {draft.lines.map((l) => {
                 const photo = photoBySku.get(l.sku);
                 return (
-                  <li key={l.localId} className="flex items-start gap-3">
-                    <span className="w-10 h-10 rounded-md bg-base-100 border border-base-200 overflow-hidden grid place-items-center shrink-0">
-                      {photo ? (
-                        <img src={photo} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="t-tiny text-base-400">
-                          {(l.label || l.sku).slice(0, 2).toUpperCase()}
-                        </span>
-                      )}
+                  <div key={l.localId} className="summary__item">
+                    <div
+                      className="summary__item-photo"
+                      style={
+                        photo
+                          ? { backgroundImage: `url(${photo})` }
+                          : { background: "var(--c-beige)" }
+                      }
+                    />
+                    <div className="summary__item-main">
+                      <div className="summary__item-name">{l.label || l.sku}</div>
+                      <div className="summary__item-meta">qty {l.qty}</div>
+                    </div>
+                    <span className="summary__item-price">
+                      <sup>RM</sup>
+                      {(l.unitPrice * l.qty).toLocaleString("en-MY")}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block t-small font-semibold leading-snug">
-                        {l.label || l.sku}
-                      </span>
-                      <span className="block t-tiny text-base-400">qty {l.qty}</span>
-                    </span>
-                    <span className="font-mono text-[12px] font-semibold shrink-0">
-                      {rm(l.unitPrice * l.qty)}
-                    </span>
-                  </li>
+                  </div>
                 );
               })}
-            </ul>
+            </div>
           )}
-        </section>
+        </div>
+
+        {/* Add-ons */}
+        {draft.addons.length > 0 && (
+          <div className="summary__section">
+            <div className="summary__section-label">Add-ons</div>
+            {draft.addons.map((a) => (
+              <div key={a.key} className="summary__row">
+                <span className="key">
+                  {a.name}
+                  {a.qty > 1 ? ` × ${a.qty}` : ""}
+                </span>
+                <span className="val">+{rm(a.unitPrice * a.qty)}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Customer */}
-        <section className="py-4">
-          <p className="t-micro text-base-400 mb-1.5">Customer</p>
+        <div className="summary__section">
+          <div className="summary__section-label">Customer</div>
           {customerCaptured ? (
-            <p className="t-small">
-              {c.name || "—"}
-              {c.phone && <span className="text-base-500"> · {c.phone}</span>}
-            </p>
+            <>
+              {c.name && (
+                <div className="summary__row">
+                  <span className="key">Name</span>
+                  <span className="val">{c.name}</span>
+                </div>
+              )}
+              {c.phone && (
+                <div className="summary__row">
+                  <span className="key">Phone</span>
+                  <span className="val">{c.phone}</span>
+                </div>
+              )}
+              {c.email && (
+                <div className="summary__row">
+                  <span className="key">Email</span>
+                  <span className="val" style={{ maxWidth: 200, overflowWrap: "anywhere" }}>
+                    {c.email}
+                  </span>
+                </div>
+              )}
+              {c.addressUnknown ? (
+                <div className="summary__row">
+                  <span className="key">Address</span>
+                  <span className="val" style={{ fontStyle: "italic", color: "var(--fg-muted)" }}>
+                    To be filled later
+                  </span>
+                </div>
+              ) : (
+                c.addressLine1 && (
+                  <div className="summary__row">
+                    <span className="key">Address</span>
+                    <span className="val" style={{ maxWidth: 200 }}>
+                      {[c.addressLine1, c.addressCity, c.addressPostcode]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </span>
+                  </div>
+                )
+              )}
+            </>
           ) : (
-            <p className="t-small text-base-400 italic">Not yet captured</p>
+            <div style={{ fontSize: 12, color: "var(--fg-muted)", fontStyle: "italic" }}>
+              Not yet captured
+            </div>
           )}
-        </section>
+        </div>
+
+        {/* Emergency */}
+        {c.emergencyName && (
+          <div className="summary__section">
+            <div className="summary__section-label">Emergency contact</div>
+            <div className="summary__row">
+              <span className="key">
+                {c.emergencyRelationship === "__OTHER__"
+                  ? c.emergencyRelationshipOther || "Contact"
+                  : c.emergencyRelationship || "Contact"}
+              </span>
+              <span className="val">{c.emergencyName}</span>
+            </div>
+            {c.emergencyPhone && (
+              <div className="summary__row">
+                <span className="key">Phone</span>
+                <span className="val">{c.emergencyPhone}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Delivery */}
-        <section className="py-4">
-          <p className="t-micro text-base-400 mb-1.5">Delivery</p>
-          <p className={`t-small ${deliveryLabel === "Pending" ? "text-base-400 italic" : ""}`}>
-            {deliveryLabel}
-          </p>
-        </section>
+        <div className="summary__section">
+          <div className="summary__section-label">Delivery</div>
+          {draft.delivery.dateTbd ? (
+            <div className="summary__row">
+              <span className="key">Date</span>
+              <span className="val" style={{ fontStyle: "italic", color: "var(--c-orange)" }}>
+                For Further Notice
+              </span>
+            </div>
+          ) : draft.delivery.date ? (
+            <div className="summary__row">
+              <span className="key">Date</span>
+              <span className="val">{draft.delivery.date}</span>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: "var(--fg-muted)", fontStyle: "italic" }}>
+              Pending
+            </div>
+          )}
+        </div>
 
         {/* Payment */}
-        <section className="py-4">
-          <p className="t-micro text-base-400 mb-1.5">Payment</p>
-          <p className={`t-small ${paymentLabel === "Pending" ? "text-base-400 italic" : ""}`}>
-            {paymentLabel}
-          </p>
-        </section>
+        <div className="summary__section">
+          <div className="summary__section-label">Payment</div>
+          {draft.paid > 0 ? (
+            <div className="summary__row">
+              <span className="key">Received</span>
+              <span className="val">{rm(draft.paid)}</span>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: "var(--fg-muted)", fontStyle: "italic" }}>
+              Pending
+            </div>
+          )}
+        </div>
 
         {/* Totals */}
-        <section className="py-4">
-          <p className="t-micro text-base-400 mb-1.5">Totals</p>
-          <div className="flex items-baseline justify-between">
-            <span className="t-small text-base-600">Items subtotal</span>
-            <span className="font-mono text-[13px] font-semibold">{rm(itemsSubtotal)}</span>
+        <div className="summary__section">
+          <div className="summary__section-label">Totals</div>
+          <div className="summary__row">
+            <span className="key">Items subtotal</span>
+            <span className="val">{rm(itemsSubtotal)}</span>
           </div>
-        </section>
+        </div>
       </div>
 
-      {/* Bottom total strip */}
-      <div className="mt-auto bg-base-900 text-white px-5 py-3.5 flex items-baseline justify-between">
-        <span className="t-micro text-white/60">Total</span>
-        <span className="font-mono text-[18px] font-bold">{rm(itemsSubtotal)}</span>
+      <div className="summary__foot">
+        <div className="summary__total-row">
+          <span className="summary__total-label">Total</span>
+          <span className="summary__total-num">
+            <sup>RM</sup>
+            {itemsSubtotal.toLocaleString("en-MY")}
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: "var(--fg-muted)", textAlign: "right" }}>
+          Delivery + stair carry are finalised at confirm.
+        </div>
       </div>
     </aside>
   );
