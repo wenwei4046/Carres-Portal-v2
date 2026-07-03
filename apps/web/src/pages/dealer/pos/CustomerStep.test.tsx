@@ -72,9 +72,9 @@ describe("CustomerStep — in-flow dealer pick (internal operator)", () => {
       />,
     );
     expect(screen.queryByText(/Pick a dealer to continue/)).toBeNull();
-    // The absorbed sale-info block is mounted (its no-outlets notice shows
-    // because we passed empty lists — presence proves the gate opened).
-    expect(screen.getByText(/No outlets yet/i)).toBeTruthy();
+    // The Customer sub-step form is mounted — demographics fields prove the
+    // gate opened.
+    expect(screen.getByTestId("pos-customer-race")).toBeTruthy();
   });
 
   it("dealer-side path (no dealerPick): no dealer card, form renders directly", () => {
@@ -89,7 +89,7 @@ describe("CustomerStep — in-flow dealer pick (internal operator)", () => {
       />,
     );
     expect(screen.queryByTestId("pos-dealer-pick")).toBeNull();
-    expect(screen.getByText(/No outlets yet/i)).toBeTruthy();
+    expect(screen.getByTestId("pos-customer-race")).toBeTruthy();
   });
 });
 
