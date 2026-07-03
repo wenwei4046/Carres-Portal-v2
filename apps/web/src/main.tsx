@@ -5,6 +5,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import App from "./App.tsx";
 import { queryClient } from "./lib/query-client";
 import "./index.css";
+// POS prototype skin — scoped under .pos-proto (Loo's Claude Design, 2026-07-04).
+import "./styles/pos-prototype.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

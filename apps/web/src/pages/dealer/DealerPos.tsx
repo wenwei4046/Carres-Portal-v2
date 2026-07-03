@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, ShoppingBag } from "lucide-react";
+import { Bookmark, ListOrdered, LogOut, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
 import { maxLeadDaysFor } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
-import CarresLockup from "@/components/CarresLockup";
 import { deliveryFeePreview } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import { useAuth } from "@/lib/auth";
@@ -42,7 +41,6 @@ import Step3SignaturePayment from "./new-order/Step3SignaturePayment";
 import ThankYou from "./new-order/ThankYou";
 import CatalogStep from "./pos/CatalogStep";
 import CustomerStep from "./pos/CustomerStep";
-import PosStepper from "./pos/PosStepper";
 import QuotesDrawer from "./pos/QuotesDrawer";
 import { quoteToDraftLines, type SavedQuote } from "./pos/quotes";
 import { cartItemCount, cartTotalExStair } from "./pos/cart";
@@ -590,45 +588,71 @@ export default function DealerPos({
   const roleLabel = (role ?? "dealer").replace(/_/g, " ");
   const myOrdersHref = role === "principal" ? "/principal?tab=orders" : "/dealer/orders";
 
+  const STEPS: Array<{ n: 1 | 2 | 3; label: string }> = [
+    { n: 1, label: "Cart" },
+    { n: 2, label: "Customer" },
+    { n: 3, label: "Confirmed" },
+  ];
+
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-background text-foreground">
-      {/* Top bar — 56px fixed height, white over cream page, hairline bottom border. */}
-      <header className="shrink-0 h-14 border-b border-base-200 bg-white px-5 flex items-center gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <CarresLockup size={22} />
-          <div className="hidden sm:block border-l border-base-200 pl-3 min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-base-400">
-              POS · {(role ?? "dealer").toUpperCase()}
-            </p>
-            <p className="t-small font-semibold truncate max-w-[200px]">{contextLabel}</p>
-          </div>
+    <div
+      className="pos-proto fixed inset-0 z-40 flex flex-col"
+      style={{ background: "var(--pos-bg)" }}
+    >
+      {/* Top bar — prototype .pos-topbar (Loo's Claude Design 2026-07-04). */}
+      <header className="pos-topbar" style={{ height: 56, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+          <span className="pos-wordmark">CARRES</span>
+          <span
+            className="pos-topbar__crumb"
+            style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            POS · {contextLabel}
+          </span>
         </div>
 
-        {!submitted ? (
-          <div className="flex-1 flex justify-center">
-            <PosStepper step={step} onStepClick={(n) => setStep(n as 1 | 2 | 3)} />
-          </div>
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="pos-topbar__center">
+          {!submitted &&
+            STEPS.map((s, i) => {
+              const clickable = s.n < step;
+              return (
+                <button
+                  key={s.n}
+                  type="button"
+                  onClick={() => clickable && setStep(s.n)}
+                  disabled={!clickable && s.n !== step}
+                  aria-current={step === s.n ? "step" : undefined}
+                  data-testid={`pos-step-${s.n}`}
+                  className={`pos-topbar__step ${step === s.n ? "is-active" : ""}`}
+                  style={{ cursor: clickable ? "pointer" : "default" }}
+                >
+                  <span style={{ opacity: 0.55, marginRight: 6 }}>0{i + 1}</span>
+                  {s.label}
+                </button>
+              );
+            })}
+        </div>
 
-        <div className="flex items-center gap-2">
+        <div className="pos-topbar__right">
           <button
             type="button"
             onClick={() => setQuotesOpen(true)}
-            className="hidden sm:flex items-center gap-1.5 rounded-full border border-base-300 bg-white px-3 py-1.5 t-tiny font-semibold text-base-700 hover:border-base-500 transition-colors"
+            className="topbar-pill"
+            aria-label="Saved quotes"
             data-testid="pos-topbar-quotes"
           >
             <Bookmark size={13} strokeWidth={1.75} />
-            Quotes
+            <span>Quotes</span>
           </button>
           <Link
             to={myOrdersHref}
-            className="hidden sm:flex items-center gap-1.5 rounded-full border border-base-300 bg-white px-3 py-1.5 t-tiny font-semibold text-base-700 hover:border-base-500 transition-colors"
+            className="topbar-pill"
+            aria-label="My orders"
             data-testid="pos-topbar-my-orders"
+            style={{ textDecoration: "none" }}
           >
             <ListOrdered size={13} strokeWidth={1.75} />
-            My orders
+            <span>My orders</span>
           </Link>
           {!submitted && itemCount > 0 && (
             <button
@@ -637,33 +661,38 @@ export default function DealerPos({
                 setStep(1);
                 setCartOpen(true);
               }}
-              className="flex items-center gap-1.5 rounded-full bg-base-900 text-white px-3 py-1.5 hover:bg-base-700 transition-colors"
+              className="pos-topbar__count"
               data-testid="pos-topbar-cart"
             >
               <ShoppingBag size={13} strokeWidth={1.75} />
-              <span className="font-mono text-[12px] font-semibold">
-                {itemCount} item{itemCount === 1 ? "" : "s"} · {rm(cartTotal)}
-              </span>
+              {itemCount} item{itemCount === 1 ? "" : "s"} · {rm(cartTotal)}
             </button>
           )}
           <Link
             to="/me"
             title="Profile · Sign out"
-            className="flex items-center gap-2 pl-1"
             data-testid="pos-topbar-staff"
+            style={{ textDecoration: "none", color: "inherit" }}
           >
-            <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-semibold">
-              {initials}
-            </span>
-            <span className="hidden md:block leading-tight text-left">
-              <span className="block text-[12px] font-semibold text-base-900">{displayName}</span>
-              <span className="block text-[10px] uppercase tracking-wide text-base-400">
-                {roleLabel}
+            <span className="pos-staff-chip">
+              <span className="pos-staff-chip__avatar">{initials}</span>
+              <span>
+                {displayName}
+                <span className="pos-staff-chip__role" style={{ display: "block" }}>
+                  {roleLabel}
+                </span>
               </span>
             </span>
           </Link>
-          <button onClick={handleExit} className="btn-ghost text-[12px]" data-testid="pos-exit">
-            Exit
+          <button
+            type="button"
+            onClick={handleExit}
+            className="icon-btn"
+            aria-label="Exit POS"
+            title="Exit POS"
+            data-testid="pos-exit"
+          >
+            <LogOut size={18} strokeWidth={1.75} />
           </button>
         </div>
       </header>
@@ -766,7 +795,13 @@ export default function DealerPos({
         )}
       </main>
 
-      {quotesOpen && <QuotesDrawer onLoad={handleLoadQuote} onClose={() => setQuotesOpen(false)} />}
+      {quotesOpen && (
+        <QuotesDrawer
+          catalog={catalogQ.data}
+          onLoad={handleLoadQuote}
+          onClose={() => setQuotesOpen(false)}
+        />
+      )}
 
       {/* Footer — steps 2 + 3 only (step 1 advances via the cart). */}
       {!submitted && step !== 1 && (
