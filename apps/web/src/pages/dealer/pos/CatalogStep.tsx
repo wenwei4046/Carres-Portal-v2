@@ -211,52 +211,58 @@ export default function CatalogStep({
   const cartTotal = cartTotalExStair(draft.lines, draft.addons);
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* Left sidebar — categories / quick / MAINTAIN (principal) / footer */}
-      <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-base-100 bg-white overflow-auto px-2 py-4">
-        <PosSidebar
-          entries={railEntries}
-          active={activeRail}
-          onSelect={setActiveRail}
-          onResetFilters={resetFilters}
-        />
-      </aside>
+    <div className="catalog">
+      {/* Left sidebar — categories / TBC / quick / MAINTAIN (principal) / footer */}
+      <PosSidebar
+        entries={railEntries}
+        active={activeRail}
+        onSelect={setActiveRail}
+        onResetFilters={resetFilters}
+      />
 
-      {/* Main: sticky toolbar + grid / add-ons */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* Sticky toolbar */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-base-100 bg-white/90 backdrop-blur sticky top-0 z-10">
-          {/* Pill search input with flame focus ring */}
-          <div className="relative flex-1 max-w-sm">
-            <Search
-              size={15}
-              strokeWidth={1.75}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base-400 pointer-events-none"
-            />
+      {/* Main: toolbar + grid / add-ons */}
+      <main className="cat-main">
+        <div className="cat-toolbar">
+          <div className="cat-search">
+            <Search size={16} strokeWidth={1.75} />
             <input
               type="search"
               value={rawSearch}
               onChange={(e) => setRawSearch(e.target.value)}
-              placeholder="Name, SKU, model…"
+              placeholder="Search by name, SKU, or detail…"
               aria-label="Search catalog"
-              className="w-full pl-9 pr-4 py-2 rounded-full border border-base-200 bg-base-50 t-small outline-none
-                         focus:border-primary focus:ring-2 focus:ring-primary/15 focus:bg-white transition-all"
             />
           </div>
-
-          {/* Section label + count */}
-          <span className="t-tiny text-base-400 whitespace-nowrap">
+          {/* One brand today — the series filter activates when series data exists. */}
+          <select className="cat-select" value="All series" onChange={() => {}}>
+            <option>All series</option>
+          </select>
+          <span className="cat-toolbar__count">
             {activeRail === "addons"
               ? `${activeAddons.length} add-on${activeAddons.length === 1 ? "" : "s"}`
               : `${shownModelCount} piece${shownModelCount === 1 ? "" : "s"}`}
           </span>
         </div>
 
-        <div className="flex-1 overflow-auto px-5 py-5 pb-28">
-          {/* Sofa-exclusivity notice — mirrors the 2990s catalog banner. */}
+        <div className="cat-grid-wrap">
+          {/* Sofa-exclusivity notice — functional mutex feedback. */}
           {activeRail !== "addons" && (cartHasSofa || cartHasMainNonSofa) && (
-            <div className="flex items-center gap-2 px-3.5 py-2.5 mb-4 rounded-lg border border-base-200 bg-base-50 t-small text-base-700">
-              <Sofa size={16} strokeWidth={1.75} className="shrink-0 text-base-500" />
+            <div
+              className="fade-in"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 14px",
+                marginBottom: 16,
+                background: "var(--pos-panel)",
+                border: "1px solid var(--line-strong)",
+                borderRadius: 12,
+                fontSize: 12,
+                color: "var(--fg)",
+              }}
+            >
+              <Sofa size={16} strokeWidth={1.75} style={{ flexShrink: 0 }} />
               <span>
                 {cartHasSofa
                   ? "Sofa order — sofas don't share an order with mattresses or bed frames. Check out or clear the cart to switch categories."
@@ -268,31 +274,29 @@ export default function CatalogStep({
           {activeRail === "addons" ? (
             <AddonsPanel addons={activeAddons} draft={draft} onChange={onChange} />
           ) : shownModels.length === 0 && shownCombos.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="t-body text-base-500">
-                {search ? `No pieces match "${rawSearch.trim()}".` : "No products in catalog."}
-              </p>
+            <div className="cat-empty">
+              <h4>No pieces match.</h4>
+              <p>Try clearing the search or pick a different category.</p>
               {search && (
-                <button type="button" onClick={resetFilters} className="btn-secondary mt-4">
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="btn btn--ghost btn--sm"
+                  style={{ marginTop: 14 }}
+                >
                   Reset filters
                 </button>
               )}
             </div>
           ) : (
-            <div className="flex flex-col gap-8">
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               {/* Combos (套餐) — featured bundle row, "All" rail only. */}
               {shownCombos.length > 0 && (
                 <section data-testid="pos-combos-section">
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="pill pill-neutral">Combos</span>
-                    <span className="font-mono text-[11px] text-base-400">
-                      {shownCombos.length} bundle{shownCombos.length === 1 ? "" : "s"}
-                    </span>
+                  <div className="cat-side__heading" style={{ padding: "0 2px 8px" }}>
+                    Combos · {shownCombos.length} bundle{shownCombos.length === 1 ? "" : "s"}
                   </div>
-                  <div
-                    className="grid gap-4"
-                    style={{ gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))" }}
-                  >
+                  <div className="cat-grid">
                     {shownCombos.map((combo) => (
                       <ComboCard key={combo.id} combo={combo} onAdd={() => addCombo(combo)} />
                     ))}
@@ -300,38 +304,24 @@ export default function CatalogStep({
                 </section>
               )}
 
-              {/* Single-brand series group — Carres is ONE brand, so the 2990s
-                  per-branding sections collapse to one "CARRES" header. */}
               {shownModels.length > 0 && (
-                <section data-testid="pos-series-carres">
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="pill pill-neutral">CARRES</span>
-                    <span className="font-mono text-[11px] text-base-400">
-                      {shownModelCount} piece{shownModelCount === 1 ? "" : "s"}
-                    </span>
-                  </div>
-                  {/* Auto-fill grid: minmax(240px, 1fr) */}
-                  <div
-                    className="grid gap-4"
-                    style={{ gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))" }}
-                  >
-                    {shownModels.map((model) => (
-                      <ProductCard
-                        key={model.id}
-                        model={model}
-                        meta={index.meta.get(model.id)!}
-                        locked={lockedCats.has(model.category)}
-                        inCart={modelIdsInCart.has(model.id)}
-                        onConfigure={() => setConfigureModelId(model.id)}
-                      />
-                    ))}
-                  </div>
-                </section>
+                <div className="cat-grid">
+                  {shownModels.map((model) => (
+                    <ProductCard
+                      key={model.id}
+                      model={model}
+                      meta={index.meta.get(model.id)!}
+                      locked={lockedCats.has(model.category)}
+                      inCart={modelIdsInCart.has(model.id)}
+                      onConfigure={() => setConfigureModelId(model.id)}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           )}
         </div>
-      </div>
+      </main>
 
       <FloatingCartButton
         itemCount={itemCount}

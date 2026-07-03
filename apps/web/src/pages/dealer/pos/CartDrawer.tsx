@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Bookmark, X, Trash2, Minus, Plus, Package, Gift, Ticket } from "lucide-react";
+import { ArrowRight, BookmarkPlus, X, Trash2, Minus, Plus, Package, Gift, Ticket, UserRound } from "lucide-react";
 import type { CatalogResponse, PwpCodeDto, PwpDiscoverDto, PwpRuleDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
@@ -186,46 +186,39 @@ export default function CartDrawer({
 
   return (
     <>
-      {/* Ink-wash + blur scrim */}
-      <div
-        onClick={onClose}
-        role="presentation"
-        className="pos-drawer-scrim"
-        aria-hidden="true"
-      />
-
-      {/* White slide-in panel */}
-      <div
-        className="fixed inset-y-0 right-0 z-[60] flex flex-col bg-white animate-drawer-slide-in"
-        style={{
-          width: 460,
-          maxWidth: "100vw",
-          boxShadow: "-4px 0 32px rgba(17,24,39,0.12)",
-        }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Cart"
-        data-testid="pos-cart-drawer"
-      >
-        {/* Header */}
-        <header
-          className="px-6 pt-5 pb-4 flex items-center justify-between gap-4 shrink-0"
-          style={{ borderBottom: "1px solid hsl(var(--base-200))" }}
+      {/* Prototype cart popup (Loo's Claude Design 2026-07-04): bottom-right
+          card over a dim backdrop. Internal line logic: UNCHANGED. */}
+      <div className="cart-pop-backdrop" onClick={onClose} role="presentation">
+        <aside
+          className="cart cart--pop"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Cart"
+          data-testid="pos-cart-drawer"
         >
-          <div>
-            <p className="kicker mb-0.5">Customer order</p>
-            <h2 className="t-h3">
-              {items} item{items === 1 ? "" : "s"}
-            </h2>
+          {/* Header */}
+          <div className="cart__head shrink-0">
+            <div className="cart__title-row">
+              <span className="cart__title">Customer order</span>
+              <span className="cart__count">
+                {items} {items === 1 ? "piece" : "pieces"}
+              </span>
+              <button className="cart__close" onClick={onClose} aria-label="Close cart">
+                <X size={16} strokeWidth={1.75} />
+              </button>
+            </div>
+            <div className="cart__customer">
+              <UserRound size={13} strokeWidth={1.75} />
+              {draft.customer.name ? (
+                <span>{draft.customer.name}</span>
+              ) : (
+                <span style={{ fontStyle: "italic" }}>
+                  Walk-in customer · details captured at the customer step
+                </span>
+              )}
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close cart"
-            className="btn-ghost p-2 shrink-0"
-          >
-            <X size={18} strokeWidth={1.75} />
-          </button>
-        </header>
 
         {/* Scrollable line list */}
         <div className="flex-1 overflow-auto px-6 py-4">
@@ -476,72 +469,61 @@ export default function CartDrawer({
           )}
         </div>
 
-        {/* Footer — subtotal + total + proceed */}
-        <footer
-          className="px-6 py-5 shrink-0 bg-white"
-          style={{ borderTop: "1px solid hsl(var(--base-200))" }}
-        >
-          <div className="flex justify-between items-center text-base-600 t-small">
-            <span>Items subtotal</span>
-            <span className="font-mono">{rm(lineSub)}</span>
+        {/* Footer — prototype .cart__foot: lines + total + CTA row. */}
+        <div className="cart__foot shrink-0">
+          <div className="cart__line">
+            <span>Subtotal</span>
+            <span>{rm(lineSub)}</span>
           </div>
           {addonSub > 0 && (
-            <div className="flex justify-between items-center text-base-600 t-small mt-1.5">
+            <div className="cart__line">
               <span>Add-ons</span>
-              <span className="font-mono">{rm(addonSub)}</span>
+              <span>{rm(addonSub)}</span>
             </div>
           )}
-
-          {/* Total row */}
-          <div
-            className="flex justify-between items-baseline mt-3 pt-3"
-            style={{ borderTop: "1px solid hsl(var(--base-200))" }}
-          >
-            <span className="t-h4 text-base-900">Total</span>
-            <span className="pos-price text-[26px]">
-              <span className="pos-price-rm">RM</span>
-              {total.toLocaleString()}
+          <div className="cart__line">
+            <span>Delivery</span>
+            <span>Set at the customer step</span>
+          </div>
+          <div className="cart__line cart__line--total">
+            <span>Total</span>
+            <span className="cart__total-num">
+              <sup>RM</sup>
+              {total.toLocaleString("en-MY")}
             </span>
           </div>
 
-          <p className="t-tiny text-base-500 mt-1.5">
-            Stair carry (if any) is added at the next step.
-          </p>
-
-          {/* Save as quote — parks a sanitized snapshot on this device (POS
-              topbar → Quotes lists + loads them back). */}
-          <button
-            type="button"
-            disabled={draft.lines.length === 0}
-            onClick={() => {
-              const q = saveQuote({
-                label: draft.customer.name,
-                phone: draft.customer.phone,
-                lines: draft.lines,
-                addons: draft.addons,
-              });
-              toast.success(`Quote saved — "${q.label}"`);
-            }}
-            className="btn-ghost w-full mt-4 flex items-center justify-center gap-1.5 text-[12px] disabled:opacity-50"
-            data-testid="pos-save-quote"
-          >
-            <Bookmark size={13} strokeWidth={1.75} />
-            Save as quote
-          </button>
-
-          {/* Proceed — BLACK btn-primary (flame belongs to the FAB) */}
-          <button
-            type="button"
-            onClick={onProceed}
-            disabled={!ready}
-            className="btn-primary w-full mt-1.5"
-          >
-            Proceed to Customer →
-          </button>
+          <div className="cart__cta">
+            {/* Save Quote — parks a sanitized snapshot on this device (POS
+                topbar → Quotes lists + loads them back). */}
+            <button
+              type="button"
+              disabled={draft.lines.length === 0}
+              onClick={() => {
+                const q = saveQuote({
+                  label: draft.customer.name,
+                  phone: draft.customer.phone,
+                  lines: draft.lines,
+                  addons: draft.addons,
+                });
+                toast.success(`Quote saved — "${q.label}"`);
+              }}
+              className="btn btn--ghost"
+              data-testid="pos-save-quote"
+            >
+              <BookmarkPlus size={16} strokeWidth={1.75} />
+              Save Quote
+            </button>
+            <button type="button" onClick={onProceed} disabled={!ready} className="btn btn--primary">
+              Convert to Sales Order
+              <ArrowRight size={16} strokeWidth={1.75} />
+            </button>
+          </div>
           {!ready && blockReason && (
-            <p className="t-tiny text-warning text-center mt-2">{blockReason}</p>
+            <p style={{ fontSize: 11, color: "var(--c-burnt)", textAlign: "center" }}>{blockReason}</p>
           )}
-        </footer>
+        </div>
+        </aside>
       </div>
     </>
   );

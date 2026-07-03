@@ -1,16 +1,20 @@
 import { Link } from "react-router-dom";
 import {
+  Baby,
   BarChart3,
+  Bath,
   Bed,
   BedDouble,
+  Lamp,
+  LayoutGrid,
   Lock,
   Package,
-  PackagePlus,
   Plus,
   RotateCcw,
-  Settings,
+  Settings2,
   Sofa,
   Sparkles,
+  Utensils,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -26,25 +30,28 @@ export interface RailEntry {
   locked?: boolean;
 }
 
+/** Icon map mirrors prototype/pos-data.jsx CATEGORIES. */
 const RAIL_ICON: Record<RailKey, LucideIcon> = {
-  all: Package,
-  mattress: Bed,
-  bedframe: BedDouble,
+  all: LayoutGrid,
+  mattress: BedDouble,
   sofa: Sofa,
-  addons: PackagePlus,
+  bedframe: Bed,
+  addons: Lamp,
 };
 
+/** Ranges still being finalised — visible but inert, exactly as designed. */
+const TBC_ENTRIES: Array<{ label: string; icon: LucideIcon }> = [
+  { label: "Dining", icon: Utensils },
+  { label: "Bathroom", icon: Bath },
+  { label: "Kids zone", icon: Baby },
+];
+
 /**
- * POS catalog left sidebar — 2990s-parity sectioned rail:
- *   CATEGORIES (All open + per-category counts, sofa-mutex locks)
- *   QUICK      (Reset filters · Bestsellers)
- *   MAINTAIN   (principal only — New Order / Products / SO Maintenance /
- *              Sales analysis; the retail-seller tooling. Dealer / salesperson /
- *              showroom logins never see this section.)
- *   footer     (honest-pricing blurb)
- *
- * Replaces the flat CategoryRail. Counts + mutex bounce logic live in
- * CatalogStep (unchanged); this component is presentation + role gating only.
+ * POS catalog sidebar — prototype skin (`.cat-side`, Loo's Claude Design
+ * 2026-07-04). Sections: Categories (counts + sofa-mutex locks) · To be
+ * confirmed (inert "Soon" rows) · Quick (Reset filters / Bestsellers) ·
+ * Maintain (principal-only retail tooling) · honest-pricing footer.
+ * Counts + mutex bounce logic live in CatalogStep (unchanged).
  */
 export default function PosSidebar({
   entries,
@@ -61,123 +68,118 @@ export default function PosSidebar({
   const showMaintain = role === "principal";
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <nav aria-label="Product categories" className="flex flex-col gap-0.5">
-        <p className="label px-3 mb-2">Categories</p>
-        {entries.map((e) => {
-          const Icon = RAIL_ICON[e.key];
-          const isActive = e.key === active;
-          return (
-            <button
-              key={e.key}
-              type="button"
-              onClick={() => !e.locked && onSelect(e.key)}
-              disabled={e.locked}
-              aria-pressed={isActive}
-              aria-disabled={e.locked}
-              title={
-                e.locked
-                  ? "Locked — this order already has a conflicting product family"
-                  : undefined
-              }
-              data-testid={`pos-rail-${e.key}`}
-              className={[
-                "relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-colors",
-                e.locked
-                  ? "text-base-300 cursor-not-allowed"
-                  : isActive
-                    ? "text-primary bg-primary/6 font-semibold"
-                    : "text-base-600 hover:bg-base-100",
-              ].join(" ")}
-            >
-              {/* Flame left-accent bar for active entry */}
-              {isActive && !e.locked && (
-                <span
-                  className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-primary"
-                  aria-hidden="true"
-                />
-              )}
-              <span className="w-4 flex items-center justify-center">
-                {e.locked ? (
-                  <Lock size={14} strokeWidth={1.75} />
-                ) : (
-                  <Icon size={16} strokeWidth={1.75} />
-                )}
-              </span>
-              <span className="t-small flex-1 truncate">{e.label}</span>
-              <span
-                className={`font-mono text-[11px] tabular-nums ${
-                  isActive ? "text-primary/70" : "text-base-400"
-                }`}
-              >
-                {e.count}
-              </span>
-            </button>
-          );
-        })}
-      </nav>
+    <aside className="cat-side">
+      <div className="cat-side__heading">Categories</div>
+      {entries.map((e) => {
+        const Icon = RAIL_ICON[e.key];
+        return (
+          <button
+            key={e.key}
+            type="button"
+            onClick={() => !e.locked && onSelect(e.key)}
+            disabled={e.locked}
+            aria-pressed={e.key === active}
+            aria-disabled={e.locked}
+            title={
+              e.locked
+                ? "Locked — this order already has a conflicting product family"
+                : undefined
+            }
+            data-testid={`pos-rail-${e.key}`}
+            className={[
+              "cat-side__item",
+              e.key === active && !e.locked ? "is-active" : "",
+              e.locked ? "cat-side__item--tbc" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {e.locked ? (
+              <Lock size={16} strokeWidth={1.75} />
+            ) : (
+              <Icon size={16} strokeWidth={1.75} />
+            )}
+            <span>{e.label}</span>
+            <span className="cat-side__count">{e.count}</span>
+          </button>
+        );
+      })}
 
-      <nav aria-label="Quick actions" className="flex flex-col gap-0.5 mt-5">
-        <p className="label px-3 mb-2">Quick</p>
-        <SideAction icon={RotateCcw} label="Reset filters" onClick={onResetFilters} />
-        <SideAction icon={Sparkles} label="Bestsellers" onClick={() => onSelect("mattress")} />
-      </nav>
+      <div className="cat-side__heading" style={{ marginTop: 16 }}>
+        To be confirmed
+      </div>
+      {TBC_ENTRIES.map(({ label, icon: Icon }) => (
+        <button
+          key={label}
+          type="button"
+          className="cat-side__item cat-side__item--tbc"
+          disabled
+          aria-disabled="true"
+          title="This range is being finalised — opening soon."
+        >
+          <Icon size={16} strokeWidth={1.75} />
+          <span>{label}</span>
+          <span className="cat-side__pill">Soon</span>
+        </button>
+      ))}
+
+      <div className="cat-side__heading" style={{ marginTop: 16 }}>
+        Quick
+      </div>
+      <button type="button" className="cat-side__item" onClick={onResetFilters}>
+        <RotateCcw size={16} strokeWidth={1.75} />
+        <span>Reset filters</span>
+      </button>
+      <button type="button" className="cat-side__item" onClick={() => onSelect("mattress")}>
+        <Sparkles size={16} strokeWidth={1.75} />
+        <span>Bestsellers</span>
+      </button>
 
       {showMaintain && (
-        <nav aria-label="Maintain" className="flex flex-col gap-0.5 mt-5" data-testid="pos-maintain">
-          <p className="label px-3 mb-2">Maintain</p>
-          <SideLink icon={Plus} label="New Order" to="/principal?tab=new-order" />
-          <SideLink icon={Package} label="Products" to="/principal?tab=catalog" />
-          <SideLink
-            icon={Settings}
-            label="SO Maintenance"
+        <nav aria-label="Maintain" data-testid="pos-maintain" style={{ display: "contents" }}>
+          <div className="cat-side__heading" style={{ marginTop: 16 }}>
+            Maintain
+          </div>
+          <Link
+            to="/principal?tab=new-order"
+            className="cat-side__item"
+            data-testid="pos-maintain-new-order"
+          >
+            <Plus size={16} strokeWidth={1.75} />
+            <span>New Order</span>
+          </Link>
+          <Link
+            to="/principal?tab=catalog"
+            className="cat-side__item"
+            data-testid="pos-maintain-products"
+          >
+            <Package size={16} strokeWidth={1.75} />
+            <span>Products</span>
+          </Link>
+          <Link
             to="/operation?tab=sales-order-maintenance"
-          />
-          <SideLink icon={BarChart3} label="Sales analysis" to="/principal?tab=sales-analysis" />
+            className="cat-side__item"
+            data-testid="pos-maintain-so-maintenance"
+          >
+            <Settings2 size={16} strokeWidth={1.75} />
+            <span>SO Maintenance</span>
+          </Link>
+          <Link
+            to="/principal?tab=sales-analysis"
+            className="cat-side__item"
+            data-testid="pos-maintain-sales-analysis"
+          >
+            <BarChart3 size={16} strokeWidth={1.75} />
+            <span>Sales analysis</span>
+          </Link>
         </nav>
       )}
 
-      <div className="mt-auto pt-6 px-3">
-        <p className="label mb-1.5">Honest pricing</p>
-        <p className="t-tiny text-base-400 leading-relaxed">
-          Every model is priced on its own — no markups, no surprises. What you see is the floor
-          price.
-        </p>
+      <div className="cat-side__footer">
+        <div className="cat-side__footer-title">Honest pricing</div>
+        Every model is priced on its own — no markups, no surprises. What you see is the floor
+        price.
       </div>
-    </div>
+    </aside>
   );
 }
-
-const ITEM_CLASS =
-  "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-base-600 hover:bg-base-100 transition-colors";
-
-function SideAction({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button type="button" onClick={onClick} className={ITEM_CLASS}>
-      <span className="w-4 flex items-center justify-center">
-        <Icon size={16} strokeWidth={1.75} />
-      </span>
-      <span className="t-small flex-1 truncate">{label}</span>
-    </button>
-  );
-}
-
-function SideLink({ icon: Icon, label, to }: { icon: LucideIcon; label: string; to: string }) {
-  return (
-    <Link to={to} className={ITEM_CLASS} data-testid={`pos-maintain-${label.toLowerCase().replace(/\s+/g, "-")}`}>
-      <span className="w-4 flex items-center justify-center">
-        <Icon size={16} strokeWidth={1.75} />
-      </span>
-      <span className="t-small flex-1 truncate">{label}</span>
-    </Link>
-  );
-}
-
