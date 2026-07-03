@@ -10,6 +10,7 @@ import PrincipalAccounts from "./PrincipalAccounts";
 import PrincipalAudit from "./PrincipalAudit";
 import DealerPos from "@/pages/dealer/DealerPos";
 import PrincipalNewOrder from "./PrincipalNewOrder";
+import PrincipalSalesAnalysis from "./PrincipalSalesAnalysis";
 import PrincipalOrders from "./PrincipalOrders";
 // 2026-05-19 — Suppliers / Stock moved to Operation sidebar. Orders + a place-
 // order POS (on behalf of a picked dealer) re-added to Principal 2026-06-25.
@@ -56,6 +57,8 @@ export default function PrincipalApp() {
         {tab === "pos" && <DealerPos onExit={() => setTab("orders")} />}
         {/* MAINTAIN → New Order — raw SO creation (no POS gates). */}
         {tab === "new-order" && <PrincipalNewOrder setTab={setTab} />}
+        {/* MAINTAIN → Sales analysis — overview / customer data / products. */}
+        {tab === "sales-analysis" && <PrincipalSalesAnalysis />}
         {tab === "orders" && <PrincipalOrders />}
         {tab === "approvals" && <PrincipalApprovals />}
         {tab === "dealers" && <PrincipalDealers />}

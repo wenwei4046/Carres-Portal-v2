@@ -126,9 +126,6 @@ export default function PosSidebar({
       {showMaintain && (
         <nav aria-label="Maintain" className="flex flex-col gap-0.5 mt-5" data-testid="pos-maintain">
           <p className="label px-3 mb-2">Maintain</p>
-          {/* Sales analysis ships in a later slice of the POS-parity program —
-              rendered as "Soon" until its page lands, mirroring the 2990s TBC
-              pattern, so this sidebar is deployable standalone. */}
           <SideLink icon={Plus} label="New Order" to="/principal?tab=new-order" />
           <SideLink icon={Package} label="Products" to="/principal?tab=catalog" />
           <SideLink
@@ -136,7 +133,7 @@ export default function PosSidebar({
             label="SO Maintenance"
             to="/operation?tab=sales-order-maintenance"
           />
-          <SideSoon icon={BarChart3} label="Sales analysis" />
+          <SideLink icon={BarChart3} label="Sales analysis" to="/principal?tab=sales-analysis" />
         </nav>
       )}
 
@@ -184,20 +181,3 @@ function SideLink({ icon: Icon, label, to }: { icon: LucideIcon; label: string; 
   );
 }
 
-function SideSoon({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
-  return (
-    <button
-      type="button"
-      disabled
-      title="Opening soon — this tool ships in the next update."
-      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-base-300 cursor-not-allowed"
-      data-testid={`pos-maintain-${label.toLowerCase().replace(/\s+/g, "-")}`}
-    >
-      <span className="w-4 flex items-center justify-center">
-        <Icon size={16} strokeWidth={1.75} />
-      </span>
-      <span className="t-small flex-1 truncate">{label}</span>
-      <span className="pill pill-neutral text-[10px] px-1.5 py-0">Soon</span>
-    </button>
-  );
-}

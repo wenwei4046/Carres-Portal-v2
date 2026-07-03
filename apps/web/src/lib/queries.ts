@@ -662,6 +662,26 @@ export function useCreateOrder(
 }
 
 /**
+ * useSalesAnalytics — GET /api/analytics/sales?months=N (POS-parity,
+ * MAINTAIN → Sales analysis; principal only). Flattened order + line rows;
+ * the page aggregates via lib/sales-analysis.
+ */
+export function useSalesAnalytics(
+  months: number,
+  opts?: Partial<UseQueryOptions<import("./sales-analysis").SalesAnalyticsResponse>>,
+) {
+  return useQuery<import("./sales-analysis").SalesAnalyticsResponse>({
+    queryKey: ["analytics", "sales", months],
+    queryFn: () =>
+      apiFetch<import("./sales-analysis").SalesAnalyticsResponse>(
+        `/api/analytics/sales?months=${months}`,
+      ),
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+/**
  * useCustomerTypeProbe — GET /api/orders/customer-type?phone= (POS-parity
  * "CUSTOMER TYPE (AUTO)"). Answers whether any RLS-visible order already
  * carries this phone. Disabled until the phone looks dial-able.

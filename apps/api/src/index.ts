@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { authMiddleware } from "./middleware/auth";
+import analyticsRouter from "./routes/analytics";
 import authRouter from "./routes/auth";
 import catalogRouter from "./routes/catalog";
 import dealerRouter from "./routes/dealers";
@@ -94,6 +95,8 @@ app.get("/health", (c) => c.json({ ok: true }));
 
 const api = new Hono<AppEnv>();
 api.use("*", authMiddleware);
+// POS-parity — MAINTAIN → Sales analysis flattened feed (principal only).
+api.route("/analytics", analyticsRouter);
 api.route("/approvals", approvalsRouter);
 api.route("/auth", authRouter);
 api.route("/dealers", dealerRouter);
