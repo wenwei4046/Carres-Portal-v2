@@ -142,6 +142,12 @@ export interface DraftPayment {
 }
 
 export interface WizardDraft {
+  /** POS-parity (2990s) — an INTERNAL operator (principal) picks the dealer the
+   *  order belongs to in-flow at the CUSTOMER step. Dealer-side logins never
+   *  set these (their JWT dealer wins; the fields stay null). Optional so
+   *  drafts saved before this field existed restore cleanly. */
+  actingDealerId?: string | null;
+  actingDealerName?: string | null;
   outletId: string | null;
   salespersonId: string | null;
   customer: {
@@ -218,6 +224,8 @@ export const DRAFT_STORAGE_KEY = "carres-order-draft";
 
 export function emptyDraft(): WizardDraft {
   return {
+    actingDealerId: null,
+    actingDealerName: null,
     outletId: null,
     salespersonId: null,
     customer: {
