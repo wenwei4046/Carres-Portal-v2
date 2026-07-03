@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ListOrdered, ShoppingBag } from "lucide-react";
+import { Bookmark, ListOrdered, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
 import { maxLeadDaysFor } from "@carres/shared";
@@ -43,6 +43,8 @@ import ThankYou from "./new-order/ThankYou";
 import CatalogStep from "./pos/CatalogStep";
 import CustomerStep from "./pos/CustomerStep";
 import PosStepper from "./pos/PosStepper";
+import QuotesDrawer from "./pos/QuotesDrawer";
+import { quoteToDraftLines, type SavedQuote } from "./pos/quotes";
 import { cartItemCount, cartTotalExStair } from "./pos/cart";
 
 /** True when a restored draft has real content worth resuming. */
@@ -123,6 +125,7 @@ export default function DealerPos({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [quotesOpen, setQuotesOpen] = useState(false);
   const [showResume, setShowResume] = useState(() => {
     const d = loadDraft();
     return !!d && draftHasContent(d);
@@ -527,6 +530,31 @@ export default function DealerPos({
     resetPwpReconciler();
   }
 
+  // Load a saved quote — REPLACES the cart (a quote is a snapshot). Keeps the
+  // typed customer unless the quote carries a real label/phone.
+  function handleLoadQuote(q: SavedQuote) {
+    if (
+      draftHasContent(draft) &&
+      !window.confirm("Replace the current cart with this quote? Unsaved cart lines are lost.")
+    ) {
+      return;
+    }
+    setDraft((d) => ({
+      ...d,
+      lines: quoteToDraftLines(q),
+      addons: q.addons,
+      customer: {
+        ...d.customer,
+        name: q.label && q.label !== "Unnamed quote" ? q.label : d.customer.name,
+        phone: q.phone || d.customer.phone,
+      },
+    }));
+    setQuotesOpen(false);
+    setShowResume(false);
+    setStep(1);
+    toast.success("Quote loaded to cart");
+  }
+
   // In-flow dealer pick (internal operator only). Switching dealers resets the
   // outlet + salesperson — those rows belong to the previous dealer.
   function pickDealer(id: string, name: string) {
@@ -585,7 +613,15 @@ export default function DealerPos({
         )}
 
         <div className="flex items-center gap-2">
-          {/* Quotes pill lands with the saved-quotes slice of the parity program. */}
+          <button
+            type="button"
+            onClick={() => setQuotesOpen(true)}
+            className="hidden sm:flex items-center gap-1.5 rounded-full border border-base-300 bg-white px-3 py-1.5 t-tiny font-semibold text-base-700 hover:border-base-500 transition-colors"
+            data-testid="pos-topbar-quotes"
+          >
+            <Bookmark size={13} strokeWidth={1.75} />
+            Quotes
+          </button>
           <Link
             to={myOrdersHref}
             className="hidden sm:flex items-center gap-1.5 rounded-full border border-base-300 bg-white px-3 py-1.5 t-tiny font-semibold text-base-700 hover:border-base-500 transition-colors"
@@ -729,6 +765,8 @@ export default function DealerPos({
           </div>
         )}
       </main>
+
+      {quotesOpen && <QuotesDrawer onLoad={handleLoadQuote} onClose={() => setQuotesOpen(false)} />}
 
       {/* Footer — steps 2 + 3 only (step 1 advances via the cart). */}
       {!submitted && step !== 1 && (

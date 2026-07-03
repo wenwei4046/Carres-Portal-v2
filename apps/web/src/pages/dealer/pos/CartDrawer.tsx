@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { X, Trash2, Minus, Plus, Package, Gift, Ticket } from "lucide-react";
+import { toast } from "sonner";
+import { Bookmark, X, Trash2, Minus, Plus, Package, Gift, Ticket } from "lucide-react";
 import type { CatalogResponse, PwpCodeDto, PwpDiscoverDto, PwpRuleDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
@@ -9,6 +10,7 @@ import {
   type WizardDraft,
 } from "../new-order/draft";
 import { cartAddonSubtotal, cartItemCount, cartLineSubtotal } from "./cart";
+import { saveQuote } from "./quotes";
 import { SpecialsSummary } from "../new-order/special-addons-picker";
 import {
   coveringCampaignsForLine,
@@ -506,12 +508,33 @@ export default function CartDrawer({
             Stair carry (if any) is added at the next step.
           </p>
 
+          {/* Save as quote — parks a sanitized snapshot on this device (POS
+              topbar → Quotes lists + loads them back). */}
+          <button
+            type="button"
+            disabled={draft.lines.length === 0}
+            onClick={() => {
+              const q = saveQuote({
+                label: draft.customer.name,
+                phone: draft.customer.phone,
+                lines: draft.lines,
+                addons: draft.addons,
+              });
+              toast.success(`Quote saved — "${q.label}"`);
+            }}
+            className="btn-ghost w-full mt-4 flex items-center justify-center gap-1.5 text-[12px] disabled:opacity-50"
+            data-testid="pos-save-quote"
+          >
+            <Bookmark size={13} strokeWidth={1.75} />
+            Save as quote
+          </button>
+
           {/* Proceed — BLACK btn-primary (flame belongs to the FAB) */}
           <button
             type="button"
             onClick={onProceed}
             disabled={!ready}
-            className="btn-primary w-full mt-4"
+            className="btn-primary w-full mt-1.5"
           >
             Proceed to Customer →
           </button>
