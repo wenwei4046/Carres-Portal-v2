@@ -497,6 +497,11 @@ export const orderFromRow = (
     billing: r.customer_billing,
     billingSame: r.customer_billing_same,
     emergency: r.customer_emergency,
+    // 0200 — `?? null` so pre-migration rows surface as null.
+    email: r.customer_email ?? null,
+    race: r.customer_race ?? null,
+    gender: r.customer_gender ?? null,
+    birthday: r.customer_birthday ?? null,
   },
   delivery: {
     date: r.delivery_date,
@@ -696,6 +701,11 @@ export const orderInputToRpcPayload = (
   customer_billing: input.customer.billingSame ? null : input.customer.billing,
   customer_billing_same: input.customer.billingSame,
   customer_emergency: input.customer.emergency,
+  // 0200 — POS-parity demographics (RPC nullifs '' → null).
+  customer_email: input.customer.email ?? null,
+  customer_race: input.customer.race ?? null,
+  customer_gender: input.customer.gender ?? null,
+  customer_birthday: input.customer.birthday ?? null,
   delivery_date: input.delivery.dateTbd ? null : input.delivery.date,
   // Phase 11.1 — proceed date pairs with delivery date; both nulled when TBD.
   proceed_date: input.delivery.dateTbd ? null : input.delivery.proceedDate,

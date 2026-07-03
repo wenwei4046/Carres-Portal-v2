@@ -44,6 +44,10 @@ function validDraft(): WizardDraft {
       emergencyPhone: "012-9988776",
       emergencyRelationship: "Spouse",
       emergencyRelationshipOther: "",
+      email: "mei.ling@example.com",
+      race: "Chinese",
+      gender: "Female",
+      birthday: "1990-04-12",
     },
     delivery: { date: "2026-06-01", dateTbd: false, floor: 1, hasLift: false, stairItems: null, proceedDate: "" },
     lines: [],
@@ -142,6 +146,21 @@ describe("save / load / clear roundtrip", () => {
     });
     expect(() => saveDraft(validDraft())).not.toThrow();
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe("step1Valid — 0200 demographics gate (POS-required, server-lenient)", () => {
+  it("fails on missing/invalid email", () => {
+    const d = validDraft();
+    d.customer.email = "";
+    expect(step1Valid(d)).toBe(false);
+    d.customer.email = "not-an-email";
+    expect(step1Valid(d)).toBe(false);
+  });
+  it.each([["race"], ["gender"], ["birthday"]] as const)("fails on empty %s", (field) => {
+    const d = validDraft();
+    d.customer[field] = "";
+    expect(step1Valid(d)).toBe(false);
   });
 });
 

@@ -77,6 +77,7 @@ import {
   type LpRejectOrderInput,
   type ReselectPartnerInput,
   type CreateOrderInput,
+  type RawCreateOrderInput,
   type CreatePoInput,
   type CreatePosBatchInput,
   type CreatePosBatchResponse,
@@ -655,6 +656,72 @@ export function useCreateOrder(
       void qc.invalidateQueries({ queryKey: ["orders"] });
       // Forward to caller's onSuccess if provided. Spread keeps us
       // signature-agnostic across TanStack versions.
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * useSalesAnalytics — GET /api/analytics/sales?months=N (POS-parity,
+ * MAINTAIN → Sales analysis; principal only). Flattened order + line rows;
+ * the page aggregates via lib/sales-analysis.
+ */
+export function useSalesAnalytics(
+  months: number,
+  opts?: Partial<UseQueryOptions<import("./sales-analysis").SalesAnalyticsResponse>>,
+) {
+  return useQuery<import("./sales-analysis").SalesAnalyticsResponse>({
+    queryKey: ["analytics", "sales", months],
+    queryFn: () =>
+      apiFetch<import("./sales-analysis").SalesAnalyticsResponse>(
+        `/api/analytics/sales?months=${months}`,
+      ),
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+/**
+ * useCustomerTypeProbe — GET /api/orders/customer-type?phone= (POS-parity
+ * "CUSTOMER TYPE (AUTO)"). Answers whether any RLS-visible order already
+ * carries this phone. Disabled until the phone looks dial-able.
+ */
+export function useCustomerTypeProbe(
+  phone: string,
+  opts?: Partial<UseQueryOptions<{ existing: boolean; matches: number }>>,
+) {
+  const trimmed = phone.trim();
+  return useQuery<{ existing: boolean; matches: number }>({
+    queryKey: ["orders", "customer-type", trimmed],
+    queryFn: () =>
+      apiFetch<{ existing: boolean; matches: number }>(
+        `/api/orders/customer-type?phone=${encodeURIComponent(trimmed)}`,
+      ),
+    enabled: trimmed.length >= 8,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/**
+ * useRawCreateOrder — POST /api/orders/raw (POS-parity, MAINTAIN → New Order).
+ * Internal-only raw creation: free-form line skus + prices, no POS gates.
+ * Same Order response contract as useCreateOrder.
+ */
+export function useRawCreateOrder(
+  opts?: Partial<UseMutationOptions<Order, Error, RawCreateOrderInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, Error, RawCreateOrderInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>("/api/orders/raw", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(order.id), order);
+      void qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

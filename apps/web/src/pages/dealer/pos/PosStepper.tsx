@@ -1,11 +1,12 @@
 const STEPS = [
-  { n: 1, label: "Catalog" },
+  { n: 1, label: "Cart" },
   { n: 2, label: "Customer" },
-  { n: 3, label: "Confirm" },
+  { n: 3, label: "Confirmed" },
 ] as const;
 
 /**
- * Top-bar progress stepper — 01 CATALOG · 02 CUSTOMER · 03 CONFIRM. Completed
+ * Top-bar progress stepper — 01 CART · 02 CUSTOMER · 03 CONFIRMED (2990s
+ * wording parity). Completed
  * steps are clickable to go back; the current step is flame-bordered; forward
  * steps are inert (advancing is gated by the footer Continue button).
  *

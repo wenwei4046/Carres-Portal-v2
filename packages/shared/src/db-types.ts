@@ -619,6 +619,11 @@ export interface OrderRow {
   customer_billing: string | null;
   customer_billing_same: boolean;
   customer_emergency: string | null;
+  // 0200 — POS-parity demographics (all nullable; POS-required, server-lenient).
+  customer_email: string | null;
+  customer_race: string | null;
+  customer_gender: string | null;
+  customer_birthday: string | null;
   delivery_date: string | null;
   delivery_date_tbd: boolean;
   // Phase 11.1 (migration 0165) — salesperson-entered planned production-start

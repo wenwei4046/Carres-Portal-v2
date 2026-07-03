@@ -8,7 +8,9 @@ import PrincipalDealers from "./PrincipalDealers";
 import PrincipalPartners from "./PrincipalPartners";
 import PrincipalAccounts from "./PrincipalAccounts";
 import PrincipalAudit from "./PrincipalAudit";
-import PrincipalPos from "./PrincipalPos";
+import DealerPos from "@/pages/dealer/DealerPos";
+import PrincipalNewOrder from "./PrincipalNewOrder";
+import PrincipalSalesAnalysis from "./PrincipalSalesAnalysis";
 import PrincipalOrders from "./PrincipalOrders";
 // 2026-05-19 — Suppliers / Stock moved to Operation sidebar. Orders + a place-
 // order POS (on behalf of a picked dealer) re-added to Principal 2026-06-25.
@@ -49,7 +51,14 @@ export default function PrincipalApp() {
       <PortalSidebar />
       <main className="min-w-0 overflow-auto bg-base-50">
         {tab === "dashboard" && <PrincipalDashboard setTab={setTab} />}
-        {tab === "pos" && <PrincipalPos onExit={() => setTab("orders")} />}
+        {/* POS-parity (2990s) — "New order" opens the POS catalog DIRECTLY; the
+            principal picks the acting dealer in-flow at the CUSTOMER step (the
+            old pre-pick page is gone). */}
+        {tab === "pos" && <DealerPos onExit={() => setTab("orders")} />}
+        {/* MAINTAIN → New Order — raw SO creation (no POS gates). */}
+        {tab === "new-order" && <PrincipalNewOrder setTab={setTab} />}
+        {/* MAINTAIN → Sales analysis — overview / customer data / products. */}
+        {tab === "sales-analysis" && <PrincipalSalesAnalysis />}
         {tab === "orders" && <PrincipalOrders />}
         {tab === "approvals" && <PrincipalApprovals />}
         {tab === "dealers" && <PrincipalDealers />}

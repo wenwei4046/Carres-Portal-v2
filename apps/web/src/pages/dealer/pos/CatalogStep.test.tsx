@@ -139,6 +139,6 @@ describe("CatalogStep", () => {
     );
     fireEvent.change(screen.getByLabelText("Search catalog"), { target: { value: "zzzznope" } });
     // search is debounced ~180ms; findByText polls until the filter applies.
-    expect(await screen.findByText(/No products match/)).toBeTruthy();
+    expect(await screen.findByText(/No pieces match/)).toBeTruthy();
   });
 });

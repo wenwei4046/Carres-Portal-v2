@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Bookmark, ListOrdered, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
 import { maxLeadDaysFor } from "@carres/shared";
@@ -15,6 +16,7 @@ import {
   useDealerSelf,
   useFreePwpCode,
   useOutlets,
+  usePrincipalDealers,
   useProceedOrder,
   usePwpAvailableForPhone,
   usePwpCodesMine,
@@ -41,6 +43,8 @@ import ThankYou from "./new-order/ThankYou";
 import CatalogStep from "./pos/CatalogStep";
 import CustomerStep from "./pos/CustomerStep";
 import PosStepper from "./pos/PosStepper";
+import QuotesDrawer from "./pos/QuotesDrawer";
+import { quoteToDraftLines, type SavedQuote } from "./pos/quotes";
 import { cartItemCount, cartTotalExStair } from "./pos/cart";
 
 /** True when a restored draft has real content worth resuming. */
@@ -121,6 +125,7 @@ export default function DealerPos({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [quotesOpen, setQuotesOpen] = useState(false);
   const [showResume, setShowResume] = useState(() => {
     const d = loadDraft();
     return !!d && draftHasContent(d);
@@ -146,24 +151,49 @@ export default function DealerPos({
     return claimGroupRef.current;
   }, []);
 
-  const { effectiveDealerId, bodyDealerId } = resolveActingDealer(actingDealerId, dealerId);
-  // useDealerSelf 403s for a principal (no own dealer) — skip it when acting.
-  const dealerQ = useDealerSelf({ enabled: !actingDealerId });
+  // POS-parity (2990s) — an INTERNAL operator (principal, no JWT dealer) who
+  // wasn't handed an acting dealer by the caller picks the dealer IN-FLOW at
+  // the CUSTOMER step; the pick lives on the draft so it survives refresh.
+  // Dealer-side logins (JWT dealer present) never pick — their dealer wins.
+  const internalPicksDealer = !actingDealerId && !dealerId;
+  const effectiveActingId =
+    actingDealerId ?? (internalPicksDealer ? draft.actingDealerId ?? undefined : undefined);
+  const effectiveActingName =
+    actingDealerName ?? (internalPicksDealer ? draft.actingDealerName ?? undefined : undefined);
+
+  const { effectiveDealerId, bodyDealerId } = resolveActingDealer(effectiveActingId, dealerId);
+  // useDealerSelf 403s for a principal (no own dealer) — only dealer-side JWTs ask.
+  const dealerQ = useDealerSelf({ enabled: !!dealerId });
   const outletsQ = useOutlets();
   const salespersonsQ = useSalespersons();
   const catalogQ = useCatalog();
 
-  // When a principal places on behalf of a picked dealer, constrain the outlet +
-  // salesperson choices to THAT dealer (the lists are RLS-read-all for internal
-  // roles). A normal dealer already sees only their own, so this is a no-op there.
+  // The in-flow dealer choices (ACTIVE dealers only — matches the live status
+  // gate). Only fetched for an internal operator; dealers never hit this route.
+  const principalDealersQ = usePrincipalDealers({}, { enabled: internalPicksDealer });
+  const pickableDealers = useMemo(
+    () =>
+      (principalDealersQ.data?.dealers ?? [])
+        .filter((d) => d.status === "active")
+        .map((d) => ({ id: d.id, name: d.name })),
+    [principalDealersQ.data],
+  );
+
+  // When an internal operator places on behalf of a picked dealer, constrain the
+  // outlet + salesperson choices to THAT dealer (the lists are RLS-read-all for
+  // internal roles). A normal dealer already sees only their own, so this is a
+  // no-op there. Unpicked internal → empty lists (the CUSTOMER step blocks on
+  // the dealer card first).
   const outlets = useMemo(() => {
     const all = outletsQ.data?.outlets ?? [];
-    return actingDealerId ? all.filter((o) => o.dealerId === actingDealerId) : all;
-  }, [outletsQ.data, actingDealerId]);
+    if (!internalPicksDealer && !actingDealerId) return all;
+    return effectiveActingId ? all.filter((o) => o.dealerId === effectiveActingId) : [];
+  }, [outletsQ.data, internalPicksDealer, actingDealerId, effectiveActingId]);
   const salespersons = useMemo(() => {
     const all = salespersonsQ.data?.salespersons ?? [];
-    return actingDealerId ? all.filter((s) => s.dealerId === actingDealerId) : all;
-  }, [salespersonsQ.data, actingDealerId]);
+    if (!internalPicksDealer && !actingDealerId) return all;
+    return effectiveActingId ? all.filter((s) => s.dealerId === effectiveActingId) : [];
+  }, [salespersonsQ.data, internalPicksDealer, actingDealerId, effectiveActingId]);
 
   // Refetch catalog once on mount so the dealer's locked unit_price is fresh
   // against principal updates (the legacy wizard refetched on Step 2 entry).
@@ -304,9 +334,10 @@ export default function DealerPos({
 
   // CATALOG (step 1) advances via the cart drawer, which gates on step2Valid
   // itself; the shell only gates the CUSTOMER → CONFIRM → submit transitions.
+  // An internal operator must have picked the acting dealer before advancing.
   const customerReady = useMemo(
-    () => step1Valid(draft) && step3DateValid(draft, minLeadDays),
-    [draft, minLeadDays],
+    () => !!effectiveDealerId && step1Valid(draft) && step3DateValid(draft, minLeadDays),
+    [draft, minLeadDays, effectiveDealerId],
   );
   const confirmReady = useMemo(
     () => step4Valid(draft) && asapDepositOk,
@@ -392,6 +423,12 @@ export default function DealerPos({
           billing: draft.customer.billingSame ? null : draft.customer.billing,
           billingSame: draft.customer.billingSame,
           emergency: composeEmergency(draft.customer),
+          // 0200 — POS-parity demographics (POS-required via step1 gate;
+          // trimmed-empty → null keeps the wire shape lenient).
+          email: draft.customer.email.trim() || null,
+          race: draft.customer.race || null,
+          gender: draft.customer.gender || null,
+          birthday: draft.customer.birthday || null,
         },
         delivery: {
           date: draft.delivery.dateTbd ? null : draft.delivery.date,
@@ -493,6 +530,43 @@ export default function DealerPos({
     resetPwpReconciler();
   }
 
+  // Load a saved quote — REPLACES the cart (a quote is a snapshot). Keeps the
+  // typed customer unless the quote carries a real label/phone.
+  function handleLoadQuote(q: SavedQuote) {
+    if (
+      draftHasContent(draft) &&
+      !window.confirm("Replace the current cart with this quote? Unsaved cart lines are lost.")
+    ) {
+      return;
+    }
+    setDraft((d) => ({
+      ...d,
+      lines: quoteToDraftLines(q),
+      addons: q.addons,
+      customer: {
+        ...d.customer,
+        name: q.label && q.label !== "Unnamed quote" ? q.label : d.customer.name,
+        phone: q.phone || d.customer.phone,
+      },
+    }));
+    setQuotesOpen(false);
+    setShowResume(false);
+    setStep(1);
+    toast.success("Quote loaded to cart");
+  }
+
+  // In-flow dealer pick (internal operator only). Switching dealers resets the
+  // outlet + salesperson — those rows belong to the previous dealer.
+  function pickDealer(id: string, name: string) {
+    setDraft((d) => ({
+      ...d,
+      actingDealerId: id,
+      actingDealerName: name,
+      outletId: null,
+      salespersonId: null,
+    }));
+  }
+
   function handleExit() {
     if (!submitted && draftHasContent(draft)) {
       const leave = window.confirm(
@@ -506,9 +580,15 @@ export default function DealerPos({
   const outletName = draft.outletId
     ? outlets.find((o) => o.id === draft.outletId)?.name
     : undefined;
-  const contextLabel = outletName ?? actingDealerName ?? dealerQ.data?.name ?? "New sale";
+  const contextLabel = outletName ?? effectiveActingName ?? dealerQ.data?.name ?? "New sale";
   const itemCount = cartItemCount(draft.lines);
   const cartTotal = cartTotalExStair(draft.lines, draft.addons);
+
+  // Topbar staff chip (2990s parity: avatar + name + role) + My-orders target.
+  const displayName = dealerQ.data?.name ?? (userEmail ? userEmail.split("@")[0] : "Staff");
+  const initials = (dealerQ.data?.name || userEmail || "··").slice(0, 2).toUpperCase();
+  const roleLabel = (role ?? "dealer").replace(/_/g, " ");
+  const myOrdersHref = role === "principal" ? "/principal?tab=orders" : "/dealer/orders";
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-background text-foreground">
@@ -533,32 +613,58 @@ export default function DealerPos({
         )}
 
         <div className="flex items-center gap-2">
-          {!submitted && (
+          <button
+            type="button"
+            onClick={() => setQuotesOpen(true)}
+            className="hidden sm:flex items-center gap-1.5 rounded-full border border-base-300 bg-white px-3 py-1.5 t-tiny font-semibold text-base-700 hover:border-base-500 transition-colors"
+            data-testid="pos-topbar-quotes"
+          >
+            <Bookmark size={13} strokeWidth={1.75} />
+            Quotes
+          </button>
+          <Link
+            to={myOrdersHref}
+            className="hidden sm:flex items-center gap-1.5 rounded-full border border-base-300 bg-white px-3 py-1.5 t-tiny font-semibold text-base-700 hover:border-base-500 transition-colors"
+            data-testid="pos-topbar-my-orders"
+          >
+            <ListOrdered size={13} strokeWidth={1.75} />
+            My orders
+          </Link>
+          {!submitted && itemCount > 0 && (
             <button
               type="button"
               onClick={() => {
                 setStep(1);
                 setCartOpen(true);
               }}
-              className="flex items-center gap-2 rounded-full border border-base-300 bg-white px-3 py-1.5 hover:border-base-500 transition-colors"
+              className="flex items-center gap-1.5 rounded-full bg-base-900 text-white px-3 py-1.5 hover:bg-base-700 transition-colors"
               data-testid="pos-topbar-cart"
             >
-              <span className="grid place-items-center w-5 h-5 rounded-full bg-base-900 text-white font-mono text-[10px]">
-                {itemCount}
+              <ShoppingBag size={13} strokeWidth={1.75} />
+              <span className="font-mono text-[12px] font-semibold">
+                {itemCount} item{itemCount === 1 ? "" : "s"} · {rm(cartTotal)}
               </span>
-              <span className="font-mono text-[12px] font-semibold">{rm(cartTotal)}</span>
             </button>
           )}
-          <button onClick={handleExit} className="btn-ghost text-[12px]" data-testid="pos-exit">
-            Exit
-          </button>
           <Link
             to="/me"
             title="Profile · Sign out"
-            className="w-8 h-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-semibold"
+            className="flex items-center gap-2 pl-1"
+            data-testid="pos-topbar-staff"
           >
-            {(dealerQ.data?.name || userEmail || "··").slice(0, 2).toUpperCase()}
+            <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-semibold">
+              {initials}
+            </span>
+            <span className="hidden md:block leading-tight text-left">
+              <span className="block text-[12px] font-semibold text-base-900">{displayName}</span>
+              <span className="block text-[10px] uppercase tracking-wide text-base-400">
+                {roleLabel}
+              </span>
+            </span>
           </Link>
+          <button onClick={handleExit} className="btn-ghost text-[12px]" data-testid="pos-exit">
+            Exit
+          </button>
         </div>
       </header>
 
@@ -629,6 +735,17 @@ export default function DealerPos({
                 salespersons={salespersons}
                 catalog={catalogQ.data}
                 minLeadDays={minLeadDays}
+                onBackToCart={() => setStep(1)}
+                dealerPick={
+                  internalPicksDealer
+                    ? {
+                        dealers: pickableDealers,
+                        loading: principalDealersQ.isLoading,
+                        value: draft.actingDealerId ?? null,
+                        onPick: pickDealer,
+                      }
+                    : undefined
+                }
               />
             ) : (
               <CenterMessage>
@@ -648,6 +765,8 @@ export default function DealerPos({
           </div>
         )}
       </main>
+
+      {quotesOpen && <QuotesDrawer onLoad={handleLoadQuote} onClose={() => setQuotesOpen(false)} />}
 
       {/* Footer — steps 2 + 3 only (step 1 advances via the cart). */}
       {!submitted && step !== 1 && (
@@ -681,9 +800,11 @@ export default function DealerPos({
                   </button>
                   {!customerReady && (
                     <span className="text-[11px] text-base-500 italic">
-                      {step1Valid(draft)
-                        ? step3DateFirstIssue(draft, minLeadDays)
-                        : `Missing: ${step1FirstIssue(draft)}`}
+                      {!effectiveDealerId
+                        ? "Missing: Sale info — pick a Dealer"
+                        : step1Valid(draft)
+                          ? step3DateFirstIssue(draft, minLeadDays)
+                          : `Missing: ${step1FirstIssue(draft)}`}
                     </span>
                   )}
                 </div>
