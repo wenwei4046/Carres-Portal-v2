@@ -483,26 +483,28 @@ export function PaymentControlFields({
   receiptMeta?: { orderCode: string; customerName: string };
 }) {
   const { draft, set } = form;
-  // Bill = operator-keyed invoice / owing amount (balance); falls back to the
-  // computed line total for native orders.
-  const bill = draft.balance.trim() ? Number(draft.balance) : total;
+  // Operation has NO Bill/Total (Jess 2026-07-02): AutoCount + Master carry only the
+  // OUTSTANDING owed, if any (the total bill surfaces in a future non-operation panel).
+  // So `balance` IS the amount owed; payments in the ledger reduce it. No `total` fallback.
+  const owing = draft.balance.trim() ? Number(draft.balance) : 0;
+  void total;
   return (
     <div data-testid="payment-summary">
-      <FieldRow label="Bill">
+      <FieldRow label="Owing (RM)">
         <input
           type="number"
           min={0}
           value={draft.balance}
           onChange={(e) => set("balance", e.target.value)}
-          placeholder={total > 0 ? `${total} (from items)` : "key invoice total"}
+          placeholder="amount owed (from import)"
           className={CELL}
         />
       </FieldRow>
-      <DueDateRow form={form} bill={bill} orderId={orderId} />
+      <DueDateRow form={form} bill={owing} orderId={orderId} />
       {orderId ? (
-        <PaymentLedger orderId={orderId} bill={bill} receiptMeta={receiptMeta} />
+        <PaymentLedger orderId={orderId} bill={owing} receiptMeta={receiptMeta} />
       ) : (
-        <LegacyPaidOutstanding form={form} paid={paid} bill={bill} />
+        <LegacyPaidOutstanding form={form} paid={paid} bill={owing} />
       )}
       <FieldRow label="Pay status">
         <select
@@ -631,6 +633,17 @@ function PaymentLedger({
   );
   const hasBill = bill > 0;
   const settled = hasBill && summary.outstanding <= 0;
+  const paidSoFar = summary.byKind.payment + summary.byKind.deposit;
+  // Auto status pill (Jess 2026-07-02): Paid (cleared) · Partial (some paid) ·
+  // Owing (nothing paid yet) · —(nothing owed). The red "On hold" comes from the
+  // delivery gate in the panel header, not here.
+  const status = !hasBill
+    ? { t: "—", c: "pill-neutral" }
+    : settled
+      ? { t: "Paid", c: "pill-confirmed" }
+      : paidSoFar > 0
+        ? { t: "Partial", c: "pill-warning" }
+        : { t: "Owing", c: "pill-neutral" };
 
   const record = useRecordPayment(orderId, {
     onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
@@ -641,8 +654,29 @@ function PaymentLedger({
   const [adding, setAdding] = useState(false);
 
   return (
-    <FieldRow label="Payments">
+    <FieldRow label="Balance">
       <div className="px-1.5 py-1.5 w-full space-y-1.5">
+        {/* Outstanding headline + auto status (Jess 2026-07-02). */}
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <div className="text-[9px] uppercase tracking-[0.05em] text-base-400">
+              Outstanding
+            </div>
+            <div
+              className={`font-mono text-[18px] font-semibold leading-tight ${
+                !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
+              }`}
+            >
+              {!hasBill ? "—" : settled ? "Settled" : RM(summary.outstanding)}
+            </div>
+          </div>
+          <span className={`pill ${status.c} mb-0.5`}>{status.t}</span>
+        </div>
+        {hasBill && (
+          <div className="text-[10px] text-base-500">
+            Paid {RM(paidSoFar)} of {RM(bill)} owed
+          </div>
+        )}
         {isLoading && <div className="text-[11px] text-base-400">Loading…</div>}
         {!isLoading && payments.length === 0 && (
           <div className="text-[11px] text-base-400">No payments recorded yet.</div>
@@ -671,20 +705,9 @@ function PaymentLedger({
             onClick={() => setAdding(true)}
             className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
           >
-            <Plus size={12} strokeWidth={2.5} /> Add payment
+            <Plus size={12} strokeWidth={2.5} /> Record payment
           </button>
         )}
-
-        <div className="flex items-center justify-between border-t border-base-100 pt-1.5 mt-1.5 text-[12px]">
-          <span className="text-base-500">Paid {RM(summary.byKind.payment + summary.byKind.deposit)}</span>
-          <span
-            className={`font-mono font-semibold ${
-              !hasBill ? "text-base-400" : settled ? "text-success" : "text-primary"
-            }`}
-          >
-            {!hasBill ? "—" : settled ? "Settled" : RM(summary.outstanding)}
-          </span>
-        </div>
       </div>
     </FieldRow>
   );

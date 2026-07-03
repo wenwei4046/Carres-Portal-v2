@@ -75,9 +75,17 @@ function renderPieces(props: {
   paid: number;
   total: number;
   orderId?: string;
+  balance?: number;
   payments?: TestLedgerRow[];
 }) {
-  controlState = { data: { control: null }, isLoading: false };
+  // Operation tracks the imported OWING amount (ops_order_control.balance), not a
+  // bill/total — so a test that wants an outstanding keys a `balance`.
+  controlState = {
+    data: {
+      control: props.balance != null ? ({ balance: props.balance } as never) : null,
+    },
+    isLoading: false,
+  };
   paymentsState = { data: { payments: props.payments ?? [] }, isLoading: false };
   return render(<Harness paid={props.paid} total={props.total} orderId={props.orderId} />);
 }
@@ -90,17 +98,17 @@ describe("Order-control form pieces — split field groups", () => {
     }
   });
 
-  it("shows Total / Paid / Outstanding from real order money while owing", () => {
-    renderPieces({ paid: 500, total: 2000 });
+  it("shows Owing / Paid / Outstanding from the imported balance while owing", () => {
+    renderPieces({ paid: 500, total: 2000, balance: 2000 });
     const summary = screen.getByTestId("payment-summary");
-    expect(within(summary).getByText("Bill")).toBeInTheDocument();
-    // Outstanding = Bill (falls back to total 2000) − Paid (deposit 500) = 1500.
+    expect(within(summary).getByText("Owing (RM)")).toBeInTheDocument();
+    // Outstanding = owing 2000 − Paid (deposit 500) = 1500.
     expect(within(summary).getByText("RM 1,500")).toBeInTheDocument();
     expect(within(summary).queryByText("Settled")).not.toBeInTheDocument();
   });
 
-  it("collapses Outstanding to 'Settled' once paid covers the total", () => {
-    renderPieces({ paid: 2000, total: 2000 });
+  it("collapses Outstanding to 'Settled' once paid covers the owing", () => {
+    renderPieces({ paid: 2000, total: 2000, balance: 2000 });
     const summary = screen.getByTestId("payment-summary");
     expect(within(summary).getByText("Settled")).toBeInTheDocument();
   });
@@ -125,6 +133,7 @@ describe("PaymentControlFields — ledger (with orderId)", () => {
     renderPieces({
       paid: 0,
       total: 5000,
+      balance: 5000,
       orderId: ID,
       payments: [
         { id: "p1", amount: 1000, kind: "deposit", method: "cash", paid_on: "2026-06-20", receipt_no: "R1-1" },
@@ -133,8 +142,8 @@ describe("PaymentControlFields — ledger (with orderId)", () => {
       ],
     });
     const summary = screen.getByTestId("payment-summary");
-    // The ledger block renders + the add-payment entry point.
-    expect(within(summary).getByText("Add payment")).toBeInTheDocument();
+    // The ledger block renders + the record-payment entry point.
+    expect(within(summary).getByText("Record payment")).toBeInTheDocument();
     expect(within(summary).getByText(/R1-1/)).toBeInTheDocument();
     // Outstanding = bill 5000 − goods (1000 + 1500) = 2500; storage excluded.
     expect(within(summary).getByText("RM 2,500")).toBeInTheDocument();

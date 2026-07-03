@@ -646,11 +646,18 @@ function DrawerBody({
             .slice(0, 10),
         )
       : null;
-  const paymentSummary = !hasTotal
-    ? `${RM(Number(order.paid || 0))} paid`
-    : outstanding <= 0
-      ? "Settled"
-      : `${RM(outstanding)} owing`;
+  // Header summary = the OWING amount (Jess: operation tracks outstanding, not a
+  // bill). Prefer the operator/import-keyed control balance; else the derived
+  // outstanding; never show "RM 0 paid" (that read as settled when it wasn't).
+  const controlOwing = form.draft.balance.trim() ? Number(form.draft.balance) : 0;
+  const paymentSummary =
+    controlOwing > 0
+      ? `${RM(controlOwing)} owing`
+      : hasTotal
+        ? outstanding <= 0
+          ? "Settled"
+          : `${RM(outstanding)} owing`
+        : "No balance";
 
   // Readiness per goods line (locked vocab): Ready (free stock ≥ qty) → Waiting
   // (a PO is raised for the sku) → No PO (nothing yet). Service lines carry no
