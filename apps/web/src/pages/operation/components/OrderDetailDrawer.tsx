@@ -583,7 +583,12 @@ function DrawerBody({
   // new placed/confirmed enum values without falling through to a
   // bogus in_production default.
   const stage: OperationStage = (() => {
-    if (order.status === "place") return "placed";
+    // AutoCount-imported orders arrive ALREADY proceeded — they carry a PO, so
+    // they are NEVER "placed / waiting for the dealer to push" (Jess 2026-07-02,
+    // project-order-lifecycle-flow: "the 'waiting for dealer' copy is WRONG for
+    // these"). Only a native dealer/POS order sits at 'placed'.
+    const autocount = order.source_system === "autocount";
+    if (order.status === "place" && !autocount) return "placed";
     if (order.operation_stage) return order.operation_stage as OperationStage;
     if (order.status === "delivered") return "delivered";
     return "in_production";
@@ -1710,11 +1715,17 @@ function ActionBar({
   if (stage === "in_production") {
     return (
       <div>
-        <div className="text-[12px] text-warning mb-2 font-body">
-          Waiting on stock for {shortageCount} line{shortageCount === 1 ? "" : "s"}.
-          When the supplier DO arrives, mark the PO as received in <strong>Procurement</strong>{" "}
-          — or transfer manually if stock is already on-hand.
-        </div>
+        {shortageCount > 0 ? (
+          <div className="text-[12px] text-warning mb-2 font-body">
+            Waiting on stock for {shortageCount} line{shortageCount === 1 ? "" : "s"}.
+            When the supplier DO arrives, mark the PO as received in <strong>Procurement</strong>{" "}
+            — or transfer manually if stock is already on-hand.
+          </div>
+        ) : (
+          <div className="text-[12px] text-base-700 mb-2 font-body">
+            Proceeded — stock is on-hand. Transfer to ready, then dispatch.
+          </div>
+        )}
         <div className="flex gap-2 flex-wrap">
           <button
             type="button"

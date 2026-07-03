@@ -1923,6 +1923,8 @@ export interface operationOrderDetailOrder {
   so: number;
   /** Customer/source reference(s), e.g. ["DL0584"] — shown next to the SO. */
   source_ref: string[] | null;
+  /** 'autocount' for imported orders (already proceeded — never "placed"). */
+  source_system?: string | null;
   status: string;
   operation_stage:
     | "placed"
