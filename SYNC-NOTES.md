@@ -7,6 +7,29 @@
 
 ---
 
+## 2026-07-05 — POS prototype program: configurator + Order Status (PRs #51-#53)
+
+Three slices, merged + deployed (web Pages `caefea95`, bundle `index-BF-4hRJF.js`;
+NO api change, NO migration):
+
+1. **PR #51** — mattress/bedframe now jump into a FULL-PAGE configurator
+   (`pos/PosConfigurePage.tsx`, design `prototype/pos-configurator.jsx`): plan-view
+   canvas + cfg-* controls + live-total header. **The drawer stays** for
+   accessory/pillow/dropdown-sofa/service. DraftLine emit byte-identical.
+   ⚠ The `.pos-proto` button/input CSS reset is now `:where()`-wrapped (element-level
+   specificity) — do NOT re-raise it; single-class prototype rules must win.
+2. **PR #52** — `SofaConfigurePage` + `SofaBuildCanvas` re-skinned (`sof-qp` rail+hero
+   quick pick, `sof-cv` room/grid/dim-callouts/tool-pill). Geometry/pricing untouched.
+3. **PR #53** — **Order Status** board behind the POS "My orders" pill
+   (`pos/OrderStatusPage.tsx`): PIN gate (**227737** = CARRES on the keypad),
+   revenue summary, 3 lanes, card → the existing `DealerOrderDetail` overlay.
+   Principal's pill still links to the portal orders tab.
+
+If your branch touches `CatalogStep` / `SofaConfigurePage` / `SofaBuildCanvas` /
+`DealerPos` / `pos-prototype.css`: rebase and take these shapes.
+
+— from the POS-prototype session (Loo's machine)
+
 ## 2026-07-03 — POS 2990s-parity program (branch `feat/pos-2990s-parity`, PR #47)
 
 Five slices, one branch. **⚠ migration 0200 must be applied BEFORE this deploys**
