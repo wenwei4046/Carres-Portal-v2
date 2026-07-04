@@ -100,6 +100,9 @@ export const orderSchema = z.object({
   approvalCode: z.string().nullable(),
   installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
   operationStage: operationStageSchema.nullable(),
+  // Origin marker — 'autocount' for imported legacy rows (null = native).
+  // Optional so responses fetched before the field existed still parse.
+  sourceSystem: z.string().nullable().optional(),
   warehouseId: z.string().uuid().nullable(),
   deliveryPartnerId: z.string().uuid().nullable(),
   partnerStage: partnerStageSchema.nullable(),

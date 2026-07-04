@@ -557,6 +557,8 @@ export interface Order {
     | "ready_to_dispatch" | "dispatched"
     | "waiting" | "delivered"
     | null;
+  // 0132 origin marker — 'autocount' for imported legacy rows (null = native).
+  sourceSystem: string | null;
   warehouseId: string | null;
   deliveryPartnerId: string | null;
   partnerStage: "assigned" | "picked_from_wh" | "en_route" | "delivered" | null;

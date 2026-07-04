@@ -82,11 +82,15 @@ export function MattressConfigurator({
   skus,
   specialAddons,
   onAdd,
+  variantLabel = "Size",
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
   specialAddons?: SpecialAddonDto[] | null;
   onAdd: (line: DraftLine) => void;
+  /** Field caption for the variant axis — "Size" for a mattress; an accessory
+   *  reuses this generic pick-variant + qty configurator as "Option". */
+  variantLabel?: string;
 }) {
   const [skuId, setSkuId] = useState<string>("");
   const [qty, setQty] = useState(1);
@@ -110,13 +114,13 @@ export function MattressConfigurator({
 
   return (
     <div className="flex flex-col gap-5">
-      <FieldLabel label="Size">
+      <FieldLabel label={variantLabel}>
         <select
           value={skuId}
           onChange={(e) => setSkuId(e.target.value)}
           className={selectClass()}
         >
-          <option value="">— pick size —</option>
+          <option value="">— pick {variantLabel.toLowerCase()} —</option>
           {skus.map((s) => (
             <option key={s.id} value={s.id}>
               {s.variant} · RM {s.price.toLocaleString()}
@@ -474,6 +478,19 @@ export function ConfiguratorForModel({
 }) {
   if (model.category === "mattress") {
     return <MattressConfigurator model={model} skus={skus} specialAddons={specialAddons} onAdd={onAdd} />;
+  }
+  if (model.category === "accessory") {
+    // Accessories are POS cards too (2990s parity) — the generic pick-variant
+    // + qty configurator fits them as-is; only the caption changes.
+    return (
+      <MattressConfigurator
+        model={model}
+        skus={skus}
+        specialAddons={specialAddons}
+        onAdd={onAdd}
+        variantLabel="Option"
+      />
+    );
   }
   if (model.category === "bedframe") {
     return <BedframeConfigurator model={model} skus={skus} specialAddons={specialAddons} onAdd={onAdd} />;

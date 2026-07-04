@@ -13,7 +13,7 @@ import type {
   SofaCompartmentDto,
   SofaFabricDto,
 } from "@carres/shared";
-import { findModule, moduleFootprint, ROOM_H } from "@carres/shared";
+import { analyzeSofa, findModule, groupSofas, moduleFootprint, ROOM_H } from "@carres/shared";
 import type { DraftLine } from "../new-order/draft";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
@@ -41,23 +41,93 @@ interface QuickPick {
   priceLabel: string;
 }
 
-/** Lay a combo's modules flush left→right (tops aligned) at default depth. */
-export function comboSeedCells(
-  combo: SofaComboDto,
-  depth: string,
-): Array<{ moduleCode: string; x: number; y: number; rot: Rot }> {
-  const cells: Array<{ moduleCode: string; x: number; y: number; rot: Rot }> = [];
+type SeedCell = { moduleCode: string; x: number; y: number; rot: Rot };
+
+const SEED_ROTS: Rot[] = [0, 90, 180, 270];
+
+/** One flush left→right run (tops aligned) at default depth. */
+function seedStraight(codes: string[], depth: string): SeedCell[] {
+  const cells: SeedCell[] = [];
   let x = 60;
   let y: number | null = null;
-  for (const slot of combo.slots) {
-    const code = slot[0];
-    if (!code) continue;
+  for (const code of codes) {
     const fp = moduleFootprint(findModule(code) ?? { w: 95, d: 95, cushions: 0 }, 0, depth);
     if (y === null) y = Math.max(20, ROOM_H / 2 - fp.h / 2);
     cells.push({ moduleCode: code, x, y, rot: 0 });
     x += fp.w;
   }
   return cells;
+}
+
+/** An L arrangement: run east up to (and incl.) the corner, then stack the
+ *  tail SOUTH below the corner — corner + tail rotations are parameters. */
+function seedTurned(
+  codes: string[],
+  cornerIdx: number,
+  cornerRot: Rot,
+  tailRot: Rot,
+  depth: string,
+): SeedCell[] {
+  const cells: SeedCell[] = [];
+  let x = 60;
+  const y = 60;
+  let southX = x;
+  let southY = y;
+  codes.forEach((code, i) => {
+    const mod = findModule(code) ?? { w: 95, d: 95, cushions: 0 };
+    if (i < cornerIdx) {
+      const fp = moduleFootprint(mod, 0, depth);
+      cells.push({ moduleCode: code, x, y, rot: 0 });
+      x += fp.w;
+    } else if (i === cornerIdx) {
+      const fp = moduleFootprint(mod, cornerRot, depth);
+      cells.push({ moduleCode: code, x, y, rot: cornerRot });
+      southX = x;
+      southY = y + fp.h;
+    } else {
+      const fp = moduleFootprint(mod, tailRot, depth);
+      cells.push({ moduleCode: code, x: southX, y: southY, rot: tailRot });
+      southY += fp.h;
+    }
+  });
+  return cells;
+}
+
+/** True when the cells form ONE connected sofa the arm-cap analysis accepts. */
+function seedClosed(cells: SeedCell[], depth: string): boolean {
+  const withIds = cells.map((c, i) => ({ ...c, id: `seed-${i}` }));
+  const groups = groupSofas(withIds, depth);
+  return groups.length === 1 && analyzeSofa(groups[0], depth).closed;
+}
+
+/**
+ * Lay a combo's modules onto the canvas. Straight runs stay flush left→right;
+ * a combo with exactly ONE corner module gets the L treatment — the tail turns
+ * south, and we search corner/tail rotations until the SAME arm-cap analysis
+ * the canvas enforces reports a closed sofa (the seed validates itself). No
+ * closed arrangement, or 2+ corners → the straight fallback and the user
+ * rearranges on canvas.
+ */
+export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
+  const codes = combo.slots
+    .map((s) => s[0])
+    .filter((code): code is string => !!code);
+  if (codes.length === 0) return [];
+
+  const straight = seedStraight(codes, depth);
+  const cornerIdxs = codes
+    .map((c, i) => ((findModule(c)?.group ?? "") === "Corner" ? i : -1))
+    .filter((i) => i >= 0);
+  if (cornerIdxs.length !== 1 || seedClosed(straight, depth)) return straight;
+
+  const cornerIdx = cornerIdxs[0];
+  for (const cornerRot of SEED_ROTS) {
+    for (const tailRot of SEED_ROTS) {
+      const turned = seedTurned(codes, cornerIdx, cornerRot, tailRot, depth);
+      if (seedClosed(turned, depth)) return turned;
+    }
+  }
+  return straight;
 }
 
 function priceLabelOf(combo: SofaComboDto): string {

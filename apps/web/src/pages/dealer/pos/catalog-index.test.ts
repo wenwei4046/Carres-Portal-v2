@@ -40,11 +40,12 @@ function catalogWithTiers(): CatalogResponse {
 const CONFIG: FabricTierGlobalConfig = { sofaTier2Delta: 100, sofaTier3Delta: 200 };
 
 describe("buildCatalogIndex", () => {
-  it("includes only mattress/bedframe/sofa models with ≥1 sku", () => {
+  it("includes card categories (accessory too, 2990s parity) with ≥1 sku", () => {
     const idx = buildCatalogIndex(catalog());
     const ids = idx.productModels.map((m) => m.id).sort();
-    // m-acc (accessory) excluded; m-empty (no skus) excluded.
-    expect(ids).toEqual(["m-mat", "m-sofa"]);
+    // m-empty (no skus) excluded; service models never become cards.
+    expect(ids).toEqual(["m-acc", "m-mat", "m-sofa"]);
+    expect(idx.meta.get("m-acc")!.optionNoun).toBe("option");
   });
 
   it("computes from-price as the cheapest sku for mattress", () => {

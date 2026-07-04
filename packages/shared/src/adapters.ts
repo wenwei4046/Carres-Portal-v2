@@ -526,6 +526,8 @@ export const orderFromRow = (
   approvalCode: r.approval_code ?? null,
   installmentMonths: r.installment_months ?? null,
   operationStage: r.operation_stage,
+  // 0132 import marker. `?? null` keeps pre-0132 rows adapting cleanly.
+  sourceSystem: r.source_system ?? null,
   warehouseId: r.warehouse_id,
   deliveryPartnerId: r.delivery_partner_id,
   partnerStage: r.partner_stage,

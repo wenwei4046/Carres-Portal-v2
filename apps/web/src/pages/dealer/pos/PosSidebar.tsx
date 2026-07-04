@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
-export type RailKey = "all" | "mattress" | "bedframe" | "sofa" | "addons";
+export type RailKey = "all" | "mattress" | "bedframe" | "sofa" | "accessory" | "addons";
 
 export interface RailEntry {
   key: RailKey;
@@ -36,6 +36,7 @@ const RAIL_ICON: Record<RailKey, LucideIcon> = {
   mattress: BedDouble,
   sofa: Sofa,
   bedframe: Bed,
+  accessory: Lamp,
   addons: Lamp,
 };
 

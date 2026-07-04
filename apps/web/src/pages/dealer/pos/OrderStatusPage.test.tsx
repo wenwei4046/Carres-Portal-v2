@@ -92,6 +92,8 @@ describe("helpers", () => {
     expect(laneOf("cancelled")).toBeNull();
     // A 'place' order operation already picked up moves to the Proceed lane.
     expect(laneOf("place", "in_production")).toBe("proceed");
+    // AutoCount imports enter the pipeline already proceeded (ops-grid rule).
+    expect(laneOf("place", null, "autocount")).toBe("proceed");
   });
 
   it("sumRevenue totals products / collected / outstanding", () => {

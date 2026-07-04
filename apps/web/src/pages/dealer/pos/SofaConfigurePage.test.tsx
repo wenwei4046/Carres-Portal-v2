@@ -14,7 +14,7 @@ import type {
   SofaCompartmentDto,
   SofaFabricDto,
 } from "@carres/shared";
-import { findModule, moduleFootprint } from "@carres/shared";
+import { analyzeSofa, findModule, groupSofas, moduleFootprint } from "@carres/shared";
 import SofaConfigurePage, { comboSeedCells } from "./SofaConfigurePage";
 
 beforeAll(() => {
@@ -97,6 +97,18 @@ describe("comboSeedCells", () => {
     expect(cells[1].x - cells[0].x).toBe(fp0.w); // flush — no gap
     expect(cells[1].y).toBe(cells[0].y); // tops aligned
     expect(cells.every((c) => c.rot === 0)).toBe(true);
+  });
+
+  it("a single-corner combo seeds as an L the arm-cap analysis accepts", () => {
+    const cornerCombo: SofaComboDto = {
+      ...COMBO,
+      slots: [["1B(LHF)"], ["CNR"], ["2A(RHF)"]],
+    };
+    const cells = comboSeedCells(cornerCombo, "24");
+    const withIds = cells.map((c, i) => ({ ...c, id: String(i) }));
+    const groups = groupSofas(withIds, "24");
+    expect(groups).toHaveLength(1); // one connected sofa
+    expect(analyzeSofa(groups[0], "24").closed).toBe(true); // no arm collision
   });
 });
 
