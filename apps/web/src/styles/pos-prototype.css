@@ -2094,4 +2094,1090 @@
   .cfg-header__totalNote { display: none; }
 }
 
+
+/* ============================================================
+   SOFA FLOW — depth picker · quick pick · customize canvas
+   (design: pos-sofa-config.jsx)
+   ============================================================ */
+/* ========= Sofa custom flow (depth → quick / customize) ========= */
+.sof-flow {
+  display: flex; flex-direction: column;
+  height: 100%; min-height: 0;
+  background: var(--pos-bg, #faf7f1);
+}
+
+/* ── Depth picker ─────────────────────────────────────────── */
+.sof-depth {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center;
+  padding: 32px 40px;
+  gap: 24px;
+}
+.sof-depth__head { text-align: center; max-width: 56ch; }
+.sof-depth__title {
+  font-family: var(--font-title); font-weight: 700;
+  font-size: 32px; letter-spacing: -0.015em; line-height: 1.1;
+  margin: 8px 0 8px;
+}
+.sof-depth__body { font-size: 14px; color: var(--fg-muted); line-height: 1.5; }
+.sof-depth__cards {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+  width: 100%; max-width: 720px;
+}
+.sof-depth__card {
+  position: relative;
+  display: flex; flex-direction: column;
+  padding: 20px;
+  background: var(--pos-panel, #fff);
+  border: 1.5px solid var(--line);
+  border-radius: 18px;
+  cursor: pointer;
+  transition: 160ms ease;
+  text-align: left;
+}
+.sof-depth__card:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+.sof-depth__card.is-on {
+  border-color: var(--c-orange);
+  box-shadow: 0 0 0 3px rgba(232,107,58,0.16);
+}
+.sof-depth__diagram {
+  height: 76px; display: flex; flex-direction: column; gap: 6px;
+  align-items: center; justify-content: center;
+  padding: 12px 16px;
+  background: var(--pos-rail, #f3efe7);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+.sof-depth__cushion {
+  height: 26px;
+  background: linear-gradient(180deg, #d8cdb8 0%, #c0b39a 100%);
+  border-radius: 6px 6px 4px 4px;
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,0.08);
+}
+.sof-depth__ruler {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted);
+  letter-spacing: 0.04em;
+}
+.sof-depth__rulerTick { width: 16px; height: 1px; background: var(--fg-muted); opacity: 0.5; }
+.sof-depth__cardBody { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.sof-depth__cardLabel {
+  font-family: var(--font-mark); font-weight: 900; font-stretch: 80%;
+  font-size: 28px; letter-spacing: -0.02em;
+  color: var(--c-burnt);
+}
+.sof-depth__cardSub { font-size: 12px; color: var(--fg-muted); }
+.sof-depth__check {
+  position: absolute; top: 14px; right: 14px;
+  width: 22px; height: 22px; border-radius: 99px;
+  background: var(--c-orange); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  opacity: 0; transform: scale(0.7); transition: 160ms ease;
+}
+.sof-depth__card.is-on .sof-depth__check { opacity: 1; transform: scale(1); }
+.sof-depth__note {
+  font-size: 12px; color: var(--fg-muted);
+  margin-top: 4px;
+}
+.sof-depth__note strong { color: var(--c-burnt); font-family: var(--font-mark); font-weight: 900; font-stretch: 80%; }
+
+/* ── Crumb / mode tabs row (hidden — content portaled into header) ── */
+.sof-flow__crumb { display: none; }
+
+/* ── Header-portaled crumb (sits inside the configurator header) ─── */
+.sof-flow__headerCrumb {
+  display: inline-flex; align-items: center; gap: 12px;
+}
+.sof-flow__crumbBack {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  font-family: var(--font-button); font-size: 12px; font-weight: 600;
+  color: var(--fg-muted); cursor: pointer;
+  transition: 120ms ease;
+}
+.sof-flow__crumbBack:hover { border-color: var(--c-burnt); color: var(--c-burnt); }
+.sof-flow__crumbDepth {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-button); font-size: 11px; font-weight: 700;
+  color: var(--fg);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.sof-flow__crumbDot {
+  width: 8px; height: 8px; border-radius: 99px; background: var(--c-orange);
+}
+.sof-flow__modeTabs {
+  display: inline-flex; padding: 3px;
+  background: var(--pos-rail, #f3efe7);
+  border-radius: 99px;
+  gap: 2px;
+}
+.sof-flow__modeTab {
+  height: 28px; padding: 0 14px;
+  background: transparent; border: none;
+  border-radius: 99px;
+  font-family: var(--font-button); font-size: 12px; font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--fg-muted); cursor: pointer;
+  transition: 140ms ease;
+}
+.sof-flow__modeTab:hover { color: var(--fg); }
+.sof-flow__modeTab.is-on {
+  background: var(--pos-panel, #fff);
+  color: var(--c-burnt);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* ── Quick Pick ───────────────────────────────────────────── */
+.sof-qp {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 320px 1fr;
+  overflow: hidden;
+}
+.sof-qp__rail {
+  border-right: 1px solid var(--line);
+  background: var(--pos-panel, #fff);
+  overflow-y: auto;
+  padding: 18px 18px 24px;
+}
+.sof-qp__railHead {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.sof-qp__railDetail {
+  font-family: var(--font-sans); font-size: 11px; color: var(--fg-muted);
+  letter-spacing: 0.02em;
+}
+.sof-qp__grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.sof-qp__card {
+  position: relative;
+  display: flex; flex-direction: column;
+  padding: 12px;
+  background: var(--pos-rail, #f3efe7);
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: 140ms ease;
+  text-align: left;
+}
+.sof-qp__card:hover { border-color: var(--line-strong); }
+.sof-qp__card.is-on {
+  background: var(--pos-panel, #fff);
+  border-color: var(--c-orange);
+  box-shadow: 0 0 0 3px rgba(232,107,58,0.14);
+}
+.sof-qp__art {
+  height: 112px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 8px;
+}
+.sof-qp__art img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+  user-select: none; -webkit-user-drag: none;
+}
+.sof-qp__cardBody { display: flex; flex-direction: column; gap: 2px; }
+.sof-qp__cardLabel {
+  font-family: var(--font-title); font-weight: 700; font-size: 14px;
+  letter-spacing: -0.005em;
+}
+.sof-qp__cardSub { font-size: 11px; color: var(--fg-muted); line-height: 1.3; }
+.sof-qp__cardPrice {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  color: var(--c-burnt); letter-spacing: 0.02em;
+  margin-top: 4px;
+}
+.sof-qp__flip {
+  position: absolute; top: 8px; right: 8px;
+  display: inline-flex; padding: 2px;
+  background: var(--pos-panel, #fff);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.sof-qp__flip span {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 99px;
+  color: var(--fg-muted); font-weight: 600;
+  cursor: pointer;
+}
+.sof-qp__flip span.is-on { background: var(--c-orange); color: #fff; }
+
+.sof-qp__hero {
+  display: flex; flex-direction: column;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(0,0,0,0.03) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(0,0,0,0.03) 39px 40px),
+    var(--pos-bg, #faf7f1);
+  overflow: hidden;
+}
+.sof-qp__heroFrame {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 32px;
+}
+.sof-qp__heroFrame img {
+  max-width: 78%; max-height: 78%; object-fit: contain;
+  filter: drop-shadow(0 16px 24px rgba(60,40,20,0.12));
+  user-select: none; -webkit-user-drag: none;
+}
+.sof-qp__heroFoot {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 12px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--pos-panel, rgba(255,255,255,0.7));
+}
+.sof-qp__heroDim {
+  font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted);
+  letter-spacing: 0.04em;
+}
+
+/* ── Customize ────────────────────────────────────────────── */
+.sof-cust {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 280px 1fr;
+  overflow: hidden;
+}
+.sof-cust__palette {
+  border-right: 1px solid var(--line);
+  background: var(--pos-panel, #fff);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sof-cust__paletteHead {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 14px 16px 8px;
+}
+.sof-cust__paletteHint {
+  font-size: 11px; color: var(--fg-muted);
+}
+.sof-cust__paletteTabs {
+  display: flex; gap: 4px;
+  padding: 0 12px 8px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.sof-cust__paletteTab {
+  height: 26px; padding: 0 10px;
+  background: transparent; border: 1px solid transparent;
+  border-radius: 99px;
+  font-family: var(--font-button); font-size: 11px; font-weight: 600;
+  color: var(--fg-muted); cursor: pointer;
+  transition: 120ms ease;
+}
+.sof-cust__paletteTab:hover { color: var(--fg); }
+.sof-cust__paletteTab.is-on {
+  background: var(--c-orange); color: #fff;
+}
+.sof-cust__paletteList {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  padding: 4px 10px 16px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.sof-cust__paletteGroup {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.sof-cust__paletteGroupHead {
+  position: sticky; top: 0;
+  padding: 8px 6px 4px;
+  background: linear-gradient(180deg, var(--pos-panel, #fff) 70%, transparent 100%);
+  font-family: var(--font-button); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--c-burnt);
+  z-index: 1;
+}
+.sof-cust__paletteItem {
+  display: grid; grid-template-columns: 84px 1fr auto;
+  align-items: center; gap: 10px;
+  padding: 8px 10px;
+  background: var(--pos-rail, #f3efe7);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 120ms ease;
+  text-align: left;
+}
+.sof-cust__paletteItem:hover {
+  border-color: var(--c-orange);
+  background: var(--pos-panel, #fff);
+}
+.sof-cust__paletteArt {
+  width: 84px; height: 66px;
+  display: flex; align-items: center; justify-content: center;
+}
+.sof-cust__paletteArt img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+  user-select: none; -webkit-user-drag: none;
+}
+.sof-cust__paletteInfo { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sof-cust__paletteLabel {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.04em; color: var(--fg);
+}
+.sof-cust__paletteSub {
+  font-size: 11px; color: var(--fg-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sof-cust__palettePrice {
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+  color: var(--c-burnt); letter-spacing: 0.02em;
+  margin-top: 1px;
+}
+.sof-cust__paletteAdd {
+  width: 22px; height: 22px; border-radius: 99px;
+  background: var(--c-orange); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; line-height: 1;
+}
+
+.sof-cust__canvas {
+  display: flex; flex-direction: column;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(0,0,0,0.03) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(0,0,0,0.03) 39px 40px),
+    var(--pos-bg, #faf7f1);
+  overflow: hidden;
+}
+.sof-cust__canvasHead {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--pos-panel, rgba(255,255,255,0.7));
+}
+.sof-cust__canvasTitle {
+  font-family: var(--font-title); font-weight: 700; font-size: 20px;
+  letter-spacing: -0.01em; line-height: 1.2;
+  margin-top: 2px;
+}
+.sof-cust__canvasFootprint {
+  font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted);
+  font-weight: 400; letter-spacing: 0.04em;
+}
+.sof-cust__canvasTools { display: inline-flex; align-items: center; gap: 12px; }
+.sof-cust__bundlePill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  background: var(--c-burnt); color: #FFF9EB;
+  border-radius: 99px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  cursor: help;
+}
+.sof-cust__bundlePill__dot {
+  width: 6px; height: 6px; border-radius: 99px;
+  background: #FFF9EB;
+  box-shadow: 0 0 0 3px rgba(255,249,235,0.3);
+}
+.sof-cust__multiPill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  background: #1F2937; color: #F9FAFB;
+  border-radius: 99px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: help;
+}
+.sof-cust__multiPill__dot {
+  width: 6px; height: 6px; border-radius: 99px;
+  background: #FFF9EB;
+  box-shadow: 0 0 0 3px rgba(255,249,235,0.3);
+}
+.sof-cust__notMatchPill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  background: #DC2626; color: #FFF;
+  border-radius: 99px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: help;
+  animation: notMatchPulse 1.6s ease-in-out infinite;
+}
+.sof-cust__notMatchPill__dot {
+  width: 6px; height: 6px; border-radius: 99px;
+  background: #FFF;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
+}
+@keyframes notMatchPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  50%      { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+}
+
+/* Module in violation — red outline on canvas */
+.sof-cv__mod.is-violation {
+  outline: 2px solid #DC2626;
+  outline-offset: -2px;
+  border-radius: 4px;
+  animation: notMatchPulse 1.6s ease-in-out infinite;
+}
+
+/* Floating "Not Match" red label between violating modules */
+.sof-cv__notMatch {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: #DC2626; color: #FFF;
+  border-radius: 99px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35), 0 0 0 2px #FFF;
+  pointer-events: auto;
+  z-index: 4;
+  animation: notMatchPulse 1.6s ease-in-out infinite;
+}
+.sof-cv__notMatch__icon { font-size: 11px; }
+.sof-cust__canvasDepth {
+  font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted);
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border: 1px solid var(--line); border-radius: 99px;
+}
+.sof-cust__lengthPill {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  padding: 5px 12px;
+  background: var(--c-burnt); color: #fff;
+  border-radius: 99px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.sof-cust__lengthPill__num {
+  font-size: 14px; font-weight: 700;
+}
+.sof-cust__lengthPill__unit {
+  font-size: 10px; font-weight: 600; opacity: 0.78;
+  text-transform: lowercase;
+}
+.sof-cust__lengthPill__sep {
+  font-size: 11px; opacity: 0.6; padding: 0 1px;
+}
+.sof-cust__clear {
+  height: 30px; padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  font-family: var(--font-button); font-size: 11px; font-weight: 600;
+  color: var(--fg-muted); cursor: pointer;
+  transition: 120ms ease;
+}
+.sof-cust__clear:hover { color: var(--c-burnt); border-color: var(--c-burnt); }
+
+.sof-cust__stage {
+  flex: 1; min-height: 0;
+  overflow: hidden;
+  display: flex; align-items: stretch; justify-content: stretch;
+  padding: 0;
+  position: relative;
+}
+.sof-cust__empty {
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  color: var(--fg-muted);
+}
+.sof-cust__empty--overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+.sof-cust__emptyDot {
+  width: 56px; height: 56px; border-radius: 99px;
+  border: 1.5px dashed var(--line-strong);
+}
+.sof-cust__emptyTitle {
+  font-family: var(--font-title); font-weight: 700; font-size: 18px;
+  color: var(--fg);
+}
+.sof-cust__emptyBody { font-size: 13px; line-height: 1.6; }
+
+/* ─── Canvas (room with TV anchor) ─────────────────────────────── */
+.sof-cv {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+.sof-cv__room {
+  position: relative;
+  background: #FAF6EC;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sof-cv__room--fill {
+  flex: 1; min-height: 0;
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.sof-cv__grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(34,31,32,0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34,31,32,0.05) 1px, transparent 1px);
+  pointer-events: none;
+}
+
+/* Grid scale legend — bottom-right corner of the canvas */
+.sof-cv__gridLegend {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 8px;
+  background: rgba(255, 252, 245, 0.92);
+  border: 1px solid rgba(34, 31, 32, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(34, 31, 32, 0.06);
+  pointer-events: none;
+  z-index: 3;
+  backdrop-filter: blur(2px);
+}
+.sof-cv__gridLegendSwatch {
+  flex-shrink: 0;
+  background-image:
+    linear-gradient(to right, rgba(34,31,32,0.18) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34,31,32,0.18) 1px, transparent 1px);
+  background-size: 100% 100%;
+  border: 1px solid rgba(34, 31, 32, 0.35);
+  border-radius: 2px;
+  background-color: #FAF6EC;
+}
+.sof-cv__gridLegendText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1;
+}
+.sof-cv__gridLegendLabel {
+  font-family: var(--font-button, 'Raleway', sans-serif);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(34, 31, 32, 0.55);
+}
+.sof-cv__gridLegendValue {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: #221F20;
+  letter-spacing: 0.02em;
+}
+
+/* TV anchor */
+.sof-cv__tv {
+  position: absolute;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #221F20;
+  border-radius: 4px;
+  box-shadow: 0 6px 14px rgba(34,31,32,0.18);
+  pointer-events: none;
+}
+.sof-cv__tvScreen {
+  position: absolute; inset: 4px;
+  background: linear-gradient(180deg, #2a4356 0%, #1a2a35 100%);
+  border-radius: 2px;
+}
+.sof-cv__tvLabel {
+  position: relative;
+  font-family: var(--font-button, sans-serif);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.18em; color: #FFF9EB;
+  text-transform: uppercase;
+}
+.sof-cv__tvBeam {
+  position: absolute;
+  width: 0; height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 10px solid var(--c-orange, #E86B3A);
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* A placed module */
+.sof-cv__mod {
+  position: absolute;
+  cursor: grab;
+  touch-action: none;
+}
+.sof-cv__mod:active { cursor: grabbing; }
+.sof-cv__mod.is-selected { z-index: 5; }
+.sof-cv__mod.is-selected::after {
+  content: '';
+  position: absolute; inset: -4px;
+  border: 2px solid var(--c-orange, #E86B3A);
+  border-radius: 6px;
+  pointer-events: none;
+}
+/* Group selection — softer dashed orange tint on each member */
+.sof-cv__mod.is-group-selected { z-index: 4; }
+.sof-cv__mod.is-group-selected::after {
+  content: '';
+  position: absolute; inset: -2px;
+  border: 1.5px dashed rgba(232,107,58,0.55);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Closed-sofa group outline — clickable hit-target around the whole sofa.
+   Inactive: subtle hover affordance + 'Whole sofa' badge.
+   Active:   orange dashed frame + group tools rail. */
+.sof-cv__groupOutline {
+  position: absolute;
+  border: 1.5px dashed transparent;
+  border-radius: 8px;
+  z-index: 2;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.sof-cv__groupOutline:hover:not(.is-active) {
+  border-color: rgba(34,31,32,0.18);
+  background: rgba(232,107,58,0.04);
+}
+.sof-cv__groupOutline.is-active {
+  border-color: var(--c-orange, #E86B3A);
+  background: rgba(232,107,58,0.06);
+  cursor: default;
+  pointer-events: none;            /* let modules inside receive drags */
+  z-index: 6;
+}
+.sof-cv__groupOutline.is-active .sof-cv__groupTools { pointer-events: auto; }
+.sof-cv__groupBadge {
+  position: absolute;
+  top: -10px; left: 10px;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  font-size: 10px; font-weight: 600;
+  color: var(--fg-muted);
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  white-space: nowrap;
+}
+.sof-cv__groupOutline:hover .sof-cv__groupBadge { opacity: 1; }
+.sof-cv__groupTools {
+  position: absolute;
+  top: -34px; left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 6px 4px 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+  white-space: nowrap;
+  z-index: 8;
+}
+.sof-cv__groupTools__label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600;
+  color: var(--c-orange, #E86B3A);
+  letter-spacing: 0.01em;
+}
+.sof-cv__groupTools__btn {
+  height: 24px; padding: 0 8px; min-width: 24px;
+  border-radius: 99px;
+  background: transparent; border: none;
+  font-size: 11px; font-weight: 600;
+  color: var(--fg-muted);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: 120ms ease;
+}
+.sof-cv__groupTools__btn:hover { background: var(--c-orange, #E86B3A); color: #fff; }
+.sof-cv__groupTools__btn--ghost {
+  border: 1px solid var(--line);
+}
+.sof-cv__groupTools__btn--ghost:hover {
+  background: var(--c-ink, #221F20); color: #fff; border-color: var(--c-ink, #221F20);
+}
+/* Inner art layer: native (un-rotated) w×d, centred on the cell, then
+   CSS-rotated. JS supplies width/height/left/top/transform inline. */
+.sof-cv__modArt {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+}
+.sof-cv__modArt > img {
+  position: absolute;
+  user-select: none; -webkit-user-drag: none;
+  display: block;
+  pointer-events: none;
+}
+
+.sof-cv__tools {
+  position: absolute; top: -34px; left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex; gap: 2px;
+  padding: 3px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+  z-index: 6;
+  pointer-events: auto;
+}
+.sof-cv__btn {
+  width: 28px; height: 28px; border-radius: 99px;
+  background: transparent; border: none;
+  color: var(--fg-muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: 120ms ease;
+}
+.sof-cv__btn:hover:not(:disabled) {
+  background: var(--c-orange, #E86B3A); color: #fff;
+}
+.sof-cv__btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.sof-cv__btn--del:hover { background: #B8331F; color: #fff; }
+.sof-cv__btn--recline.is-on {
+  background: var(--c-orange, #E86B3A);
+  color: #fff;
+}
+
+/* Power recliner OPEN overlay — footrest extension + safety zone.
+   Sits inside the rotated module art so it follows orientation. */
+.sof-cv__recline {
+  position: absolute;
+  pointer-events: none;
+}
+.sof-cv__reclineFootrest {
+  position: absolute; inset: 0;
+  background: #EAD6B0;                              /* soft tan, matches OPEN art */
+  border: 1.5px solid #221F20;
+  border-top: 0;                                    /* flush with seat above */
+  border-radius: 0 0 14px 14px;
+  box-shadow: inset 0 -2px 0 rgba(34,31,32,0.06);
+}
+.sof-cv__reclineFootrest::after {
+  /* dashed centre seam, like the artwork */
+  content: '';
+  position: absolute; left: 18%; right: 18%;
+  top: 50%; height: 0;
+  border-top: 1.5px dashed rgba(34,31,32,0.45);
+}
+.sof-cv__reclineSafety {
+  position: absolute; left: 0; right: 0;
+  background: rgba(232,107,58,0.08);
+  border: 1.5px dashed var(--c-orange, #E86B3A);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.sof-cv__reclineSafetyLabel {
+  font-family: var(--font-button, 'Raleway', sans-serif);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-burnt, #A6471E);
+  white-space: nowrap;
+}
+.sof-cv__reclineLabel {
+  position: absolute;
+  top: 35%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-button, 'Raleway', sans-serif);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--c-orange, #E86B3A);
+  pointer-events: none;
+}
+.sof-cv__mod.is-recline-open { z-index: 6; }
+/* Allow the footrest overlay (which sits below the seat art) to render
+   outside the rotated art container. The container clips by default. */
+.sof-cv__mod.is-recline-open .sof-cv__modArt { overflow: visible; }
+
+/* Seat-level OPEN feedback — sits ON the closed seat art so the state
+   change is impossible to miss at the click point. Now positioned per
+   seat (multi-seat modules), so left/top/width/height come inline. */
+.sof-cv__reclineSeatWash {
+  position: absolute;
+  background: rgba(232, 107, 58, 0.18);             /* orange tint */
+  border-radius: 6px;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.sof-cv__reclineSeatBadge {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 4px 9px;
+  background: var(--c-orange, #E86B3A);
+  color: #fff;
+  font-family: var(--font-button, 'Raleway', sans-serif);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(34,31,32,0.25);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Per-seat selection control — clickable region over each seat cushion
+   when the module is selected, with stacked +R / open / remove pills. */
+.sof-cv__seatCtl {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;                              /* let buttons opt in */
+}
+.sof-cv__seatCtlStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+.sof-cv__seatBtn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: #FFFCF5;
+  border: 1.5px solid var(--c-orange, #E86B3A);
+  border-radius: 999px;
+  font-family: var(--font-button, 'Raleway', sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--c-burnt, #A6471E);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(34, 31, 32, 0.18);
+  white-space: nowrap;
+  text-transform: uppercase;
+  transition: background 120ms ease, transform 120ms ease;
+}
+.sof-cv__seatBtn:hover {
+  background: var(--c-orange, #E86B3A);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.sof-cv__seatBtn--toggle.is-on {
+  background: var(--c-orange, #E86B3A);
+  color: #fff;
+}
+.sof-cv__seatBtn--add {
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  min-width: 32px;
+}
+.sof-cv__seatBtn--remove {
+  padding: 3px 8px;
+  font-size: 11px;
+  border-color: rgba(34, 31, 32, 0.35);
+  color: rgba(34, 31, 32, 0.7);
+}
+.sof-cv__seatBtn--remove:hover {
+  background: #B8331F;
+  border-color: #B8331F;
+  color: #fff;
+}
+
+.sof-cv__tag {
+  position: absolute; bottom: 4px; left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono, monospace); font-size: 10px;
+  letter-spacing: 0.04em; color: var(--fg-muted);
+  background: rgba(255,249,235,0.92);
+  padding: 2px 6px; border-radius: 99px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.sof-cv__legend {
+  position: absolute;
+  left: 16px; bottom: 12px;
+  display: flex; gap: 18px; flex-wrap: wrap;
+  font-size: 11px; color: var(--fg-muted);
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.7);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 3;
+  pointer-events: none;
+}
+.sof-cv__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sof-cv__legendDot {
+  width: 8px; height: 8px; border-radius: 99px;
+  background: var(--fg-muted);
+  display: inline-block;
+}
+.sof-cv__legendDot--tv { background: #221F20; }
+.sof-cv__legendDot--snap { background: var(--c-orange, #E86B3A); }
+
+@media (max-width: 1100px) {
+  .sof-qp { grid-template-columns: 280px 1fr; }
+  .sof-cust { grid-template-columns: 240px 1fr; }
+}
+@media (max-width: 820px) {
+  .sof-flow__headerCrumb { gap: 8px; }
+  .sof-qp { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .sof-qp__rail { border-right: none; border-bottom: 1px solid var(--line); max-height: 280px; }
+  .sof-cust { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .sof-cust__palette { border-right: none; border-bottom: 1px solid var(--line); max-height: 220px; }
+  .sof-cust__paletteList { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 8px 12px 12px; }
+  .sof-cust__paletteItem { min-width: 200px; }
+}
+
+
+/* ── Canvas dimension callouts ───────────────────────────────────── */
+/* Length (width) line above each sofa group; depth line to the right. */
+.sof-cv__dim {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+  --dim-color: #1a1714;
+  --dim-tick: 8px;
+}
+.sof-cv__dim--top {
+  height: 18px;
+  display: flex;
+  align-items: center;
+}
+.sof-cv__dim--right {
+  width: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.sof-cv__dim__line {
+  flex: 1;
+  height: 1.5px;
+  background: var(--dim-color);
+}
+.sof-cv__dim__line--v {
+  width: 1.5px;
+  height: 100%;
+  background: var(--dim-color);
+  flex: 1;
+}
+.sof-cv__dim__tick {
+  background: var(--dim-color);
+  flex-shrink: 0;
+}
+.sof-cv__dim__tick--l,
+.sof-cv__dim__tick--r {
+  width: 1.5px;
+  height: var(--dim-tick);
+}
+.sof-cv__dim__tick--t,
+.sof-cv__dim__tick--b {
+  width: var(--dim-tick);
+  height: 1.5px;
+}
+.sof-cv__dim__label {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--surface, #fff8f0);
+  color: var(--dim-color);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  line-height: 1;
+  border: 1.5px solid var(--dim-color);
+}
+.sof-cv__dim__label--v {
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.sof-cv__dim__unit {
+  font-weight: 400;
+  font-size: 10px;
+  margin-left: 2px;
+  opacity: 0.6;
+}
+
+
+/* ── Quick Pick hero dim callouts ────────────────────────────────── */
+/* Wrapper sized to the preset's plan-aspect ratio. The img fills it,
+   so dim callouts align with the actual sofa silhouette regardless
+   of available frame size. */
+.sof-qp__heroFrame {
+  /* Allow aspect-driven sizing inside */
+  position: relative;
+}
+.sof-qp__heroBox {
+  position: relative;
+  /* aspect-ratio set inline. Anchor to height so all presets display
+     at consistent vertical size; width derives from AR. Cap width too
+     so very wide presets (2S AR≈3.3) don't overflow horizontally. */
+  height: min(55cqh, calc(80cqw / var(--qp-ar, 2)));
+  width: auto;
+}
+.sof-qp__heroFrame {
+  container-type: size;
+}
+.sof-qp__heroBox img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.sof-qp__heroImgWrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.sof-qp__heroFrame img.sof-qp__heroImg {
+  position: absolute;
+  filter: drop-shadow(0 16px 24px rgba(60,40,20,0.12));
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+}
+.sof-qp__heroFrame img.sof-qp__heroImg--loading {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  position: static;
+  max-width: none;
+  max-height: none;
+}
+.sof-qp__heroDimW {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -28px;
+  width: 100%;
+}
+.sof-qp__heroDimD {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -28px;
+  height: 100%;
+}
+
 
