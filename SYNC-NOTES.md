@@ -7,7 +7,7 @@
 
 ---
 
-## 2026-07-05 — POS prototype program: configurator + Order Status (PRs #51-#53)
+## 2026-07-05 — POS prototype program: configurator + Order Status (PRs #51-#54)
 
 Three slices, merged + deployed (web Pages `caefea95`, bundle `index-BF-4hRJF.js`;
 NO api change, NO migration):
@@ -24,6 +24,13 @@ NO api change, NO migration):
    (`pos/OrderStatusPage.tsx`): PIN gate (**227737** = CARRES on the keypad),
    revenue summary, 3 lanes, card → the existing `DealerOrderDetail` overlay.
    Principal's pill still links to the portal orders tab.
+
+4. **PR #54** — accessory POS cards (rail row + generic Option configurator) ·
+   corner-combo quick-pick seeds as a self-validated L (analyzeSofa-searched
+   rotations) · `orders.sourceSystem` surfaced (shared schema/adapter/domain) so
+   AutoCount rows sit in the Order Status Proceed lane. Shared adapter changed
+   → API redeployed (`f3f741e7`); web `a78e33b8`. Prod catalog gained the 2990s
+   pilot trio: Cloud Series Mattress · Kayu Platform Bed · Pasir Wool Rug.
 
 If your branch touches `CatalogStep` / `SofaConfigurePage` / `SofaBuildCanvas` /
 `DealerPos` / `pos-prototype.css`: rebase and take these shapes.
