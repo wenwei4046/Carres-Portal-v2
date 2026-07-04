@@ -39,6 +39,7 @@ import Step3SignaturePayment from "./new-order/Step3SignaturePayment";
 import ThankYou from "./new-order/ThankYou";
 import CatalogStep from "./pos/CatalogStep";
 import CustomerStep from "./pos/CustomerStep";
+import OrderStatusPage from "./pos/OrderStatusPage";
 import OrderSummaryRail from "./pos/OrderSummaryRail";
 import QuotesDrawer from "./pos/QuotesDrawer";
 import { quoteToDraftLines, type SavedQuote } from "./pos/quotes";
@@ -123,6 +124,7 @@ export default function DealerPos({
   const [uploading, setUploading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   const [showResume, setShowResume] = useState(() => {
     const d = loadDraft();
     return !!d && draftHasContent(d);
@@ -643,16 +645,31 @@ export default function DealerPos({
             <Bookmark size={13} strokeWidth={1.75} />
             <span>Quotes</span>
           </button>
-          <Link
-            to={myOrdersHref}
-            className="topbar-pill"
-            aria-label="My orders"
-            data-testid="pos-topbar-my-orders"
-            style={{ textDecoration: "none" }}
-          >
-            <ListOrdered size={13} strokeWidth={1.75} />
-            <span>My orders</span>
-          </Link>
+          {role === "principal" ? (
+            // Principal traces orders in the portal tab — keep the link.
+            <Link
+              to={myOrdersHref}
+              className="topbar-pill"
+              aria-label="My orders"
+              data-testid="pos-topbar-my-orders"
+              style={{ textDecoration: "none" }}
+            >
+              <ListOrdered size={13} strokeWidth={1.75} />
+              <span>My orders</span>
+            </Link>
+          ) : (
+            // Dealer/showroom get the in-POS Order Status board (PIN-gated).
+            <button
+              type="button"
+              onClick={() => setStatusOpen(true)}
+              className="topbar-pill"
+              aria-label="My orders"
+              data-testid="pos-topbar-my-orders"
+            >
+              <ListOrdered size={13} strokeWidth={1.75} />
+              <span>My orders</span>
+            </button>
+          )}
           {!submitted && itemCount > 0 && (
             <button
               type="button"
@@ -817,6 +834,8 @@ export default function DealerPos({
           onClose={() => setQuotesOpen(false)}
         />
       )}
+
+      {statusOpen && <OrderStatusPage onClose={() => setStatusOpen(false)} />}
 
       {/* Footer — step 3 only (step 1 advances via the cart; step 2's wizard
           owns its own Back/Next). Prototype-styled bar: ghost Back · Total ·
