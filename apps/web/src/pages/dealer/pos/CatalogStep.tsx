@@ -23,7 +23,7 @@ import CartDrawer from "./CartDrawer";
 import AddonsPanel from "./AddonsPanel";
 import FloatingCartButton from "./FloatingCartButton";
 
-const CARD_ORDER: ProductCategory[] = ["mattress", "bedframe", "sofa"];
+const CARD_ORDER: ProductCategory[] = ["mattress", "bedframe", "sofa", "accessory"];
 
 /**
  * Step 01 — POS catalog. 2990s-parity layout: sectioned left sidebar
@@ -136,6 +136,12 @@ export default function CatalogStep({
       count: countByCat.get("sofa") ?? 0,
       locked: lockedCats.has("sofa"),
     },
+    // Accessories are cards too (2990s parity) — never mutex-locked.
+    {
+      key: "accessory",
+      label: "Accessories",
+      count: countByCat.get("accessory") ?? 0,
+    },
     { key: "addons", label: "Add-ons", count: activeAddons.length },
   ];
 
@@ -143,7 +149,7 @@ export default function CatalogStep({
   // (mattress → bedframe → sofa) inside the single CARRES series group.
   const shownCats = activeRail === "all" ? CARD_ORDER : [activeRail as ProductCategory];
   const shownModels = shownCats
-    .filter((cat) => cat === "mattress" || cat === "bedframe" || cat === "sofa")
+    .filter((cat) => CARD_ORDER.includes(cat))
     .flatMap((cat) =>
       index.productModels.filter((m) => {
         if (m.category !== cat) return false;

@@ -15,13 +15,19 @@ import { resolveFabricDelta } from "@carres/shared";
  * sku/fabric indexes, the sku→category map (for the sofa mutex), and per-model
  * from-price / option-count / search blob. Pure so it unit-tests cleanly.
  *
- * Only mattress/bedframe/sofa models with ≥1 sellable sku become product
- * cards — accessory/service models carry no variant axis and are surfaced
- * elsewhere (service backs the add-ons list).
+ * Mattress/bedframe/sofa/accessory models with ≥1 sellable sku become product
+ * cards (accessories get the generic pick-option configurator — 2990s shows
+ * them as cards too); service models carry no card (service backs the
+ * add-ons list).
  */
 
-/** Categories that render as configurable product cards in the POS grid. */
-export const POS_CARD_CATEGORIES: ProductCategory[] = ["mattress", "bedframe", "sofa"];
+/** Categories that render as product cards in the POS grid. */
+export const POS_CARD_CATEGORIES: ProductCategory[] = [
+  "mattress",
+  "bedframe",
+  "sofa",
+  "accessory",
+];
 
 export interface ModelMeta {
   fromPrice: number;
@@ -118,7 +124,7 @@ export function buildCatalogIndex(
       m.category === "sofa"
         ? skus.filter((s) => s.variantKind === "preset").length || skus.length
         : skus.filter((s) => s.variantKind === "size").length || skus.length;
-    const optionNoun = m.category === "sofa" ? "option" : "size";
+    const optionNoun = m.category === "sofa" || m.category === "accessory" ? "option" : "size";
 
     const searchBlob = [
       m.name,

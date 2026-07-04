@@ -55,14 +55,16 @@ export type Lane = "place" | "proceed" | "delivered";
 export function laneOf(
   status: Order["status"],
   operationStage?: Order["operationStage"],
+  sourceSystem?: Order["sourceSystem"],
 ): Lane | null {
   if (status === "delivered") return "delivered";
   if (status === "proceed_order") return "proceed";
   if (status === "place") {
-    // A 'place' order that operation is already working (stage set) is out of
-    // the dealer's hands — Proceed lane. (AutoCount legacy imports carry no
-    // stage in the list payload and stay in lane 01; cosmetic, noted.)
-    return operationStage ? "proceed" : "place";
+    // A 'place' order that's already out of the dealer's hands sits in the
+    // Proceed lane: operation picked it up (stage set), or it's an AutoCount
+    // import (those enter the pipeline already proceeded — same rule the
+    // operation grid uses).
+    return operationStage || sourceSystem === "autocount" ? "proceed" : "place";
   }
   return null; // cancelled — off the board
 }
@@ -216,7 +218,7 @@ function OrderCard({
   staffName: string | null;
   onOpen: (o: Order) => void;
 }) {
-  const lane = laneOf(order.status, order.operationStage) ?? "place";
+  const lane = laneOf(order.status, order.operationStage, order.sourceSystem) ?? "place";
   const cond = checkConditions(order);
   const pct = paidPct(order);
   const pieces = order.lineCount ?? 0;
@@ -385,7 +387,7 @@ export default function OrderStatusPage({ onClose }: { onClose: () => void }) {
   const ordersQ = useOrders(undefined, { enabled: unlocked });
   const salespersonsQ = useSalespersons(undefined, { enabled: unlocked });
   const orders = useMemo(
-    () => (ordersQ.data?.orders ?? []).filter((o) => laneOf(o.status, o.operationStage) !== null),
+    () => (ordersQ.data?.orders ?? []).filter((o) => laneOf(o.status, o.operationStage, o.sourceSystem) !== null),
     [ordersQ.data],
   );
   const staffById = useMemo(() => {
@@ -417,9 +419,9 @@ export default function OrderStatusPage({ onClose }: { onClose: () => void }) {
 
   const lanes = useMemo(
     () => ({
-      place: scoped.filter((o) => laneOf(o.status, o.operationStage) === "place"),
-      proceed: scoped.filter((o) => laneOf(o.status, o.operationStage) === "proceed"),
-      delivered: scoped.filter((o) => laneOf(o.status, o.operationStage) === "delivered"),
+      place: scoped.filter((o) => laneOf(o.status, o.operationStage, o.sourceSystem) === "place"),
+      proceed: scoped.filter((o) => laneOf(o.status, o.operationStage, o.sourceSystem) === "proceed"),
+      delivered: scoped.filter((o) => laneOf(o.status, o.operationStage, o.sourceSystem) === "delivered"),
     }),
     [scoped],
   );
