@@ -418,10 +418,13 @@ export default function SofaBuildCanvas({
   return (
     <div
       className={
+        // pos-proto on the standalone overlay so the design tokens resolve
+        // when the builder mounts outside the POS shell (drawer path).
         embedded
-          ? "relative flex h-full min-h-0 flex-col bg-base-50"
-          : "fixed inset-0 z-50 flex flex-col bg-base-50"
+          ? "relative flex h-full min-h-0 flex-col"
+          : "pos-proto fixed inset-0 z-50 flex flex-col"
       }
+      style={{ background: "var(--pos-bg, #F5F3F0)" }}
       data-testid="sofa-build-canvas"
       role={embedded ? undefined : "dialog"}
       aria-label={`Build a sofa — ${model.name}`}
@@ -448,13 +451,17 @@ export default function SofaBuildCanvas({
       {/* Body: palette | room */}
       <div className="flex min-h-0 flex-1">
         {/* Left palette */}
-        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r border-base-200 bg-white p-3 md:flex" data-testid="sofa-build-palette">
+        <aside
+          className="hidden w-64 shrink-0 flex-col overflow-y-auto p-3 md:flex"
+          style={{ borderRight: "1px solid var(--line)", background: "var(--pos-panel, #fff)" }}
+          data-testid="sofa-build-palette"
+        >
           {palette.length === 0 && (
             <p className="t-small text-base-500">This model has no offered compartments.</p>
           )}
           {palette.map(({ group, rows }) => (
             <div key={group} className="mb-4">
-              <div className="t-micro mb-1.5 text-base-400">{group}</div>
+              <div className="pos-eyebrow mb-1.5" style={{ fontSize: 10 }}>{group}</div>
               <div className="flex flex-col gap-2">
                 {rows.map(({ pool, offered }) => (
                   <ModulePaletteItem
@@ -470,18 +477,33 @@ export default function SofaBuildCanvas({
         </aside>
 
         {/* Center room */}
-        <main className="flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-base-100 p-4">
+        <main className="flex min-w-0 flex-1 items-center justify-center overflow-hidden p-4">
           <div
             ref={stageRef}
-            className="relative overflow-visible rounded-[6px] border border-base-300 bg-white shadow-md"
+            className="sof-cv__room"
             style={{
               width: ROOM_W,
               height: ROOM_H,
               transform: `scale(${visualScale})`,
               transformOrigin: "center center",
+              overflow: "visible",
+              border: "1px solid var(--line-strong)",
+              borderRadius: 6,
             }}
             data-testid="sofa-build-room"
           >
+            {/* 50×50 cm design grid + its corner legend */}
+            <div className="sof-cv__grid" style={{ backgroundSize: "50px 50px" }} />
+            <div className="sof-cv__gridLegend" style={{ pointerEvents: "none" }}>
+              <div
+                className="sof-cv__gridLegendSwatch"
+                style={{ width: 18, height: 18 }}
+              />
+              <div className="sof-cv__gridLegendText">
+                <span className="sof-cv__gridLegendLabel">Grid</span>
+                <span className="sof-cv__gridLegendValue">50 × 50 cm</span>
+              </div>
+            </div>
             {/* connected-sofa outlines + dimension callouts */}
             {analyses.map((a, gi) => {
               const bb = cellsBbox(a.group, depth);
@@ -493,19 +515,31 @@ export default function SofaBuildCanvas({
                     style={{ left: bb.x - 6, top: bb.y - 6, width: bb.w + 12, height: bb.h + 12 }}
                     data-testid="sofa-group-outline"
                   />
-                  {/* width callout (top) */}
+                  {/* width callout (top) — design tick · line · boxed label */}
                   <div
-                    className="pointer-events-none absolute text-center t-tiny font-mono text-base-500"
-                    style={{ left: bb.x, top: bb.y - 24, width: bb.w }}
+                    className="sof-cv__dim sof-cv__dim--top"
+                    style={{ left: bb.x, top: bb.y - 26, width: bb.w }}
                   >
-                    {Math.round(bb.w)}cm
+                    <span className="sof-cv__dim__tick sof-cv__dim__tick--l" />
+                    <span className="sof-cv__dim__line" />
+                    <span className="sof-cv__dim__label" style={{ left: "50%" }}>
+                      {Math.round(bb.w)}
+                      <span className="sof-cv__dim__unit">cm</span>
+                    </span>
+                    <span className="sof-cv__dim__tick sof-cv__dim__tick--r" />
                   </div>
-                  {/* height callout (right) */}
+                  {/* depth callout (right) */}
                   <div
-                    className="pointer-events-none absolute t-tiny font-mono text-base-500"
-                    style={{ left: bb.x + bb.w + 10, top: bb.y + bb.h / 2 - 8 }}
+                    className="sof-cv__dim sof-cv__dim--right"
+                    style={{ left: bb.x + bb.w + 8, top: bb.y, height: bb.h }}
                   >
-                    {Math.round(bb.h)}cm
+                    <span className="sof-cv__dim__tick sof-cv__dim__tick--t" />
+                    <span className="sof-cv__dim__line sof-cv__dim__line--v" />
+                    <span className="sof-cv__dim__label sof-cv__dim__label--v" style={{ top: "50%" }}>
+                      {Math.round(bb.h)}
+                      <span className="sof-cv__dim__unit">cm</span>
+                    </span>
+                    <span className="sof-cv__dim__tick sof-cv__dim__tick--b" />
                   </div>
                   {!a.closed && (
                     <span
@@ -570,13 +604,18 @@ export default function SofaBuildCanvas({
                     </span>
                   )}
                   {selected && (
-                    <div className="absolute -top-3 right-0 flex gap-1" data-cell-tool>
+                    <div
+                      className="sof-cv__tools"
+                      data-cell-tool
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
                       <button
                         type="button"
                         data-cell-tool
                         onClick={() => rotateCell(id)}
-                        className="flex h-7 w-7 items-center justify-center rounded-full border border-base-300 bg-white text-base-700 shadow-sm hover:border-primary hover:text-primary"
+                        className="sof-cv__btn"
                         aria-label="Rotate"
+                        title="Rotate 90° CW"
                         data-testid={`sofa-cell-rotate-${id}`}
                       >
                         <RotateCw size={13} />
@@ -585,8 +624,9 @@ export default function SofaBuildCanvas({
                         type="button"
                         data-cell-tool
                         onClick={() => removeCell(id)}
-                        className="flex h-7 w-7 items-center justify-center rounded-full border border-base-300 bg-white text-danger shadow-sm hover:border-danger"
+                        className="sof-cv__btn sof-cv__btn--del"
                         aria-label="Delete"
+                        title="Remove"
                         data-testid={`sofa-cell-delete-${id}`}
                       >
                         <Trash2 size={13} />
@@ -601,7 +641,10 @@ export default function SofaBuildCanvas({
       </div>
 
       {/* Bottom price bar + pickers + add */}
-      <footer className="flex shrink-0 flex-wrap items-center gap-4 border-t border-base-200 bg-white px-5 py-3">
+      <footer
+        className="flex shrink-0 flex-wrap items-center gap-4 px-5 py-3"
+        style={{ borderTop: "1px solid var(--line)", background: "var(--pos-panel, #fff)" }}
+      >
         {/* Fabric picker */}
         <label className="flex items-center gap-2 t-small text-base-600">
           Fabric
@@ -645,8 +688,19 @@ export default function SofaBuildCanvas({
             </span>
           )}
           <div className="text-right">
-            <div className="t-micro text-base-400">Total</div>
-            <div className="t-h2 font-mono text-base-900" data-testid="sofa-build-total">
+            <div className="pos-eyebrow" style={{ fontSize: 10 }}>Live total</div>
+            <div
+              style={{
+                fontFamily: "var(--font-mark, Georgia, serif)",
+                fontStretch: "80%",
+                fontWeight: 900,
+                fontSize: 26,
+                lineHeight: 1.1,
+                color: "var(--c-burnt, #BC4319)",
+                letterSpacing: "-0.01em",
+              }}
+              data-testid="sofa-build-total"
+            >
               RM {fmtRM(priceResult.total)}
             </div>
           </div>
@@ -654,7 +708,7 @@ export default function SofaBuildCanvas({
             type="button"
             onClick={handleAdd}
             disabled={!canAdd}
-            className="btn-hero disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn btn--primary btn--lg"
             data-testid="sofa-build-add"
           >
             {blocker ?? "Add to cart"}

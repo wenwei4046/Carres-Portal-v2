@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, LayoutGrid, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import type {
   FabricTierConfigDto,
   FabricTierGlobalConfig,
@@ -140,105 +140,169 @@ export default function SofaConfigurePage({
   const fabricTierOverride =
     (modelFabricTierOverrides ?? []).find((o) => o.modelId === model.id) ?? null;
 
+  // Hero pane previews the hovered (else first) pick — clicking a card still
+  // loads it straight onto the canvas, same contract as before.
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const heroPick =
+    picks.find((p) => p.combo.id === hoverId) ?? picks[0] ?? null;
+
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-base-50"
+      className="pos-proto cfg-root"
+      style={{ position: "fixed", inset: 0, zIndex: 50 }}
       role="dialog"
       aria-modal="true"
       aria-label={`Configure ${model.name}`}
       data-testid="sofa-configure-page"
     >
-      {/* Page header — back · model · mode tabs · from-price */}
-      <header className="flex shrink-0 items-center gap-4 border-b border-base-200 bg-white px-5 py-3">
+      {/* Header — the design's cfg-header with the sofa-flow crumb: back ·
+          eyebrow/model · mode tabs (rail pill pair) · from-price. */}
+      <div className="cfg-header cfg-header--icon">
         <button
+          className="cfg-header__back"
           type="button"
           onClick={onClose}
           aria-label="Back to catalog"
-          className="btn-ghost flex h-9 w-9 shrink-0 items-center justify-center"
           data-testid="sofa-configure-back"
         >
-          <ArrowLeft size={18} strokeWidth={1.75} />
+          <ArrowLeft size={16} strokeWidth={1.75} />
         </button>
-        <div className="min-w-0">
-          <p className="t-micro text-base-400">Sofa</p>
-          <h2 className="t-h3 truncate">{model.name}</h2>
-        </div>
-
-        {/* Mode tabs */}
-        <div className="flex-1 flex justify-center">
-          <div className="flex items-center gap-1.5">
-            <ModeTab
-              icon={Sparkles}
-              label="Quick pick"
-              active={mode === "quick"}
+        <div className="sof-flow__headerCrumb" style={{ minWidth: 0 }}>
+          <span className="sof-flow__crumbDepth">
+            <span className="sof-flow__crumbDot" />
+            {model.name}
+          </span>
+          <div className="sof-flow__modeTabs">
+            <button
+              type="button"
+              className={`sof-flow__modeTab ${mode === "quick" ? "is-on" : ""}`}
               disabled={picks.length === 0}
+              aria-pressed={mode === "quick"}
               onClick={() => setMode("quick")}
-              testId="sofa-mode-quick"
-            />
-            <ModeTab
-              icon={LayoutGrid}
-              label="Customize"
-              active={mode === "custom"}
+              data-testid="sofa-mode-quick"
+            >
+              Quick pick
+            </button>
+            <button
+              type="button"
+              className={`sof-flow__modeTab ${mode === "custom" ? "is-on" : ""}`}
+              aria-pressed={mode === "custom"}
               onClick={() => setMode("custom")}
-              testId="sofa-mode-custom"
-            />
+              data-testid="sofa-mode-custom"
+            >
+              Customize
+            </button>
           </div>
         </div>
-
-        {meta && (
-          <p className="shrink-0 leading-none hidden sm:block">
-            <span className="pos-price-rm t-tiny">From RM</span>
-            <span className="pos-price text-[22px]">{meta.fromPrice.toLocaleString()}</span>
-          </p>
-        )}
-      </header>
+        <div className="cfg-header__live">
+          <div className="cfg-header__summary">
+            <div className="cfg-header__eyebrow">Sofa · built from modules</div>
+            <div className="cfg-header__title">{model.name}</div>
+            <div className="cfg-header__sub">
+              {mode === "quick"
+                ? "Pick a layout — it lands on the canvas assembled"
+                : "Drag modules · rotate · we price the connected sofa live"}
+            </div>
+          </div>
+          {meta && (
+            <div className="cfg-header__total" tabIndex={0}>
+              <div className="cfg-header__totalLabel">From</div>
+              <div className="cfg-header__totalNum">
+                <sup>RM</sup>
+                {meta.fromPrice.toLocaleString("en-MY")}
+              </div>
+              <div className="cfg-header__totalNote">priced live on the canvas</div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Body */}
       {mode === "quick" ? (
-        <div className="flex-1 min-h-0 overflow-auto px-6 py-6">
-          <p className="t-small text-base-500 mb-5 max-w-xl">
-            Ready-made layouts for this model — pick one and it lands on the canvas assembled;
-            confirm the fabric and seat height there, then add it to the cart.
-          </p>
-          <div
-            className="grid gap-4"
-            style={{ gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))" }}
-            data-testid="sofa-quick-picks"
-          >
-            {picks.map((p) => (
-              <button
-                key={p.combo.id}
-                type="button"
-                onClick={() => loadPick(p)}
-                className="text-left bg-white border border-base-200 rounded-xl p-5 hover:border-primary hover:shadow-md transition-all group"
-                data-testid={`sofa-quick-pick-${p.combo.id}`}
-              >
-                {/* Composition silhouettes */}
-                <div className="flex items-end gap-1 mb-4 h-14 overflow-hidden">
-                  {p.codes.slice(0, 5).map((code, i) => (
-                    <CompartmentSilhouette key={`${code}-${i}`} code={code} className="h-12 w-auto" />
-                  ))}
-                  {p.codes.length > 5 && (
-                    <span className="t-tiny text-base-400">+{p.codes.length - 5}</span>
-                  )}
-                </div>
-                <p className="t-small font-semibold">{p.title}</p>
-                <p className="t-tiny text-base-500 mt-0.5 font-mono">{p.codes.join(" + ")}</p>
-                <div className="flex items-baseline justify-between mt-3">
-                  <span className="pos-price text-[18px]">
-                    <span className="pos-price-rm">{"‎"}</span>
-                    {p.priceLabel}
+        <div className="cfg-body" style={{ minHeight: 0, overflow: "hidden" }}>
+          <div className="sof-qp" style={{ height: "100%" }}>
+            {/* Rail — this model's ready-made layouts */}
+            <div className="sof-qp__rail">
+              <div className="sof-qp__railHead">
+                <span className="pos-eyebrow">Quick pick</span>
+                <span className="sof-qp__railDetail">combo pricing per layout</span>
+              </div>
+              <div className="sof-qp__grid" data-testid="sofa-quick-picks">
+                {picks.map((p) => (
+                  <button
+                    key={p.combo.id}
+                    type="button"
+                    onClick={() => loadPick(p)}
+                    onMouseEnter={() => setHoverId(p.combo.id)}
+                    className={`sof-qp__card ${heroPick?.combo.id === p.combo.id ? "is-on" : ""}`}
+                    data-testid={`sofa-quick-pick-${p.combo.id}`}
+                  >
+                    <span className="sof-qp__art" style={{ gap: 2 }}>
+                      {p.codes.slice(0, 4).map((code, i) => (
+                        <CompartmentSilhouette
+                          key={`${code}-${i}`}
+                          code={code}
+                          className="h-12 w-auto"
+                        />
+                      ))}
+                      {p.codes.length > 4 && (
+                        <span className="sof-qp__cardSub">+{p.codes.length - 4}</span>
+                      )}
+                    </span>
+                    <span className="sof-qp__cardBody">
+                      <span className="sof-qp__cardLabel">{p.title}</span>
+                      <span className="sof-qp__cardSub">{p.codes.join(" + ")}</span>
+                      <span className="sof-qp__cardPrice">{p.priceLabel}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Hero — the hovered pick at room scale, then load on canvas */}
+            <div className="sof-qp__hero">
+              <div className="sof-qp__heroFrame">
+                {heroPick ? (
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
+                    {heroPick.codes.slice(0, 6).map((code, i) => (
+                      <CompartmentSilhouette
+                        key={`${code}-${i}`}
+                        code={code}
+                        className="h-40 w-auto"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <span className="sof-qp__railDetail">No layouts authored yet.</span>
+                )}
+              </div>
+              {heroPick && (
+                <div className="sof-qp__heroFoot">
+                  <span>
+                    <span className="sof-qp__cardLabel">{heroPick.title}</span>
+                    <span className="sof-qp__heroDim" style={{ marginLeft: 10 }}>
+                      {heroPick.codes.join(" + ")}
+                    </span>
                   </span>
-                  <span className="t-tiny text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                    Load on canvas →
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 14 }}>
+                    <span className="sof-qp__cardPrice" style={{ fontSize: 14 }}>
+                      {heroPick.priceLabel}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={() => loadPick(heroPick)}
+                    >
+                      Load on canvas →
+                    </button>
                   </span>
                 </div>
-              </button>
-            ))}
+              )}
+            </div>
           </div>
         </div>
       ) : (
-        <div className="relative flex-1 min-h-0">
+        <div className="cfg-body" style={{ position: "relative", minHeight: 0 }}>
           <SofaBuildCanvas
             key={seedKey}
             embedded
@@ -262,42 +326,5 @@ export default function SofaConfigurePage({
       )}
     </div>,
     document.body,
-  );
-}
-
-function ModeTab({
-  icon: Icon,
-  label,
-  active,
-  disabled,
-  onClick,
-  testId,
-}: {
-  icon: typeof Sparkles;
-  label: string;
-  active: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  testId: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={active}
-      data-testid={testId}
-      className={[
-        "flex items-center gap-1.5 rounded-full px-4 py-1.5 t-small font-semibold border transition-colors",
-        active
-          ? "bg-base-900 text-white border-base-900"
-          : disabled
-            ? "bg-white text-base-300 border-base-200 cursor-not-allowed"
-            : "bg-white text-base-600 border-base-200 hover:border-base-400",
-      ].join(" ")}
-    >
-      <Icon size={14} strokeWidth={1.75} />
-      {label}
-    </button>
   );
 }
