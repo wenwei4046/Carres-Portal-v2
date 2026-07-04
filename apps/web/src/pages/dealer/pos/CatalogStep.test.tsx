@@ -64,13 +64,14 @@ describe("CatalogStep", () => {
     expect(screen.getByTestId("pos-card-cloud")).toBeTruthy();
     expect(screen.getByText("Carres Cloud")).toBeTruthy();
 
-    // Open configure drawer.
+    // A mattress card jumps straight into the full-page configurator
+    // (prototype's ConfiguratorScreen), not the drawer.
     fireEvent.click(screen.getByTestId("pos-card-cloud"));
-    expect(screen.getByTestId("pos-configure-drawer")).toBeTruthy();
+    expect(screen.getByTestId("pos-configure-page")).toBeTruthy();
 
     // Pick size + add to cart.
-    fireEvent.change(screen.getByLabelText("Size"), { target: { value: "s1" } });
-    fireEvent.click(screen.getByText("+ Add"));
+    fireEvent.click(screen.getByTestId("cfg-size-s1"));
+    fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
 
     expect(onChange).toHaveBeenCalledTimes(1);
     const next = onChange.mock.calls[0][0];

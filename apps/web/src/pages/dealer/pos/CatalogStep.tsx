@@ -17,6 +17,7 @@ import PosSidebar, { type RailEntry, type RailKey } from "./PosSidebar";
 import ProductCard from "./ProductCard";
 import ComboCard from "./ComboCard";
 import ConfigureDrawer from "./ConfigureDrawer";
+import PosConfigurePage from "./PosConfigurePage";
 import SofaConfigurePage from "./SofaConfigurePage";
 import CartDrawer from "./CartDrawer";
 import AddonsPanel from "./AddonsPanel";
@@ -339,6 +340,25 @@ export default function CatalogStep({
           const offered = (catalog.modelSofaCompartments ?? []).filter(
             (mc) => mc.modelId === configureModel.id,
           );
+          // Mattress + bed frame ALSO go full page now (prototype's
+          // ConfiguratorScreen — plan-view canvas + live total), same
+          // straight-in convention. Accessory / pillow / dropdown-sofa /
+          // service keep the drawer.
+          if (
+            configureModel.category === "mattress" ||
+            configureModel.category === "bedframe"
+          ) {
+            return (
+              <PosConfigurePage
+                model={configureModel}
+                meta={index.meta.get(configureModel.id)}
+                skus={index.skusByModel.get(configureModel.id) ?? []}
+                specialAddons={catalog.specialAddons}
+                onAdd={addLine}
+                onClose={() => setConfigureModelId(null)}
+              />
+            );
+          }
           if (configureModel.category === "sofa" && offered.length > 0) {
             return (
               <SofaConfigurePage
