@@ -700,6 +700,8 @@ export type { PwpDiscover } from "./domain";
 export {
   resolveCompartmentPrice,
   mirrorCode,
+  mirrorModules,
+  canMirror,
   canonicalizeSofaSlots,
   matchSofaCombo,
   pickSofaCombo,
