@@ -10,6 +10,7 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import type {
   ModelSofaCompartmentDto,
   ProductModelDto,
+  ProductSkuDto,
   SofaComboDto,
   SofaCompartmentDto,
   SofaFabricDto,
@@ -78,14 +79,29 @@ const COMBO: SofaComboDto = {
   discontinuedAt: null,
 };
 
-function renderPage(over?: { combos?: SofaComboDto[]; onClose?: () => void }) {
+const PRESET_SKU: ProductSkuDto = {
+  id: "sku-preset",
+  modelId: MODEL.id,
+  sku: "BOOQIT-PRESET",
+  variant: "3-seater",
+  variantKind: "preset",
+  price: 2990,
+  cost: null,
+  supplierId: null,
+};
+
+function renderPage(over?: {
+  combos?: SofaComboDto[];
+  onClose?: () => void;
+  skus?: ProductSkuDto[];
+}) {
   const onAdd = vi.fn();
   const onClose = vi.fn(over?.onClose);
   render(
     <SofaConfigurePage
       model={MODEL}
       meta={undefined}
-      skus={[]}
+      skus={over?.skus ?? []}
       fabrics={FABRICS}
       fabricTierConfig={null}
       modelFabricTierOverrides={null}
@@ -200,6 +216,28 @@ describe("SofaConfigurePage", () => {
     };
     renderPage({ combos: [symmetric] });
     expect(screen.queryByTestId(`sofa-flip-${symmetric.id}`)).toBeNull();
+  });
+
+  it("size toggle reprices the LIVE TOTAL from the preset's per-height price", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage(); // COMBO.pricesByHeight = { 24: 2990, 28: 3190 }
+    expect(screen.getByTestId("sofa-qp-total").textContent).toBe("RM 2,990");
+    fireEvent.click(screen.getByTestId("sofa-qp-height-28"));
+    expect(screen.getByTestId("sofa-qp-total").textContent).toBe("RM 3,190");
+  });
+
+  it("Add to cart emits a DraftLine straight from quick pick (fabric deferred + remark)", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    const { onAdd, onClose } = renderPage({ skus: [PRESET_SKU] });
+    fireEvent.change(screen.getByTestId("sofa-qp-remark"), { target: { value: "match showroom" } });
+    fireEvent.click(screen.getByTestId("sofa-qp-add"));
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    const line = onAdd.mock.calls[0]![0];
+    expect(line.unitPrice).toBe(2990); // base @ 24″, fabric deferred → no delta
+    const attrs = line.attrs as Record<string, unknown>;
+    expect(attrs.fabric_deferred).toBe(true);
+    expect(attrs.remark).toBe("match showroom");
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("renders a to-scale plan view with width + depth cm callouts", () => {
