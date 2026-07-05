@@ -202,6 +202,14 @@ describe("SofaConfigurePage", () => {
     expect(screen.queryByTestId(`sofa-flip-${symmetric.id}`)).toBeNull();
   });
 
+  it("renders a to-scale plan view with width + depth cm callouts", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage();
+    expect(screen.getByTestId("sofa-plan-view")).toBeTruthy();
+    expect(screen.getByTestId("sofa-plan-width").textContent).toMatch(/\d+ cm/);
+    expect(screen.getByTestId("sofa-plan-depth").textContent).toMatch(/\d+ cm/);
+  });
+
   it("shows the INSERT PWP code input by default", () => {
     pwpMock.current = { data: { vouchers: [] }, isFetching: false };
     renderPage();

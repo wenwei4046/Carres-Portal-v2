@@ -140,6 +140,19 @@ export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
   return straight;
 }
 
+/** Overall footprint of a flush left→right layout, in cm — width = Σ module
+ *  widths, depth = deepest module. Drives the to-scale plan-view callouts. */
+function layoutDims(codes: string[], depth: string): { w: number; d: number } {
+  let w = 0;
+  let d = 0;
+  for (const code of codes) {
+    const fp = moduleFootprint(findModule(code) ?? { w: 95, d: 95, cushions: 0 }, 0, depth);
+    w += fp.w;
+    d = Math.max(d, fp.h);
+  }
+  return { w, d };
+}
+
 function priceLabelOf(combo: SofaComboDto): string {
   const vals = Object.values(combo.pricesByHeight).filter(
     (v): v is number => typeof v === "number",
@@ -451,19 +464,60 @@ export default function SofaConfigurePage({
               </div>
             </div>
 
-            {/* Hero — the hovered pick at room scale, then load on canvas */}
+            {/* Hero — the hovered pick as a to-scale PLAN VIEW with cm callouts */}
             <div className="sof-qp__hero">
               <div className="sof-qp__heroFrame">
                 {heroPick ? (
-                  <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
-                    {displayFor(heroPick).codes.slice(0, 6).map((code, i) => (
-                      <CompartmentSilhouette
-                        key={`${code}-${i}`}
-                        code={code}
-                        className="h-40 w-auto"
-                      />
-                    ))}
-                  </div>
+                  (() => {
+                    const codes = displayFor(heroPick).codes;
+                    const dim = layoutDims(codes, "24");
+                    return (
+                      <div
+                        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+                        data-testid="sofa-plan-view"
+                      >
+                        {/* width callout */}
+                        <span
+                          className="t-tiny font-mono"
+                          style={{
+                            border: "1px solid var(--line, #d9d2c7)",
+                            borderRadius: 4,
+                            padding: "1px 6px",
+                            background: "var(--pos-panel, #fff)",
+                          }}
+                          data-testid="sofa-plan-width"
+                        >
+                          {dim.w} cm
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
+                            {codes.slice(0, 6).map((code, i) => (
+                              <CompartmentSilhouette
+                                key={`${code}-${i}`}
+                                code={code}
+                                className="h-40 w-auto"
+                              />
+                            ))}
+                          </div>
+                          {/* depth callout */}
+                          <span
+                            className="t-tiny font-mono"
+                            style={{
+                              border: "1px solid var(--line, #d9d2c7)",
+                              borderRadius: 4,
+                              padding: "1px 6px",
+                              background: "var(--pos-panel, #fff)",
+                              writingMode: "vertical-rl",
+                            }}
+                            data-testid="sofa-plan-depth"
+                          >
+                            {dim.d} cm
+                          </span>
+                        </div>
+                        <span className="sof-qp__railDetail">Plan view · to scale</span>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <span className="sof-qp__railDetail">No layouts authored yet.</span>
                 )}
