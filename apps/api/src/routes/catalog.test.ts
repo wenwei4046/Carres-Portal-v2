@@ -5242,3 +5242,248 @@ describe("0201 — option pool batch save + config history", () => {
     expect(res.status).toBe(422);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 0202 — global fabric master (PUT /fabrics → catalog_fabrics_batch_save RPC)
+// + fabrics history read. Mirrors the 0201 batch-save contract tests above.
+// ---------------------------------------------------------------------------
+
+describe("0202 — fabric master batch save + history", () => {
+  it("GET /api/catalog returns fabrics (mapped camelCase, sorted by sort_order)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        product_models: [],
+        product_skus: [],
+        sofa_fabrics: [],
+        addons: [],
+        floor_config: [
+          { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
+        ],
+        catalog_fabrics: [
+          {
+            id: "00000000-0000-4000-8000-0000000fab02",
+            fabric_code: "CG-001",
+            series: "KOONA VELVET H2O",
+            description: "CG-001 Pearl",
+            supplier_code: "KN390-1",
+            sofa_tier: "PRICE_2",
+            bedframe_tier: "PRICE_2",
+            active: true,
+            sort_order: 19,
+            created_at: "2026-07-06T00:00:00Z",
+            updated_at: "2026-07-06T00:00:00Z",
+            updated_by: null,
+          },
+          {
+            id: "00000000-0000-4000-8000-0000000fab01",
+            fabric_code: "BF-15",
+            series: null,
+            description: "BF-15",
+            supplier_code: "PC151-15",
+            sofa_tier: "PRICE_1",
+            bedframe_tier: "PRICE_2",
+            active: false,
+            sort_order: 15,
+            created_at: "2026-07-06T00:00:00Z",
+            updated_at: "2026-07-06T00:00:00Z",
+            updated_by: null,
+          },
+        ],
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      fabrics: {
+        fabricCode: string;
+        series: string | null;
+        supplierCode: string | null;
+        sofaTier: string;
+        bedframeTier: string;
+        active: boolean;
+      }[];
+    };
+    // sorted by sort_order: BF-15 (15) before CG-001 (19); inactive rows kept
+    expect(body.fabrics.map((f) => f.fabricCode)).toEqual(["BF-15", "CG-001"]);
+    expect(body.fabrics[0]).toMatchObject({
+      fabricCode: "BF-15",
+      supplierCode: "PC151-15",
+      sofaTier: "PRICE_1",
+      bedframeTier: "PRICE_2",
+      active: false,
+    });
+    expect(body.fabrics[1]).toMatchObject({
+      fabricCode: "CG-001",
+      series: "KOONA VELVET H2O",
+      sofaTier: "PRICE_2",
+    });
+  });
+
+  function buildRpcSb(opts?: {
+    rpcError?: { code?: string; message?: string } | null;
+    calls?: { fn: string; args: unknown }[];
+  }): SbStub {
+    const calls = opts?.calls ?? [];
+    return {
+      rpc: async (fn: string, args: unknown) => {
+        calls.push({ fn, args });
+        if (opts?.rpcError) return { data: null, error: opts.rpcError };
+        return { data: { ok: true, count: 2 }, error: null };
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+  }
+
+  it("PUT /fabrics — principal → RPC with camelCase p_entries in array order (tiers default PRICE_2)", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabrics", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { fabricCode: "BF-01", supplierCode: "PC151-01" },
+            { fabricCode: "BF-15", sofaTier: "PRICE_1", active: false },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].fn).toBe("catalog_fabrics_batch_save");
+    expect(calls[0].args).toEqual({
+      p_entries: [
+        {
+          fabricCode: "BF-01",
+          series: null,
+          description: null,
+          supplierCode: "PC151-01",
+          sofaTier: "PRICE_2",
+          bedframeTier: "PRICE_2",
+          active: true,
+        },
+        {
+          fabricCode: "BF-15",
+          series: null,
+          description: null,
+          supplierCode: null,
+          sofaTier: "PRICE_1",
+          bedframeTier: "PRICE_2",
+          active: false,
+        },
+      ],
+      p_notes: null,
+    });
+  });
+
+  it("PUT /fabrics — non-principal → 403, RPC never called", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabrics", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ fabricCode: "BF-01" }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("PUT /fabrics — duplicate codes in the body → 409, RPC never called", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabrics", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ fabricCode: "BF-01" }, { fabricCode: "BF-01" }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_fabric_code");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("PUT /fabrics — invalid tier value → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabrics", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ fabricCode: "BF-01", sofaTier: "PRICE_9" }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("GET /fabrics/history — internal read maps fabric-shaped snapshots", async () => {
+    const historyRow = {
+      id: "00000000-0000-0000-0000-0000000f0001",
+      section: "fabrics",
+      snapshot: [
+        {
+          fabricCode: "BF-01",
+          series: null,
+          description: "BF-01",
+          supplierCode: "PC151-01",
+          sofaTier: "PRICE_2",
+          bedframeTier: "PRICE_2",
+          active: true,
+          sortOrder: 1,
+        },
+      ],
+      effective_from: "2026-07-06",
+      notes: "Baseline — ported from the live 2990s fabric_trackings (0202)",
+      created_at: "2026-07-06T08:00:00.000Z",
+      created_by: null,
+    };
+    const eqCalls: { col: string; val: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue({
+      from: (table: string) => {
+        expect(table).toBe("catalog_config_history");
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = (col: string, val: unknown) => {
+          eqCalls.push({ col, val });
+          return chain;
+        };
+        chain.order = () => chain;
+        chain.limit = async () => ({ data: [historyRow], error: null });
+        return chain;
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabrics/history", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(eqCalls).toEqual([{ col: "section", val: "fabrics" }]);
+    const body = (await res.json()) as {
+      history: { effectiveFrom: string; entries: { fabricCode: string; sofaTier: string }[] }[];
+    };
+    expect(body.history).toHaveLength(1);
+    expect(body.history[0].effectiveFrom).toBe("2026-07-06");
+    expect(body.history[0].entries[0]).toMatchObject({
+      fabricCode: "BF-01",
+      supplierCode: "PC151-01",
+      sofaTier: "PRICE_2",
+    });
+  });
+});

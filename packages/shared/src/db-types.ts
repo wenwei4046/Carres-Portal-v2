@@ -260,15 +260,36 @@ export interface CatalogOptionPoolRow {
 
 /** `catalog_config_history` (migration 0201). Lightweight append-only snapshot
  *  log for the option pools — one row per pool Edit-save; `snapshot` holds the
- *  FULL pool contents at save time (camelCase entries). */
+ *  FULL pool contents at save time (camelCase entries). 0202 widens `section`
+ *  with 'fabrics' (fabric-master snapshots share the same log). */
 export interface CatalogConfigHistoryRow {
   id: string;
-  section: CatalogOptionPoolRow["pool"];
+  section: CatalogOptionPoolRow["pool"] | "fabrics";
   snapshot: unknown;
   effective_from: string;
   notes: string | null;
   created_at: string;
   created_by: string | null;
+}
+
+/** `catalog_fabrics` (migration 0202, 2990s fabric_trackings port). Global
+ *  procurement fabric master — read-only reference; the SELLING fabric path
+ *  stays per-model `sofa_fabrics` + the 0176 tier deltas (independent by
+ *  design, mirroring 2990s). `sofa_tier` covers sofa+accessory contexts,
+ *  `bedframe_tier` covers bedframe (no bedframe selling consumer yet). */
+export interface CatalogFabricRow {
+  id: string;
+  fabric_code: string;
+  series: string | null;
+  description: string | null;
+  supplier_code: string | null;
+  sofa_tier: "PRICE_1" | "PRICE_2" | "PRICE_3";
+  bedframe_tier: "PRICE_1" | "PRICE_2" | "PRICE_3";
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
 }
 
 /**

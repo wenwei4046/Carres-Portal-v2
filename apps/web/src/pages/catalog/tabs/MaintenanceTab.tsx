@@ -697,8 +697,11 @@ function DeliveryFeeSection({
  * FabricTierDeltasCard — global RM premium for P2 and P3 sofa fabrics.
  * These apply to all sofa models unless a per-model override is set in the
  * Modular drawer. Principal-only write (RLS + UI gate).
+ *
+ * Exported (0202): the Fabrics tab renders this same card as its "Fabric
+ * Pricing" sidebar panel (2990s parity) — one component, two entry points.
  */
-function FabricTierDeltasCard({
+export function FabricTierDeltasCard({
   catalog,
   isPrincipal,
 }: {

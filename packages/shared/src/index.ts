@@ -218,6 +218,16 @@ export {
   type CatalogPoolBatchSaveInput,
   type CatalogPoolSnapshotEntryDto,
   type CatalogConfigHistoryDto,
+  // 0202 — global fabric master schemas + input/Dto types.
+  fabricTierValueSchema,
+  catalogFabricSchema,
+  catalogFabricEntryInput,
+  catalogFabricsBatchSaveInput,
+  catalogFabricsHistorySchema,
+  type CatalogFabricDto,
+  type CatalogFabricEntryInput,
+  type CatalogFabricsBatchSaveInput,
+  type CatalogFabricsHistoryDto,
   // 0184 — delivery fee config + special rules + RuleTarget schemas/inputs.
   deliveryFeeConfigSchema,
   deliveryFeeConfigPatchInput,
@@ -614,6 +624,9 @@ export type { SpecialAddon } from "./domain";
 // config-history domain type + its adapter.
 export type { CatalogOptionPool, CatalogConfigHistory } from "./domain";
 export { catalogConfigHistoryFromRow } from "./adapters";
+// 0202 — global fabric master domain type + adapters.
+export type { CatalogFabric, CatalogFabricsHistory } from "./domain";
+export { catalogFabricFromRow, catalogFabricsHistoryFromRow } from "./adapters";
 export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
 
 // 0184 — 2990s Products parity Phase 6: the unified RuleTarget matcher (PURE,

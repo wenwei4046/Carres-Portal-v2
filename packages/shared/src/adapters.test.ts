@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   catalogOptionPoolFromRow,
+  catalogFabricFromRow,
+  catalogFabricsHistoryFromRow,
   deliveryFeeConfigFromRow,
   freeItemCampaignFromRow,
   modelDefaultFreeGiftsFromRow,
@@ -17,6 +19,7 @@ import {
 } from "./adapters";
 import type {
   CatalogOptionPoolRow,
+  CatalogFabricRow,
   DeliveryFeeConfigRow,
   FreeItemCampaignRow,
   ModelDefaultFreeGiftsRow,
@@ -412,6 +415,89 @@ describe("modelSofaCompartmentFromRow", () => {
   it("distinguishes an explicit zero override from null", () => {
     const out = modelSofaCompartmentFromRow(baseRow({ price_override: 0 }));
     expect(out.priceOverride).toBe(0);
+  });
+});
+
+describe("catalogFabricFromRow (0202)", () => {
+  const row: CatalogFabricRow = {
+    id: "00000000-0000-0000-0000-0000000fab01",
+    fabric_code: "CG-001",
+    series: "KOONA VELVET H2O",
+    description: "CG-001 Pearl",
+    supplier_code: "KN390-1",
+    sofa_tier: "PRICE_2",
+    bedframe_tier: "PRICE_1",
+    active: true,
+    sort_order: "19" as unknown as number,
+    created_at: "2026-07-06T08:00:00.000Z",
+    updated_at: "2026-07-06T08:00:00.000Z",
+    updated_by: null,
+  };
+
+  it("snake->camel + coerces sort_order; keeps split tiers", () => {
+    const out = catalogFabricFromRow(row);
+    expect(out).toEqual({
+      id: "00000000-0000-0000-0000-0000000fab01",
+      fabricCode: "CG-001",
+      series: "KOONA VELVET H2O",
+      description: "CG-001 Pearl",
+      supplierCode: "KN390-1",
+      sofaTier: "PRICE_2",
+      bedframeTier: "PRICE_1",
+      active: true,
+      sortOrder: 19,
+    });
+  });
+
+  it("nulls stay null (series/description/supplier) — not coerced to empty", () => {
+    const out = catalogFabricFromRow({
+      ...row,
+      series: null,
+      description: null,
+      supplier_code: null,
+    });
+    expect(out.series).toBeNull();
+    expect(out.description).toBeNull();
+    expect(out.supplierCode).toBeNull();
+  });
+});
+
+describe("catalogFabricsHistoryFromRow (0202)", () => {
+  it("maps fabric-shaped snapshot entries; drops malformed; defaults bad tiers to PRICE_2", () => {
+    const out = catalogFabricsHistoryFromRow({
+      id: "00000000-0000-0000-0000-0000000fh001",
+      section: "fabrics",
+      snapshot: [
+        {
+          fabricCode: "BF-01",
+          series: null,
+          description: "BF-01",
+          supplierCode: "PC151-01",
+          sofaTier: "PRICE_1",
+          bedframeTier: "NOT_A_TIER",
+          active: false,
+          sortOrder: 1,
+        },
+        { value: "pool-shaped-entry-without-fabricCode" },
+        "garbage",
+      ],
+      effective_from: "2026-07-06",
+      notes: null,
+      created_at: "2026-07-06T08:00:00.000Z",
+      created_by: null,
+    });
+    expect(out.entries).toHaveLength(1);
+    expect(out.entries[0]).toEqual({
+      fabricCode: "BF-01",
+      series: null,
+      description: "BF-01",
+      supplierCode: "PC151-01",
+      sofaTier: "PRICE_1",
+      bedframeTier: "PRICE_2",
+      active: false,
+      sortOrder: 1,
+    });
+    expect(out.effectiveFrom).toBe("2026-07-06");
   });
 });
 
