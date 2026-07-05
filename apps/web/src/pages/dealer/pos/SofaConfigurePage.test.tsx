@@ -10,11 +10,22 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import type {
   ModelSofaCompartmentDto,
   ProductModelDto,
+  ProductSkuDto,
   SofaComboDto,
   SofaCompartmentDto,
   SofaFabricDto,
 } from "@carres/shared";
 import { analyzeSofa, findModule, groupSofas, moduleFootprint } from "@carres/shared";
+
+// Mock the PWP availability hook (usePwpAvailableForPhone) so the component's
+// useQuery has no QueryClient dependency + the voucher result is controllable.
+const { pwpMock } = vi.hoisted(() => ({
+  pwpMock: { current: { data: { vouchers: [] as { code: string }[] }, isFetching: false } },
+}));
+vi.mock("@/lib/queries", () => ({
+  usePwpAvailableForPhone: () => pwpMock.current,
+}));
+
 import SofaConfigurePage, { comboSeedCells } from "./SofaConfigurePage";
 
 beforeAll(() => {
@@ -68,14 +79,29 @@ const COMBO: SofaComboDto = {
   discontinuedAt: null,
 };
 
-function renderPage(over?: { combos?: SofaComboDto[]; onClose?: () => void }) {
+const PRESET_SKU: ProductSkuDto = {
+  id: "sku-preset",
+  modelId: MODEL.id,
+  sku: "BOOQIT-PRESET",
+  variant: "3-seater",
+  variantKind: "preset",
+  price: 2990,
+  cost: null,
+  supplierId: null,
+};
+
+function renderPage(over?: {
+  combos?: SofaComboDto[];
+  onClose?: () => void;
+  skus?: ProductSkuDto[];
+}) {
   const onAdd = vi.fn();
   const onClose = vi.fn(over?.onClose);
   render(
     <SofaConfigurePage
       model={MODEL}
       meta={undefined}
-      skus={[]}
+      skus={over?.skus ?? []}
       fabrics={FABRICS}
       fabricTierConfig={null}
       modelFabricTierOverrides={null}
@@ -121,9 +147,12 @@ describe("SofaConfigurePage", () => {
     expect(within(grid).getByText(/From RM 2,990/)).toBeTruthy();
   });
 
-  it("loading a pick flips to Customize with the canvas pre-seeded as ONE connected sofa", () => {
+  it("card click SELECTS; Customize → loads the canvas pre-seeded as ONE connected sofa", () => {
     renderPage();
     fireEvent.click(screen.getByTestId(`sofa-quick-pick-${COMBO.id}`));
+    // Selecting a card does NOT jump to the canvas (prototype behaviour).
+    expect(screen.queryByTestId("sofa-build-canvas")).toBeNull();
+    fireEvent.click(screen.getByTestId("sofa-qp-customize"));
     expect(screen.getByTestId("sofa-build-canvas")).toBeTruthy();
     const room = screen.getByTestId("sofa-build-room");
     // The flush-seeded modules join as a single connected group — exactly one
@@ -141,5 +170,131 @@ describe("SofaConfigurePage", () => {
     const { onClose } = renderPage();
     fireEvent.click(screen.getByTestId("sofa-configure-back"));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows an L/R flip toggle on a handed combo's active card, defaulting to L", () => {
+    renderPage();
+    const flip = screen.getByTestId(`sofa-flip-${COMBO.id}`);
+    const [l, r] = within(flip).getAllByText(/^[LR]$/);
+    expect(l.className).toContain("is-on"); // L active by default
+    expect(r.className).not.toContain("is-on");
+  });
+
+  it("clicking the flip toggle mirrors the shown composition L↔R", () => {
+    renderPage();
+    const grid = screen.getByTestId("sofa-quick-picks");
+    expect(within(grid).getByText("1A(LHF) + 2A(RHF)")).toBeTruthy();
+    fireEvent.click(screen.getByTestId(`sofa-flip-${COMBO.id}`));
+    // reversed slot order + LHF↔RHF swap
+    expect(within(grid).getByText("2A(LHF) + 1A(RHF)")).toBeTruthy();
+    expect(within(grid).queryByText("1A(LHF) + 2A(RHF)")).toBeNull();
+  });
+
+  it("a flipped pick seeds the mirrored layout onto the canvas", () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId(`sofa-flip-${COMBO.id}`));
+    fireEvent.click(screen.getByTestId("sofa-qp-customize"));
+    // still one connected sofa, but mirrored (2A now on the left)
+    const room = screen.getByTestId("sofa-build-room");
+    expect(within(room).getAllByTestId("sofa-group-outline")).toHaveLength(1);
+  });
+
+  it("shows the selected configuration name + size in the header (quick mode)", () => {
+    renderPage();
+    const name = screen.getByTestId("sofa-config-name").textContent ?? "";
+    expect(name).toContain("1A(LHF) + 2A(RHF)");
+    expect(name).toContain("24″");
+  });
+
+  it("the header config name follows the L/R flip", () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId(`sofa-flip-${COMBO.id}`));
+    expect(screen.getByTestId("sofa-config-name").textContent).toContain("2A(LHF) + 1A(RHF)");
+  });
+
+  it("hides the flip toggle for a symmetric (orientation-free) combo", () => {
+    const symmetric: SofaComboDto = {
+      ...COMBO,
+      id: "00000000-0000-0000-0000-00000000c002",
+      slots: [["1NA"]],
+      label: "Solo",
+    };
+    renderPage({ combos: [symmetric] });
+    expect(screen.queryByTestId(`sofa-flip-${symmetric.id}`)).toBeNull();
+  });
+
+  it("header size toggle reprices the LIVE TOTAL from the preset's per-height price", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage(); // COMBO.pricesByHeight = { 24: 2990, 28: 3190 }
+    expect(screen.getByTestId("sofa-qp-total").textContent).toContain("2,990");
+    fireEvent.click(screen.getByTestId("sofa-qp-height-28"));
+    expect(screen.getByTestId("sofa-qp-total").textContent).toContain("3,190");
+  });
+
+  it("header Add to Cart emits a DraftLine (fabric deferred + remark + PWP hint)", () => {
+    pwpMock.current = { data: { vouchers: [{ code: "PWP-1234ABCD" }] }, isFetching: false };
+    const { onAdd, onClose } = renderPage({ skus: [PRESET_SKU] });
+    fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "PWP-1234ABCD" } });
+    fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
+    fireEvent.change(screen.getByTestId("sofa-qp-remark"), { target: { value: "match showroom" } });
+    fireEvent.click(screen.getByTestId("sofa-qp-add"));
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    const line = onAdd.mock.calls[0]![0];
+    expect(line.unitPrice).toBe(2990); // base @ 24″, fabric deferred → no delta
+    const attrs = line.attrs as Record<string, unknown>;
+    expect(attrs.fabric_deferred).toBe(true);
+    expect(attrs.remark).toBe("match showroom");
+    expect(attrs.pwp_pending_code).toBe("PWP-1234ABCD");
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("fabric pills: Confirm later selected by default; clicking a fabric selects it", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage();
+    expect(screen.getByTestId("sofa-qp-fabric-defer").getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByTestId("sofa-qp-fabric-f-1"));
+    expect(screen.getByTestId("sofa-qp-fabric-f-1").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("sofa-qp-fabric-defer").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("renders a to-scale plan view with width + depth cm callouts", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage();
+    expect(screen.getByTestId("sofa-plan-view")).toBeTruthy();
+    expect(screen.getByTestId("sofa-plan-width").textContent).toMatch(/\d+ cm/);
+    expect(screen.getByTestId("sofa-plan-depth").textContent).toMatch(/\d+ cm/);
+  });
+
+  it("shows the INSERT PWP code input by default", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage();
+    expect(screen.getByTestId("sofa-pwp-input")).toBeTruthy();
+  });
+
+  it("a valid PWP code shows the applied chip", () => {
+    pwpMock.current = { data: { vouchers: [{ code: "PWP-1234ABCD" }] }, isFetching: false };
+    renderPage();
+    fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "pwp-1234abcd" } });
+    fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
+    expect(screen.getByTestId("sofa-pwp-applied").textContent).toContain("PWP-1234ABCD");
+  });
+
+  it("an unknown PWP code shows a validation error", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage();
+    fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "BADCODE" } });
+    fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
+    expect(screen.getByTestId("sofa-pwp-error")).toBeTruthy();
+  });
+
+  it("clears the applied code via remove", () => {
+    pwpMock.current = { data: { vouchers: [{ code: "PWP-1234ABCD" }] }, isFetching: false };
+    renderPage();
+    fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "PWP-1234ABCD" } });
+    fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
+    expect(screen.getByTestId("sofa-pwp-applied")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("sofa-pwp-remove"));
+    expect(screen.queryByTestId("sofa-pwp-applied")).toBeNull();
+    expect(screen.getByTestId("sofa-pwp-input")).toBeTruthy();
   });
 });

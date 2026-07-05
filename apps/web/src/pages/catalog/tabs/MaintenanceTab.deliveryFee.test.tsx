@@ -28,16 +28,12 @@ const mockDeleteRule = vi.fn();
 vi.mock("@/lib/queries", () => ({
   usePatchFloorConfig:        () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateFabricTierConfig:  () => ({ mutate: vi.fn(), isPending: false }),
-  useCreateAddon:             () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-  usePatchAddon:              () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-  useDeleteAddon:             () => ({ mutate: vi.fn(), isPending: false }),
   useCreateSofaCompartment:   () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useUpdateSofaCompartment:   () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteSofaCompartment:   () => ({ mutate: vi.fn(), isPending: false }),
-  // option pool hooks (OptionPoolEditor children)
-  useCreateOptionPoolEntry:   () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-  usePatchOptionPoolEntry:    () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-  useDeleteOptionPoolEntry:   () => ({ mutate: vi.fn(), isPending: false }),
+  // 0201 — option pool hooks (PoolPanel children)
+  useBatchSaveOptionPool:     () => ({ mutate: vi.fn(), isPending: false }),
+  useCatalogConfigHistory:    () => ({ data: undefined, isLoading: false }),
   // 0184 — delivery trip fee hooks under test
   useUpdateDeliveryFeeConfig:      () => ({ mutate: mockUpdateDeliveryConfig, isPending: false }),
   useCreateSpecialDeliveryFeeRule: () => ({ mutate: vi.fn(), mutateAsync: mockCreateRule, isPending: false }),
@@ -88,6 +84,13 @@ function wrap(ui: React.ReactNode) {
   return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
 }
 
+/** 0201 — the tab is sidebar-driven now: delivery config lives behind the
+ *  "Delivery Fees" nav item, so every test opens that panel first. */
+function renderDeliveryPanel(catalog: CatalogResponse, isPrincipal: boolean) {
+  render(wrap(<MaintenanceTab catalog={catalog} isPrincipal={isPrincipal} />));
+  fireEvent.click(screen.getByTestId("maint-nav-delivery"));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockCreateRule.mockResolvedValue({});
@@ -100,7 +103,7 @@ beforeEach(() => {
 
 describe("Delivery trip fee config", () => {
   it("renders the config section with the seeded values", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal />));
+    renderDeliveryPanel(makeCatalog(), true);
     expect(screen.getByText("Delivery trip fee")).toBeInTheDocument();
     expect(screen.getByTestId("delivery-base-fee")).toHaveValue(0);
     expect(screen.getByTestId("delivery-cross-fee")).toHaveValue(0);
@@ -110,7 +113,7 @@ describe("Delivery trip fee config", () => {
   });
 
   it("a principal edits base + cross fee and saves the patch payload", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal />));
+    renderDeliveryPanel(makeCatalog(), true);
     fireEvent.change(screen.getByTestId("delivery-base-fee"), { target: { value: "80" } });
     fireEvent.change(screen.getByTestId("delivery-cross-fee"), { target: { value: "120" } });
     fireEvent.click(screen.getByTestId("delivery-fee-save"));
@@ -125,7 +128,7 @@ describe("Delivery trip fee config", () => {
   });
 
   it("toggling a charged category is reflected in the saved payload", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal />));
+    renderDeliveryPanel(makeCatalog(), true);
     // turn ON service, turn OFF sofa
     fireEvent.click(screen.getByTestId("delivery-cat-service"));
     fireEvent.click(screen.getByTestId("delivery-cat-sofa"));
@@ -137,7 +140,7 @@ describe("Delivery trip fee config", () => {
   });
 
   it("non-principal sees read-only config (disabled inputs, no Save)", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal={false} />));
+    renderDeliveryPanel(makeCatalog(), false);
     expect(screen.getByTestId("delivery-base-fee")).toBeDisabled();
     expect(screen.queryByTestId("delivery-fee-save")).not.toBeInTheDocument();
   });
@@ -145,7 +148,7 @@ describe("Delivery trip fee config", () => {
 
 describe("Special delivery rules + RuleTargetPicker", () => {
   it("a principal adds a rule with a model target and a fee", async () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal />));
+    renderDeliveryPanel(makeCatalog(), true);
     // open the add form
     fireEvent.click(screen.getByRole("button", { name: "+ Add rule" }));
 
@@ -171,7 +174,7 @@ describe("Special delivery rules + RuleTargetPicker", () => {
   });
 
   it("Save stays disabled until at least one target is ticked", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal />));
+    renderDeliveryPanel(makeCatalog(), true);
     fireEvent.click(screen.getByRole("button", { name: "+ Add rule" }));
     fireEvent.change(screen.getByTestId("rule-standalone-fee"), { target: { value: "150" } });
     expect(screen.getByTestId("rule-save")).toBeDisabled();
@@ -193,7 +196,7 @@ describe("Special delivery rules + RuleTargetPicker", () => {
     });
     // confirm() must return true for the delete to fire
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(wrap(<MaintenanceTab catalog={catalog} isPrincipal />));
+    renderDeliveryPanel(catalog, true);
     expect(screen.getByText("Heavy item")).toBeInTheDocument();
     const row = screen.getByTestId("delivery-rule-row-rule-1");
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
@@ -215,7 +218,7 @@ describe("Special delivery rules + RuleTargetPicker", () => {
         },
       ],
     });
-    render(wrap(<MaintenanceTab catalog={catalog} isPrincipal={false} />));
+    renderDeliveryPanel(catalog, false);
     expect(screen.queryByRole("button", { name: "+ Add rule" })).not.toBeInTheDocument();
     const row = screen.getByTestId("delivery-rule-row-rule-1");
     expect(within(row).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();

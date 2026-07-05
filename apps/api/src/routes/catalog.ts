@@ -39,7 +39,10 @@ import {
   SPECIAL_ADDONS,
   catalogOptionPoolCreateInput,
   catalogOptionPoolPatchInput,
+  catalogOptionPoolNameSchema,
+  catalogPoolBatchSaveInput,
   CATALOG_OPTION_POOLS,
+  CATALOG_CONFIG_HISTORY,
   deliveryFeeConfigPatchInput,
   specialDeliveryFeeRuleInput,
   DELIVERY_FEE_CONFIG,
@@ -2138,6 +2141,7 @@ catalogRouter.post("/option-pools", async (c) => {
       value: parsed.data.value,
       label: parsed.data.label ?? null,
       dimensions: parsed.data.dimensions ?? null,
+      surcharge: parsed.data.surcharge ?? null,
       active: parsed.data.active ?? true,
       sort_order: parsed.data.sortOrder ?? 0,
       updated_at: new Date().toISOString(),
@@ -2170,6 +2174,7 @@ catalogRouter.patch("/option-pools/:id", async (c) => {
   if (parsed.data.value !== undefined) patch.value = parsed.data.value;
   if (parsed.data.label !== undefined) patch.label = parsed.data.label;
   if (parsed.data.dimensions !== undefined) patch.dimensions = parsed.data.dimensions;
+  if (parsed.data.surcharge !== undefined) patch.surcharge = parsed.data.surcharge;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
   if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
   if (Object.keys(patch).length === 0) {
@@ -2212,6 +2217,80 @@ catalogRouter.delete("/option-pools/:id", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ ok: true });
+});
+
+// PUT /option-pools/:pool — 0201 batch save (principal-only). REPLACE semantics:
+// the body's `entries` become the pool's full new contents (array order =
+// display order) and the catalog_pool_batch_save RPC appends a
+// catalog_config_history snapshot in the SAME transaction — that atomicity is
+// exactly why this is an RPC and not delete+insert round-trips. SECURITY
+// INVOKER: the user JWT is forwarded, so RLS
+// (catalog_option_pools_write_principal + catalog_config_history_write_principal)
+// stays the real boundary.
+catalogRouter.put("/option-pools/:pool", async (c) => {
+  principalOnly(c, OPTION_POOL_MSG);
+  const poolParam = catalogOptionPoolNameSchema.safeParse(c.req.param("pool"));
+  if (!poolParam.success) {
+    return c.json({ error: "not_found", code: "not_found", message: "unknown option pool" }, 404);
+  }
+  const parsed = await parseJsonBody(c, catalogPoolBatchSaveInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // Friendly 409 before the round-trip: duplicate values would trip
+  // UNIQUE(pool,value) mid-RPC and roll the whole save back anyway.
+  const values = parsed.data.entries.map((e) => e.value);
+  if (new Set(values).size !== values.length) {
+    return c.json(optionPoolDuplicate(undefined, poolParam.data), 409);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("catalog_pool_batch_save", {
+    p_pool: poolParam.data,
+    p_entries: parsed.data.entries.map((e) => ({
+      value: e.value,
+      label: e.label ?? null,
+      dimensions: e.dimensions ?? null,
+      surcharge: e.surcharge ?? null,
+      active: e.active ?? true,
+    })),
+    p_notes: parsed.data.notes ?? null,
+  });
+  if (error) {
+    if (error.code === "23505") {
+      return c.json(optionPoolDuplicate(undefined, poolParam.data), 409);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, result: data ?? null });
+});
+
+// GET /config-history?section= — 0201 snapshot log for one pool, newest first
+// (internal read; the History dialog is operation+principal facing).
+catalogRouter.get("/config-history", async (c) => {
+  internalOnly(c);
+  const sectionParam = catalogOptionPoolNameSchema.safeParse(c.req.query("section"));
+  if (!sectionParam.success) {
+    return c.json(
+      { error: "validation", code: "validation", message: "unknown config-history section" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(CATALOG_CONFIG_HISTORY)
+    .select("*")
+    .eq("section", sectionParam.data)
+    .order("effective_from", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({
+    history: (data ?? []).map((r) =>
+      Adapters.catalogConfigHistoryFromRow(r as DB.CatalogConfigHistoryRow),
+    ),
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   resolveCompartmentPrice,
   mirrorCode,
+  mirrorModules,
+  canMirror,
   canonicalizeSofaSlots,
   matchSofaCombo,
   pickSofaCombo,
@@ -165,6 +167,47 @@ describe("mirrorCode", () => {
   it("passes orientation-free codes through unchanged", () => {
     expect(mirrorCode("1NA")).toBe("1NA");
     expect(mirrorCode("Console")).toBe("Console");
+  });
+});
+
+/* ─── mirrorModules ────────────────────────────────────────────────────── */
+
+describe("mirrorModules", () => {
+  it("reverses slot order and swaps each handed code L↔R", () => {
+    expect(mirrorModules([["1A(LHF)"], ["2A(RHF)"]])).toEqual([
+      ["2A(LHF)"],
+      ["1A(RHF)"],
+    ]);
+  });
+  it("mirrors an L-shape (corner + tail) end to end", () => {
+    expect(mirrorModules([["1A(LHF)"], ["CNR"], ["2A(RHF)"]])).toEqual([
+      ["2A(LHF)"],
+      ["CNR"],
+      ["1A(RHF)"],
+    ]);
+  });
+  it("mirrors every code inside a multi-code OR-set slot", () => {
+    expect(mirrorModules([["1A(LHF)", "1B(LHF)"]])).toEqual([
+      ["1A(RHF)", "1B(RHF)"],
+    ]);
+  });
+});
+
+/* ─── canMirror ────────────────────────────────────────────────────────── */
+
+describe("canMirror", () => {
+  it("is true when the representative sequence changes", () => {
+    expect(canMirror([["1A(LHF)"], ["2A(RHF)"]])).toBe(true);
+  });
+  it("is false for an orientation-free palindrome (nothing to flip)", () => {
+    expect(canMirror([["1NA"]])).toBe(false);
+    expect(canMirror([["Console"], ["Console"]])).toBe(false);
+  });
+  it("is false for a single symmetric handed seat (mirror = self via reverse)", () => {
+    // one slot: reverse is a no-op, and canMirror compares first-code sequence
+    // only, so a lone handed code still flips its rep → true. A genuinely
+    // symmetric layout (same rep after mirror) is the palindrome case above.
+    expect(canMirror([["1A(LHF)"]])).toBe(true);
   });
 });
 

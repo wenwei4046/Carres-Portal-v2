@@ -181,16 +181,46 @@ export const specialDeliveryFeeRuleFromRow = (
 });
 
 // 0182 — global option pool entry (supplier_category / bedframe_size /
-// mattress_size). `label` + `dimensions` are nullable (size pools only) and
-// stay null; `sort_order` is Postgres integer normalised via Number().
+// mattress_size + the 0201 pools). `label` + `dimensions` are nullable (size
+// pools only) and stay null; `surcharge` (0201) is Postgres numeric → Number();
+// `sort_order` is Postgres integer normalised via Number().
 export const catalogOptionPoolFromRow = (r: DB.CatalogOptionPoolRow): D.CatalogOptionPool => ({
   id: r.id,
   pool: r.pool,
   value: r.value,
   label: r.label ?? null,
   dimensions: r.dimensions ?? null,
+  surcharge: r.surcharge == null ? null : Number(r.surcharge),
   active: r.active,
   sortOrder: Number(r.sort_order),
+});
+
+/** 0201 — catalog_config_history row → domain. `snapshot` entries are stored
+ *  camelCase by the RPC/migration; malformed entries are dropped (defensive —
+ *  the write path always produces the full shape). */
+export const catalogConfigHistoryFromRow = (
+  r: DB.CatalogConfigHistoryRow,
+): D.CatalogConfigHistory => ({
+  id: r.id,
+  section: r.section,
+  entries: (Array.isArray(r.snapshot) ? r.snapshot : []).flatMap((e) => {
+    if (typeof e !== "object" || e === null) return [];
+    const o = e as Record<string, unknown>;
+    if (typeof o.value !== "string") return [];
+    return [
+      {
+        value: o.value,
+        label: typeof o.label === "string" ? o.label : null,
+        dimensions: typeof o.dimensions === "string" ? o.dimensions : null,
+        surcharge: typeof o.surcharge === "number" ? o.surcharge : null,
+        active: typeof o.active === "boolean" ? o.active : true,
+        sortOrder: typeof o.sortOrder === "number" ? o.sortOrder : 0,
+      },
+    ];
+  }),
+  effectiveFrom: r.effective_from,
+  notes: r.notes ?? null,
+  createdAt: r.created_at,
 });
 
 /**

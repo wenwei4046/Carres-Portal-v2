@@ -5132,3 +5132,164 @@ describe("0186 — pwp_price + pwp_prices_by_height write paths", () => {
     expect(upd?.payload).not.toHaveProperty("pwp_prices_by_height");
   });
 });
+
+// ---------------------------------------------------------------------------
+// 0201 — option pool BATCH save (PUT /option-pools/:pool → catalog_pool_batch_
+// save RPC) + config-history read. The RPC replaces the pool's contents and
+// appends a catalog_config_history snapshot atomically; these tests assert the
+// route→RPC contract + gates, not the SQL.
+// ---------------------------------------------------------------------------
+
+describe("0201 — option pool batch save + config history", () => {
+  /** Minimal sb stub with a recording `.rpc()`. */
+  function buildRpcSb(opts?: {
+    rpcError?: { code?: string; message?: string } | null;
+    calls?: { fn: string; args: unknown }[];
+  }): SbStub {
+    const calls = opts?.calls ?? [];
+    return {
+      rpc: async (fn: string, args: unknown) => {
+        calls.push({ fn, args });
+        if (opts?.rpcError) return { data: null, error: opts.rpcError };
+        return { data: { ok: true, count: 2 }, error: null };
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+  }
+
+  it("PUT /option-pools/:pool — principal → RPC with p_pool/p_entries in array order", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools/divan_height", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { value: '4"' },
+            { value: '10"', surcharge: 125 },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].fn).toBe("catalog_pool_batch_save");
+    expect(calls[0].args).toEqual({
+      p_pool: "divan_height",
+      p_entries: [
+        { value: '4"', label: null, dimensions: null, surcharge: null, active: true },
+        { value: '10"', label: null, dimensions: null, surcharge: 125, active: true },
+      ],
+      p_notes: null,
+    });
+  });
+
+  it("PUT /option-pools/:pool — non-principal → 403, RPC never called", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools/divan_height", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ value: '4"' }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("PUT /option-pools/:pool — unknown pool → 404", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools/branding", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ value: "X" }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("PUT /option-pools/:pool — duplicate values in the body → 409, RPC never called", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools/gap", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ value: '4"' }, { value: '4"' }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_option_pool_value");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("GET /config-history?section= — internal read maps snapshot rows to camelCase", async () => {
+    const historyRow = {
+      id: "00000000-0000-0000-0000-0000000e0001",
+      section: "divan_height",
+      snapshot: [
+        { value: '10"', label: null, dimensions: null, surcharge: 125, active: true, sortOrder: 1 },
+      ],
+      effective_from: "2026-07-05",
+      notes: "Baseline — ported from 2990s Portal (0201)",
+      created_at: "2026-07-05T08:00:00.000Z",
+      created_by: null,
+    };
+    const eqCalls: { col: string; val: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue({
+      from: (table: string) => {
+        expect(table).toBe("catalog_config_history");
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = (col: string, val: unknown) => {
+          eqCalls.push({ col, val });
+          return chain;
+        };
+        chain.order = () => chain;
+        chain.limit = async () => ({ data: [historyRow], error: null });
+        return chain;
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/config-history?section=divan_height", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(eqCalls).toEqual([{ col: "section", val: "divan_height" }]);
+    const body = (await res.json()) as {
+      history: { section: string; effectiveFrom: string; entries: { surcharge: number }[] }[];
+    };
+    expect(body.history).toHaveLength(1);
+    expect(body.history[0]).toMatchObject({
+      section: "divan_height",
+      effectiveFrom: "2026-07-05",
+      notes: "Baseline — ported from 2990s Portal (0201)",
+    });
+    expect(body.history[0].entries[0].surcharge).toBe(125);
+  });
+
+  it("GET /config-history — unknown section → 422", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/config-history?section=branding", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});

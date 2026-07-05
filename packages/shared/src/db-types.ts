@@ -236,15 +236,39 @@ export interface SpecialAddonRow {
  *  supplier_category). Read-only reference list — no order-side consumer. */
 export interface CatalogOptionPoolRow {
   id: string;
-  pool: "supplier_category" | "bedframe_size" | "mattress_size";
+  pool:
+    | "supplier_category"
+    | "bedframe_size"
+    | "mattress_size"
+    | "divan_height"
+    | "total_height"
+    | "gap"
+    | "bedframe_leg_height"
+    | "sofa_size"
+    | "sofa_leg_height";
   value: string;
   label: string | null;
   dimensions: string | null;
+  /** 0201 — RM selling surcharge (numeric arrives as number|string). */
+  surcharge: number | string | null;
   active: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
+}
+
+/** `catalog_config_history` (migration 0201). Lightweight append-only snapshot
+ *  log for the option pools — one row per pool Edit-save; `snapshot` holds the
+ *  FULL pool contents at save time (camelCase entries). */
+export interface CatalogConfigHistoryRow {
+  id: string;
+  section: CatalogOptionPoolRow["pool"];
+  snapshot: unknown;
+  effective_from: string;
+  notes: string | null;
+  created_at: string;
+  created_by: string | null;
 }
 
 /**

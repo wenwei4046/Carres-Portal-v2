@@ -175,15 +175,46 @@ export interface SpecialAddon {
  * any order-side behaviour (sizes stay per-model in allowedOptions; supplier
  * scope stays in suppliers.cat_covered).
  */
-export type CatalogOptionPoolName = "supplier_category" | "bedframe_size" | "mattress_size";
+export type CatalogOptionPoolName =
+  | "supplier_category"
+  | "bedframe_size"
+  | "mattress_size"
+  | "divan_height"
+  | "total_height"
+  | "gap"
+  | "bedframe_leg_height"
+  | "sofa_size"
+  | "sofa_leg_height";
 export interface CatalogOptionPool {
   id: string;
   pool: CatalogOptionPoolName;
   value: string;
   label: string | null;
   dimensions: string | null;
+  /** 0201 — RM selling surcharge for priced pools; null renders as "—". */
+  surcharge: number | null;
   active: boolean;
   sortOrder: number;
+}
+
+/**
+ * 0201 — one catalog_config_history row: the lightweight append-only snapshot
+ * a pool Edit-save writes (effective_from = the save date; no future-dating).
+ */
+export interface CatalogConfigHistory {
+  id: string;
+  section: CatalogOptionPoolName;
+  entries: {
+    value: string;
+    label: string | null;
+    dimensions: string | null;
+    surcharge: number | null;
+    active: boolean;
+    sortOrder: number;
+  }[];
+  effectiveFrom: string;
+  notes: string | null;
+  createdAt: string;
 }
 
 /**

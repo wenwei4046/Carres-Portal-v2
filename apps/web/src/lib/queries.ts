@@ -31,9 +31,9 @@ import {
   type SpecialAddonDto,
   type SpecialAddonCreateInput,
   type SpecialAddonPatchInput,
-  type CatalogOptionPoolDto,
-  type CatalogOptionPoolCreateInput,
-  type CatalogOptionPoolPatchInput,
+  type CatalogOptionPoolName,
+  type CatalogPoolBatchSaveInput,
+  type CatalogConfigHistoryDto,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
   type ComboDto,
@@ -141,6 +141,9 @@ export const qk = {
   orders:       (filters?: OrderFilters) => ["orders", filters ?? {}] as const,
   order:        (id: string) => ["orders", id] as const,
   catalog:      () => ["catalog"] as const,
+  /** 0201 — per-pool config-history snapshots. Nested under 'catalog' so every
+   *  catalog mutation's ["catalog"] prefix-invalidation refreshes it too. */
+  catalogConfigHistory: (section: string) => ["catalog", "config-history", section] as const,
   outlets:      () => ["outlets"] as const,
   salespersons: (outletId?: string) => ["salespersons", outletId ?? null] as const,
   /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (GET /api/pwp-codes/mine),
@@ -5025,38 +5028,35 @@ export function useDeleteSpecialAddon() {
   });
 }
 
-// 0182 — Global option pools (2990s Products parity Phase 4). Three curated
-// READ-ONLY reference lists (supplier_category / bedframe_size / mattress_size).
-// Not a source of truth for any order-side consumer — sizes only SUGGEST in the
-// per-model size picker; product_models.allowed_options.sizes stays authoritative.
-// CRUD mirrors the special-addon hooks; all invalidate ['catalog'] so the
-// Maintenance tab + per-model size picker refresh (pools ride in the catalog
-// bundle — no dedicated query key needed). Principal-only at the API/RLS layer;
-// the UI gate in OptionPoolEditor is a friendly read-only veneer.
-export function useCreateOptionPoolEntry() {
+// 0182→0201 — Global option pools. Curated reference lists (sizes / heights /
+// gaps / supplier categories) rendered by the Maintenance + Special Add-ons
+// sidebar panels. Not a source of truth for any order-side consumer — sizes
+// only SUGGEST in the per-model size picker; product_models.allowed_options
+// stays authoritative. 0201 replaced the per-row CRUD hooks with ONE batch
+// save (Edit-mode draft → PUT replaces the pool + appends a history snapshot
+// atomically via the catalog_pool_batch_save RPC). Principal-only at the
+// API/RLS layer; the UI gate in PoolPanel is a friendly read-only veneer.
+export function useBatchSaveOptionPool() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CatalogOptionPoolCreateInput) =>
-      apiFetch<{ optionPool: CatalogOptionPoolDto }>("/api/catalog/option-pools", catalogJson("POST", input)),
+    mutationFn: ({ pool, input }: { pool: CatalogOptionPoolName; input: CatalogPoolBatchSaveInput }) =>
+      apiFetch<{ ok: true }>(`/api/catalog/option-pools/${pool}`, catalogJson("PUT", input)),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }
 
-export function usePatchOptionPoolEntry() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: CatalogOptionPoolPatchInput }) =>
-      apiFetch<{ optionPool: CatalogOptionPoolDto }>(`/api/catalog/option-pools/${id}`, catalogJson("PATCH", patch)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
-  });
-}
-
-export function useDeleteOptionPoolEntry() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) =>
-      apiFetch<{ ok: true }>(`/api/catalog/option-pools/${id}`, catalogJson("DELETE")),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+/** 0201 — the History dialog's snapshot log for one pool (newest first). Only
+ *  fetched while the dialog is open (`enabled`); rides the ["catalog"] prefix
+ *  so every pool save refreshes it. */
+export function useCatalogConfigHistory(section: CatalogOptionPoolName, enabled: boolean) {
+  return useQuery({
+    queryKey: qk.catalogConfigHistory(section),
+    queryFn: () =>
+      apiFetch<{ history: CatalogConfigHistoryDto[] }>(
+        `/api/catalog/config-history?section=${section}`,
+      ),
+    enabled,
+    staleTime: 60_000,
   });
 }
 

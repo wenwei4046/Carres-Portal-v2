@@ -21,7 +21,9 @@ import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
 /**
  * SKU Master — flat product table with cost + plan-margin visibility for the
  * Master Admin. Columns: Product code · Description · Product name · Category ·
- * Size · Price · Cost · Margin · Status. Filter by category + free-text search;
+ * Size · Price · Cost · Margin · Status. Filter by category + model pills +
+ * free-text search; picking a category reveals a second pill row of that
+ * category's model names (shown even for a single model — e.g. Sofa → Booqit).
  * "Edit Prices" flips the Price and Cost cells to inline inputs (commit on blur,
  * verified by the catalog re-fetch the patch triggers). Price 0 renders as a
  * muted "not set"; Cost null renders as a muted "not set" — NEVER coerced to 0.
@@ -87,8 +89,8 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     });
   }, [catalog.skus, modelById]);
 
-  // Models available for the model-filter dropdown — scoped to the active
-  // category so the picker isn't a flat 1000-model list (2990s parity).
+  // Models for the model pill row — scoped to the active category so the row
+  // isn't a flat 1000-model list; hidden entirely while category is "all".
   const categoryModels = useMemo(
     () =>
       catalog.models
@@ -202,22 +204,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           ))}
         </div>
         <div className="flex items-center gap-2">
-          {categoryModels.length > 1 && (
-            <select
-              value={modelFilter}
-              onChange={(e) => setModelFilter(e.target.value)}
-              aria-label="Filter by model"
-              data-testid="sku-model-filter"
-              className={`${INPUT_CLS} w-44`}
-            >
-              <option value="all">All models</option>
-              {categoryModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          )}
           <input
             type="search"
             value={search}
@@ -282,6 +268,30 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           </button>
         </div>
       </div>
+
+      {/* Model pill row — second-level filter under the category chips. Shown
+          whenever a specific category is picked, even with a single model, so
+          the model name (e.g. Booqit) is always visible + clickable. */}
+      {category !== "all" && categoryModels.length > 0 && (
+        <div
+          className="flex items-center gap-1.5 flex-wrap -mt-1 mb-4"
+          data-testid="sku-model-filter"
+        >
+          <span className="t-micro text-base-400 mr-1">Model</span>
+          <CategoryChip active={modelFilter === "all"} onClick={() => setModelFilter("all")}>
+            All {CATEGORY_LABEL[category]}
+          </CategoryChip>
+          {categoryModels.map((m) => (
+            <CategoryChip
+              key={m.id}
+              active={modelFilter === m.id}
+              onClick={() => setModelFilter(m.id)}
+            >
+              {m.name}
+            </CategoryChip>
+          ))}
+        </div>
+      )}
 
       <p className="t-tiny text-base-500 mb-2">
         {filtered.length} SKU{filtered.length === 1 ? "" : "s"}
@@ -443,12 +453,12 @@ const SkuRowView = memo(function SkuRowView({
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
             aria-label={`${sku.sku} price`}
-            className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+            className={`${INPUT_CLS} text-right t-num text-[12px]`}
           />
         ) : sku.price === 0 ? (
           <span className="t-tiny text-base-400 italic">price not set</span>
         ) : (
-          <span className="font-mono text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
+          <span className="t-num text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
         )}
       </div>
 
@@ -466,12 +476,12 @@ const SkuRowView = memo(function SkuRowView({
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
             aria-label={`${sku.sku} cost`}
-            className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+            className={`${INPUT_CLS} text-right t-num text-[12px]`}
           />
         ) : sku.cost === null ? (
           <span className="t-tiny text-base-400 italic">not set</span>
         ) : (
-          <span className="font-mono text-[12px] text-base-700">{fmtPrice(sku.cost)}</span>
+          <span className="t-num text-[12px] text-base-700">{fmtPrice(sku.cost)}</span>
         )}
       </div>
 
@@ -481,7 +491,7 @@ const SkuRowView = memo(function SkuRowView({
           <span className="t-tiny text-base-400 italic" title={`${marginLabel} · cost not set`}>—</span>
         ) : (
           <span
-            className={`font-mono text-[12px] ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
+            className={`t-num text-[12px] ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
             title={marginLabel}
           >
             {fmtPrice(margin.amount)}

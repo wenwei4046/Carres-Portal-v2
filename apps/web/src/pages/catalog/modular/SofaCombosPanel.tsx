@@ -171,7 +171,7 @@ export default function SofaCombosPanel({
                 <div className="t-tiny text-base-400 truncate">{slotsSummary(combo.slots)}</div>
               )}
             </div>
-            <div className="t-tiny text-base-600 font-mono">{pricedHeights(combo.pricesByHeight)}</div>
+            <div className="t-tiny text-base-600 t-num">{pricedHeights(combo.pricesByHeight)}</div>
             <div className="t-tiny text-base-600">{combo.tier ? combo.tier.replace("PRICE_", "P") : "Any"}</div>
             <div className="text-right flex justify-end items-center gap-3">
               {isPrincipal ? (
@@ -458,7 +458,7 @@ function SofaComboEditor({
                 className="flex items-start gap-2 bg-base-50 border border-base-200 rounded-[4px] px-2.5 py-2"
                 data-testid={`sofa-combo-slot-${i}`}
               >
-                <span className="t-tiny text-base-400 font-mono mt-2 w-5 shrink-0">{i + 1}</span>
+                <span className="t-tiny text-base-400 t-num mt-2 w-5 shrink-0">{i + 1}</span>
                 <SlotCodePicker
                   selected={slot}
                   options={offeredCodes}
@@ -503,13 +503,13 @@ function SofaComboEditor({
                     value={prices[h] ?? ""}
                     onChange={(e) => setPrices((p) => ({ ...p, [h]: e.target.value }))}
                     placeholder="n/a"
-                    className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+                    className={`${INPUT_CLS} text-right t-num text-[12px]`}
                     data-testid={`sofa-combo-price-${h}`}
                     aria-label={`combo price at height ${h}`}
                   />
                   {saves !== null && (
                     <span
-                      className={`block t-tiny mt-0.5 text-right font-mono ${
+                      className={`block t-tiny mt-0.5 text-right t-num ${
                         saves >= 0 ? "text-base-500" : "text-danger"
                       }`}
                       data-testid={`sofa-combo-implied-${h}`}
@@ -524,7 +524,7 @@ function SofaComboEditor({
           <p className="t-tiny text-base-400 mt-1.5">
             Blank = the combo does not apply at that height. À-la-carte baseline (sum of each
             slot&apos;s first code):{" "}
-            <b className="font-mono text-base-600">RM {fmtRM(baseline)}</b>. The figure under each
+            <b className="t-num text-base-600">RM {fmtRM(baseline)}</b>. The figure under each
             price is the implied discount (or markup) vs that baseline.
           </p>
         </div>
@@ -554,12 +554,12 @@ function SofaComboEditor({
                     value={costs[h] ?? ""}
                     onChange={(e) => setCosts((c) => ({ ...c, [h]: e.target.value }))}
                     placeholder="n/a"
-                    className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+                    className={`${INPUT_CLS} text-right t-num text-[12px]`}
                     data-testid={`sofa-combo-cost-${h}`}
                     aria-label={`combo cost at height ${h}`}
                   />
                   <span
-                    className={`block t-tiny mt-0.5 text-right font-mono ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-500"}`}
+                    className={`block t-tiny mt-0.5 text-right t-num ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-500"}`}
                     data-testid={`sofa-combo-margin-${h}`}
                   >
                     {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : "—"}

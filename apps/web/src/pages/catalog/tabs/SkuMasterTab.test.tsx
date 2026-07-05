@@ -115,6 +115,19 @@ const MODEL_SOFA: ProductModelDto = {
   sofaMode: "preset",
 };
 
+// Second mattress model — the model-filter tests need two models inside ONE
+// category so a model pill pick filters within the category scope.
+const MODEL_MAT2: ProductModelDto = {
+  id: "m-mat2",
+  category: "mattress",
+  modelKey: "dream",
+  name: "Carres Dream",
+  blurb: null,
+  colors: null,
+  gaps: null,
+  sofaMode: null,
+};
+
 const SKU_COST_NULL: ProductSkuDto = {
   id: "s1",
   modelId: "m-mat",
@@ -145,6 +158,17 @@ const SKU_SOFA: ProductSkuDto = {
   variantKind: "preset",
   price: 4200,
   cost: 2800,
+  supplierId: null,
+};
+
+const SKU_MAT2: ProductSkuDto = {
+  id: "s4",
+  modelId: "m-mat2",
+  sku: "DREAM-QUEEN",
+  variant: "Queen",
+  variantKind: "size",
+  price: 1990,
+  cost: null,
   supplierId: null,
 };
 
@@ -568,25 +592,37 @@ describe("SkuMasterTab — Export / Import buttons", () => {
 // 2990s Products parity Phase 2 — model filter in SKU Master.
 // ---------------------------------------------------------------------------
 describe("SkuMasterTab — model filter", () => {
-  it("shows a model dropdown when >1 model is in scope, and filters by it", () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
-    const select = screen.getByTestId("sku-model-filter");
-    expect(select).toBeInTheDocument();
-    // both models' SKUs visible initially
-    expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
-    expect(screen.getByTestId("sku-cost-LUNA-3S")).toBeInTheDocument();
-    // pick the sofa model → only its SKU remains
-    fireEvent.change(select, { target: { value: "m-sofa" } });
-    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
-    expect(screen.getByTestId("sku-cost-LUNA-3S")).toBeInTheDocument();
-  });
+  const CATALOG_3 = () =>
+    makeCatalog([SKU_COST_SET, SKU_MAT2, SKU_SOFA], [MODEL_MAT, MODEL_MAT2, MODEL_SOFA]);
 
-  it("resets the model filter when the category changes", () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
-    fireEvent.change(screen.getByTestId("sku-model-filter"), { target: { value: "m-sofa" } });
-    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
-    // switch to the Mattress category — model filter should reset to "all"
+  it("shows model pills once a category is picked — even a single model — and filters by model", () => {
+    render(wrap(<SkuMasterTab catalog={CATALOG_3()} />));
+    // "All" category → no model row
+    expect(screen.queryByTestId("sku-model-filter")).not.toBeInTheDocument();
+    // Sofa has a single model — the row still shows it (the Booqit case)
+    fireEvent.click(screen.getByRole("button", { name: "Sofa" }));
+    expect(screen.getByTestId("sku-model-filter")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Luna Sofa" })).toBeInTheDocument();
+    // Mattress has two models — picking one keeps only its SKU
     fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
     expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Carres Dream" }));
+    expect(screen.getByTestId("sku-cost-DREAM-QUEEN")).toBeInTheDocument();
+    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+  });
+
+  it("resets the model pick when the category changes", () => {
+    render(wrap(<SkuMasterTab catalog={CATALOG_3()} />));
+    fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
+    fireEvent.click(screen.getByRole("button", { name: "Carres Dream" }));
+    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    // leave and come back — the model pick must not survive the category switch
+    fireEvent.click(screen.getByRole("button", { name: "Sofa" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
+    expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All Mattress" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 });
