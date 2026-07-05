@@ -46,6 +46,9 @@ export function buildToDraftLine(
     fabric_name: payload.fabricName,
     fabric_surcharge: payload.fabricSurcharge,
     fabric_tier: payload.fabricTier,
+    // "Confirm later" — fabric deferred to the customer; downstream shows a
+    // "to confirm" chip instead of a fabric name.
+    fabric_deferred: payload.fabricDeferred,
     // Full build geometry descriptor (cells + height) — Phase 4 reads this to
     // server-recompute + explode into per-compartment lines.
     sofa_build: { cells: payload.cells, height: payload.height },
@@ -82,5 +85,6 @@ function cellsSummary(payload: SofaBuildAddPayload): string {
 function buildLabel(payload: SofaBuildAddPayload, model: ProductModelDto): string {
   const parts = [model.name, cellsSummary(payload), `${payload.height}″`];
   if (payload.fabricName) parts.push(payload.fabricName);
+  else if (payload.fabricDeferred) parts.push("Fabric to confirm");
   return parts.join(" · ");
 }

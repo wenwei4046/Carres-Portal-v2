@@ -64,9 +64,14 @@ export interface SofaBuildAddPayload {
   fabricId: string | null;
   fabricName: string | null;
   fabricSurcharge: number;
+  /** True when the salesperson deferred fabric choice (customer to confirm). */
+  fabricDeferred: boolean;
   total: number;
   priceBasis: "combo" | "a_la_carte";
 }
+
+/** Fabric-select sentinel — "Confirm later, customer to confirm". */
+const FABRIC_DEFER = "__defer__";
 
 interface DragState {
   /** The primary cell id under the pointer. */
@@ -178,7 +183,10 @@ export default function SofaBuildCanvas({
   const [fabricId, setFabricId] = useState<string>(sofaFabrics[0]?.id ?? "");
 
   const depth = height; // seat-depth axis == the chosen height key (cm widening)
-  const fabric = sofaFabrics.find((f) => f.id === fabricId) ?? null;
+  // "Confirm later" — salesperson defers the fabric; the sofa still adds to
+  // cart, priced at the base tier, flagged for the customer to confirm.
+  const fabricDeferred = fabricId === FABRIC_DEFER;
+  const fabric = fabricDeferred ? null : sofaFabrics.find((f) => f.id === fabricId) ?? null;
   const fabricTier: FabricTierValue = fabric?.tier ?? "PRICE_1";
 
   // Live drag override — carries the in-flight translation for the dragging
@@ -401,6 +409,7 @@ export default function SofaBuildCanvas({
       fabricId: fabric?.id ?? null,
       fabricName: fabric?.fabricName ?? null,
       fabricSurcharge: priceResult.fabricDelta,
+      fabricDeferred,
       total: priceResult.total,
       priceBasis: priceResult.basis,
     });
@@ -645,9 +654,12 @@ export default function SofaBuildCanvas({
         className="flex shrink-0 flex-wrap items-center gap-4 px-5 py-3"
         style={{ borderTop: "1px solid var(--line)", background: "var(--pos-panel, #fff)" }}
       >
-        {/* Fabric picker */}
+        {/* Fabric picker — optional, deferrable to the customer */}
         <label className="flex items-center gap-2 t-small text-base-600">
-          Fabric
+          <span className="flex flex-col leading-tight">
+            Fabric
+            <span className="t-micro text-base-400">Optional · confirm later</span>
+          </span>
           <select
             value={fabricId}
             onChange={(e) => setFabricId(e.target.value)}
@@ -660,6 +672,7 @@ export default function SofaBuildCanvas({
                 {f.fabricName} · {f.tier.replace("PRICE_", "P")}
               </option>
             ))}
+            <option value={FABRIC_DEFER}>Confirm later — customer to confirm</option>
           </select>
         </label>
 
