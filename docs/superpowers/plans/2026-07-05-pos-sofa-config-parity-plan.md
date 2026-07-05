@@ -21,10 +21,13 @@
 - **P2 — Live config name in header** (feature 2). ✅ DONE `cbd2ca7` — header title shows the flip-aware combo codes; product name → eyebrow. web +2.
 - **P3 — Fabric panel + "Confirm later"** (feature 4). ✅ DONE `a791bf6` — "Confirm later — customer to confirm" fabric option; attrs.fabric_deferred + label. web +2.
 - **P4 — PWP CODE in configurator toolbar** (feature 1). ✅ DONE `cce0185` — validate-only header box (Loo option 1); usePwpAvailableForPhone check + applied/error + attrs.pwp_pending_code hint. web +4.
-- **P5 — Layout fidelity pass**. ⏳ TODO — the big visual rebuild: quick-pick mode gets a centered to-scale PLAN VIEW + a left config panel (leg / fabric / remark) + a rich top bar (size toggle · LIVE TOTAL · Cancel · Add to Cart), matching the prototype/2990S. Best done as a focused session.
+- **P5 — Layout fidelity pass**. ✅ MOSTLY DONE:
+  - **P5a** `1aff7a0` — to-scale PLAN VIEW with width/depth cm callouts (moduleFootprint) on the quick-pick hero.
+  - **P5b** `2fce0c8` — quick-pick direct-add: seat-height toggle (reprices via combo.pricesByHeight + resolveFabricDelta) · LIVE TOTAL · Fabric picker + "Confirm later" · Remark · "Add to cart" (emits DraftLine) + "Customize →" kept.
+  - **DEFERRED (needs schema, Loo's call 2026-07-05):** LEG OPTION (Natural/Walnut/Black metal) — no leg-option data model exists in CARRES *or even 2990S* (it's a pure mockup element). Requires `product_models` leg options + pricing. Do as a separate schema phase.
 
 ## Status (2026-07-05)
-All 4 circled FUNCTIONS complete + committed on this branch. Verification: typecheck shared+api+web clean · shared 610/610 · web 985 pass (+13 new), the 5 fails are pre-existing §17.7 (OhanaSofaTab ×4 + NiceFuture ×1), zero new regressions. Not yet deployed. P5 (layout) remaining.
+All 4 circled FUNCTIONS + the layout re-skin (P5a plan view + P5b direct-add) complete + committed on `feat/pos-sofa-config-parity`. ONLY leg options remain (deferred — needs schema). Verification: typecheck shared+api+web clean · shared 610/610 · web 988 pass (+ new tests across P1–P5), the 5 fails are pre-existing §17.7 (OhanaSofaTab ×4 + NiceFuture ×1), zero new regressions. Not yet deployed.
 
 ## Guardrails
 - Each phase: `pnpm --filter @carres/web typecheck` clean + unit tests + commit. No cross-phase scope creep.
