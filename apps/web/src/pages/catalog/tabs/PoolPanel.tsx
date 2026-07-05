@@ -215,7 +215,7 @@ export default function PoolPanel({
               </span>
               {!e.active && <span className="pill pill-neutral shrink-0">OFF</span>}
               {variant === "priced" && (
-                <span className="ml-auto font-mono text-[13px] tabular-nums text-base-900 shrink-0">
+                <span className="ml-auto t-num text-[13px] text-base-900 shrink-0">
                   {e.surcharge != null ? (
                     <>
                       <span className="t-tiny text-base-400 mr-1.5">RM</span>
@@ -283,7 +283,7 @@ export default function PoolPanel({
                   value={r.surcharge}
                   onChange={(e) => patchRow(i, { surcharge: e.target.value })}
                   placeholder="—"
-                  className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+                  className={`${INPUT_CLS} text-right t-num text-[12px]`}
                   aria-label={`row ${i + 1} surcharge`}
                 />
               )}
@@ -372,7 +372,7 @@ export default function PoolPanel({
                         {e.dimensions ? ` · ${e.dimensions}` : ""}
                       </span>
                       {e.surcharge != null && (
-                        <span className="ml-auto font-mono tabular-nums">RM {fmtRm(e.surcharge)}</span>
+                        <span className="ml-auto t-num">RM {fmtRm(e.surcharge)}</span>
                       )}
                     </div>
                   ))}

@@ -196,7 +196,7 @@ function ComboRow({
           <CodeChip>{combo.comboKey}</CodeChip>
         </div>
       </div>
-      <div className="text-right font-mono text-[12px] text-base-800">
+      <div className="text-right t-num text-[12px] text-base-800">
         RM {fmtRM(combo.comboPrice)}
         {combo.cost != null && (
           <div className="t-tiny text-base-400 font-sans">cost RM {fmtRM(combo.cost)}</div>
@@ -206,7 +206,7 @@ function ComboRow({
         )}
       </div>
       <div
-        className={`text-right font-mono text-[12px] ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-700"}`}
+        className={`text-right t-num text-[12px] ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-700"}`}
         data-testid={`combo-margin-${combo.id}`}
       >
         {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : "—"}
@@ -734,7 +734,7 @@ function ComboEditor({
                     </button>
                   </div>
                   {/* per-row catalog price hint */}
-                  <span className="t-tiny text-base-400 w-28 text-right font-mono">
+                  <span className="t-tiny text-base-400 w-28 text-right t-num">
                     {row.sku
                       ? skuPrice !== undefined
                         ? `RM ${fmtRM(skuPrice * row.qty)}`
@@ -778,26 +778,26 @@ function ComboEditor({
           data-testid="combo-discount-readout"
         >
           <span className="text-base-600">
-            Components total <b className="font-mono text-base-800">RM {fmtRM(componentsTotal)}</b>
+            Components total <b className="t-num text-base-800">RM {fmtRM(componentsTotal)}</b>
           </span>
           <span className="text-base-400 mx-2">·</span>
           <span className="text-base-600">
             Combo price{" "}
-            <b className="font-mono text-base-800">
+            <b className="t-num text-base-800">
               RM {fmtRM(priceValid ? priceNum : 0)}
             </b>
           </span>
           <span className="text-base-400 mx-2">·</span>
           {saves >= 0 ? (
             <span className="text-base-700">
-              Saves <b className="font-mono text-primary">RM {fmtRM(saves)}</b>
+              Saves <b className="t-num text-primary">RM {fmtRM(saves)}</b>
               {componentsTotal > 0 && (
                 <span className="text-base-500"> ({savesPct.toFixed(1)}%)</span>
               )}
             </span>
           ) : (
             <span className="text-danger">
-              Marked up <b className="font-mono">RM {fmtRM(-saves)}</b> (above component total)
+              Marked up <b className="t-num">RM {fmtRM(-saves)}</b> (above component total)
             </span>
           )}
           {anyMissingPrice && (
@@ -807,7 +807,7 @@ function ComboEditor({
           )}
           <span className="block t-tiny text-base-500 mt-1" data-testid="combo-margin-readout">
             Margin vs cost benchmark{" "}
-            <b className={`font-mono ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-700"}`}>
+            <b className={`t-num ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-700"}`}>
               {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : "—"}
             </b>
             {costNum == null && (

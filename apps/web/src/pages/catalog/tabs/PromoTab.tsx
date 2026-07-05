@@ -569,7 +569,7 @@ function CampaignRow({
         </div>
         <div className="t-tiny text-base-400 truncate">{summarizeTargets(campaign.eligible, catalog)}</div>
       </div>
-      <div className="text-right font-mono text-[12px]">{campaign.maxFreeQty}</div>
+      <div className="text-right t-num text-[12px]">{campaign.maxFreeQty}</div>
       <div className="text-right flex justify-end gap-1.5">
         {isPrincipal && (
           <>
@@ -829,7 +829,7 @@ function PwpRuleRow({
           {triggerLabel} <span className="text-base-300">→</span> {rewardLabel}
         </div>
       </div>
-      <div className="text-right font-mono text-[12px]">{rule.qtyPerTrigger}</div>
+      <div className="text-right t-num text-[12px]">{rule.qtyPerTrigger}</div>
       <div className="text-right flex justify-end gap-1.5">
         {isPrincipal && (
           <>

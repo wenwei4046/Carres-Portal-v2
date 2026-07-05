@@ -159,14 +159,14 @@ export default function EditSkuModal({
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 data-testid="edit-sku-price"
-                className={`${INPUT_CLS} text-right font-mono`}
+                className={`${INPUT_CLS} text-right t-num`}
               />
             </label>
           ) : (
             <div>
               <span className="label block mb-1">Price (RM)</span>
               <div
-                className="t-small font-mono text-right text-base-700 mt-2"
+                className="t-small t-num text-right text-base-700 mt-2"
                 data-testid="edit-sku-price-readonly"
               >
                 {sku.price === 0 ? (
@@ -193,7 +193,7 @@ export default function EditSkuModal({
                 onChange={(e) => setCost(e.target.value)}
                 placeholder="not set"
                 data-testid="edit-sku-cost"
-                className={`${INPUT_CLS} text-right font-mono`}
+                className={`${INPUT_CLS} text-right t-num`}
               />
               <div className="t-tiny text-base-400 mt-1">Blank = not set (null).</div>
             </label>
@@ -201,7 +201,7 @@ export default function EditSkuModal({
             <div>
               <span className="label block mb-1">Cost (RM)</span>
               <div
-                className="t-small font-mono text-right text-base-700 mt-2"
+                className="t-small t-num text-right text-base-700 mt-2"
                 data-testid="edit-sku-cost-readonly"
               >
                 {sku.cost === null ? (
@@ -219,7 +219,7 @@ export default function EditSkuModal({
               <div className="t-small text-base-400 italic mt-2">— set cost to compute</div>
             ) : (
               <div
-                className={`font-mono text-[13px] mt-2 ${liveMargin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
+                className={`t-num text-[13px] mt-2 ${liveMargin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
                 data-testid="edit-sku-margin"
               >
                 RM {liveMargin.amount.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -245,7 +245,7 @@ export default function EditSkuModal({
                 onChange={(e) => setPwpPrice(e.target.value)}
                 placeholder="not set"
                 data-testid="edit-sku-pwp-price"
-                className={`${INPUT_CLS} text-right font-mono`}
+                className={`${INPUT_CLS} text-right t-num`}
               />
               <div className="t-tiny text-base-400 mt-1">
                 Reward price for PWP rules. Blank = not set (null).
@@ -255,7 +255,7 @@ export default function EditSkuModal({
             <div>
               <span className="label block mb-1">PWP price (RM)</span>
               <div
-                className="t-small font-mono text-right text-base-700 mt-2"
+                className="t-small t-num text-right text-base-700 mt-2"
                 data-testid="edit-sku-pwp-price-readonly"
               >
                 {sku.pwpPrice === null || sku.pwpPrice === undefined ? (

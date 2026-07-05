@@ -92,6 +92,15 @@
 }
 
 @layer components {
+  /* Formal numeric readout — the body font (Inter) with lining + tabular
+   * figures (the financial-statement look) instead of the code-y JetBrains
+   * Mono. Use on money / qty / margin displays and their inline inputs.
+   * CODES (SKU, model key, compartment, dimensions) stay `font-mono`. */
+  .t-num {
+    @apply font-medium;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
   /* v17 button utilities — sentence case (no uppercase), 13px semibold, 6px
    * radius. Phase 2 hierarchy (locked): `.btn-hero` = the ONE flame CTA per page;
    * `.btn-primary` = black workhorse for every other primary action;

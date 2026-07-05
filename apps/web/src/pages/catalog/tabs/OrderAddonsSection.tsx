@@ -115,7 +115,7 @@ function AddonRow({ addon }: { addon: AddonDto }) {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         aria-label={`${addon.key} price`}
-        className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+        className={`${INPUT_CLS} text-right t-num text-[12px]`}
       />
       <div>{addon.serviceSku ? <CodeChip>{addon.serviceSku}</CodeChip> : <span className="t-tiny text-base-400">—</span>}</div>
       <div className="text-right">
