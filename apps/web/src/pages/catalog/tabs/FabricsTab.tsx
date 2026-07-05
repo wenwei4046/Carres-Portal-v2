@@ -160,6 +160,35 @@ function FabricsPanel({
         : d,
     );
 
+  // Direct click-to-cycle in VIEW mode (2990s behaviour — Loo 2026-07-06: the
+  // pill must switch without entering Edit). One click = cycle Price 1 → 2 → 3
+  // and save immediately through the same batch RPC (whole list, one tier
+  // changed), stamping a descriptive history note.
+  function cycleTier(f: CatalogFabricDto, field: "sofaTier" | "bedframeTier") {
+    if (save.isPending) return;
+    const next = TIER_CYCLE[f[field]];
+    const side = field === "sofaTier" ? "Sofa" : "Bedframe";
+    save.mutate(
+      {
+        entries: fabrics.map((x) => ({
+          fabricCode: x.fabricCode,
+          series: x.series,
+          description: x.description,
+          supplierCode: x.supplierCode,
+          sofaTier: x.id === f.id && field === "sofaTier" ? next : x.sofaTier,
+          bedframeTier: x.id === f.id && field === "bedframeTier" ? next : x.bedframeTier,
+          active: x.active,
+        })),
+        notes: `${f.fabricCode} ${side} tier → ${tierLabel(next)}`,
+      },
+      {
+        onSuccess: () => toast.success(`${f.fabricCode} · ${side} tier → ${tierLabel(next)}`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
   const draftCodes = (draft ?? []).map((r) => r.fabricCode.trim()).filter((v) => v.length > 0);
   const hasDuplicates = new Set(draftCodes).size !== draftCodes.length;
   const canSave = draftCodes.length > 0 && !hasDuplicates;
@@ -305,10 +334,36 @@ function FabricsPanel({
                 {f.supplierCode || <span className="text-base-300">—</span>}
               </div>
               <div data-testid={`fabric-sofa-tier-${f.fabricCode}`}>
-                <TierPill tier={f.sofaTier} />
+                {isPrincipal ? (
+                  <button
+                    type="button"
+                    onClick={() => cycleTier(f, "sofaTier")}
+                    disabled={save.isPending}
+                    className="disabled:opacity-50"
+                    aria-label={`${f.fabricCode} sofa tier — ${tierLabel(f.sofaTier)}, click to change`}
+                    title="Click to cycle Price 1 → 2 → 3 (saves immediately)"
+                  >
+                    <TierPill tier={f.sofaTier} />
+                  </button>
+                ) : (
+                  <TierPill tier={f.sofaTier} />
+                )}
               </div>
               <div className="flex items-center gap-1.5" data-testid={`fabric-bed-tier-${f.fabricCode}`}>
-                <TierPill tier={f.bedframeTier} />
+                {isPrincipal ? (
+                  <button
+                    type="button"
+                    onClick={() => cycleTier(f, "bedframeTier")}
+                    disabled={save.isPending}
+                    className="disabled:opacity-50"
+                    aria-label={`${f.fabricCode} bedframe tier — ${tierLabel(f.bedframeTier)}, click to change`}
+                    title="Click to cycle Price 1 → 2 → 3 (saves immediately)"
+                  >
+                    <TierPill tier={f.bedframeTier} />
+                  </button>
+                ) : (
+                  <TierPill tier={f.bedframeTier} />
+                )}
                 {!f.active && <span className="pill pill-neutral">OFF</span>}
               </div>
             </div>

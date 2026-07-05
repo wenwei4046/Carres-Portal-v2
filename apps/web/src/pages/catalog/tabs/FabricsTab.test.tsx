@@ -126,6 +126,37 @@ describe("FabricsTab — view table", () => {
   });
 });
 
+describe("FabricsTab — view-mode tier click-cycle (2990s behaviour)", () => {
+  it("principal clicks a tier pill in the table → immediate batch save with the cycled tier", () => {
+    render(wrap(<FabricsTab catalog={makeCatalog([FABRIC_BF, FABRIC_CG])} isPrincipal={true} />));
+    // BF-01 sofa tier is Price 2 → one click cycles to Price 3, saved at once
+    fireEvent.click(screen.getByRole("button", { name: /BF-01 sofa tier — Price 2/ }));
+    expect(mockBatchSaveMutate).toHaveBeenCalledTimes(1);
+    const payload = mockBatchSaveMutate.mock.calls[0][0];
+    expect(payload.notes).toBe("BF-01 Sofa tier → Price 3");
+    expect(payload.entries).toHaveLength(2);
+    expect(payload.entries[0]).toMatchObject({ fabricCode: "BF-01", sofaTier: "PRICE_3", bedframeTier: "PRICE_2" });
+    // the other fabric rides along unchanged
+    expect(payload.entries[1]).toMatchObject({ fabricCode: "CG-001", sofaTier: "PRICE_1", bedframeTier: "PRICE_3" });
+  });
+
+  it("bedframe pill cycles independently; Price 1 → Price 2", () => {
+    render(wrap(<FabricsTab catalog={makeCatalog([FABRIC_CG])} isPrincipal={true} />));
+    fireEvent.click(screen.getByRole("button", { name: /CG-001 sofa tier — Price 1/ }));
+    expect(mockBatchSaveMutate.mock.calls[0][0].entries[0]).toMatchObject({
+      fabricCode: "CG-001",
+      sofaTier: "PRICE_2",
+      bedframeTier: "PRICE_3",
+    });
+  });
+
+  it("non-principal sees static pills — no tier buttons", () => {
+    render(wrap(<FabricsTab catalog={makeCatalog([FABRIC_BF])} isPrincipal={false} />));
+    expect(screen.queryByRole("button", { name: /BF-01 sofa tier/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId("fabric-sofa-tier-BF-01").textContent).toBe("Price 2");
+  });
+});
+
 describe("FabricsTab — edit draft", () => {
   it("tier pill click-cycles and Save sends the batch payload", () => {
     render(wrap(<FabricsTab catalog={makeCatalog([FABRIC_BF])} isPrincipal={true} />));
