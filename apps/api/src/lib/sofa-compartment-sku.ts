@@ -70,9 +70,12 @@ export async function syncCompartmentSku(
   if (cErr) return { ok: false, ...mapPgError(cErr) };
   if (!comp) return notFound("compartment");
 
-  // 3. Per-model price: override wins (incl. an explicit 0), else the pool
-  //    default (mirrors resolveCompartmentPrice's `??` discipline).
-  const price = args.priceOverride ?? (comp.default_price as number | null) ?? 0;
+  // 3. SEED price for a first-time offer only: override wins (incl. an explicit
+  //    0), else the legacy pool default. The synced SKU's price is the
+  //    AUTHORITATIVE à-la-carte source (SKU Master — Loo, 2026-07-05), so on a
+  //    RE-offer the existing row's price is preserved (like `cost`) — a
+  //    principal's SKU-Master edit must survive un-offer → re-offer.
+  const seedPrice = args.priceOverride ?? (comp.default_price as number | null) ?? 0;
 
   // 4. Supplier: inherit THIS model's own supplier (each sofa model has exactly
   //    one across its flat SKUs) so PO-by-sku routes the compartment to the
@@ -129,6 +132,9 @@ export async function syncCompartmentSku(
 
   // Upsert on the UNIQUE sku (idempotent re-offer). pos_active=false keeps it
   // out of the flat POS grid; compartment_id (0178) links it back to its type.
+  // `price` is included ONLY on first insert (no existing row) — a re-offer
+  // preserves the SKU-Master-authored price, exactly like `cost`.
+  const isReoffer = clash != null;
   const { error: upErr } = await sb.from("product_skus").upsert(
     {
       sku,
@@ -136,7 +142,7 @@ export async function syncCompartmentSku(
       compartment_id: args.compartmentId,
       variant: comp.code,
       variant_kind: "part",
-      price,
+      ...(isReoffer ? {} : { price: seedPrice }),
       supplier_id: supplierId,
       pos_active: false,
       description: comp.description ?? null,

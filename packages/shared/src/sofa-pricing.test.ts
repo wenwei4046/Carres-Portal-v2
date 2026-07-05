@@ -116,7 +116,25 @@ const ASOF = "2026-05-28";
 /* ─── resolveCompartmentPrice ──────────────────────────────────────────── */
 
 describe("resolveCompartmentPrice", () => {
-  it("uses the model override when present", () => {
+  it("skuPrice (SKU Master) is authoritative — beats override AND pool default", () => {
+    expect(
+      resolveCompartmentPrice({ ...modelComp("c", 500), skuPrice: 777 }, pool("X", 300)),
+    ).toBe(777);
+  });
+
+  it("skuPrice of 0 wins (explicitly free — ?? not ||)", () => {
+    expect(
+      resolveCompartmentPrice({ ...modelComp("c", 500), skuPrice: 0 }, pool("X", 300)),
+    ).toBe(0);
+  });
+
+  it("skuPrice null falls through to the legacy override chain", () => {
+    expect(
+      resolveCompartmentPrice({ ...modelComp("c", 500), skuPrice: null }, pool("X", 300)),
+    ).toBe(500);
+  });
+
+  it("uses the model override when present (no synced sku)", () => {
     expect(resolveCompartmentPrice(modelComp("c", 500), pool("X", 300))).toBe(500);
   });
 

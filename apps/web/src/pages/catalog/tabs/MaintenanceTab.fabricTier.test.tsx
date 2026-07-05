@@ -31,6 +31,9 @@ vi.mock("@/lib/queries", () => ({
   useCreateSofaCompartment:  () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useUpdateSofaCompartment:  () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteSofaCompartment:  () => ({ mutate: vi.fn(), isPending: false }),
+  // Compartment photo hooks (icon_url upload/remove in the pool list).
+  useSetCompartmentPhoto:    () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteCompartmentPhoto: () => ({ mutate: vi.fn(), isPending: false }),
   // 0201 — option pool hooks (PoolPanel children).
   useBatchSaveOptionPool:    () => ({ mutate: vi.fn(), isPending: false }),
   useCatalogConfigHistory:   () => ({ data: undefined, isLoading: false }),
@@ -203,9 +206,22 @@ describe("SofaCompartmentsSection — render + gating", () => {
     expect(screen.queryByText("Disable")).not.toBeInTheDocument();
   });
 
-  it("compartment default price input reflects the catalog value", () => {
+  it("has NO price column (prices live on the per-model SKUs in SKU Master)", () => {
     renderPanel(catalogWithCompartments(), true, "compartments");
-    const priceInput = screen.getByLabelText("1A(LHF) default price") as HTMLInputElement;
-    expect(priceInput.value).toBe("250");
+    expect(screen.queryByLabelText("1A(LHF) default price")).not.toBeInTheDocument();
+    expect(screen.queryByText(/default price/i)).not.toBeInTheDocument();
+  });
+
+  it("principal: photo upload control per row (Remove only once a photo exists)", () => {
+    renderPanel(catalogWithCompartments(), true, "compartments");
+    expect(screen.getByTestId("compartment-photo-input-1A(LHF)")).toBeInTheDocument();
+    // iconUrl null in the fixture → SVG silhouette fallback + no Remove button.
+    expect(screen.queryByLabelText("1A(LHF) remove photo")).not.toBeInTheDocument();
+    expect(screen.getByTestId("compartment-silhouette")).toBeInTheDocument();
+  });
+
+  it("non-principal: no photo upload control", () => {
+    renderPanel(catalogWithCompartments(), false, "compartments");
+    expect(screen.queryByTestId("compartment-photo-input-1A(LHF)")).not.toBeInTheDocument();
   });
 });

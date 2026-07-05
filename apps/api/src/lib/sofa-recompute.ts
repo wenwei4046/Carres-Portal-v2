@@ -248,9 +248,11 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
       sb.from(MODEL_FABRIC_TIER_OVERRIDES).select("*").eq("model_id", modelId).maybeSingle(),
       // 5A — this model's real compartment skus (auto-synced on offer). Excludes
       // discontinued (un-offered) skus so an un-offered compartment can't be sold.
+      // `price` = the AUTHORITATIVE à-la-carte compartment price (SKU Master —
+      // Loo, 2026-07-05); enriched onto modelCompartments as `skuPrice` below.
       sb
         .from("product_skus")
-        .select("sku, compartment_id")
+        .select("sku, compartment_id, price")
         .eq("model_id", modelId)
         .not("compartment_id", "is", null)
         .is("discontinued_at", null),
@@ -268,9 +270,25 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
   const compartmentPool = (poolR.data ?? []).map((r) =>
     Adapters.sofaCompartmentFromRow(r as DB.SofaCompartmentRow),
   );
-  const modelCompartments = (modelCompsR.data ?? []).map((r) =>
-    Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow),
+  // skuPrice enrichment — the synced compartment SKU's price is the
+  // authoritative à-la-carte source; resolveCompartmentPrice falls back to the
+  // legacy override→pool-default chain only when no synced sku exists.
+  const compSkuRows = (compSkusR.data ?? []) as Array<{
+    sku: string;
+    compartment_id: string;
+    price: number | string;
+  }>;
+  // Number.isFinite guard: a malformed/absent price must fall through to the
+  // legacy chain (null), never poison the drift gate with NaN (NaN survives ??).
+  const priceByCompId = new Map(
+    compSkuRows
+      .filter((r) => Number.isFinite(Number(r.price)))
+      .map((r) => [r.compartment_id, Number(r.price)]),
   );
+  const modelCompartments = (modelCompsR.data ?? []).map((r) => {
+    const mc = Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow);
+    return { ...mc, skuPrice: priceByCompId.get(mc.compartmentId) ?? null };
+  });
 
   const snapshot: SofaPricingSnapshot = {
     compartmentPool,

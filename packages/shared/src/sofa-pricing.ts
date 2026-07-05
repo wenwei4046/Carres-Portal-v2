@@ -90,17 +90,22 @@ export function canMirror(slots: string[][]): boolean {
 
 /**
  * Resolve the à-la-carte RM price for a per-model compartment.
- *   `modelComp.priceOverride ?? pool.defaultPrice`
- * Mirrors `resolveFabricDelta`'s `??` discipline: an override of `0` WINS
- * (explicitly free for this model); `null` INHERITS the pool default. When
- * neither is available (compartment not in the pool / not offered), returns 0
- * — the caller's mirror fallback gets a chance before this 0 lands.
+ *   `modelComp.skuPrice ?? modelComp.priceOverride ?? pool.defaultPrice`
+ *
+ * PRICE SOURCE (Loo, 2026-07-05): the synced `{MODEL_KEY}-{code}` SKU's price
+ * (SKU Master) is authoritative — `skuPrice` is joined onto the offered row by
+ * the catalog bundle / server recompute. The legacy override→pool-default
+ * chain survives only as a fallback for offered rows whose synced SKU is
+ * missing (pre-cutover data). `??` discipline throughout: an explicit `0` at
+ * any level WINS (explicitly free); `null`/absent falls through. When nothing
+ * is available (compartment not in the pool / not offered), returns 0 — the
+ * caller's mirror fallback gets a chance before this 0 lands.
  */
 export function resolveCompartmentPrice(
   modelComp: ModelSofaCompartment | null | undefined,
   pool: SofaCompartment | null | undefined,
 ): number {
-  return modelComp?.priceOverride ?? pool?.defaultPrice ?? 0;
+  return modelComp?.skuPrice ?? modelComp?.priceOverride ?? pool?.defaultPrice ?? 0;
 }
 
 /* ─── canonicalizeSofaSlots ────────────────────────────────────────────── */

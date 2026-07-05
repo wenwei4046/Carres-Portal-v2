@@ -133,7 +133,7 @@ import {
   type ModelFabricTierOverrideDto,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
-import { uploadModelPhoto } from "./photo-upload";
+import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
   dealers:      () => ["dealers"] as const,
@@ -5223,6 +5223,29 @@ export function useDeleteModelSofaCompartment() {
     mutationFn: ({ modelId, compartmentId }: { modelId: string; compartmentId: string }) =>
       apiFetch<{ ok: true }>(
         `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
+        catalogJson("DELETE"),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** Compartment photo (signed-upload flow in photo-upload.ts — principal-only).
+ *  Lands in `sofa_compartments.icon_url`; the builder silhouettes prefer it. */
+export function useSetCompartmentPhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ compartmentId, file }: { compartmentId: string; file: Blob }) =>
+      uploadCompartmentPhoto(compartmentId, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteCompartmentPhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (compartmentId: string) =>
+      apiFetch<{ compartment: SofaCompartmentDto }>(
+        `/api/catalog/sofa-compartments/${compartmentId}/photo`,
         catalogJson("DELETE"),
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),

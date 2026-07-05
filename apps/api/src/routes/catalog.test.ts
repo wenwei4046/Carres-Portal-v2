@@ -1539,7 +1539,25 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
               discontinued_at: null,
             },
           ],
-          product_skus: [],
+          // The synced compartment sku: pos_active=false (never in the flat POS
+          // grid / non-admin `skus` output) but its PRICE must still enrich the
+          // offered row as `skuPrice` — the authoritative à-la-carte source.
+          product_skus: [
+            {
+              id: "00000000-0000-0000-0000-0000000d0001",
+              model_id: MODEL_ID_LIVE,
+              sku: "CLASSIC-1A(LHF)",
+              variant: "1A(LHF)",
+              variant_kind: "part",
+              price: 777,
+              cost: null,
+              supplier_id: null,
+              discontinued_at: null,
+              pos_active: false,
+              description: null,
+              compartment_id: COMP_ID,
+            },
+          ],
           sofa_fabrics: [],
           addons: [],
           floor_config: [
@@ -1576,10 +1594,14 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       modelId: MODEL_ID_LIVE,
       compartmentId: COMP_ID,
       priceOverride: null,
+      // skuPrice = the synced compartment sku's price (SKU Master), even though
+      // the pos_active=false sku itself is excluded from the non-admin skus list.
+      skuPrice: 777,
     });
+    expect(body.skus).toHaveLength(0);
   });
 
-  it("POST /sofa-compartments — principal inserts → 201", async () => {
+  it("POST /sofa-compartments — principal inserts → 201 (NO price field — prices live in SKU Master)", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: COMP_ROW }));
     const jwt = await makeJwt("principal", null);
@@ -1587,7 +1609,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       new Request("http://t/api/catalog/sofa-compartments", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ code: "1A(LHF)", description: "1 seat, ONE arm (left)", seatCount: 1, defaultPrice: 250 }),
+        body: JSON.stringify({ code: "1A(LHF)", description: "1 seat, ONE arm (left)", seatCount: 1 }),
       }),
       env,
     );
@@ -1595,8 +1617,24 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     const ins = recorded.find((r) => r.op === "insert");
     expect(ins?.table).toBe("sofa_compartments");
     expect((ins?.payload as { code: string }).code).toBe("1A(LHF)");
-    const body = (await res.json()) as { compartment: { code: string; defaultPrice: number } };
-    expect(body.compartment).toMatchObject({ code: "1A(LHF)", defaultPrice: 250 });
+    // The pool carries no authored price — the insert never sets default_price
+    // (the column stays at its DB default, a dormant legacy fallback).
+    expect(ins?.payload as Record<string, unknown>).not.toHaveProperty("default_price");
+    const body = (await res.json()) as { compartment: { code: string } };
+    expect(body.compartment).toMatchObject({ code: "1A(LHF)" });
+  });
+
+  it("POST /sofa-compartments — defaultPrice is no longer accepted → 422 (strict schema)", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-compartments", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "1A(LHF)", defaultPrice: 250 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
   });
 
   it("POST /sofa-compartments — non-principal → 403", async () => {
@@ -1626,9 +1664,24 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     expect(res.status).toBe(422);
   });
 
-  it("PATCH /sofa-compartments/:id — principal updates default_price → 200", async () => {
+  it("PATCH /sofa-compartments/:id — principal updates iconUrl → 200", async () => {
     const recorded: AdminCall[] = [];
-    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { ...COMP_ROW, default_price: 300 } }));
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { ...COMP_ROW, icon_url: "https://x/y.jpg" } }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ iconUrl: "https://x/y.jpg" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect((upd?.payload as { icon_url: string }).icon_url).toBe("https://x/y.jpg");
+  });
+
+  it("PATCH /sofa-compartments/:id — defaultPrice is no longer accepted → 422 (strict schema)", async () => {
     const jwt = await makeJwt("principal", null);
     const res = await app.fetch(
       new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
@@ -1638,9 +1691,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       }),
       env,
     );
-    expect(res.status).toBe(200);
-    const upd = recorded.find((r) => r.op === "update");
-    expect((upd?.payload as { default_price: number }).default_price).toBe(300);
+    expect(res.status).toBe(422);
   });
 
   it("DELETE /sofa-compartments/:id — soft-delete via active=false", async () => {

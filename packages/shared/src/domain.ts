@@ -265,14 +265,23 @@ export interface SofaCompartment {
 
 /**
  * A per-model offered compartment (migration 0178). Row present = the model
- * offers this compartment. `priceOverride` NULL = use the pool's `defaultPrice`;
- * a value (>= 0) supersedes it for this model.
+ * offers this compartment.
+ *
+ * PRICE SOURCE (Loo, 2026-07-05): the authoritative à-la-carte price is the
+ * synced compartment SKU's `product_skus.price` (`{MODEL_KEY}-{code}`, set in
+ * SKU Master). `skuPrice` carries that price — joined in by the catalog bundle
+ * / server recompute, NOT a DB column on `model_sofa_compartments`. The legacy
+ * `priceOverride` → pool `defaultPrice` chain remains only as a fallback for
+ * rows whose synced SKU is missing (pre-cutover data).
  */
 export interface ModelSofaCompartment {
   modelId: string;
   compartmentId: string;
   priceOverride: number | null;
   sortOrder: number;
+  /** The synced `{MODEL_KEY}-{code}` SKU's price (SKU Master). Enriched by the
+   *  bundle/recompute; absent/null = no synced sku → legacy fallback. */
+  skuPrice?: number | null;
 }
 
 /**

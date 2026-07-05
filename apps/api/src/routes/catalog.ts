@@ -346,9 +346,30 @@ catalogRouter.get("/", async (c) => {
     sofaCompartments: (sofaCompsR.data ?? []).map(
       (r) => Adapters.sofaCompartmentFromRow(r as DB.SofaCompartmentRow),
     ),
-    modelSofaCompartments: (modelSofaCompsR.data ?? []).map(
-      (r) => Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow),
-    ),
+    // Each offered row is enriched with `skuPrice` — the synced
+    // `{MODEL_KEY}-{code}` compartment SKU's price (SKU Master), which is the
+    // authoritative à-la-carte price source (Loo, 2026-07-05). Joined from
+    // `allSkus` (pre-pos_active-filter — compartment skus are pos_active=false
+    // by design and must still price the builder in the non-admin POS bundle).
+    modelSofaCompartments: (() => {
+      const compSkuPrice = new Map<string, number>();
+      for (const s of allSkus) {
+        const row = s as DB.ProductSkuRow;
+        if (row.compartment_id == null || row.discontinued_at != null) continue;
+        const p = Number(row.price);
+        // NaN guard: a malformed price falls through to the legacy chain (null)
+        // instead of poisoning resolveCompartmentPrice (NaN survives ??).
+        if (!Number.isFinite(p)) continue;
+        compSkuPrice.set(`${row.model_id}|${row.compartment_id}`, p);
+      }
+      return (modelSofaCompsR.data ?? []).map((r) => {
+        const mc = Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow);
+        return {
+          ...mc,
+          skuPrice: compSkuPrice.get(`${mc.modelId}|${mc.compartmentId}`) ?? null,
+        };
+      });
+    })(),
     // 0179 — sofa combo pricing (additive; optional). Non-admin consumers
     // (POS / the future builder) only see live combos (active && not
     // discontinued); admin (maintenance tab) sees ALL so it can restore them —
@@ -1225,7 +1246,7 @@ catalogRouter.patch("/models/:id/photo", async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_input", code: "invalid_param", message: "path required" }, 422);
   }
-  if (!parsed.data.path.startsWith(`${id}/`)) {
+  if (!parsed.data.path.startsWith(`${id}/`) || parsed.data.path.includes("..")) {
     return c.json({ error: "invalid_input", code: "path_mismatch", message: "path does not belong to this model" }, 422);
   }
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -1748,7 +1769,9 @@ catalogRouter.post("/sofa-compartments", async (c) => {
       seat_count: parsed.data.seatCount ?? null,
       arm_config: parsed.data.armConfig ?? null,
       icon_url: parsed.data.iconUrl ?? null,
-      default_price: parsed.data.defaultPrice ?? 0,
+      // NO default_price (Loo, 2026-07-05): the pool is a foundation catalog;
+      // prices live on the synced per-model SKUs (SKU Master). Column stays at
+      // its DB default (0) as a dormant legacy fallback.
       sort_order: parsed.data.sortOrder ?? 0,
       active: parsed.data.active ?? true,
       updated_at: new Date().toISOString(),
@@ -1776,7 +1799,6 @@ catalogRouter.patch("/sofa-compartments/:id", async (c) => {
   if (parsed.data.seatCount !== undefined) patch.seat_count = parsed.data.seatCount;
   if (parsed.data.armConfig !== undefined) patch.arm_config = parsed.data.armConfig;
   if (parsed.data.iconUrl !== undefined) patch.icon_url = parsed.data.iconUrl;
-  if (parsed.data.defaultPrice !== undefined) patch.default_price = parsed.data.defaultPrice;
   if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
   if (Object.keys(patch).length === 0) {
@@ -1816,6 +1838,83 @@ catalogRouter.delete("/sofa-compartments/:id", async (c) => {
     return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
   }
   return c.json({ ok: true });
+});
+
+// ----- Compartment photo (signed-upload pattern, mirrors /models/:id/photo) -----
+// Reuses the PUBLIC product-model-photos bucket (0173 — internal-write, no path
+// scoping) under the reserved `compartments/{id}/…` prefix (model photo paths
+// start with a model uuid, so the prefixes can never collide). The photo lands
+// in `sofa_compartments.icon_url` (0178) — CompartmentSilhouette prefers it
+// over the SVG in the builder / POS configurator cell boxes.
+
+// POST /sofa-compartments/:id/photo/sign-upload — principal-only.
+catalogRouter.post("/sofa-compartments/:id/photo/sign-upload", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = photoSignSchema.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: issue?.message ?? "invalid input", field: issue?.path.join(".") ?? "unknown" },
+      422,
+    );
+  }
+  const ext =
+    parsed.data.mimeType === "image/jpeg" ? "jpg" : parsed.data.mimeType === "image/png" ? "png" : "webp";
+  const path = `compartments/${id}/${crypto.randomUUID()}.${ext}`;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.storage
+    .from(PRODUCT_MODEL_PHOTOS_BUCKET)
+    .createSignedUploadUrl(path);
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ token: data.token, path: data.path });
+});
+
+// PATCH /sofa-compartments/:id/photo — store the uploaded file's public URL in
+// icon_url. The path must belong to this compartment (anti-spoof).
+catalogRouter.patch("/sofa-compartments/:id/photo", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = photoStoreSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: "path required" }, 422);
+  }
+  if (!parsed.data.path.startsWith(`compartments/${id}/`) || parsed.data.path.includes("..")) {
+    return c.json({ error: "invalid_input", code: "path_mismatch", message: "path does not belong to this compartment" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const pub = sb.storage.from(PRODUCT_MODEL_PHOTOS_BUCKET).getPublicUrl(parsed.data.path);
+  const { data, error } = await sb
+    .from(SOFA_COMPARTMENTS)
+    .update({ icon_url: pub.data.publicUrl, updated_at: new Date().toISOString(), updated_by: c.var.auth.id })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
+  }
+  return c.json({ compartment: Adapters.sofaCompartmentFromRow(data as DB.SofaCompartmentRow) });
+});
+
+// DELETE /sofa-compartments/:id/photo — clear icon_url (falls back to the SVG).
+catalogRouter.delete("/sofa-compartments/:id/photo", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SOFA_COMPARTMENTS)
+    .update({ icon_url: null, updated_at: new Date().toISOString(), updated_by: c.var.auth.id })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
+  }
+  return c.json({ compartment: Adapters.sofaCompartmentFromRow(data as DB.SofaCompartmentRow) });
 });
 
 // PUT /models/:modelId/compartments/:compartmentId — upsert the per-model

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import type {
   CatalogOptionPoolDto,
@@ -22,7 +22,10 @@ import {
   useCreateSofaCompartment,
   useUpdateSofaCompartment,
   useDeleteSofaCompartment,
+  useSetCompartmentPhoto,
+  useDeleteCompartmentPhoto,
 } from "@/lib/queries";
+import CompartmentSilhouette from "@/pages/dealer/sofa-build/CompartmentSilhouette";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
 import MaintenanceSidebar, {
@@ -828,8 +831,11 @@ function SofaCompartmentsSection({
         )}
       </div>
       <p className="t-tiny text-base-500 mb-3">
-        The compartment pool (1A(LHF), 1NA, 2A(RHF), …). A sofa is assembled from
-        these; each sofa model ticks which it offers in the Modular tab.
+        The compartment pool (1A(LHF), 1NA, 2A(RHF), …) — a foundation catalog
+        only. A sofa is assembled from these; each sofa model ticks which it
+        offers in the Modular tab, and prices live on the per-model compartment
+        SKUs in SKU Master (no price here). The photo shows in the sofa
+        builder&apos;s cell box.
         {!isPrincipal && " Principal only — read-only for your role."}
       </p>
 
@@ -838,11 +844,11 @@ function SofaCompartmentsSection({
       <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
         <div
           className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
-          style={{ gridTemplateColumns: "120px minmax(160px,1.6fr) 130px 110px" }}
+          style={{ gridTemplateColumns: COMPARTMENT_COLS }}
         >
           <div className="label">Code</div>
+          <div className="label">Photo</div>
           <div className="label">Description</div>
-          <div className="label text-right">Default price (RM)</div>
           <div className="label text-right">Actions</div>
         </div>
         {compartments.length === 0 && (
@@ -856,6 +862,9 @@ function SofaCompartmentsSection({
   );
 }
 
+/** Shared grid template for the compartment pool list (header + rows). */
+const COMPARTMENT_COLS = "120px 140px minmax(160px,1.6fr) 110px";
+
 function SofaCompartmentRow({
   comp,
   isPrincipal,
@@ -865,6 +874,8 @@ function SofaCompartmentRow({
 }) {
   const patch = useUpdateSofaCompartment();
   const del = useDeleteSofaCompartment();
+  const setPhoto = useSetCompartmentPhoto();
+  const delPhoto = useDeleteCompartmentPhoto();
 
   function commitDescription(raw: string) {
     const next = raw.trim();
@@ -874,13 +885,25 @@ function SofaCompartmentRow({
       { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
     );
   }
-  function commitPrice(raw: string) {
-    const v = Number(raw.trim());
-    if (!Number.isFinite(v) || v < 0 || v === comp.defaultPrice) return;
-    patch.mutate(
-      { id: comp.id, patch: { defaultPrice: v } },
-      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
+  function pickPhoto(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhoto.mutate(
+      { compartmentId: comp.id, file },
+      {
+        onSuccess: () => toast.success(`${comp.code} photo updated`),
+        onError: (err: unknown) =>
+          toast.error(err instanceof Error ? err.message : "Photo upload failed"),
+      },
     );
+  }
+  function removePhoto() {
+    delPhoto.mutate(comp.id, {
+      onSuccess: () => toast.success(`${comp.code} photo removed`),
+      onError: (err: unknown) =>
+        toast.error(err instanceof ApiError ? err.message : "Photo remove failed"),
+    });
   }
   function remove() {
     if (!confirm(`Disable compartment "${comp.code}"? It will drop off this list.`)) return;
@@ -893,11 +916,47 @@ function SofaCompartmentRow({
   return (
     <div
       className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
-      style={{ gridTemplateColumns: "120px minmax(160px,1.6fr) 130px 110px" }}
+      style={{ gridTemplateColumns: COMPARTMENT_COLS }}
       data-testid={`compartment-row-${comp.code}`}
     >
       <div>
         <CodeChip>{comp.code}</CodeChip>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+          <CompartmentSilhouette
+            code={comp.code}
+            iconUrl={comp.iconUrl}
+            className="max-h-10 max-w-10"
+          />
+        </span>
+        {isPrincipal && (
+          <div className="flex flex-col items-start gap-0.5">
+            <label className="btn-ghost text-[11px] cursor-pointer">
+              {setPhoto.isPending ? "Uploading…" : comp.iconUrl ? "Replace" : "Upload"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                disabled={setPhoto.isPending}
+                onChange={pickPhoto}
+                aria-label={`${comp.code} photo upload`}
+                data-testid={`compartment-photo-input-${comp.code}`}
+              />
+            </label>
+            {comp.iconUrl && (
+              <button
+                type="button"
+                onClick={removePhoto}
+                disabled={delPhoto.isPending}
+                className="btn-danger text-[11px]"
+                aria-label={`${comp.code} remove photo`}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <input
         defaultValue={comp.description ?? ""}
@@ -908,19 +967,6 @@ function SofaCompartmentRow({
         }}
         aria-label={`${comp.code} description`}
         className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[13px] outline-none bg-transparent disabled:opacity-60"
-      />
-      <input
-        type="number"
-        min={0}
-        step="0.01"
-        defaultValue={comp.defaultPrice}
-        disabled={!isPrincipal}
-        onBlur={(e) => commitPrice(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-        }}
-        aria-label={`${comp.code} default price`}
-        className={`${INPUT_CLS} text-right t-num text-[12px] disabled:opacity-60`}
       />
       <div className="text-right">
         {isPrincipal && (
@@ -938,17 +984,12 @@ function SofaCompartmentAddForm({ onDone }: { onDone: () => void }) {
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [seatCount, setSeatCount] = useState("");
-  const [price, setPrice] = useState("");
   const busy = create.isPending;
 
   const codeValid = code.trim().length >= 1 && /^[A-Za-z0-9()\-_/. ]+$/.test(code.trim());
-  const priceNum = price.trim() === "" ? 0 : Number(price);
   const seatNum = seatCount.trim() === "" ? null : Number(seatCount);
   const valid =
-    codeValid &&
-    Number.isFinite(priceNum) &&
-    priceNum >= 0 &&
-    (seatNum === null || (Number.isInteger(seatNum) && seatNum >= 0));
+    codeValid && (seatNum === null || (Number.isInteger(seatNum) && seatNum >= 0));
 
   async function submit() {
     if (!valid) return;
@@ -957,7 +998,6 @@ function SofaCompartmentAddForm({ onDone }: { onDone: () => void }) {
         code: code.trim(),
         description: description.trim() || null,
         seatCount: seatNum,
-        defaultPrice: priceNum,
       });
       toast.success(`Added ${code.trim()}`);
       onDone();
@@ -979,10 +1019,6 @@ function SofaCompartmentAddForm({ onDone }: { onDone: () => void }) {
       <label className="block">
         <span className="label block mb-1">Seats</span>
         <input type="number" min={0} step="1" value={seatCount} onChange={(e) => setSeatCount(e.target.value)} className={`${INPUT_CLS} w-20`} />
-      </label>
-      <label className="block">
-        <span className="label block mb-1">Default price (RM)</span>
-        <input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className={`${INPUT_CLS} w-28`} />
       </label>
       <button
         type="button"
