@@ -198,12 +198,55 @@ export interface CatalogOptionPool {
 }
 
 /**
+ * 0202 — one global procurement fabric (2990s fabric_trackings port). Read-only
+ * reference list; no order-side consumer (the SELLING fabric path stays
+ * per-model sofaFabrics + the 0176 tier deltas). `series` is the free-text
+ * collection name the "+ Add series" chip edits.
+ */
+export interface CatalogFabric {
+  id: string;
+  fabricCode: string;
+  series: string | null;
+  description: string | null;
+  supplierCode: string | null;
+  sofaTier: FabricTier;
+  bedframeTier: FabricTier;
+  active: boolean;
+  sortOrder: number;
+}
+
+/**
+ * 0202 — one section='fabrics' catalog_config_history row: the snapshot a
+ * fabric-master Edit-save writes (fabric-shaped entries; same lightweight
+ * effective-from-save-date model as the pool history).
+ */
+export interface CatalogFabricsHistory {
+  id: string;
+  entries: {
+    fabricCode: string;
+    series: string | null;
+    description: string | null;
+    supplierCode: string | null;
+    sofaTier: FabricTier;
+    bedframeTier: FabricTier;
+    active: boolean;
+    sortOrder: number;
+  }[];
+  effectiveFrom: string;
+  notes: string | null;
+  createdAt: string;
+}
+
+/**
  * 0201 — one catalog_config_history row: the lightweight append-only snapshot
  * a pool Edit-save writes (effective_from = the save date; no future-dating).
  */
 export interface CatalogConfigHistory {
   id: string;
-  section: CatalogOptionPoolName;
+  // 0202 widened the DB CHECK with 'fabrics' — the POOL history adapter can
+  // technically see it, though the fabrics log is read via its own endpoint
+  // + CatalogFabricsHistory shape.
+  section: CatalogOptionPoolName | "fabrics";
   entries: {
     value: string;
     label: string | null;

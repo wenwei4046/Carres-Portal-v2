@@ -43,6 +43,8 @@ import {
   catalogPoolBatchSaveInput,
   CATALOG_OPTION_POOLS,
   CATALOG_CONFIG_HISTORY,
+  CATALOG_FABRICS,
+  catalogFabricsBatchSaveInput,
   deliveryFeeConfigPatchInput,
   specialDeliveryFeeRuleInput,
   DELIVERY_FEE_CONFIG,
@@ -186,7 +188,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -243,6 +245,11 @@ catalogRouter.get("/", async (c) => {
     // `active` itself. Additive — pre-0186 clients ignore the key, and with NONE
     // authored / `active` default false it's dormant (zero behaviour change).
     sb.from(PWP_RULES).select("*"),
+    // 0202 — global procurement fabric master (2990s fabric_trackings port).
+    // Fetched UNFILTERED (active AND inactive — each row carries `active`; the
+    // Fabrics tab editor must see OFF rows). Read-only reference — NOT a source
+    // of truth for any order-side consumer (selling fabrics stay sofa_fabrics).
+    sb.from(CATALOG_FABRICS).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -262,6 +269,7 @@ catalogRouter.get("/", async (c) => {
   if (modelFreeGiftsR.error) throw new HTTPException(500, { message: modelFreeGiftsR.error.message });
   if (freeItemCampaignsR.error) throw new HTTPException(500, { message: freeItemCampaignsR.error.message });
   if (pwpRulesR.error) throw new HTTPException(500, { message: pwpRulesR.error.message });
+  if (fabricMasterR.error) throw new HTTPException(500, { message: fabricMasterR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -444,6 +452,16 @@ catalogRouter.get("/", async (c) => {
           : String(ra.created_at).localeCompare(String(rb.created_at));
       })
       .map((r) => Adapters.pwpRuleFromRow(r as DB.PwpRuleRow)),
+    // 0202 — global procurement fabric master (additive, OPTIONAL). Sorted in
+    // JS by (sort_order, fabric_code) to mirror the plain `.select("*")` fetch
+    // and stay mock-friendly, the way the 0182 option-pools branch sorts.
+    fabrics: (fabricMasterR.data ?? [])
+      .map((r) => Adapters.catalogFabricFromRow(r as DB.CatalogFabricRow))
+      .sort((a, b) =>
+        a.sortOrder !== b.sortOrder
+          ? a.sortOrder - b.sortOrder
+          : a.fabricCode.localeCompare(b.fabricCode),
+      ),
   });
   // EXPOSURE NOTE (0186): unlike `cost`, the PWP discounted reward price
   // (product_skus.pwp_price → sku.pwpPrice / sofa_combo_pricing.pwp_prices_by_height
@@ -2293,6 +2311,80 @@ catalogRouter.get("/config-history", async (c) => {
   return c.json({
     history: (data ?? []).map((r) =>
       Adapters.catalogConfigHistoryFromRow(r as DB.CatalogConfigHistoryRow),
+    ),
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0202 — Global procurement fabric master (2990s fabric_trackings port). The
+// Fabrics tab edits the WHOLE list as one draft, so the write is a single
+// atomic batch save (replace contents + append a section='fabrics'
+// catalog_config_history snapshot via catalog_fabrics_batch_save — 0201
+// pattern). Principal-only write; RLS (catalog_fabrics_write_principal) is the
+// real boundary — userClient, never service_role.
+// ---------------------------------------------------------------------------
+
+const FABRIC_MSG = "Only the principal (Master Admin) can manage fabrics";
+
+// PUT /fabrics — batch save (principal-only). REPLACE semantics.
+catalogRouter.put("/fabrics", async (c) => {
+  principalOnly(c, FABRIC_MSG);
+  const parsed = await parseJsonBody(c, catalogFabricsBatchSaveInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // Friendly 409 before the round-trip: duplicate codes would trip
+  // UNIQUE(fabric_code) mid-RPC and roll the whole save back anyway.
+  const codes = parsed.data.entries.map((e) => e.fabricCode);
+  if (new Set(codes).size !== codes.length) {
+    return c.json(fabricDuplicate(), 409);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("catalog_fabrics_batch_save", {
+    p_entries: parsed.data.entries.map((e) => ({
+      fabricCode: e.fabricCode,
+      series: e.series ?? null,
+      description: e.description ?? null,
+      supplierCode: e.supplierCode ?? null,
+      sofaTier: e.sofaTier ?? "PRICE_2",
+      bedframeTier: e.bedframeTier ?? "PRICE_2",
+      active: e.active ?? true,
+    })),
+    p_notes: parsed.data.notes ?? null,
+  });
+  if (error) {
+    if (error.code === "23505") return c.json(fabricDuplicate(), 409);
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, result: data ?? null });
+});
+
+function fabricDuplicate() {
+  return {
+    error: "conflict",
+    code: "duplicate_fabric_code",
+    message: "Duplicate fabric codes — each fabric code must be unique.",
+  } as const;
+}
+
+// GET /fabrics/history — the section='fabrics' snapshot log, newest first
+// (internal read; the History dialog is operation+principal facing).
+catalogRouter.get("/fabrics/history", async (c) => {
+  internalOnly(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(CATALOG_CONFIG_HISTORY)
+    .select("*")
+    .eq("section", "fabrics")
+    .order("effective_from", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({
+    history: (data ?? []).map((r) =>
+      Adapters.catalogFabricsHistoryFromRow(r as DB.CatalogConfigHistoryRow),
     ),
   });
 });

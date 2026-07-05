@@ -34,6 +34,8 @@ import {
   type CatalogOptionPoolName,
   type CatalogPoolBatchSaveInput,
   type CatalogConfigHistoryDto,
+  type CatalogFabricsBatchSaveInput,
+  type CatalogFabricsHistoryDto,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
   type ComboDto,
@@ -5055,6 +5057,30 @@ export function useCatalogConfigHistory(section: CatalogOptionPoolName, enabled:
       apiFetch<{ history: CatalogConfigHistoryDto[] }>(
         `/api/catalog/config-history?section=${section}`,
       ),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** 0202 — atomic replace-all save of the global fabric master (the Fabrics tab
+ *  Edit draft). Appends a section='fabrics' history snapshot server-side
+ *  (catalog_fabrics_batch_save RPC). Principal-only at the API/RLS layer. */
+export function useBatchSaveCatalogFabrics() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CatalogFabricsBatchSaveInput) =>
+      apiFetch<{ ok: true }>("/api/catalog/fabrics", catalogJson("PUT", input)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** 0202 — the Fabrics History dialog's snapshot log (newest first). Rides the
+ *  ["catalog"] prefix so every fabric save refreshes it. */
+export function useCatalogFabricsHistory(enabled: boolean) {
+  return useQuery({
+    queryKey: qk.catalogConfigHistory("fabrics"),
+    queryFn: () =>
+      apiFetch<{ history: CatalogFabricsHistoryDto[] }>("/api/catalog/fabrics/history"),
     enabled,
     staleTime: 60_000,
   });

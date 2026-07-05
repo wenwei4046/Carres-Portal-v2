@@ -7,6 +7,7 @@ import ModularTab from "./modular/ModularTab";
 import MaintenanceTab from "./tabs/MaintenanceTab";
 import CombosTab from "./tabs/CombosTab";
 import SpecialAddonsTab from "./tabs/SpecialAddonsTab";
+import FabricsTab from "./tabs/FabricsTab";
 import PromoTab from "./tabs/PromoTab";
 
 /**
@@ -36,12 +37,13 @@ import PromoTab from "./tabs/PromoTab";
  * The prop is kept as an explicit override (tests / the legacy Principal mount).
  */
 
-type TabKey = "sku" | "modular" | "special" | "maintenance" | "combos" | "promo";
+type TabKey = "sku" | "modular" | "special" | "fabrics" | "maintenance" | "combos" | "promo";
 
 const TABS: readonly PillTab<TabKey>[] = [
   { key: "sku", label: "SKU Master" },
   { key: "modular", label: "Modular" },
   { key: "special", label: "Special Add-ons" },
+  { key: "fabrics", label: "Fabrics" },
   { key: "maintenance", label: "Maintenance" },
   { key: "combos", label: "Combos" },
   { key: "promo", label: "Promo / Free Gifts" },
@@ -88,6 +90,9 @@ export default function ProductMaintenancePage({
           {tab === "modular" && <ModularTab catalog={catalogQ.data} isPrincipal={isPrincipal} />}
           {tab === "special" && (
             <SpecialAddonsTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
+          )}
+          {tab === "fabrics" && (
+            <FabricsTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
           {tab === "maintenance" && (
             <MaintenanceTab catalog={catalogQ.data} isPrincipal={isPrincipal} />

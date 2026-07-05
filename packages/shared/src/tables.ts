@@ -69,7 +69,13 @@ export const CATALOG_OPTION_POOLS    = "catalog_option_pools" as const;
 
 // 0201 — lightweight append-only snapshot log for the option pools (one row
 // per pool Edit-save; "Effective from" + History in the catalog admin UI).
+// 0202 widens `section` with 'fabrics' (fabric-master Edit-saves log here too).
 export const CATALOG_CONFIG_HISTORY  = "catalog_config_history" as const;
+
+// 0202 — global procurement fabric master (2990s fabric_trackings port): code ·
+// series · description · supplier code · sofa/bedframe tier · active. Read-only
+// reference — the SELLING fabric path stays per-model sofa_fabrics + 0176 deltas.
+export const CATALOG_FABRICS         = "catalog_fabrics" as const;
 
 // 0185 — 2990s Products parity Phase 7: principal-owned Default Free Gifts (per
 // model) + Free Item Campaigns (GWP). Free lines book as RM0 order_lines with

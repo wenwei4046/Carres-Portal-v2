@@ -223,6 +223,56 @@ export const catalogConfigHistoryFromRow = (
   createdAt: r.created_at,
 });
 
+// 0202 — global procurement fabric master row → domain (2990s fabric_trackings
+// port). Tiers default PRICE_2 defensively (matches the DB column default).
+export const catalogFabricFromRow = (r: DB.CatalogFabricRow): D.CatalogFabric => ({
+  id: r.id,
+  fabricCode: r.fabric_code,
+  series: r.series ?? null,
+  description: r.description ?? null,
+  supplierCode: r.supplier_code ?? null,
+  sofaTier: (r.sofa_tier ?? "PRICE_2") as D.FabricTier,
+  bedframeTier: (r.bedframe_tier ?? "PRICE_2") as D.FabricTier,
+  active: r.active,
+  sortOrder: Number(r.sort_order),
+});
+
+const FABRIC_TIERS: readonly D.FabricTier[] = ["PRICE_1", "PRICE_2", "PRICE_3"];
+
+/** 0202 — a section='fabrics' catalog_config_history row → domain. The
+ *  snapshot entries are fabric-shaped (camelCase, written by
+ *  catalog_fabrics_batch_save); malformed entries are dropped (defensive —
+ *  the write path always produces the full shape). */
+export const catalogFabricsHistoryFromRow = (
+  r: DB.CatalogConfigHistoryRow,
+): D.CatalogFabricsHistory => ({
+  id: r.id,
+  entries: (Array.isArray(r.snapshot) ? r.snapshot : []).flatMap((e) => {
+    if (typeof e !== "object" || e === null) return [];
+    const o = e as Record<string, unknown>;
+    if (typeof o.fabricCode !== "string") return [];
+    return [
+      {
+        fabricCode: o.fabricCode,
+        series: typeof o.series === "string" ? o.series : null,
+        description: typeof o.description === "string" ? o.description : null,
+        supplierCode: typeof o.supplierCode === "string" ? o.supplierCode : null,
+        sofaTier: FABRIC_TIERS.includes(o.sofaTier as D.FabricTier)
+          ? (o.sofaTier as D.FabricTier)
+          : "PRICE_2",
+        bedframeTier: FABRIC_TIERS.includes(o.bedframeTier as D.FabricTier)
+          ? (o.bedframeTier as D.FabricTier)
+          : "PRICE_2",
+        active: typeof o.active === "boolean" ? o.active : true,
+        sortOrder: typeof o.sortOrder === "number" ? o.sortOrder : 0,
+      },
+    ];
+  }),
+  effectiveFrom: r.effective_from,
+  notes: r.notes ?? null,
+  createdAt: r.created_at,
+});
+
 /**
  * Maps a `combo_components` row to the camelCase domain shape (migration 0177).
  */

@@ -246,6 +246,75 @@ export const catalogConfigHistorySchema = z.object({
 });
 export type CatalogConfigHistoryDto = z.infer<typeof catalogConfigHistorySchema>;
 
+// ---------------------------------------------------------------------------
+// 0202 — global procurement fabric master (2990s fabric_trackings port). One
+// schema, two consumers (§9.5): the API bundle + PUT /fabrics batch save and
+// the web Fabrics tab reuse these exact shapes.
+// ---------------------------------------------------------------------------
+
+export const fabricTierValueSchema = z.enum(["PRICE_1", "PRICE_2", "PRICE_3"]);
+
+/** One fabric row (bundle DTO, camelCased). */
+export const catalogFabricSchema = z.object({
+  id: z.string().uuid(),
+  fabricCode: z.string(),
+  series: z.string().nullable(),
+  description: z.string().nullable(),
+  supplierCode: z.string().nullable(),
+  sofaTier: fabricTierValueSchema,
+  bedframeTier: fabricTierValueSchema,
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type CatalogFabricDto = z.infer<typeof catalogFabricSchema>;
+
+/** 0202 — one entry inside a fabric batch-save (rows re-minted by the RPC;
+ *  array order = display order, sortOrder server-assigned from ordinality). */
+export const catalogFabricEntryInput = z
+  .object({
+    fabricCode: z.string().trim().min(1).max(80),
+    series: z.string().trim().max(120).nullable().optional(),
+    description: z.string().trim().max(200).nullable().optional(),
+    supplierCode: z.string().trim().max(120).nullable().optional(),
+    sofaTier: fabricTierValueSchema.optional(),
+    bedframeTier: fabricTierValueSchema.optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+export type CatalogFabricEntryInput = z.infer<typeof catalogFabricEntryInput>;
+
+/** 0202 — PUT /fabrics body: the fabric master's FULL new contents (replace
+ *  semantics; catalog_fabrics_batch_save appends a section='fabrics'
+ *  catalog_config_history snapshot in the same transaction). */
+export const catalogFabricsBatchSaveInput = z
+  .object({
+    entries: z.array(catalogFabricEntryInput).max(500),
+    notes: z.string().trim().max(500).optional(),
+  })
+  .strict();
+export type CatalogFabricsBatchSaveInput = z.infer<typeof catalogFabricsBatchSaveInput>;
+
+/** 0202 — one section='fabrics' history row (fabric-shaped snapshot entries). */
+export const catalogFabricsHistorySchema = z.object({
+  id: z.string().uuid(),
+  entries: z.array(
+    z.object({
+      fabricCode: z.string(),
+      series: z.string().nullable(),
+      description: z.string().nullable(),
+      supplierCode: z.string().nullable(),
+      sofaTier: fabricTierValueSchema,
+      bedframeTier: fabricTierValueSchema,
+      active: z.boolean(),
+      sortOrder: z.number().int(),
+    }),
+  ),
+  effectiveFrom: z.string(),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type CatalogFabricsHistoryDto = z.infer<typeof catalogFabricsHistorySchema>;
+
 export const floorConfigSchema = z.object({
   id: z.number().int(),
   freeUpToFloor: z.number().int(),
@@ -838,6 +907,9 @@ export const catalogResponseSchema = z.object({
   freeItemCampaigns: z.array(freeItemCampaignSchema).optional(),
   // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients unaffected.
   pwpRules: z.array(pwpRuleSchema).optional(),
+  // 0202 — global procurement fabric master (additive, OPTIONAL). Pre-0202
+  // clients that don't read this are wholly unaffected.
+  fabrics: z.array(catalogFabricSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 
