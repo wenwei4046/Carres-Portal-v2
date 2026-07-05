@@ -209,6 +209,15 @@ export {
   type CatalogOptionPoolDto,
   type CatalogOptionPoolCreateInput,
   type CatalogOptionPoolPatchInput,
+  // 0201 — pool batch-save + config history schemas/Dto types.
+  catalogPoolEntryInput,
+  catalogPoolBatchSaveInput,
+  catalogPoolSnapshotEntrySchema,
+  catalogConfigHistorySchema,
+  type CatalogPoolEntryInput,
+  type CatalogPoolBatchSaveInput,
+  type CatalogPoolSnapshotEntryDto,
+  type CatalogConfigHistoryDto,
   // 0184 — delivery fee config + special rules + RuleTarget schemas/inputs.
   deliveryFeeConfigSchema,
   deliveryFeeConfigPatchInput,
@@ -601,8 +610,10 @@ export {
 } from "./special-addons";
 export type { SpecialAddon } from "./domain";
 // 0182 — global option pool domain type (the name union is re-exported from the
-// schemas/catalog block above as CatalogOptionPoolName).
-export type { CatalogOptionPool } from "./domain";
+// schemas/catalog block above as CatalogOptionPoolName). 0201 adds the
+// config-history domain type + its adapter.
+export type { CatalogOptionPool, CatalogConfigHistory } from "./domain";
+export { catalogConfigHistoryFromRow } from "./adapters";
 export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
 
 // 0184 — 2990s Products parity Phase 6: the unified RuleTarget matcher (PURE,
