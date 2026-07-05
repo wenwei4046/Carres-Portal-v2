@@ -170,6 +170,17 @@ describe("SofaConfigurePage", () => {
     expect(within(room).getAllByTestId("sofa-group-outline")).toHaveLength(1);
   });
 
+  it("shows the selected configuration name in the header (quick mode)", () => {
+    renderPage();
+    expect(screen.getByTestId("sofa-config-name").textContent).toBe("1A(LHF) + 2A(RHF)");
+  });
+
+  it("the header config name follows the L/R flip", () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId(`sofa-flip-${COMBO.id}`));
+    expect(screen.getByTestId("sofa-config-name").textContent).toBe("2A(LHF) + 1A(RHF)");
+  });
+
   it("hides the flip toggle for a symmetric (orientation-free) combo", () => {
     const symmetric: SofaComboDto = {
       ...COMBO,

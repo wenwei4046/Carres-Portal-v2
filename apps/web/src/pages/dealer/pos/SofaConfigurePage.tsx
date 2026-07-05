@@ -287,11 +287,17 @@ export default function SofaConfigurePage({
         </div>
         <div className="cfg-header__live">
           <div className="cfg-header__summary">
-            <div className="cfg-header__eyebrow">Sofa · built from modules</div>
-            <div className="cfg-header__title">{model.name}</div>
+            <div className="cfg-header__eyebrow">{model.name} · Sofa</div>
+            <div className="cfg-header__title" data-testid="sofa-config-name">
+              {mode === "quick" && heroPick
+                ? displayFor(heroPick).codes.join(" + ")
+                : model.name}
+            </div>
             <div className="cfg-header__sub">
               {mode === "quick"
-                ? "Pick a layout — it lands on the canvas assembled"
+                ? heroPick
+                  ? "Quick pick"
+                  : "Pick a layout — it lands on the canvas assembled"
                 : "Drag modules · rotate · we price the connected sofa live"}
             </div>
           </div>
