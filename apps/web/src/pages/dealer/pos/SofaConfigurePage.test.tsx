@@ -15,6 +15,16 @@ import type {
   SofaFabricDto,
 } from "@carres/shared";
 import { analyzeSofa, findModule, groupSofas, moduleFootprint } from "@carres/shared";
+
+// Mock the PWP availability hook (usePwpAvailableForPhone) so the component's
+// useQuery has no QueryClient dependency + the voucher result is controllable.
+const { pwpMock } = vi.hoisted(() => ({
+  pwpMock: { current: { data: { vouchers: [] as { code: string }[] }, isFetching: false } },
+}));
+vi.mock("@/lib/queries", () => ({
+  usePwpAvailableForPhone: () => pwpMock.current,
+}));
+
 import SofaConfigurePage, { comboSeedCells } from "./SofaConfigurePage";
 
 beforeAll(() => {
@@ -190,5 +200,38 @@ describe("SofaConfigurePage", () => {
     };
     renderPage({ combos: [symmetric] });
     expect(screen.queryByTestId(`sofa-flip-${symmetric.id}`)).toBeNull();
+  });
+
+  it("shows the INSERT PWP code input by default", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage();
+    expect(screen.getByTestId("sofa-pwp-input")).toBeTruthy();
+  });
+
+  it("a valid PWP code shows the applied chip", () => {
+    pwpMock.current = { data: { vouchers: [{ code: "PWP-1234ABCD" }] }, isFetching: false };
+    renderPage();
+    fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "pwp-1234abcd" } });
+    fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
+    expect(screen.getByTestId("sofa-pwp-applied").textContent).toContain("PWP-1234ABCD");
+  });
+
+  it("an unknown PWP code shows a validation error", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage();
+    fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "BADCODE" } });
+    fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
+    expect(screen.getByTestId("sofa-pwp-error")).toBeTruthy();
+  });
+
+  it("clears the applied code via remove", () => {
+    pwpMock.current = { data: { vouchers: [{ code: "PWP-1234ABCD" }] }, isFetching: false };
+    renderPage();
+    fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "PWP-1234ABCD" } });
+    fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
+    expect(screen.getByTestId("sofa-pwp-applied")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("sofa-pwp-remove"));
+    expect(screen.queryByTestId("sofa-pwp-applied")).toBeNull();
+    expect(screen.getByTestId("sofa-pwp-input")).toBeTruthy();
   });
 });

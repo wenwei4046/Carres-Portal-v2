@@ -8,6 +8,7 @@ import type {
   ModelSofaCompartmentDto,
   ProductModelDto,
   ProductSkuDto,
+  PwpDiscoverDto,
   Rot,
   SofaComboDto,
   SofaCompartmentDto,
@@ -22,6 +23,7 @@ import {
   moduleFootprint,
   ROOM_H,
 } from "@carres/shared";
+import { usePwpAvailableForPhone } from "@/lib/queries";
 import type { DraftLine } from "../new-order/draft";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
@@ -213,6 +215,24 @@ export default function SofaConfigurePage({
     return { flipped, slots, codes };
   }
 
+  // ── INSERT PWP CODE (2990s parity) ──────────────────────────────────────
+  // Validate-only: the header box checks a voucher code against the existing
+  // /pwp-codes/available lookup and, on a match, carries the code forward as a
+  // benign hint on the emitted line (attrs.pwp_pending_code). The cart's PWP
+  // machine + the server remain the sole authority for actually consuming a
+  // voucher — this never mutates voucher state.
+  const [pwpInput, setPwpInput] = useState("");
+  const [pwpCode, setPwpCode] = useState<string | null>(null);
+  const pwpQuery = usePwpAvailableForPhone({ code: pwpCode });
+  const pwpVoucher: PwpDiscoverDto | null =
+    pwpCode !== null
+      ? pwpQuery.data?.vouchers.find(
+          (v) => v.code.toUpperCase() === pwpCode.toUpperCase(),
+        ) ?? null
+      : null;
+  const pwpChecking = pwpCode !== null && pwpQuery.isFetching;
+  const pwpError = pwpCode !== null && !pwpChecking && !pwpVoucher;
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -284,6 +304,61 @@ export default function SofaConfigurePage({
               Customize
             </button>
           </div>
+        </div>
+        {/* INSERT PWP CODE — validate a voucher code (2990s parity). */}
+        <div
+          className="sof-flow__pwp"
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+          data-testid="sofa-pwp"
+        >
+          {pwpVoucher ? (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} className="t-small">
+              <span className="pill pill-confirmed" data-testid="sofa-pwp-applied">
+                PWP {pwpVoucher.code} ✓
+              </span>
+              <button
+                type="button"
+                className="t-small text-base-500 underline hover:text-base-800"
+                onClick={() => {
+                  setPwpCode(null);
+                  setPwpInput("");
+                }}
+                data-testid="sofa-pwp-remove"
+              >
+                remove
+              </button>
+            </span>
+          ) : (
+            <>
+              <input
+                type="text"
+                value={pwpInput}
+                onChange={(e) => {
+                  setPwpInput(e.target.value);
+                  if (pwpCode !== null) setPwpCode(null);
+                }}
+                placeholder="Insert PWP code"
+                aria-label="Insert PWP code"
+                className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small uppercase"
+                style={{ width: 148 }}
+                data-testid="sofa-pwp-input"
+              />
+              <button
+                type="button"
+                className="btn btn--secondary"
+                disabled={pwpChecking || !pwpInput.trim()}
+                onClick={() => setPwpCode(pwpInput.trim().toUpperCase())}
+                data-testid="sofa-pwp-apply"
+              >
+                {pwpChecking ? "Checking…" : "Apply"}
+              </button>
+              {pwpError && (
+                <span className="t-small text-danger" data-testid="sofa-pwp-error">
+                  No such / not redeemable PWP code.
+                </span>
+              )}
+            </>
+          )}
         </div>
         <div className="cfg-header__live">
           <div className="cfg-header__summary">
@@ -434,7 +509,15 @@ export default function SofaConfigurePage({
             sofaFabrics={fabrics}
             onAddBuild={(payload) => {
               const line = buildToDraftLine(payload, model, skus);
-              if (line) onAdd(line);
+              if (line) {
+                // Carry a validated PWP code forward as a benign hint — the
+                // cart's PWP control + the server are the sole authority for
+                // actually applying/consuming the voucher.
+                if (pwpVoucher) {
+                  (line.attrs as Record<string, unknown>).pwp_pending_code = pwpVoucher.code;
+                }
+                onAdd(line);
+              }
               onClose();
             }}
             onClose={onClose}
