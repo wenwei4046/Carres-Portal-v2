@@ -164,15 +164,6 @@ export default function SofaBuildCanvas({
     return GROUP_ORDER.filter((g) => byGroup.has(g)).map((g) => ({ group: g, rows: byGroup.get(g)! }));
   }, [modelCompartments, poolById]);
 
-  /** Code (or its mirror) → the pool compartment (for the icon_url + price). */
-  const poolForCode = useCallback(
-    (code: string): SofaCompartmentDto | null =>
-      compartmentPool.find((c) => c.code === code) ??
-      compartmentPool.find((c) => c.code === mirrorCode(code)) ??
-      null,
-    [compartmentPool],
-  );
-
   /* ─── Build state ────────────────────────────────────────────────── */
 
   const [cells, setCells] = useState<GeoCell[]>(() =>
@@ -595,10 +586,13 @@ export default function SofaBuildCanvas({
                       transform: `translate(-50%, -50%) rotate(${c.rot}deg)`,
                     }}
                   >
+                    {/* Canvas cells ALWAYS draw the plan-view SVG — never the
+                        photoreal icon_url (an opaque product photo breaks the
+                        top-down plan look + the joined-group SofaPlanView
+                        styling; photos live in the palette + Maintenance). */}
                     <CompartmentSilhouette
                       code={c.moduleCode}
                       depth={depth}
-                      iconUrl={poolForCode(c.moduleCode)?.iconUrl ?? null}
                       selected={selected}
                       violation={violated}
                       className="h-full w-full"
