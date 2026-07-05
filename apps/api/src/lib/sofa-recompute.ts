@@ -278,7 +278,13 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
     compartment_id: string;
     price: number | string;
   }>;
-  const priceByCompId = new Map(compSkuRows.map((r) => [r.compartment_id, Number(r.price)]));
+  // Number.isFinite guard: a malformed/absent price must fall through to the
+  // legacy chain (null), never poison the drift gate with NaN (NaN survives ??).
+  const priceByCompId = new Map(
+    compSkuRows
+      .filter((r) => Number.isFinite(Number(r.price)))
+      .map((r) => [r.compartment_id, Number(r.price)]),
+  );
   const modelCompartments = (modelCompsR.data ?? []).map((r) => {
     const mc = Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow);
     return { ...mc, skuPrice: priceByCompId.get(mc.compartmentId) ?? null };

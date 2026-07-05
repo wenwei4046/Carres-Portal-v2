@@ -356,7 +356,11 @@ catalogRouter.get("/", async (c) => {
       for (const s of allSkus) {
         const row = s as DB.ProductSkuRow;
         if (row.compartment_id == null || row.discontinued_at != null) continue;
-        compSkuPrice.set(`${row.model_id}|${row.compartment_id}`, Number(row.price));
+        const p = Number(row.price);
+        // NaN guard: a malformed price falls through to the legacy chain (null)
+        // instead of poisoning resolveCompartmentPrice (NaN survives ??).
+        if (!Number.isFinite(p)) continue;
+        compSkuPrice.set(`${row.model_id}|${row.compartment_id}`, p);
       }
       return (modelSofaCompsR.data ?? []).map((r) => {
         const mc = Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow);
@@ -1242,7 +1246,7 @@ catalogRouter.patch("/models/:id/photo", async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_input", code: "invalid_param", message: "path required" }, 422);
   }
-  if (!parsed.data.path.startsWith(`${id}/`)) {
+  if (!parsed.data.path.startsWith(`${id}/`) || parsed.data.path.includes("..")) {
     return c.json({ error: "invalid_input", code: "path_mismatch", message: "path does not belong to this model" }, 422);
   }
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -1877,7 +1881,7 @@ catalogRouter.patch("/sofa-compartments/:id/photo", async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_input", code: "invalid_param", message: "path required" }, 422);
   }
-  if (!parsed.data.path.startsWith(`compartments/${id}/`)) {
+  if (!parsed.data.path.startsWith(`compartments/${id}/`) || parsed.data.path.includes("..")) {
     return c.json({ error: "invalid_input", code: "path_mismatch", message: "path does not belong to this compartment" }, 422);
   }
   const sb = userClient(c.env, c.var.auth.jwt);

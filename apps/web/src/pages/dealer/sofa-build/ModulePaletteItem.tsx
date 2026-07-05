@@ -6,8 +6,9 @@ import CompartmentSilhouette from "./CompartmentSilhouette";
 /**
  * <ModulePaletteItem> — one card in the sofa builder's left module palette.
  * Shows the compartment's silhouette + code + its resolved à-la-carte price
- * (`resolveCompartmentPrice(offered, pool)` — the per-model `priceOverride`
- * falls back to the pool `defaultPrice`) + a `+` button that spawns the cell on
+ * (`resolveCompartmentPrice(offered, pool)` — the synced compartment SKU's
+ * price (SKU Master) is authoritative; the legacy `priceOverride` → pool
+ * `defaultPrice` chain is the fallback) + a `+` button that spawns the cell on
  * the canvas (`onAdd(code)`).
  *
  * Purely presentational + a single callback — the canvas owns placement.
