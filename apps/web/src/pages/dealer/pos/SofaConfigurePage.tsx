@@ -13,7 +13,15 @@ import type {
   SofaCompartmentDto,
   SofaFabricDto,
 } from "@carres/shared";
-import { analyzeSofa, findModule, groupSofas, moduleFootprint, ROOM_H } from "@carres/shared";
+import {
+  analyzeSofa,
+  canMirror,
+  findModule,
+  groupSofas,
+  mirrorModules,
+  moduleFootprint,
+  ROOM_H,
+} from "@carres/shared";
 import type { DraftLine } from "../new-order/draft";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
@@ -193,6 +201,18 @@ export default function SofaConfigurePage({
   // Remount key — bumps when a pick is loaded so the canvas re-reads the seed.
   const [seedKey, setSeedKey] = useState(0);
 
+  // Per-card L↔R orientation (2990s "flip" — prototype pos-sofa-config.jsx). 'L'
+  // = the combo as authored; 'R' = mirrored. Only shown for handed layouts.
+  const [flip, setFlip] = useState<Record<string, "L" | "R">>({});
+
+  /** The combo slots/codes to SHOW + SEED for a pick, honouring its flip. */
+  function displayFor(pick: QuickPick): { flipped: boolean; slots: string[][]; codes: string[] } {
+    const flipped = flip[pick.combo.id] === "R";
+    const slots = flipped ? mirrorModules(pick.combo.slots) : pick.combo.slots;
+    const codes = slots.map((s) => s[0]).filter((code): code is string => !!code);
+    return { flipped, slots, codes };
+  }
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -202,7 +222,8 @@ export default function SofaConfigurePage({
   }, [onClose]);
 
   function loadPick(pick: QuickPick) {
-    setSeed(comboSeedCells(pick.combo, "24"));
+    const { slots } = displayFor(pick);
+    setSeed(comboSeedCells({ ...pick.combo, slots }, "24"));
     setSeedKey((k) => k + 1);
     setMode("custom");
   }
@@ -298,34 +319,54 @@ export default function SofaConfigurePage({
                 <span className="sof-qp__railDetail">combo pricing per layout</span>
               </div>
               <div className="sof-qp__grid" data-testid="sofa-quick-picks">
-                {picks.map((p) => (
-                  <button
-                    key={p.combo.id}
-                    type="button"
-                    onClick={() => loadPick(p)}
-                    onMouseEnter={() => setHoverId(p.combo.id)}
-                    className={`sof-qp__card ${heroPick?.combo.id === p.combo.id ? "is-on" : ""}`}
-                    data-testid={`sofa-quick-pick-${p.combo.id}`}
-                  >
-                    <span className="sof-qp__art" style={{ gap: 2 }}>
-                      {p.codes.slice(0, 4).map((code, i) => (
-                        <CompartmentSilhouette
-                          key={`${code}-${i}`}
-                          code={code}
-                          className="h-12 w-auto"
-                        />
-                      ))}
-                      {p.codes.length > 4 && (
-                        <span className="sof-qp__cardSub">+{p.codes.length - 4}</span>
+                {picks.map((p) => {
+                  const d = displayFor(p);
+                  const isOn = heroPick?.combo.id === p.combo.id;
+                  const mirrorable = canMirror(p.combo.slots);
+                  return (
+                    <button
+                      key={p.combo.id}
+                      type="button"
+                      onClick={() => loadPick(p)}
+                      onMouseEnter={() => setHoverId(p.combo.id)}
+                      className={`sof-qp__card ${isOn ? "is-on" : ""}`}
+                      data-testid={`sofa-quick-pick-${p.combo.id}`}
+                    >
+                      <span className="sof-qp__art" style={{ gap: 2 }}>
+                        {d.codes.slice(0, 4).map((code, i) => (
+                          <CompartmentSilhouette
+                            key={`${code}-${i}`}
+                            code={code}
+                            className="h-12 w-auto"
+                          />
+                        ))}
+                        {d.codes.length > 4 && (
+                          <span className="sof-qp__cardSub">+{d.codes.length - 4}</span>
+                        )}
+                      </span>
+                      <span className="sof-qp__cardBody">
+                        <span className="sof-qp__cardLabel">{p.title}</span>
+                        <span className="sof-qp__cardSub">{d.codes.join(" + ")}</span>
+                        <span className="sof-qp__cardPrice">{p.priceLabel}</span>
+                      </span>
+                      {mirrorable && isOn && (
+                        <span
+                          className="sof-qp__flip"
+                          role="group"
+                          aria-label="Flip layout left or right"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFlip((f) => ({ ...f, [p.combo.id]: d.flipped ? "L" : "R" }));
+                          }}
+                          data-testid={`sofa-flip-${p.combo.id}`}
+                        >
+                          <span className={d.flipped ? "" : "is-on"}>L</span>
+                          <span className={d.flipped ? "is-on" : ""}>R</span>
+                        </span>
                       )}
-                    </span>
-                    <span className="sof-qp__cardBody">
-                      <span className="sof-qp__cardLabel">{p.title}</span>
-                      <span className="sof-qp__cardSub">{p.codes.join(" + ")}</span>
-                      <span className="sof-qp__cardPrice">{p.priceLabel}</span>
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -334,7 +375,7 @@ export default function SofaConfigurePage({
               <div className="sof-qp__heroFrame">
                 {heroPick ? (
                   <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
-                    {heroPick.codes.slice(0, 6).map((code, i) => (
+                    {displayFor(heroPick).codes.slice(0, 6).map((code, i) => (
                       <CompartmentSilhouette
                         key={`${code}-${i}`}
                         code={code}
@@ -351,7 +392,7 @@ export default function SofaConfigurePage({
                   <span>
                     <span className="sof-qp__cardLabel">{heroPick.title}</span>
                     <span className="sof-qp__heroDim" style={{ marginLeft: 10 }}>
-                      {heroPick.codes.join(" + ")}
+                      {displayFor(heroPick).codes.join(" + ")}
                     </span>
                   </span>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 14 }}>

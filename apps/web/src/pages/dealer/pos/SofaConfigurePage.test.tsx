@@ -142,4 +142,42 @@ describe("SofaConfigurePage", () => {
     fireEvent.click(screen.getByTestId("sofa-configure-back"));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("shows an L/R flip toggle on a handed combo's active card, defaulting to L", () => {
+    renderPage();
+    const flip = screen.getByTestId(`sofa-flip-${COMBO.id}`);
+    const [l, r] = within(flip).getAllByText(/^[LR]$/);
+    expect(l.className).toContain("is-on"); // L active by default
+    expect(r.className).not.toContain("is-on");
+  });
+
+  it("clicking the flip toggle mirrors the shown composition L↔R", () => {
+    renderPage();
+    const grid = screen.getByTestId("sofa-quick-picks");
+    expect(within(grid).getByText("1A(LHF) + 2A(RHF)")).toBeTruthy();
+    fireEvent.click(screen.getByTestId(`sofa-flip-${COMBO.id}`));
+    // reversed slot order + LHF↔RHF swap
+    expect(within(grid).getByText("2A(LHF) + 1A(RHF)")).toBeTruthy();
+    expect(within(grid).queryByText("1A(LHF) + 2A(RHF)")).toBeNull();
+  });
+
+  it("a flipped pick seeds the mirrored layout onto the canvas", () => {
+    const { } = renderPage();
+    fireEvent.click(screen.getByTestId(`sofa-flip-${COMBO.id}`));
+    fireEvent.click(screen.getByTestId(`sofa-quick-pick-${COMBO.id}`));
+    // still one connected sofa, but mirrored (2A now on the left)
+    const room = screen.getByTestId("sofa-build-room");
+    expect(within(room).getAllByTestId("sofa-group-outline")).toHaveLength(1);
+  });
+
+  it("hides the flip toggle for a symmetric (orientation-free) combo", () => {
+    const symmetric: SofaComboDto = {
+      ...COMBO,
+      id: "00000000-0000-0000-0000-00000000c002",
+      slots: [["1NA"]],
+      label: "Solo",
+    };
+    renderPage({ combos: [symmetric] });
+    expect(screen.queryByTestId(`sofa-flip-${symmetric.id}`)).toBeNull();
+  });
 });
