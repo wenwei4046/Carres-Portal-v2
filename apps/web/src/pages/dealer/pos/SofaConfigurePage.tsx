@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus, X } from "lucide-react";
 import type {
   FabricTierConfigDto,
   FabricTierGlobalConfig,
@@ -30,7 +30,7 @@ import { usePwpAvailableForPhone } from "@/lib/queries";
 import type { DraftLine } from "../new-order/draft";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
-import CompartmentSilhouette from "../sofa-build/CompartmentSilhouette";
+import SofaPlanView from "../sofa-build/SofaPlanView";
 import type { ModelMeta } from "./catalog-index";
 
 /**
@@ -146,17 +146,22 @@ export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
 /** Quick-pick fabric-select sentinel — "Confirm later, customer to confirm". */
 const QP_FABRIC_DEFER = "__defer__";
 
-/** Overall footprint of a flush left→right layout, in cm — width = Σ module
- *  widths, depth = deepest module. Drives the to-scale plan-view callouts. */
-function layoutDims(codes: string[], depth: string): { w: number; d: number } {
-  let w = 0;
-  let d = 0;
-  for (const code of codes) {
-    const fp = moduleFootprint(findModule(code) ?? { w: 95, d: 95, cushions: 0 }, 0, depth);
-    w += fp.w;
-    d = Math.max(d, fp.h);
+/** Overall bbox of a seeded layout in cm (works for straight runs AND L-shapes).
+ *  Drives the to-scale plan-view callouts. */
+function cellsDims(cells: SeedCell[], depth: string): { w: number; d: number } {
+  if (cells.length === 0) return { w: 0, d: 0 };
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const c of cells) {
+    const fp = moduleFootprint(findModule(c.moduleCode) ?? { w: 95, d: 95, cushions: 0 }, c.rot, depth);
+    minX = Math.min(minX, c.x);
+    minY = Math.min(minY, c.y);
+    maxX = Math.max(maxX, c.x + fp.w);
+    maxY = Math.max(maxY, c.y + fp.h);
   }
-  return { w, d };
+  return { w: maxX - minX, d: maxY - minY };
 }
 
 function priceLabelOf(combo: SofaComboDto): string {
@@ -270,11 +275,15 @@ export default function SofaConfigurePage({
   const fabricTierOverride =
     (modelFabricTierOverrides ?? []).find((o) => o.modelId === model.id) ?? null;
 
-  // Hero pane previews the hovered (else first) pick — clicking a card still
-  // loads it straight onto the canvas, same contract as before.
+  // Hero pane previews the hovered (else selected, else first) pick. Clicking a
+  // card SELECTS it (prototype behaviour — Customize is the explicit canvas path).
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const heroPick =
-    picks.find((p) => p.combo.id === hoverId) ?? picks[0] ?? null;
+    picks.find((p) => p.combo.id === hoverId) ??
+    picks.find((p) => p.combo.id === selectedId) ??
+    picks[0] ??
+    null;
 
   // ── Quick-pick direct-add controls (seat height · fabric · remark) ──────
   const [qpHeight, setQpHeight] = useState<SofaHeight>("24");
@@ -293,6 +302,12 @@ export default function SofaConfigurePage({
     : 0;
   const heroBase = heroPick ? heroPick.combo.pricesByHeight[effHeight] ?? null : null;
   const qpTotal = heroBase !== null ? heroBase + qpDelta : null;
+
+  // The hero layout seeded at the chosen depth — ONE joined plan view + bbox dims.
+  const heroCells = heroPick
+    ? comboSeedCells({ ...heroPick.combo, slots: displayFor(heroPick).slots }, effHeight)
+    : [];
+  const heroDims = cellsDims(heroCells, effHeight);
 
   /** Add the previewed preset straight to the cart (no canvas hop). */
   function addQuickPick(pick: QuickPick) {
@@ -350,6 +365,28 @@ export default function SofaConfigurePage({
             <span className="sof-flow__crumbDot" />
             {model.name}
           </span>
+          {/* Seat-size toggle — top-left, beside the mode tabs (prototype). */}
+          {mode === "quick" && heroHeights.length > 0 && (
+            <span
+              className="sof-flow__modeTabs"
+              role="group"
+              aria-label="Seat height"
+              data-testid="sofa-qp-heights"
+            >
+              {heroHeights.map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  className={`sof-flow__modeTab ${effHeight === h ? "is-on" : ""}`}
+                  aria-pressed={effHeight === h}
+                  onClick={() => setQpHeight(h)}
+                  data-testid={`sofa-qp-height-${h}`}
+                >
+                  {h}&Prime;
+                </button>
+              ))}
+            </span>
+          )}
           <div className="sof-flow__modeTabs">
             <button
               type="button"
@@ -432,7 +469,7 @@ export default function SofaConfigurePage({
             <div className="cfg-header__eyebrow">{model.name} · Sofa</div>
             <div className="cfg-header__title" data-testid="sofa-config-name">
               {mode === "quick" && heroPick
-                ? displayFor(heroPick).codes.join(" + ")
+                ? `${displayFor(heroPick).codes.join(" + ")} · ${effHeight}″`
                 : model.name}
             </div>
             <div className="cfg-header__sub">
@@ -443,16 +480,54 @@ export default function SofaConfigurePage({
                 : "Drag modules · rotate · we price the connected sofa live"}
             </div>
           </div>
-          {meta && (
+          {mode === "quick" ? (
             <div className="cfg-header__total" tabIndex={0}>
-              <div className="cfg-header__totalLabel">From</div>
-              <div className="cfg-header__totalNum">
-                <sup>RM</sup>
-                {meta.fromPrice.toLocaleString("en-MY")}
+              <div className="cfg-header__totalLabel">Live total</div>
+              <div className="cfg-header__totalNum" data-testid="sofa-qp-total">
+                {qpTotal !== null ? (
+                  <>
+                    <sup>RM</sup>
+                    {qpTotal.toLocaleString("en-MY")}
+                  </>
+                ) : (
+                  "—"
+                )}
               </div>
-              <div className="cfg-header__totalNote">priced live on the canvas</div>
+              <div className="cfg-header__totalNote">combo pricing per layout</div>
             </div>
+          ) : (
+            meta && (
+              <div className="cfg-header__total" tabIndex={0}>
+                <div className="cfg-header__totalLabel">From</div>
+                <div className="cfg-header__totalNum">
+                  <sup>RM</sup>
+                  {meta.fromPrice.toLocaleString("en-MY")}
+                </div>
+                <div className="cfg-header__totalNote">priced live on the canvas</div>
+              </div>
+            )
           )}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10, marginLeft: 14 }}>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={onClose}
+              data-testid="sofa-cancel"
+            >
+              <X size={14} strokeWidth={2} /> Cancel
+            </button>
+            {mode === "quick" && (
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={!heroPick || qpTotal === null}
+                onClick={() => heroPick && addQuickPick(heroPick)}
+                data-testid="sofa-qp-add"
+              >
+                <Plus size={14} strokeWidth={2} /> Add to Cart
+              </button>
+            )}
+          </span>
         </div>
       </div>
 
@@ -471,26 +546,18 @@ export default function SofaConfigurePage({
                   const d = displayFor(p);
                   const isOn = heroPick?.combo.id === p.combo.id;
                   const mirrorable = canMirror(p.combo.slots);
+                  const cardCells = comboSeedCells({ ...p.combo, slots: d.slots }, "24");
                   return (
                     <button
                       key={p.combo.id}
                       type="button"
-                      onClick={() => loadPick(p)}
+                      onClick={() => setSelectedId(p.combo.id)}
                       onMouseEnter={() => setHoverId(p.combo.id)}
                       className={`sof-qp__card ${isOn ? "is-on" : ""}`}
                       data-testid={`sofa-quick-pick-${p.combo.id}`}
                     >
                       <span className="sof-qp__art" style={{ gap: 2 }}>
-                        {d.codes.slice(0, 4).map((code, i) => (
-                          <CompartmentSilhouette
-                            key={`${code}-${i}`}
-                            code={code}
-                            className="h-12 w-auto"
-                          />
-                        ))}
-                        {d.codes.length > 4 && (
-                          <span className="sof-qp__cardSub">+{d.codes.length - 4}</span>
-                        )}
+                        <SofaPlanView cells={cardCells} depth="24" className="h-12 w-auto" />
                       </span>
                       <span className="sof-qp__cardBody">
                         <span className="sof-qp__cardLabel">{p.title}</span>
@@ -517,25 +584,59 @@ export default function SofaConfigurePage({
                 })}
               </div>
 
-              {/* Fabric — optional, deferrable to the customer */}
+              {/* Fabric — swatch pills (prototype), deferrable to the customer */}
               <div className="sof-qp__railHead" style={{ marginTop: 16 }}>
-                <span className="pos-eyebrow">Fabric</span>
+                <span className="pos-eyebrow">Fabric option</span>
                 <span className="sof-qp__railDetail">optional · confirm later</span>
               </div>
-              <select
-                value={qpFabricId}
-                onChange={(e) => setQpFabricId(e.target.value)}
-                className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
-                style={{ width: "100%" }}
+              <div
+                style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+                role="group"
+                aria-label="Fabric option"
                 data-testid="sofa-qp-fabric"
               >
-                {fabrics.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.fabricName} · {f.tier.replace("PRICE_", "P")}
-                  </option>
-                ))}
-                <option value={QP_FABRIC_DEFER}>Confirm later — customer to confirm</option>
-              </select>
+                {fabrics.map((f) => {
+                  const delta = resolveFabricDelta(
+                    f.tier,
+                    fabricTierOverride,
+                    fabricTierConfig ?? null,
+                  );
+                  const on = qpFabricId === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setQpFabricId(f.id)}
+                      aria-pressed={on}
+                      className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
+                        on ? "border-primary text-primary" : "border-base-300 text-base-700"
+                      }`}
+                      data-testid={`sofa-qp-fabric-${f.id}`}
+                    >
+                      <span
+                        className="h-3 w-3 rounded-full border border-base-300"
+                        style={{ background: f.colors?.[0] ?? "#CBAA7C" }}
+                      />
+                      {f.fabricName}
+                      <span className="t-micro text-base-400">
+                        {delta > 0 ? `+RM ${delta.toLocaleString("en-MY")}` : "Included"}
+                      </span>
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setQpFabricId(QP_FABRIC_DEFER)}
+                  aria-pressed={qpDeferred}
+                  className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
+                    qpDeferred ? "border-primary text-primary" : "border-base-300 text-base-700"
+                  }`}
+                  data-testid="sofa-qp-fabric-defer"
+                >
+                  Confirm later
+                  <span className="t-micro text-base-400">customer to confirm</span>
+                </button>
+              </div>
 
               {/* Remark */}
               <div className="sof-qp__railHead" style={{ marginTop: 16 }}>
@@ -556,101 +657,56 @@ export default function SofaConfigurePage({
             <div className="sof-qp__hero">
               <div className="sof-qp__heroFrame">
                 {heroPick ? (
-                  (() => {
-                    const codes = displayFor(heroPick).codes;
-                    const dim = layoutDims(codes, "24");
-                    return (
-                      <div
-                        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
-                        data-testid="sofa-plan-view"
+                  <div
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+                    data-testid="sofa-plan-view"
+                  >
+                    {/* width callout */}
+                    <span
+                      className="t-tiny font-mono"
+                      style={{
+                        border: "1px solid var(--line, #d9d2c7)",
+                        borderRadius: 4,
+                        padding: "1px 6px",
+                        background: "var(--pos-panel, #fff)",
+                      }}
+                      data-testid="sofa-plan-width"
+                    >
+                      {heroDims.w} cm
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {/* ONE joined sofa — all modules in a single to-scale SVG */}
+                      <SofaPlanView cells={heroCells} depth={effHeight} className="h-64 w-auto" />
+                      {/* depth callout */}
+                      <span
+                        className="t-tiny font-mono"
+                        style={{
+                          border: "1px solid var(--line, #d9d2c7)",
+                          borderRadius: 4,
+                          padding: "1px 6px",
+                          background: "var(--pos-panel, #fff)",
+                          writingMode: "vertical-rl",
+                        }}
+                        data-testid="sofa-plan-depth"
                       >
-                        {/* width callout */}
-                        <span
-                          className="t-tiny font-mono"
-                          style={{
-                            border: "1px solid var(--line, #d9d2c7)",
-                            borderRadius: 4,
-                            padding: "1px 6px",
-                            background: "var(--pos-panel, #fff)",
-                          }}
-                          data-testid="sofa-plan-width"
-                        >
-                          {dim.w} cm
-                        </span>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
-                            {codes.slice(0, 6).map((code, i) => (
-                              <CompartmentSilhouette
-                                key={`${code}-${i}`}
-                                code={code}
-                                className="h-40 w-auto"
-                              />
-                            ))}
-                          </div>
-                          {/* depth callout */}
-                          <span
-                            className="t-tiny font-mono"
-                            style={{
-                              border: "1px solid var(--line, #d9d2c7)",
-                              borderRadius: 4,
-                              padding: "1px 6px",
-                              background: "var(--pos-panel, #fff)",
-                              writingMode: "vertical-rl",
-                            }}
-                            data-testid="sofa-plan-depth"
-                          >
-                            {dim.d} cm
-                          </span>
-                        </div>
-                        <span className="sof-qp__railDetail">Plan view · to scale</span>
-                      </div>
-                    );
-                  })()
+                        {heroDims.d} cm
+                      </span>
+                    </div>
+                  </div>
                 ) : (
                   <span className="sof-qp__railDetail">No layouts authored yet.</span>
                 )}
               </div>
               {heroPick && (
                 <div className="sof-qp__heroFoot">
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                    <span>
-                      <span className="sof-qp__cardLabel">{heroPick.title}</span>
-                      <span className="sof-qp__heroDim" style={{ marginLeft: 10 }}>
-                        {displayFor(heroPick).codes.join(" + ")}
-                      </span>
+                  <span>
+                    <span className="sof-qp__cardLabel">{heroPick.title}</span>
+                    <span className="sof-qp__heroDim" style={{ marginLeft: 10 }}>
+                      {displayFor(heroPick).codes.join(" + ")}
                     </span>
-                    {/* Seat-height toggle (only the heights this preset is priced for) */}
-                    {heroHeights.length > 0 && (
-                      <span
-                        className="sof-flow__modeTabs"
-                        role="group"
-                        aria-label="Seat height"
-                        data-testid="sofa-qp-heights"
-                      >
-                        {heroHeights.map((h) => (
-                          <button
-                            key={h}
-                            type="button"
-                            className={`sof-flow__modeTab ${effHeight === h ? "is-on" : ""}`}
-                            aria-pressed={effHeight === h}
-                            onClick={() => setQpHeight(h)}
-                            data-testid={`sofa-qp-height-${h}`}
-                          >
-                            {h}&Prime;
-                          </button>
-                        ))}
-                      </span>
-                    )}
                   </span>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 14 }}>
-                    <span className="text-right">
-                      <span className="pos-eyebrow" style={{ fontSize: 10, display: "block" }}>
-                        Live total
-                      </span>
-                      <span className="sof-qp__cardPrice" style={{ fontSize: 18 }} data-testid="sofa-qp-total">
-                        {qpTotal !== null ? `RM ${qpTotal.toLocaleString("en-MY")}` : "—"}
-                      </span>
-                    </span>
+                    <span className="sof-qp__railDetail">{effHeight}&Prime; seat · to scale</span>
                     <button
                       type="button"
                       className="btn btn--secondary"
@@ -658,15 +714,6 @@ export default function SofaConfigurePage({
                       data-testid="sofa-qp-customize"
                     >
                       Customize →
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--primary"
-                      disabled={qpTotal === null}
-                      onClick={() => addQuickPick(heroPick)}
-                      data-testid="sofa-qp-add"
-                    >
-                      Add to cart
                     </button>
                   </span>
                 </div>
