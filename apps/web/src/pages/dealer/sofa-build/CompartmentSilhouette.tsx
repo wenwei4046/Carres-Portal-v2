@@ -45,6 +45,15 @@ const BACK_FILL = "#CBAA7C"; // warm tan backrest band
 const ARM_FILL = "#BE9A64"; // deeper tan arms (reads as the frame)
 const SEAM = "#A98C5E"; // muted tan cushion seam
 
+/** The warm plan-view palette, shared with <SofaPlanView> (the joined view). */
+export const PLAN_PALETTE = {
+  stroke: STROKE,
+  body: BODY_FILL,
+  back: BACK_FILL,
+  arm: ARM_FILL,
+  seam: SEAM,
+} as const;
+
 /** A short mechanism label drawn in the body centre when a compartment has a
  *  power / recliner / power-leg mechanism. NOT an emoji (CLAUDE.md §10). */
 const MECH_LABEL: Record<"P" | "R" | "L", string> = {

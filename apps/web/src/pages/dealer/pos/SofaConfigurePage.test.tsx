@@ -147,9 +147,12 @@ describe("SofaConfigurePage", () => {
     expect(within(grid).getByText(/From RM 2,990/)).toBeTruthy();
   });
 
-  it("loading a pick flips to Customize with the canvas pre-seeded as ONE connected sofa", () => {
+  it("card click SELECTS; Customize → loads the canvas pre-seeded as ONE connected sofa", () => {
     renderPage();
     fireEvent.click(screen.getByTestId(`sofa-quick-pick-${COMBO.id}`));
+    // Selecting a card does NOT jump to the canvas (prototype behaviour).
+    expect(screen.queryByTestId("sofa-build-canvas")).toBeNull();
+    fireEvent.click(screen.getByTestId("sofa-qp-customize"));
     expect(screen.getByTestId("sofa-build-canvas")).toBeTruthy();
     const room = screen.getByTestId("sofa-build-room");
     // The flush-seeded modules join as a single connected group — exactly one
@@ -188,23 +191,25 @@ describe("SofaConfigurePage", () => {
   });
 
   it("a flipped pick seeds the mirrored layout onto the canvas", () => {
-    const { } = renderPage();
+    renderPage();
     fireEvent.click(screen.getByTestId(`sofa-flip-${COMBO.id}`));
-    fireEvent.click(screen.getByTestId(`sofa-quick-pick-${COMBO.id}`));
+    fireEvent.click(screen.getByTestId("sofa-qp-customize"));
     // still one connected sofa, but mirrored (2A now on the left)
     const room = screen.getByTestId("sofa-build-room");
     expect(within(room).getAllByTestId("sofa-group-outline")).toHaveLength(1);
   });
 
-  it("shows the selected configuration name in the header (quick mode)", () => {
+  it("shows the selected configuration name + size in the header (quick mode)", () => {
     renderPage();
-    expect(screen.getByTestId("sofa-config-name").textContent).toBe("1A(LHF) + 2A(RHF)");
+    const name = screen.getByTestId("sofa-config-name").textContent ?? "";
+    expect(name).toContain("1A(LHF) + 2A(RHF)");
+    expect(name).toContain("24″");
   });
 
   it("the header config name follows the L/R flip", () => {
     renderPage();
     fireEvent.click(screen.getByTestId(`sofa-flip-${COMBO.id}`));
-    expect(screen.getByTestId("sofa-config-name").textContent).toBe("2A(LHF) + 1A(RHF)");
+    expect(screen.getByTestId("sofa-config-name").textContent).toContain("2A(LHF) + 1A(RHF)");
   });
 
   it("hides the flip toggle for a symmetric (orientation-free) combo", () => {
@@ -218,17 +223,19 @@ describe("SofaConfigurePage", () => {
     expect(screen.queryByTestId(`sofa-flip-${symmetric.id}`)).toBeNull();
   });
 
-  it("size toggle reprices the LIVE TOTAL from the preset's per-height price", () => {
+  it("header size toggle reprices the LIVE TOTAL from the preset's per-height price", () => {
     pwpMock.current = { data: { vouchers: [] }, isFetching: false };
     renderPage(); // COMBO.pricesByHeight = { 24: 2990, 28: 3190 }
-    expect(screen.getByTestId("sofa-qp-total").textContent).toBe("RM 2,990");
+    expect(screen.getByTestId("sofa-qp-total").textContent).toContain("2,990");
     fireEvent.click(screen.getByTestId("sofa-qp-height-28"));
-    expect(screen.getByTestId("sofa-qp-total").textContent).toBe("RM 3,190");
+    expect(screen.getByTestId("sofa-qp-total").textContent).toContain("3,190");
   });
 
-  it("Add to cart emits a DraftLine straight from quick pick (fabric deferred + remark)", () => {
-    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+  it("header Add to Cart emits a DraftLine (fabric deferred + remark + PWP hint)", () => {
+    pwpMock.current = { data: { vouchers: [{ code: "PWP-1234ABCD" }] }, isFetching: false };
     const { onAdd, onClose } = renderPage({ skus: [PRESET_SKU] });
+    fireEvent.change(screen.getByTestId("sofa-pwp-input"), { target: { value: "PWP-1234ABCD" } });
+    fireEvent.click(screen.getByTestId("sofa-pwp-apply"));
     fireEvent.change(screen.getByTestId("sofa-qp-remark"), { target: { value: "match showroom" } });
     fireEvent.click(screen.getByTestId("sofa-qp-add"));
     expect(onAdd).toHaveBeenCalledTimes(1);
@@ -237,7 +244,17 @@ describe("SofaConfigurePage", () => {
     const attrs = line.attrs as Record<string, unknown>;
     expect(attrs.fabric_deferred).toBe(true);
     expect(attrs.remark).toBe("match showroom");
+    expect(attrs.pwp_pending_code).toBe("PWP-1234ABCD");
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("fabric pills: Confirm later selected by default; clicking a fabric selects it", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage();
+    expect(screen.getByTestId("sofa-qp-fabric-defer").getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByTestId("sofa-qp-fabric-f-1"));
+    expect(screen.getByTestId("sofa-qp-fabric-f-1").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("sofa-qp-fabric-defer").getAttribute("aria-pressed")).toBe("false");
   });
 
   it("renders a to-scale plan view with width + depth cm callouts", () => {
