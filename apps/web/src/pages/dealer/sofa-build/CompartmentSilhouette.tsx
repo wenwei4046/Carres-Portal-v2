@@ -36,11 +36,14 @@ import type { EdgeType } from "@carres/shared";
  *   · `violation` → red outline (the builder's arm-cap / arm-collision warning).
  */
 
-const STROKE = "hsl(var(--base-400))";
-const BODY_FILL = "hsl(var(--base-100))";
-const BACK_FILL = "hsl(var(--base-200))";
-const ARM_FILL = "hsl(var(--base-300))";
-const SEAM = "hsl(var(--base-400))";
+// Plan-view furniture palette — WARM, matching the CARRES prototype art:
+// a cream seat cushion inside a tan arm/backrest frame with a dark outline, so
+// each compartment reads with front/back depth (not a flat gray box).
+const STROKE = "#2B2521"; // dark warm charcoal — the sofa outline
+const BODY_FILL = "#EFE7D6"; // cream / oat seat cushion (the light base)
+const BACK_FILL = "#CBAA7C"; // warm tan backrest band
+const ARM_FILL = "#BE9A64"; // deeper tan arms (reads as the frame)
+const SEAM = "#A98C5E"; // muted tan cushion seam
 
 /** A short mechanism label drawn in the body centre when a compartment has a
  *  power / recliner / power-leg mechanism. NOT an emoji (CLAUDE.md §10). */
@@ -136,35 +139,35 @@ export default function CompartmentSilhouette({
         rx={3}
         fill={BODY_FILL}
         stroke={violation ? "hsl(var(--danger))" : STROKE}
-        strokeWidth={1.4}
+        strokeWidth={2}
       />
 
       {/* backrest strip (on the back edge) */}
       {geom.backN && (
-        <rect x={PAD} y={PAD} width={geom.w} height={BACK} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-back" />
+        <rect x={PAD} y={PAD} width={geom.w} height={BACK} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-back" />
       )}
       {geom.backS && (
-        <rect x={PAD} y={PAD + geom.h - BACK} width={geom.w} height={BACK} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-back" />
+        <rect x={PAD} y={PAD + geom.h - BACK} width={geom.w} height={BACK} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-back" />
       )}
       {geom.backW && (
-        <rect x={PAD} y={PAD} width={BACK} height={geom.h} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-back" />
+        <rect x={PAD} y={PAD} width={BACK} height={geom.h} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-back" />
       )}
       {geom.backE && (
-        <rect x={PAD + geom.w - BACK} y={PAD} width={BACK} height={geom.h} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-back" />
+        <rect x={PAD + geom.w - BACK} y={PAD} width={BACK} height={geom.h} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-back" />
       )}
 
       {/* arm rects */}
       {geom.armW && (
-        <rect x={PAD} y={PAD} width={ARM} height={geom.h} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-arm-left" />
+        <rect x={PAD} y={PAD} width={ARM} height={geom.h} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-arm-left" />
       )}
       {geom.armE && (
-        <rect x={PAD + geom.w - ARM} y={PAD} width={ARM} height={geom.h} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-arm-right" />
+        <rect x={PAD + geom.w - ARM} y={PAD} width={ARM} height={geom.h} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-arm-right" />
       )}
       {geom.armN && (
-        <rect x={PAD} y={PAD} width={geom.w} height={ARM} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-arm-top" />
+        <rect x={PAD} y={PAD} width={geom.w} height={ARM} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-arm-top" />
       )}
       {geom.armS && (
-        <rect x={PAD} y={PAD + geom.h - ARM} width={geom.w} height={ARM} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-arm-bottom" />
+        <rect x={PAD} y={PAD + geom.h - ARM} width={geom.w} height={ARM} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-arm-bottom" />
       )}
 
       {/* per-cushion seams (vertical dashed dividers along the seat length) */}
@@ -179,7 +182,7 @@ export default function CompartmentSilhouette({
               x2={x}
               y2={PAD + geom.h}
               stroke={SEAM}
-              strokeWidth={0.6}
+              strokeWidth={0.9}
               strokeDasharray="3,3"
               data-testid="silhouette-seam"
             />
@@ -195,7 +198,7 @@ export default function CompartmentSilhouette({
           dominantBaseline="central"
           fontSize={Math.min(geom.w, geom.h) * 0.28}
           fontWeight={700}
-          fill="hsl(var(--base-500))"
+          fill={STROKE}
           data-testid="silhouette-mechanism"
         >
           {MECH_LABEL[geom.mechanism]}
