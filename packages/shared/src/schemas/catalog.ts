@@ -165,27 +165,86 @@ export type SpecialAddonDto = z.infer<typeof specialAddonSchema>;
 // these and the Maintenance UI reuses the exact same shapes.
 // ---------------------------------------------------------------------------
 
-/** The three curated pools (branding dropped — every Carres product is one brand). */
+/** The curated pools (branding stays dropped — every Carres product is one
+ *  brand). 0201 widens the original three with the six 2990s-ported pools that
+ *  back the Maintenance + Special Add-ons sidebar sections. */
 export const CATALOG_OPTION_POOL_NAMES = [
   "supplier_category",
   "bedframe_size",
   "mattress_size",
+  "divan_height",
+  "total_height",
+  "gap",
+  "bedframe_leg_height",
+  "sofa_size",
+  "sofa_leg_height",
 ] as const;
 export const catalogOptionPoolNameSchema = z.enum(CATALOG_OPTION_POOL_NAMES);
 export type CatalogOptionPoolName = z.infer<typeof catalogOptionPoolNameSchema>;
 
 /** One pool entry (mirrors the domain `CatalogOptionPool` / a row, camelCased).
- *  `label` + `dimensions` are populated for size pools only (null otherwise). */
+ *  `label` + `dimensions` are populated for size pools only (null otherwise);
+ *  `surcharge` (0201) is the RM selling surcharge for priced pools (divan /
+ *  total / leg heights) — null renders as "—". */
 export const catalogOptionPoolSchema = z.object({
   id: z.string().uuid(),
   pool: catalogOptionPoolNameSchema,
   value: z.string(),
   label: z.string().nullable(),
   dimensions: z.string().nullable(),
+  surcharge: z.number().nullable(),
   active: z.boolean(),
   sortOrder: z.number().int(),
 });
 export type CatalogOptionPoolDto = z.infer<typeof catalogOptionPoolSchema>;
+
+/** 0201 — one entry inside a pool batch-save. Same shape as a pool row minus
+ *  `id`/`pool`/`sortOrder` (the RPC re-mints rows; array order = display
+ *  order, so sortOrder is server-assigned from ordinality). */
+export const catalogPoolEntryInput = z
+  .object({
+    value: z.string().trim().min(1).max(60),
+    label: z.string().trim().max(60).nullable().optional(),
+    dimensions: z.string().trim().max(60).nullable().optional(),
+    surcharge: z.number().nullable().optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+export type CatalogPoolEntryInput = z.infer<typeof catalogPoolEntryInput>;
+
+/** 0201 — PUT /option-pools/:pool body: the pool's FULL new contents (replace
+ *  semantics; the catalog_pool_batch_save RPC appends a catalog_config_history
+ *  snapshot in the same transaction). */
+export const catalogPoolBatchSaveInput = z
+  .object({
+    entries: z.array(catalogPoolEntryInput).max(200),
+    notes: z.string().trim().max(500).optional(),
+  })
+  .strict();
+export type CatalogPoolBatchSaveInput = z.infer<typeof catalogPoolBatchSaveInput>;
+
+/** 0201 — one snapshot entry as stored in catalog_config_history.snapshot. */
+export const catalogPoolSnapshotEntrySchema = z.object({
+  value: z.string(),
+  label: z.string().nullable(),
+  dimensions: z.string().nullable(),
+  surcharge: z.number().nullable(),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type CatalogPoolSnapshotEntryDto = z.infer<typeof catalogPoolSnapshotEntrySchema>;
+
+/** 0201 — one catalog_config_history row (lightweight append-only history:
+ *  effective_from = the save date; no future-dating engine). */
+export const catalogConfigHistorySchema = z.object({
+  id: z.string().uuid(),
+  section: catalogOptionPoolNameSchema,
+  entries: z.array(catalogPoolSnapshotEntrySchema),
+  effectiveFrom: z.string(),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type CatalogConfigHistoryDto = z.infer<typeof catalogConfigHistorySchema>;
 
 export const floorConfigSchema = z.object({
   id: z.number().int(),
@@ -1050,6 +1109,7 @@ export const catalogOptionPoolCreateInput = z
     value: z.string().trim().min(1).max(60),
     label: z.string().trim().max(60).nullable().optional(),
     dimensions: z.string().trim().max(60).nullable().optional(),
+    surcharge: z.number().nullable().optional(),
     active: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   })
@@ -1064,6 +1124,7 @@ export const catalogOptionPoolPatchInput = z
     value: z.string().trim().min(1).max(60).optional(),
     label: z.string().trim().max(60).nullable().optional(),
     dimensions: z.string().trim().max(60).nullable().optional(),
+    surcharge: z.number().nullable().optional(),
     active: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   })

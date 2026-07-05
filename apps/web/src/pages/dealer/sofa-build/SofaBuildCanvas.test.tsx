@@ -166,6 +166,20 @@ describe("SofaBuildCanvas", () => {
     expect(payload.fabricName).toBe("Linen Beige");
     expect(payload.total).toBe(1500);
     expect(payload.priceBasis).toBe("a_la_carte");
+    expect(payload.fabricDeferred).toBe(false);
+  });
+
+  it("'Confirm later' defers the fabric: null fabric + base tier + fabricDeferred", () => {
+    const onAddBuild = vi.fn();
+    renderCanvas({ onAddBuild });
+    addModule("1S");
+    fireEvent.change(screen.getByTestId("sofa-build-fabric"), { target: { value: "__defer__" } });
+    fireEvent.click(screen.getByTestId("sofa-build-add"));
+    const payload = onAddBuild.mock.calls[0]![0];
+    expect(payload.fabricDeferred).toBe(true);
+    expect(payload.fabricId).toBeNull();
+    expect(payload.fabricName).toBeNull();
+    expect(payload.fabricTier).toBe("PRICE_1"); // base tier when deferred
   });
 
   it("shows the matched-combo badge + savings when a combo applies", () => {

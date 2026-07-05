@@ -12,6 +12,13 @@ vi.mock("@/lib/queries", () => ({
   useCreateSpecialAddon: () => ({ mutate: vi.fn(), mutateAsync: createAsync, isPending: false }),
   usePatchSpecialAddon: () => ({ mutate: vi.fn(), mutateAsync: patchAsync, isPending: false }),
   useDeleteSpecialAddon: () => ({ mutate: vi.fn(), mutateAsync: delAsync, isPending: false }),
+  // 0201 — option pool hooks (PoolPanel panels in the sidebar layout).
+  useBatchSaveOptionPool: () => ({ mutate: vi.fn(), isPending: false }),
+  useCatalogConfigHistory: () => ({ data: undefined, isLoading: false }),
+  // Order Add-ons section (hosted here since 0201).
+  useCreateAddon: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  usePatchAddon: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useDeleteAddon: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const SA: SpecialAddonDto = {
@@ -44,21 +51,28 @@ beforeEach(() => {
   delAsync.mockReset().mockResolvedValue({ ok: true });
 });
 
+/** 0201 — the tab is sidebar-driven now: the special_addons editor lives
+ *  behind the "Product Add-ons" nav item, so every test opens it first. */
+function renderProductPanel(cat: CatalogResponse, isPrincipal: boolean) {
+  render(<SpecialAddonsTab catalog={cat} isPrincipal={isPrincipal} />);
+  fireEvent.click(screen.getByTestId("maint-nav-product"));
+}
+
 describe("SpecialAddonsTab", () => {
   it("renders rows with negative price shown as a minus", () => {
-    render(<SpecialAddonsTab catalog={catalog([SA])} isPrincipal />);
+    renderProductPanel(catalog([SA]), true);
     expect(screen.getByTestId("special-row-right-drawer")).toBeInTheDocument();
     expect(screen.getByText("−RM 40.00")).toBeInTheDocument();
   });
 
   it("non-principal: no + New button, edit shows 'View'", () => {
-    render(<SpecialAddonsTab catalog={catalog([SA])} isPrincipal={false} />);
+    renderProductPanel(catalog([SA]), false);
     expect(screen.queryByTestId("special-new")).not.toBeInTheDocument();
     expect(screen.getByTestId("special-edit-right-drawer")).toHaveTextContent("View");
   });
 
   it("principal can create a new special add-on with a follow-up question", async () => {
-    render(<SpecialAddonsTab catalog={catalog([])} isPrincipal />);
+    renderProductPanel(catalog([]), true);
     fireEvent.click(screen.getByTestId("special-new"));
     fireEvent.change(screen.getByTestId("special-code"), { target: { value: "no-side-panel" } });
     fireEvent.change(screen.getByTestId("special-label"), { target: { value: "No Side Panel" } });
@@ -73,7 +87,7 @@ describe("SpecialAddonsTab", () => {
   });
 
   it("create is blocked until a category is chosen", () => {
-    render(<SpecialAddonsTab catalog={catalog([])} isPrincipal />);
+    renderProductPanel(catalog([]), true);
     fireEvent.click(screen.getByTestId("special-new"));
     fireEvent.change(screen.getByTestId("special-code"), { target: { value: "x-thing" } });
     fireEvent.change(screen.getByTestId("special-label"), { target: { value: "X Thing" } });

@@ -23,18 +23,17 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // ---------------------------------------------------------------------------
 const mockTierConfigMutate = vi.fn();
 const mockFloorConfigMutate = vi.fn();
-const mockAddonMutate = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   usePatchFloorConfig:       () => ({ mutate: mockFloorConfigMutate, isPending: false }),
   useUpdateFabricTierConfig: () => ({ mutate: mockTierConfigMutate, isPending: false }),
-  useCreateAddon:            () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-  usePatchAddon:             () => ({ mutate: mockAddonMutate, mutateAsync: vi.fn(), isPending: false }),
-  useDeleteAddon:            () => ({ mutate: vi.fn(), isPending: false }),
   // 0178 — sofa compartment hooks (MaintenanceTab now renders SofaCompartmentsSection).
   useCreateSofaCompartment:  () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useUpdateSofaCompartment:  () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteSofaCompartment:  () => ({ mutate: vi.fn(), isPending: false }),
+  // 0201 — option pool hooks (PoolPanel children).
+  useBatchSaveOptionPool:    () => ({ mutate: vi.fn(), isPending: false }),
+  useCatalogConfigHistory:   () => ({ data: undefined, isLoading: false }),
   // 0184 — delivery TRIP fee hooks (MaintenanceTab now renders the trip-fee +
   // special-rules sections).
   useUpdateDeliveryFeeConfig:       () => ({ mutate: vi.fn(), isPending: false }),
@@ -64,6 +63,18 @@ function wrap(ui: React.ReactNode) {
   return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
 }
 
+/** 0201 — the tab is sidebar-driven now: each section lives behind its nav
+ *  item ("fabric" = Fabric Tiers, "compartments" = Sofa Compartments), so
+ *  every test opens the right panel first. */
+function renderPanel(
+  catalog: CatalogResponse,
+  isPrincipal: boolean,
+  nav: "fabric" | "compartments",
+) {
+  render(wrap(<MaintenanceTab catalog={catalog} isPrincipal={isPrincipal} />));
+  fireEvent.click(screen.getByTestId(`maint-nav-${nav}`));
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -76,32 +87,25 @@ beforeEach(() => {
 
 describe("FabricTierDeltasCard — render", () => {
   it("renders the Fabric tier deltas heading", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal={true} />));
+    renderPanel(makeCatalog(), true, "fabric");
     expect(screen.getByText("Fabric tier deltas")).toBeInTheDocument();
   });
 
   it("shows P2 and P3 numeric inputs", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal={true} />));
+    renderPanel(makeCatalog(), true, "fabric");
     expect(screen.getByTestId("global-tier2-delta")).toBeInTheDocument();
     expect(screen.getByTestId("global-tier3-delta")).toBeInTheDocument();
   });
 
   it("renders summary with config values", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal={true} />));
+    renderPanel(makeCatalog(), true, "fabric");
     const summary = screen.getByTestId("fabric-tier-summary");
     expect(summary.textContent).toContain("100.00");
     expect(summary.textContent).toContain("200.00");
   });
 
   it("summary falls back to 0.00 when fabricTierConfig is absent", () => {
-    render(
-      wrap(
-        <MaintenanceTab
-          catalog={makeCatalog({ fabricTierConfig: undefined })}
-          isPrincipal={true}
-        />,
-      ),
-    );
+    renderPanel(makeCatalog({ fabricTierConfig: undefined }), true, "fabric");
     const summary = screen.getByTestId("fabric-tier-summary");
     expect(summary.textContent).toContain("0.00");
   });
@@ -109,7 +113,7 @@ describe("FabricTierDeltasCard — render", () => {
 
 describe("FabricTierDeltasCard — principal-gating", () => {
   it("principal: inputs are enabled + Save button present", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal={true} />));
+    renderPanel(makeCatalog(), true, "fabric");
     const t2 = screen.getByTestId("global-tier2-delta") as HTMLInputElement;
     const t3 = screen.getByTestId("global-tier3-delta") as HTMLInputElement;
     expect(t2).not.toBeDisabled();
@@ -118,7 +122,7 @@ describe("FabricTierDeltasCard — principal-gating", () => {
   });
 
   it("non-principal: inputs are disabled, no Save button", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal={false} />));
+    renderPanel(makeCatalog(), false, "fabric");
     const t2 = screen.getByTestId("global-tier2-delta") as HTMLInputElement;
     const t3 = screen.getByTestId("global-tier3-delta") as HTMLInputElement;
     expect(t2).toBeDisabled();
@@ -127,7 +131,7 @@ describe("FabricTierDeltasCard — principal-gating", () => {
   });
 
   it("principal: changing inputs and saving calls mutate with correct values", async () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal={true} />));
+    renderPanel(makeCatalog(), true, "fabric");
     const t2 = screen.getByTestId("global-tier2-delta");
     const t3 = screen.getByTestId("global-tier3-delta");
     fireEvent.change(t2, { target: { value: "120" } });
@@ -140,7 +144,7 @@ describe("FabricTierDeltasCard — principal-gating", () => {
   });
 
   it("principal: Save is disabled when values are unchanged (not dirty)", () => {
-    render(wrap(<MaintenanceTab catalog={makeCatalog()} isPrincipal={true} />));
+    renderPanel(makeCatalog(), true, "fabric");
     const saveBtn = screen.getByTestId("global-tier-save") as HTMLButtonElement;
     // No changes made — dirty=false → disabled
     expect(saveBtn).toBeDisabled();
@@ -179,27 +183,28 @@ describe("SofaCompartmentsSection — render + gating", () => {
   }
 
   it("renders the heading + active rows, hides disabled compartments", () => {
-    render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={true} />));
-    expect(screen.getByText("Sofa Compartments")).toBeInTheDocument();
+    renderPanel(catalogWithCompartments(), true, "compartments");
+    // 0201: "Sofa Compartments" appears in the sidebar nav AND the panel title.
+    expect(screen.getAllByText("Sofa Compartments").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByTestId("compartment-row-1A(LHF)")).toBeInTheDocument();
     expect(screen.queryByTestId("compartment-row-1NA")).not.toBeInTheDocument();
   });
 
   it("principal: shows the + Add compartment control + a Disable action", () => {
-    render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={true} />));
+    renderPanel(catalogWithCompartments(), true, "compartments");
     expect(screen.getByText("+ Add compartment")).toBeInTheDocument();
     expect(screen.getByText("Disable")).toBeInTheDocument();
   });
 
   it("non-principal: read-only — no Add control, no Disable button", () => {
-    render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={false} />));
+    renderPanel(catalogWithCompartments(), false, "compartments");
     expect(screen.queryByText("+ Add compartment")).not.toBeInTheDocument();
     expect(screen.getByTestId("compartment-row-1A(LHF)")).toBeInTheDocument();
     expect(screen.queryByText("Disable")).not.toBeInTheDocument();
   });
 
   it("compartment default price input reflects the catalog value", () => {
-    render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={true} />));
+    renderPanel(catalogWithCompartments(), true, "compartments");
     const priceInput = screen.getByLabelText("1A(LHF) default price") as HTMLInputElement;
     expect(priceInput.value).toBe("250");
   });

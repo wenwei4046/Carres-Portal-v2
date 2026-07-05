@@ -423,6 +423,7 @@ describe("catalogOptionPoolFromRow", () => {
       value: "K",
       label: "6FT",
       dimensions: "183X190CM",
+      surcharge: null,
       // Postgres integer arrives fine, but exercise the Number() coercion anyway.
       sort_order: "3" as unknown as number,
       active: true,
@@ -440,6 +441,7 @@ describe("catalogOptionPoolFromRow", () => {
     expect(out.value).toBe("K");
     expect(out.label).toBe("6FT");
     expect(out.dimensions).toBe("183X190CM");
+    expect(out.surcharge).toBeNull();
     expect(out.sortOrder).toBe(3);
     expect(typeof out.sortOrder).toBe("number");
     expect(out.active).toBe(true);
@@ -453,6 +455,21 @@ describe("catalogOptionPoolFromRow", () => {
     expect(out.value).toBe("sofa");
     expect(out.label).toBeNull();
     expect(out.dimensions).toBeNull();
+  });
+
+  it("0201 — coerces Postgres numeric surcharge (string) via Number()", () => {
+    const out = catalogOptionPoolFromRow(
+      baseRow({
+        pool: "divan_height",
+        value: '10"',
+        label: null,
+        dimensions: null,
+        surcharge: "125.00" as unknown as number,
+      }),
+    );
+    expect(out.pool).toBe("divan_height");
+    expect(out.surcharge).toBe(125);
+    expect(typeof out.surcharge).toBe("number");
   });
 });
 

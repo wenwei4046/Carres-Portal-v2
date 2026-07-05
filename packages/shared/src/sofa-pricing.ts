@@ -65,6 +65,30 @@ export function mirrorCode(code: string): string {
 }
 
 /**
+ * Mirror a Quick Pick's OR-set slot layout left↔right: reverse the slot order
+ * and swap each handed code's LHF↔RHF. Pure; identical result on POS + server.
+ * Faithful port of 2990s `mirrorModules` (sofa-build.ts:376-378).
+ */
+export function mirrorModules(slots: string[][]): string[][] {
+  return slots
+    .slice()
+    .reverse()
+    .map((slot) => slot.map(mirrorCode));
+}
+
+/**
+ * True when mirroring actually changes the layout. Symmetric palindromes
+ * (1-seater, 2-seater) mirror to themselves → false, so the POS hides the flip
+ * control for them. Compares the representative-code sequence (first code per
+ * slot) — that's what the preview + cart build consume.
+ * Faithful port of 2990s `canMirror` (sofa-build.ts:383-386).
+ */
+export function canMirror(slots: string[][]): boolean {
+  const rep = (m: string[][]): string => m.map((s) => s[0] ?? "").join("+");
+  return rep(slots) !== rep(mirrorModules(slots));
+}
+
+/**
  * Resolve the à-la-carte RM price for a per-model compartment.
  *   `modelComp.priceOverride ?? pool.defaultPrice`
  * Mirrors `resolveFabricDelta`'s `??` discipline: an override of `0` WINS

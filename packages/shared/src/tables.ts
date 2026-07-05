@@ -67,6 +67,10 @@ export const SPECIAL_ADDONS          = "special_addons" as const;
 // stays in suppliers.cat_covered).
 export const CATALOG_OPTION_POOLS    = "catalog_option_pools" as const;
 
+// 0201 — lightweight append-only snapshot log for the option pools (one row
+// per pool Edit-save; "Effective from" + History in the catalog admin UI).
+export const CATALOG_CONFIG_HISTORY  = "catalog_config_history" as const;
+
 // 0185 — 2990s Products parity Phase 7: principal-owned Default Free Gifts (per
 // model) + Free Item Campaigns (GWP). Free lines book as RM0 order_lines with
 // attrs markers (attrs.free_gift / attrs.free_item) — create_order / order_lines

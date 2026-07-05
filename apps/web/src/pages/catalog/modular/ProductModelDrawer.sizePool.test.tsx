@@ -67,10 +67,10 @@ const SKUS: ProductSkuDto[] = [];
 // One active mattress entry, one wrong-pool entry, one inactive mattress entry,
 // and one mattress entry already present in the model's sizes (must not re-show).
 const OPTION_POOLS: CatalogResponse["optionPools"] = [
-  { id: "op-1", pool: "mattress_size", value: "Super King", label: "7FT", dimensions: "200X200CM", active: true, sortOrder: 1 },
-  { id: "op-2", pool: "bedframe_size", value: "King Frame", label: null, dimensions: null, active: true, sortOrder: 1 },
-  { id: "op-3", pool: "mattress_size", value: "Cot", label: null, dimensions: null, active: false, sortOrder: 2 },
-  { id: "op-4", pool: "mattress_size", value: "Queen", label: null, dimensions: null, active: true, sortOrder: 3 },
+  { id: "op-1", pool: "mattress_size", value: "Super King", label: "7FT", dimensions: "200X200CM", surcharge: null, active: true, sortOrder: 1 },
+  { id: "op-2", pool: "bedframe_size", value: "King Frame", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 1 },
+  { id: "op-3", pool: "mattress_size", value: "Cot", label: null, dimensions: null, surcharge: null, active: false, sortOrder: 2 },
+  { id: "op-4", pool: "mattress_size", value: "Queen", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 3 },
 ];
 
 function makeCatalog(overrides?: Partial<CatalogResponse>): CatalogResponse {

@@ -38,6 +38,7 @@ function payload(over: Partial<SofaBuildAddPayload> = {}): SofaBuildAddPayload {
     fabricId: "fab-1",
     fabricName: "Velvet Teal",
     fabricSurcharge: 150,
+    fabricDeferred: false,
     total: 4250,
     priceBasis: "a_la_carte",
     ...over,
@@ -109,6 +110,20 @@ describe("buildToDraftLine", () => {
     const attrs = line.attrs as Record<string, unknown>;
     expect(attrs.fabric_id).toBeNull();
     expect(attrs.fabric_name).toBeNull();
+    expect(attrs.fabric_deferred).toBe(false);
+  });
+
+  it("'Confirm later' defers fabric: flag set + 'Fabric to confirm' in the label", () => {
+    const skus = [sku("s-preset", "m-ohana", "OH-PRESET", "3-seater", "preset", 3000)];
+    const line = buildToDraftLine(
+      payload({ fabricId: null, fabricName: null, fabricSurcharge: 0, fabricDeferred: true }),
+      model,
+      skus,
+    )!;
+    const attrs = line.attrs as Record<string, unknown>;
+    expect(attrs.fabric_deferred).toBe(true);
+    expect(attrs.fabric_name).toBeNull();
+    expect(line.label).toBe("Ohana · 1A(LHF) + 1A(RHF) · 28″ · Fabric to confirm");
   });
 
   it("two builds get distinct sofa_build_key + localId values", () => {

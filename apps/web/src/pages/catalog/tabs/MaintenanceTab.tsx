@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type {
-  AddonDto,
+  CatalogOptionPoolDto,
+  CatalogOptionPoolName,
   CatalogResponse,
   DeliveryFeeConfigDto,
   ProductCategory,
@@ -12,9 +13,6 @@ import type {
 import { MAX_DELIVERY_FLOOR } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
-  useCreateAddon,
-  useDeleteAddon,
-  usePatchAddon,
   usePatchFloorConfig,
   useUpdateDeliveryFeeConfig,
   useCreateSpecialDeliveryFeeRule,
@@ -27,7 +25,10 @@ import {
 } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
-import OptionPoolEditor from "./OptionPoolEditor";
+import MaintenanceSidebar, {
+  type MaintenanceSidebarGroup,
+} from "../components/MaintenanceSidebar";
+import PoolPanel from "./PoolPanel";
 import RuleTargetPicker, { finalizeRuleTargets } from "./RuleTargetPicker";
 
 /** The product categories the delivery base fee can be scoped to. */
@@ -50,19 +51,36 @@ const DEFAULT_DELIVERY_FEE_CONFIG: DeliveryFeeConfigDto = {
 };
 
 /**
- * Maintenance (narrow) — the global catalog config that isn't per-model:
- *   • Delivery fee (floor_config singleton) — principal-only (RLS
- *     floor_write_principal), so the editor is UI-gated to principal.
- *   • Add-ons (addons) — name / price / active, with a read-only link to the
- *     Service-category SKU each add-on charges through (addons.service_sku).
- *   • Global option pools (0182) — supplier_category + bedframe/mattress sizes,
- *     curated principal-only reference lists rendered via OptionPoolEditor.
+ * Maintenance — 0201 reshaped to the 2990s reference layout (Loo 2026-07-05
+ * screenshots): a grouped LEFT SIDEBAR with counts + ONE panel at a time.
  *
- * NOTE: the 0182 pools are GLOBAL reference lists. Per-model variant axes
- * (the actual sizes / colours / gaps / compartments a model offers) still live
+ *   PRODUCTS MAINTENANCE
+ *     • Bedframe Sizes / Mattress Sizes — 0182→0201 option pools (PoolPanel:
+ *       Edit-draft batch save + Effective-from + History).
+ *     • Sofa Compartments — the 0178 pool (existing per-row editor, unchanged).
+ *     • Supplier Categories — 0182 pool (empty mirrors 2990s' (0)).
+ *   DELIVERY & PRICING (Carres-only config the 2990s reference keeps in other
+ *   tabs — preserved here so nothing regresses)
+ *     • Delivery Fees — trip fee + special rules + stair-carry (0184 + 0001).
+ *     • Fabric Tiers — global P2/P3 deltas (0176).
+ *
+ * (Order Add-ons moved to the Special Add-ons tab's ORDER ADD-ONS section,
+ * matching the 2990s sidebar.)
+ *
+ * NOTE: the pools are GLOBAL reference lists. Per-model variant axes (the
+ * actual sizes / colours / gaps / compartments a model offers) still live
  * per-model in allowed_options, edited on the Modular tab's drawer — the size
  * pools here only feed that drawer's picker as curated suggestions.
  */
+
+type MaintKey =
+  | "bedframe_size"
+  | "mattress_size"
+  | "compartments"
+  | "supplier_category"
+  | "delivery"
+  | "fabric";
+
 export default function MaintenanceTab({
   catalog,
   isPrincipal,
@@ -70,58 +88,86 @@ export default function MaintenanceTab({
   catalog: CatalogResponse;
   isPrincipal: boolean;
 }) {
-  return (
-    <div className="flex flex-col gap-8 max-w-[680px]">
-      <DeliveryTripFeeSection catalog={catalog} isPrincipal={isPrincipal} />
-      <SpecialDeliveryRulesSection catalog={catalog} isPrincipal={isPrincipal} />
-      <DeliveryFeeSection catalog={catalog} isPrincipal={isPrincipal} />
-      <FabricTierDeltasCard catalog={catalog} isPrincipal={isPrincipal} />
-      <SofaCompartmentsSection catalog={catalog} isPrincipal={isPrincipal} />
-      <AddonsSection addons={catalog.addons} />
-      <OptionPoolsSection catalog={catalog} isPrincipal={isPrincipal} />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 0182 — Global option pools (2990s Products parity Phase 4). Three curated
-// READ-ONLY reference lists: supplier_category + the two size pools. These only
-// SUGGEST — no order-side consumer reads them (sizes still live per-model in
-// allowed_options.sizes; supplier_category is curate-only this phase).
-// ---------------------------------------------------------------------------
-
-function OptionPoolsSection({
-  catalog,
-  isPrincipal,
-}: {
-  catalog: CatalogResponse;
-  isPrincipal: boolean;
-}) {
+  const [active, setActive] = useState<MaintKey>("bedframe_size");
   const pools = catalog.optionPools ?? [];
+  const byPool = (p: CatalogOptionPoolName): CatalogOptionPoolDto[] =>
+    pools.filter((e) => e.pool === p);
+  const activeCompartments = (catalog.sofaCompartments ?? []).filter((c) => c.active);
+
+  const groups: MaintenanceSidebarGroup<MaintKey>[] = [
+    {
+      title: "Products Maintenance",
+      items: [
+        { key: "bedframe_size", label: "Bedframe Sizes", count: byPool("bedframe_size").length },
+        { key: "mattress_size", label: "Mattress Sizes", count: byPool("mattress_size").length },
+        { key: "compartments", label: "Sofa Compartments", count: activeCompartments.length },
+        {
+          key: "supplier_category",
+          label: "Supplier Categories",
+          count: byPool("supplier_category").length,
+        },
+      ],
+    },
+    {
+      title: "Delivery & Pricing",
+      items: [
+        { key: "delivery", label: "Delivery Fees" },
+        { key: "fabric", label: "Fabric Tiers" },
+      ],
+    },
+  ];
+
   return (
-    <>
-      <OptionPoolEditor
-        pool="supplier_category"
-        title="Supplier Categories"
-        description="Curated list of the product categories a supplier can cover. Reference only — supplier coverage is still set per supplier."
-        entries={pools.filter((p) => p.pool === "supplier_category")}
-        isPrincipal={isPrincipal}
-      />
-      <OptionPoolEditor
-        pool="bedframe_size"
-        title="Bedframe Sizes"
-        description="Suggested bedframe sizes shown in the per-model size picker. Each model's active sizes stay authoritative — this only offers quick-add suggestions."
-        entries={pools.filter((p) => p.pool === "bedframe_size")}
-        isPrincipal={isPrincipal}
-      />
-      <OptionPoolEditor
-        pool="mattress_size"
-        title="Mattress Sizes"
-        description="Suggested mattress sizes shown in the per-model size picker. Each model's active sizes stay authoritative — this only offers quick-add suggestions."
-        entries={pools.filter((p) => p.pool === "mattress_size")}
-        isPrincipal={isPrincipal}
-      />
-    </>
+    <div className="flex gap-5 items-start">
+      <MaintenanceSidebar groups={groups} active={active} onChange={setActive} />
+      <div className="flex-1 min-w-0 max-w-[860px]">
+        {active === "bedframe_size" && (
+          <PoolPanel
+            pool="bedframe_size"
+            variant="size"
+            title="Bedframe Sizes"
+            description="Bedframe sizes — code · label · dimensions (e.g. K · 6FT · 183X190CM). Used in generated SKU names; each model's active sizes stay authoritative."
+            entries={byPool("bedframe_size")}
+            isPrincipal={isPrincipal}
+          />
+        )}
+        {active === "mattress_size" && (
+          <PoolPanel
+            pool="mattress_size"
+            variant="size"
+            title="Mattress Sizes"
+            description="Mattress sizes — code · label · dimensions. Feeds the per-model size picker as curated suggestions."
+            entries={byPool("mattress_size")}
+            isPrincipal={isPrincipal}
+          />
+        )}
+        {active === "compartments" && (
+          <SofaCompartmentsSection catalog={catalog} isPrincipal={isPrincipal} />
+        )}
+        {active === "supplier_category" && (
+          <PoolPanel
+            pool="supplier_category"
+            variant="plain"
+            title="Supplier Categories"
+            description="Curated list of the product categories a supplier can cover. Reference only — supplier coverage is still set per supplier."
+            entries={byPool("supplier_category")}
+            isPrincipal={isPrincipal}
+          />
+        )}
+        {active === "delivery" && (
+          <div className="flex flex-col gap-8 max-w-[680px]">
+            <DeliveryTripFeeSection catalog={catalog} isPrincipal={isPrincipal} />
+            <SpecialDeliveryRulesSection catalog={catalog} isPrincipal={isPrincipal} />
+            <DeliveryFeeSection catalog={catalog} isPrincipal={isPrincipal} />
+          </div>
+        )}
+        {active === "fabric" && (
+          <div className="max-w-[680px]">
+            <FabricTierDeltasCard catalog={catalog} isPrincipal={isPrincipal} />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -750,237 +796,9 @@ function FabricTierDeltasCard({
 }
 
 // ---------------------------------------------------------------------------
-// Add-ons CRUD
+// (Order Add-ons CRUD moved to ./OrderAddonsSection.tsx — the Special Add-ons
+// tab hosts it under ORDER ADD-ONS, mirroring the 2990s sidebar. 0201.)
 // ---------------------------------------------------------------------------
-
-function AddonsSection({ addons }: { addons: AddonDto[] }) {
-  const [adding, setAdding] = useState(false);
-
-  return (
-    <section>
-      <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display">Add-ons</div>
-        <button
-          type="button"
-          onClick={() => setAdding((v) => !v)}
-          className="btn-ghost text-[12px]"
-        >
-          {adding ? "Close" : "+ Add add-on"}
-        </button>
-      </div>
-      <p className="t-tiny text-base-500 mb-3">
-        Optional services offered at checkout (e.g. disposal). Each charges
-        through its linked Service SKU.
-      </p>
-
-      {adding && <AddonAddForm onDone={() => setAdding(false)} />}
-
-      <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
-        <div
-          className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
-          style={{ gridTemplateColumns: "minmax(140px,1.4fr) 120px 150px 110px" }}
-        >
-          <div className="label">Name</div>
-          <div className="label text-right">Price (RM)</div>
-          <div className="label">Service SKU</div>
-          <div className="label text-right">Actions</div>
-        </div>
-        {addons.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-4">No add-ons configured.</div>
-        )}
-        {addons.map((a) => (
-          <AddonRow key={a.key} addon={a} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function AddonRow({ addon }: { addon: AddonDto }) {
-  const patch = usePatchAddon();
-  const del = useDeleteAddon();
-
-  function commitName(raw: string) {
-    const next = raw.trim();
-    if (next.length < 2 || next === addon.name) return;
-    patch.mutate(
-      { key: addon.key, patch: { name: next } },
-      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
-    );
-  }
-  function commitPrice(raw: string) {
-    const v = Number(raw.trim());
-    if (!Number.isFinite(v) || v < 0 || v === addon.price) return;
-    patch.mutate(
-      { key: addon.key, patch: { price: v } },
-      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
-    );
-  }
-  function remove() {
-    if (
-      !confirm(
-        `Disable add-on "${addon.name}"? It will no longer be offered at checkout and ` +
-          `will drop off this list. To restore it later, "+ Add add-on" with the same key (${addon.key}).`,
-      )
-    )
-      return;
-    del.mutate(addon.key, {
-      onSuccess: () => toast.success(`${addon.name} disabled`),
-      onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Disable failed"),
-    });
-  }
-
-  return (
-    <div
-      className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
-      style={{ gridTemplateColumns: "minmax(140px,1.4fr) 120px 150px 110px" }}
-      data-testid={`addon-row-${addon.key}`}
-    >
-      <input
-        defaultValue={addon.name}
-        onBlur={(e) => commitName(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-        }}
-        aria-label={`${addon.key} name`}
-        className="w-full px-2 py-1 border border-transparent hover:border-base-200 focus:border-base-400 rounded-[3px] text-[13px] outline-none bg-transparent"
-      />
-      <input
-        type="number"
-        min={0}
-        step="0.01"
-        defaultValue={addon.price}
-        onBlur={(e) => commitPrice(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-        }}
-        aria-label={`${addon.key} price`}
-        className={`${INPUT_CLS} text-right font-mono text-[12px]`}
-      />
-      <div>{addon.serviceSku ? <CodeChip>{addon.serviceSku}</CodeChip> : <span className="t-tiny text-base-400">—</span>}</div>
-      <div className="text-right">
-        <button
-          type="button"
-          onClick={remove}
-          disabled={del.isPending}
-          className="btn-danger text-[11px]"
-        >
-          Disable
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function AddonAddForm({ onDone }: { onDone: () => void }) {
-  const create = useCreateAddon();
-  const patch = usePatchAddon();
-  const [key, setKey] = useState("");
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [serviceSku, setServiceSku] = useState("");
-  const busy = create.isPending || patch.isPending;
-
-  const keyValid = /^[a-z0-9-]{2,60}$/.test(key.trim());
-  const priceNum = Number(price);
-  const skuValid = serviceSku.trim() === "" || /^SVC-[A-Z0-9-]+$/.test(serviceSku.trim());
-  const valid =
-    keyValid &&
-    name.trim().length >= 2 &&
-    Number.isFinite(priceNum) &&
-    priceNum >= 0 &&
-    skuValid;
-
-  async function submit() {
-    if (!valid) return;
-    const body = {
-      key: key.trim(),
-      name: name.trim(),
-      price: priceNum,
-      serviceSku: serviceSku.trim() || null,
-    };
-    try {
-      await create.mutateAsync(body);
-      toast.success(`Added ${name}`);
-      onDone();
-    } catch (e) {
-      // The GET bundle is active-only, so a previously-disabled add-on with
-      // this key is invisible here and a fresh insert hits the unique key
-      // (mapPgError has no 23505 case → 500 with a "duplicate key" message).
-      // Treat that as "restore": PATCH the existing row back to active + update.
-      const conflict =
-        e instanceof ApiError && /duplicate key|already exists|unique/i.test(e.message);
-      if (!conflict) {
-        toast.error(e instanceof ApiError ? e.message : "Add failed");
-        return;
-      }
-      try {
-        await patch.mutateAsync({
-          key: body.key,
-          patch: { name: body.name, price: body.price, active: true, serviceSku: body.serviceSku },
-        });
-        toast.success(`Restored ${name}`);
-        onDone();
-      } catch (e2) {
-        toast.error(e2 instanceof ApiError ? e2.message : "Restore failed");
-      }
-    }
-  }
-
-  return (
-    <div className="bg-base-50 border border-base-200 rounded-[4px] p-4 mb-3 flex flex-wrap gap-3 items-end">
-      <label className="block">
-        <span className="label block mb-1">Key (kebab-case)</span>
-        <input
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          placeholder="dispose-mattress"
-          className={`${INPUT_CLS} w-44`}
-        />
-      </label>
-      <label className="block">
-        <span className="label block mb-1">Name</span>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Old mattress disposal"
-          className={`${INPUT_CLS} w-52`}
-        />
-      </label>
-      <label className="block">
-        <span className="label block mb-1">Price (RM)</span>
-        <input
-          type="number"
-          min={0}
-          step="0.01"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          className={`${INPUT_CLS} w-28`}
-        />
-      </label>
-      <label className="block">
-        <span className="label block mb-1">Service SKU (optional)</span>
-        <input
-          value={serviceSku}
-          onChange={(e) => setServiceSku(e.target.value)}
-          placeholder="SVC-DISPOSE-MATTRESS"
-          className={`${INPUT_CLS} w-52 font-mono`}
-        />
-      </label>
-      <button
-        type="button"
-        onClick={submit}
-        disabled={!valid || busy}
-        className="btn-primary text-[12px] disabled:opacity-40"
-      >
-        {busy ? "Saving…" : "Add"}
-      </button>
-      <p className="t-tiny text-base-400 basis-full">
-        Re-using a disabled add-on's key restores it.
-      </p>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // 0178 — Sofa compartments (the "Base" pool) — principal-gated
