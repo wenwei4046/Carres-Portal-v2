@@ -17,11 +17,14 @@
 | 4 | FABRIC "Optional — confirm later" + tiers CG/EZ | no | tiers exist in canvas; no confirm-later | add confirm-later + surface in quick pick |
 
 ## Phases (each independently shippable + typecheck-clean + tested)
-- **P1 — Quick-Pick flip L/R button** (feature 3). Port `mirrorModules`/`canMirror` from 2990S to `packages/shared/src/sofa-pricing.ts` (CARRES has `mirrorCode` only). Add per-card flip state + L/R toggle to `SofaConfigurePage`; mirrored seed on load. Self-contained, visible. ← START HERE
-- **P2 — Live config name in header** (feature 2). `buildComboLabel`-style subtitle reflecting selected combo + depth.
-- **P3 — Fabric panel + "Confirm later"** (feature 4). Surface CG/EZ tiers in quick-pick; add "Confirm later — customer to confirm" that parks fabric as TBD.
-- **P4 — PWP CODE in configurator toolbar** (feature 1). Reuse CartDrawer PWP queries/logic in the sofa header.
-- **P5 — Layout fidelity pass**. Left config panel + centered to-scale PLAN VIEW + rich header to match prototype pixel-for-pixel.
+- **P1 — Quick-Pick flip L/R button** (feature 3). ✅ DONE `a70ddb6` — `mirrorModules`/`canMirror` in shared + L/R toggle on active card + mirrored seed. shared +6, web +5.
+- **P2 — Live config name in header** (feature 2). ✅ DONE `cbd2ca7` — header title shows the flip-aware combo codes; product name → eyebrow. web +2.
+- **P3 — Fabric panel + "Confirm later"** (feature 4). ✅ DONE `a791bf6` — "Confirm later — customer to confirm" fabric option; attrs.fabric_deferred + label. web +2.
+- **P4 — PWP CODE in configurator toolbar** (feature 1). ✅ DONE `cce0185` — validate-only header box (Loo option 1); usePwpAvailableForPhone check + applied/error + attrs.pwp_pending_code hint. web +4.
+- **P5 — Layout fidelity pass**. ⏳ TODO — the big visual rebuild: quick-pick mode gets a centered to-scale PLAN VIEW + a left config panel (leg / fabric / remark) + a rich top bar (size toggle · LIVE TOTAL · Cancel · Add to Cart), matching the prototype/2990S. Best done as a focused session.
+
+## Status (2026-07-05)
+All 4 circled FUNCTIONS complete + committed on this branch. Verification: typecheck shared+api+web clean · shared 610/610 · web 985 pass (+13 new), the 5 fails are pre-existing §17.7 (OhanaSofaTab ×4 + NiceFuture ×1), zero new regressions. Not yet deployed. P5 (layout) remaining.
 
 ## Guardrails
 - Each phase: `pnpm --filter @carres/web typecheck` clean + unit tests + commit. No cross-phase scope creep.
