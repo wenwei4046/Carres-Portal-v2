@@ -212,6 +212,7 @@ export default function ProductModelDrawer({
               modelKey={model.modelKey}
               pool={(catalog.sofaCompartments ?? []).filter((c) => c.active)}
               offered={(catalog.modelSofaCompartments ?? []).filter((o) => o.modelId === model.id)}
+              skus={skus}
               isPrincipal={isPrincipal ?? false}
             />
           )}
@@ -846,7 +847,9 @@ function SofaFabricsPanel({
 
 // ---------------------------------------------------------------------------
 // 0178 — Offered compartments panel: which pool compartments this sofa model
-// offers + an optional per-model price override. Sofa-only, principal-gated.
+// offers. The price column edits the synced `{MODEL_KEY}-{code}` SKU's price —
+// the SKU Master row, which is the AUTHORITATIVE à-la-carte compartment price
+// (Loo, 2026-07-05). Sofa-only, principal-gated.
 // ---------------------------------------------------------------------------
 
 function SofaCompartmentsOfferedPanel({
@@ -854,17 +857,27 @@ function SofaCompartmentsOfferedPanel({
   modelKey,
   pool,
   offered,
+  skus,
   isPrincipal,
 }: {
   modelId: string;
   modelKey: string;
   pool: SofaCompartmentDto[];
   offered: ModelSofaCompartmentDto[];
+  /** This model's SKUs (admin bundle — includes the pos_active=false synced
+   *  compartment SKUs), used to read + edit each compartment's price. */
+  skus: ProductSkuDto[];
   isPrincipal: boolean;
 }) {
   const upsert = useUpsertModelSofaCompartment();
   const del = useDeleteModelSofaCompartment();
+  const patchSku = usePatchCatalogSku();
   const offeredById = new Map(offered.map((o) => [o.compartmentId, o]));
+  // The synced compartment SKU rows, keyed by compartment id (Phase 5 sync
+  // stamps product_skus.compartment_id).
+  const skuByCompId = new Map(
+    skus.filter((s) => s.compartmentId != null).map((s) => [s.compartmentId as string, s]),
+  );
 
   // Phase 5 — offering a compartment auto-syncs a real product_skus row whose
   // sku is the shared `deriveSkuCode(modelKey, code)` (one formula, no drift with
@@ -878,20 +891,21 @@ function SofaCompartmentsOfferedPanel({
       onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed"),
     };
     if (on) {
-      upsert.mutate({ modelId, compartmentId: comp.id, input: { priceOverride: null } }, opts);
+      upsert.mutate({ modelId, compartmentId: comp.id, input: {} }, opts);
     } else {
       del.mutate({ modelId, compartmentId: comp.id }, opts);
     }
   }
 
-  function commitOverride(comp: SofaCompartmentDto, raw: string) {
+  function commitSkuPrice(comp: SofaCompartmentDto, raw: string) {
+    const row = skuByCompId.get(comp.id);
+    if (!row) return;
     const trimmed = raw.trim();
-    const next = trimmed === "" ? null : Number(trimmed);
-    if (next !== null && (!Number.isFinite(next) || next < 0)) return;
-    const cur = offeredById.get(comp.id)?.priceOverride ?? null;
-    if (next === cur) return;
-    upsert.mutate(
-      { modelId, compartmentId: comp.id, input: { priceOverride: next } },
+    if (trimmed === "") return;
+    const next = Number(trimmed);
+    if (!Number.isFinite(next) || next < 0 || next === row.price) return;
+    patchSku.mutate(
+      { id: row.id, patch: { price: next } },
       { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
     );
   }
@@ -902,8 +916,9 @@ function SofaCompartmentsOfferedPanel({
     <div className="mb-4">
       <div className="label mb-1">Offered compartments</div>
       <p className="t-tiny text-base-500 mb-3">
-        Tick which pool compartments this sofa model offers. Leave the price blank
-        to use the pool default; enter a price to override it for this model.
+        Tick which pool compartments this sofa model offers. The price edits the
+        compartment&apos;s own SKU (the same row as SKU Master) — that SKU price
+        is what the sofa builder charges.
         {!isPrincipal && " Principal only — read-only for your role."}
       </p>
       <div className="border border-base-200 rounded-[4px] overflow-hidden">
@@ -914,7 +929,7 @@ function SofaCompartmentsOfferedPanel({
           <div className="label">Offer</div>
           <div className="label">Code</div>
           <div className="label">Description</div>
-          <div className="label text-right">Price override</div>
+          <div className="label text-right">Price (RM)</div>
         </div>
         {pool.length === 0 && (
           <div className="t-small text-base-500 px-3 py-3">
@@ -924,6 +939,7 @@ function SofaCompartmentsOfferedPanel({
         {pool.map((comp) => {
           const row = offeredById.get(comp.id);
           const isOffered = row != null;
+          const skuRow = skuByCompId.get(comp.id);
           return (
             <div
               key={comp.id}
@@ -953,18 +969,19 @@ function SofaCompartmentsOfferedPanel({
                 )}
               </div>
               <input
-                key={`po-${comp.id}-${row?.priceOverride ?? "x"}-${isOffered}`}
+                key={`sp-${comp.id}-${skuRow?.price ?? "x"}-${isOffered}`}
                 type="number"
                 min={0}
                 step="0.01"
-                defaultValue={row?.priceOverride ?? ""}
-                placeholder={comp.defaultPrice.toFixed(2)}
-                disabled={!isPrincipal || !isOffered}
-                onBlur={(e) => commitOverride(comp, e.target.value)}
+                defaultValue={isOffered && skuRow ? skuRow.price : ""}
+                placeholder={isOffered ? "0.00" : ""}
+                disabled={!isPrincipal || !isOffered || !skuRow}
+                onBlur={(e) => commitSkuPrice(comp, e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
-                aria-label={`${comp.code} price override`}
+                aria-label={`${comp.code} price`}
+                title="Writes to the compartment's SKU price (SKU Master)"
                 className={`${INPUT_CLS} text-right font-mono text-[12px] disabled:opacity-50`}
               />
             </div>

@@ -35,6 +35,9 @@ vi.mock("@/lib/queries", () => ({
   useCreateSofaCompartment:  () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useUpdateSofaCompartment:  () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteSofaCompartment:  () => ({ mutate: vi.fn(), isPending: false }),
+  // Compartment photo hooks (icon_url upload/remove in the pool list).
+  useSetCompartmentPhoto:    () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteCompartmentPhoto: () => ({ mutate: vi.fn(), isPending: false }),
   // 0184 — delivery TRIP fee hooks (MaintenanceTab now renders the trip-fee +
   // special-rules sections).
   useUpdateDeliveryFeeConfig:       () => ({ mutate: vi.fn(), isPending: false }),
@@ -198,9 +201,22 @@ describe("SofaCompartmentsSection — render + gating", () => {
     expect(screen.queryByText("Disable")).not.toBeInTheDocument();
   });
 
-  it("compartment default price input reflects the catalog value", () => {
+  it("has NO price column (prices live on the per-model SKUs in SKU Master)", () => {
     render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={true} />));
-    const priceInput = screen.getByLabelText("1A(LHF) default price") as HTMLInputElement;
-    expect(priceInput.value).toBe("250");
+    expect(screen.queryByLabelText("1A(LHF) default price")).not.toBeInTheDocument();
+    expect(screen.queryByText(/default price/i)).not.toBeInTheDocument();
+  });
+
+  it("principal: photo upload control per row (Remove only once a photo exists)", () => {
+    render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={true} />));
+    expect(screen.getByTestId("compartment-photo-input-1A(LHF)")).toBeInTheDocument();
+    // iconUrl null in the fixture → SVG silhouette fallback + no Remove button.
+    expect(screen.queryByLabelText("1A(LHF) remove photo")).not.toBeInTheDocument();
+    expect(screen.getByTestId("compartment-silhouette")).toBeInTheDocument();
+  });
+
+  it("non-principal: no photo upload control", () => {
+    render(wrap(<MaintenanceTab catalog={catalogWithCompartments()} isPrincipal={false} />));
+    expect(screen.queryByTestId("compartment-photo-input-1A(LHF)")).not.toBeInTheDocument();
   });
 });

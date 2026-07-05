@@ -304,19 +304,23 @@ export const sofaCompartmentSchema = z.object({
 export type SofaCompartmentDto = z.infer<typeof sofaCompartmentSchema>;
 
 /** One per-model offered compartment (mirrors `ModelSofaCompartment` /
- *  a `model_sofa_compartments` row). `priceOverride` NULL = inherit the pool's
- *  `defaultPrice`. */
+ *  a `model_sofa_compartments` row). `skuPrice` = the synced
+ *  `{MODEL_KEY}-{code}` SKU's price (SKU Master — the authoritative à-la-carte
+ *  price source), joined in by the bundle; `priceOverride` → pool
+ *  `defaultPrice` is the legacy fallback when no synced sku exists. */
 export const modelSofaCompartmentSchema = z.object({
   modelId: z.string().uuid(),
   compartmentId: z.string().uuid(),
   priceOverride: z.number().nullable(),
   sortOrder: z.number().int(),
+  skuPrice: z.number().nullable().optional(),
 });
 export type ModelSofaCompartmentDto = z.infer<typeof modelSofaCompartmentSchema>;
 
 /**
- * Create a compartment in the pool. `code` is required + unique-by-convention;
- * `defaultPrice` defaults to 0 server-side and must be >= 0 when given.
+ * Create a compartment in the pool. `code` is required + unique-by-convention.
+ * NO price field (Loo, 2026-07-05): the pool is a foundation catalog only —
+ * compartment prices live on the synced per-model SKUs in SKU Master.
  */
 export const sofaCompartmentCreateInput = z
   .object({
@@ -330,7 +334,6 @@ export const sofaCompartmentCreateInput = z
     seatCount: z.number().int().nonnegative().nullable().optional(),
     armConfig: z.string().trim().max(60).nullable().optional(),
     iconUrl: z.string().trim().max(500).nullable().optional(),
-    defaultPrice: z.number().nonnegative().optional(),
     sortOrder: z.number().int().optional(),
     active: z.boolean().optional(),
   })

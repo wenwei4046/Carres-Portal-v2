@@ -1,4 +1,8 @@
-import { PRODUCT_MODEL_PHOTOS_BUCKET, type ProductModelDto } from "@carres/shared";
+import {
+  PRODUCT_MODEL_PHOTOS_BUCKET,
+  type ProductModelDto,
+  type SofaCompartmentDto,
+} from "@carres/shared";
 import { apiFetch } from "./api";
 import { supabase } from "./supabase";
 import { shrinkImage } from "./image-shrink";
@@ -49,4 +53,43 @@ export async function uploadModelPhoto(modelId: string, file: Blob): Promise<Pro
     },
   );
   return res.model;
+}
+
+/**
+ * Sofa-compartment photo upload — same signed-upload flow against the
+ * compartment routes (principal-only). The photo lands in
+ * `sofa_compartments.icon_url`; CompartmentSilhouette prefers it over the SVG
+ * everywhere (builder palette, POS configurator, maintenance list).
+ */
+export async function uploadCompartmentPhoto(
+  compartmentId: string,
+  file: Blob,
+): Promise<SofaCompartmentDto> {
+  const { blob } = await shrinkImage(file);
+
+  const sign = await apiFetch<SignUploadResponse>(
+    `/api/catalog/sofa-compartments/${compartmentId}/photo/sign-upload`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mimeType: "image/jpeg", sizeBytes: blob.size }),
+    },
+  );
+
+  const { error } = await supabase.storage
+    .from(PRODUCT_MODEL_PHOTOS_BUCKET)
+    .uploadToSignedUrl(sign.path, sign.token, blob, { contentType: "image/jpeg" });
+  if (error) {
+    throw new Error(`Photo upload failed: ${error.message}`);
+  }
+
+  const res = await apiFetch<{ compartment: SofaCompartmentDto }>(
+    `/api/catalog/sofa-compartments/${compartmentId}/photo`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: sign.path }),
+    },
+  );
+  return res.compartment;
 }
