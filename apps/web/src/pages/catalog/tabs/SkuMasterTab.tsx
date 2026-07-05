@@ -453,12 +453,12 @@ const SkuRowView = memo(function SkuRowView({
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
             aria-label={`${sku.sku} price`}
-            className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+            className={`${INPUT_CLS} text-right t-num text-[12px]`}
           />
         ) : sku.price === 0 ? (
           <span className="t-tiny text-base-400 italic">price not set</span>
         ) : (
-          <span className="font-mono text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
+          <span className="t-num text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
         )}
       </div>
 
@@ -476,12 +476,12 @@ const SkuRowView = memo(function SkuRowView({
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
             aria-label={`${sku.sku} cost`}
-            className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+            className={`${INPUT_CLS} text-right t-num text-[12px]`}
           />
         ) : sku.cost === null ? (
           <span className="t-tiny text-base-400 italic">not set</span>
         ) : (
-          <span className="font-mono text-[12px] text-base-700">{fmtPrice(sku.cost)}</span>
+          <span className="t-num text-[12px] text-base-700">{fmtPrice(sku.cost)}</span>
         )}
       </div>
 
@@ -491,7 +491,7 @@ const SkuRowView = memo(function SkuRowView({
           <span className="t-tiny text-base-400 italic" title={`${marginLabel} · cost not set`}>—</span>
         ) : (
           <span
-            className={`font-mono text-[12px] ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
+            className={`t-num text-[12px] ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
             title={marginLabel}
           >
             {fmtPrice(margin.amount)}

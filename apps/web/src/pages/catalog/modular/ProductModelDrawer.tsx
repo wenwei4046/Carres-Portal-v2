@@ -745,7 +745,7 @@ function VariantSkuTable({ skus }: { skus: ProductSkuDto[] }) {
               <div className="t-small text-base-800">{sku.variant}</div>
               <div className="font-mono text-[10px] text-base-500">{sku.sku}</div>
             </div>
-            <div className="text-right font-mono text-[11px] text-base-700">
+            <div className="text-right t-num text-[11px] text-base-700">
               {sku.price === 0 ? <span className="text-base-400">—</span> : sku.price.toFixed(2)}
             </div>
             <div className="text-right">
@@ -965,7 +965,7 @@ function SofaCompartmentsOfferedPanel({
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
                 aria-label={`${comp.code} price override`}
-                className={`${INPUT_CLS} text-right font-mono text-[12px] disabled:opacity-50`}
+                className={`${INPUT_CLS} text-right t-num text-[12px] disabled:opacity-50`}
               />
             </div>
           );
@@ -1028,7 +1028,7 @@ function FabricRow({
       ) : (
         <span className="t-small text-base-800 px-2" data-testid={`fabric-name-readonly-${fabric.id}`}>{fabric.fabricName}</span>
       )}
-      <div className="font-mono text-[12px] text-base-700 px-2">
+      <div className="t-num text-[12px] text-base-700 px-2">
         {fabric.surcharge > 0 ? `+${fabric.surcharge.toFixed(2)}` : "—"}
       </div>
       {isPrincipal ? (

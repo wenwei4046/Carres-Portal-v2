@@ -468,8 +468,8 @@ function SpecialDeliveryRuleRow({
         )}
         {!rule.active && <span className="pill pill-neutral mt-0.5">inactive</span>}
       </div>
-      <div className="text-right font-mono text-[12px]">{rule.standaloneFee.toFixed(2)}</div>
-      <div className="text-right font-mono text-[12px]">{rule.crossCategoryFollowupFee.toFixed(2)}</div>
+      <div className="text-right t-num text-[12px]">{rule.standaloneFee.toFixed(2)}</div>
+      <div className="text-right t-num text-[12px]">{rule.crossCategoryFollowupFee.toFixed(2)}</div>
       <div className="text-right flex justify-end gap-1.5">
         {isPrincipal && (
           <>
@@ -920,7 +920,7 @@ function SofaCompartmentRow({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         aria-label={`${comp.code} default price`}
-        className={`${INPUT_CLS} text-right font-mono text-[12px] disabled:opacity-60`}
+        className={`${INPUT_CLS} text-right t-num text-[12px] disabled:opacity-60`}
       />
       <div className="text-right">
         {isPrincipal && (
