@@ -132,6 +132,20 @@ describe("SofaCombosPanel — principal-gating", () => {
     // a height with no price gets no chip.
     expect(screen.queryByTestId("sofa-combo-price-chip-sc-1-24")).not.toBeInTheDocument();
   });
+
+  it("shows the PWP reward price per height on the card when set", () => {
+    const pwpCombo = { ...sampleCombo, id: "sc-pwp", pwpPricesByHeight: { "28": 2000 } };
+    renderPanel({ isPrincipal: true, combos: [pwpCombo] });
+    expect(screen.getByTestId("sofa-combo-pwp-chip-sc-pwp-28")).toHaveTextContent("2,000");
+    // no PWP chip at a height with no PWP price.
+    expect(screen.queryByTestId("sofa-combo-pwp-chip-sc-pwp-32")).not.toBeInTheDocument();
+  });
+
+  it("shows NO PWP chips when the combo has no PWP prices set", () => {
+    // sampleCombo.pwpPricesByHeight is null.
+    renderPanel({ isPrincipal: true, combos: [sampleCombo] });
+    expect(screen.queryByTestId("sofa-combo-pwp-chip-sc-1-28")).not.toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------
