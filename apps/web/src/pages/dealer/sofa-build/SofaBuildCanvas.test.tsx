@@ -99,6 +99,12 @@ function addModule(code: string) {
   fireEvent.click(screen.getByTestId(`module-palette-item-${code}`));
 }
 
+/** jsdom has no PointerEvent — dispatch a coordinate-carrying MouseEvent under
+ *  the pointer event's type (React's onPointer* handlers fire on the type). */
+function firePointer(el: Element, type: "pointerdown" | "pointermove" | "pointerup", x: number, y: number) {
+  fireEvent(el, new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+}
+
 describe("SofaBuildCanvas", () => {
   it("renders the offered palette + a starting price of 0", () => {
     renderCanvas();
@@ -172,6 +178,65 @@ describe("SofaBuildCanvas", () => {
     // A size with no entry falls back to the flat price.
     fireEvent.change(screen.getByTestId("sofa-build-height"), { target: { value: "Flat" } });
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
+  });
+
+  it("a CLOSED sofa drags as ONE piece — grabbing any cell moves the whole group", () => {
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+        initialCells={[
+          { moduleCode: "1A(LHF)", x: 100, y: 100, rot: 0 },
+          { moduleCode: "1A(RHF)", x: 195, y: 100, rot: 0 }, // flush → ONE closed sofa
+        ]}
+      />,
+    );
+    const [c1, c2] = screen.getAllByTestId(/^sofa-cell-sc_/);
+    expect(c1).toHaveStyle({ left: "100px" });
+    expect(c2).toHaveStyle({ left: "195px" });
+    firePointer(c1!, "pointerdown", 0, 0);
+    firePointer(c1!, "pointermove", 60, 40);
+    firePointer(c1!, "pointerup", 60, 40);
+    // BOTH cells translate by the same delta (no snap targets, room clamp inert)
+    expect(c1).toHaveStyle({ left: "160px", top: "140px" });
+    expect(c2).toHaveStyle({ left: "255px", top: "140px" });
+  });
+
+  it("an UNCLOSED pair still drags per-cell (assembly mode)", () => {
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+        initialCells={[
+          // two LHF pieces — joined but right end open ⇒ NOT closed
+          { moduleCode: "1A(LHF)", x: 100, y: 100, rot: 0 },
+          { moduleCode: "1NA", x: 195, y: 100, rot: 0 },
+        ]}
+      />,
+    );
+    const [c1, c2] = screen.getAllByTestId(/^sofa-cell-sc_/);
+    firePointer(c2!, "pointerdown", 0, 0);
+    firePointer(c2!, "pointermove", 0, 200);
+    firePointer(c2!, "pointerup", 0, 200);
+    // only the grabbed piece moved
+    expect(c1).toHaveStyle({ left: "100px", top: "100px" });
+    expect(c2).toHaveStyle({ top: "300px" });
   });
 
   it("canvas cells draw the uploaded compartment art (flush) when the pool row has one", () => {

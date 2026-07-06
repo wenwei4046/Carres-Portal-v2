@@ -294,13 +294,23 @@ export default function SofaBuildCanvas({
       /* jsdom / unsupported — drag still works via move/up on the same element */
     }
     setSelectedId(id);
+    // Complete-sofa lock (2990s parity, Loo 2026-07-06): grabbing any cell of
+    // a CLOSED sofa drags the WHOLE group — a finished sofa moves as one
+    // piece. Loose / unclosed pieces keep per-cell dragging for assembly.
+    const analysis = analyses.find((a) => a.group.some((g) => g.id === id));
+    const group =
+      analysis && analysis.closed && analysis.group.length > 1
+        ? analysis.group
+            .filter((g): g is GeoCell & { id: string } => g.id != null)
+            .map((g) => ({ id: g.id, x: g.x, y: g.y }))
+        : [{ id, x: cell.x, y: cell.y }];
     dragRef.current = {
       id,
       pid: e.pointerId,
       sx: e.clientX,
       sy: e.clientY,
       moved: false,
-      group: [{ id, x: cell.x, y: cell.y }],
+      group,
     };
   };
 
@@ -326,6 +336,33 @@ export default function SofaBuildCanvas({
     const delta = draftDelta;
     setDraftDelta(null);
     if (!delta || !s.moved) return;
+
+    // Whole-sofa drag (closed group): snap + clamp by the group's collective
+    // bbox, then translate every member by the same delta. No auto-mirror —
+    // that's a single-piece placement affordance.
+    if (s.group.length > 1) {
+      const ids = new Set(s.group.map((g) => g.id));
+      const members = cells.filter((c) => c.id != null && ids.has(c.id));
+      const bb = cellsBbox(members, depth);
+      if (!bb) return;
+      const others = cells.filter((c) => c.id == null || !ids.has(c.id));
+      const snap = findSnap(
+        { x: bb.x + delta.dx, y: bb.y + delta.dy, w: bb.w, h: bb.h },
+        others,
+        undefined,
+        depth,
+      );
+      let fdx = delta.dx + snap.dx;
+      let fdy = delta.dy + snap.dy;
+      fdx = Math.max(-bb.x, Math.min(fdx, ROOM_W - bb.w - bb.x));
+      fdy = Math.max(-bb.y, Math.min(fdy, ROOM_H - bb.h - bb.y));
+      setCells((prev) =>
+        prev.map((c) =>
+          c.id != null && ids.has(c.id) ? { ...c, x: c.x + fdx, y: c.y + fdy } : c,
+        ),
+      );
+      return;
+    }
 
     const primary = s.group[0]!;
     const cell = cells.find((c) => c.id === primary.id);
