@@ -274,7 +274,7 @@ function PerModelTierOverride({
           <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
             <div
               className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
-              style={{ gridTemplateColumns: "minmax(120px,1.5fr) 100px 100px 96px" }}
+              style={{ gridTemplateColumns: "minmax(120px,1.4fr) 84px 84px 140px" }}
             >
               <div className="label">Model</div>
               <div className="label text-right">P2</div>
@@ -290,7 +290,7 @@ function PerModelTierOverride({
               <div
                 key={o.modelId}
                 className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
-                style={{ gridTemplateColumns: "minmax(120px,1.5fr) 100px 100px 96px" }}
+                style={{ gridTemplateColumns: "minmax(120px,1.4fr) 84px 84px 140px" }}
                 data-testid={`tier-override-row-${o.modelId}`}
               >
                 <div className="t-small text-base-900 truncate">{modelById.get(o.modelId)?.name}</div>
@@ -488,7 +488,7 @@ function PerCompartmentSpecialPrice({
             <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
               <div
                 className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
-                style={{ gridTemplateColumns: "minmax(120px,1.5fr) 100px 100px 96px" }}
+                style={{ gridTemplateColumns: "minmax(120px,1.4fr) 84px 84px 140px" }}
               >
                 <div className="label">Compartment</div>
                 <div className="label text-right">P2</div>
@@ -504,7 +504,7 @@ function PerCompartmentSpecialPrice({
                 <div
                   key={c.id}
                   className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
-                  style={{ gridTemplateColumns: "minmax(120px,1.5fr) 100px 100px 96px" }}
+                  style={{ gridTemplateColumns: "minmax(120px,1.4fr) 84px 84px 140px" }}
                   data-testid={`compartment-special-row-${c.id}`}
                 >
                   <div className="t-small text-base-900 truncate" title={c.description ?? c.code}>
