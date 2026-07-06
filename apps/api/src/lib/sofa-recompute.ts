@@ -11,6 +11,7 @@ import {
   explodeSofaBuildToOrderLines,
   isSofaBuildLine,
   mirrorCode,
+  pwpSwappedCombos,
   resolveCompartmentPrice,
   sofaBuildLineAttrsSchema,
   sofaPriceWithinTolerance,
@@ -93,11 +94,17 @@ export async function recomputeAndExplodeSofaBuildLines(
   sb: SupabaseClient,
   lines: RecomputableLine[],
   asOf?: string,
+  /** 0186 sofa-as-reward — per LINE INDEX (in `lines`), the granted reward
+   *  combo ids from the PWP stage. That line prices against a snapshot whose
+   *  reward combos carry their PWP-merged maps (`pwpSwappedCombos`); the POS
+   *  preview applies the identical swap, so the drift gate stays honest. */
+  sofaRewardCombosByIndex?: Record<number, string[]>,
 ): Promise<SofaRecomputeOutcome> {
   const snapshotByModel = new Map<string, ModelSofaContext>();
   const out: RecomputableLine[] = [];
 
-  for (const line of lines) {
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx]!;
     if (!isSofaBuildLine(line.attrs)) {
       out.push(line);
       continue;
@@ -176,7 +183,14 @@ export async function recomputeAndExplodeSofaBuildLines(
           : undefined,
       asOf,
     };
-    const priceResult = computeSofaPrice(sofaBuild, ctx.snapshot);
+    // 0186 sofa-as-reward — a PWP-granted build prices against the SWAPPED
+    // snapshot: its reward combos' price maps replaced by the PWP-merged maps.
+    const rewardIds = sofaRewardCombosByIndex?.[lineIdx];
+    const snapshot =
+      rewardIds && rewardIds.length > 0
+        ? { ...ctx.snapshot, sofaCombos: pwpSwappedCombos(ctx.snapshot.sofaCombos, new Set(rewardIds)) }
+        : ctx.snapshot;
+    const priceResult = computeSofaPrice(sofaBuild, snapshot);
     const serverTotal = round2(priceResult.total);
 
     // 5. Drift gate.
@@ -214,6 +228,18 @@ export async function recomputeAndExplodeSofaBuildLines(
         fabric_tier: parsed.data.fabric_tier ?? null,
         ...(parsed.data.leg_height
           ? { leg_height: parsed.data.leg_height, leg_surcharge: priceResult.legDelta }
+          : {}),
+        // 0186 sofa-as-reward — a SLIM pwp marker rides every exploded line
+        // (ruleId + type only; the voucher code was already claimed pre-explode)
+        // so the carry-forward sweep's reward-line detection (promo one-way)
+        // still sees the exploded reward.
+        ...(rewardIds && rewardIds.length > 0 && (line.attrs as Record<string, unknown>)?.pwp
+          ? {
+              pwp: {
+                ruleId: ((line.attrs as Record<string, unknown>).pwp as { ruleId?: string }).ruleId ?? null,
+                type: ((line.attrs as Record<string, unknown>).pwp as { type?: string }).type ?? null,
+              },
+            }
           : {}),
       },
     });

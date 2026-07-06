@@ -321,6 +321,44 @@ export function pickSofaCombo(
   return { combo: winner.combo, priceMyr: winner.price, matchedIndices: winner.subset };
 }
 
+/* ─── PWP sofa reward (0186) ───────────────────────────────────────────── */
+
+/**
+ * The charged per-height price map for a combo redeemed as a PWP/promo REWARD:
+ * per height, the authored `pwpPricesByHeight` entry wins; a height with no PWP
+ * price falls back to the normal combo price (2990s `comboChargedPrices`).
+ */
+export function comboChargedPrices(
+  pwp: Record<string, number | null> | null | undefined,
+  normal: Record<string, number | null>,
+): Record<string, number | null> {
+  const out: Record<string, number | null> = { ...normal };
+  for (const [h, v] of Object.entries(pwp ?? {})) {
+    if (v !== null && v !== undefined) out[h] = v;
+  }
+  return out;
+}
+
+/**
+ * Swap the granted reward combos' price maps for their PWP-merged maps, leaving
+ * every other combo untouched. The normal `computeSofaPrice` engine then runs
+ * UNCHANGED over the swapped snapshot — the reward build re-prices to the
+ * combo's PWP price at its height, and the drift gate stays honest because the
+ * POS preview applies the IDENTICAL swap (the 2990s `pwpSofaComboIds` pattern).
+ */
+export function pwpSwappedCombos(
+  combos: readonly (SofaComboLike & {
+    pwpPricesByHeight?: Record<string, number | null> | null;
+  })[],
+  rewardComboIds: ReadonlySet<string>,
+): SofaComboLike[] {
+  return combos.map((c) =>
+    rewardComboIds.has(c.id)
+      ? { ...c, pricesByHeight: comboChargedPrices(c.pwpPricesByHeight, c.pricesByHeight) }
+      : c,
+  );
+}
+
 /* ─── computeSofaPrice ─────────────────────────────────────────────────── */
 
 /** One assembled-sofa cell (Phase 2: just the compartment code + optional

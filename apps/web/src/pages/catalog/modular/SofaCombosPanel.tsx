@@ -283,6 +283,17 @@ function SofaComboEditor({
     }
     return init;
   });
+  // 0186 — PWP reward price per height: what THIS combo sells for when it is
+  // redeemed as a PWP reward. "" = no PWP price at that height (not redeemable
+  // there); the whole map collapses to null when every height is blank.
+  const [pwpPrices, setPwpPrices] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const h of heights) {
+      const v = combo?.pwpPricesByHeight?.[h];
+      init[h] = typeof v === "number" ? String(v) : "";
+    }
+    return init;
+  });
   const [tier, setTier] = useState<FabricTierValue | "">(combo?.tier ?? "");
   const [effectiveFrom, setEffectiveFrom] = useState(
     combo?.effectiveFrom ?? new Date().toISOString().slice(0, 10),
@@ -334,6 +345,22 @@ function SofaComboEditor({
     return anyCost ? out : null;
   }, [costs]);
 
+  // 0186 — PWP reward price map; same null-collapse semantics as costByHeight.
+  const pwpPricesByHeight = useMemo<Record<string, number | null> | null>(() => {
+    const out: Record<string, number | null> = {};
+    let anyPwp = false;
+    for (const h of heights) {
+      const raw = pwpPrices[h]?.trim() ?? "";
+      if (raw === "") {
+        out[h] = null;
+      } else {
+        out[h] = Number(raw);
+        anyPwp = true;
+      }
+    }
+    return anyPwp ? out : null;
+  }, [pwpPrices]);
+
   // --- per-height implied-discount baseline ------------------------------
   // À-la-carte baseline = Σ over slots of the FIRST code's resolved price
   // (matches what the combo's matched-subset would cost at à-la-carte; the
@@ -352,6 +379,7 @@ function SofaComboEditor({
     tier: tier === "" ? null : tier,
     pricesByHeight,
     costByHeight,
+    pwpPricesByHeight,
     label: label.trim() === "" ? null : label.trim(),
     effectiveFrom,
     active,
@@ -378,8 +406,9 @@ function SofaComboEditor({
       tier: tier === "" ? null : (tier as FabricTierValue),
       pricesByHeight,
       // Always send costByHeight (null when no height carries a cost) so clearing
-      // every cost on edit clears the DB benchmark.
+      // every cost on edit clears the DB benchmark. Same for pwpPricesByHeight.
       costByHeight,
+      pwpPricesByHeight,
       label: label.trim() === "" ? null : label.trim(),
       effectiveFrom,
       active,
@@ -542,6 +571,55 @@ function SofaComboEditor({
             slot&apos;s first code):{" "}
             <b className="t-num text-base-600">RM {fmtRM(baseline)}</b>. The figure under each
             price is the implied discount (or markup) vs that baseline.
+          </p>
+        </div>
+
+        {/* PWP-price-by-height grid (0186) — the price this combo sells at when
+            redeemed as a PWP reward. Blank = not redeemable at that height. */}
+        <div>
+          <span className="label block mb-1.5">PWP reward price by seat height (RM)</span>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${heights.length}, minmax(0,1fr))` }}>
+            {heights.map((h) => {
+              const priceRaw = prices[h]?.trim() ?? "";
+              const priceNum = priceRaw === "" ? null : Number(priceRaw);
+              const pwpRaw = pwpPrices[h]?.trim() ?? "";
+              const pwpNum = pwpRaw === "" ? null : Number(pwpRaw);
+              const saves =
+                priceNum !== null && pwpNum !== null && Number.isFinite(priceNum) && Number.isFinite(pwpNum)
+                  ? priceNum - pwpNum
+                  : null;
+              return (
+                <label key={h} className="block">
+                  <span className="t-tiny text-base-500 block mb-0.5">{h}&Prime;</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={pwpPrices[h] ?? ""}
+                    onChange={(e) => setPwpPrices((p) => ({ ...p, [h]: e.target.value }))}
+                    placeholder="n/a"
+                    className={`${INPUT_CLS} text-right t-num text-[12px]`}
+                    data-testid={`sofa-combo-pwp-${h}`}
+                    aria-label={`combo PWP price at height ${h}`}
+                  />
+                  {saves !== null && (
+                    <span
+                      className={`block t-tiny mt-0.5 text-right t-num ${
+                        saves >= 0 ? "text-base-500" : "text-danger"
+                      }`}
+                      data-testid={`sofa-combo-pwp-saves-${h}`}
+                    >
+                      {saves >= 0 ? `−RM ${fmtRM(saves)}` : `+RM ${fmtRM(-saves)}`}
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+          <p className="t-tiny text-base-400 mt-1.5">
+            The price a customer pays for THIS combo when redeeming it as a PWP reward. Blank =
+            the combo cannot be a PWP reward at that height. The figure under each price is the
+            saving vs that height&apos;s normal combo price.
           </p>
         </div>
 

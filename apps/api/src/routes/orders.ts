@@ -408,9 +408,16 @@ ordersRouter.post("/", async (c) => {
   // total. Non-build lines pass through verbatim; `create_order` + `order_lines`
   // stay UNCHANGED — the RPC just inserts the (possibly expanded) line set.
   // NOTE: sofa recompute runs on `pwpClaim.lines` (=== pwp.lines — price + attrs
-  // untouched by Stage B). The P8c carry-through left `attrs.pwp.code`/`claimGroup`
-  // on coded lines, so they persist into create_order's payload.lines.
-  const recompute = await recomputeAndExplodeSofaBuildLines(sb, pwpClaim.lines);
+  // untouched by Stage B), so the PWP stage's per-INDEX sofa reward grants line
+  // up. A granted build prices against the PWP-swapped combo maps (0186
+  // sofa-as-reward) — the drift gate then checks the client preview against the
+  // SAME swapped figure.
+  const recompute = await recomputeAndExplodeSofaBuildLines(
+    sb,
+    pwpClaim.lines,
+    undefined,
+    pwp.sofaRewardCombosByIndex,
+  );
   if (recompute.status === "bad_request") {
     await rollbackPwpClaims(); // exit 1 (§4.5)
     throw new HTTPException(400, { message: recompute.message });

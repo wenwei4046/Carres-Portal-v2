@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  comboChargedPrices,
+  pwpSwappedCombos,
   resolveCompartmentPrice,
   mirrorCode,
   mirrorModules,
@@ -1032,5 +1034,42 @@ describe("computeSofaPrice — leg-height surcharge (0201-wiring)", () => {
     expect(r.fabricDelta).toBe(200);
     expect(r.legDelta).toBe(120);
     expect(r.total).toBe(3070);
+  });
+});
+
+/* ─── 0186 sofa-as-reward — comboChargedPrices + pwpSwappedCombos ────────── */
+
+describe("comboChargedPrices + pwpSwappedCombos (0186 sofa-as-reward)", () => {
+  it("merges per height: an authored PWP entry wins; unset heights keep the normal price", () => {
+    const merged = comboChargedPrices({ "28": 1990, "24": null }, { "24": 2640, "28": 2750 });
+    expect(merged).toEqual({ "24": 2640, "28": 1990 });
+  });
+
+  it("null / absent PWP map keeps the normal map byte-identical", () => {
+    expect(comboChargedPrices(null, { "28": 2750 })).toEqual({ "28": 2750 });
+    expect(comboChargedPrices(undefined, { "28": 2750 })).toEqual({ "28": 2750 });
+  });
+
+  it("pwpSwappedCombos swaps only the reward ids; computeSofaPrice then charges the PWP price", () => {
+    const c = { ...combo(), pwpPricesByHeight: { "28": 1990 } };
+    const other = { ...combo({ id: "r2" }), pwpPricesByHeight: { "28": 1111 } };
+    const swapped = pwpSwappedCombos([c, other], new Set(["r1"]));
+    // r1 swapped to the PWP price at 28; r2 untouched.
+    expect(swapped[0]!.pricesByHeight["28"]).toBe(1990);
+    expect(swapped[1]!.pricesByHeight["28"]).toBe(2750);
+
+    const snapNormal = snapshotFrom(
+      { "2A(LHF)": 1500, "L(RHF)": 1400 },
+      { combos: [c] },
+    );
+    const snapSwapped: SofaPricingSnapshot = {
+      ...snapNormal,
+      sofaCombos: pwpSwappedCombos(snapNormal.sofaCombos, new Set(["r1"])),
+    };
+    const b = build({ asOf: ASOF });
+    expect(computeSofaPrice(b, snapNormal).total).toBe(2750); // normal combo price
+    const rewarded = computeSofaPrice(b, snapSwapped);
+    expect(rewarded.basis).toBe("combo");
+    expect(rewarded.total).toBe(1990); // the PWP price at height 28
   });
 });

@@ -37,8 +37,11 @@ import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
  */
 
 const VISIBLE_CAP = 300;
-// 9 tracks: checkbox · code · desc · product · category · size · price · margin · edit
-const GRID_COLS = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 60px";
+// 10 tracks: checkbox · code · desc · product · category · size · price · pwp · margin · edit
+// (PWP = the 0186 per-SKU PWP reward price, 2990s "PWP Price" column. The sofa
+// per-size grid variant deliberately has NO pwp column — a sofa's PWP price
+// lives on the matched COMBO (pwp_prices_by_height), never on component SKUs.)
+const GRID_COLS = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 90px 60px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -364,6 +367,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               <div className="label">Category</div>
               <div className="label">Size</div>
               <div className="label text-right">Price</div>
+              <div className="label text-right">PWP Price</div>
               <div className="label text-right">Margin</div>
               <div className="label" />
             </>
@@ -556,6 +560,26 @@ const SkuRowView = memo(function SkuRowView({
     );
   }
 
+  // 0186 — the PWP reward price. Blank = null ("not set" — the SKU cannot be a
+  // PWP reward); a 'promo' reward ignores it (always RM 0).
+  function commitPwpPrice(raw: string) {
+    const trimmed = raw.trim();
+    const val = trimmed === "" ? null : Number(trimmed);
+    if (val !== null && (!Number.isFinite(val) || val < 0)) {
+      toast.error("Enter a non-negative number (blank = not set)");
+      return;
+    }
+    if (val === (sku.pwpPrice ?? null)) return;
+    patch.mutate(
+      { id: sku.id, patch: { pwpPrice: val } },
+      {
+        onSuccess: () => toast.success(`${sku.sku} · PWP price updated`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
   // 0204 — sofa-size grid variant: one price cell per pool size for a
   // COMPARTMENT sku; a flat (non-compartment) sofa sku keeps its single price
   // spanning the size tracks. Category/Size/Margin columns are dropped here —
@@ -667,6 +691,31 @@ const SkuRowView = memo(function SkuRowView({
           <span className="t-tiny text-base-400 italic">price not set</span>
         ) : (
           <span className="t-num text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
+        )}
+      </div>
+
+      {/* PWP Price (0186) — the reward price when this SKU is a PWP reward. */}
+      <div className="text-right" data-testid={`sku-pwp-${sku.sku}`}>
+        {editMode ? (
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            defaultValue={sku.pwpPrice ?? ""}
+            placeholder="—"
+            onBlur={(e) => commitPwpPrice(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            aria-label={`${sku.sku} PWP price`}
+            className={`${INPUT_CLS} text-right t-num text-[12px]`}
+          />
+        ) : sku.pwpPrice == null ? (
+          <span className="t-tiny text-base-400 italic" title="No PWP price — this SKU cannot be a PWP reward">
+            —
+          </span>
+        ) : (
+          <span className="t-num text-[12px] text-base-800">{fmtPrice(sku.pwpPrice)}</span>
         )}
       </div>
 
