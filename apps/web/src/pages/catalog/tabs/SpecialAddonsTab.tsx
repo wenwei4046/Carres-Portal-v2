@@ -22,6 +22,7 @@ import MaintenanceSidebar, {
 } from "../components/MaintenanceSidebar";
 import OrderAddonsSection from "./OrderAddonsSection";
 import PoolPanel from "./PoolPanel";
+import StairCarryFeeSection from "./StairCarryFeeSection";
 
 /**
  * Special Add-ons tab — 0201 reshaped to the 2990s reference layout (Loo
@@ -35,7 +36,9 @@ import PoolPanel from "./PoolPanel";
  *               surcharges with one-level follow-up question groups; may be
  *               negative). Unchanged editor, now hosted as a panel.
  *   ORDER ADD-ONS — the order-level addons CRUD (disposal, lift…), moved here
- *               from the Maintenance tab to mirror the 2990s sidebar.
+ *               from the Maintenance tab to mirror the 2990s sidebar. Also
+ *               hosts the stair-carry fee (an order-level charge — moved out
+ *               of the Delivery tab, Loo 2026-07-06).
  */
 
 // NOTE (Loo 2026-07-06): "total_height" is deliberately NOT a section — total
@@ -151,7 +154,12 @@ export default function SpecialAddonsTab({
         {active === "product" && (
           <ProductAddonsPanel catalog={catalog} isPrincipal={isPrincipal} />
         )}
-        {active === "order" && <OrderAddonsSection addons={catalog.addons} />}
+        {active === "order" && (
+          <div className="flex flex-col gap-8">
+            <OrderAddonsSection addons={catalog.addons} />
+            <StairCarryFeeSection catalog={catalog} isPrincipal={isPrincipal} />
+          </div>
+        )}
       </div>
     </div>
   );
