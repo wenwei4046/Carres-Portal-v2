@@ -43,8 +43,47 @@ function catalogWithCombo(): CatalogResponse {
   };
 }
 
+/** Catalog with one single-sku accessory (no options to pick). */
+function catalogWithAccessory(): CatalogResponse {
+  return {
+    ...catalog(),
+    models: [
+      ...catalog().models,
+      { id: "m-acc", category: "accessory", modelKey: "pasir-rug", name: "Pasir Wool Rug", blurb: "Hand-tufted", colors: null, gaps: null, sofaMode: null },
+    ],
+    skus: [
+      ...catalog().skus,
+      { id: "s-acc", modelId: "m-acc", sku: "PASIR-RUG", variant: "200×290cm", variantKind: "preset", price: 200, cost: null, supplierId: null },
+    ],
+  };
+}
+
 describe("CatalogStep", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("a single-sku accessory adds STRAIGHT to the cart (no configurator drawer)", () => {
+    const onChange = vi.fn();
+    render(
+      <CatalogStep
+        draft={emptyDraft()}
+        onChange={onChange}
+        catalog={catalogWithAccessory()}
+        onProceed={() => {}}
+        cartOpen={false}
+        onCartOpenChange={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("pos-card-pasir-rug"));
+    // No configurator opened — it went straight to the cart.
+    expect(screen.queryByTestId("pos-configure-drawer")).toBeNull();
+    expect(screen.queryByTestId("pos-configure-page")).toBeNull();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0];
+    expect(next.lines).toHaveLength(1);
+    expect(next.lines[0].sku).toBe("PASIR-RUG");
+    expect(next.lines[0].unitPrice).toBe(200);
+    expect(next.lines[0].qty).toBe(1);
+  });
 
   it("renders the rail + product card and adds a configured line to the cart", () => {
     const onChange = vi.fn();
