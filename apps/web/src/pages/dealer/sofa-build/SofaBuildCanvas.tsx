@@ -68,8 +68,10 @@ export interface SofaBuildAddPayload {
    *  tab list (null for legacy per-model sofa_fabrics picks). */
   fabricCode: string | null;
   fabricName: string | null;
+  /** 0202 series of the chosen master fabric (null for legacy / no pick). */
+  fabricSeries: string | null;
   fabricSurcharge: number;
-  /** True when the salesperson deferred fabric choice (customer to confirm). */
+  /** True when the salesperson deferred fabric choice (KIV — customer to confirm). */
   fabricDeferred: boolean;
   /** 0201-wiring — the chosen sofa_leg_height pool value + its SERVER-shaped
    *  surcharge (computeSofaPrice legDelta; already inside `total`). */
@@ -602,6 +604,7 @@ export default function SofaBuildCanvas({
       fabricId: fabric?.id ?? null,
       fabricCode: fabric?.code ?? null,
       fabricName: fabric?.name ?? null,
+      fabricSeries: fabric?.series ?? null,
       fabricSurcharge: priceResult.fabricDelta,
       fabricDeferred,
       legHeight: legHeight || null,
@@ -961,7 +964,7 @@ export default function SofaBuildCanvas({
         <label className="flex items-center gap-2 t-small text-base-600">
           <span className="flex flex-col leading-tight">
             Fabric
-            <span className="t-micro text-base-400">Optional · confirm later</span>
+            <span className="t-micro text-base-400">Optional · KIV to defer</span>
           </span>
           <select
             value={fabricKey}
@@ -975,7 +978,7 @@ export default function SofaBuildCanvas({
                 {f.name} · {f.tier.replace("PRICE_", "P")}
               </option>
             ))}
-            <option value={FABRIC_DEFER}>Confirm later — customer to confirm</option>
+            <option value={FABRIC_DEFER}>KIV — colour to confirm</option>
           </select>
         </label>
 
@@ -984,7 +987,7 @@ export default function SofaBuildCanvas({
           <label className="flex items-center gap-2 t-small text-base-600">
             <span className="flex flex-col leading-tight">
               Leg height
-              <span className="t-micro text-base-400">Optional · confirm later</span>
+              <span className="t-micro text-base-400">Optional · KIV to defer</span>
             </span>
             <select
               value={legHeight}
@@ -992,7 +995,7 @@ export default function SofaBuildCanvas({
               className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
               data-testid="sofa-build-leg"
             >
-              <option value="">Confirm later</option>
+              <option value="">KIV</option>
               {legOpts.map((o) => (
                 <option key={o.id} value={o.value}>
                   {o.value}
