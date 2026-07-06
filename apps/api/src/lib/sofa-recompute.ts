@@ -226,6 +226,11 @@ export async function recomputeAndExplodeSofaBuildLines(
         fabric_name: line.attrs?.fabric_name ?? null,
         fabric_surcharge: line.attrs?.fabric_surcharge ?? 0,
         fabric_tier: parsed.data.fabric_tier ?? null,
+        // 0202 series survives the explode even when the colour is still KIV, so
+        // each per-compartment line/PO shows "EZ series · colour to confirm".
+        ...(typeof line.attrs?.fabric_series === "string"
+          ? { fabric_series: line.attrs.fabric_series }
+          : {}),
         ...(parsed.data.leg_height
           ? { leg_height: parsed.data.leg_height, leg_surcharge: priceResult.legDelta }
           : {}),
