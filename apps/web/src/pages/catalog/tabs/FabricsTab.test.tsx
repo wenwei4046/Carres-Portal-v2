@@ -26,6 +26,8 @@ vi.mock("@/lib/queries", () => ({
     mutate: mockBatchSaveMutate,
     isPending: false,
   }),
+  // Per-model tier override (moved here from Modular, Loo 2026-07-06).
+  useUpsertModelFabricTierOverride: () => ({ mutate: vi.fn(), isPending: false }),
   useCatalogFabricsHistory: () => ({
     data: {
       history: [

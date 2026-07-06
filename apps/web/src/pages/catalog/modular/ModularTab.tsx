@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Layers, Search, SlidersHorizontal } from "lucide-react";
+import { Layers, Search } from "lucide-react";
 import type {
   CatalogResponse,
   ProductCategory,
@@ -8,19 +8,16 @@ import type {
 } from "@carres/shared";
 import { PRODUCT_CATEGORIES } from "@carres/shared";
 import { CategoryChip, CATEGORY_LABEL } from "../components/atoms";
-import AllowedOptionsModal from "./AllowedOptionsModal";
-import ProductModelDrawer from "./ProductModelDrawer";
+import ModelEditorModal from "./ModelEditorModal";
 import NewModelModal from "./NewModelModal";
 
 /**
  * Modular — the 2990s "Products › Modular" layout (Loo 2026-07-06 screenshots):
  * a searchable card wall grouped by CATEGORY ("N MODELS · CLICK A CARD TO EDIT
- * ALLOWED OPTIONS"). Clicking a card opens the CENTERED Allowed Options modal
- * (the daily action — tick what POS staff can pick). The heavier model-setup
- * surface (photo · blurb · SKU generation · per-SKU toggles · sofa combos)
- * stays in the legacy drawer, reachable from the card's corner icon or the
- * modal's "Model setup" link — 2990s keeps the same split ("those stay on
- * Backend").
+ * ALLOWED OPTIONS"). Clicking a card opens ONE centered ModelEditorModal —
+ * Loo's Modular permission set is exactly: ON/OFF ticks · rename · description
+ * · photo. NOTHING here creates variants (SKU creation = + New Model / SKU
+ * Master; sofa combos = the Combo Pricing tab; fabric money = the Fabrics tab).
  *
  * Card badges: "Hidden from POS" = the model HAS SKUs but none is pos_active
  * (the 2990s model-level visibility, derived — Carres has no model.active).
@@ -37,8 +34,7 @@ export default function ModularTab({
 }) {
   const [category, setCategory] = useState<CatFilter>("all");
   const [search, setSearch] = useState("");
-  const [optionsModelId, setOptionsModelId] = useState<string | null>(null);
-  const [drawerModelId, setDrawerModelId] = useState<string | null>(null);
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [newModelOpen, setNewModelOpen] = useState(false);
 
   const skusByModel = useMemo(() => {
@@ -75,11 +71,8 @@ export default function ModularTab({
 
   const totalShown = grouped.reduce((s, g) => s + g.models.length, 0);
 
-  const optionsModel = optionsModelId
-    ? catalog.models.find((m) => m.id === optionsModelId) ?? null
-    : null;
-  const drawerModel = drawerModelId
-    ? catalog.models.find((m) => m.id === drawerModelId) ?? null
+  const editingModel = editingModelId
+    ? catalog.models.find((m) => m.id === editingModelId) ?? null
     : null;
 
   return (
@@ -153,8 +146,7 @@ export default function ModularTab({
                   key={model.id}
                   model={model}
                   skus={skusByModel.get(model.id) ?? []}
-                  onOpen={() => setOptionsModelId(model.id)}
-                  onOpenSetup={() => setDrawerModelId(model.id)}
+                  onOpen={() => setEditingModelId(model.id)}
                 />
               ))}
             </div>
@@ -162,29 +154,14 @@ export default function ModularTab({
         ))}
       </div>
 
-      {optionsModel && (
-        <AllowedOptionsModal
-          key={optionsModel.id}
-          model={optionsModel}
-          skus={skusByModel.get(optionsModel.id) ?? []}
+      {editingModel && (
+        <ModelEditorModal
+          key={editingModel.id}
+          model={editingModel}
+          skus={skusByModel.get(editingModel.id) ?? []}
           catalog={catalog}
           isPrincipal={isPrincipal}
-          onOpenSetup={() => {
-            setDrawerModelId(optionsModel.id);
-            setOptionsModelId(null);
-          }}
-          onClose={() => setOptionsModelId(null)}
-        />
-      )}
-
-      {drawerModel && (
-        <ProductModelDrawer
-          key={drawerModel.id}
-          model={drawerModel}
-          skus={skusByModel.get(drawerModel.id) ?? []}
-          catalog={catalog}
-          isPrincipal={isPrincipal}
-          onClose={() => setDrawerModelId(null)}
+          onClose={() => setEditingModelId(null)}
         />
       )}
 
@@ -197,12 +174,10 @@ function ModelCard({
   model,
   skus,
   onOpen,
-  onOpenSetup,
 }: {
   model: ProductModelDto;
   skus: ProductSkuDto[];
   onOpen: () => void;
-  onOpenSetup: () => void;
 }) {
   const liveSkus = skus.filter((s) => !s.discontinuedAt);
   const hidden = liveSkus.length > 0 && !liveSkus.some((s) => s.posActive !== false);
@@ -235,7 +210,7 @@ function ModelCard({
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <div className="t-small font-semibold text-base-900 uppercase truncate pr-6">
+        <div className="t-small font-semibold text-base-900 uppercase truncate">
           {model.name}
         </div>
         <div className="t-tiny text-base-500 truncate">{model.modelKey}</div>
@@ -249,19 +224,6 @@ function ModelCard({
           {liveSkus.length} SKU{liveSkus.length === 1 ? "" : "s"}
         </div>
       </div>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenSetup();
-        }}
-        title="Model setup (photo · SKUs · combos)"
-        aria-label={`Model setup for ${model.name}`}
-        className="absolute top-2 right-2 p-1 rounded text-base-300 hover:text-base-700 hover:bg-base-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-        data-testid={`model-setup-${model.modelKey}`}
-      >
-        <SlidersHorizontal size={13} strokeWidth={1.75} />
-      </button>
     </div>
   );
 }

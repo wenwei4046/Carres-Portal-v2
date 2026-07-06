@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Edit3, History, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { CatalogFabricDto, CatalogResponse, FabricTier } from "@carres/shared";
+import type { CatalogFabricDto, CatalogResponse, FabricTier, ProductModelDto } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { useBatchSaveCatalogFabrics, useCatalogFabricsHistory } from "@/lib/queries";
+import {
+  useBatchSaveCatalogFabrics,
+  useCatalogFabricsHistory,
+  useUpsertModelFabricTierOverride,
+} from "@/lib/queries";
 import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
 import MaintenanceSidebar, {
@@ -101,12 +105,134 @@ export default function FabricsTab({
       <div className="flex-1 min-w-0 max-w-[980px]">
         {active === "fabrics" && <FabricsPanel fabrics={fabrics} isPrincipal={isPrincipal} />}
         {active === "pricing" && (
-          <div className="max-w-[680px]">
+          <div className="max-w-[680px] flex flex-col gap-6">
             <FabricTierDeltasCard catalog={catalog} isPrincipal={isPrincipal} />
+            <PerModelTierOverride catalog={catalog} isPrincipal={isPrincipal} />
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-model tier delta override (0176) — moved here from the Modular drawer
+// (Loo 2026-07-06: Modular = ON/OFF · name · description · photo ONLY; money
+// knobs live with the other fabric pricing). Blank delta = inherit global.
+// ---------------------------------------------------------------------------
+
+function PerModelTierOverride({
+  catalog,
+  isPrincipal,
+}: {
+  catalog: CatalogResponse;
+  isPrincipal: boolean;
+}) {
+  const upsert = useUpsertModelFabricTierOverride();
+  const models = useMemo(
+    () =>
+      catalog.models
+        .filter((m: ProductModelDto) => m.category === "sofa" || m.category === "bedframe")
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [catalog.models],
+  );
+  const [modelId, setModelId] = useState<string>(models[0]?.id ?? "");
+  const override =
+    (catalog.modelFabricTierOverrides ?? []).find((o) => o.modelId === modelId) ?? null;
+
+  const [t2, setT2] = useState("");
+  const [t3, setT3] = useState("");
+  useEffect(() => {
+    setT2(override?.tier2Delta != null ? String(override.tier2Delta) : "");
+    setT3(override?.tier3Delta != null ? String(override.tier3Delta) : "");
+  }, [modelId, override?.tier2Delta, override?.tier3Delta]);
+
+  const t2Num = t2.trim() === "" ? null : Number(t2);
+  const t3Num = t3.trim() === "" ? null : Number(t3);
+  const valid =
+    (t2Num === null || (Number.isFinite(t2Num) && t2Num >= 0)) &&
+    (t3Num === null || (Number.isFinite(t3Num) && t3Num >= 0));
+  const dirty =
+    t2Num !== (override?.tier2Delta ?? null) || t3Num !== (override?.tier3Delta ?? null);
+
+  function save() {
+    if (!valid || !dirty || !modelId) return;
+    upsert.mutate(
+      { modelId, tier2Delta: t2Num, tier3Delta: t3Num },
+      {
+        onSuccess: () => toast.success("Tier override saved"),
+        onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Save failed"),
+      },
+    );
+  }
+
+  if (models.length === 0) return null;
+
+  return (
+    <section data-testid="per-model-tier-override">
+      <div className="t-h4 font-display text-base-900 mb-1">Per-model tier override</div>
+      <p className="t-tiny text-base-500 mb-2 max-w-[520px]">
+        Model-specific premium for P2 / P3 fabrics — overrides the global deltas above.
+        Blank = use global.
+        {!isPrincipal && " Master Admin only — read-only for your role."}
+      </p>
+      <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-wrap gap-4 items-end">
+        <label className="block">
+          <span className="label block mb-1">Model</span>
+          <select
+            value={modelId}
+            onChange={(e) => setModelId(e.target.value)}
+            className={`${INPUT_CLS} w-52`}
+            data-testid="tier-override-model"
+          >
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="label block mb-1">P2 delta (RM)</span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={t2}
+            disabled={!isPrincipal}
+            onChange={(e) => setT2(e.target.value)}
+            placeholder="global"
+            className={`${INPUT_CLS} w-28 disabled:opacity-60`}
+            data-testid="tier-override-t2"
+          />
+        </label>
+        <label className="block">
+          <span className="label block mb-1">P3 delta (RM)</span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={t3}
+            disabled={!isPrincipal}
+            onChange={(e) => setT3(e.target.value)}
+            placeholder="global"
+            className={`${INPUT_CLS} w-28 disabled:opacity-60`}
+            data-testid="tier-override-t3"
+          />
+        </label>
+        {isPrincipal && (
+          <button
+            type="button"
+            onClick={save}
+            disabled={!valid || !dirty || upsert.isPending}
+            className="btn-primary text-[12px] disabled:opacity-40"
+            data-testid="tier-override-save"
+          >
+            {upsert.isPending ? "Saving…" : "Save override"}
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 
