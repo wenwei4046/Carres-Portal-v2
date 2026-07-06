@@ -36,9 +36,26 @@ function comboLabel(c: SofaComboDto): string {
   return c.slots.map((s) => s.join("|")).join(" + ");
 }
 
-/** The size strings a mattress/bedframe model offers (allowed_options.sizes). */
-const modelSizes = (m: ProductModelDto): string[] =>
-  (m.allowedOptions?.sizes ?? []).map((s) => s.trim()).filter(Boolean);
+/** The size strings a mattress/bedframe model offers — `allowed_options.sizes`
+ *  when curated, else DERIVED from the model's live SKU variants. Some models
+ *  (e.g. imported ones) never had allowed_options populated even though their
+ *  SKUs carry King/Queen/… variants; the order-time matcher compares against
+ *  the SKU variant anyway, so the SKU-derived list is the correct vocabulary
+ *  (Loo 2026-07-06: the "Only for specific sizes" tick showed nothing). */
+export function modelSizes(m: ProductModelDto, catalog: CatalogResponse): string[] {
+  const curated = (m.allowedOptions?.sizes ?? []).map((s) => s.trim()).filter(Boolean);
+  if (curated.length > 0) return curated;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of catalog.skus) {
+    if (s.modelId !== m.id || s.variantKind !== "size" || s.discontinuedAt) continue;
+    const v = (s.variant ?? "").trim();
+    if (!v || seen.has(v.toUpperCase())) continue;
+    seen.add(v.toUpperCase());
+    out.push(v);
+  }
+  return out;
+}
 
 /** The compartment codes a sofa model offers — the per-model offered set
  *  (model_sofa_compartments → sofa_compartments.code), falling back to the
@@ -126,7 +143,7 @@ export function RuleTargetRefinementRow({
   };
 
   if (cat === "mattress" || cat === "bedframe") {
-    const sizes = modelSizes(model);
+    const sizes = modelSizes(model, catalog);
     if (sizes.length === 0) return null;
     const picked = value.scope === "variant" ? (value.sizeCodes ?? []) : [];
     return (
