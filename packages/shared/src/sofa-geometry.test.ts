@@ -418,9 +418,9 @@ describe("analyzeSofa closure", () => {
     expect(r.reason).toBeNull();
   });
 
-  it("an off-axis open end is fine when both MAIN-axis ends are armed", () => {
-    // Vertical-dominant L: the main (vertical) run CNR→2A is armed at both ends;
-    // the horizontal 2NA's far end is open but off the main axis → still closed.
+  it("an off-axis open end is fine when there are arms on two outer sides", () => {
+    // The main run CNR→2A is armed; the horizontal 2NA's far end is open but the
+    // build carries arms on 2+ distinct outer sides → complete (lenient rule).
     const group: GeoCell[] = [
       { id: "cnr", moduleCode: "CNR", x: 0, y: 0, rot: 0 },
       { id: "2na", moduleCode: "2NA", x: 95, y: 0, rot: 0 },
@@ -430,14 +430,28 @@ describe("analyzeSofa closure", () => {
     expect(r.closed).toBe(true);
   });
 
-  it("a MAIN-axis end with no arm still fails (the off-axis exemption never rescues a main end)", () => {
-    // Two armless 1NAs in a row → both main (W/E) ends open + armless → not a sofa.
-    const group: GeoCell[] = [
+  it("a vertical chaise pushed back-against the main run JOINS + closes (Loo 2026-07-07)", () => {
+    // 2A(LHF) main run [west arm] + a vertical 2A(RHF) chaise whose BACK abuts the
+    // run's open seat side. The lenient join links them into ONE sofa; arms on two
+    // outer sides (the run's west arm + the chaise's top arm) → complete. This was
+    // previously two disconnected groups → "Right end has no arm".
+    const cells: GeoCell[] = [
+      { id: "run", moduleCode: "2A(LHF)", x: 0, y: 0, rot: 0 },
+      { id: "chaise", moduleCode: "2A(RHF)", x: 158, y: 0, rot: 270 },
+    ];
+    const groups = groupSofas(cells, "24");
+    expect(groups).toHaveLength(1); // now ONE sofa (was two)
+    const r = analyzeSofa(groups[0]!, "24");
+    expect(r.closed).toBe(true);
+  });
+
+  it("fewer than two armed sides is NOT a complete sofa", () => {
+    // Two armless 1NAs → 0 arms; a lone 1A → 1 arm. Neither reaches two ends.
+    expect(analyzeSofa([
       { id: "a", moduleCode: "1NA", x: 0, y: 0, rot: 0 },
       { id: "b", moduleCode: "1NA", x: 75, y: 0, rot: 0 },
-    ];
-    const r = analyzeSofa(group, "24");
-    expect(r.closed).toBe(false);
+    ], "24").closed).toBe(false);
+    expect(analyzeSofa([{ id: "a", moduleCode: "1A(LHF)", x: 0, y: 0, rot: 0 }], "24").closed).toBe(false);
   });
 
   it("accessory open edges do NOT fail closure", () => {

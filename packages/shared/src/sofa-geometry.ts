@@ -482,7 +482,19 @@ const hasConnectingContact = (a: GeoCell, b: GeoCell, depth: Depth): boolean => 
   const ea = cellEdges(a);
   const eb = cellEdges(b);
   const connectable = (t: EdgeType | undefined): boolean => t === "arm" || t === "open";
-  return contacts.some(({ edgeA, edgeB }) => connectable(ea[edgeA]) && connectable(eb[edgeB]));
+  // Two seat-connect/arm edges join (the original rule). ALSO join when one
+  // piece's BACK abuts the other's seat-connect/arm side — a chaise pushed
+  // back-against the main run is still ONE sofa (Loo 2026-07-07). A FRONT edge
+  // never joins: a piece facing away isn't part of the sofa (keeps genuinely
+  // separate back-to-back / face-to-open sofas apart).
+  return contacts.some(({ edgeA, edgeB }) => {
+    const ta = ea[edgeA];
+    const tb = eb[edgeB];
+    if (connectable(ta) && connectable(tb)) return true;
+    if (ta === "back" && connectable(tb)) return true;
+    if (tb === "back" && connectable(ta)) return true;
+    return false;
+  });
 };
 
 /** Union-find by edge contact. Returns an array of cell groups (each its own sofa). */
@@ -995,28 +1007,28 @@ export const analyzeSofa = (group: GeoCell[], depth: Depth): SofaAnalysis => {
     }
   }
 
-  const ends = headArm && tailArm;
-  // A finished sofa needs an armrest on its two MAIN ends — the extremities of
-  // its longest (dominant) axis. An exposed open cushion edge on the OFF axis is
-  // a chaise/lounger FOOT: a chaise is open at the foot by design (Loo 2026-07-07:
-  // open-foot chaises are a real Carres product), so it does NOT fail closure.
-  // A bare armless run still fails, because the main-end arm check (`ends`) does.
-  const hasUnclosedOpen = horizontalDominant
-    ? unclosedByDir[EDGE_W] || unclosedByDir[EDGE_E]
-    : unclosedByDir[EDGE_N] || unclosedByDir[EDGE_S];
-  let closed = violations.length === 0 && ends && !hasUnclosedOpen;
+  // Lenient completeness (Loo 2026-07-07): a build is a complete sofa when it
+  // carries armrests on at least TWO distinct outer sides (its "two main ends")
+  // and no two arms collide. We no longer require the arms to sit on a specific
+  // axis, nor that every open cushion edge be capped — an L's chaise foot or any
+  // perpendicular leg may be open, and touching pieces that meet via a back/front
+  // edge still count. `unclosedByDir` (open cushion edges) is kept for reference
+  // but no longer gates closure. The salesperson vets the final shape.
+  const armDirections = new Set(outwardArms.map((a) => a.edge));
+  const hasTwoEnds = armDirections.size >= 2;
+  let closed = violations.length === 0 && hasTwoEnds;
   let reason: ClosureFailure | null = null;
   if (violations.length > 0) reason = "Arms colliding";
-  else if (!headArm && !tailArm) reason = "No arms on either end";
-  else if (!headArm) reason = horizontalDominant ? "Left end has no arm" : "Top end has no arm";
-  else if (!tailArm) reason = horizontalDominant ? "Right end has no arm" : "Bottom end has no arm";
-  else if (hasUnclosedOpen) {
-    reason = horizontalDominant
-      ? unclosedByDir[EDGE_W]
+  else if (armDirections.size === 0) reason = "No arms on either end";
+  else if (!hasTwoEnds) {
+    // Exactly one armed side → point at an unarmed extremity so the salesperson
+    // knows to cap the other end.
+    reason = !headArm
+      ? horizontalDominant
         ? "Left end has no arm"
-        : "Right end has no arm"
-      : unclosedByDir[EDGE_N]
-        ? "Top end has no arm"
+        : "Top end has no arm"
+      : horizontalDominant
+        ? "Right end has no arm"
         : "Bottom end has no arm";
   }
 
