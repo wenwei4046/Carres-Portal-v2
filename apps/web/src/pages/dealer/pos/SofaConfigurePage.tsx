@@ -24,12 +24,16 @@ import {
   gatedSofaSizes,
   analyzeSofa,
   canMirror,
+  computeSofaPrice,
   findModule,
   groupSofas,
   mirrorModules,
   moduleFootprint,
   resolveFabricDelta,
   ROOM_H,
+  type FabricTier,
+  type SofaBuild,
+  type SofaPricingSnapshot,
 } from "@carres/shared";
 import { useDeleteSofaCombo, usePwpAvailableForPhone } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
@@ -60,7 +64,6 @@ interface QuickPick {
   combo: SofaComboDto;
   title: string;
   codes: string[];
-  priceLabel: string;
 }
 
 type SeedCell = { moduleCode: string; x: number; y: number; rot: Rot };
@@ -235,17 +238,6 @@ function cellsDims(cells: SeedCell[], depth: string): { w: number; d: number } {
   return { w: maxX - minX, d: maxY - minY };
 }
 
-function priceLabelOf(combo: SofaComboDto): string {
-  const vals = Object.values(combo.pricesByHeight).filter(
-    (v): v is number => typeof v === "number",
-  );
-  if (vals.length === 0) return "Priced on build";
-  const min = Math.min(...vals);
-  const max = Math.max(...vals);
-  const rm = (n: number) => `RM ${n.toLocaleString("en-MY")}`;
-  return min === max ? rm(min) : `From ${rm(min)}`;
-}
-
 export default function SofaConfigurePage({
   model,
   meta,
@@ -326,7 +318,6 @@ export default function SofaConfigurePage({
             combo: c,
             title: c.label?.trim() || codes.join(" + "),
             codes,
-            priceLabel: priceLabelOf(c),
           };
         }),
     [sofaCombos, model.id],
@@ -413,6 +404,38 @@ export default function SofaConfigurePage({
   const fabricTierOverride =
     (modelFabricTierOverrides ?? []).find((o) => o.modelId === model.id) ?? null;
 
+  // Price a quick-pick layout with the SAME engine the canvas + server use:
+  // à-la-carte (the sum of the component compartment prices), or a matched
+  // pricing combo when the layout hits one. A Quick Pick row carries no price of
+  // its own (0206) — the total is computed live, not read off the combo.
+  const pricingSnapshot: SofaPricingSnapshot = useMemo(
+    () => ({
+      compartmentPool: sofaCompartments,
+      modelCompartments,
+      sofaCombos,
+      fabricTierOverride,
+      fabricTierConfig: fabricTierConfig ?? null,
+      legHeightPool: legOpts,
+    }),
+    [sofaCompartments, modelCompartments, sofaCombos, fabricTierOverride, fabricTierConfig, legOpts],
+  );
+  const pricePick = (codes: string[], tier: FabricTier, height: string, leg: string | null) => {
+    const build: SofaBuild = {
+      modelId: model.id,
+      cells: codes.map((moduleCode) => ({ moduleCode })),
+      fabricTier: tier,
+      height,
+      legHeight: leg,
+    };
+    return computeSofaPrice(build, pricingSnapshot);
+  };
+  // Card "from" price — the base layout total at PRICE_1 fabric, no leg.
+  const cardHeight = offeredHeights[0] ?? "24";
+  const cardPriceLabel = (codes: string[]) => {
+    const t = pricePick(codes, "PRICE_1", cardHeight, null).total;
+    return t > 0 ? `From RM ${t.toLocaleString("en-MY")}` : "—";
+  };
+
   // Hero pane previews the hovered (else selected, else first) pick. Clicking a
   // card SELECTS it (prototype behaviour — Customize is the explicit canvas path).
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -428,19 +451,22 @@ export default function SofaConfigurePage({
   const [qpLeg, setQpLeg] = useState<string>("");
   const [qpRemark, setQpRemark] = useState("");
 
-  // Heights = the ACTIVE Maintenance sofa sizes this preset is priced for.
-  const heroHeights = heroPick
-    ? offeredHeights.filter((h) => heroPick.combo.pricesByHeight[h] != null)
-    : [];
+  // Heights = the model's full offered sizes (à-la-carte prices any size; a
+  // matched combo may cover only some, and the engine falls back per size).
+  const heroHeights = heroPick ? offeredHeights : [];
   const effHeight = heroHeights.includes(qpHeight) ? qpHeight : heroHeights[0] ?? qpHeight;
-  // KIV (series or colour) → no concrete fabric → no tier delta yet.
+  // KIV (series or colour) → no concrete fabric → no tier delta yet. These ride
+  // onto the DraftLine attrs; the LIVE TOTAL itself comes from computeSofaPrice.
   const qpDelta = qpFabric
     ? resolveFabricDelta(qpFabric.tier, fabricTierOverride, fabricTierConfig ?? null)
     : 0;
   // Leg-height surcharge (0201 pool; server re-verifies via computeSofaPrice).
   const qpLegDelta = qpLeg ? legOpts.find((o) => o.value === qpLeg)?.surcharge ?? 0 : 0;
-  const heroBase = heroPick ? heroPick.combo.pricesByHeight[effHeight] ?? null : null;
-  const qpTotal = heroBase !== null ? heroBase + qpDelta + qpLegDelta : null;
+  // LIVE TOTAL = component sum, or a matched combo price — priced live via the
+  // shared engine (NOT read off the combo, which has no price for a quick pick).
+  const qpTotal = heroPick
+    ? pricePick(heroPick.codes, qpFabric?.tier ?? "PRICE_1", effHeight, qpLeg || null).total
+    : null;
 
   // The hero layout seeded at the chosen depth — ONE joined plan view + bbox dims.
   const heroCells = heroPick
@@ -448,12 +474,12 @@ export default function SofaConfigurePage({
     : [];
   const heroDims = cellsDims(heroCells, effHeight);
 
-  /** Add the previewed preset straight to the cart (no canvas hop). */
+  /** Add the previewed preset straight to the cart (no canvas hop). Priced live
+   *  via the shared engine — à-la-carte, or a matched combo. */
   function addQuickPick(pick: QuickPick) {
-    const base = pick.combo.pricesByHeight[effHeight];
-    if (base == null) return;
     const { slots } = displayFor(pick);
     const cells = comboSeedCells({ ...pick.combo, slots }, effHeight);
+    const priced = pricePick(pick.codes, qpFabric?.tier ?? "PRICE_1", effHeight, qpLeg || null);
     const line = buildToDraftLine(
       {
         cells: cells.map((c) => ({ moduleCode: c.moduleCode, x: c.x, y: c.y, rot: c.rot })),
@@ -469,8 +495,8 @@ export default function SofaConfigurePage({
         fabricDeferred: qpDeferred,
         legHeight: qpLeg || null,
         legSurcharge: qpLegDelta,
-        total: base + qpDelta + qpLegDelta,
-        priceBasis: "combo",
+        total: priced.total,
+        priceBasis: priced.basis,
       },
       model,
       skus,
@@ -662,7 +688,7 @@ export default function SofaConfigurePage({
                   "—"
                 )}
               </div>
-              <div className="cfg-header__totalNote">combo pricing per layout</div>
+              <div className="cfg-header__totalNote">component total · combo when matched</div>
             </div>
           ) : (
             meta && (
@@ -685,9 +711,8 @@ export default function SofaConfigurePage({
             >
               <X size={14} strokeWidth={2} /> Cancel
             </button>
-            {/* 0206 — a Quick Pick preset has no fixed price (qpTotal null); it
-                routes through "Customize →" (loadPick) which prices it live on
-                the canvas. Only a priced pick shows the direct Add to Cart. */}
+            {/* Quick pick is priced live (component total, or a matched combo)
+                — the direct Add to Cart uses that engine price. */}
             {mode === "quick" && qpTotal !== null && (
               <button
                 type="button"
@@ -711,7 +736,7 @@ export default function SofaConfigurePage({
             <div className="sof-qp__rail">
               <div className="sof-qp__railHead">
                 <span className="pos-eyebrow">Quick pick</span>
-                <span className="sof-qp__railDetail">combo pricing per layout</span>
+                <span className="sof-qp__railDetail">component total · combo when matched</span>
               </div>
               <div className="sof-qp__grid" data-testid="sofa-quick-picks">
                 {picks.map((p) => {
@@ -734,7 +759,7 @@ export default function SofaConfigurePage({
                       <span className="sof-qp__cardBody">
                         <span className="sof-qp__cardLabel">{p.title}</span>
                         <span className="sof-qp__cardSub">{d.codes.join(" + ")}</span>
-                        <span className="sof-qp__cardPrice">{p.priceLabel}</span>
+                        <span className="sof-qp__cardPrice">{cardPriceLabel(p.codes)}</span>
                       </span>
                       {mirrorable && isOn && (
                         <span

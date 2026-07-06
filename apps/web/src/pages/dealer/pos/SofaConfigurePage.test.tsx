@@ -229,6 +229,21 @@ describe("SofaConfigurePage", () => {
     expect(within(grid).getByText(/From RM 2,990/)).toBeTruthy();
   });
 
+  it("0206 — a price-less quick pick shows the à-la-carte component total (no combo)", () => {
+    const priceless: SofaComboDto = {
+      ...COMBO,
+      id: "00000000-0000-0000-0000-0000000c0aa1",
+      label: "Bare layout",
+      pricesByHeight: {}, // no price → priced live from the components
+    };
+    renderPage({ combos: [priceless] });
+    const grid = screen.getByTestId("sofa-quick-picks");
+    // 1A(LHF) 1200 + 2A(RHF) 1900 = 3100 (à-la-carte; the price-less combo is
+    // skipped by the engine, so there is no combo override).
+    expect(within(grid).getByText("From RM 3,100")).toBeTruthy();
+    expect(screen.getByTestId("sofa-qp-total").textContent).toContain("3,100");
+  });
+
   it("0206 — a plain combo (isQuickPick=false) is hidden; only the quick pick shows", () => {
     const plain: SofaComboDto = {
       ...COMBO,
