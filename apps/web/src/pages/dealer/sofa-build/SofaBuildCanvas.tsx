@@ -164,6 +164,12 @@ export default function SofaBuildCanvas({
     [compartmentPool],
   );
 
+  /** code → uploaded icon art (0178 icon_url) for the canvas cells. */
+  const iconByCode = useMemo(
+    () => new Map(compartmentPool.map((c) => [c.code, c.iconUrl ?? null])),
+    [compartmentPool],
+  );
+
   /** This model's OFFERED compartments (pool row + offered row), palette-grouped
    *  and price-resolved. Only offered compartments can be placed. */
   const palette = useMemo(() => {
@@ -647,13 +653,17 @@ export default function SofaBuildCanvas({
                       transform: `translate(-50%, -50%) rotate(${c.rot}deg)`,
                     }}
                   >
-                    {/* Canvas cells ALWAYS draw the plan-view SVG — never the
-                        photoreal icon_url (an opaque product photo breaks the
-                        top-down plan look + the joined-group SofaPlanView
-                        styling; photos live in the palette + Maintenance). */}
+                    {/* Canvas cells draw the UPLOADED compartment art when the
+                        pool row carries one (Loo 2026-07-06 — "完完全全跟着我
+                        upload 的照片", supersedes the 2026-06-21 SVG-only
+                        lock). `flush` alpha-bbox-fits the art so joined
+                        modules tile with NO seams; a code without art falls
+                        back to the schematic SVG, also flush. */}
                     <CompartmentSilhouette
                       code={c.moduleCode}
                       depth={depth}
+                      iconUrl={iconByCode.get(c.moduleCode) ?? null}
+                      flush
                       selected={selected}
                       violation={violated}
                       className="h-full w-full"

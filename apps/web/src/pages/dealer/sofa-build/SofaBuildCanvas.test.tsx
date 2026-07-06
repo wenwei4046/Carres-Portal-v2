@@ -12,7 +12,7 @@
  *   · onAddBuild fires with the expected payload (cells + height + fabric + total)
  */
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import type {
   ProductModelDto,
   ProductSkuDto,
@@ -69,6 +69,7 @@ const FABRICS: SofaFabricDto[] = [
 
 function renderCanvas(props?: {
   combos?: SofaComboDto[];
+  compartmentPool?: SofaCompartmentDto[];
   onAddBuild?: (p: unknown) => void;
   onClose?: () => void;
 }) {
@@ -78,7 +79,7 @@ function renderCanvas(props?: {
     <SofaBuildCanvas
       model={MODEL}
       skus={SKUS}
-      compartmentPool={POOL}
+      compartmentPool={props?.compartmentPool ?? POOL}
       modelCompartments={OFFERED}
       sofaCombos={props?.combos ?? []}
       fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
@@ -136,6 +137,18 @@ describe("SofaBuildCanvas", () => {
     // height picker present with the canonical heights
     const heightSel = screen.getByTestId("sofa-build-height") as HTMLSelectElement;
     expect(heightSel.value).toBe("24");
+  });
+
+  it("canvas cells draw the uploaded compartment art (flush) when the pool row has one", () => {
+    const pool = POOL.map((p) =>
+      p.code === "1S" ? { ...p, iconUrl: "https://cdn/1s.png" } : p,
+    );
+    renderCanvas({ compartmentPool: pool });
+    addModule("1S");
+    // the palette icon uses the same img testid — assert within the flush box
+    const box = screen.getByTestId("compartment-silhouette-img-flush");
+    const img = within(box).getByTestId("compartment-silhouette-img");
+    expect(img).toHaveAttribute("src", "https://cdn/1s.png");
   });
 
   it("clicking empty canvas deselects — the floating rotate/delete tools dismiss", () => {
