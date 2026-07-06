@@ -50,21 +50,21 @@ export async function syncCompartmentSku(
   sb: SupabaseClient,
   args: { modelId: string; compartmentId: string; priceOverride: number | null },
 ): Promise<CompartmentSkuResult> {
-  // 1. The model gives the sku prefix (model_key) + the category (supplier +
-  //    mutex soundness derive from it).
+  // 1. The model gives the sku prefix (model_key), the category (supplier +
+  //    mutex soundness derive from it) and the name (description prefix).
   const { data: model, error: mErr } = await sb
     .from("product_models")
-    .select("model_key, category")
+    .select("model_key, category, name")
     .eq("id", args.modelId)
     .maybeSingle();
   if (mErr) return { ok: false, ...mapPgError(mErr) };
   if (!model || !model.model_key) return notFound("model");
 
-  // 2. The compartment pool row gives the code (sku suffix + variant),
-  //    description, and the fallback price.
+  // 2. The compartment pool row gives the code (sku suffix + variant + the
+  //    description suffix) and the fallback price.
   const { data: comp, error: cErr } = await sb
     .from("sofa_compartments")
-    .select("code, description, default_price")
+    .select("code, default_price")
     .eq("id", args.compartmentId)
     .maybeSingle();
   if (cErr) return { ok: false, ...mapPgError(cErr) };
@@ -145,7 +145,10 @@ export async function syncCompartmentSku(
       ...(isReoffer ? {} : { price: seedPrice }),
       supplier_id: supplierId,
       pos_active: false,
-      description: comp.description ?? null,
+      // "Sofa {Model} {code}" (Loo 2026-07-06) — the SKU Master row names the
+      // model+compartment pair, NOT the pool compartment's own description
+      // (e.g. "Sofa Angsa 1A(LHF)", not "Left hand facing").
+      description: `Sofa ${model.name} ${comp.code}`,
       discontinued_at: null,
     },
     { onConflict: "sku" },

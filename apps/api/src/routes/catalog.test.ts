@@ -1718,7 +1718,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
         // Phase 5 — the auto-sync reads the model (sku prefix + category), the
         // pool compartment, and the model's own supplier before the upsert.
         reads: {
-          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa" }],
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
           sofa_compartments: [COMP_ROW],
           product_skus: [{ model_id: MODEL_ID_LIVE, supplier_id: "sup-ohana" }],
         },
@@ -1738,7 +1738,9 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
 
     // The synced compartment sku: real product_skus row, pos_active OFF (never in
     // the flat POS grid), variant_kind 'part', deterministic {MODEL_KEY}-{code}
-    // sku, inherited supplier, the override price, compartment_id linked.
+    // sku, inherited supplier, the override price, compartment_id linked, and
+    // the "Sofa {Model} {code}" description (Loo 2026-07-06 — names the
+    // model+compartment pair, NOT the pool compartment's own description).
     const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
     expect(skuUpsert?.payload).toMatchObject({
       sku: "OHANA-1A(LHF)",
@@ -1749,6 +1751,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       price: 280,
       supplier_id: "sup-ohana",
       pos_active: false,
+      description: "Sofa Ohana 1A(LHF)",
       discontinued_at: null,
     });
     // cost is OMITTED so a manually-set cost survives a re-sync.
@@ -1769,7 +1772,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       buildWriteSb({
         recorded,
         reads: {
-          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa" }],
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
           sofa_compartments: [COMP_ROW],
           product_skus: [], // model has no existing sku → no own supplier
           suppliers: [{ id: "sup-covers-sofa" }],
@@ -1817,7 +1820,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       buildWriteSb({
         recorded,
         reads: {
-          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa" }],
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
           sofa_compartments: [COMP_ROW],
           // The model's own supplier read + the collision read both hit
           // product_skus. The colliding flat row has compartment_id NULL.
