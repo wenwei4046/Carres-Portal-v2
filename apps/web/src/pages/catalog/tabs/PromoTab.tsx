@@ -24,7 +24,11 @@ import {
   useUpsertModelFreeGifts,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
-import RuleTargetPicker, { RuleTargetRefinementRow, finalizeRuleTargets } from "./RuleTargetPicker";
+import RuleTargetPicker, {
+  RuleTargetRefinementRow,
+  finalizeRuleTargets,
+  modelSizes,
+} from "./RuleTargetPicker";
 
 const PRODUCT_CATEGORIES: ProductCategory[] = ["mattress", "bedframe", "sofa", "accessory", "service"];
 
@@ -595,12 +599,13 @@ function BulkGwpModal({
   })).filter((g) => g.list.length > 0);
 
   // Size chips = union of offered sizes across all mattress/bedframe models
-  // (uppercased — RuleTarget sizeCodes are stored uppercase).
+  // (uppercased — RuleTarget sizeCodes are stored uppercase). `modelSizes`
+  // falls back to SKU-derived variants when allowed_options isn't curated.
   const sizeOptions = [
     ...new Set(
       models
         .filter((m) => m.category === "mattress" || m.category === "bedframe")
-        .flatMap((m) => m.allowedOptions?.sizes ?? [])
+        .flatMap((m) => modelSizes(m, catalog))
         .map((s) => s.trim().toUpperCase())
         .filter(Boolean),
     ),

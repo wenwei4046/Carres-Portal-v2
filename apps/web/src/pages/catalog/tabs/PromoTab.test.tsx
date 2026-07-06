@@ -201,6 +201,25 @@ describe("PromoTab — default free gifts", () => {
     expect((screen.getByTestId("gift-row-sku-0") as HTMLSelectElement).value).toBe("PILLOW");
   });
 
+  it("size chips fall back to SKU-derived variants when allowed_options.sizes is empty", async () => {
+    // Loo 2026-07-06: Cloud Series Mattress had allowed_options.sizes = null but
+    // real King/Queen SKUs — the "Only for specific sizes" tick showed nothing.
+    // makeCatalog's mattress model has NO allowedOptions; its MATT-A sku carries
+    // variant "S" (variantKind "size") → the chip must still render.
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.change(screen.getByTestId("promo-gift-model-select"), { target: { value: MATTRESS_MODEL } });
+    fireEvent.click(screen.getByTestId("promo-gift-add"));
+    fireEvent.change(screen.getByTestId("gift-row-sku-0"), { target: { value: "PILLOW" } });
+    fireEvent.click(screen.getByTestId("gift-row-cond-toggle-0"));
+
+    // The SKU-derived size chip "S" renders and ticks into the payload.
+    fireEvent.click(screen.getByRole("button", { name: "S" }));
+    fireEvent.click(screen.getByTestId("gift-save"));
+    await waitFor(() => expect(mockUpsertGifts).toHaveBeenCalledOnce());
+    const gifts = mockUpsertGifts.mock.calls[0][0].input.gifts;
+    expect(gifts[0].condition).toEqual({ scope: "variant", sizeCodes: ["S"] });
+  });
+
   it("a size condition rides into the saved payload", async () => {
     // give the model an offered size so the variant refinement renders chips
     const catalog = makeCatalog();
