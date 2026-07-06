@@ -14,7 +14,6 @@ import {
   allowedFabricsFor,
   allowedPoolValues,
   computedTotalHeight,
-  fabricTierFor,
   resolveFabricDelta,
   resolveOptionsTotal,
   type OptionPick,
@@ -22,6 +21,8 @@ import {
 import type { DraftLine } from "../new-order/draft";
 import { newLocalId } from "../new-order/configurators";
 import { SpecialAddonsPicker, useSpecials } from "../new-order/special-addons-picker";
+import { useSeriesFabric, FABRIC_KIV } from "../sofa-build/use-series-fabric";
+import type { SellingFabric } from "../sofa-build/selling-fabrics";
 import type { ModelMeta } from "./catalog-index";
 
 /**
@@ -343,12 +344,34 @@ export default function PosConfigurePage({
   const [divan, setDivan] = useState<string>("");
   const [leg, setLeg] = useState<string>("");
   // Fabric IS the bed's colour / finish (Loo 2026-07-06 — a bed frame follows
-  // the fabric; the separate model.colors picker was removed). The chosen
-  // fabric's description ("Oat weave") is the finish name used for the label
-  // + the plan-view frame tint.
-  const [fabricCode, setFabricCode] = useState<string>("");
-  const selectedFabric = fabricOpts.find((f) => f.fabricCode === fabricCode) ?? null;
-  const finishName = selectedFabric?.description || selectedFabric?.fabricCode || "";
+  // the fabric). A two-level Series → Colour dropdown with KIV-to-defer at each
+  // level, driven by the SAME `useSeriesFabric` hook the sofa uses (Loo
+  // 2026-07-07: "I want the dropdown like the sofa's Fabric Option"). Priced by
+  // the fabric's bedframe tier; the picked colour is the finish name + tint.
+  const bedFabrics = useMemo<SellingFabric[]>(
+    () =>
+      fabricOpts.map((f) => ({
+        key: `cf:${f.fabricCode}`,
+        name: f.description ? `${f.fabricCode} · ${f.description}` : f.fabricCode,
+        tier: f.bedframeTier,
+        id: null,
+        code: f.fabricCode,
+        swatch: null,
+        series: f.series,
+      })),
+    [fabricOpts],
+  );
+  const {
+    seriesList: fabSeriesList,
+    series: fabSeries,
+    chooseSeries: chooseFabSeries,
+    colourKey: fabColourKey,
+    setColourKey: setFabColourKey,
+    seriesColours: fabSeriesColours,
+    fabric: selFabric,
+  } = useSeriesFabric(bedFabrics);
+  const fabricCode = selFabric?.code ?? "";
+  const finishName = selFabric?.name ?? "";
   const [qty, setQty] = useState(1);
   const sku = skus.find((s) => s.id === skuId);
   const sp = useSpecials(model, specialAddons);
@@ -378,22 +401,6 @@ export default function PosConfigurePage({
   );
   const optionsTotal = resolvedOptions.total;
   const totalHeight = computedTotalHeight(divan || null, leg || null);
-  // Display-only per-fabric delta for the dropdown labels (same resolution the
-  // shared resolver applies when the fabric is actually picked).
-  const fabricDeltaByCode = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const f of fabricOpts) {
-      m.set(
-        f.fabricCode,
-        resolveFabricDelta(
-          fabricTierFor(model.category, f),
-          fabricTierOverride,
-          fabricTierConfig ?? null,
-        ),
-      );
-    }
-    return m;
-  }, [fabricOpts, model.category, fabricTierOverride, fabricTierConfig]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -604,47 +611,73 @@ export default function PosConfigurePage({
               )}
             </div>
 
-            {/* Fabric / finish — bed frames whose model offers master fabrics
-                (opt-in Modular ticks). This IS the bed's colour/finish: a frame
-                follows the fabric, priced by its bedframe tier delta (Loo
-                2026-07-06 — the separate model.colors picker was removed). */}
-            {isBed && fabricOpts.length > 0 && (
+            {/* Fabric option — Series → Colour, two-level KIV-to-defer, driven
+                by the SAME useSeriesFabric hook the sofa uses. This IS the bed's
+                finish: a frame follows the fabric, priced by its bedframe tier
+                (Loo 2026-07-07: "I want the dropdown like the sofa's"). */}
+            {isBed && bedFabrics.length > 0 && (
               <div className="cfg-section" data-testid="cfg-fabric-section">
                 <div className="cfg-section__head">
-                  <span className="pos-eyebrow">Fabric / finish</span>
-                  <span className="cfg-section__detail">
-                    {selectedFabric
-                      ? selectedFabric.description || selectedFabric.fabricCode
-                      : "Confirm later"}
-                  </span>
+                  <span className="pos-eyebrow">Fabric option</span>
+                  <span className="cfg-section__detail">series · colour · KIV to defer</span>
                 </div>
-                <div className="cfg-swatchRow">
-                  <button
-                    className={`cfg-sw ${fabricCode === "" ? "is-on" : ""}`}
-                    onClick={() => setFabricCode("")}
-                    data-testid="cfg-fabric-later"
-                  >
-                    <span className="cfg-sw__name">Confirm later</span>
-                  </button>
-                  {fabricOpts.map((f) => {
-                    const delta = fabricDeltaByCode.get(f.fabricCode) ?? 0;
-                    const nm = f.description || f.fabricCode;
-                    return (
-                      <button
-                        key={f.id}
-                        className={`cfg-sw ${fabricCode === f.fabricCode ? "is-on" : ""}`}
-                        onClick={() => setFabricCode(f.fabricCode)}
-                        data-testid={`cfg-fabric-${f.fabricCode}`}
-                      >
-                        <span className="cfg-sw__chip" style={{ background: hexForColourName(nm) }}></span>
-                        <span className="cfg-sw__name">
-                          {f.fabricCode}
-                          {f.description ? ` · ${f.description}` : ""}
-                          {delta > 0 ? ` +RM${delta.toLocaleString("en-MY")}` : ""}
-                        </span>
-                      </button>
-                    );
-                  })}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {fabSeriesList.length > 1 && (
+                    <select
+                      value={fabSeries}
+                      onChange={(e) => chooseFabSeries(e.target.value)}
+                      aria-label="Fabric series"
+                      className="cfg-select"
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: "1.5px solid var(--line, #d9d2c7)",
+                        background: "var(--pos-panel, #fff)",
+                        fontSize: 13,
+                      }}
+                      data-testid="cfg-fabric-series"
+                    >
+                      <option value="">KIV · series to confirm</option>
+                      {fabSeriesList.map((s) => (
+                        <option key={s} value={s}>
+                          {s === "Other" ? "Other" : `${s} series`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {fabSeries && (
+                    <select
+                      value={fabColourKey}
+                      onChange={(e) => setFabColourKey(e.target.value)}
+                      aria-label="Fabric colour"
+                      className="cfg-select"
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: "1.5px solid var(--line, #d9d2c7)",
+                        background: "var(--pos-panel, #fff)",
+                        fontSize: 13,
+                      }}
+                      data-testid="cfg-fabric"
+                    >
+                      <option value={FABRIC_KIV}>KIV · colour to confirm</option>
+                      {fabSeriesColours.map((f) => {
+                        const delta = resolveFabricDelta(
+                          f.tier,
+                          fabricTierOverride,
+                          fabricTierConfig ?? null,
+                        );
+                        return (
+                          <option key={f.key} value={f.key}>
+                            {f.name}
+                            {delta > 0 ? ` · +RM ${delta.toLocaleString("en-MY")}` : " · Included"}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
                 </div>
               </div>
             )}
