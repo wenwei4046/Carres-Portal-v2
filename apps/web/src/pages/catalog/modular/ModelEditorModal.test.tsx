@@ -79,6 +79,9 @@ const ACC_SKUS: ProductSkuDto[] = [
 
 const BED_SKUS: ProductSkuDto[] = [
   { id: "b1", modelId: "m-bed", sku: "KAYU-K", variant: "King", variantKind: "size", price: 1990, cost: null, supplierId: null, posActive: true },
+  { id: "b2", modelId: "m-bed", sku: "KAYU-Q", variant: "Queen", variantKind: "size", price: 1790, cost: null, supplierId: null, posActive: true },
+  // Single is deactivated in POS (pos_active=false) → its chip must read OFF.
+  { id: "b3", modelId: "m-bed", sku: "KAYU-S", variant: "Single", variantKind: "size", price: 1290, cost: null, supplierId: null, posActive: false },
 ];
 
 function makeCatalog(over?: Partial<CatalogResponse>): CatalogResponse {
@@ -95,6 +98,10 @@ function makeCatalog(over?: Partial<CatalogResponse>): CatalogResponse {
       { id: "p4", pool: "sofa_leg_height", value: "No Leg", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 1 },
       { id: "p5", pool: "sofa_leg_height", value: '6"', label: null, dimensions: null, surcharge: 90, active: true, sortOrder: 2 },
       { id: "p6", pool: "bedframe_leg_height", value: '4"', label: null, dimensions: null, surcharge: 60, active: true, sortOrder: 1 },
+      { id: "p7", pool: "divan_height", value: '4"', label: null, dimensions: null, surcharge: null, active: true, sortOrder: 1 },
+      { id: "p8", pool: "divan_height", value: '6"', label: null, dimensions: null, surcharge: 125, active: true, sortOrder: 2 },
+      { id: "p9", pool: "gap", value: '10"', label: null, dimensions: null, surcharge: null, active: true, sortOrder: 1 },
+      { id: "p10", pool: "gap", value: '12"', label: null, dimensions: null, surcharge: null, active: true, sortOrder: 2 },
     ],
     sofaCompartments: [
       { id: "c1", code: "1A(LHF)", description: null, seatCount: 1, armConfig: "left", iconUrl: null, defaultPrice: 0, sortOrder: 1, active: true },
@@ -220,25 +227,69 @@ describe("ModelEditorModal — sofa (2990s arrangement)", () => {
 });
 
 describe("ModelEditorModal — bedframe / mattress", () => {
-  it("no Compartments, NO sku list; sizes = model axis ∪ variants; changed sizes cascade on Save", async () => {
-    renderModal(BED, BED_SKUS);
+  it("size chips mirror the live POS SKUs (pos_active), NOT the stale allowed_options.sizes", () => {
+    // Loo 2026-07-06 regression: Kayu had allowed_options.sizes=[] (drifted) but
+    // every size SKU was pos_active=true — Modular showed all-off while POS sold
+    // them all. The chips must reflect what POS actually sells.
+    renderModal({ ...BED, allowedOptions: { sizes: [] } }, BED_SKUS);
+    expect(screen.getByTestId("allowed-size-King").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("allowed-size-Queen").getAttribute("aria-pressed")).toBe("true");
+    // a deactivated SKU (pos_active=false) → its chip is OFF, matching POS
+    expect(screen.getByTestId("allowed-size-Single").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("no Compartments, NO sku list; turning a size off cascades pos_active on Save", async () => {
+    renderModal({ ...BED, allowedOptions: { sizes: [] } }, BED_SKUS);
     expect(screen.queryByTestId("allowed-compartments")).toBeNull();
     // The Sizes chips ARE the per-size ON/OFF — no duplicate Variant SKUs list.
     expect(screen.queryByText(/Variant SKUs/i)).toBeNull();
     expect(screen.queryByTestId("flat-show-in-pos")).toBeNull();
     expect(screen.getByTestId("allowed-sizes")).toHaveTextContent("Sizes");
-    expect(screen.getByTestId("allowed-size-Queen").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByTestId("allowed-size-King").getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByTestId('allowed-leg-4"')).toBeInTheDocument();
 
+    // Seeded ON = {King, Queen} (the pos_active SKUs). Turn King off → cascade {Queen}.
     fireEvent.click(screen.getByTestId("allowed-size-King"));
     fireEvent.click(screen.getByTestId("model-editor-save"));
     await waitFor(() => expect(mockToggleSizes).toHaveBeenCalledTimes(1));
     expect(mockToggleSizes.mock.calls[0][0]).toEqual({
       modelId: "m-bed",
-      input: { sizes: ["Queen", "King"] },
+      input: { sizes: ["Queen"] },
     });
     expect(mockPatchSku).not.toHaveBeenCalled();
+  });
+
+  it("bedframe: Colour list editor + Divan/Gap tick sections render and save (Loo 2026-07-06)", async () => {
+    // Colours seed from model.colors; divan/gap seed from the pool (absent ticks = all).
+    renderModal(
+      { ...BED, allowedOptions: { sizes: [] }, colors: ["Natural oak", "Walnut"] },
+      BED_SKUS,
+    );
+    expect(screen.getByTestId("allowed-colour-Natural oak")).toBeInTheDocument();
+    expect(screen.getByTestId("allowed-colour-Walnut")).toBeInTheDocument();
+    expect(screen.getByTestId('allowed-divan-4"').getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId('allowed-divan-6"').getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId('allowed-gap-10"').getAttribute("aria-pressed")).toBe("true");
+
+    // Remove a colour, add one (accented name allowed), turn a divan height off.
+    fireEvent.click(screen.getByTestId("allowed-colour-remove-Walnut"));
+    fireEvent.change(screen.getByTestId("allowed-colour-input"), { target: { value: "Cream bouclé" } });
+    fireEvent.click(screen.getByTestId("allowed-colour-add"));
+    fireEvent.click(screen.getByTestId('allowed-divan-6"')); // 6" off
+
+    fireEvent.click(screen.getByTestId("model-editor-save"));
+    await waitFor(() => expect(mockPatchModel).toHaveBeenCalledTimes(1));
+    const [{ patch }] = mockPatchModel.mock.calls[0];
+    expect(patch.colors).toEqual(["Natural oak", "Cream bouclé"]);
+    expect(patch.allowedOptions.divan_heights).toEqual(['4"']);
+    expect(patch.allowedOptions.gaps).toEqual(['10"', '12"']);
+  });
+
+  it("mattress: no Colour / Divan / Gap sections (bedframe-only)", () => {
+    const MATT: ProductModelDto = { ...BED, id: "m-matt", category: "mattress", modelKey: "matt" };
+    renderModal({ ...MATT, allowedOptions: { sizes: [] } }, []);
+    expect(screen.queryByTestId("allowed-colours")).toBeNull();
+    expect(screen.queryByTestId("allowed-divans")).toBeNull();
+    expect(screen.queryByTestId("allowed-gaps")).toBeNull();
   });
 });
 

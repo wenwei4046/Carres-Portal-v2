@@ -1728,6 +1728,45 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     expect((upd?.payload as { icon_url: string }).icon_url).toBe("https://x/y.jpg");
   });
 
+  it("PATCH /sofa-compartments/:id — principal sets P2/P3 fabric-tier specials → 200 (0205)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: COMP_ROW }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ specialTier2Delta: 500, specialTier3Delta: 800 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload as Record<string, unknown>).toMatchObject({
+      special_tier2_delta: 500,
+      special_tier3_delta: 800,
+    });
+  });
+
+  it("PATCH /sofa-compartments/:id — explicit null clears a fabric-tier special (0205)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: COMP_ROW }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ specialTier2Delta: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    // `!== undefined` guard → an explicit null IS written (clears to inherit).
+    expect(Object.prototype.hasOwnProperty.call(upd?.payload, "special_tier2_delta")).toBe(true);
+    expect((upd?.payload as Record<string, unknown>).special_tier2_delta).toBeNull();
+  });
+
   it("PATCH /sofa-compartments/:id — defaultPrice is no longer accepted → 422 (strict schema)", async () => {
     const jwt = await makeJwt("principal", null);
     const res = await app.fetch(

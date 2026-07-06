@@ -309,6 +309,13 @@ export interface SofaCompartment {
   defaultPrice: number;
   sortOrder: number;
   active: boolean;
+  /** 0205 — per-compartment fabric-tier P2/P3 delta override. When a sofa build
+   *  uses this compartment, this REPLACES (overwrites) the per-model / global
+   *  fabric delta for the WHOLE sofa (highest wins across several). Absent /
+   *  `null` = no special (inherit). Optional: the adapter always emits it from
+   *  the pool row; only pre-0205 test fixtures omit it. */
+  specialTier2Delta?: number | null;
+  specialTier3Delta?: number | null;
 }
 
 /**

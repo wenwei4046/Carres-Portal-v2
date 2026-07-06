@@ -321,6 +321,10 @@ export const sofaCompartmentFromRow = (r: DB.SofaCompartmentRow): D.SofaCompartm
   defaultPrice: Number(r.default_price),
   sortOrder: Number(r.sort_order),
   active: r.active,
+  // 0205 — nullable per-compartment fabric-tier deltas. null stays null so
+  // "no special" is distinct from "special of 0" (mirrors priceOverride below).
+  specialTier2Delta: r.special_tier2_delta == null ? null : Number(r.special_tier2_delta),
+  specialTier3Delta: r.special_tier3_delta == null ? null : Number(r.special_tier3_delta),
 });
 
 /**

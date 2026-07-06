@@ -665,6 +665,94 @@ describe("computeSofaPrice — fabric tier delta", () => {
   });
 });
 
+describe("computeSofaPrice — per-compartment fabric special (0205)", () => {
+  // Snapshot with global config (+ optional per-model override), then set the
+  // per-compartment specials directly on the pool rows.
+  function withSpecials(
+    specials: Record<string, { t2?: number | null; t3?: number | null }>,
+    opts: { fabricTierOverride?: { tier2Delta: number | null; tier3Delta: number | null } } = {},
+  ): SofaPricingSnapshot {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      {
+        fabricTierConfig: { sofaTier2Delta: 200, sofaTier3Delta: 400 },
+        fabricTierOverride: opts.fabricTierOverride,
+      },
+    );
+    for (const c of snap.compartmentPool) {
+      const s = specials[c.code];
+      if (s) {
+        c.specialTier2Delta = s.t2 ?? null;
+        c.specialTier3Delta = s.t3 ?? null;
+      }
+    }
+    return snap;
+  }
+
+  it("a used compartment's P2 special OVERWRITES the global + per-model delta", () => {
+    const snap = withSpecials(
+      { "2A(LHF)": { t2: 500 } },
+      { fabricTierOverride: { tier2Delta: 50, tier3Delta: null } },
+    );
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_2" }), snap);
+    expect(r.fabricDelta).toBe(500); // special > per-model 50 > global 200
+    expect(r.total).toBe(2300); // 1800 à-la-carte + 500
+  });
+
+  it("PRICE_1 build never gets a delta, even if the compartment has a special", () => {
+    const snap = withSpecials({ "2A(LHF)": { t2: 500, t3: 900 } });
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_1" }), snap);
+    expect(r.fabricDelta).toBe(0);
+    expect(r.total).toBe(1800);
+  });
+
+  it("no used compartment has a special → delta unchanged (dormant guarantee)", () => {
+    const snap = withSpecials({});
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_2" }), snap);
+    expect(r.fabricDelta).toBe(200); // falls through to global config
+  });
+
+  it("highest special wins when a build spans several special compartments", () => {
+    const snap = withSpecials({ "2A(LHF)": { t2: 300 }, "L(RHF)": { t2: 650 } });
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_2" }), snap);
+    expect(r.fabricDelta).toBe(650);
+  });
+
+  it("a special of 0 explicitly zeroes the fabric premium (?? not ||)", () => {
+    const snap = withSpecials(
+      { "2A(LHF)": { t2: 0 } },
+      { fabricTierOverride: { tier2Delta: 50, tier3Delta: null } },
+    );
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_2" }), snap);
+    expect(r.fabricDelta).toBe(0);
+    expect(r.total).toBe(1800);
+  });
+
+  it("special stacks on a COMBO price the same way the tier delta does", () => {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      {
+        combos: [combo({ tier: null, pricesByHeight: { "28": 2750 } })],
+        fabricTierConfig: { sofaTier2Delta: 200, sofaTier3Delta: 400 },
+      },
+    );
+    snap.compartmentPool.find((c) => c.code === "2A(LHF)")!.specialTier3Delta = 999;
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_3" }), snap);
+    expect(r.basis).toBe("combo");
+    expect(r.fabricDelta).toBe(999); // special > global 400
+    expect(r.total).toBe(3749); // 2750 combo + 999
+  });
+
+  it("special applies via the mirror-code fallback (same lookup as pricing)", () => {
+    // Build uses L(RHF); pool prices L under L(LHF) with the special → the mirror
+    // fallback in the special collection still finds it (the C1 lookup parity).
+    const snap = snapshotFrom({ "2A(LHF)": 1000, "L(LHF)": 800 });
+    snap.compartmentPool.find((c) => c.code === "L(LHF)")!.specialTier2Delta = 700;
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_2" }), snap);
+    expect(r.fabricDelta).toBe(700);
+  });
+});
+
 describe("computeSofaPrice — recliner stub", () => {
   it("reclinerExtra is always 0 in Phase 2 (interface-complete stub)", () => {
     const snap = snapshotFrom({ "2A(LHF)": 1000, "L(RHF)": 800 });

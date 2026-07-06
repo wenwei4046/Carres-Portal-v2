@@ -40,6 +40,7 @@ import type {
 import type { FabricTier } from "./fabric-tier";
 import {
   resolveFabricDelta,
+  pickCompartmentSpecial,
   type FabricTierOverride,
   type FabricTierGlobalConfig,
 } from "./fabric-tier";
@@ -536,11 +537,27 @@ export function computeSofaPrice(
   // Recliner extra — Phase-3 stub (interface present, no data → 0).
   const reclinerCents = 0;
 
-  // Fabric-tier P2/P3 delta (RM → cents).
+  // Per-compartment fabric-tier special (0205): the highest-precedence delta
+  // layer. Collect the special of every compartment this build uses (mirror
+  // fallback — the SAME pool lookup as cellPriceCents), highest-wins per tier →
+  // one whole-sofa delta that REPLACES the per-model / global delta below.
+  const compartmentSpecial = pickCompartmentSpecial(
+    build.cells.flatMap((cell) => {
+      const comp =
+        poolByCode.get(cell.moduleCode) ?? poolByCode.get(mirrorCode(cell.moduleCode));
+      return comp
+        ? [{ tier2Delta: comp.specialTier2Delta ?? null, tier3Delta: comp.specialTier3Delta ?? null }]
+        : [];
+    }),
+  );
+
+  // Fabric-tier P2/P3 delta (RM → cents). Precedence: per-compartment special >
+  // per-model override > global config (resolveFabricDelta owns the ?? chain).
   const fabricDeltaMyr = resolveFabricDelta(
     lookupTier,
     snapshot.fabricTierOverride,
     snapshot.fabricTierConfig,
+    compartmentSpecial,
   );
   const fabricDeltaCents = toCents(fabricDeltaMyr);
 

@@ -5,12 +5,14 @@ import type {
   CatalogResponse,
   ComboDto,
   ProductCategory,
+  ProductModelDto,
   PwpCodeDto,
   PwpDiscoverDto,
 } from "@carres/shared";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { comboToDraftLines, type DraftLine, type WizardDraft } from "../new-order/draft";
-import { lockedCategoriesFor } from "../new-order/configurators";
+import { lockedCategoriesFor, newLocalId } from "../new-order/configurators";
+import { offeredSpecialsFor } from "../new-order/special-addons-picker";
 import { buildCatalogIndex } from "./catalog-index";
 import { cartItemCount, cartTotalExStair, mergeLine } from "./cart";
 import PosSidebar, { type RailEntry, type RailKey } from "./PosSidebar";
@@ -179,6 +181,27 @@ export default function CatalogStep({
     toast.success("Added to cart");
   }
 
+  // Card tap. Accessories / services have no options to pick — a single-sku,
+  // no-specials model adds STRAIGHT to the cart (Loo 2026-07-06: "can direct
+  // add to cart", no drawer). Anything with a real choice opens the configurator.
+  function handleConfigure(model: ProductModelDto) {
+    const modelSkus = index.skusByModel.get(model.id) ?? [];
+    const flat = model.category === "accessory" || model.category === "service";
+    if (flat && modelSkus.length === 1 && offeredSpecialsFor(model, catalog.specialAddons).length === 0) {
+      const s = modelSkus[0]!;
+      addLine({
+        localId: newLocalId(),
+        sku: s.sku,
+        qty: 1,
+        attrs: null,
+        unitPrice: s.price,
+        label: `${model.name} · ${s.variant}`,
+      });
+      return;
+    }
+    setConfigureModelId(model.id);
+  }
+
   // Explode a combo into its component DraftLines (split price) and fold ALL of
   // them into the cart via mergeLine. attrs.combo_key keeps them grouped + lets
   // CartDrawer offer one "Remove combo". Re-adding the same combo bumps qty via
@@ -320,7 +343,7 @@ export default function CatalogStep({
                       meta={index.meta.get(model.id)!}
                       locked={lockedCats.has(model.category)}
                       inCart={modelIdsInCart.has(model.id)}
-                      onConfigure={() => setConfigureModelId(model.id)}
+                      onConfigure={() => handleConfigure(model)}
                     />
                   ))}
                 </div>
