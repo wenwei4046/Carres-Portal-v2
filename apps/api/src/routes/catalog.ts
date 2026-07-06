@@ -56,6 +56,7 @@ import {
   pwpRuleInput,
   PWP_RULES,
   deriveSkuCode,
+  canonicalSize,
   skuImportInput,
   hasPricingIntent,
   type SkuImportRow,
@@ -634,7 +635,16 @@ catalogRouter.post("/skus", async (c) => {
   if (!modelRow) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
-  const skuCode = deriveSkuCode(modelRow.model_key, parsed.data.variant);
+  // Mattress/bedframe sizes resolve through the canonical table so the SKU code
+  // stays SHORT (`-K`) while the stored variant (the SIZE shown) is the FULL
+  // name (`King`). Non-size variants (sofa presets, accessories) pass through.
+  const isBedSize =
+    parsed.data.variantKind === "size" &&
+    (modelRow.category === "mattress" || modelRow.category === "bedframe");
+  const resolvedVariant = isBedSize
+    ? canonicalSize(parsed.data.variant)
+    : { code: parsed.data.variant, name: parsed.data.variant };
+  const skuCode = deriveSkuCode(modelRow.model_key, resolvedVariant.code);
   const supplierless = SUPPLIERLESS_CATEGORIES.has(modelRow.category);
 
   // 0074 bugfix (Loo 2026-05-09): product_skus.supplier_id was NOT NULL on
@@ -672,7 +682,7 @@ catalogRouter.post("/skus", async (c) => {
     .insert({
       model_id: parsed.data.modelId,
       sku: skuCode,
-      variant: parsed.data.variant,
+      variant: resolvedVariant.name,
       variant_kind: parsed.data.variantKind,
       price: parsed.data.price,
       cost: parsed.data.cost ?? null,
@@ -1212,7 +1222,13 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
     supplierId = supRow.id as string;
   }
 
-  const codeFor = (v: string) => deriveSkuCode(modelRow.model_key, v);
+  // Mattress/bedframe sizes resolve through the canonical table so the SKU
+  // code stays SHORT (`-K`) while the stored variant (the SIZE shown) is the
+  // FULL name (`King`) — never the raw pool code. Other categories pass through
+  // unchanged (canonicalSize is a no-op for non-bed tokens anyway).
+  const isBedCategory = modelRow.category === "mattress" || modelRow.category === "bedframe";
+  const resolve = (v: string) => (isBedCategory ? canonicalSize(v) : { code: v, name: v });
+  const codeFor = (v: string) => deriveSkuCode(modelRow.model_key, resolve(v).code);
   const wantCodes = variants.map(codeFor);
   const { data: existingRows, error: exErr } = await sb
     .from("product_skus")
@@ -1226,7 +1242,7 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
     .map((v) => ({
       model_id: id,
       sku: codeFor(v),
-      variant: v,
+      variant: resolve(v).name,
       variant_kind: "size" as const,
       price: parsed.data.price ?? 0,
       cost: null,

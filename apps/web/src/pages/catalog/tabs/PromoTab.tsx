@@ -1125,7 +1125,13 @@ function PwpRulesSection({
       </p>
 
       {newRuleKind !== null && isPrincipal && (
-        <PwpRuleForm catalog={catalog} initialKind={newRuleKind} onDone={onCloseNewRule} />
+        <Modal
+          title={newRuleKind === "pwp" ? "New PWP rule" : "New Promo rule"}
+          onClose={onCloseNewRule}
+          size="lg"
+        >
+          <PwpRuleForm catalog={catalog} initialKind={newRuleKind} onDone={onCloseNewRule} bare />
+        </Modal>
       )}
 
       <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
@@ -1246,11 +1252,16 @@ function PwpRuleForm({
   rule,
   initialKind,
   onDone,
+  bare = false,
 }: {
   catalog: CatalogResponse;
   rule?: PwpRuleDto;
   initialKind?: PwpRuleDto["type"];
   onDone: () => void;
+  /** True when rendered inside a Modal (the "+ New PWP/Promo" entry points):
+   *  drop the inline card chrome so the modal supplies the box. Inline Edit
+   *  keeps the card (bare=false). */
+  bare?: boolean;
 }) {
   const create = useCreatePwpRule();
   const update = useUpdatePwpRule();
@@ -1319,7 +1330,13 @@ function PwpRuleForm({
   }
 
   return (
-    <div className="bg-base-50 border border-base-200 rounded-[4px] p-4 mb-3 flex flex-col gap-4">
+    <div
+      className={
+        bare
+          ? "flex flex-col gap-4"
+          : "bg-base-50 border border-base-200 rounded-[4px] p-4 mb-3 flex flex-col gap-4"
+      }
+    >
       <div className="flex flex-wrap gap-4 items-end">
         <div className="block">
           <span className="label block mb-1">Kind</span>

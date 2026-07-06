@@ -1202,8 +1202,8 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
             allowed_options: { sizes: ["Queen", "King"] },
           },
           suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
-          // Queen already exists → only King should be inserted.
-          product_skus__list: [{ sku: "CARRES-CLASSIC-Queen" }],
+          // Queen already exists (SHORT code suffix) → only King should insert.
+          product_skus__list: [{ sku: "CARRES-CLASSIC-Q" }],
         },
         inserted: [{ id: "00000000-0000-0000-0000-00000000bb30" }],
         records,
@@ -1222,9 +1222,51 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
     const body = (await res.json()) as { generated: number; skipped: number };
     expect(body).toMatchObject({ generated: 1, skipped: 1 });
     const insert = records.find((r) => r.op === "insert");
-    const rows = insert?.body as { sku: string }[];
+    const rows = insert?.body as { sku: string; variant: string }[];
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.sku).toBe("CARRES-CLASSIC-King");
+    // SHORT code suffix, FULL name variant — the SIZE reads "King", not "K".
+    expect(rows[0]?.sku).toBe("CARRES-CLASSIC-K");
+    expect(rows[0]?.variant).toBe("King");
+  });
+
+  it("expands raw bed-size codes to full-name variants (K→King, SS→Super Single)", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "lumi-classic",
+            allowed_options: {},
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+        },
+        inserted: [
+          { id: "00000000-0000-0000-0000-00000000bb31" },
+          { id: "00000000-0000-0000-0000-00000000bb32" },
+        ],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ variants: ["K", "SS"] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as {
+      sku: string;
+      variant: string;
+    }[];
+    expect(rows).toEqual([
+      expect.objectContaining({ sku: "LUMI-CLASSIC-K", variant: "King" }),
+      expect.objectContaining({ sku: "LUMI-CLASSIC-SS", variant: "Super Single" }),
+    ]);
   });
 });
 
