@@ -723,14 +723,6 @@ function DrawerBody({
   const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
   const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
   const holdCount = (balanceGate === "hold" ? 1 : 0) + (storageGate === "hold" ? 1 : 0);
-  // The grouped "Collect before delivery" card summary = the WORST of the two
-  // sub-gates (balance + storage), so the card header warns/blocks as a unit.
-  const collectGate: "hold" | "warn" | null =
-    balanceGate === "hold" || storageGate === "hold"
-      ? "hold"
-      : balanceGate === "warn" || storageGate === "warn"
-        ? "warn"
-        : null;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -1118,28 +1110,21 @@ function DrawerBody({
             </div>
           </Panel>
 
-          {/* 2. Collect before delivery — Balance + Storage share ONE card and one
-              gate: both must be collected before dispatch or the header rolls a
-              🔴 HOLD DELIVERY (Jess: same operational lever). Balance always;
-              Storage only when a storable category is on the order. */}
-          <section className="border border-base-200 rounded-[12px] bg-white overflow-hidden shrink-0">
-            <header className="flex items-center justify-between gap-3 px-3 py-2 border-b border-base-100">
-              <span className="t-h4 text-base-900 truncate">Collect before delivery</span>
-              <span className="shrink-0 flex items-center gap-1.5">
-                {collectGate ? (
-                  <GateBadge gate={collectGate} />
-                ) : (
-                  <MiniBadge tone="muted">{paymentSummary}</MiniBadge>
-                )}
-              </span>
-            </header>
-
-            {/* Balance sub-section */}
+          {/* 2. Balance — its OWN card (Jess: split from Storage). Header summary =
+              the gate (Collect before delivery / Hold delivery) or the owing amount.
+              Collect-by (ETA−7d) / last-call (ETA−1d) readout escalates with the
+              gate colour. Operation shows only the OUTSTANDING owed (no Bill/Total). */}
+          <Panel
+            title="Balance"
+            summary={
+              balanceGate ? (
+                <GateBadge gate={balanceGate} />
+              ) : (
+                <MiniBadge tone="muted">{paymentSummary}</MiniBadge>
+              )
+            }
+          >
             <div className="p-3">
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="t-micro text-base-400">Balance</span>
-                {balanceGate ? <GateBadge gate={balanceGate} /> : null}
-              </div>
               {balanceOwing && collectByLabel && (
                 <div
                   className={`mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11.5px] ${
@@ -1167,18 +1152,24 @@ function DrawerBody({
                 }}
               />
             </div>
+          </Panel>
 
-            {/* Storage sub-section — same card, own sub-header + gate. */}
-            {(hasMsbf || hasSof) && (
-              <div className="p-3 border-t border-base-100">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span className="t-micro text-base-400">Storage fee</span>
-                  {storageGate ? (
-                    <GateBadge gate={storageGate} />
-                  ) : (
-                    <MiniBadge tone="muted">fee if held</MiniBadge>
-                  )}
-                </div>
+          {/* 3. Storage — its OWN card (Jess: split from Balance). Header summary =
+              the storage gate or "fee if held". StorageControlFields lays the two
+              category fees (MS/BF · Sofa) 2-col; fee auto-computes today (Master
+              import is P2). Only shows when a storable category is on the order. */}
+          {(hasMsbf || hasSof) && (
+            <Panel
+              title="Storage"
+              summary={
+                storageGate ? (
+                  <GateBadge gate={storageGate} />
+                ) : (
+                  <MiniBadge tone="muted">fee if held</MiniBadge>
+                )
+              }
+            >
+              <div className="p-3">
                 <StorageControlFields
                   form={form}
                   hasMsbf={hasMsbf}
@@ -1191,8 +1182,8 @@ function DrawerBody({
                   }}
                 />
               </div>
-            )}
-          </section>
+            </Panel>
+          )}
 
           {/* Card B — Delivery. Header badge = region. Body split Original |
               Logistic update; then the 3 remark rows; then a Route section only

@@ -994,30 +994,43 @@ export function StorageControlFields({
           )}
           {/* Auto breakdown — separate MS/BF (per month) and Sofa (per 2 weeks)
               lines (Jess), each = rate × commenced periods between From and To. */}
-          {hasMsbf && (
-            <FieldRow label="MS / BF">
-              <div className="px-2 py-1.5 text-[12px] font-semibold text-base-900">
-                RM {storage.msbf.toLocaleString()}
-                <span className="ml-1 text-[11px] font-normal text-base-500">
+          {/* Category fees 2-col (Jess: MS/BF vs Sofa side by side) — display-only
+              readout of the auto-computed fee + its free-window; the shared
+              controls below (Charge / Paid / waiver / extension) stay full-width. */}
+          <div
+            className={`px-1 py-1 grid gap-2 ${hasMsbf && hasSof ? "grid-cols-2" : "grid-cols-1"}`}
+          >
+            {hasMsbf && (
+              <div className="rounded-md border border-base-100 bg-base-50 px-2 py-1.5">
+                <div className="text-[10px] uppercase tracking-[0.04em] text-base-400">
+                  MS / BF
+                </div>
+                <div className="text-[13px] font-semibold text-base-900">
+                  RM {storage.msbf.toLocaleString()}
+                </div>
+                <div className="text-[10px] text-base-500">
                   {storage.msbf > 0
-                    ? `· ${storage.msbfMonths} mth × RM150`
-                    : `· free until ${fmtShort(storage.freeUntilMsbf)}`}
-                </span>
+                    ? `${storage.msbfMonths} mth × RM150`
+                    : `free until ${fmtShort(storage.freeUntilMsbf)}`}
+                </div>
               </div>
-            </FieldRow>
-          )}
-          {hasSof && (
-            <FieldRow label="Sofa">
-              <div className="px-2 py-1.5 text-[12px] font-semibold text-base-900">
-                RM {storage.sof.toLocaleString()}
-                <span className="ml-1 text-[11px] font-normal text-base-500">
+            )}
+            {hasSof && (
+              <div className="rounded-md border border-base-100 bg-base-50 px-2 py-1.5">
+                <div className="text-[10px] uppercase tracking-[0.04em] text-base-400">
+                  Sofa
+                </div>
+                <div className="text-[13px] font-semibold text-base-900">
+                  RM {storage.sof.toLocaleString()}
+                </div>
+                <div className="text-[10px] text-base-500">
                   {storage.sofCharged
-                    ? "· flat RM200 / order"
-                    : `· free until ${fmtShort(storage.freeUntilSof)}`}
-                </span>
+                    ? "flat RM200 / order"
+                    : `free until ${fmtShort(storage.freeUntilSof)}`}
+                </div>
               </div>
-            </FieldRow>
-          )}
+            )}
+          </div>
           <FieldRow label="Charge">
             <input
               type="number"
