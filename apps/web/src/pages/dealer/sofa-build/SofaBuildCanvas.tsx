@@ -552,17 +552,25 @@ export default function SofaBuildCanvas({
                 <span className="sof-cv__gridLegendValue">50 × 50 cm</span>
               </div>
             </div>
-            {/* connected-sofa outlines + dimension callouts */}
+            {/* connected-sofa outlines + dimension callouts. 2990s parity
+                (CustomBuilder :1338 + Loo 2026-07-06 screenshot): only a
+                CLOSED sofa earns a group outline — unjoined/incomplete pieces
+                render clean (dims only), no red ring and no per-group caption.
+                The closure reason lives in ONE place: the Add button's
+                "Resolve · …" label. Arm collisions still paint the cell red
+                via CompartmentSilhouette's violation prop. */}
             {analyses.map((a, gi) => {
               const bb = cellsBbox(a.group, depth);
               if (!bb) return null;
               return (
                 <div key={`g${gi}`}>
-                  <div
-                    className={`pointer-events-none absolute rounded-[6px] border-2 ${a.closed ? "border-primary/40" : "border-danger/50"}`}
-                    style={{ left: bb.x - 6, top: bb.y - 6, width: bb.w + 12, height: bb.h + 12 }}
-                    data-testid="sofa-group-outline"
-                  />
+                  {a.closed && (
+                    <div
+                      className="pointer-events-none absolute rounded-[6px] border-2 border-primary/40"
+                      style={{ left: bb.x - 6, top: bb.y - 6, width: bb.w + 12, height: bb.h + 12 }}
+                      data-testid="sofa-group-outline"
+                    />
+                  )}
                   {/* width callout (top) — design tick · line · boxed label */}
                   <div
                     className="sof-cv__dim sof-cv__dim--top"
@@ -589,15 +597,6 @@ export default function SofaBuildCanvas({
                     </span>
                     <span className="sof-cv__dim__tick sof-cv__dim__tick--b" />
                   </div>
-                  {!a.closed && (
-                    <span
-                      className="pill pill-overdue pointer-events-none absolute"
-                      style={{ left: bb.x, top: bb.y + bb.h + 8 }}
-                      data-testid="sofa-group-not-closed"
-                    >
-                      {a.reason ?? "Not closed"}
-                    </span>
-                  )}
                 </div>
               );
             })}

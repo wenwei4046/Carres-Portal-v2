@@ -144,8 +144,10 @@ describe("SofaBuildCanvas", () => {
     const add = screen.getByTestId("sofa-build-add");
     expect(add).toBeDisabled();
     expect(add).toHaveTextContent(/Resolve/);
-    // the canvas shows a not-closed pill for the group
-    expect(screen.getByTestId("sofa-group-not-closed")).toBeInTheDocument();
+    // 2990s parity: the Add button is the ONLY closure messaging — an
+    // unclosed group gets no red outline and no per-group caption on canvas.
+    expect(screen.queryByTestId("sofa-group-not-closed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sofa-group-outline")).not.toBeInTheDocument();
   });
 
   it("enables Add for a self-closing single piece (1S = both arms) and emits the payload", () => {
