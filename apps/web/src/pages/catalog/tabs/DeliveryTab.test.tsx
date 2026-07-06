@@ -1,5 +1,6 @@
 /**
- * MaintenanceTab — Delivery TRIP fee (0184) tests.
+ * DeliveryTab — Delivery TRIP fee (0184) tests. (Moved from
+ * MaintenanceTab.deliveryFee.test.tsx when Delivery became its own tab.)
  *
  * Covers Phase 6 web requirements:
  *  - The Delivery trip fee config section renders + a principal can edit + save
@@ -13,7 +14,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CatalogResponse } from "@carres/shared";
-import MaintenanceTab from "./MaintenanceTab";
+import DeliveryTab from "./DeliveryTab";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -27,13 +28,6 @@ const mockDeleteRule = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   usePatchFloorConfig:        () => ({ mutate: vi.fn(), isPending: false }),
-  useUpdateFabricTierConfig:  () => ({ mutate: vi.fn(), isPending: false }),
-  useCreateSofaCompartment:   () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-  useUpdateSofaCompartment:   () => ({ mutate: vi.fn(), isPending: false }),
-  useDeleteSofaCompartment:   () => ({ mutate: vi.fn(), isPending: false }),
-  // 0201 — option pool hooks (PoolPanel children)
-  useBatchSaveOptionPool:     () => ({ mutate: vi.fn(), isPending: false }),
-  useCatalogConfigHistory:    () => ({ data: undefined, isLoading: false }),
   // 0184 — delivery trip fee hooks under test
   useUpdateDeliveryFeeConfig:      () => ({ mutate: mockUpdateDeliveryConfig, isPending: false }),
   useCreateSpecialDeliveryFeeRule: () => ({ mutate: vi.fn(), mutateAsync: mockCreateRule, isPending: false }),
@@ -84,11 +78,8 @@ function wrap(ui: React.ReactNode) {
   return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
 }
 
-/** 0201 — the tab is sidebar-driven now: delivery config lives behind the
- *  "Delivery Fees" nav item, so every test opens that panel first. */
 function renderDeliveryPanel(catalog: CatalogResponse, isPrincipal: boolean) {
-  render(wrap(<MaintenanceTab catalog={catalog} isPrincipal={isPrincipal} />));
-  fireEvent.click(screen.getByTestId("maint-nav-delivery"));
+  render(wrap(<DeliveryTab catalog={catalog} isPrincipal={isPrincipal} />));
 }
 
 beforeEach(() => {

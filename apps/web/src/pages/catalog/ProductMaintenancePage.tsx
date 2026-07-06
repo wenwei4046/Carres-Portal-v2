@@ -8,17 +8,20 @@ import MaintenanceTab from "./tabs/MaintenanceTab";
 import CombosTab from "./tabs/CombosTab";
 import SpecialAddonsTab from "./tabs/SpecialAddonsTab";
 import FabricsTab from "./tabs/FabricsTab";
+import DeliveryTab from "./tabs/DeliveryTab";
 import PromoTab from "./tabs/PromoTab";
 
 /**
  * Product & Maintenance — the rebuilt Catalog page (0169-0173). Replaces the
- * old single-page `OperationCatalog`. Four tabs:
+ * old single-page `OperationCatalog`. Tabs:
  *
  *   • SKU Master  — flat product table (code · description · name · category ·
  *                   size · price · status), filter + search + Edit Prices.
  *   • Modular     — model cards grouped by category; photo, allowed-options,
  *                   per-size SKU ON/OFF (pos_active), Generate SKUs.
- *   • Maintenance — option pools + delivery-fee (floor_config) + add-ons.
+ *   • Delivery    — trip fee + special delivery rules + stair-carry fee (its
+ *                   own tab, split out of Maintenance — Loo 2026-07-06).
+ *   • Maintenance — option pools (sizes / compartments / supplier categories).
  *   • Combos      — principal-only named SKU sets sold at one combo price; the
  *                   components split that price back out at checkout (0177).
  *
@@ -37,13 +40,22 @@ import PromoTab from "./tabs/PromoTab";
  * The prop is kept as an explicit override (tests / the legacy Principal mount).
  */
 
-type TabKey = "sku" | "modular" | "special" | "fabrics" | "maintenance" | "combos" | "promo";
+type TabKey =
+  | "sku"
+  | "modular"
+  | "special"
+  | "fabrics"
+  | "delivery"
+  | "maintenance"
+  | "combos"
+  | "promo";
 
 const TABS: readonly PillTab<TabKey>[] = [
   { key: "sku", label: "SKU Master" },
   { key: "modular", label: "Modular" },
   { key: "special", label: "Special Add-ons" },
   { key: "fabrics", label: "Fabrics" },
+  { key: "delivery", label: "Delivery" },
   { key: "maintenance", label: "Maintenance" },
   { key: "combos", label: "Combos" },
   { key: "promo", label: "Promo / Free Gifts" },
@@ -93,6 +105,9 @@ export default function ProductMaintenancePage({
           )}
           {tab === "fabrics" && (
             <FabricsTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
+          )}
+          {tab === "delivery" && (
+            <DeliveryTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
           {tab === "maintenance" && (
             <MaintenanceTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
