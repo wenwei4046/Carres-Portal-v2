@@ -47,7 +47,7 @@ export default function SofaCombosTab({
   const model = sofaModels.find((m) => m.id === modelId) ?? null;
 
   return (
-    <section className="max-w-[980px]" data-testid="sofa-combos-section">
+    <section className="max-w-[1600px]" data-testid="sofa-combos-section">
       <div className="flex items-end justify-between gap-4 flex-wrap mb-1">
         <div className="t-h4 font-display">Sofa combos</div>
         {sofaModels.length > 0 && (
