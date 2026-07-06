@@ -5243,6 +5243,42 @@ export function useUpsertModelSofaCompartment() {
   });
 }
 
+/** Offer MANY compartments on a model in one go (the New-SKU sofa flow — Loo
+ *  2026-07-06). Each offer is the same idempotent principal-only PUT the drawer
+ *  uses (the server auto-syncs the `{MODEL_KEY}-{code}` SKU per offer). One
+ *  failing compartment does NOT abort the rest — failures are collected and
+ *  returned so the caller can retry just those — and the catalog invalidates
+ *  ONCE at the end instead of once per compartment. */
+export function useOfferModelCompartments() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      modelId,
+      compartmentIds,
+    }: {
+      modelId: string;
+      compartmentIds: string[];
+    }) => {
+      const failed: { compartmentId: string; message: string }[] = [];
+      for (const compartmentId of compartmentIds) {
+        try {
+          await apiFetch<{ modelSofaCompartment: ModelSofaCompartmentDto }>(
+            `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
+            catalogJson("PUT", {}),
+          );
+        } catch (e) {
+          failed.push({
+            compartmentId,
+            message: e instanceof ApiError ? e.message : "offer failed",
+          });
+        }
+      }
+      return { offered: compartmentIds.length - failed.length, failed };
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
 export function useDeleteModelSofaCompartment() {
   const qc = useQueryClient();
   return useMutation({

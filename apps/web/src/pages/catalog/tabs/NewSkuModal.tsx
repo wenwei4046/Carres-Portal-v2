@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { ProductCategory, ProductModelDto, VariantKind } from "@carres/shared";
+import type { ProductCategory, ProductModelDto, SofaCompartmentDto, VariantKind } from "@carres/shared";
 import { PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useCreateCatalogModel, useCreateCatalogSku } from "@/lib/queries";
+import { useCreateCatalogModel, useCreateCatalogSku, useOfferModelCompartments } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CATEGORY_LABEL, CodeChip } from "../components/atoms";
 
@@ -21,6 +21,14 @@ import { CATEGORY_LABEL, CodeChip } from "../components/atoms";
  *
  * Cost is optional on creation (blank = null). If provided it auto-fills onto
  * every Create-PO line that references this SKU.
+ *
+ * SOFA (principal, Loo 2026-07-06) -- a new sofa is a COMBINATION of pool
+ * compartments, so picking category Sofa surfaces the compartment pool as
+ * chips (default: every compartment offered, 2990s parity). Creating then
+ * makes the model (sofa_mode 'custom') and offers each ticked compartment;
+ * every offer auto-generates its real `{MODEL_KEY}-{code}` SKU server-side
+ * with description "Sofa {Name} {code}" (all editable later in SKU Master).
+ * Untick ALL compartments to fall back to the classic single flat SKU.
  */
 
 type Mode = "new" | "existing";
@@ -42,9 +50,13 @@ function variantKindFor(category: ProductCategory, model?: ProductModelDto): Var
 
 export default function NewSkuModal({
   models,
+  sofaCompartments = [],
   onClose,
 }: {
   models: ProductModelDto[];
+  /** Compartment pool (catalog bundle) — drives the sofa "pick compartments →
+   *  auto-generate SKUs" path. Optional so non-catalog callers stay valid. */
+  sofaCompartments?: SofaCompartmentDto[];
   onClose: () => void;
 }) {
   // Phase 2 (0175): price + cost are principal-only ("Master Admin"). A
@@ -54,6 +66,7 @@ export default function NewSkuModal({
   const isPrincipal = useAuth((s) => s.role) === "principal";
   const createModel = useCreateCatalogModel();
   const createSku = useCreateCatalogSku();
+  const offerCompartments = useOfferModelCompartments();
   const [mode, setMode] = useState<Mode>("new");
 
   // shared fields
@@ -66,6 +79,23 @@ export default function NewSkuModal({
   const [name, setName] = useState("");
   // existing-model field
   const [modelId, setModelId] = useState("");
+
+  // Sofa compartment pool (active only, pool order). A new sofa model defaults
+  // to offering EVERY compartment — untick what this model doesn't offer.
+  const compPool = useMemo(
+    () =>
+      sofaCompartments
+        .filter((c) => c.active)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)),
+    [sofaCompartments],
+  );
+  const [selectedComps, setSelectedComps] = useState<Set<string>>(
+    () => new Set(compPool.map((c) => c.id)),
+  );
+  // Compartment-path retry anchor: once the model row exists, a retry must NOT
+  // re-insert it (23505 on the unique (category, model_key) constraint) — it
+  // only re-offers the still-selected (= failed) compartments.
+  const [createdModelId, setCreatedModelId] = useState<string | null>(null);
 
   const sortedModels = useMemo(
     () =>
@@ -90,17 +120,60 @@ export default function NewSkuModal({
     costTrimmed === "" ||
     (Number.isFinite(costNum as number) && (costNum as number) >= 0);
 
-  const valid =
-    variant.trim().length > 0 &&
-    // Price/cost only gate validity when the principal can actually set them.
-    (!isPrincipal || (priceOk && costOk)) &&
-    (mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel);
+  // Sofa compartment path (principal-only — the per-compartment offer PUT is
+  // principal-gated server-side; everyone else keeps the classic flow).
+  const compSection = mode === "new" && category === "sofa" && isPrincipal;
+  const compFlow = compSection && (selectedComps.size > 0 || createdModelId !== null);
+  const firstSelectedCode = compPool.find((c) => selectedComps.has(c.id))?.code ?? "";
 
-  const pending = createModel.isPending || createSku.isPending;
+  const valid = compFlow
+    ? name.trim().length >= 2 && modelKey.length >= 2 && selectedComps.size > 0
+    : variant.trim().length > 0 &&
+      // Price/cost only gate validity when the principal can actually set them.
+      (!isPrincipal || (priceOk && costOk)) &&
+      (mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel);
+
+  const pending = createModel.isPending || createSku.isPending || offerCompartments.isPending;
 
   async function submit() {
     if (!valid) return;
     try {
+      // Sofa compartment path — create the model (sofa_mode 'custom'), then
+      // offer every ticked compartment; each offer mints its real
+      // `{MODEL_KEY}-{code}` SKU server-side ("Sofa {Name} {code}").
+      if (compFlow) {
+        let sofaModelId = createdModelId;
+        if (!sofaModelId) {
+          const res = await createModel.mutateAsync({
+            category,
+            modelKey,
+            name: name.trim(),
+            sofaMode: "custom",
+          });
+          sofaModelId = res.model.id;
+          setCreatedModelId(sofaModelId); // lock identity; a retry only re-offers
+        }
+        const ids = compPool.filter((c) => selectedComps.has(c.id)).map((c) => c.id);
+        const { failed } = await offerCompartments.mutateAsync({
+          modelId: sofaModelId,
+          compartmentIds: ids,
+        });
+        if (failed.length > 0) {
+          // Keep the modal open with ONLY the failed compartments selected —
+          // clicking create again retries just those (the offer is idempotent).
+          setSelectedComps(new Set(failed.map((f) => f.compartmentId)));
+          toast.error(
+            `${ids.length - failed.length} of ${ids.length} compartment SKUs created — ${failed.length} failed: ${failed[0].message}`,
+          );
+          return;
+        }
+        toast.success(
+          `Created ${name.trim()} + ${ids.length} compartment SKU${ids.length === 1 ? "" : "s"}`,
+        );
+        onClose();
+        return;
+      }
+
       let targetModelId: string;
       let kind: VariantKind;
       if (mode === "new") {
@@ -144,7 +217,8 @@ export default function NewSkuModal({
             key={m}
             type="button"
             onClick={() => setMode(m)}
-            className={`t-small font-semibold px-3.5 py-1 rounded-full transition-colors ${
+            disabled={createdModelId !== null}
+            className={`t-small font-semibold px-3.5 py-1 rounded-full transition-colors disabled:opacity-50 ${
               mode === m ? "bg-white text-base-900 shadow-sm" : "text-base-600 hover:text-base-900"
             }`}
             data-testid={`new-sku-mode-${m}`}
@@ -155,6 +229,17 @@ export default function NewSkuModal({
       </div>
 
       <div className="flex flex-col gap-3">
+        {createdModelId && (
+          <div
+            className="rounded-[4px] border border-amber-300 bg-amber-50 px-3 py-2"
+            data-testid="new-sku-model-created-notice"
+          >
+            <div className="t-small font-semibold text-amber-800">Model created</div>
+            <div className="t-tiny text-amber-700 mt-0.5">
+              The model exists — click create again to retry only the failed compartments.
+            </div>
+          </div>
+        )}
         {mode === "new" ? (
           <>
             <label className="block">
@@ -162,8 +247,9 @@ export default function NewSkuModal({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as ProductCategory)}
+                disabled={createdModelId !== null}
                 data-testid="new-sku-category"
-                className={INPUT_CLS}
+                className={`${INPUT_CLS} disabled:opacity-50`}
               >
                 {PRODUCT_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -177,9 +263,10 @@ export default function NewSkuModal({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={createdModelId !== null}
                 placeholder="Lumi FirmCare"
                 data-testid="new-sku-name"
-                className={INPUT_CLS}
+                className={`${INPUT_CLS} disabled:opacity-50`}
               />
               {modelKey && (
                 <div className="t-tiny text-base-500 font-mono mt-1">
@@ -187,6 +274,87 @@ export default function NewSkuModal({
                 </div>
               )}
             </label>
+            {compSection && (
+              <div className="block" data-testid="new-sku-compartments">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="label">Compartments</span>
+                  {compPool.length > 0 && (
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedComps(new Set(compPool.map((c) => c.id)))}
+                        className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                        data-testid="new-sku-comps-all"
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedComps(new Set())}
+                        className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                        data-testid="new-sku-comps-none"
+                      >
+                        None
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {compPool.length === 0 ? (
+                  <div className="t-tiny text-base-500">
+                    No compartments in the pool yet — add them in Maintenance → Sofa
+                    Compartments, or use the size field below for a flat sofa SKU.
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {compPool.map((comp) => {
+                        const on = selectedComps.has(comp.id);
+                        return (
+                          <button
+                            key={comp.id}
+                            type="button"
+                            onClick={() =>
+                              setSelectedComps((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(comp.id)) next.delete(comp.id);
+                                else next.add(comp.id);
+                                return next;
+                              })
+                            }
+                            aria-pressed={on}
+                            title={comp.description ?? comp.code}
+                            className={`t-tiny font-mono font-semibold px-2 py-1 rounded-[4px] border transition-colors ${
+                              on
+                                ? "bg-base-900 border-base-900 text-white"
+                                : "bg-white border-base-200 text-base-500 hover:border-base-400"
+                            }`}
+                            data-testid={`new-sku-comp-${comp.code}`}
+                          >
+                            {comp.code}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="t-tiny text-base-500 mt-1.5">
+                      {selectedComps.size > 0 ? (
+                        <>
+                          Every sofa is a combination of compartments — auto-generates{" "}
+                          <span className="text-base-700 font-medium">{selectedComps.size}</span>{" "}
+                          SKU{selectedComps.size === 1 ? "" : "s"}, e.g.{" "}
+                          <span className="font-mono text-base-700">
+                            {(modelKey || "model").toUpperCase()}-{firstSelectedCode}
+                          </span>{" "}
+                          · &quot;Sofa {name.trim() || "…"} {firstSelectedCode}&quot;. Untick what
+                          this model doesn&apos;t offer; prices are set per SKU in SKU Master.
+                        </>
+                      ) : (
+                        <>None selected — creates a single flat sofa SKU from the size field below.</>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <label className="block">
@@ -207,80 +375,92 @@ export default function NewSkuModal({
           </label>
         )}
 
-        <label className="block">
-          <span className="label block mb-1">Size / variant</span>
-          <input
-            value={variant}
-            onChange={(e) => setVariant(e.target.value)}
-            placeholder={category === "sofa" ? "3-seater" : "King"}
-            data-testid="new-sku-variant"
-            className={INPUT_CLS}
-          />
-          {codePreview && (
-            <div className="t-tiny text-base-500 mt-1 flex items-center gap-1.5">
-              Code: <CodeChip>{codePreview}</CodeChip>
-            </div>
-          )}
-        </label>
-
-        {isPrincipal ? (
+        {/* Classic single-SKU fields — hidden on the compartment path (codes,
+            descriptions + prices all derive per compartment there). */}
+        {!compFlow && (
           <>
             <label className="block">
-              <span className="label block mb-1">Price (RM, optional)</span>
+              <span className="label block mb-1">Size / variant</span>
               <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0.00"
-                data-testid="new-sku-price"
+                value={variant}
+                onChange={(e) => setVariant(e.target.value)}
+                placeholder={category === "sofa" ? "3-seater" : "King"}
+                data-testid="new-sku-variant"
                 className={INPUT_CLS}
               />
+              {codePreview && (
+                <div className="t-tiny text-base-500 mt-1 flex items-center gap-1.5">
+                  Code: <CodeChip>{codePreview}</CodeChip>
+                </div>
+              )}
             </label>
 
+            {isPrincipal ? (
+              <>
+                <label className="block">
+                  <span className="label block mb-1">Price (RM, optional)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="0.00"
+                    data-testid="new-sku-price"
+                    className={INPUT_CLS}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="label block mb-1">Cost (RM, optional)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={cost}
+                    onChange={(e) => setCost(e.target.value)}
+                    placeholder="not set"
+                    data-testid="new-sku-cost"
+                    className={INPUT_CLS}
+                  />
+                </label>
+              </>
+            ) : (
+              <div
+                className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2"
+                data-testid="new-sku-price-lock-hint"
+              >
+                <div className="t-small text-base-600">Price &amp; cost</div>
+                <div className="t-tiny text-base-400 mt-0.5">
+                  Set by the principal (Master Admin). This SKU is created unpriced —
+                  the principal will price it.
+                </div>
+              </div>
+            )}
+
             <label className="block">
-              <span className="label block mb-1">Cost (RM, optional)</span>
+              <span className="label block mb-1">Description (optional)</span>
               <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={cost}
-                onChange={(e) => setCost(e.target.value)}
-                placeholder="not set"
-                data-testid="new-sku-cost"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Shown on the SKU list + dealer picker"
                 className={INPUT_CLS}
               />
             </label>
           </>
-        ) : (
-          <div
-            className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2"
-            data-testid="new-sku-price-lock-hint"
-          >
-            <div className="t-small text-base-600">Price &amp; cost</div>
-            <div className="t-tiny text-base-400 mt-0.5">
-              Set by the principal (Master Admin). This SKU is created unpriced —
-              the principal will price it.
-            </div>
-          </div>
         )}
-
-        <label className="block">
-          <span className="label block mb-1">Description (optional)</span>
-          <input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Shown on the SKU list + dealer picker"
-            className={INPUT_CLS}
-          />
-        </label>
       </div>
 
       <ModalActions
         onCancel={onClose}
         onPrimary={submit}
-        primary={mode === "new" ? "Create product + SKU" : "Add SKU"}
+        primary={
+          compFlow
+            ? `Create model + ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
+            : mode === "new"
+              ? "Create product + SKU"
+              : "Add SKU"
+        }
         primaryDisabled={!valid}
         primaryPending={pending}
       />

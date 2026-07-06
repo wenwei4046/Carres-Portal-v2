@@ -348,7 +348,13 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         ))}
       </div>
 
-      {newOpen && <NewSkuModal models={catalog.models} onClose={() => setNewOpen(false)} />}
+      {newOpen && (
+        <NewSkuModal
+          models={catalog.models}
+          sofaCompartments={catalog.sofaCompartments ?? []}
+          onClose={() => setNewOpen(false)}
+        />
+      )}
       {importOpen && <ImportSkusDialog onClose={() => setImportOpen(false)} />}
       {editRow && (
         <EditSkuModal sku={editRow.sku} model={editRow.model} onClose={() => setEditRow(null)} />

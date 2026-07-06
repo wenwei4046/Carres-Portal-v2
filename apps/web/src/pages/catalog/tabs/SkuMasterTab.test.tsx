@@ -83,6 +83,14 @@ vi.mock("@/lib/queries", () => ({
     mutateAsync: mockCreateSkuMutateAsync,
     isPending: false,
   }),
+  // Sofa compartment path (Loo 2026-07-06) — NewSkuModal calls this hook
+  // unconditionally; the compartment-flow behaviour itself is covered in
+  // NewSkuModal.test.tsx.
+  useOfferModelCompartments: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ offered: 0, failed: [] }),
+    isPending: false,
+  }),
   useImportSkus: () => ({
     mutate: vi.fn(),
     mutateAsync: mockImportMutateAsync,
