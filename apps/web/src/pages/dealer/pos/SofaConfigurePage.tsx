@@ -18,9 +18,9 @@ import type {
   SofaHeight,
 } from "@carres/shared";
 import {
-  activeSofaHeights,
-  activeSofaSizes,
   allowedPoolValues,
+  gatedSofaHeights,
+  gatedSofaSizes,
   analyzeSofa,
   canMirror,
   findModule,
@@ -282,8 +282,8 @@ export default function SofaConfigurePage({
   //     value incl. non-canonical ("Flat") — per-size prices key off these;
   //   leg heights = `sofa_leg_height` pool ∩ this model's Modular ticks;
   //   fabrics = legacy per-model rows + the model's opted-in master fabrics.
-  const offeredHeights = useMemo(() => activeSofaHeights(optionPools), [optionPools]);
-  const sofaSizes = useMemo(() => activeSofaSizes(optionPools), [optionPools]);
+  const offeredHeights = useMemo(() => gatedSofaHeights(model, optionPools), [model, optionPools]);
+  const sofaSizes = useMemo(() => gatedSofaSizes(model, optionPools), [model, optionPools]);
   const legOpts = useMemo(
     () => allowedPoolValues(model, "sofa_leg_height", optionPools),
     [model, optionPools],

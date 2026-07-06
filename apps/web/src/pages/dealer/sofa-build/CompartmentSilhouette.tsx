@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   parseCompartmentStructure,
   findModule,
@@ -11,6 +11,7 @@ import {
   DEFAULT_FOOTPRINT,
 } from "@carres/shared";
 import type { EdgeType } from "@carres/shared";
+import { ART_BBOX_FALLBACK, getCachedArtBbox, measureArtBbox } from "./sofa-art";
 
 /**
  * <CompartmentSilhouette> — a top-down plan-view SVG of one sofa compartment,
@@ -68,6 +69,7 @@ export default function CompartmentSilhouette({
   iconUrl,
   selected = false,
   violation = false,
+  flush = false,
   className,
 }: {
   /** Compartment code, e.g. '1A(LHF)', '2NA', 'CNR', 'L(RHF)'. */
@@ -78,6 +80,12 @@ export default function CompartmentSilhouette({
   iconUrl?: string | null;
   selected?: boolean;
   violation?: boolean;
+  /** Build-canvas mode (Loo 2026-07-06 — joined modules must tile with NO
+   *  seams): the art bleeds edge-to-edge. iconUrl art is alpha-bbox-fitted
+   *  (2990s technique) so its padded margins are cropped away; the SVG
+   *  fallback drops its viewBox inset + corner radius. Default (palette /
+   *  standalone) keeps the breathing room. */
+  flush?: boolean;
   className?: string;
 }) {
   const geom = useMemo(() => {
@@ -103,11 +111,56 @@ export default function CompartmentSilhouette({
     };
   }, [code, depth]);
 
+  // Flush art path — re-render once the alpha bbox has been measured so the
+  // first paint (fallback stretch) snaps to the cropped fit.
+  const [, bumpArt] = useState(0);
+  useEffect(() => {
+    if (!iconUrl || !flush) return;
+    let live = true;
+    void measureArtBbox(iconUrl).then(() => {
+      if (live) bumpArt((n) => n + 1);
+    });
+    return () => {
+      live = false;
+    };
+  }, [iconUrl, flush]);
+
   const ringStyle = violation
     ? { boxShadow: "0 0 0 2px hsl(var(--danger))" }
     : selected
       ? { boxShadow: "0 0 0 3px hsl(var(--primary) / 0.4)" }
       : undefined;
+
+  // Flush photoreal path (build canvas): scale/offset the img so the measured
+  // silhouette bbox fills the cell exactly — cropped margins ⇒ joined modules
+  // tile without gaps (2990s SofaCellsPreview technique).
+  if (iconUrl && flush) {
+    const bbox = getCachedArtBbox(iconUrl) ?? ART_BBOX_FALLBACK;
+    const bw = Math.max(bbox.r - bbox.l, 0.01);
+    const bh = Math.max(bbox.b - bbox.t, 0.01);
+    return (
+      <div
+        className={`relative overflow-hidden ${className ?? ""}`}
+        style={ringStyle}
+        data-testid="compartment-silhouette-img-flush"
+        data-code={code}
+      >
+        <img
+          src={iconUrl}
+          alt={code}
+          draggable={false}
+          className="absolute max-w-none select-none"
+          style={{
+            width: `${100 / bw}%`,
+            height: `${100 / bh}%`,
+            left: `${(-bbox.l / bw) * 100}%`,
+            top: `${(-bbox.t / bh) * 100}%`,
+          }}
+          data-testid="compartment-silhouette-img"
+        />
+      </div>
+    );
+  }
 
   // Photoreal path: a 0178 icon_url wins. Keep the same box / ring chrome.
   if (iconUrl) {
@@ -123,7 +176,9 @@ export default function CompartmentSilhouette({
   }
 
   // SVG geometry. viewBox = the footprint aspect (cm), small inset for stroke.
-  const PAD = 4;
+  // Flush (build canvas): NO inset — cells abut in cm space, so any padding
+  // here reads as a visible gap between joined modules.
+  const PAD = flush ? 0 : 4;
   const vbW = geom.w + PAD * 2;
   const vbH = geom.h + PAD * 2;
   const ARM = Math.min(14, geom.w * 0.16, geom.h * 0.16); // arm strip thickness
@@ -145,7 +200,7 @@ export default function CompartmentSilhouette({
         y={PAD}
         width={geom.w}
         height={geom.h}
-        rx={3}
+        rx={flush ? 0 : 3}
         fill={BODY_FILL}
         stroke={violation ? "hsl(var(--danger))" : STROKE}
         strokeWidth={2}

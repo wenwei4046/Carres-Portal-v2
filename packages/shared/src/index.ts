@@ -641,6 +641,8 @@ export {
   fabricTierFor,
   activeSofaHeights,
   activeSofaSizes,
+  gatedSofaHeights,
+  gatedSofaSizes,
   resolveOptionsTotal,
   inchesOf,
   computedTotalHeight,

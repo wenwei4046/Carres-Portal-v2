@@ -4,6 +4,8 @@ import {
   activeSofaSizes,
   allowedFabricsFor,
   allowedPoolValues,
+  gatedSofaHeights,
+  gatedSofaSizes,
   computedTotalHeight,
   fabricTierFor,
   inchesOf,
@@ -83,23 +85,37 @@ describe("poolTicksFor", () => {
     ).toEqual(['6"']);
   });
 
+  it("2990s exact-set semantics: ABSENT → null; PRESENT (even []) → exact", () => {
+    expect(poolTicksFor({ gaps: null, allowedOptions: {} }, "divan_height")).toBeNull();
+    expect(
+      poolTicksFor({ gaps: null, allowedOptions: { leg_heights: [] } }, "bedframe_leg_height"),
+    ).toEqual([]);
+  });
+
   it("gap falls back to the legacy product_models.gaps column", () => {
     expect(poolTicksFor({ gaps: ['10"', '12"'], allowedOptions: {} }, "gap")).toEqual(['10"', '12"']);
     // explicit allowed_options.gaps wins over the column
     expect(
       poolTicksFor({ gaps: ['10"'], allowedOptions: { gaps: ['14"'] } }, "gap"),
     ).toEqual(['14"']);
+    // no explicit key + empty/absent column → unconfigured
+    expect(poolTicksFor({ gaps: [], allowedOptions: {} }, "gap")).toBeNull();
   });
 
   it("non-gap pools have no legacy fallback", () => {
-    expect(poolTicksFor({ gaps: ['10"'], allowedOptions: {} }, "divan_height")).toEqual([]);
+    expect(poolTicksFor({ gaps: ['10"'], allowedOptions: {} }, "divan_height")).toBeNull();
   });
 });
 
 describe("allowedPoolValues", () => {
-  it("EMPTY/ABSENT ticks = no restriction → every ACTIVE master option", () => {
+  it("ABSENT ticks (unconfigured) = no restriction → every ACTIVE master option", () => {
     const got = allowedPoolValues(bareModel, "divan_height", POOLS);
     expect(got.map((p) => p.value)).toEqual(['8"', '10"', '12"']); // 14" inactive
+  });
+
+  it("an explicitly-saved EMPTY tick list = offer none (2990s owner 2026-06-16)", () => {
+    const model = { gaps: null, allowedOptions: { divan_heights: [] } };
+    expect(allowedPoolValues(model, "divan_height", POOLS)).toEqual([]);
   });
 
   it("non-empty ticks narrow to that subset (pool order kept)", () => {
@@ -163,6 +179,36 @@ describe("activeSofaSizes (0204 — the à-la-carte size axis)", () => {
   it("empty pool falls back to the canonical axis (fresh-DB safety)", () => {
     expect(activeSofaSizes([])).toEqual(["24", "26", "28", "30", "32", "35", "37"]);
     expect(activeSofaSizes(null)).toEqual(["24", "26", "28", "30", "32", "35", "37"]);
+  });
+});
+
+describe("gatedSofaHeights", () => {
+  it("model seat-size ticks (allowed_options.sizes) narrow the active set", () => {
+    const model = { allowedOptions: { sizes: ["24", "35", "Flat"] } };
+    expect(gatedSofaHeights(model, POOLS)).toEqual(["24", "35"]); // Flat non-dimensional
+  });
+
+  it("absent OR empty ticks = all actives (dead-builder guard)", () => {
+    expect(gatedSofaHeights({ allowedOptions: {} }, POOLS)).toEqual(["24", "26", "35"]);
+    expect(gatedSofaHeights({ allowedOptions: { sizes: [] } }, POOLS)).toEqual(["24", "26", "35"]);
+  });
+
+  it("ticks that miss every active height fall back to all actives", () => {
+    const model = { allowedOptions: { sizes: ["28"] } }; // 28 inactive in the pool
+    expect(gatedSofaHeights(model, POOLS)).toEqual(["24", "26", "35"]);
+  });
+});
+
+describe("gatedSofaSizes (0204 — the à-la-carte twin of gatedSofaHeights)", () => {
+  it("model ticks narrow the FULL size axis — 'Flat' survives the gate", () => {
+    const model = { allowedOptions: { sizes: ["24", "35", "Flat"] } };
+    expect(gatedSofaSizes(model, POOLS)).toEqual(["24", "35", "Flat"]);
+  });
+
+  it("absent/empty/dead ticks fall back to every active size", () => {
+    expect(gatedSofaSizes({ allowedOptions: {} }, POOLS)).toEqual(["24", "26", "35", "Flat"]);
+    expect(gatedSofaSizes({ allowedOptions: { sizes: [] } }, POOLS)).toEqual(["24", "26", "35", "Flat"]);
+    expect(gatedSofaSizes({ allowedOptions: { sizes: ["28"] } }, POOLS)).toEqual(["24", "26", "35", "Flat"]);
   });
 });
 

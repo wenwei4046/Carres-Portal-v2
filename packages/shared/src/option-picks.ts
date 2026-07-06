@@ -58,24 +58,27 @@ export function tickKeyFor(pool: OptionPoolPickKind): "divan_heights" | "gaps" |
   return TICK_KEY[pool];
 }
 
-/** The model's raw tick list for a pool. For `gap` the legacy
- *  `product_models.gaps` COLUMN is the fallback tick source — pre-0201 bedframe
- *  models authored their gaps there, and those picks must keep gating the POS
- *  until the model is re-saved through the pool-driven Modular section. */
+/** The model's tick list for a pool — 2990s exact-set semantics (owner
+ *  2026-06-16): the key ABSENT → `null` = unconfigured = no restriction;
+ *  the key PRESENT (even `[]`) = the exact offered set (a saved `[]` means
+ *  "offer none"). For `gap` the legacy `product_models.gaps` COLUMN is the
+ *  fallback tick source — pre-0201 bedframe models authored their gaps there,
+ *  and those picks must keep gating the POS until the model is re-saved
+ *  through the Allowed Options modal. */
 export function poolTicksFor(
   model: Pick<ProductModelDto, "gaps" | "allowedOptions">,
   pool: OptionPoolPickKind,
-): string[] {
+): string[] | null {
   const opts = (model.allowedOptions ?? {}) as Record<string, unknown>;
   const raw = opts[TICK_KEY[pool]];
-  const ticks = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
-  if (ticks.length > 0) return ticks;
-  if (pool === "gap") return model.gaps ?? [];
-  return [];
+  if (Array.isArray(raw)) return raw.filter((v): v is string => typeof v === "string");
+  if (pool === "gap" && model.gaps && model.gaps.length > 0) return model.gaps;
+  return null;
 }
 
-/** Active master rows of `pool`, gated by the model's ticks (empty ticks = no
- *  restriction). Pool sort order preserved. */
+/** Active master rows of `pool`, gated by the model's ticks (ticks `null` =
+ *  unconfigured = no restriction; an explicit `[]` = offer none). Pool sort
+ *  order preserved. */
 export function allowedPoolValues(
   model: Pick<ProductModelDto, "gaps" | "allowedOptions">,
   pool: OptionPoolPickKind,
@@ -86,7 +89,7 @@ export function allowedPoolValues(
     .slice()
     .sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value));
   const ticks = poolTicksFor(model, pool);
-  if (ticks.length === 0) return master;
+  if (ticks === null) return master;
   const allow = new Set(ticks);
   return master.filter((p) => allow.has(p.value));
 }
@@ -146,6 +149,40 @@ export function activeSofaSizes(
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((p) => p.value);
   return fromPool.length > 0 ? fromPool : [...SOFA_HEIGHTS];
+}
+
+/** `activeSofaHeights` further gated by the model's Allowed-Options seat-size
+ *  ticks (2990s writes sofa seat sizes to `allowed_options.sizes`). Absent OR
+ *  empty ticks — and ticks that miss every active height — fall back to the
+ *  full active set, so a mis-configured model never renders a dead builder. */
+export function gatedSofaHeights(
+  model: Pick<ProductModelDto, "allowedOptions">,
+  pools: CatalogOptionPoolDto[] | null | undefined,
+): SofaHeight[] {
+  const actives = activeSofaHeights(pools);
+  const raw = (model.allowedOptions ?? ({} as Record<string, unknown>)).sizes;
+  const ticks = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
+  if (ticks.length === 0) return actives;
+  const allow = new Set(ticks);
+  const gated = actives.filter((h) => allow.has(h));
+  return gated.length > 0 ? gated : actives;
+}
+
+/** `activeSofaSizes` gated by the SAME model seat-size ticks as
+ *  `gatedSofaHeights` — the à-la-carte/canvas twin (0204): a model that ticks
+ *  specific sizes narrows BOTH axes identically, non-canonical values ("Flat")
+ *  included. Same fall-backs: no/dead ticks → the full active set. */
+export function gatedSofaSizes(
+  model: Pick<ProductModelDto, "allowedOptions">,
+  pools: CatalogOptionPoolDto[] | null | undefined,
+): string[] {
+  const actives = activeSofaSizes(pools);
+  const raw = (model.allowedOptions ?? ({} as Record<string, unknown>)).sizes;
+  const ticks = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
+  if (ticks.length === 0) return actives;
+  const allow = new Set(ticks);
+  const gated = actives.filter((h) => allow.has(h));
+  return gated.length > 0 ? gated : actives;
 }
 
 /* ─── Option-pick attrs (DraftLine / order_lines) + the shared resolver ──── */
