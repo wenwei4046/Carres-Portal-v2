@@ -130,6 +130,16 @@ export default function CartDrawer({
   function removeAddon(key: string) {
     onChange({ ...draft, addons: draft.addons.filter((a) => a.key !== key) });
   }
+  // Empty every item from the cart (lines + add-ons) in one tap. Customer /
+  // delivery details are kept — this clears the ITEMS only. One click, but an
+  // Undo toast makes an accidental clear recoverable.
+  function clearCart() {
+    const prev = draft;
+    onChange({ ...draft, lines: [], addons: [] });
+    toast.success("Cart cleared", {
+      action: { label: "Undo", onClick: () => onChange(prev) },
+    });
+  }
   // Drop every line belonging to a combo (its exploded component lines share
   // one combo_key). Standalone lines + add-ons are untouched.
   function removeCombo(comboKey: string) {
@@ -497,6 +507,19 @@ export default function CartDrawer({
           </div>
 
           <div className="cart__cta">
+            {/* Clear cart — empties every item in one tap (Undo toast recovers
+                it). Kept away from the primary CTA to avoid a misclick. */}
+            <button
+              type="button"
+              disabled={draft.lines.length === 0 && draft.addons.length === 0}
+              onClick={clearCart}
+              className="btn btn--ghost"
+              style={{ color: "var(--c-burnt)" }}
+              data-testid="pos-clear-cart"
+            >
+              <Trash2 size={16} strokeWidth={1.75} />
+              Clear cart
+            </button>
             {/* Save Quote — parks a sanitized snapshot on this device (POS
                 topbar → Quotes lists + loads them back). */}
             <button
