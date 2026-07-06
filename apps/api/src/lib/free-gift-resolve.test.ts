@@ -121,6 +121,35 @@ describe("resolveDefaultFreeGiftLines", () => {
     });
   });
 
+  it("a campaign-freed item (attrs.free_item) STILL keeps its default gift (GWP not stripped by 'Make free')", async () => {
+    const sb = mockSb({
+      productSkus: [skuRow("MATT-1"), skuRow("GIFT-PILLOW", { product_models: { category: "accessory" } })],
+      modelGifts: [giftRow([{ giftSku: "GIFT-PILLOW", qty: 1 }])],
+    });
+    // The mattress was made free via a campaign (unitPrice 0 + attrs.free_item) —
+    // it must STILL trigger its ACC gift.
+    const r = await resolveDefaultFreeGiftLines(sb, [
+      line({ attrs: { free_item: { campaignId: "camp-1" } }, unitPrice: 0 }),
+    ]);
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0]).toMatchObject({ sku: "GIFT-PILLOW", qty: 1, unitPrice: 0 });
+  });
+
+  it("an appended gift line (attrs.free_gift) never triggers another gift (no recursion)", async () => {
+    const sb = mockSb({
+      productSkus: [skuRow("MATT-1"), skuRow("GIFT-PILLOW", { product_models: { category: "accessory" } })],
+      modelGifts: [giftRow([{ giftSku: "GIFT-PILLOW", qty: 1 }])],
+    });
+    const r = await resolveDefaultFreeGiftLines(sb, [
+      line({ attrs: { free_gift: { giftSku: "GIFT-PILLOW" } } }),
+    ]);
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.lines).toEqual([]);
+  });
+
   it("scales a non-sofa gift by the trigger line qty", async () => {
     const sb = mockSb({
       productSkus: [skuRow("MATT-1"), skuRow("GIFT-PILLOW", { product_models: { category: "accessory" } })],

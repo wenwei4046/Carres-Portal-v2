@@ -192,8 +192,10 @@ export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
   return straight;
 }
 
-/** Quick-pick fabric-select sentinel — "Confirm later, customer to confirm". */
-const QP_FABRIC_DEFER = "__defer__";
+/** Quick-pick fabric colour KIV sentinel — the colour is deferred (a series may
+ *  still be chosen). Series-level KIV = an empty `qpSeries`; colour-level KIV =
+ *  this value in `qpFabricKey`. One KIV concept, two levels. */
+const QP_FABRIC_KIV = "__kiv__";
 
 // Hero dimension lines — port of 2990s SofaCellsPreview `showDims`: a measured
 // line with end ticks spanning the sofa's W (above) / D (right), the cm chip
@@ -292,6 +294,21 @@ export default function SofaConfigurePage({
     () => sellingFabricsFor(model, fabrics, masterFabrics),
     [model, fabrics, masterFabrics],
   );
+  // Fabric SERIES → COLOUR (Loo 2026-07-06). The series step lists the distinct
+  // collections this model offers; legacy per-model rows (no series) bucket under
+  // "Other". One series → the series step auto-collapses to just the colours.
+  const fabricSeriesList = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const f of sellingFabrics) {
+      const s = f.series ?? "Other";
+      if (!seen.has(s)) {
+        seen.add(s);
+        out.push(s);
+      }
+    }
+    return out;
+  }, [sellingFabrics]);
   // Customize size — CONTROLLED here so the header chips (Loo 2026-07-06) and
   // the canvas's bottom-bar picker drive the same value; survives the canvas
   // remount when a quick pick is loaded (seedKey).
@@ -384,19 +401,35 @@ export default function SofaConfigurePage({
 
   // ── Quick-pick direct-add controls (seat height · fabric · leg · remark) ──
   const [qpHeight, setQpHeight] = useState<SofaHeight>(offeredHeights[0] ?? "24");
-  const [qpFabricKey, setQpFabricKey] = useState<string>(QP_FABRIC_DEFER);
+  // Fabric = two cascading picks. `qpSeries` "" = series-level KIV (nothing
+  // chosen); a value = a chosen collection. A sole series auto-selects so the
+  // step collapses to just the colour list. `qpFabricKey` = QP_FABRIC_KIV until
+  // a concrete colour is picked (colour-level KIV).
+  const [qpSeries, setQpSeries] = useState<string>(() =>
+    fabricSeriesList.length === 1 ? fabricSeriesList[0]! : "",
+  );
+  const [qpFabricKey, setQpFabricKey] = useState<string>(QP_FABRIC_KIV);
   const [qpLeg, setQpLeg] = useState<string>("");
   const [qpRemark, setQpRemark] = useState("");
+
+  // The colours inside the chosen series (empty until a series is picked).
+  const seriesColours = useMemo(
+    () => (qpSeries ? sellingFabrics.filter((f) => (f.series ?? "Other") === qpSeries) : []),
+    [sellingFabrics, qpSeries],
+  );
 
   // Heights = the ACTIVE Maintenance sofa sizes this preset is priced for.
   const heroHeights = heroPick
     ? offeredHeights.filter((h) => heroPick.combo.pricesByHeight[h] != null)
     : [];
   const effHeight = heroHeights.includes(qpHeight) ? qpHeight : heroHeights[0] ?? qpHeight;
-  const qpDeferred = qpFabricKey === QP_FABRIC_DEFER;
-  const qpFabric = qpDeferred
-    ? null
-    : sellingFabrics.find((f) => f.key === qpFabricKey) ?? null;
+  // A concrete colour only exists when a series is chosen AND a colour picked;
+  // otherwise the fabric is KIV (series or colour) → no tier delta yet.
+  const qpFabric =
+    qpSeries && qpFabricKey !== QP_FABRIC_KIV
+      ? seriesColours.find((f) => f.key === qpFabricKey) ?? null
+      : null;
+  const qpDeferred = qpFabric == null;
   const qpDelta = qpFabric
     ? resolveFabricDelta(qpFabric.tier, fabricTierOverride, fabricTierConfig ?? null)
     : 0;
@@ -425,6 +458,9 @@ export default function SofaConfigurePage({
         fabricId: qpFabric?.id ?? null,
         fabricCode: qpFabric?.code ?? null,
         fabricName: qpFabric?.name ?? null,
+        // Record the chosen series even when the colour is KIV (the synthetic
+        // "Other" bucket for legacy rows never becomes a real series stamp).
+        fabricSeries: qpSeries && qpSeries !== "Other" ? qpSeries : null,
         fabricSurcharge: qpDelta,
         fabricDeferred: qpDeferred,
         legHeight: qpLeg || null,
@@ -713,97 +749,103 @@ export default function SofaConfigurePage({
                 })}
               </div>
 
-              {/* Fabric — swatch pills (prototype), deferrable to the customer */}
-              <div className="sof-qp__railHead" style={{ marginTop: 16 }}>
-                <span className="pos-eyebrow">Fabric option</span>
-                <span className="sof-qp__railDetail">optional · confirm later</span>
-              </div>
-              <div
-                style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-                role="group"
-                aria-label="Fabric option"
-                data-testid="sofa-qp-fabric"
-              >
-                {sellingFabrics.map((f) => {
-                  const delta = resolveFabricDelta(
-                    f.tier,
-                    fabricTierOverride,
-                    fabricTierConfig ?? null,
-                  );
-                  const on = qpFabricKey === f.key;
-                  return (
-                    <button
-                      key={f.key}
-                      type="button"
-                      onClick={() => setQpFabricKey(f.key)}
-                      aria-pressed={on}
-                      className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
-                        on ? "border-primary text-primary" : "border-base-300 text-base-700"
-                      }`}
-                      data-testid={`sofa-qp-fabric-${f.key}`}
-                    >
-                      <span
-                        className="h-3 w-3 rounded-full border border-base-300"
-                        style={{ background: f.swatch ?? "#CBAA7C" }}
-                      />
-                      {f.name}
-                      <span className="t-micro text-base-400">
-                        {delta > 0 ? `+RM ${delta.toLocaleString("en-MY")}` : "Included"}
-                      </span>
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => setQpFabricKey(QP_FABRIC_DEFER)}
-                  aria-pressed={qpDeferred}
-                  className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
-                    qpDeferred ? "border-primary text-primary" : "border-base-300 text-base-700"
-                  }`}
-                  data-testid="sofa-qp-fabric-defer"
-                >
-                  Confirm later
-                  <span className="t-micro text-base-400">customer to confirm</span>
-                </button>
-              </div>
+              {/* Fabric — Series → Colour, both deferrable via KIV (Loo
+                  2026-07-06). Pick a series → its colours appear; either level
+                  can stay KIV so the sofa still adds to cart. One series → the
+                  series step auto-collapses. A swatch chip shows the pick. */}
+              {sellingFabrics.length > 0 && (
+                <>
+                  <div className="sof-qp__railHead" style={{ marginTop: 16 }}>
+                    <span className="pos-eyebrow">Fabric option</span>
+                    <span className="sof-qp__railDetail">series · colour · KIV to defer</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {fabricSeriesList.length > 1 && (
+                      <select
+                        value={qpSeries}
+                        onChange={(e) => {
+                          setQpSeries(e.target.value);
+                          setQpFabricKey(QP_FABRIC_KIV);
+                        }}
+                        aria-label="Fabric series"
+                        className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
+                        style={{ width: "100%" }}
+                        data-testid="sofa-qp-fabric-series"
+                      >
+                        <option value="">KIV · series to confirm</option>
+                        {fabricSeriesList.map((s) => (
+                          <option key={s} value={s}>
+                            {s === "Other" ? "Other" : `${s} series`}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {qpSeries && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          className="h-4 w-4 shrink-0 rounded-full border border-base-300"
+                          style={{ background: qpFabric?.swatch ?? "transparent" }}
+                          aria-hidden="true"
+                        />
+                        <select
+                          value={qpFabricKey}
+                          onChange={(e) => setQpFabricKey(e.target.value)}
+                          aria-label="Fabric colour"
+                          className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
+                          style={{ width: "100%" }}
+                          data-testid="sofa-qp-fabric"
+                        >
+                          <option value={QP_FABRIC_KIV}>KIV · colour to confirm</option>
+                          {seriesColours.map((f) => {
+                            const delta = resolveFabricDelta(
+                              f.tier,
+                              fabricTierOverride,
+                              fabricTierConfig ?? null,
+                            );
+                            return (
+                              <option key={f.key} value={f.key}>
+                                {f.name}
+                                {delta > 0
+                                  ? ` · +RM ${delta.toLocaleString("en-MY")}`
+                                  : " · Included"}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* Leg height — the sofa_leg_height pool ∩ Modular ticks (0201).
-                  Optional; the surcharge joins the drift-gated build total. */}
+                  Optional; the surcharge joins the drift-gated build total.
+                  A dropdown (Loo 2026-07-06) — the tiers read as one ordered
+                  list instead of a wrap of look-alike "Included" chips. */}
               {legOpts.length > 0 && (
                 <>
                   <div className="sof-qp__railHead" style={{ marginTop: 16 }}>
                     <span className="pos-eyebrow">Leg height</span>
-                    <span className="sof-qp__railDetail">optional · confirm later</span>
+                    <span className="sof-qp__railDetail">optional · KIV to defer</span>
                   </div>
-                  <div
-                    style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-                    role="group"
+                  <select
+                    value={qpLeg}
+                    onChange={(e) => setQpLeg(e.target.value)}
                     aria-label="Leg height"
+                    className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
+                    style={{ width: "100%" }}
                     data-testid="sofa-qp-legs"
                   >
-                    {legOpts.map((o) => {
-                      const on = qpLeg === o.value;
-                      return (
-                        <button
-                          key={o.id}
-                          type="button"
-                          onClick={() => setQpLeg(on ? "" : o.value)}
-                          aria-pressed={on}
-                          className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
-                            on ? "border-primary text-primary" : "border-base-300 text-base-700"
-                          }`}
-                          data-testid={`sofa-qp-leg-${o.value}`}
-                        >
-                          {o.value}
-                          <span className="t-micro text-base-400">
-                            {o.surcharge != null && o.surcharge !== 0
-                              ? `+RM ${o.surcharge.toLocaleString("en-MY")}`
-                              : "Included"}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                    <option value="">KIV</option>
+                    {legOpts.map((o) => (
+                      <option key={o.id} value={o.value}>
+                        {o.value}
+                        {o.surcharge != null && o.surcharge !== 0
+                          ? ` · +RM ${o.surcharge.toLocaleString("en-MY")}`
+                          : " · Included"}
+                      </option>
+                    ))}
+                  </select>
                 </>
               )}
 

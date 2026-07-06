@@ -2240,13 +2240,25 @@
 }
 .sof-qp__rail {
   border-right: 1px solid var(--line);
-  background: var(--pos-panel, #fff);
+  /* Warm-paper panel (Loo 2026-07-06 — the flat-white rail melted into the
+     page). Three warm layers now read: cream page → paper rail → white
+     cards/controls that lift off it. */
+  background: linear-gradient(180deg, #F2EEE8 0%, var(--c-paper) 62%);
   overflow-y: auto;
   padding: 18px 18px 24px;
 }
 .sof-qp__railHead {
   display: flex; align-items: baseline; justify-content: space-between;
   margin-bottom: 12px;
+}
+/* Ink the section label + a flame tick so each block lifts off the paper
+   panel (the muted-grey eyebrow was invisible on white). Rail-scoped so the
+   rest of the POS keeps its plain eyebrow. */
+.sof-qp__rail .pos-eyebrow { color: var(--fg); }
+.sof-qp__rail .pos-eyebrow::before {
+  content: ""; flex: 0 0 auto;
+  width: 3px; height: 12px; border-radius: 2px;
+  background: var(--c-orange);
 }
 .sof-qp__railDetail {
   font-family: var(--font-sans); font-size: 11px; color: var(--fg-muted);
@@ -2259,12 +2271,15 @@
   position: relative;
   display: flex; flex-direction: column;
   padding: 12px;
-  background: var(--pos-rail, #f3efe7);
-  border: 1.5px solid transparent;
+  /* White card on the warm-paper rail — pops as the top layer (was
+     paper-on-white, which blended once the rail went paper). */
+  background: var(--pos-panel, #fff);
+  border: 1.5px solid var(--line);
   border-radius: 14px;
   cursor: pointer;
   transition: 140ms ease;
   text-align: left;
+  box-shadow: 0 1px 2px rgba(34, 31, 32, 0.04);
 }
 .sof-qp__card:hover { border-color: var(--line-strong); }
 .sof-qp__card.is-on {
@@ -3270,7 +3285,7 @@
 /* ---------- Top-bar pill: active state ---------- */
 .topbar-pill.is-active {
   background: var(--c-ink); color: var(--c-cream); border-color: var(--c-ink);
-}
+}
 
 /* ---------- Order Status Page ---------- */
 .os-page {

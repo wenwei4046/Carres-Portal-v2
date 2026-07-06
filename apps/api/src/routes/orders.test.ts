@@ -2448,6 +2448,30 @@ describe("POST /api/orders — sofa build recompute + explode (Phase 5)", () => 
     });
   });
 
+  it("0202 KIV series survives the explode: fabric_series rides every per-compartment line", async () => {
+    // Colour KIV (fabric_name stays null) but the EZ series was chosen — the
+    // series must ride each exploded line so the PO shows "EZ · colour to confirm".
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(1600, { fabric_series: "EZ" })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const payload = sb._rpcCalls[0]!.payload as {
+      lines: Array<{ attrs: Record<string, unknown> }>;
+    };
+    expect(payload.lines).toHaveLength(2);
+    expect(payload.lines.every((l) => l.attrs.fabric_series === "EZ")).toBe(true);
+    // colour still deferred → no fabric_name got invented
+    expect(payload.lines.every((l) => l.attrs.fabric_name == null)).toBe(true);
+  });
+
   it("rejects a tampered client price (> 0.5% drift) with 422 sofa_price_drift and does NOT create", async () => {
     const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
     vi.mocked(userClient).mockReturnValue(sb);

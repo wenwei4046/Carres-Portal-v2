@@ -38,6 +38,7 @@ function payload(over: Partial<SofaBuildAddPayload> = {}): SofaBuildAddPayload {
     fabricId: "fab-1",
     fabricCode: null,
     fabricName: "Velvet Teal",
+    fabricSeries: null,
     fabricSurcharge: 150,
     fabricDeferred: false,
     legHeight: null,
@@ -116,7 +117,7 @@ describe("buildToDraftLine", () => {
     expect(attrs.fabric_deferred).toBe(false);
   });
 
-  it("'Confirm later' defers fabric: flag set + 'Fabric to confirm' in the label", () => {
+  it("KIV defers fabric entirely: flag set + 'Fabric KIV' in the label", () => {
     const skus = [sku("s-preset", "m-ohana", "OH-PRESET", "3-seater", "preset", 3000)];
     const line = buildToDraftLine(
       payload({ fabricId: null, fabricName: null, fabricSurcharge: 0, fabricDeferred: true }),
@@ -126,7 +127,21 @@ describe("buildToDraftLine", () => {
     const attrs = line.attrs as Record<string, unknown>;
     expect(attrs.fabric_deferred).toBe(true);
     expect(attrs.fabric_name).toBeNull();
-    expect(line.label).toBe("Ohana · 1A(LHF) + 1A(RHF) · 28″ · Fabric to confirm");
+    expect("fabric_series" in attrs).toBe(false);
+    expect(line.label).toBe("Ohana · 1A(LHF) + 1A(RHF) · 28″ · Fabric KIV");
+  });
+
+  it("series chosen + colour KIV: attrs.fabric_series set + 'EZ · colour KIV' label", () => {
+    const skus = [sku("s-preset", "m-ohana", "OH-PRESET", "3-seater", "preset", 3000)];
+    const line = buildToDraftLine(
+      payload({ fabricId: null, fabricName: null, fabricSurcharge: 0, fabricDeferred: true, fabricSeries: "EZ" }),
+      model,
+      skus,
+    )!;
+    const attrs = line.attrs as Record<string, unknown>;
+    expect(attrs.fabric_series).toBe("EZ");
+    expect(attrs.fabric_deferred).toBe(true);
+    expect(line.label).toBe("Ohana · 1A(LHF) + 1A(RHF) · 28″ · EZ · colour KIV");
   });
 
   it("0201-wiring — a leg pick rides attrs.leg_height/leg_surcharge + the label", () => {

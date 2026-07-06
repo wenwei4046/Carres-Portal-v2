@@ -21,6 +21,10 @@ export interface SellingFabric {
   id: string | null;
   code: string | null;
   swatch: string | null;
+  /** 0202 `catalog_fabrics.series` — the collection a master fabric belongs to
+   *  (e.g. "EZ", "BF"). null for legacy per-model rows (they carry no series);
+   *  the POS buckets those under a synthetic "Other" group for the series step. */
+  series: string | null;
 }
 
 export function sellingFabricsFor(
@@ -35,6 +39,7 @@ export function sellingFabricsFor(
     id: f.id,
     code: null,
     swatch: f.colors?.[0] ?? null,
+    series: null,
   }));
   const fromMaster: SellingFabric[] = allowedFabricsFor(model, master).map((f) => ({
     key: `cf:${f.fabricCode}`,
@@ -43,6 +48,7 @@ export function sellingFabricsFor(
     id: null,
     code: f.fabricCode,
     swatch: null,
+    series: f.series,
   }));
   return [...fromLegacy, ...fromMaster];
 }
