@@ -90,6 +90,11 @@ export const productSkuSchema = z.object({
   // (null = no PWP price set). Additive/optional so pre-0186 serialized SKUs
   // stay valid. DORMANT — no order consumer yet.
   pwpPrice: z.number().nullable().optional(),
+  // 0204 (per-size pricing, Loo 2026-07-06) — {size → RM} map keyed by the
+  // `sofa_size` pool values. Values nullable defensively: a null value reads
+  // as "not priced at this size" and falls through to the flat price.
+  // Additive/optional so pre-0204 serialized SKUs stay valid.
+  pricesBySize: z.record(z.number().nullable()).nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
 
@@ -442,6 +447,8 @@ export const modelSofaCompartmentSchema = z.object({
   priceOverride: z.number().nullable(),
   sortOrder: z.number().int(),
   skuPrice: z.number().nullable().optional(),
+  // 0204 — the synced SKU's {size → RM} map, enriched alongside `skuPrice`.
+  skuPricesBySize: z.record(z.number().nullable()).nullable().optional(),
 });
 export type ModelSofaCompartmentDto = z.infer<typeof modelSofaCompartmentSchema>;
 
@@ -1028,6 +1035,14 @@ export const productSkuPatchInput = z
     // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (mirrors `cost`).
     // Presence = intent to change → gated to principal in the route.
     pwpPrice: z.number().nonnegative().nullable().optional(),
+    // 0204 (per-size pricing) — REPLACES the whole {size → RM} map (the UI
+    // sends the full map on each commit; a size with no price is OMITTED, not
+    // nulled). `null` clears the map entirely. Presence = intent to change →
+    // gated to principal in the route (mirrors price/cost/pwpPrice).
+    pricesBySize: z
+      .record(z.string().trim().min(1).max(24), z.number().nonnegative())
+      .nullable()
+      .optional(),
   })
   .strict();
 export type ProductSkuPatchInput = z.infer<typeof productSkuPatchInput>;

@@ -100,6 +100,11 @@ export interface ProductSku {
   // 0186 (PWP Phase 8a) — principal-only per-SKU PWP reward price (the price a
   // PWP-rule reward line is sold at). null = not set (mirrors cost). DORMANT.
   pwpPrice?: number | null;
+  // 0204 (per-size pricing, Loo 2026-07-06) — {size → RM} selling-price map,
+  // keys = the catalog_option_pools `sofa_size` values ("24"…"Flat"). Missing
+  // key / null map → the flat `price` applies. Principal-only. DORMANT until
+  // authored; only sofa compartment SKUs carry it today.
+  pricesBySize?: Record<string, number | null> | null;
 }
 
 export interface SofaFabric {
@@ -325,6 +330,10 @@ export interface ModelSofaCompartment {
   /** The synced `{MODEL_KEY}-{code}` SKU's price (SKU Master). Enriched by the
    *  bundle/recompute; absent/null = no synced sku → legacy fallback. */
   skuPrice?: number | null;
+  /** 0204 — the synced SKU's {size → RM} map. Enriched alongside `skuPrice`;
+   *  a chosen size hits this FIRST, then falls back to `skuPrice` when the
+   *  size key is absent/null (see resolveCompartmentPrice). */
+  skuPricesBySize?: Record<string, number | null> | null;
 }
 
 /**

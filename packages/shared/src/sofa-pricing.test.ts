@@ -153,6 +153,47 @@ describe("resolveCompartmentPrice", () => {
   it("falls back to pool default when model-comp is missing", () => {
     expect(resolveCompartmentPrice(undefined, pool("X", 420))).toBe(420);
   });
+
+  /* 0204 — per-size head of the chain (Loo 2026-07-06). */
+
+  it("per-size price wins over skuPrice when the size is priced (0204)", () => {
+    const mc = {
+      ...modelComp("c", 500),
+      skuPrice: 777,
+      skuPricesBySize: { "24": 900, "32": 1200 },
+    };
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "32")).toBe(1200);
+  });
+
+  it("per-size explicit 0 wins (explicitly free at that size — ?? not ||)", () => {
+    const mc = { ...modelComp("c", 500), skuPrice: 777, skuPricesBySize: { "24": 0 } };
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "24")).toBe(0);
+  });
+
+  it("size key absent from the map → falls back to the flat skuPrice", () => {
+    const mc = { ...modelComp("c", 500), skuPrice: 777, skuPricesBySize: { "24": 900 } };
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "Flat")).toBe(777);
+  });
+
+  it("size entry null (defensive) → falls back to the flat skuPrice", () => {
+    const mc = {
+      ...modelComp("c", 500),
+      skuPrice: 777,
+      skuPricesBySize: { "24": null as number | null },
+    };
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "24")).toBe(777);
+  });
+
+  it("no size argument → flat behaviour unchanged (map ignored)", () => {
+    const mc = { ...modelComp("c", 500), skuPrice: 777, skuPricesBySize: { "24": 900 } };
+    expect(resolveCompartmentPrice(mc, pool("X", 300))).toBe(777);
+  });
+
+  it("per-size map present but no skuPrice → unsized falls to the legacy chain", () => {
+    const mc = { ...modelComp("c", 500), skuPrice: null, skuPricesBySize: { "24": 900 } };
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "24")).toBe(900);
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "28")).toBe(500);
+  });
 });
 
 /* ─── mirrorCode ───────────────────────────────────────────────────────── */
@@ -634,6 +675,67 @@ describe("computeSofaPrice — cents-exact rounding", () => {
     const r = computeSofaPrice(build(), snap);
     expect(r.aLaCarteSum).toBe(1800.3);
     expect(r.total).toBe(1800.3);
+  });
+});
+
+/* ─── computeSofaPrice — per-size à-la-carte (0204) ────────────────────── */
+
+describe("computeSofaPrice — per-size à-la-carte (0204)", () => {
+  /** Two offered compartments whose synced SKUs price per size:
+   *  2A(LHF): flat 1000, {"24": 900, "32": 1200}
+   *  L(RHF):  flat 800,  {"32": 950}  (no 24 entry → flat fallback at 24) */
+  function sizedSnapshot(combos: SofaComboLike[] = []): SofaPricingSnapshot {
+    const c1 = pool("2A(LHF)", 111); // pool defaults are decoys — skuPrice wins
+    const c2 = pool("L(RHF)", 222);
+    return {
+      compartmentPool: [c1, c2],
+      modelCompartments: [
+        {
+          ...modelComp(c1.id, null),
+          skuPrice: 1000,
+          skuPricesBySize: { "24": 900, "32": 1200 },
+        },
+        { ...modelComp(c2.id, null), skuPrice: 800, skuPricesBySize: { "32": 950 } },
+      ],
+      sofaCombos: combos,
+      fabricTierConfig: null,
+      fabricTierOverride: null,
+    };
+  }
+
+  it("prices the à-la-carte sum at the build's size; unmapped size falls to flat", () => {
+    const snap = sizedSnapshot();
+    // 24: 900 (sized) + 800 (L has no 24 → flat) = 1700
+    expect(computeSofaPrice(build({ height: "24", asOf: ASOF }), snap).total).toBe(1700);
+    // 32: 1200 + 950 = 2150
+    expect(computeSofaPrice(build({ height: "32", asOf: ASOF }), snap).total).toBe(2150);
+    // Pool-only size with no entries anywhere (e.g. "Flat") → all flat: 1800
+    expect(computeSofaPrice(build({ height: "Flat", asOf: ASOF }), snap).total).toBe(1800);
+  });
+
+  it("a combo unpriced at a pool-only size → à-la-carte basis at that size", () => {
+    // The combo prices only 24/28 — at "32" it must NOT apply.
+    const snap = sizedSnapshot([combo()]);
+    const at32 = computeSofaPrice(build({ height: "32", asOf: ASOF }), snap);
+    expect(at32.basis).toBe("a_la_carte");
+    expect(at32.total).toBe(2150);
+    // At 24 the combo (2640) covers both slots — combo basis, sized subset math.
+    const at24 = computeSofaPrice(build({ height: "24", asOf: ASOF }), snap);
+    expect(at24.basis).toBe("combo");
+    expect(at24.total).toBe(2640);
+  });
+
+  it("C1 invariant holds per size: mirrored matched cell prices identically in subset + à-la-carte", () => {
+    // Build uses L(LHF) — only L(RHF) exists in the pool (mirror fallback).
+    // Subset sum must use the SAME sized lookup, so extras stay 0.
+    const snap = sizedSnapshot([combo()]);
+    const res = computeSofaPrice(
+      build({ cells: [{ moduleCode: "2A(LHF)" }, { moduleCode: "L(LHF)" }], height: "24", asOf: ASOF }),
+      snap,
+    );
+    expect(res.basis).toBe("combo");
+    expect(res.comboExtras).toBe(0);
+    expect(res.total).toBe(2640);
   });
 });
 
