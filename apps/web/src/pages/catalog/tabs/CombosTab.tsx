@@ -14,6 +14,7 @@ import { useCreateCombo, useDeleteCombo, useUpdateCombo } from "@/lib/queries";
 import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
 import { skuMargin } from "../margin";
+import SofaCombosPanel from "../modular/SofaCombosPanel";
 
 /**
  * Combos (套餐) — the 4th Product & Maintenance tab. A combo is a fixed-set
@@ -140,7 +141,90 @@ export default function CombosTab({
           onClose={() => setEditing(null)}
         />
       )}
+
+      <SofaCombosSection catalog={catalog} isPrincipal={isPrincipal} />
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sofa combos (0179) — matched-shape bundles priced per seat height. Moved
+// here from the Modular drawer (Loo 2026-07-06: Modular = ON/OFF · name ·
+// description · photo ONLY; combo authoring is pricing, so it lives in the
+// Combo Pricing tab). Pick a sofa model → the same SofaCombosPanel editor.
+// ---------------------------------------------------------------------------
+
+function SofaCombosSection({
+  catalog,
+  isPrincipal,
+}: {
+  catalog: CatalogResponse;
+  isPrincipal: boolean;
+}) {
+  const sofaModels = useMemo(
+    () =>
+      catalog.models
+        .filter((m) => m.category === "sofa")
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [catalog.models],
+  );
+  const offeredCountByModel = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of catalog.modelSofaCompartments ?? []) {
+      m.set(o.modelId, (m.get(o.modelId) ?? 0) + 1);
+    }
+    return m;
+  }, [catalog.modelSofaCompartments]);
+
+  // Default to the first sofa model that actually offers compartments (a combo
+  // needs offered codes for its slots); fall back to the first sofa model.
+  const [modelId, setModelId] = useState<string>(
+    () =>
+      sofaModels.find((m) => (offeredCountByModel.get(m.id) ?? 0) > 0)?.id ??
+      sofaModels[0]?.id ??
+      "",
+  );
+  const model = sofaModels.find((m) => m.id === modelId) ?? null;
+
+  if (sofaModels.length === 0) return null;
+
+  return (
+    <div className="mt-8" data-testid="sofa-combos-section">
+      <div className="flex items-center justify-between mb-1">
+        <div className="t-h4 font-display">Sofa combos</div>
+        <select
+          value={modelId}
+          onChange={(e) => setModelId(e.target.value)}
+          className="px-3 py-1.5 border border-base-300 rounded-[4px] text-[13px] bg-white outline-none focus:border-base-500"
+          aria-label="Sofa model"
+          data-testid="sofa-combos-model"
+        >
+          {sofaModels.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+              {(offeredCountByModel.get(m.id) ?? 0) > 0
+                ? ` (${offeredCountByModel.get(m.id)} compartments)`
+                : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="t-tiny text-base-500 mb-3">
+        Matched-shape compartment bundles priced per seat height (moved here from Modular —
+        authoring a combo is pricing work). Offer compartments to the model in Modular first.
+      </p>
+      {model && (
+        <SofaCombosPanel
+          key={model.id}
+          modelId={model.id}
+          pool={catalog.sofaCompartments ?? []}
+          offered={(catalog.modelSofaCompartments ?? []).filter((o) => o.modelId === model.id)}
+          combos={catalog.sofaCombos ?? []}
+          optionPools={catalog.optionPools}
+          isPrincipal={isPrincipal}
+        />
+      )}
+    </div>
   );
 }
 

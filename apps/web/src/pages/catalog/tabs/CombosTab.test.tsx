@@ -37,6 +37,11 @@ vi.mock("@/lib/queries", () => ({
   useCreateCombo: () => ({ mutate: vi.fn(), mutateAsync: mockCreateMutateAsync, isPending: false }),
   useUpdateCombo: () => ({ mutate: vi.fn(), mutateAsync: mockUpdateMutateAsync, isPending: false }),
   useDeleteCombo: () => ({ mutate: mockDeleteMutate, isPending: false }),
+  // Sofa combos section (moved here from Modular, Loo 2026-07-06) — the
+  // SofaCombosPanel it hosts reads these three hooks.
+  useCreateSofaCombo: () => ({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+  useUpdateSofaCombo: () => ({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+  useDeleteSofaCombo: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 // ---------------------------------------------------------------------------

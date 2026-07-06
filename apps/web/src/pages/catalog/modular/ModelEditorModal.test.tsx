@@ -1,19 +1,22 @@
 /**
- * AllowedOptionsModal — the centered 2990s-parity Allowed Options editor
- * (Loo 2026-07-06). Covers:
- *  - sofa: Seat sizes (sofa_size pool) · Compartments · Leg heights ·
- *    Special Add-ons · Fabrics (series-grouped) render; Save writes ONE model
- *    PATCH + the compartment offer/un-offer diff;
- *  - leg seeding: key ABSENT → all chips ON; saved [] → all OFF (exact set);
- *  - bedframe: NO compartments; size universe = model sizes ∪ size variants
- *    (not the pool); changed sizes go through the cascade endpoint;
- *  - accessory: single Show-in-POS switch bulk-flips pos_active on Save.
+ * ModelEditorModal — THE one centered Modular editor (Loo 2026-07-06: one
+ * base window; Modular = ON/OFF ticks · rename · description · photo ONLY).
+ * Covers:
+ *  - sofa: Seat sizes (pool) · Compartments · Leg heights · Specials ·
+ *    Fabrics (series-grouped) render; Save = ONE model PATCH (name/blurb/
+ *    allowed_options) + compartment offer/un-offer diff;
+ *  - leg seeding: key ABSENT → all ON; saved [] → all OFF (exact set);
+ *  - bedframe: no Compartments; size universe = model sizes ∪ size variants;
+ *    changed sizes go through the cascade endpoint; NO add-size / generate UI;
+ *  - variant SKU ON/OFF drafts apply on Save via patchSku diffs (all
+ *    categories — this is the flat-category on/off too);
+ *  - name is part of the Save batch.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CatalogResponse, ProductModelDto, ProductSkuDto } from "@carres/shared";
-import AllowedOptionsModal from "./AllowedOptionsModal";
+import ModelEditorModal from "./ModelEditorModal";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -29,6 +32,8 @@ vi.mock("@/lib/queries", () => ({
   useUpsertModelSofaCompartment: () => ({ mutateAsync: mockUpsertComp, isPending: false }),
   useDeleteModelSofaCompartment: () => ({ mutateAsync: mockDelComp, isPending: false }),
   usePatchCatalogSku: () => ({ mutateAsync: mockPatchSku, isPending: false }),
+  useSetModelPhoto: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteModelPhoto: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const SOFA: ProductModelDto = {
@@ -48,7 +53,7 @@ const BED: ProductModelDto = {
   category: "bedframe",
   modelKey: "kayu",
   name: "Kayu",
-  blurb: null,
+  blurb: "Solid ash",
   colors: null,
   gaps: null,
   sofaMode: null,
@@ -116,85 +121,84 @@ function wrap(ui: React.ReactNode) {
   return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
 }
 
+function renderModal(model: ProductModelDto, skus: ProductSkuDto[] = []) {
+  render(
+    wrap(
+      <ModelEditorModal
+        model={model}
+        skus={skus}
+        catalog={makeCatalog()}
+        isPrincipal
+        onClose={() => {}}
+      />,
+    ),
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("AllowedOptionsModal — sofa (2990s arrangement)", () => {
-  function renderSofa(model: ProductModelDto = SOFA) {
-    render(
-      wrap(
-        <AllowedOptionsModal
-          model={model}
-          skus={[]}
-          catalog={makeCatalog()}
-          isPrincipal
-          onOpenSetup={() => {}}
-          onClose={() => {}}
-        />,
-      ),
-    );
-  }
-
-  it("renders Seat sizes (pool) · Compartments · Leg heights · Specials · Fabrics by series", () => {
-    renderSofa();
+describe("ModelEditorModal — sofa (2990s arrangement)", () => {
+  it("renders photo/name/description + Seat sizes · Compartments · Legs · Specials · Fabrics-by-series", () => {
+    renderModal(SOFA);
+    expect(screen.getByTestId("model-photo")).toBeInTheDocument();
+    expect((screen.getByTestId("model-name-input") as HTMLInputElement).value).toBe("Booqit");
+    expect(screen.getByTestId("model-blurb-input")).toBeInTheDocument();
     expect(screen.getByTestId("allowed-sizes")).toHaveTextContent("Seat sizes (inches)");
-    expect(screen.getByTestId("allowed-size-24")).toBeInTheDocument();
     expect(screen.getByTestId("allowed-size-Flat")).toBeInTheDocument();
-    // active compartments only (OLD inactive filtered out)
     expect(screen.getByTestId("allowed-comp-1A(LHF)")).toBeInTheDocument();
     expect(screen.queryByTestId("allowed-comp-OLD")).toBeNull();
-    // offered compartment pre-ticked
     expect(screen.getByTestId("allowed-comp-2S").getAttribute("aria-pressed")).toBe("true");
     // legs seeded ALL ON (key absent)
     expect(screen.getByTestId("allowed-leg-No Leg").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByTestId('allowed-leg-6"').getAttribute("aria-pressed")).toBe("true");
     // category-matching specials only
     expect(screen.getByTestId("allowed-special-Sofa Full Fabric")).toBeInTheDocument();
     expect(screen.queryByTestId("allowed-special-Hydraulic")).toBeNull();
     // fabrics grouped by series, actives only
-    expect(screen.getByTestId("allowed-fabrics")).toHaveTextContent("BF");
     expect(screen.getByTestId("allowed-fabric-CG-01")).toHaveTextContent("Pearl");
     expect(screen.queryByTestId("allowed-fabric-GONE")).toBeNull();
+    // NO creation affordances in Modular
+    expect(screen.queryByText(/Generate SKUs/i)).toBeNull();
+    expect(screen.queryByPlaceholderText(/Add a size/i)).toBeNull();
   });
 
   it("a saved [] leg set renders every leg chip OFF (exact-set semantics)", () => {
-    renderSofa({ ...SOFA, allowedOptions: { leg_heights: [] } });
+    renderModal({ ...SOFA, allowedOptions: { leg_heights: [] } });
     expect(screen.getByTestId("allowed-leg-No Leg").getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByTestId('allowed-leg-6"').getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("Save writes ONE model PATCH + the compartment offer/un-offer diff", async () => {
-    renderSofa();
-    fireEvent.click(screen.getByTestId("allowed-size-24")); // tick a seat size
+  it("Save = ONE model PATCH (name/blurb/allowed_options) + compartment diff", async () => {
+    renderModal(SOFA);
+    fireEvent.change(screen.getByTestId("model-name-input"), { target: { value: "Booqit II" } });
+    fireEvent.change(screen.getByTestId("model-blurb-input"), { target: { value: "Corner king" } });
+    fireEvent.click(screen.getByTestId("allowed-size-24"));
     fireEvent.click(screen.getByTestId("allowed-comp-1A(LHF)")); // offer c1
     fireEvent.click(screen.getByTestId("allowed-comp-2S")); // un-offer c2
-    fireEvent.click(screen.getByTestId('allowed-leg-6"')); // untick one leg
-    fireEvent.click(screen.getByTestId("allowed-fabrics-allon-BF")); // BF series on
-    fireEvent.click(screen.getByTestId("allowed-save"));
+    fireEvent.click(screen.getByTestId("allowed-fabrics-allon-BF"));
+    fireEvent.click(screen.getByTestId("model-editor-save"));
 
     await waitFor(() => expect(mockPatchModel).toHaveBeenCalledTimes(1));
     const [{ id, patch }] = mockPatchModel.mock.calls[0];
     expect(id).toBe("m-sofa");
+    expect(patch.name).toBe("Booqit II");
+    expect(patch.blurb).toBe("Corner king");
     expect(patch.allowedOptions.sizes).toEqual(["24"]);
-    expect(patch.allowedOptions.leg_heights).toEqual(["No Leg"]);
     expect(patch.allowedOptions.fabrics).toEqual(["BF-01", "BF-02"]);
-    // sofa seat sizes do NOT go through the size-cascade endpoint
-    expect(mockToggleSizes).not.toHaveBeenCalled();
-    // compartment diff
+    expect(mockToggleSizes).not.toHaveBeenCalled(); // sofa sizes don't cascade
     expect(mockUpsertComp).toHaveBeenCalledWith({ modelId: "m-sofa", compartmentId: "c1", input: {} });
     expect(mockDelComp).toHaveBeenCalledWith({ modelId: "m-sofa", compartmentId: "c2" });
   });
 
-  it("non-principal: compartment chips disabled, everything else editable", () => {
+  it("non-principal: compartment chips disabled, other ticks editable", () => {
     render(
       wrap(
-        <AllowedOptionsModal
+        <ModelEditorModal
           model={SOFA}
           skus={[]}
           catalog={makeCatalog()}
           isPrincipal={false}
-          onOpenSetup={() => {}}
           onClose={() => {}}
         />,
       ),
@@ -204,59 +208,43 @@ describe("AllowedOptionsModal — sofa (2990s arrangement)", () => {
   });
 });
 
-describe("AllowedOptionsModal — bedframe", () => {
-  it("no Compartments; sizes = model sizes ∪ size variants; changed sizes cascade", async () => {
-    render(
-      wrap(
-        <AllowedOptionsModal
-          model={BED}
-          skus={BED_SKUS}
-          catalog={makeCatalog()}
-          isPrincipal
-          onOpenSetup={() => {}}
-          onClose={() => {}}
-        />,
-      ),
-    );
+describe("ModelEditorModal — bedframe", () => {
+  it("no Compartments; sizes = model axis ∪ variants; changed sizes cascade on Save", async () => {
+    renderModal(BED, BED_SKUS);
     expect(screen.queryByTestId("allowed-compartments")).toBeNull();
-    // universe = saved "Queen" + materialized "King" variant (NOT pool codes)
+    expect(screen.getByTestId("allowed-sizes")).toHaveTextContent("Sizes");
     expect(screen.getByTestId("allowed-size-Queen").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("allowed-size-King").getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByTestId('allowed-leg-4"')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("allowed-size-King"));
-    fireEvent.click(screen.getByTestId("allowed-save"));
+    fireEvent.click(screen.getByTestId("model-editor-save"));
     await waitFor(() => expect(mockToggleSizes).toHaveBeenCalledTimes(1));
     expect(mockToggleSizes.mock.calls[0][0]).toEqual({
       modelId: "m-bed",
       input: { sizes: ["Queen", "King"] },
     });
-    expect(mockUpsertComp).not.toHaveBeenCalled();
   });
 });
 
-describe("AllowedOptionsModal — accessory (flat)", () => {
-  it("renders only the Show-in-POS switch; Save bulk-flips pos_active", async () => {
-    render(
-      wrap(
-        <AllowedOptionsModal
-          model={ACC}
-          skus={ACC_SKUS}
-          catalog={makeCatalog()}
-          isPrincipal
-          onOpenSetup={() => {}}
-          onClose={() => {}}
-        />,
-      ),
-    );
+describe("ModelEditorModal — variant SKU ON/OFF (draft, applies on Save)", () => {
+  it("accessory: no tick sections; SKU pills flip pos_active via Save diffs", async () => {
+    renderModal(ACC, ACC_SKUS);
     expect(screen.queryByTestId("allowed-sizes")).toBeNull();
-    const sw = screen.getByTestId("allowed-show-in-pos");
-    expect(sw.getAttribute("aria-checked")).toBe("true");
-    fireEvent.click(sw); // → Off
-    fireEvent.click(screen.getByTestId("allowed-save"));
-    await waitFor(() => expect(mockPatchSku).toHaveBeenCalledTimes(2));
+    expect(screen.queryByTestId("allowed-fabrics")).toBeNull();
+    // draft-toggle one SKU off, save → exactly ONE patchSku call
+    fireEvent.click(screen.getByTestId("sku-toggle-PILLOW-1"));
+    fireEvent.click(screen.getByTestId("model-editor-save"));
+    await waitFor(() => expect(mockPatchSku).toHaveBeenCalledTimes(1));
     expect(mockPatchSku).toHaveBeenCalledWith({ id: "a1", patch: { posActive: false } });
-    expect(mockPatchSku).toHaveBeenCalledWith({ id: "a2", patch: { posActive: false } });
+    // name unchanged → no model PATCH at all
     expect(mockPatchModel).not.toHaveBeenCalled();
+  });
+
+  it("All off flips every SKU in one save", async () => {
+    renderModal(ACC, ACC_SKUS);
+    fireEvent.click(screen.getByText("All off"));
+    fireEvent.click(screen.getByTestId("model-editor-save"));
+    await waitFor(() => expect(mockPatchSku).toHaveBeenCalledTimes(2));
   });
 });

@@ -21,10 +21,10 @@ import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
 import { skuMargin } from "../margin";
 
 /**
- * Sofa Combos panel (migration 0179, sofa engine Phase 2) — lives INSIDE
- * ProductModelDrawer for SOFA models only, beside the P1 offered-compartments
- * panel + the fabric-tier override card (a sofa combo is model-scoped via
- * `modelId`, so a per-model panel is the natural home).
+ * Sofa Combos panel (migration 0179, sofa engine Phase 2) — hosted in the
+ * COMBO PRICING tab's "Sofa combos" section (model picker there supplies
+ * `modelId`; moved out of Modular per Loo 2026-07-06 — combo authoring is
+ * pricing work, and Modular is ON/OFF · name · description · photo only).
  *
  * A sofa combo = an ordered list of SLOTS (each slot an OR-set of compartment
  * `code` strings drawn from THIS model's offered set) priced per seat HEIGHT in
