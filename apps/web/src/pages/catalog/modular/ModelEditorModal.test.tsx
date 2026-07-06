@@ -258,30 +258,25 @@ describe("ModelEditorModal — bedframe / mattress", () => {
     expect(mockPatchSku).not.toHaveBeenCalled();
   });
 
-  it("bedframe: Colour list editor + Divan/Gap tick sections render and save (Loo 2026-07-06)", async () => {
-    // Colours seed from model.colors; divan/gap seed from the pool (absent ticks = all).
-    renderModal(
-      { ...BED, allowedOptions: { sizes: [] }, colors: ["Natural oak", "Walnut"] },
-      BED_SKUS,
-    );
-    expect(screen.getByTestId("allowed-colour-Natural oak")).toBeInTheDocument();
-    expect(screen.getByTestId("allowed-colour-Walnut")).toBeInTheDocument();
+  it("bedframe: Divan / Gap tick sections render and save (Loo 2026-07-06)", async () => {
+    // divan/gap seed from the pool (absent ticks = all).
+    renderModal({ ...BED, allowedOptions: { sizes: [] } }, BED_SKUS);
     expect(screen.getByTestId('allowed-divan-4"').getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId('allowed-divan-6"').getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId('allowed-gap-10"').getAttribute("aria-pressed")).toBe("true");
 
-    // Remove a colour, add one (accented name allowed), turn a divan height off.
-    fireEvent.click(screen.getByTestId("allowed-colour-remove-Walnut"));
-    fireEvent.change(screen.getByTestId("allowed-colour-input"), { target: { value: "Cream bouclé" } });
-    fireEvent.click(screen.getByTestId("allowed-colour-add"));
     fireEvent.click(screen.getByTestId('allowed-divan-6"')); // 6" off
-
     fireEvent.click(screen.getByTestId("model-editor-save"));
     await waitFor(() => expect(mockPatchModel).toHaveBeenCalledTimes(1));
     const [{ patch }] = mockPatchModel.mock.calls[0];
-    expect(patch.colors).toEqual(["Natural oak", "Cream bouclé"]);
     expect(patch.allowedOptions.divan_heights).toEqual(['4"']);
     expect(patch.allowedOptions.gaps).toEqual(['10"', '12"']);
+  });
+
+  it("bedframe: NO Colour section — finish comes from Fabrics (Loo 2026-07-06)", () => {
+    // model.colors is dead: a bedframe with colours set still shows NO colour editor.
+    renderModal({ ...BED, allowedOptions: { sizes: [] }, colors: ["Natural oak"] }, BED_SKUS);
+    expect(screen.queryByTestId("allowed-colours")).toBeNull();
   });
 
   it("mattress: no Colour / Divan / Gap sections (bedframe-only)", () => {
