@@ -20,13 +20,17 @@ import { analyzeSofa, findModule, groupSofas, moduleFootprint } from "@carres/sh
 
 // Mock the PWP availability hook (usePwpAvailableForPhone) so the component's
 // useQuery has no QueryClient dependency + the voucher result is controllable.
-const { pwpMock, roleMock } = vi.hoisted(() => ({
+const { pwpMock, roleMock, deleteMock } = vi.hoisted(() => ({
   pwpMock: { current: { data: { vouchers: [] as { code: string }[] }, isFetching: false } },
   roleMock: { current: null as string | null },
+  deleteMock: { mutate: vi.fn(), isPending: false },
 }));
 vi.mock("@/lib/queries", () => ({
   usePwpAvailableForPhone: () => pwpMock.current,
+  // 0206 — principal deletes a quick pick from its card.
+  useDeleteSofaCombo: () => deleteMock,
 }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // The principal-only "Create combo" gate reads useAuth((s) => s.role).
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string | null }) => unknown) =>
@@ -48,6 +52,7 @@ beforeAll(() => {
 // Default to a non-principal role; the Create-combo gate tests opt in.
 beforeEach(() => {
   roleMock.current = null;
+  deleteMock.mutate.mockClear();
 });
 
 const MODEL: ProductModelDto = {
@@ -237,6 +242,32 @@ describe("SofaConfigurePage", () => {
     // the pricing-only combo is filtered out of the Quick pick tab
     expect(screen.queryByTestId(`sofa-quick-pick-${plain.id}`)).toBeNull();
     expect(within(grid).queryByText("Pricing only")).toBeNull();
+  });
+
+  it("0206 — principal sees a delete (trash) icon per quick pick; confirm → deletes", () => {
+    roleMock.current = "principal";
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderPage();
+    const del = screen.getByTestId(`sofa-quick-pick-delete-${COMBO.id}`);
+    expect(del).toBeInTheDocument();
+    fireEvent.click(del);
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(deleteMock.mutate).toHaveBeenCalledWith(COMBO.id, expect.anything());
+    confirmSpy.mockRestore();
+  });
+
+  it("0206 — a non-principal (salesperson) sees NO delete icon", () => {
+    renderPage(); // roleMock defaults to null (non-principal)
+    expect(screen.queryByTestId(`sofa-quick-pick-delete-${COMBO.id}`)).toBeNull();
+  });
+
+  it("0206 — cancelling the confirm does NOT delete", () => {
+    roleMock.current = "principal";
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderPage();
+    fireEvent.click(screen.getByTestId(`sofa-quick-pick-delete-${COMBO.id}`));
+    expect(deleteMock.mutate).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 
   it("Customize header size chips drive the size; the redundant bottom picker is gone", () => {
