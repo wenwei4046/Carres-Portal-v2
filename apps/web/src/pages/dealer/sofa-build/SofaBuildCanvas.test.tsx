@@ -69,6 +69,8 @@ const FABRICS: SofaFabricDto[] = [
 
 function renderCanvas(props?: {
   combos?: SofaComboDto[];
+  offered?: ModelSofaCompartmentDto[];
+  heights?: string[];
   compartmentPool?: SofaCompartmentDto[];
   onAddBuild?: (p: unknown) => void;
   onClose?: () => void;
@@ -80,11 +82,12 @@ function renderCanvas(props?: {
       model={MODEL}
       skus={SKUS}
       compartmentPool={props?.compartmentPool ?? POOL}
-      modelCompartments={OFFERED}
+      modelCompartments={props?.offered ?? OFFERED}
       sofaCombos={props?.combos ?? []}
       fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
       fabricTierOverride={null}
       sofaFabrics={FABRICS}
+      heights={props?.heights}
       onAddBuild={onAddBuild}
       onClose={onClose}
     />,
@@ -137,6 +140,38 @@ describe("SofaBuildCanvas", () => {
     // height picker present with the canonical heights
     const heightSel = screen.getByTestId("sofa-build-height") as HTMLSelectElement;
     expect(heightSel.value).toBe("24");
+  });
+
+  // 0204 — the size axis follows the sofa_size pool; per-size prices win.
+  it("heights drive the size picker (incl. non-numeric 'Flat'), default 24", () => {
+    renderCanvas({ heights: ["24", "32", "Flat"] });
+    const sel = screen.getByTestId("sofa-build-height") as HTMLSelectElement;
+    expect(sel.value).toBe("24");
+    expect(Array.from(sel.options).map((o) => o.value)).toEqual(["24", "32", "Flat"]);
+    // Non-numeric size renders WITHOUT the inch mark.
+    expect(Array.from(sel.options).map((o) => o.textContent)).toEqual(["24″", "32″", "Flat"]);
+  });
+
+  it("switching size re-prices the build + the palette via the per-size map", () => {
+    const offered: ModelSofaCompartmentDto[] = POOL.map((p, i) => ({
+      modelId: MODEL.id,
+      compartmentId: p.id,
+      priceOverride: null,
+      sortOrder: i,
+      skuPrice: p.defaultPrice,
+      // Only 1S is size-priced: RM 1,990 at 32; other sizes inherit the flat 1,500.
+      skuPricesBySize: p.code === "1S" ? { "32": 1990 } : null,
+    }));
+    renderCanvas({ offered, heights: ["24", "32", "Flat"] });
+    addModule("1S");
+    expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
+    fireEvent.change(screen.getByTestId("sofa-build-height"), { target: { value: "32" } });
+    expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,990.00");
+    // The palette card shows the sized price too.
+    expect(screen.getByTestId("module-palette-item-1S")).toHaveTextContent("1,990.00");
+    // A size with no entry falls back to the flat price.
+    fireEvent.change(screen.getByTestId("sofa-build-height"), { target: { value: "Flat" } });
+    expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
   });
 
   it("canvas cells draw the uploaded compartment art (flush) when the pool row has one", () => {

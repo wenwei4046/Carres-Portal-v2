@@ -1556,6 +1556,9 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
               pos_active: false,
               description: null,
               compartment_id: COMP_ID,
+              // 0204 — per-size map; "900.00" exercises the PostgREST
+              // numeric-as-string coercion, null value preserved.
+              prices_by_size: { "24": "900.00", "32": 1200, Flat: null },
             },
           ],
           sofa_fabrics: [],
@@ -1597,6 +1600,8 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       // skuPrice = the synced compartment sku's price (SKU Master), even though
       // the pos_active=false sku itself is excluded from the non-admin skus list.
       skuPrice: 777,
+      // 0204 — the sku's per-size map rides along, numerics coerced, null kept.
+      skuPricesBySize: { "24": 900, "32": 1200, Flat: null },
     });
     expect(body.skus).toHaveLength(0);
   });
@@ -4983,6 +4988,53 @@ describe("0186 — pwp_price + pwp_prices_by_height write paths", () => {
     expect(res.status).toBe(200);
     const upd = recorded.find((r) => r.op === "update");
     expect(upd?.payload).not.toHaveProperty("pwp_price");
+  });
+
+  // 0204 — per-size price map: same principal lock + full-map replace.
+  it("PATCH /skus/:id — principal sets pricesBySize → 200 (camelCase → prices_by_size, full map)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: skuRow({ prices_by_size: { "24": 900 } }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pricesBySize: { "24": 900, "32": 1200 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toEqual({ prices_by_size: { "24": 900, "32": 1200 } });
+  });
+
+  it("PATCH /skus/:id — pricesBySize by a non-principal → 403 (joins the 0175/0204 lock)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pricesBySize: { "24": 900 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("PATCH /skus/:id — a negative per-size price → 422 (schema)", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pricesBySize: { "24": -5 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
   });
 
   it("POST /skus — a sku WITH pwpPrice by a non-principal → 403", async () => {

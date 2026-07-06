@@ -6,7 +6,7 @@ import type {
   ProductModelDto,
   ProductSkuDto,
 } from "@carres/shared";
-import { PRODUCT_CATEGORIES } from "@carres/shared";
+import { activeSofaSizes, PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useDeleteCatalogSku, usePatchCatalogSku } from "@/lib/queries";
@@ -19,14 +19,16 @@ import ImportSkusDialog from "./ImportSkusDialog";
 import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
 
 /**
- * SKU Master — flat product table with cost + plan-margin visibility for the
- * Master Admin. Columns: Product code · Description · Product name · Category ·
- * Size · Price · Cost · Margin · Status. Filter by category + model pills +
- * free-text search; picking a category reveals a second pill row of that
- * category's model names (shown even for a single model — e.g. Sofa → Booqit).
- * "Edit Prices" flips the Price and Cost cells to inline inputs (commit on blur,
- * verified by the catalog re-fetch the patch triggers). Price 0 renders as a
- * muted "not set"; Cost null renders as a muted "not set" — NEVER coerced to 0.
+ * SKU Master — flat product table for the Master Admin. Columns: Product code ·
+ * Description · Product name · Category · Size · Price · Margin · Status.
+ * (The COST column was dropped 2026-07-06 — Loo: not needed for now. Cost
+ * itself survives in the schema + Edit modal + import; only the list column
+ * went, so margin still renders for SKUs whose cost is set elsewhere.)
+ * Filter by category + model pills + free-text search; picking a category
+ * reveals a second pill row of that category's model names (shown even for a
+ * single model — e.g. Sofa → Booqit). "Edit Prices" flips the Price cell to an
+ * inline input (commit on blur, verified by the catalog re-fetch the patch
+ * triggers). Price 0 renders as a muted "not set" — NEVER coerced to 0.
  *
  * Performance: the live catalog has 1000+ SKUs. We render at most VISIBLE_CAP
  * rows and show a "refine your filter" banner past that, rather than mount
@@ -34,8 +36,8 @@ import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
  */
 
 const VISIBLE_CAP = 300;
-// 9 columns: checkbox · code · desc · product · category · size · price · cost · margin · status · edit
-const GRID_COLS = "32px 150px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 110px 90px 92px 60px";
+// 10 tracks: checkbox · code · desc · product · category · size · price · margin · status · edit
+const GRID_COLS = "32px 150px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 92px 60px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -98,6 +100,21 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         .sort((a, b) => a.name.localeCompare(b.name)),
     [catalog.models, category],
   );
+
+  // 0204 (Loo 2026-07-06) — the sofa-size axis (Special Add-ons → SOFA →
+  // Sizes pool, the SAME `activeSofaSizes` the builder's Customize canvas
+  // offers). With the Sofa category filtered, the grid swaps the single Price
+  // column for ONE PRICE COLUMN PER SIZE (2990s parity) — adding a size to
+  // the pool automatically adds a column here. `activeSofaSizes` falls back
+  // to the canonical SOFA_HEIGHTS when the pool is empty, so the sofa grid
+  // variant only needs the pools field to be present.
+  const sofaSizes = useMemo(() => activeSofaSizes(catalog.optionPools), [catalog.optionPools]);
+  const sofaSizeMode =
+    category === "sofa" &&
+    (catalog.optionPools ?? []).some((p) => p.pool === "sofa_size" && p.active);
+  const gridCols = sofaSizeMode
+    ? `32px 150px minmax(200px,1.2fr) ${sofaSizes.map(() => "minmax(84px,1fr)").join(" ")} 92px 60px`
+    : GRID_COLS;
 
   // Switching category invalidates a model pick from the previous category —
   // reset synchronously in the same handler so there's no stale-filter frame.
@@ -301,13 +318,20 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             · showing first {VISIBLE_CAP} — refine the search or category to see the rest
           </span>
         )}
+        {sofaSizeMode && (
+          <span className="text-base-400" data-testid="sofa-size-mode-hint">
+            {" "}
+            · per-size prices (RM) — a blank cell inherits the base price shown in grey
+            (base price: row Edit); sizes follow Special Add-ons → Sizes
+          </span>
+        )}
       </p>
 
       {/* Grid */}
-      <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
+      <div className="bg-white border border-base-200 rounded-[4px] overflow-x-auto">
         <div
           className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
-          style={{ gridTemplateColumns: GRID_COLS }}
+          style={{ gridTemplateColumns: gridCols }}
         >
           <input
             type="checkbox"
@@ -318,16 +342,31 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             }}
             onChange={toggleAll}
           />
-          <div className="label">Code</div>
-          <div className="label">Description</div>
-          <div className="label">Product</div>
-          <div className="label">Category</div>
-          <div className="label">Size</div>
-          <div className="label text-right">Price</div>
-          <div className="label text-right">Cost</div>
-          <div className="label text-right">Margin</div>
-          <div className="label">Status</div>
-          <div className="label" />
+          {sofaSizeMode ? (
+            <>
+              <div className="label">Code</div>
+              <div className="label">Description</div>
+              {sofaSizes.map((s) => (
+                <div key={s} className="label text-right" data-testid={`sku-size-col-${s}`}>
+                  {s}
+                </div>
+              ))}
+              <div className="label">Status</div>
+              <div className="label" />
+            </>
+          ) : (
+            <>
+              <div className="label">Code</div>
+              <div className="label">Description</div>
+              <div className="label">Product</div>
+              <div className="label">Category</div>
+              <div className="label">Size</div>
+              <div className="label text-right">Price</div>
+              <div className="label text-right">Margin</div>
+              <div className="label">Status</div>
+              <div className="label" />
+            </>
+          )}
         </div>
 
         {visible.length === 0 && (
@@ -344,6 +383,8 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             selected={selected.has(r.sku.id)}
             onToggle={toggleRow}
             onEdit={setEditRow}
+            sofaSizes={sofaSizeMode ? sofaSizes : null}
+            gridCols={gridCols}
           />
         ))}
       </div>
@@ -369,12 +410,18 @@ const SkuRowView = memo(function SkuRowView({
   selected,
   onToggle,
   onEdit,
+  sofaSizes,
+  gridCols,
 }: {
   row: FlatRow;
   editMode: boolean;
   selected: boolean;
   onToggle: (id: string) => void;
   onEdit: (row: FlatRow) => void;
+  /** 0204 — non-null = render the sofa-size grid variant (one price cell per
+   *  pool size for compartment SKUs; flat SKUs span the size tracks). */
+  sofaSizes: string[] | null;
+  gridCols: string;
 }) {
   const { sku, category, productName } = row;
   const patch = usePatchCatalogSku();
@@ -401,22 +448,76 @@ const SkuRowView = memo(function SkuRowView({
     );
   }
 
-  function commitCost(raw: string) {
-    const trimmed = raw.trim();
-    // blank input → set cost to null ("not set")
-    const val = trimmed === "" ? null : Number(trimmed);
-    if (val !== null && (!Number.isFinite(val) || val < 0)) {
-      toast.error("Enter a non-negative number");
-      return;
-    }
-    if (val === sku.cost) return;
-    patch.mutate(
-      { id: sku.id, patch: { cost: val } },
-      {
-        onSuccess: () => toast.success(`${sku.sku} · cost updated`),
-        onError: (e: unknown) =>
-          toast.error(e instanceof ApiError ? e.message : "Update failed"),
-      },
+  // 0204 — sofa-size grid variant: one price cell per pool size for a
+  // COMPARTMENT sku; a flat (non-compartment) sofa sku keeps its single price
+  // spanning the size tracks. Category/Size/Margin columns are dropped here —
+  // the sofa filter + the description already carry that context.
+  if (sofaSizes) {
+    return (
+      <div
+        className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
+        style={{ gridTemplateColumns: gridCols, opacity: discontinued ? 0.5 : 1 }}
+        data-testid={`sku-row-${sku.sku}`}
+      >
+        <input
+          type="checkbox"
+          aria-label={`Select ${sku.sku}`}
+          checked={selected}
+          onChange={() => onToggle(sku.id)}
+        />
+        <div>
+          <CodeChip>{sku.sku}</CodeChip>
+        </div>
+        <div className="t-small text-base-700 truncate" title={sku.description ?? ""}>
+          {sku.description || <span className="text-base-400">—</span>}
+        </div>
+        {sku.compartmentId != null ? (
+          <CompartmentSizeCells sku={sku} sizes={sofaSizes} editMode={editMode} />
+        ) : (
+          <div
+            className="text-right"
+            style={{ gridColumn: `span ${sofaSizes.length}` }}
+            data-testid={`sku-flat-price-${sku.sku}`}
+          >
+            <span className="t-tiny text-base-400 mr-1.5">flat SKU · one price</span>
+            {editMode ? (
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                defaultValue={sku.price}
+                onBlur={(e) => commitPrice(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                aria-label={`${sku.sku} price`}
+                className={`${INPUT_CLS} text-right t-num text-[12px] max-w-[140px] inline-block`}
+              />
+            ) : sku.price === 0 ? (
+              <span className="t-tiny text-base-400 italic">price not set</span>
+            ) : (
+              <span className="t-num text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
+            )}
+          </div>
+        )}
+        <div>
+          {discontinued ? (
+            <span className="pill pill-neutral">Discontinued</span>
+          ) : (
+            <SkuStatusPill posActive={sku.posActive !== false} />
+          )}
+        </div>
+        <div className="text-right">
+          <button
+            type="button"
+            onClick={() => onEdit(row)}
+            className="btn-ghost text-[11px]"
+            data-testid={`sku-edit-${sku.sku}`}
+          >
+            Edit
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -468,29 +569,6 @@ const SkuRowView = memo(function SkuRowView({
         )}
       </div>
 
-      {/* Cost */}
-      <div className="text-right" data-testid={`sku-cost-${sku.sku}`}>
-        {editMode ? (
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            defaultValue={sku.cost ?? ""}
-            placeholder="—"
-            onBlur={(e) => commitCost(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-            }}
-            aria-label={`${sku.sku} cost`}
-            className={`${INPUT_CLS} text-right t-num text-[12px]`}
-          />
-        ) : sku.cost === null ? (
-          <span className="t-tiny text-base-400 italic">not set</span>
-        ) : (
-          <span className="t-num text-[12px] text-base-700">{fmtPrice(sku.cost)}</span>
-        )}
-      </div>
-
       {/* Margin */}
       <div className="text-right" data-testid={`sku-margin-${sku.sku}`}>
         {margin === null ? (
@@ -528,3 +606,108 @@ const SkuRowView = memo(function SkuRowView({
     </div>
   );
 });
+
+/**
+ * 0204 — one price cell per pool size for a COMPARTMENT sku row (sofa-size
+ * grid). View mode: an explicit per-size price renders normally; an unset size
+ * shows the inherited base price muted in parentheses. Edit mode: one input
+ * per size; each blur PATCHes the FULL {size → RM} map rebuilt from a local
+ * draft, so two successive cell edits COMPOSE instead of racing the catalog
+ * refetch, and prices under keys NOT in the current pool (renamed/removed
+ * sizes) are PRESERVED — a cell edit never silently erases an orphaned price.
+ */
+function CompartmentSizeCells({
+  sku,
+  sizes,
+  editMode,
+}: {
+  sku: ProductSkuDto;
+  sizes: string[];
+  editMode: boolean;
+}) {
+  const patch = usePatchCatalogSku();
+  // The user's in-session truth for this row's inputs (server refetch never
+  // clobbers half-typed cells; init from the sku once on mount).
+  const [draft, setDraft] = useState<Record<string, string>>(() => {
+    const d: Record<string, string> = {};
+    for (const s of sizes) {
+      const v = sku.pricesBySize?.[s];
+      d[s] = typeof v === "number" ? String(v) : "";
+    }
+    return d;
+  });
+
+  function commit() {
+    // Orphan preservation: keep prices under keys outside the current pool.
+    const map: Record<string, number> = {};
+    for (const [k, v] of Object.entries(sku.pricesBySize ?? {})) {
+      if (!sizes.includes(k) && typeof v === "number") map[k] = v;
+    }
+    for (const s of sizes) {
+      const t = (draft[s] ?? "").trim();
+      if (t === "") continue; // blank = unpriced at this size (inherits base)
+      const n = Number(t);
+      if (!Number.isFinite(n) || n < 0) {
+        toast.error("Enter a non-negative number");
+        return;
+      }
+      map[s] = n;
+    }
+    // No-op guard — identical map ⇒ no PATCH.
+    const before: Record<string, number> = {};
+    for (const [k, v] of Object.entries(sku.pricesBySize ?? {})) {
+      if (typeof v === "number") before[k] = v;
+    }
+    const same =
+      Object.keys(map).length === Object.keys(before).length &&
+      Object.entries(map).every(([k, v]) => before[k] === v);
+    if (same) return;
+    patch.mutate(
+      { id: sku.id, patch: { pricesBySize: map } },
+      {
+        onSuccess: () => toast.success(`${sku.sku} · size prices updated`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  return (
+    <>
+      {sizes.map((s) => {
+        const explicit = sku.pricesBySize?.[s];
+        return (
+          <div key={s} className="text-right" data-testid={`sku-size-${sku.sku}-${s}`}>
+            {editMode ? (
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={draft[s] ?? ""}
+                placeholder={sku.price > 0 ? String(sku.price) : "—"}
+                onChange={(e) => setDraft((d) => ({ ...d, [s]: e.target.value }))}
+                onBlur={commit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                aria-label={`${sku.sku} price at ${s}`}
+                className={`${INPUT_CLS} text-right t-num text-[12px]`}
+              />
+            ) : typeof explicit === "number" ? (
+              <span className="t-num text-[12px] text-base-800">{fmtPrice(explicit)}</span>
+            ) : sku.price > 0 ? (
+              <span
+                className="t-tiny text-base-400"
+                title={`Inherits the base price ${fmtPrice(sku.price)} — set a price for ${s} to override`}
+              >
+                ({fmtPrice(sku.price)})
+              </span>
+            ) : (
+              <span className="t-tiny text-base-400 italic">—</span>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}

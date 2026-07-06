@@ -135,10 +135,21 @@ function gateSkuCreatePriceCost(
 // pwp_price key at all (presence = intent to change; a `null` clearing counts).
 function gateSkuPatchPriceCost(
   c: { var: { auth: { role: string } } },
-  data: { price?: number; cost?: number | null; pwpPrice?: number | null },
+  data: {
+    price?: number;
+    cost?: number | null;
+    pwpPrice?: number | null;
+    // 0204 — per-size price map; presence = intent to change, same lock.
+    pricesBySize?: Record<string, number> | null;
+  },
 ) {
   if (c.var.auth.role === "principal") return;
-  if (data.price !== undefined || data.cost !== undefined || data.pwpPrice !== undefined) {
+  if (
+    data.price !== undefined ||
+    data.cost !== undefined ||
+    data.pwpPrice !== undefined ||
+    data.pricesBySize !== undefined
+  ) {
     throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
   }
 }
@@ -361,9 +372,20 @@ catalogRouter.get("/", async (c) => {
     // by design and must still price the builder in the non-admin POS bundle).
     modelSofaCompartments: (() => {
       const compSkuPrice = new Map<string, number>();
+      // 0204 — the synced SKU's {size → RM} map, enriched alongside skuPrice so
+      // the builder + POS price à-la-carte per the chosen size.
+      const compSkuSizes = new Map<string, Record<string, number | null>>();
       for (const s of allSkus) {
         const row = s as DB.ProductSkuRow;
         if (row.compartment_id == null || row.discontinued_at != null) continue;
+        if (row.prices_by_size != null) {
+          const m: Record<string, number | null> = {};
+          for (const [k, v] of Object.entries(row.prices_by_size)) {
+            // NaN guard per entry: malformed → null (falls to the flat price).
+            m[k] = v == null || !Number.isFinite(Number(v)) ? null : Number(v);
+          }
+          compSkuSizes.set(`${row.model_id}|${row.compartment_id}`, m);
+        }
         const p = Number(row.price);
         // NaN guard: a malformed price falls through to the legacy chain (null)
         // instead of poisoning resolveCompartmentPrice (NaN survives ??).
@@ -375,6 +397,7 @@ catalogRouter.get("/", async (c) => {
         return {
           ...mc,
           skuPrice: compSkuPrice.get(`${mc.modelId}|${mc.compartmentId}`) ?? null,
+          skuPricesBySize: compSkuSizes.get(`${mc.modelId}|${mc.compartmentId}`) ?? null,
         };
       });
     })(),
@@ -686,6 +709,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   // 0186 — only write pwp_price when present so an unrelated patch doesn't clobber
   // the benchmark; an explicit null clears it (back to "unset").
   if (parsed.data.pwpPrice !== undefined) patch.pwp_price = parsed.data.pwpPrice;
+  // 0204 — full-map replace: the UI sends the whole {size → RM} map on each
+  // commit (unpriced sizes OMITTED); explicit null clears the map entirely.
+  if (parsed.data.pricesBySize !== undefined) patch.prices_by_size = parsed.data.pricesBySize;
   if (parsed.data.supplierId !== undefined) patch.supplier_id = parsed.data.supplierId;
   // 0075 — restore toggle (Loo 2026-05-09).
   if (parsed.data.discontinuedAt !== undefined)

@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   activeSofaHeights,
+  activeSofaSizes,
   allowedFabricsFor,
   allowedPoolValues,
   gatedSofaHeights,
+  gatedSofaSizes,
   computedTotalHeight,
   fabricTierFor,
   inchesOf,
@@ -167,6 +169,19 @@ describe("activeSofaHeights", () => {
   });
 });
 
+describe("activeSofaSizes (0204 — the à-la-carte size axis)", () => {
+  it("EVERY active sofa_size value, pool order — non-canonical 'Flat' included", () => {
+    // Unlike activeSofaHeights (the combo axis), Flat survives here: per-size
+    // compartment prices key off the raw pool values. 28 inactive still skipped.
+    expect(activeSofaSizes(POOLS)).toEqual(["24", "26", "35", "Flat"]);
+  });
+
+  it("empty pool falls back to the canonical axis (fresh-DB safety)", () => {
+    expect(activeSofaSizes([])).toEqual(["24", "26", "28", "30", "32", "35", "37"]);
+    expect(activeSofaSizes(null)).toEqual(["24", "26", "28", "30", "32", "35", "37"]);
+  });
+});
+
 describe("gatedSofaHeights", () => {
   it("model seat-size ticks (allowed_options.sizes) narrow the active set", () => {
     const model = { allowedOptions: { sizes: ["24", "35", "Flat"] } };
@@ -181,6 +196,19 @@ describe("gatedSofaHeights", () => {
   it("ticks that miss every active height fall back to all actives", () => {
     const model = { allowedOptions: { sizes: ["28"] } }; // 28 inactive in the pool
     expect(gatedSofaHeights(model, POOLS)).toEqual(["24", "26", "35"]);
+  });
+});
+
+describe("gatedSofaSizes (0204 — the à-la-carte twin of gatedSofaHeights)", () => {
+  it("model ticks narrow the FULL size axis — 'Flat' survives the gate", () => {
+    const model = { allowedOptions: { sizes: ["24", "35", "Flat"] } };
+    expect(gatedSofaSizes(model, POOLS)).toEqual(["24", "35", "Flat"]);
+  });
+
+  it("absent/empty/dead ticks fall back to every active size", () => {
+    expect(gatedSofaSizes({ allowedOptions: {} }, POOLS)).toEqual(["24", "26", "35", "Flat"]);
+    expect(gatedSofaSizes({ allowedOptions: { sizes: [] } }, POOLS)).toEqual(["24", "26", "35", "Flat"]);
+    expect(gatedSofaSizes({ allowedOptions: { sizes: ["28"] } }, POOLS)).toEqual(["24", "26", "35", "Flat"]);
   });
 });
 

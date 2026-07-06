@@ -90,22 +90,28 @@ export function canMirror(slots: string[][]): boolean {
 
 /**
  * Resolve the à-la-carte RM price for a per-model compartment.
- *   `modelComp.skuPrice ?? modelComp.priceOverride ?? pool.defaultPrice`
+ *   `skuPricesBySize[size] ?? modelComp.skuPrice ?? modelComp.priceOverride
+ *    ?? pool.defaultPrice`
  *
  * PRICE SOURCE (Loo, 2026-07-05): the synced `{MODEL_KEY}-{code}` SKU's price
  * (SKU Master) is authoritative — `skuPrice` is joined onto the offered row by
- * the catalog bundle / server recompute. The legacy override→pool-default
- * chain survives only as a fallback for offered rows whose synced SKU is
- * missing (pre-cutover data). `??` discipline throughout: an explicit `0` at
- * any level WINS (explicitly free); `null`/absent falls through. When nothing
- * is available (compartment not in the pool / not offered), returns 0 — the
- * caller's mirror fallback gets a chance before this 0 lands.
+ * the catalog bundle / server recompute. 0204 (Loo 2026-07-06) puts the SKU's
+ * per-SIZE map in FRONT of it: when a `size` is given and the map prices that
+ * size, that price wins; an absent/null size entry falls through to the flat
+ * `skuPrice`. The legacy override→pool-default chain survives only as a
+ * fallback for offered rows whose synced SKU is missing (pre-cutover data).
+ * `??` discipline throughout: an explicit `0` at any level WINS (explicitly
+ * free); `null`/absent falls through. When nothing is available (compartment
+ * not in the pool / not offered), returns 0 — the caller's mirror fallback
+ * gets a chance before this 0 lands.
  */
 export function resolveCompartmentPrice(
   modelComp: ModelSofaCompartment | null | undefined,
   pool: SofaCompartment | null | undefined,
+  size?: string | null,
 ): number {
-  return modelComp?.skuPrice ?? modelComp?.priceOverride ?? pool?.defaultPrice ?? 0;
+  const bySize = size == null ? undefined : modelComp?.skuPricesBySize?.[size];
+  return bySize ?? modelComp?.skuPrice ?? modelComp?.priceOverride ?? pool?.defaultPrice ?? 0;
 }
 
 /* ─── canonicalizeSofaSlots ────────────────────────────────────────────── */
@@ -398,17 +404,20 @@ export interface SofaPriceResult {
  * flipped Quick Pick) so a one-hand-priced module never prices to RM 0. This is
  * the SINGLE lookup used by BOTH the à-la-carte loop and the combo-subset loop
  * (the C1 invariant — both must agree, or extras double-charge a mirrored cell).
+ * 0204: `size` (= build.height) threads through so the per-size price map wins
+ * when authored — identically in both loops, preserving C1.
  */
 function cellPriceCents(
   code: string,
   poolByCode: Map<string, SofaCompartment>,
   modelByCompId: Map<string, ModelSofaCompartment>,
+  size?: string | null,
 ): number {
   const direct = poolByCode.get(code);
   const comp = direct ?? poolByCode.get(mirrorCode(code));
   if (!comp) return 0;
   const mc = modelByCompId.get(comp.id);
-  return toCents(resolveCompartmentPrice(mc, comp));
+  return toCents(resolveCompartmentPrice(mc, comp, size));
 }
 
 /**
@@ -427,10 +436,11 @@ export function computeSofaPrice(
     snapshot.modelCompartments.map((m) => [m.compartmentId, m]),
   );
 
-  // À-la-carte total (cents) — sum every cell with mirror fallback.
+  // À-la-carte total (cents) — sum every cell with mirror fallback, priced at
+  // the build's chosen size (0204: per-size map wins, flat price fallback).
   let aLaCarteCents = 0;
   for (const cell of build.cells) {
-    aLaCarteCents += cellPriceCents(cell.moduleCode, poolByCode, modelByCompId);
+    aLaCarteCents += cellPriceCents(cell.moduleCode, poolByCode, modelByCompId, build.height);
   }
 
   // Combo override. Default lookup tier when fabricTier is unset = PRICE_1
@@ -472,6 +482,7 @@ export function computeSofaPrice(
         build.cells[i]!.moduleCode,
         poolByCode,
         modelByCompId,
+        build.height,
       );
     }
     const extrasCents = Math.max(0, aLaCarteCents - subsetCents);

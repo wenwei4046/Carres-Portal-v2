@@ -1,12 +1,11 @@
 /**
- * SkuMasterTab — cost + margin rendering tests.
+ * SkuMasterTab — price/margin rendering tests.
  *
- * Covers the Task-1 requirements:
- *  - cost === null renders "not set" (never as "0" or empty)
- *  - cost set renders the RM value
- *  - margin muted when cost is null
- *  - margin shows RM amount + pct when cost is set
- *  - inline edit-mode cost input: blank → null patch, numeric → numeric patch
+ * The COST column was removed from the list 2026-07-06 (Loo: not needed for
+ * now) — cost survives only in the Edit modal + import. Covers:
+ *  - the list renders NO cost cell / header / inline cost input
+ *  - margin muted when cost is null; RM amount + pct when cost is set
+ *  - inline edit-mode price input still works
  *  - Edit modal: cost field renders + round-trips through usePatchCatalogSku
  *
  * Mocking strategy:
@@ -180,13 +179,40 @@ const SKU_MAT2: ProductSkuDto = {
   supplierId: null,
 };
 
-function makeCatalog(skus: ProductSkuDto[], models: ProductModelDto[] = [MODEL_MAT, MODEL_SOFA]): CatalogResponse {
+// 0204 — a compartment sofa SKU (compartmentId set) with a partial per-size map.
+const SKU_SOFA_COMP: ProductSkuDto = {
+  id: "s5",
+  modelId: "m-sofa",
+  sku: "LUNA-1A(LHF)",
+  variant: "1A(LHF)",
+  variantKind: "part",
+  price: 1490,
+  cost: null,
+  supplierId: null,
+  compartmentId: "comp-1",
+  pricesBySize: { "24": 900, "99": 555 }, // "99" = orphaned key (not in the pool)
+};
+
+/** The sofa_size pool (Special Add-ons → SOFA → Sizes) — drives the size columns. */
+const SOFA_SIZE_POOLS = [
+  { id: "p1", pool: "sofa_size" as const, value: "24", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 1 },
+  { id: "p2", pool: "sofa_size" as const, value: "32", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 2 },
+  { id: "p3", pool: "sofa_size" as const, value: "Flat", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 3 },
+  { id: "p4", pool: "sofa_size" as const, value: "RETIRED", label: null, dimensions: null, surcharge: null, active: false, sortOrder: 4 },
+];
+
+function makeCatalog(
+  skus: ProductSkuDto[],
+  models: ProductModelDto[] = [MODEL_MAT, MODEL_SOFA],
+  optionPools?: CatalogResponse["optionPools"],
+): CatalogResponse {
   return {
     models,
     skus,
     sofaFabrics: [],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
+    ...(optionPools ? { optionPools } : {}),
   };
 }
 
@@ -211,19 +237,13 @@ beforeEach(() => {
   mockRole = "principal";
 });
 
-describe("SkuMasterTab — cost column", () => {
-  it("shows 'not set' (muted) when cost is null — never '0' or blank", () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_NULL])} />));
-    const costCell = screen.getByTestId("sku-cost-CLOUD-QUEEN");
-    expect(costCell.textContent).toContain("not set");
-    expect(costCell.textContent).not.toContain("RM 0");
-    expect(costCell.textContent).not.toBe("");
-  });
-
-  it("shows the RM cost value when cost is set", () => {
+describe("SkuMasterTab — cost column removed (Loo 2026-07-06), margin kept", () => {
+  it("renders NO cost cell and no Cost header — cost lives only in the Edit modal now", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    const costCell = screen.getByTestId("sku-cost-CLOUD-KING");
-    expect(costCell.textContent).toContain("2,100");
+    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    expect(screen.queryByText("Cost")).not.toBeInTheDocument();
+    // The row itself still renders (column removal, not row removal).
+    expect(screen.getByTestId("sku-row-CLOUD-KING")).toBeInTheDocument();
   });
 
   it("shows muted '—' in margin column when cost is null", () => {
@@ -258,47 +278,12 @@ describe("SkuMasterTab — cost column", () => {
   });
 });
 
-describe("SkuMasterTab — Edit Prices mode (inline cost editing)", () => {
-  it("shows cost input in Edit Prices mode with defaultValue from sku.cost", () => {
+describe("SkuMasterTab — Edit Prices mode (price only; cost input removed)", () => {
+  it("shows the price input but NO cost input in Edit Prices mode", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
     fireEvent.click(screen.getByTestId("sku-edit-prices"));
-    const costInput = screen.getByLabelText("CLOUD-KING cost") as HTMLInputElement;
-    expect(costInput).toBeTruthy();
-    expect(costInput.value).toBe("2100");
-  });
-
-  it("blank cost input on blur dispatches patch with cost: null", async () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-prices"));
-    const costInput = screen.getByLabelText("CLOUD-KING cost");
-    fireEvent.change(costInput, { target: { value: "" } });
-    fireEvent.blur(costInput);
-    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
-    const call = mockPatchMutate.mock.calls[0][0];
-    expect(call.id).toBe("s2");
-    expect(call.patch.cost).toBeNull();
-  });
-
-  it("numeric cost input on blur dispatches patch with cost: number", async () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_NULL])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-prices"));
-    const costInput = screen.getByLabelText("CLOUD-QUEEN cost");
-    fireEvent.change(costInput, { target: { value: "1500" } });
-    fireEvent.blur(costInput);
-    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
-    const call = mockPatchMutate.mock.calls[0][0];
-    expect(call.id).toBe("s1");
-    expect(call.patch.cost).toBe(1500);
-  });
-
-  it("same cost value on blur does not dispatch patch (no-op)", async () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-prices"));
-    const costInput = screen.getByLabelText("CLOUD-KING cost");
-    // Do NOT change; blur with same value
-    fireEvent.blur(costInput);
-    // no patch dispatch
-    expect(mockPatchMutate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("CLOUD-KING price")).toBeInTheDocument();
+    expect(screen.queryByLabelText("CLOUD-KING cost")).not.toBeInTheDocument();
   });
 });
 
@@ -490,10 +475,9 @@ describe("0175 — price/cost lock (non-principal read-only)", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
     expect(screen.queryByTestId("sku-edit-prices")).not.toBeInTheDocument();
     expect(screen.getByTestId("sku-price-lock-hint")).toBeInTheDocument();
-    // The cost cell still shows the value read-only (no input).
-    const costCell = screen.getByTestId("sku-cost-CLOUD-KING");
-    expect(costCell.textContent).toContain("2,100");
-    expect(costCell.querySelector("input")).toBeNull();
+    // The row renders read-only (no inline inputs anywhere).
+    const row = screen.getByTestId("sku-row-CLOUD-KING");
+    expect(row.querySelector('input[type="number"]')).toBeNull();
   });
 
   it("EditSkuModal: non-principal gets read-only price/cost, no input fields", () => {
@@ -597,6 +581,84 @@ describe("SkuMasterTab — Export / Import buttons", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 0204 — sofa-size grid: one price column per `sofa_size` pool value when the
+// Sofa category is filtered (Loo 2026-07-06).
+// ---------------------------------------------------------------------------
+describe("SkuMasterTab — per-size sofa pricing grid (0204)", () => {
+  const sofaCatalog = () =>
+    makeCatalog([SKU_SOFA_COMP, SKU_SOFA], [MODEL_MAT, MODEL_SOFA], SOFA_SIZE_POOLS);
+
+  function openSofa() {
+    fireEvent.click(screen.getByRole("button", { name: "Sofa" }));
+  }
+
+  it("Sofa filter + pool → one column per ACTIVE size; compartment cells show explicit vs inherited", () => {
+    render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
+    openSofa();
+    // Columns follow the pool (active only, pool order).
+    expect(screen.getByTestId("sku-size-col-24")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-size-col-32")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-size-col-Flat")).toBeInTheDocument();
+    expect(screen.queryByTestId("sku-size-col-RETIRED")).not.toBeInTheDocument();
+    // Compartment row: explicit 900 at 24; 32 inherits the base 1,490 (muted parens).
+    expect(screen.getByTestId("sku-size-LUNA-1A(LHF)-24").textContent).toContain("900");
+    expect(screen.getByTestId("sku-size-LUNA-1A(LHF)-32").textContent).toContain("(RM 1,490.00)");
+    // Flat (non-compartment) sofa SKU keeps ONE price spanning the size tracks.
+    expect(screen.getByTestId("sku-flat-price-LUNA-3S").textContent).toContain("4,200");
+    expect(screen.getByTestId("sofa-size-mode-hint")).toBeInTheDocument();
+  });
+
+  it("non-sofa categories keep the normal grid even when the pool exists", () => {
+    render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
+    expect(screen.queryByTestId("sku-size-col-24")).not.toBeInTheDocument(); // "All"
+    fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
+    expect(screen.queryByTestId("sku-size-col-24")).not.toBeInTheDocument();
+  });
+
+  it("Sofa filter WITHOUT a pool keeps the normal grid", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_SOFA_COMP, SKU_SOFA])} />));
+    openSofa();
+    expect(screen.queryByTestId("sku-size-col-24")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sku-row-LUNA-1A(LHF)")).toBeInTheDocument();
+  });
+
+  it("Edit Prices: a size-cell blur PATCHes the FULL map — composed edits + ORPHANED keys preserved", async () => {
+    render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
+    openSofa();
+    fireEvent.click(screen.getByTestId("sku-edit-prices"));
+    const input32 = screen.getByLabelText("LUNA-1A(LHF) price at 32");
+    fireEvent.change(input32, { target: { value: "1200" } });
+    fireEvent.blur(input32);
+    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
+    const call = mockPatchMutate.mock.calls[0][0];
+    expect(call.id).toBe("s5");
+    // Full map: existing 24 kept, new 32 added, orphan "99" (not in the pool)
+    // preserved — a cell edit never erases an orphaned size price.
+    expect(call.patch.pricesBySize).toEqual({ "24": 900, "32": 1200, "99": 555 });
+  });
+
+  it("Edit Prices: blanking a size removes its key (falls back to the base price)", async () => {
+    render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
+    openSofa();
+    fireEvent.click(screen.getByTestId("sku-edit-prices"));
+    const input24 = screen.getByLabelText("LUNA-1A(LHF) price at 24");
+    fireEvent.change(input24, { target: { value: "" } });
+    fireEvent.blur(input24);
+    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
+    const call = mockPatchMutate.mock.calls[0][0];
+    expect(call.patch.pricesBySize).toEqual({ "99": 555 });
+  });
+
+  it("Edit Prices: blur without a change is a no-op (no PATCH)", () => {
+    render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
+    openSofa();
+    fireEvent.click(screen.getByTestId("sku-edit-prices"));
+    fireEvent.blur(screen.getByLabelText("LUNA-1A(LHF) price at 24"));
+    expect(mockPatchMutate).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 2990s Products parity Phase 2 — model filter in SKU Master.
 // ---------------------------------------------------------------------------
 describe("SkuMasterTab — model filter", () => {
@@ -613,21 +675,21 @@ describe("SkuMasterTab — model filter", () => {
     expect(screen.getByRole("button", { name: "Luna Sofa" })).toBeInTheDocument();
     // Mattress has two models — picking one keeps only its SKU
     fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
-    expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-row-CLOUD-KING")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Carres Dream" }));
-    expect(screen.getByTestId("sku-cost-DREAM-QUEEN")).toBeInTheDocument();
-    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sku-row-DREAM-QUEEN")).toBeInTheDocument();
+    expect(screen.queryByTestId("sku-row-CLOUD-KING")).not.toBeInTheDocument();
   });
 
   it("resets the model pick when the category changes", () => {
     render(wrap(<SkuMasterTab catalog={CATALOG_3()} />));
     fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
     fireEvent.click(screen.getByRole("button", { name: "Carres Dream" }));
-    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sku-row-CLOUD-KING")).not.toBeInTheDocument();
     // leave and come back — the model pick must not survive the category switch
     fireEvent.click(screen.getByRole("button", { name: "Sofa" }));
     fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
-    expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-row-CLOUD-KING")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All Mattress" })).toHaveAttribute(
       "aria-pressed",
       "true",

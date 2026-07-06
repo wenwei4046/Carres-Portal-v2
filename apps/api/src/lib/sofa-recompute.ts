@@ -142,6 +142,20 @@ export async function recomputeAndExplodeSofaBuildLines(
       snapshotByModel.set(modelId, ctx);
     }
 
+    // 3b. 0204 — the build's size must be a LIVE `sofa_size` pool value when
+    //     the pool is configured (per-size prices key off those exact values;
+    //     a stale/spoofed size would silently price at the flat fallback). An
+    //     empty pool (unconfigured) skips the gate so legacy SOFA_HEIGHTS
+    //     builds keep working.
+    if (ctx.allowedSizes.length > 0 && !ctx.allowedSizes.includes(build.height)) {
+      return {
+        status: "bad_request",
+        message:
+          `Sofa build size '${build.height}' is not an active sofa size option. ` +
+          `Rebuild the sofa to pick a current size.`,
+      };
+    }
+
     // 4. Authoritative recompute with the SAME pure function the client previews.
     const sofaBuild: SofaBuild = {
       modelId,
@@ -177,10 +191,12 @@ export async function recomputeAndExplodeSofaBuildLines(
     //    split weight mirrors computeSofaPrice's à-la-carte cell lookup (incl.
     //    mirror fallback) so the proportional split tracks the price basis.
     const { poolByCode, modelByCompId, codeToSku } = ctx;
+    // 0204 — the split weight prices each cell at the BUILD'S SIZE, mirroring
+    // computeSofaPrice's sized à-la-carte lookup (same fallback chain).
     const priceLookup = (code: string): number => {
       const comp = poolByCode.get(code) ?? poolByCode.get(mirrorCode(code));
       if (!comp) return 0;
-      return resolveCompartmentPrice(modelByCompId.get(comp.id), comp);
+      return resolveCompartmentPrice(modelByCompId.get(comp.id), comp, build.height);
     };
     // Fabric attrs ride on EVERY exploded line (each compartment is made in the
     // same fabric; the operation CreatePOModal cascade keys off them per line).
@@ -229,6 +245,8 @@ interface ModelSofaContext {
   modelByCompId: Map<string, ModelSofaCompartment>;
   /** Compartment code → the model's real `product_skus.sku` (5A auto-sync). */
   codeToSku: Map<string, string>;
+  /** 0204 — live `sofa_size` pool values; empty = pool unconfigured (gate off). */
+  allowedSizes: string[];
 }
 
 type FetchResult =
@@ -242,7 +260,7 @@ type FetchResult =
  * error fails CLOSED (`{ ok: false }`).
  */
 async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<FetchResult> {
-  const [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR, legPoolR] =
+  const [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR, sizesR, legPoolR] =
     await Promise.all([
       sb.from(SOFA_COMPARTMENTS).select("*"),
       sb.from(MODEL_SOFA_COMPARTMENTS).select("*").eq("model_id", modelId),
@@ -259,19 +277,27 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
       // 5A — this model's real compartment skus (auto-synced on offer). Excludes
       // discontinued (un-offered) skus so an un-offered compartment can't be sold.
       // `price` = the AUTHORITATIVE à-la-carte compartment price (SKU Master —
-      // Loo, 2026-07-05); enriched onto modelCompartments as `skuPrice` below.
+      // Loo, 2026-07-05); enriched onto modelCompartments as `skuPrice`, and
+      // (0204) `prices_by_size` as `skuPricesBySize`.
       sb
         .from("product_skus")
-        .select("sku, compartment_id, price")
+        .select("sku, compartment_id, price, prices_by_size")
         .eq("model_id", modelId)
         .not("compartment_id", "is", null)
         .is("discontinued_at", null),
+      // 0204 — the live sofa-size axis (the per-size price keys + the builder's
+      // size options). Empty = pool unconfigured → the size gate is skipped.
+      sb
+        .from(CATALOG_OPTION_POOLS)
+        .select("value")
+        .eq("pool", "sofa_size")
+        .eq("active", true),
       // 0201-wiring — the sofa_leg_height pool rows so a build's legHeight
       // surcharge joins the drift-gated total (computeSofaPrice legDelta).
       sb.from(CATALOG_OPTION_POOLS).select("*").eq("pool", "sofa_leg_height"),
     ]);
 
-  for (const r of [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR, legPoolR]) {
+  for (const r of [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR, sizesR, legPoolR]) {
     if (r.error) return { ok: false, message: r.error.message };
   }
 
@@ -290,6 +316,7 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
     sku: string;
     compartment_id: string;
     price: number | string;
+    prices_by_size: Record<string, number | string | null> | null;
   }>;
   // Number.isFinite guard: a malformed/absent price must fall through to the
   // legacy chain (null), never poison the drift gate with NaN (NaN survives ??).
@@ -298,9 +325,24 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
       .filter((r) => Number.isFinite(Number(r.price)))
       .map((r) => [r.compartment_id, Number(r.price)]),
   );
+  // 0204 — per-size map, same NaN discipline per entry (malformed → null so the
+  // chain falls through to the flat price instead of poisoning the drift gate).
+  const sizesByCompId = new Map<string, Record<string, number | null>>();
+  for (const r of compSkuRows) {
+    if (r.prices_by_size == null) continue;
+    const m: Record<string, number | null> = {};
+    for (const [k, v] of Object.entries(r.prices_by_size)) {
+      m[k] = v == null || !Number.isFinite(Number(v)) ? null : Number(v);
+    }
+    sizesByCompId.set(r.compartment_id, m);
+  }
   const modelCompartments = (modelCompsR.data ?? []).map((r) => {
     const mc = Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow);
-    return { ...mc, skuPrice: priceByCompId.get(mc.compartmentId) ?? null };
+    return {
+      ...mc,
+      skuPrice: priceByCompId.get(mc.compartmentId) ?? null,
+      skuPricesBySize: sizesByCompId.get(mc.compartmentId) ?? null,
+    };
   });
 
   const snapshot: SofaPricingSnapshot = {
@@ -339,6 +381,7 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
       poolByCode: new Map(compartmentPool.map((c) => [c.code, c])),
       modelByCompId: new Map(modelCompartments.map((m) => [m.compartmentId, m])),
       codeToSku,
+      allowedSizes: ((sizesR.data ?? []) as Array<{ value: string }>).map((r) => r.value),
     },
   };
 }

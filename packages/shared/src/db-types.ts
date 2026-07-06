@@ -158,6 +158,11 @@ export interface ProductSkuRow {
   // PWP price set" (mirrors `cost`). Economic field; the 0175 trigger is
   // extended to lock it to the principal. DORMANT — no order consumer yet.
   pwp_price: number | null;
+  // 0204 (per-size pricing, Loo 2026-07-06) — {size → RM} selling-price map,
+  // keys = the catalog_option_pools `sofa_size` values. Missing key / NULL map
+  // → the flat `price` applies. Principal-only (0175/0204 trigger). Only sofa
+  // compartment SKUs carry it today. DORMANT until authored.
+  prices_by_size: Record<string, number | null> | null;
 }
 
 export interface SofaFabricRow {

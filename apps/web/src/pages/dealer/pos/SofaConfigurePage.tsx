@@ -20,6 +20,7 @@ import type {
 import {
   allowedPoolValues,
   gatedSofaHeights,
+  gatedSofaSizes,
   analyzeSofa,
   canMirror,
   findModule,
@@ -276,10 +277,13 @@ export default function SofaConfigurePage({
   onClose: () => void;
 }) {
   // 0201/0202-wiring — the Maintenance-authored option sources:
-  //   sizes (seat heights) = the ACTIVE `sofa_size` pool values;
+  //   COMBO heights (quick-pick tabs) = ACTIVE `sofa_size` ∩ canonical axis;
+  //   à-la-carte SIZES (Customize canvas, 0204) = EVERY active `sofa_size`
+  //     value incl. non-canonical ("Flat") — per-size prices key off these;
   //   leg heights = `sofa_leg_height` pool ∩ this model's Modular ticks;
   //   fabrics = legacy per-model rows + the model's opted-in master fabrics.
   const offeredHeights = useMemo(() => gatedSofaHeights(model, optionPools), [model, optionPools]);
+  const sofaSizes = useMemo(() => gatedSofaSizes(model, optionPools), [model, optionPools]);
   const legOpts = useMemo(
     () => allowedPoolValues(model, "sofa_leg_height", optionPools),
     [model, optionPools],
@@ -902,7 +906,7 @@ export default function SofaConfigurePage({
             sofaFabrics={fabrics}
             sellingFabrics={sellingFabrics}
             legHeightOptions={legOpts}
-            heights={offeredHeights}
+            heights={sofaSizes}
             onAddBuild={(payload) => {
               const line = buildToDraftLine(payload, model, skus);
               if (line) {

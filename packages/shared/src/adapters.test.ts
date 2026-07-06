@@ -671,6 +671,7 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
       description: null,
       compartment_id: "00000000-0000-0000-0000-0000000c0001",
       pwp_price: null,
+      prices_by_size: null,
       ...over,
     };
   }
@@ -690,6 +691,21 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
     const out = productSkuFromRow(baseSkuRow({ pwp_price: "999.00" as unknown as number }));
     expect(out.pwpPrice).toBe(999);
     expect(typeof out.pwpPrice).toBe("number");
+  });
+
+  it("maps prices_by_size -> pricesBySize, coercing numerics + preserving nulls (0204)", () => {
+    expect(productSkuFromRow(baseSkuRow()).pricesBySize).toBeNull();
+    const out = productSkuFromRow(
+      baseSkuRow({
+        prices_by_size: {
+          "24": "900.00" as unknown as number, // PostgREST jsonb numeric-as-string
+          "32": 1200,
+          Flat: null, // defensive: null value = "not priced at this size"
+        },
+      }),
+    );
+    expect(out.pricesBySize).toEqual({ "24": 900, "32": 1200, Flat: null });
+    expect(typeof out.pricesBySize!["24"]).toBe("number");
   });
 });
 

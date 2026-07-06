@@ -115,10 +115,12 @@ export function fabricTierFor(
   return category === "bedframe" ? fabric.bedframeTier : fabric.sofaTier;
 }
 
-/** The seat heights the sofa builder offers = ACTIVE `sofa_size` pool values ∩
- *  the canonical `SOFA_HEIGHTS` axis (pool order; non-dimensional entries like
- *  "Flat" are skipped). An empty/absent pool falls back to the full axis so a
- *  fresh DB never renders a builder with zero heights. */
+/** The COMBO height axis = ACTIVE `sofa_size` pool values ∩ the canonical
+ *  `SOFA_HEIGHTS` axis (pool order; non-dimensional entries like "Flat" are
+ *  skipped — a combo's `prices_by_height` zod only accepts canonical keys).
+ *  An empty/absent pool falls back to the full axis so a fresh DB never
+ *  renders a builder with zero heights. Quick-pick + the Sofa Combos price
+ *  grid key off THIS; the à-la-carte size axis is `activeSofaSizes` below. */
 export function activeSofaHeights(
   pools: CatalogOptionPoolDto[] | null | undefined,
 ): SofaHeight[] {
@@ -131,6 +133,24 @@ export function activeSofaHeights(
   return fromPool.length > 0 ? fromPool : [...SOFA_HEIGHTS];
 }
 
+/** The À-LA-CARTE size axis (0204, Loo 2026-07-06) = EVERY active `sofa_size`
+ *  pool value, pool order, INCLUDING non-canonical entries ("Flat") — the
+ *  per-size compartment price map (`product_skus.prices_by_size`) keys off
+ *  these exact values, and 2990s sells them (pool edits auto-follow into SKU
+ *  Master's size columns + the Customize canvas size picker). A combo simply
+ *  has no price at a non-canonical size → à-la-carte applies there. Empty/
+ *  absent pool → the canonical SOFA_HEIGHTS fallback (fresh-DB safety). */
+export function activeSofaSizes(
+  pools: CatalogOptionPoolDto[] | null | undefined,
+): string[] {
+  const fromPool = (pools ?? [])
+    .filter((p) => p.pool === "sofa_size" && p.active)
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((p) => p.value);
+  return fromPool.length > 0 ? fromPool : [...SOFA_HEIGHTS];
+}
+
 /** `activeSofaHeights` further gated by the model's Allowed-Options seat-size
  *  ticks (2990s writes sofa seat sizes to `allowed_options.sizes`). Absent OR
  *  empty ticks — and ticks that miss every active height — fall back to the
@@ -140,6 +160,23 @@ export function gatedSofaHeights(
   pools: CatalogOptionPoolDto[] | null | undefined,
 ): SofaHeight[] {
   const actives = activeSofaHeights(pools);
+  const raw = (model.allowedOptions ?? ({} as Record<string, unknown>)).sizes;
+  const ticks = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
+  if (ticks.length === 0) return actives;
+  const allow = new Set(ticks);
+  const gated = actives.filter((h) => allow.has(h));
+  return gated.length > 0 ? gated : actives;
+}
+
+/** `activeSofaSizes` gated by the SAME model seat-size ticks as
+ *  `gatedSofaHeights` — the à-la-carte/canvas twin (0204): a model that ticks
+ *  specific sizes narrows BOTH axes identically, non-canonical values ("Flat")
+ *  included. Same fall-backs: no/dead ticks → the full active set. */
+export function gatedSofaSizes(
+  model: Pick<ProductModelDto, "allowedOptions">,
+  pools: CatalogOptionPoolDto[] | null | undefined,
+): string[] {
+  const actives = activeSofaSizes(pools);
   const raw = (model.allowedOptions ?? ({} as Record<string, unknown>)).sizes;
   const ticks = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
   if (ticks.length === 0) return actives;

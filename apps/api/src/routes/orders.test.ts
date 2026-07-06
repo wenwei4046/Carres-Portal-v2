@@ -2772,6 +2772,9 @@ describe("POST /api/orders — option picks recompute (0201/0202 wiring)", () =>
         { id: "00000000-0000-4000-8000-000000000901", pool: "divan_height", value: '10"', label: null, dimensions: null, surcharge: "125", active: true, sort_order: 1, created_at: "2026-07-05T00:00:00Z", updated_at: "2026-07-05T00:00:00Z", updated_by: null },
         { id: "00000000-0000-4000-8000-000000000902", pool: "bedframe_leg_height", value: '4"', label: null, dimensions: null, surcharge: "60", active: true, sort_order: 2, created_at: "2026-07-05T00:00:00Z", updated_at: "2026-07-05T00:00:00Z", updated_by: null },
         { id: "00000000-0000-4000-8000-000000000903", pool: "sofa_leg_height", value: '6"', label: null, dimensions: null, surcharge: "90", active: true, sort_order: 3, created_at: "2026-07-05T00:00:00Z", updated_at: "2026-07-05T00:00:00Z", updated_by: null },
+        // 0204 — the sofa_size axis the recompute's size gate reads: like a
+        // real DB, the build fixture's height "28" must be a live pool value.
+        { id: "00000000-0000-4000-8000-000000000904", pool: "sofa_size", value: "28", label: null, dimensions: null, surcharge: null, active: true, sort_order: 4, created_at: "2026-07-05T00:00:00Z", updated_at: "2026-07-05T00:00:00Z", updated_by: null },
       ],
     },
   };

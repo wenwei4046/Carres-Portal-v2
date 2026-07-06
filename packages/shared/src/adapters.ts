@@ -75,6 +75,9 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   // 0186 — principal-only PWP reward price; null stays null (not coerced to 0)
   // so "unset" is distinct from "zero PWP price".
   pwpPrice: r.pwp_price == null ? null : Number(r.pwp_price),
+  // 0204 — per-size price map; null column stays null ("nothing authored"),
+  // present maps get their numeric values coerced (PostgREST jsonb strings).
+  pricesBySize: r.prices_by_size == null ? null : coerceHeightMap(r.prices_by_size),
 });
 
 export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({

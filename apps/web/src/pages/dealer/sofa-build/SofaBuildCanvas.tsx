@@ -143,8 +143,9 @@ export default function SofaBuildCanvas({
   /** 0201-wiring — the sofa_leg_height pool rows this model offers (surcharge
    *  joins the drift-gated total via computeSofaPrice). Absent → no leg picker. */
   legHeightOptions?: Array<{ id: string; value: string; surcharge: number | null; active: boolean }>;
-  /** 0201-wiring — the ACTIVE Maintenance sofa sizes (seat heights). Absent →
-   *  the full canonical SOFA_HEIGHTS axis (legacy behaviour). */
+  /** 0201-wiring + 0204 — the ACTIVE Maintenance sofa sizes: the size picker's
+   *  options AND the per-size à-la-carte price axis (prices_by_size keys off
+   *  these exact values). Absent → the canonical SOFA_HEIGHTS fallback. */
   heights?: readonly string[];
   onAddBuild: (payload: SofaBuildAddPayload) => void;
   onClose: () => void;
@@ -197,8 +198,9 @@ export default function SofaBuildCanvas({
     (initialCells ?? []).map((c) => ({ ...c, id: nextCellId() })),
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // 0201-wiring — the seat-height axis follows the ACTIVE Maintenance sofa
-  // sizes when the caller passes them; legacy callers keep the full axis.
+  // 0201-wiring + 0204 — the size axis follows the ACTIVE Maintenance sofa
+  // sizes when the caller passes them (per-size prices key off those exact
+  // values); legacy callers keep the full canonical axis.
   const heightChoices = useMemo<readonly string[]>(
     () => (heights && heights.length > 0 ? heights : SOFA_HEIGHTS),
     [heights],
@@ -522,6 +524,7 @@ export default function SofaBuildCanvas({
                     key={pool.id}
                     compartment={pool}
                     offered={offered}
+                    size={height}
                     onAdd={addCell}
                   />
                 ))}
@@ -768,9 +771,10 @@ export default function SofaBuildCanvas({
           </label>
         )}
 
-        {/* Height picker — the ACTIVE Maintenance sofa sizes (0201) */}
+        {/* Size picker — the ACTIVE Maintenance sofa sizes (0201 + 0204: also
+            the per-size à-la-carte price axis) */}
         <label className="flex items-center gap-2 t-small text-base-600">
-          Seat height
+          Size
           <select
             value={height}
             onChange={(e) => setHeight(e.target.value)}
@@ -779,7 +783,7 @@ export default function SofaBuildCanvas({
           >
             {heightChoices.map((h) => (
               <option key={h} value={h}>
-                {h}&Prime;
+                {/^\d+$/.test(h) ? `${h}″` : h}
               </option>
             ))}
           </select>
