@@ -3061,6 +3061,40 @@ describe("0179 — sofa combo pricing (GET bundle + principal-gated CRUD)", () =
     expect(body.sofaCombo).toMatchObject({ id: SOFA_COMBO_ID, modelId: MODEL_ID_LIVE });
   });
 
+  it("0206 — POST /sofa-combos threads is_quick_pick=true (Create quick pick)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId: MODEL_ID_LIVE, slots: [["1NA"]], isQuickPick: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect((ins?.payload as { is_quick_pick: boolean }).is_quick_pick).toBe(true);
+  });
+
+  it("0206 — POST /sofa-combos defaults is_quick_pick=false (Create combo)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId: MODEL_ID_LIVE, slots: [["1NA"]], pricesByHeight: { "24": 1000 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect((ins?.payload as { is_quick_pick: boolean }).is_quick_pick).toBe(false);
+  });
+
   it("0183 — POST /sofa-combos persists cost_by_height (camelCase costByHeight → snake)", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));

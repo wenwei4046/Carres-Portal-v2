@@ -8,13 +8,20 @@ import { useCreateSofaCombo } from "@/lib/queries";
 /**
  * Principal-only modal (Loo 2026-07-06): turn the CURRENT sofa build (its
  * arranged compartment codes) into a `sofa_combo_pricing` row without leaving
- * the Customize canvas.
+ * the Customize canvas. Two kinds (Loo 2026-07-07):
  *
- * A per-size grid captures the combo price + PWP price for each canonical sofa
- * height. A size whose PRICE is left BLANK is simply not offered at that size
- * (the combo carries no price there). Saving goes through `useCreateSofaCombo`,
- * which invalidates the catalog query — so the combo immediately appears in the
- * Maintenance Combo Pricing tab AND the Quick-pick list.
+ *   • "combo"      — a PRICING rule. A per-size grid captures the combo price +
+ *     PWP price for each canonical height; a blank price = not offered at that
+ *     size. Saved with `isQuickPick: false` → the engine matches it for pricing
+ *     but it does NOT appear in the POS Quick pick tab.
+ *   • "quick_pick" — a LAYOUT PRESET shown in the POS Quick pick tab. NO price
+ *     (empty `pricesByHeight`) → it never competes in matched-combo pricing;
+ *     picking it just loads the layout onto the canvas, which prices live. Saved
+ *     with `isQuickPick: true`.
+ *
+ * Saving goes through `useCreateSofaCombo`, which invalidates the catalog query
+ * so a combo shows immediately in Maintenance › Combo Pricing, and a quick pick
+ * shows immediately in the POS Quick pick tab.
  *
  * `heights` MUST be the canonical combo axis (`gatedSofaHeights`) — the server's
  * `prices_by_height` only accepts `SOFA_HEIGHTS` keys (Flat is excluded).
@@ -23,13 +30,16 @@ export default function CreateSofaComboModal({
   model,
   moduleCodes,
   heights,
+  kind = "combo",
   onClose,
 }: {
   model: ProductModelDto;
   moduleCodes: string[];
   heights: readonly string[];
+  kind?: "combo" | "quick_pick";
   onClose: () => void;
 }) {
+  const isQuickPick = kind === "quick_pick";
   const create = useCreateSofaCombo();
   const [label, setLabel] = useState(moduleCodes.join(" + "));
   // Per-height { price, pwp } as raw strings — blank = not priced at that size.
@@ -60,7 +70,8 @@ export default function CreateSofaComboModal({
 
   const canSave =
     moduleCodes.length > 0 &&
-    Object.keys(priced.pricesByHeight).length > 0 &&
+    // A Quick Pick is a price-less layout preset; a combo needs ≥1 authored size.
+    (isQuickPick || Object.keys(priced.pricesByHeight).length > 0) &&
     !create.isPending;
 
   async function save() {
@@ -68,18 +79,25 @@ export default function CreateSofaComboModal({
     const input: SofaComboCreateInput = {
       modelId: model.id,
       slots: moduleCodes.map((c) => [c]),
-      pricesByHeight: priced.pricesByHeight,
+      // Quick Pick = a price-less layout preset (prices live when used); Combo =
+      // a priced matched-combo rule. `isQuickPick` gates the POS Quick pick tab.
+      pricesByHeight: isQuickPick ? {} : priced.pricesByHeight,
       pwpPricesByHeight:
-        Object.keys(priced.pwpByHeight).length > 0 ? priced.pwpByHeight : null,
+        !isQuickPick && Object.keys(priced.pwpByHeight).length > 0 ? priced.pwpByHeight : null,
       label: label.trim() || null,
       active: true,
+      isQuickPick,
     };
     try {
       await create.mutateAsync(input);
-      toast.success("Combo created — synced to Maintenance");
+      toast.success(isQuickPick ? "Quick pick created" : "Combo created — synced to Maintenance");
       onClose();
     } catch {
-      toast.error("Could not create the combo. Please try again.");
+      toast.error(
+        isQuickPick
+          ? "Could not create the quick pick. Please try again."
+          : "Could not create the combo. Please try again.",
+      );
     }
   }
 
@@ -98,8 +116,8 @@ export default function CreateSofaComboModal({
       }}
       role="dialog"
       aria-modal="true"
-      aria-label="Create combo"
-      data-testid="create-sofa-combo-modal"
+      aria-label={isQuickPick ? "Create quick pick" : "Create combo"}
+      data-testid={isQuickPick ? "create-sofa-quickpick-modal" : "create-sofa-combo-modal"}
       onClick={onClose}
     >
       <div
@@ -124,7 +142,9 @@ export default function CreateSofaComboModal({
           }}
         >
           <div style={{ minWidth: 0 }}>
-            <div className="pos-eyebrow">Principal · Create combo</div>
+            <div className="pos-eyebrow">
+              Principal · {isQuickPick ? "Create quick pick" : "Create combo"}
+            </div>
             <div className="t-h4" style={{ marginTop: 2 }}>
               {model.name}
             </div>
@@ -145,7 +165,7 @@ export default function CreateSofaComboModal({
 
         <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
           <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span className="pos-eyebrow">Combo name</span>
+            <span className="pos-eyebrow">{isQuickPick ? "Quick pick name" : "Combo name"}</span>
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
@@ -154,49 +174,64 @@ export default function CreateSofaComboModal({
             />
           </label>
 
-          <div>
-            <div className="pos-eyebrow" style={{ marginBottom: 6 }}>
-              Price per size
-            </div>
-            <div className="t-tiny text-base-400" style={{ marginBottom: 10 }}>
-              Leave a size blank = this combo isn't offered at that size.
-            </div>
+          {isQuickPick ? (
             <div
+              className="t-tiny text-base-500"
               style={{
-                display: "grid",
-                gridTemplateColumns: "64px 1fr 1fr",
-                gap: 8,
-                alignItems: "center",
+                background: "var(--pos-soft, #f6f3ef)",
+                border: "1px solid var(--line)",
+                borderRadius: 8,
+                padding: "10px 12px",
+                lineHeight: 1.5,
               }}
+              data-testid="create-quickpick-note"
             >
-              <span className="t-micro text-base-400">Size</span>
-              <span className="t-micro text-base-400">Combo price (RM)</span>
-              <span className="t-micro text-base-400">PWP price (RM)</span>
-              {heights.map((h) => (
-                <Fragment key={h}>
-                  <span className="t-small font-mono">
-                    {/^\d+$/.test(h) ? `${h}″` : h}
-                  </span>
-                  <input
-                    inputMode="decimal"
-                    value={rows[h]?.price ?? ""}
-                    onChange={(e) => setCell(h, "price", e.target.value)}
-                    placeholder="—"
-                    className="rounded-[6px] border border-base-300 bg-white px-2 py-1 t-small font-mono"
-                    data-testid={`create-combo-price-${h}`}
-                  />
-                  <input
-                    inputMode="decimal"
-                    value={rows[h]?.pwp ?? ""}
-                    onChange={(e) => setCell(h, "pwp", e.target.value)}
-                    placeholder="—"
-                    className="rounded-[6px] border border-base-300 bg-white px-2 py-1 t-small font-mono"
-                    data-testid={`create-combo-pwp-${h}`}
-                  />
-                </Fragment>
-              ))}
+              This layout appears in the <strong>Quick pick</strong> tab for salespeople. It has
+              no fixed price — picking it drops the layout on the canvas and prices live.
             </div>
-          </div>
+          ) : (
+            <div>
+              <div className="pos-eyebrow" style={{ marginBottom: 6 }}>
+                Price per size
+              </div>
+              <div className="t-tiny text-base-400" style={{ marginBottom: 10 }}>
+                Leave a size blank = this combo isn't offered at that size.
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "64px 1fr 1fr",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <span className="t-micro text-base-400">Size</span>
+                <span className="t-micro text-base-400">Combo price (RM)</span>
+                <span className="t-micro text-base-400">PWP price (RM)</span>
+                {heights.map((h) => (
+                  <Fragment key={h}>
+                    <span className="t-small font-mono">{/^\d+$/.test(h) ? `${h}″` : h}</span>
+                    <input
+                      inputMode="decimal"
+                      value={rows[h]?.price ?? ""}
+                      onChange={(e) => setCell(h, "price", e.target.value)}
+                      placeholder="—"
+                      className="rounded-[6px] border border-base-300 bg-white px-2 py-1 t-small font-mono"
+                      data-testid={`create-combo-price-${h}`}
+                    />
+                    <input
+                      inputMode="decimal"
+                      value={rows[h]?.pwp ?? ""}
+                      onChange={(e) => setCell(h, "pwp", e.target.value)}
+                      placeholder="—"
+                      className="rounded-[6px] border border-base-300 bg-white px-2 py-1 t-small font-mono"
+                      data-testid={`create-combo-pwp-${h}`}
+                    />
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 2 }}>
             <button type="button" className="btn btn--secondary" onClick={onClose}>
@@ -209,7 +244,11 @@ export default function CreateSofaComboModal({
               onClick={save}
               data-testid="create-combo-save"
             >
-              {create.isPending ? "Creating…" : "Create combo"}
+              {create.isPending
+                ? "Creating…"
+                : isQuickPick
+                  ? "Create quick pick"
+                  : "Create combo"}
             </button>
           </div>
         </div>

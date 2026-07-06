@@ -98,6 +98,8 @@ const COMBO: SofaComboDto = {
   effectiveFrom: "2026-06-01",
   active: true,
   discontinuedAt: null,
+  // 0206 — a Quick Pick preset so it appears in the Quick pick tab.
+  isQuickPick: true,
 };
 
 const PRESET_SKU: ProductSkuDto = {
@@ -220,6 +222,21 @@ describe("SofaConfigurePage", () => {
     expect(within(grid).getByText("Corner starter")).toBeTruthy();
     expect(within(grid).getByText("1A(LHF) + 2A(RHF)")).toBeTruthy();
     expect(within(grid).getByText(/From RM 2,990/)).toBeTruthy();
+  });
+
+  it("0206 — a plain combo (isQuickPick=false) is hidden; only the quick pick shows", () => {
+    const plain: SofaComboDto = {
+      ...COMBO,
+      id: "00000000-0000-0000-0000-0000000c0099",
+      label: "Pricing only",
+      isQuickPick: false,
+    };
+    renderPage({ combos: [COMBO, plain] });
+    const grid = screen.getByTestId("sofa-quick-picks");
+    expect(within(grid).getByText("Corner starter")).toBeTruthy(); // the quick pick
+    // the pricing-only combo is filtered out of the Quick pick tab
+    expect(screen.queryByTestId(`sofa-quick-pick-${plain.id}`)).toBeNull();
+    expect(within(grid).queryByText("Pricing only")).toBeNull();
   });
 
   it("Customize header size chips drive the size; the redundant bottom picker is gone", () => {

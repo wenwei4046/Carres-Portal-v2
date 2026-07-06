@@ -320,7 +320,9 @@ export default function SofaConfigurePage({
   const picks: QuickPick[] = useMemo(
     () =>
       sofaCombos
-        .filter((c) => c.modelId === model.id && c.active && !c.discontinuedAt)
+        // 0206 — the Quick pick tab shows only rows flagged as Quick Pick
+        // presets; plain pricing combos (isQuickPick=false) stay out of it.
+        .filter((c) => c.modelId === model.id && c.active && !c.discontinuedAt && c.isQuickPick)
         .map((c) => {
           const codes = c.slots.map((s) => s[0]).filter((code): code is string => !!code);
           return {
@@ -338,7 +340,12 @@ export default function SofaConfigurePage({
   // the current Customize build as a priced sofa combo. `comboCodes` = the
   // arranged compartment codes handed up by the canvas (null = modal closed).
   const isPrincipal = useAuth((s) => s.role) === "principal";
-  const [comboCodes, setComboCodes] = useState<string[] | null>(null);
+  // 0206 — one modal, two kinds: "combo" (priced pricing rule) vs "quick_pick"
+  // (a price-less layout preset shown in the Quick pick tab).
+  const [creating, setCreating] = useState<{
+    codes: string[];
+    kind: "combo" | "quick_pick";
+  } | null>(null);
   const [seed, setSeed] = useState<Array<{
     moduleCode: string;
     x: number;
@@ -688,11 +695,14 @@ export default function SofaConfigurePage({
             >
               <X size={14} strokeWidth={2} /> Cancel
             </button>
-            {mode === "quick" && (
+            {/* 0206 — a Quick Pick preset has no fixed price (qpTotal null); it
+                routes through "Customize →" (loadPick) which prices it live on
+                the canvas. Only a priced pick shows the direct Add to Cart. */}
+            {mode === "quick" && qpTotal !== null && (
               <button
                 type="button"
                 className="btn btn--primary"
-                disabled={!heroPick || qpTotal === null}
+                disabled={!heroPick}
                 onClick={() => heroPick && addQuickPick(heroPick)}
                 data-testid="sofa-qp-add"
               >
@@ -1001,17 +1011,23 @@ export default function SofaConfigurePage({
               }
               onClose();
             }}
-            onCreateCombo={isPrincipal ? setComboCodes : undefined}
+            onCreateCombo={
+              isPrincipal ? (codes) => setCreating({ codes, kind: "combo" }) : undefined
+            }
+            onCreateQuickPick={
+              isPrincipal ? (codes) => setCreating({ codes, kind: "quick_pick" }) : undefined
+            }
             onClose={onClose}
           />
         </div>
       )}
-      {comboCodes && (
+      {creating && (
         <CreateSofaComboModal
           model={model}
-          moduleCodes={comboCodes}
+          moduleCodes={creating.codes}
           heights={offeredHeights}
-          onClose={() => setComboCodes(null)}
+          kind={creating.kind}
+          onClose={() => setCreating(null)}
         />
       )}
     </div>,

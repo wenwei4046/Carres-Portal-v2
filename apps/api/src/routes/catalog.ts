@@ -2085,6 +2085,8 @@ catalogRouter.post("/sofa-combos", async (c) => {
     pwp_prices_by_height: parsed.data.pwpPricesByHeight ?? null,
     label: parsed.data.label ?? null,
     active: parsed.data.active ?? true,
+    // 0206 — Quick Pick preset flag (default false = a pricing-only combo).
+    is_quick_pick: parsed.data.isQuickPick ?? false,
     updated_at: new Date().toISOString(),
     updated_by: c.var.auth.id,
   };
@@ -2125,6 +2127,8 @@ catalogRouter.patch("/sofa-combos/:id", async (c) => {
   if (parsed.data.label !== undefined) patch.label = parsed.data.label;
   if (parsed.data.effectiveFrom !== undefined) patch.effective_from = parsed.data.effectiveFrom;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  // 0206 — Quick Pick preset flag (promote/demote a combo to/from Quick pick).
+  if (parsed.data.isQuickPick !== undefined) patch.is_quick_pick = parsed.data.isQuickPick;
 
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);

@@ -122,6 +122,7 @@ export default function SofaBuildCanvas({
   onHeightChange,
   onAddBuild,
   onCreateCombo,
+  onCreateQuickPick,
   onClose,
   embedded = false,
   initialCells,
@@ -163,6 +164,10 @@ export default function SofaBuildCanvas({
    *  provided, a "Create combo" button appears beside Add to cart (enabled once
    *  the build is a valid connected sofa). Absent → no button (dealer flow). */
   onCreateCombo?: (moduleCodes: string[]) => void;
+  /** Principal-only (Loo 2026-07-07) — save the current build as a Quick Pick
+   *  layout PRESET (no price; prices live when loaded). Renders a "Create quick
+   *  pick" button beside "Create combo". Absent → no button (dealer flow). */
+  onCreateQuickPick?: (moduleCodes: string[]) => void;
   onClose: () => void;
   /** POS-parity (sofa configure page) — render as a FILL panel inside a parent
    *  page (no fixed overlay, no own header; the page owns the chrome). The
@@ -1069,6 +1074,18 @@ export default function SofaBuildCanvas({
               title="Save this arrangement as a priced combo (principal)"
             >
               Create combo
+            </button>
+          )}
+          {onCreateQuickPick && (
+            <button
+              type="button"
+              onClick={() => onCreateQuickPick(cells.map((c) => c.moduleCode))}
+              disabled={!canAdd}
+              className="btn btn--secondary btn--lg"
+              data-testid="sofa-build-create-quickpick"
+              title="Save this arrangement as a Quick Pick preset — no price (principal)"
+            >
+              Create quick pick
             </button>
           )}
           <button

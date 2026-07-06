@@ -366,6 +366,11 @@ export interface SofaCombo {
   effectiveFrom: string;
   active: boolean;
   discontinuedAt: string | null;
+  /** 0206 — true = a Quick Pick layout preset (shown in the POS Quick pick tab;
+   *  authored with no price → prices live when loaded). false = a pricing-only
+   *  matched combo (hidden from Quick pick). Optional: the adapter always emits
+   *  it (`?? false`); only pre-0206 test fixtures omit it. */
+  isQuickPick?: boolean;
 }
 
 export interface FloorConfig {
