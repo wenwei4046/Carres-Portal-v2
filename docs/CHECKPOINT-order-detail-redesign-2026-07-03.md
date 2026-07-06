@@ -59,6 +59,21 @@ to show. Preview servers die often — start fresh on a new port/name if dead.
   (233/233 real product lines). 5 orders created from the Master (SO-1146.. = the
   ones AutoCount export missed). Orders now = **150**.
 
+### AS-SEEN 2026-07-03 (Jess screenshot of #1070, In Production) — what's live + the 3 gaps to CLOSE next
+Live + good: action bar at the TOP (Re-check / Transfer to ready / Issue POs / Abandon);
+pill = In Production (not the wrong "Placed"); Balance = Owing(RM) / OUTSTANDING / Record
+payment (Bill gone); right column is a vertical stack (Customer → a "Collect before
+delivery" card → Delivery). **But the whole page is NOT "closed off" yet — the NEXT slice
+makes it finally LOOK like the agreed design:**
+1. 🔴 **Left column has a big empty gap** — the fixed-height Warehouse panel leaves the
+   left column short, so the page got TALL and scrolls (no longer one-screen). Tighten it
+   back toward one screen; don't leave the white void.
+2. 🟡 **Balance + Storage are merged** under one "Collect before delivery" card — split
+   into TWO separate cards: a Balance card and a Storage card (Storage 2-col MS/BF vs Sofa).
+3. 🟡 **Delivery not deduped** — region once (header badge only) · logistic name-only ·
+   support MULTIPLE carriers · rework "Contact by" into "call customer by <date>".
+Do THIS slice first (web-only, visible) → the page "forms up"; then P2/P3/P4.
+
 ## 2. THE INITIATIVE = Operation Order Detail WHOLE-PAGE redesign (4 phases)
 Jess reviewed visualize mockups panel-by-panel and said "ok proceed". Build in
 **deployable slices**, commit+deploy each, show a real screenshot.
