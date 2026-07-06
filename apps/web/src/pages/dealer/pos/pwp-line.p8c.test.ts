@@ -90,7 +90,16 @@ describe("triggerLinesInCart", () => {
   it("returns the mattress TRIGGER line (matches the rule's trigger scope), not the bedframe reward", () => {
     const cat = catalog({ pwpRules: [pwpRule] });
     const triggers = triggerLinesInCart([mattLine({ qty: 2 }), bedLine()], cat);
-    expect(triggers).toEqual([{ cartLineKey: "T1", sku: "MATT-A", qty: 2 }]);
+    expect(triggers).toEqual([{ cartLineKey: "T1", sku: "MATT-A", qty: 2, rewardLine: false }]);
+  });
+
+  it("flags a trigger line that is itself a reward (free gift) as rewardLine", () => {
+    const cat = catalog({ pwpRules: [pwpRule] });
+    const triggers = triggerLinesInCart(
+      [mattLine({ attrs: { free_gift: { giftSku: "PILLOW" } } })],
+      cat,
+    );
+    expect(triggers).toEqual([{ cartLineKey: "T1", sku: "MATT-A", qty: 1, rewardLine: true }]);
   });
 
   it("a reward-only cart (no trigger) → []", () => {

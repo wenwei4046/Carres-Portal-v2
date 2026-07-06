@@ -221,8 +221,9 @@ export default function DealerPos({
   // makes ZERO discovery traffic. The stripped (no-PII) DTO; the server computes
   // the phone match. The cross-order claim is re-validated server-side at Confirm.
   const customerPhone = draft.customer.phone.trim();
+  const customerName = draft.customer.name.trim();
   const pwpAvailableQ = usePwpAvailableForPhone(
-    { phone: customerPhone },
+    { phone: customerPhone, name: customerName },
     { enabled: pwpActive && !submitted && customerPhone.length > 0 },
   );
 
@@ -237,12 +238,13 @@ export default function DealerPos({
       const params = new URLSearchParams();
       params.set("code", trimmed);
       if (customerPhone) params.set("phone", customerPhone);
+      if (customerName) params.set("name", customerName); // 0204 — name binding
       const res = await apiFetch<PwpDiscoverResponse>(
         `/api/pwp-codes/available?${params.toString()}`,
       );
       return res.vouchers.find((v) => v.code === trimmed) ?? null;
     },
-    [customerPhone],
+    [customerPhone, customerName],
   );
 
   // The trigger lines currently in the cart (keyed by localId). A trigger is a
@@ -258,7 +260,7 @@ export default function DealerPos({
   // qty-down to 0 → free. Single-flight per cartLineKey via an in-flight ref, so
   // reserves stay sequential (the §3.1 idempotency holds). Best-effort — a missed
   // reserve just shows fewer codes in the rail; never blocks submit. */
-  const lastReconciledRef = useRef<Map<string, number>>(new Map());
+  const lastReconciledRef = useRef<Map<string, string>>(new Map());
   const inFlightRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!pwpActive || submitted) return;
@@ -266,17 +268,20 @@ export default function DealerPos({
       const prev = lastReconciledRef.current;
       const next = new Map(triggerLines.map((t) => [t.cartLineKey, t]));
 
-      // Reserve new triggers + qty changes (sequential, single-flight per key).
+      // Reserve new triggers + qty/reward-flag changes (sequential, single-flight
+      // per key). The diff key includes `rewardLine` so marking a trigger line as
+      // a reward re-reconciles it (the server then trims its promo reservations).
       for (const t of triggerLines) {
         if (inFlightRef.current.has(t.cartLineKey)) continue;
-        if (prev.get(t.cartLineKey) === t.qty) continue; // unchanged → no-op
+        const diffKey = `${t.qty}:${t.rewardLine}`;
+        if (prev.get(t.cartLineKey) === diffKey) continue; // unchanged → no-op
         inFlightRef.current.add(t.cartLineKey);
         reservePwp.mutate(
-          { cartLineKey: t.cartLineKey, sku: t.sku, qty: t.qty },
+          { cartLineKey: t.cartLineKey, sku: t.sku, qty: t.qty, rewardLine: t.rewardLine },
           {
             onSettled: () => {
               inFlightRef.current.delete(t.cartLineKey);
-              lastReconciledRef.current.set(t.cartLineKey, t.qty);
+              lastReconciledRef.current.set(t.cartLineKey, diffKey);
             },
           },
         );

@@ -832,6 +832,9 @@ export const pwpDiscoverDtoSchema = z.object({
   sourceOrderId: z.string().uuid().nullable(),
   expiresAt: z.string().nullable(),
   phoneMatches: z.boolean(),
+  /** 0204 — the NAME half of the 2990s name+phone binding (server-computed;
+   *  defaults true for pre-0204 API responses). */
+  nameMatches: z.boolean().default(true),
 });
 export type PwpDiscoverDto = z.infer<typeof pwpDiscoverDtoSchema>;
 
@@ -849,6 +852,11 @@ export const pwpReserveInputSchema = z
     cartLineKey: z.string().min(1),
     sku: z.string().min(1),
     qty: z.number().int().positive(),
+    /** True when the trigger line is ITSELF a reward (claimed PWP/promo, free
+     *  item, or appended free gift). The reserve route then skips PROMO rules —
+     *  a free reward must never mint a promo voucher that funds the next free
+     *  reward (2990s one-way parity). PWP rules still reserve (chainable). */
+    rewardLine: z.boolean().optional(),
   })
   .strict();
 export type PwpReserveInput = z.infer<typeof pwpReserveInputSchema>;

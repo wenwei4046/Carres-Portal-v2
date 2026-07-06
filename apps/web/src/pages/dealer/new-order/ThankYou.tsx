@@ -1,7 +1,8 @@
-import { Check, Plus } from "lucide-react";
+import { Check, Gift, Plus } from "lucide-react";
 import type { Order } from "@carres/shared";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import { useAuth } from "@/lib/auth";
+import { usePwpCodesByOrder } from "@/lib/queries";
 
 interface Props {
   order: Order;
@@ -26,6 +27,13 @@ export default function ThankYou({ order, onNewOrder, onClose }: Props) {
   const itemsTotal = (order.lines ?? []).reduce((s, l) => s + l.unitPrice * l.qty, 0);
   const addonsTotal = (order.addons ?? []).reduce((s, a) => s + a.unitPrice * a.qty, 0);
   const total = itemsTotal + addonsTotal;
+  // 2990s parity (0204): the vouchers this order EARNED (carry-forward codes the
+  // customer can redeem on a future order) — printed here so they walk away with
+  // the code, like the 2990s SO. Empty for a no-PWP order (query returns []).
+  const earnedVouchersQ = usePwpCodesByOrder(order.id);
+  const earnedVouchers = (earnedVouchersQ.data?.codes ?? []).filter(
+    (c) => c.status === "AVAILABLE",
+  );
 
   return (
     <div className="confirm">
@@ -111,6 +119,30 @@ export default function ThankYou({ order, onNewOrder, onClose }: Props) {
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {earnedVouchers.length > 0 && (
+            <div className="summary__section" data-testid="thankyou-vouchers">
+              <div className="summary__section-label">
+                <Gift size={12} strokeWidth={1.75} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                Customer vouchers
+              </div>
+              {earnedVouchers.map((v) => (
+                <div key={v.code} className="summary__row">
+                  <span className="key" style={{ fontFamily: "var(--font-mono, monospace)" }}>
+                    {v.code}
+                  </span>
+                  <span className="val">
+                    {v.type === "promo" ? "FREE" : "PWP"} · {v.rewardCategory}
+                  </span>
+                </div>
+              ))}
+              <div className="summary__row">
+                <span className="key" style={{ fontSize: 11, opacity: 0.7 }}>
+                  Redeemable on the customer&rsquo;s next order (same name + phone).
+                </span>
+              </div>
             </div>
           )}
 

@@ -493,6 +493,8 @@ export interface PwpDiscover {
   sourceOrderId: string | null;
   expiresAt: string | null;
   phoneMatches: boolean;
+  /** 0204 — the NAME half of the 2990s name+phone binding (server-computed). */
+  nameMatches: boolean;
 }
 
 export interface Warehouse {

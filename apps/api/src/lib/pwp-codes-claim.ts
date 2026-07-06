@@ -89,12 +89,17 @@ function readPwpClaim(attrs: Record<string, unknown> | null): {
  *              canonicalizes via `pwp_phone_key`). Required for a cross-order
  *              (`crossOrder=true`) claim; the SQL twin asserts the phone binding.
  *              A same-cart claim ignores it.
+ * @param customerName the REDEEMING order's customer name (raw — the RPC
+ *              canonicalizes via `pwp_name_key`). 0204: the NAME half of the
+ *              2990s name+phone voucher identity; a cross-order claim against a
+ *              name-stamped code must present the same name.
  */
 export async function claimPwpCodesForLines(
   sb: SupabaseClient,
   _auth: ClaimAuth,
   lines: RecomputableLine[],
   customerPhone: string | null = null,
+  customerName: string | null = null,
 ): Promise<PwpClaimOutcome> {
   // 1. Collect coded reward lines. A line with no non-empty `attrs.pwp.code` is
   //    not a voucher claim. DORMANT short-circuit: no coded line → no DB call.
@@ -184,7 +189,8 @@ export async function claimPwpCodesForLines(
           p_rule_id: c.ruleId, // the code must be minted under the rule that priced this line
           p_claim_group: claimGroup, // cancel/recovery join key, set at claim (pre-create_order)
           p_redeemed_sku: c.sku, // best-effort audit (§4.2a)
-          p_customer_phone: customerPhone, // the binding the SQL twin asserts (§4.2)
+          p_customer_phone: customerPhone, // the PHONE binding the SQL twin asserts (§4.2)
+          p_customer_name: customerName, // the NAME binding (0204, 2990s name+phone parity)
         })
       : await sb.rpc("pwp_claim_code", {
           p_code: c.code,

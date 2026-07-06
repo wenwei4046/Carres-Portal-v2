@@ -363,7 +363,13 @@ ordersRouter.post("/", async (c) => {
   // P8d (§4.2): pass the order's customer phone so a CROSS-order claim
   // (attrs.pwp.crossOrder=true) can assert the phone binding in the DEFINER RPC.
   // A same-cart claim ignores it (byte-identical to P8c).
-  const pwpClaim = await claimPwpCodesForLines(sb, { id: auth.id }, pwp.lines, parsed.data.customer.phone);
+  const pwpClaim = await claimPwpCodesForLines(
+    sb,
+    { id: auth.id },
+    pwp.lines,
+    parsed.data.customer.phone,
+    parsed.data.customer.name, // 0204 — the NAME half of the voucher identity
+  );
   if (pwpClaim.status === "server_error") {
     throw new HTTPException(500, { message: pwpClaim.message });
   }
@@ -644,6 +650,7 @@ ordersRouter.post("/", async (c) => {
     ownerDealerId: effectiveDealerId,
     orderId: id,
     customerPhone: parsed.data.customer.phone,
+    customerName: parsed.data.customer.name, // 0204 — the NAME half of the identity
     finalLines,
     clientCartLineKeys: parsed.data.pwpCartLineKeys ?? [],
   });
