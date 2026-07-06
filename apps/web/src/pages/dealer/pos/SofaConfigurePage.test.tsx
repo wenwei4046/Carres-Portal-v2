@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import type {
+  CatalogFabricDto,
   ModelSofaCompartmentDto,
   ProductModelDto,
   ProductSkuDto,
@@ -65,6 +66,15 @@ const FABRICS: SofaFabricDto[] = [
   { id: "f-1", modelId: MODEL.id, fabricName: "Linen Beige", surcharge: 0, colors: null, tier: "PRICE_1" },
 ];
 
+// Master Fabrics-tab rows across two series (0202 `series`). A model opts in via
+// allowedOptions.fabrics (the fabric CODES). Used to exercise the SERIES → COLOUR
+// cascade + KIV.
+const MASTER_FABRICS: CatalogFabricDto[] = [
+  { id: "mf-ez1", fabricCode: "EZ-001", series: "EZ", description: "Pearl", supplierCode: null, sofaTier: "PRICE_2", bedframeTier: "PRICE_1", active: true, sortOrder: 0 },
+  { id: "mf-ez2", fabricCode: "EZ-002", series: "EZ", description: "Sand", supplierCode: null, sofaTier: "PRICE_2", bedframeTier: "PRICE_1", active: true, sortOrder: 1 },
+  { id: "mf-k1", fabricCode: "K-001", series: "K", description: "Coal", supplierCode: null, sofaTier: "PRICE_2", bedframeTier: "PRICE_1", active: true, sortOrder: 2 },
+];
+
 const COMBO: SofaComboDto = {
   id: "00000000-0000-0000-0000-00000000c001",
   modelId: MODEL.id,
@@ -94,15 +104,19 @@ function renderPage(over?: {
   combos?: SofaComboDto[];
   onClose?: () => void;
   skus?: ProductSkuDto[];
+  fabrics?: SofaFabricDto[];
+  masterFabrics?: CatalogFabricDto[] | null;
+  model?: ProductModelDto;
 }) {
   const onAdd = vi.fn();
   const onClose = vi.fn(over?.onClose);
   render(
     <SofaConfigurePage
-      model={MODEL}
+      model={over?.model ?? MODEL}
       meta={undefined}
       skus={over?.skus ?? []}
-      fabrics={FABRICS}
+      fabrics={over?.fabrics ?? FABRICS}
+      masterFabrics={over?.masterFabrics ?? null}
       fabricTierConfig={null}
       modelFabricTierOverrides={null}
       sofaCompartments={POOL}
@@ -309,13 +323,52 @@ describe("SofaConfigurePage", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("fabric pills: Confirm later selected by default; clicking a fabric selects it", () => {
+  it("fabric: sole series auto-collapses; colour KIV by default; picking a colour selects it", () => {
     pwpMock.current = { data: { vouchers: [] }, isFetching: false };
-    renderPage();
-    expect(screen.getByTestId("sofa-qp-fabric-defer").getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByTestId("sofa-qp-fabric-sf:f-1"));
-    expect(screen.getByTestId("sofa-qp-fabric-sf:f-1").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByTestId("sofa-qp-fabric-defer").getAttribute("aria-pressed")).toBe("false");
+    renderPage(); // one legacy fabric → single "Other" series → no series step
+    expect(screen.queryByTestId("sofa-qp-fabric-series")).toBeNull();
+    const colour = screen.getByTestId("sofa-qp-fabric") as HTMLSelectElement;
+    expect(colour.value).toBe("__kiv__"); // colour-level KIV until chosen
+    fireEvent.change(colour, { target: { value: "sf:f-1" } });
+    expect(colour.value).toBe("sf:f-1");
+    expect(colour.options[colour.selectedIndex]!.textContent).toMatch(/Linen Beige/);
+  });
+
+  it("fabric: multiple series → pick a series to reveal its colours; other series excluded", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    renderPage({
+      model: { ...MODEL, allowedOptions: { fabrics: ["EZ-001", "EZ-002", "K-001"] } },
+      masterFabrics: MASTER_FABRICS,
+    });
+    const series = screen.getByTestId("sofa-qp-fabric-series") as HTMLSelectElement;
+    expect(series.value).toBe(""); // series-level KIV by default
+    expect(screen.queryByTestId("sofa-qp-fabric")).toBeNull(); // no colours until a series
+    fireEvent.change(series, { target: { value: "EZ" } });
+    const colour = screen.getByTestId("sofa-qp-fabric") as HTMLSelectElement;
+    expect(colour.value).toBe("__kiv__"); // colour KIV until chosen
+    const labels = Array.from(colour.options).map((o) => o.textContent ?? "");
+    expect(labels.some((l) => /EZ-001/.test(l))).toBe(true);
+    expect(labels.some((l) => /EZ-002/.test(l))).toBe(true);
+    expect(labels.some((l) => /K-001/.test(l))).toBe(false); // only the EZ series
+  });
+
+  it("series chosen + colour KIV → line carries fabric_series, stays deferred, no tier delta", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    const { onAdd } = renderPage({
+      model: { ...MODEL, allowedOptions: { fabrics: ["EZ-001", "EZ-002"] } },
+      fabrics: [], // no legacy rows → EZ is the ONLY series
+      masterFabrics: MASTER_FABRICS.filter((f) => f.series === "EZ"),
+      skus: [PRESET_SKU],
+    });
+    // sole EZ series → auto-collapsed; colour defaults to KIV
+    expect(screen.queryByTestId("sofa-qp-fabric-series")).toBeNull();
+    expect((screen.getByTestId("sofa-qp-fabric") as HTMLSelectElement).value).toBe("__kiv__");
+    fireEvent.click(screen.getByTestId("sofa-qp-add"));
+    const line = onAdd.mock.calls[0]![0];
+    expect(line.unitPrice).toBe(2990); // base @ 24″ — no tier delta while colour is KIV
+    const attrs = line.attrs as Record<string, unknown>;
+    expect(attrs.fabric_series).toBe("EZ");
+    expect(attrs.fabric_deferred).toBe(true);
   });
 
   it("renders a to-scale plan view with width + depth cm callouts", () => {
