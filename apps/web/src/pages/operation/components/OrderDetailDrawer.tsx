@@ -8,6 +8,7 @@ import {
   Flag,
   MoreVertical,
   Pencil,
+  Phone,
   RotateCcw,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -441,19 +442,6 @@ function Panel({
   );
 }
 
-/** A sub-header for a split card's inner column (Customer | Balance): the column
- *  name on the left + its own summary badge on the right, its own bottom rule. */
-function SplitHead({ title, summary }: { title: string; summary?: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-base-100">
-      <span className="t-h4 text-base-900 shrink-0">{title}</span>
-      {summary != null && (
-        <span className="min-w-0 flex justify-end">{summary}</span>
-      )}
-    </div>
-  );
-}
-
 /** Tiny status counter for a panel header — tighter than the full `.pill` so up
  *  to three fit on one header row. Colours track the locked stock vocab. */
 function MiniBadge({
@@ -646,6 +634,20 @@ function DrawerBody({
             .slice(0, 10),
         )
       : null;
+  // Collect-before-delivery reminder dates (Jess): ideal collect ≥7 days before the
+  // logistic ETA (delivery date); last-call at ETA−1 (after which delivery holds).
+  const deliveryMs =
+    !order.delivery_date_tbd && order.delivery_date
+      ? new Date(order.delivery_date).getTime()
+      : null;
+  const collectByLabel =
+    deliveryMs !== null
+      ? fmtDate(new Date(deliveryMs - 7 * 86_400_000).toISOString().slice(0, 10))
+      : null;
+  const lastCallLabel =
+    deliveryMs !== null
+      ? fmtDate(new Date(deliveryMs - 1 * 86_400_000).toISOString().slice(0, 10))
+      : null;
   // Header summary = the OWING amount (Jess: operation tracks outstanding, not a
   // bill). Prefer the operator/import-keyed control balance; else the derived
   // outstanding; never show "RM 0 paid" (that read as settled when it wasn't).
@@ -721,6 +723,14 @@ function DrawerBody({
   const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
   const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
   const holdCount = (balanceGate === "hold" ? 1 : 0) + (storageGate === "hold" ? 1 : 0);
+  // The grouped "Collect before delivery" card summary = the WORST of the two
+  // sub-gates (balance + storage), so the card header warns/blocks as a unit.
+  const collectGate: "hold" | "warn" | null =
+    balanceGate === "hold" || storageGate === "hold"
+      ? "hold"
+      : balanceGate === "warn" || storageGate === "warn"
+        ? "warn"
+        : null;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -1085,69 +1095,87 @@ function DrawerBody({
           style={{ gridArea: "side" }}
           className="flex flex-col gap-2.5 min-w-0 min-h-0 overflow-auto"
         >
-          {/* Card A — Customer | Balance split in ONE card (each half its own
-              sub-header + summary), with a Storage strip at the bottom for a
-              storage-eligible order. */}
-          <section className="border border-base-200 rounded-[12px] bg-white overflow-hidden shrink-0">
-            <div className="grid grid-cols-2">
-              <div className="border-r border-base-100 flex flex-col min-w-0">
-                <SplitHead
-                  title="Customer"
-                  summary={
-                    loc.label ? (
-                      <span
-                        title={loc.label}
-                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-base-100 text-base-500 max-w-[120px] truncate"
-                      >
-                        {loc.label}
-                      </span>
-                    ) : null
-                  }
-                />
-                <div className="p-3 flex-1">
-                  <OrderCustomerCard order={order} />
-                </div>
-              </div>
-              <div className="flex flex-col min-w-0">
-                <SplitHead
-                  title="Balance"
-                  summary={
-                    balanceGate ? (
-                      <GateBadge gate={balanceGate} />
-                    ) : (
-                      <MiniBadge tone="muted">{paymentSummary}</MiniBadge>
-                    )
-                  }
-                />
-                <div className="p-3 flex-1">
-                  <PaymentControlFields
-                    form={form}
-                    paid={Number(order.paid || 0)}
-                    total={grandTotal}
-                    orderId={order.id}
-                    receiptMeta={{
-                      orderCode: `SO-${order.so}`,
-                      customerName: order.customer_name ?? "",
-                    }}
-                  />
-                </div>
-              </div>
+          {/* 1. Customer — a quiet identity card (name / phone / address, with an
+              inline Edit on a Place order). Header summary = the area. */}
+          <Panel
+            title="Customer"
+            summary={
+              loc.label ? (
+                <span
+                  title={loc.label}
+                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-base-100 text-base-500 max-w-[140px] truncate"
+                >
+                  {loc.label}
+                </span>
+              ) : undefined
+            }
+          >
+            <div className="p-3">
+              <OrderCustomerCard order={order} />
             </div>
-          </section>
+          </Panel>
 
-          {/* Storage — its OWN panel now (Jess: not merged with Customer/Balance). */}
-          {(hasMsbf || hasSof) && (
-            <Panel
-              title="Storage"
-              summary={
-                storageGate ? (
-                  <GateBadge gate={storageGate} />
+          {/* 2. Collect before delivery — Balance + Storage share ONE card and one
+              gate: both must be collected before dispatch or the header rolls a
+              🔴 HOLD DELIVERY (Jess: same operational lever). Balance always;
+              Storage only when a storable category is on the order. */}
+          <section className="border border-base-200 rounded-[12px] bg-white overflow-hidden shrink-0">
+            <header className="flex items-center justify-between gap-3 px-3 py-2 border-b border-base-100">
+              <span className="t-h4 text-base-900 truncate">Collect before delivery</span>
+              <span className="shrink-0 flex items-center gap-1.5">
+                {collectGate ? (
+                  <GateBadge gate={collectGate} />
                 ) : (
-                  <MiniBadge tone="muted">fee if held</MiniBadge>
-                )
-              }
-            >
-              <div className="p-3">
+                  <MiniBadge tone="muted">{paymentSummary}</MiniBadge>
+                )}
+              </span>
+            </header>
+
+            {/* Balance sub-section */}
+            <div className="p-3">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="t-micro text-base-400">Balance</span>
+                {balanceGate ? <GateBadge gate={balanceGate} /> : null}
+              </div>
+              {balanceOwing && collectByLabel && (
+                <div
+                  className={`mb-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11.5px] ${
+                    balanceGate === "hold"
+                      ? "bg-[#FEE2E2] text-[#991B1B]"
+                      : balanceGate === "warn"
+                        ? "bg-[#FEF3C7] text-[#92400E]"
+                        : "bg-base-50 text-base-500"
+                  }`}
+                >
+                  <span>Collect by {collectByLabel}</span>
+                  <span className="font-medium whitespace-nowrap">
+                    last call {lastCallLabel}
+                  </span>
+                </div>
+              )}
+              <PaymentControlFields
+                form={form}
+                paid={Number(order.paid || 0)}
+                total={grandTotal}
+                orderId={order.id}
+                receiptMeta={{
+                  orderCode: `SO-${order.so}`,
+                  customerName: order.customer_name ?? "",
+                }}
+              />
+            </div>
+
+            {/* Storage sub-section — same card, own sub-header + gate. */}
+            {(hasMsbf || hasSof) && (
+              <div className="p-3 border-t border-base-100">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="t-micro text-base-400">Storage fee</span>
+                  {storageGate ? (
+                    <GateBadge gate={storageGate} />
+                  ) : (
+                    <MiniBadge tone="muted">fee if held</MiniBadge>
+                  )}
+                </div>
                 <StorageControlFields
                   form={form}
                   hasMsbf={hasMsbf}
@@ -1160,8 +1188,8 @@ function DrawerBody({
                   }}
                 />
               </div>
-            </Panel>
-          )}
+            )}
+          </section>
 
           {/* Card B — Delivery. Header badge = region. Body split Original |
               Logistic update; then the 3 remark rows; then a Route section only
@@ -1202,19 +1230,17 @@ function DrawerBody({
                     <LogisticEtaField form={form} />
                     <DeliveryTimeSlotField form={form} />
                   </FieldGrid>
-                  {/* Contact-by — reach the customer BEFORE the deadline to confirm
-                      stock + timing; a daily cron drops the task on this date. */}
+                  {/* Call-by — reach the customer BEFORE the deadline to confirm
+                      stock + timing; a daily cron drops the task on this date. The
+                      lead-days stepper is the quiet knob; the DATE is the headline. */}
                   {contactByLabel && (
                     <div className="mt-1.5 flex items-center justify-between gap-2 rounded-md bg-info-soft/50 px-2 py-1">
-                      <span
-                        className="text-[11px] font-medium text-info shrink-0"
-                        title="Call the customer this many days before the deadline"
-                      >
-                        Contact by
+                      <span className="flex items-center gap-1 text-[11.5px] font-medium text-info min-w-0">
+                        <Phone size={12} strokeWidth={2.25} className="shrink-0" />
+                        <span className="truncate">Call customer by {contactByLabel}</span>
                       </span>
-                      <span className="flex items-center gap-1 text-[11.5px] whitespace-nowrap">
-                        <span className="font-medium text-base-800">{contactByLabel}</span>
-                        <span className="text-base-400">· −</span>
+                      <span className="flex items-center gap-0.5 text-[11px] text-info/70 whitespace-nowrap shrink-0">
+                        <span>−</span>
                         <input
                           type="number"
                           min={0}
@@ -1222,10 +1248,11 @@ function DrawerBody({
                           value={form.draft.contact_by_days}
                           onChange={(e) => form.set("contact_by_days", e.target.value)}
                           placeholder="3"
-                          aria-label="Contact-by lead days before the deadline"
-                          className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[11.5px] text-center outline-none focus:border-primary"
+                          aria-label="Call-by lead days before the deadline"
+                          title="Days before the deadline to call the customer"
+                          className="w-8 rounded border border-base-200 bg-white px-1 py-0.5 text-[11px] text-center outline-none focus:border-primary"
                         />
-                        <span className="text-base-400">d</span>
+                        <span>d</span>
                       </span>
                     </div>
                   )}
@@ -1254,22 +1281,28 @@ function DrawerBody({
                   />
                 </FieldGrid>
               </div>
-              {/* Route — only for a cross-border / multi-leg order. */}
-              {order.delivery_stops?.length ? (
-                <div className="border-t border-base-100 pt-2">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="t-micro text-base-400">Route</span>
-                    <MiniBadge tone="muted">
-                      {order.delivery_stops.length} stops
-                    </MiniBadge>
-                  </div>
-                  <DeliveryChain
-                    orderId={order.id}
-                    stops={order.delivery_stops}
-                    fallbackPartnerId={order.delivery_partner_id}
-                  />
+              {/* Carriers / route — always available now (Jess: an order can have
+                  MORE than one carrier). A single trip shows the assigned carrier +
+                  "Add leg"; adding a leg = adding a second carrier (multi-leg rows).
+                  fallbackPartnerId prefers the Logistic select so the single-trip
+                  read-out reflects the carrier picked above. */}
+              <div className="border-t border-base-100 pt-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="t-micro text-base-400">Carriers / route</span>
+                  <MiniBadge tone="muted">
+                    {order.delivery_stops?.length
+                      ? `${order.delivery_stops.length} legs`
+                      : "single trip"}
+                  </MiniBadge>
                 </div>
-              ) : null}
+                <DeliveryChain
+                  orderId={order.id}
+                  stops={order.delivery_stops ?? null}
+                  fallbackPartnerId={
+                    order.ops_assigned_logistic ?? order.delivery_partner_id
+                  }
+                />
+              </div>
             </div>
           </Panel>
         </div>{/* /right column */}
