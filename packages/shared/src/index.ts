@@ -871,6 +871,7 @@ export {
   edgeContacts,
   groupSofas,
   orderSofaCellsLeftToRight,
+  reflowCellsForDepth,
   findSnap,
   hasArmConflict,
   analyzeSofa,

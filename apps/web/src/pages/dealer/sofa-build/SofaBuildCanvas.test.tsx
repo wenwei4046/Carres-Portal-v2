@@ -251,6 +251,14 @@ describe("SofaBuildCanvas", () => {
     expect(c2).toHaveStyle({ left: "255px", top: "140px" });
   });
 
+  it("switching size re-abuts a linked sofa — it grows as ONE piece", () => {
+    const [c1, c2] = renderClosedPair(); // 1A pair flush at 24″ (95 wide each)
+    fireEvent.change(screen.getByTestId("sofa-build-height"), { target: { value: "28" } });
+    // 1A at 28″ is 105 wide → the right piece re-abuts instead of overlapping
+    expect(c1).toHaveStyle({ left: "100px", top: "100px" });
+    expect(c2).toHaveStyle({ left: "205px", top: "100px" });
+  });
+
   it("clicking a complete sofa selects the WHOLE item — group toolbar, no per-cell pill", () => {
     const [c1] = renderClosedPair();
     firePointer(c1!, "pointerdown", 0, 0);

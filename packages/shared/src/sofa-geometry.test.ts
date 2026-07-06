@@ -33,6 +33,7 @@ import {
   analyzeSofa,
   findSnap,
   orderSofaCellsLeftToRight,
+  reflowCellsForDepth,
   SNAP_CM,
   CONTACT_TOL,
   EDGE_W,
@@ -490,6 +491,44 @@ describe("findSnap threshold", () => {
     const s = findSnap(dragged, [below], "me", "24");
     expect(s.dy).toBe(15); // abut: 110 - 95
     expect(s.dx).toBe(-29); // magnet: lefts level
+  });
+});
+
+/* ─── reflowCellsForDepth ──────────────────────────────────────────────── */
+
+describe("reflowCellsForDepth (size change keeps sofas linked)", () => {
+  it("re-abuts a flush pair when the size grows — the sofa grows as one piece", () => {
+    const cells: GeoCell[] = [
+      { id: "a", moduleCode: "1B(LHF)", x: 0, y: 0, rot: 0 }, // 24″: 105 wide
+      { id: "b", moduleCode: "1B(RHF)", x: 105, y: 0, rot: 0 },
+    ];
+    const out = reflowCellsForDepth(cells, "24", "28"); // 28″: 115 wide
+    expect(out.find((c) => c.id === "a")).toMatchObject({ x: 0, y: 0 });
+    expect(out.find((c) => c.id === "b")).toMatchObject({ x: 115, y: 0 });
+  });
+
+  it("keeps a corner L linked across a size change (still ONE closed sofa)", () => {
+    // seedCornerL LHF shape at 24″: chaise under the corner, 2A east of it.
+    const cells: GeoCell[] = [
+      { id: "one", moduleCode: "1B(LHF)", x: 0, y: 95, rot: 270 },
+      { id: "cnr", moduleCode: "CNR", x: 0, y: 0, rot: 0 },
+      { id: "two", moduleCode: "2A(RHF)", x: 95, y: 0, rot: 0 },
+    ];
+    const out = reflowCellsForDepth(cells, "24", "28");
+    expect(out.find((c) => c.id === "one")).toMatchObject({ x: 0, y: 95 }); // anchor
+    expect(out.find((c) => c.id === "cnr")).toMatchObject({ x: 0, y: 0 });
+    expect(out.find((c) => c.id === "two")).toMatchObject({ x: 105, y: 0 }); // corner now 105 wide
+    const groups = groupSofas(out, "28");
+    expect(groups).toHaveLength(1); // still one connected sofa at the NEW size
+    expect(analyzeSofa(groups[0]!, "28").closed).toBe(true);
+  });
+
+  it("free-standing pieces keep their anchor; same depth is a no-op", () => {
+    const cells: GeoCell[] = [
+      { id: "solo", moduleCode: "1S", x: 300, y: 300, rot: 0 },
+    ];
+    expect(reflowCellsForDepth(cells, "24", "28")).toEqual(cells);
+    expect(reflowCellsForDepth(cells, "24", "24")).toBe(cells);
   });
 });
 

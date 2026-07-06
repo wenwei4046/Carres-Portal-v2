@@ -31,6 +31,7 @@ import {
   findSnap,
   hasArmConflict,
   mirrorCode,
+  reflowCellsForDepth,
   classifySofaCompartment,
   computeSofaPrice,
   ROOM_W,
@@ -242,6 +243,17 @@ export default function SofaBuildCanvas({
   const legOpts = legHeightOptions ?? [];
 
   const depth = height; // seat-depth axis == the chosen height key (cm widening)
+
+  // Seat-size change reflow (Loo 2026-07-06): modules widen/narrow with the
+  // size, so a linked sofa's cells re-abut automatically — the complete sofa
+  // grows as ONE piece instead of overlapping and breaking apart.
+  const prevDepthRef = useRef(depth);
+  useEffect(() => {
+    const prev = prevDepthRef.current;
+    if (prev === depth) return;
+    prevDepthRef.current = depth;
+    setCells((cs) => reflowCellsForDepth(cs, prev, depth));
+  }, [depth]);
   // "Confirm later" — salesperson defers the fabric; the sofa still adds to
   // cart, priced at the base tier, flagged for the customer to confirm.
   const fabricDeferred = fabricKey === FABRIC_DEFER;

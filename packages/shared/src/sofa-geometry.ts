@@ -604,6 +604,94 @@ export const orderSofaCellsLeftToRight = (cells: GeoCell[], depth: Depth): GeoCe
     .flatMap(({ g }) => orderGroup(g));
 };
 
+/* ─── Depth-change reflow (keep sofas linked across seat sizes) ────────── */
+
+/** Perpendicular alignment across a seam after a size change: starts flush →
+ *  stay starts-flush; ends flush → stay ends-flush; a deliberate offset is
+ *  carried over as-is. */
+const alignPerp = (
+  aOldStart: number,
+  aOldLen: number,
+  bOldStart: number,
+  bOldLen: number,
+  aNewStart: number,
+  aNewLen: number,
+  bNewLen: number,
+): number => {
+  if (Math.abs(bOldStart - aOldStart) <= CONTACT_TOL) return aNewStart;
+  if (Math.abs(bOldStart + bOldLen - (aOldStart + aOldLen)) <= CONTACT_TOL)
+    return aNewStart + aNewLen - bNewLen;
+  return aNewStart + (bOldStart - aOldStart);
+};
+
+/**
+ * Re-abut every connected sofa after a seat-size change (Loo 2026-07-06):
+ * footprints widen along the seat axis, so cells that were flush at the old
+ * size would overlap (grow) or gap (shrink) at the new one — the assembled
+ * sofa broke and had to be re-linked by hand. Each connected group re-lays
+ * from its leftmost cell (walk order): every old contact re-abuts on the SAME
+ * side with the new footprints, preserving flush tops/bottoms (or a
+ * deliberate offset). Free-standing singles keep their anchor; positions of
+ * group starts are unchanged.
+ */
+export const reflowCellsForDepth = (
+  cells: GeoCell[],
+  oldDepth: Depth,
+  newDepth: Depth,
+): GeoCell[] => {
+  if (oldDepth === newDepth || cells.length < 2) return cells;
+  const newFp = (c: GeoCell) =>
+    moduleFootprint(findModule(c.moduleCode) ?? DEFAULT_FOOTPRINT, c.rot, newDepth);
+  const pos = new Map<GeoCell, { x: number; y: number }>();
+  for (const group of groupSofas(cells, oldDepth)) {
+    if (group.length <= 1) continue;
+    const ordered = orderSofaCellsLeftToRight(group, oldDepth);
+    const start = ordered[0]!;
+    pos.set(start, { x: start.x, y: start.y });
+    const placed = new Set<GeoCell>([start]);
+    const queue: GeoCell[] = [start];
+    while (queue.length > 0) {
+      const a = queue.shift()!;
+      const aOld = cellBbox(a, oldDepth);
+      if (!aOld) continue;
+      const aPos = pos.get(a)!;
+      const aNew = newFp(a);
+      for (const b of group) {
+        if (placed.has(b)) continue;
+        const contacts = edgeContacts(a, b, oldDepth);
+        if (contacts.length === 0) continue;
+        const bOld = cellBbox(b, oldDepth);
+        if (!bOld) continue;
+        const bNew = newFp(b);
+        const side = contacts[0]!.edgeA;
+        let nx: number;
+        let ny: number;
+        if (side === EDGE_E) {
+          nx = aPos.x + aNew.w;
+          ny = alignPerp(aOld.y, aOld.h, bOld.y, bOld.h, aPos.y, aNew.h, bNew.h);
+        } else if (side === EDGE_W) {
+          nx = aPos.x - bNew.w;
+          ny = alignPerp(aOld.y, aOld.h, bOld.y, bOld.h, aPos.y, aNew.h, bNew.h);
+        } else if (side === EDGE_S) {
+          ny = aPos.y + aNew.h;
+          nx = alignPerp(aOld.x, aOld.w, bOld.x, bOld.w, aPos.x, aNew.w, bNew.w);
+        } else {
+          ny = aPos.y - bNew.h;
+          nx = alignPerp(aOld.x, aOld.w, bOld.x, bOld.w, aPos.x, aNew.w, bNew.w);
+        }
+        pos.set(b, { x: nx, y: ny });
+        placed.add(b);
+        queue.push(b);
+      }
+    }
+  }
+  if (pos.size === 0) return cells;
+  return cells.map((c) => {
+    const p = pos.get(c);
+    return p && (p.x !== c.x || p.y !== c.y) ? { ...c, x: p.x, y: p.y } : c;
+  });
+};
+
 /* ─── Snap math (drag UI) ──────────────────────────────────────────────── */
 
 /** Threshold in cm — drag releases snap to a neighbour edge if within this. */
