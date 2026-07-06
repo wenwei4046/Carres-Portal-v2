@@ -3152,8 +3152,9 @@
   position: relative;
   /* aspect-ratio set inline. Anchor to height so all presets display
      at consistent vertical size; width derives from AR. Cap width too
-     so very wide presets (2S AR≈3.3) don't overflow horizontally. */
-  height: min(55cqh, calc(80cqw / var(--qp-ar, 2)));
+     so very wide presets (2S AR≈3.3) don't overflow horizontally.
+     Loo 2026-07-07 — nudged the hero a touch smaller (was 55cqh/80cqw). */
+  height: min(48cqh, calc(70cqw / var(--qp-ar, 2)));
   width: auto;
 }
 .sof-qp__heroFrame {
