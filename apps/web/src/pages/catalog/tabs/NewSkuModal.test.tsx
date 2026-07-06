@@ -282,11 +282,12 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
       category: "mattress",
       modelKey: "lumi-firmcare",
       name: "Lumi FirmCare",
-      allowedOptions: { sizes: ["S", "K"] },
+      // Stored as canonical full names (the SIZE shown), not the pool codes.
+      allowedOptions: { sizes: ["Single", "King"] },
     });
     expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith({
       modelId: "m-new",
-      input: { variants: ["S", "K"], price: 1990 },
+      input: { variants: ["Single", "King"], price: 1990 },
     });
     expect(mockCreateSkuMutateAsync).not.toHaveBeenCalled();
   });
@@ -302,7 +303,7 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith({
       modelId: "m-new",
-      input: { variants: ["S", "Q", "K"], price: undefined },
+      input: { variants: ["Single", "Queen", "King"], price: undefined },
     });
   });
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { ProductCategory } from "@carres/shared";
-import { PRODUCT_CATEGORIES, deriveModelKey } from "@carres/shared";
+import { PRODUCT_CATEGORIES, deriveModelKey, canonicalSize } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useCreateCatalogModel, useGenerateSkus } from "@/lib/queries";
@@ -36,18 +36,24 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
   const [createdModelId, setCreatedModelId] = useState<string | null>(null);
 
   const modelKey = deriveModelKey(name);
+  // Mattress/bedframe sizes normalize to the canonical full name (a typed "K" or
+  // "king" becomes "King"), so the generated SIZE is never a raw abbreviation.
+  // Other categories keep the free-text token verbatim.
+  const isBed = category === "mattress" || category === "bedframe";
   const sizes = useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const s of sizesRaw.split(",")) {
       const t = s.trim();
-      if (t && !seen.has(t.toLowerCase())) {
-        seen.add(t.toLowerCase());
-        out.push(t);
+      if (!t) continue;
+      const value = isBed ? canonicalSize(t).name : t;
+      if (!seen.has(value.toLowerCase())) {
+        seen.add(value.toLowerCase());
+        out.push(value);
       }
     }
     return out;
-  }, [sizesRaw]);
+  }, [sizesRaw, isBed]);
 
   const priceNum = price.trim() === "" ? 0 : Number(price);
   const priceOk = Number.isFinite(priceNum) && priceNum >= 0;
@@ -147,7 +153,7 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
           <input
             value={sizesRaw}
             onChange={(e) => setSizesRaw(e.target.value)}
-            placeholder="K, Q, S"
+            placeholder={isBed ? "Single, Super Single, Queen, King" : "e.g. 3-seater, L-shape"}
             data-testid="new-model-sizes"
             className={INPUT_CLS}
           />
@@ -156,7 +162,10 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
               <>
                 Generates <span className="text-base-700 font-medium">{sizes.length}</span> SKU
                 {sizes.length === 1 ? "" : "s"}:{" "}
-                {sizes.slice(0, 8).map((s) => `${modelKey.toUpperCase()}-${s}`).join(", ")}
+                {sizes
+                  .slice(0, 8)
+                  .map((s) => `${modelKey.toUpperCase()}-${isBed ? canonicalSize(s).code : s}`)
+                  .join(", ")}
                 {sizes.length > 8 ? ` … (+${sizes.length - 8})` : ""}
               </>
             ) : (

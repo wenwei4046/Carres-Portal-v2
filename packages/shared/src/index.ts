@@ -787,6 +787,16 @@ export {
 // cosmetic case/separator drift (the catalog is empty) — the ops stock-reserve link.
 export { deriveSkuCode, normalizeSkuKey } from "./sku-code";
 
+// Canonical MY mattress/bedframe size table — the short code (SKU suffix) ↔ full
+// name (the SIZE shown). Size auto-generation resolves through this so the code
+// stays `-K` while the SIZE reads `King` (never the raw `K`).
+export {
+  CANONICAL_SIZES,
+  canonicalSize,
+  sizeName,
+  type CanonicalSize,
+} from "./mattress-sizes";
+
 // 2990s Products parity Phase 1 — SKU Import: the one record->row mapper + zod
 // shared by the staged-preview client and the import endpoint.
 export {
