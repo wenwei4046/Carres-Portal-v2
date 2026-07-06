@@ -253,7 +253,7 @@ describe("PosConfigurePage — bed frame Maintenance options (0201/0202)", () =>
     expect(screen.queryByTestId('cfg-gap-16"')).toBeNull();
   });
 
-  it("fabric IS the finish: no picker without ticks; swatch chips render + priced when ticked", () => {
+  it("fabric IS the finish: no picker without ticks; series→colour dropdown priced when ticked", () => {
     const onAdd = vi.fn();
     renderBed(onAdd);
     expect(screen.queryByTestId("cfg-fabric-section")).toBeNull();
@@ -272,8 +272,9 @@ describe("PosConfigurePage — bed frame Maintenance options (0201/0202)", () =>
       />,
     );
     fireEvent.click(screen.getAllByTestId("cfg-size-b1")[1]!);
-    // The fabric IS the finish — pick the swatch chip (only render 2 has it).
-    fireEvent.click(screen.getByTestId("cfg-fabric-PC151-01"));
+    // One series ("Other" — PC151-01 has no series) auto-collapses to the colour
+    // dropdown; pick the colour by its hook key (only render 2 has cfg-fabric).
+    fireEvent.change(screen.getByTestId("cfg-fabric"), { target: { value: "cf:PC151-01" } });
     // 1990 + bedframeTier PRICE_2 delta 150 = 2140.
     expect(screen.getAllByTestId("cfg-live-total")[1]!.textContent).toContain("2,140");
     fireEvent.click(screen.getAllByTestId("cfg-add-to-cart")[1]!);
