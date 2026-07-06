@@ -242,25 +242,8 @@ export default function ModelEditorModal({
         ? model.gaps
         : gapPool,
   );
-  // Bedframe colour / finish is a per-model free list (model.colors — there is
-  // NO colour pool). Editing this list IS the POS gate: the bed configurator
-  // renders model.colors directly.
-  const [colors, setColors] = useState<string[]>(() => model.colors ?? []);
-  const [colorDraft, setColorDraft] = useState("");
   const [specials, setSpecials] = useState<string[]>(() => opts.specials ?? []);
   const [fabrics, setFabrics] = useState<string[]>(() => opts.fabrics ?? []);
-
-  function addColor() {
-    const v = colorDraft.trim();
-    if (!v) return;
-    // Mirror the server's colorOrGapValueRegex so a bad name is caught before Save.
-    if (!/^[\p{L}\p{N} _\-/'"().+]{1,40}$/u.test(v)) {
-      toast.error("Colour name: letters / numbers / spaces only, up to 40 characters.");
-      return;
-    }
-    setColors((cs) => (cs.some((x) => x.toLowerCase() === v.toLowerCase()) ? cs : [...cs, v]));
-    setColorDraft("");
-  }
   // Flat categories — the single Activate/Deactivate-in-POS switch draft.
   const [showInPos, setShowInPos] = useState<boolean>(anyPosActive);
   const [saving, setSaving] = useState(false);
@@ -305,18 +288,9 @@ export default function ModelEditorModal({
     if (!nameValid) return;
     setSaving(true);
     try {
-      const patch: {
-        name?: string;
-        blurb?: string | null;
-        colors?: string[];
-        allowedOptions?: AllowedOptions;
-      } = {};
+      const patch: { name?: string; blurb?: string | null; allowedOptions?: AllowedOptions } = {};
       if (name.trim() !== model.name) patch.name = name.trim();
       if (blurb.trim() !== (model.blurb ?? "")) patch.blurb = blurb.trim() || null;
-      // Bedframe colour list edits the model.colors column directly (the POS gate).
-      if (isBed && JSON.stringify(colors) !== JSON.stringify(model.colors ?? [])) {
-        patch.colors = colors;
-      }
       if (!isFlat) {
         patch.allowedOptions = {
           ...opts,
@@ -468,65 +442,6 @@ export default function ModelEditorModal({
                     created in + New Model / SKU Master, not here.
                   </p>
                 )}
-              </div>
-            )}
-
-            {/* Colour / finish — bedframe only (model.colors free list, no pool). */}
-            {isBed && (
-              <div data-testid="allowed-colours">
-                <SectionHead label="Colours / finishes" />
-                <div className="flex flex-wrap gap-1.5 items-center">
-                  {colors.map((c) => (
-                    <span
-                      key={c}
-                      className={`t-small font-semibold pl-3 pr-1.5 py-1 rounded-full border inline-flex items-center gap-1.5 ${CHIP_ON}`}
-                      data-testid={`allowed-colour-${c}`}
-                    >
-                      {c}
-                      <button
-                        type="button"
-                        onClick={() => setColors((cs) => cs.filter((x) => x !== c))}
-                        aria-label={`Remove ${c}`}
-                        className="leading-none text-[15px] text-white/80 hover:text-white"
-                        data-testid={`allowed-colour-remove-${c}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                  {colors.length === 0 && (
-                    <span className="t-tiny text-base-400">
-                      No colours — POS shows no colour picker for this frame.
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <input
-                    value={colorDraft}
-                    onChange={(e) => setColorDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addColor();
-                      }
-                    }}
-                    placeholder="Add a colour (e.g. Natural oak)"
-                    className={`${INPUT_CLS} max-w-[220px]`}
-                    data-testid="allowed-colour-input"
-                  />
-                  <button
-                    type="button"
-                    onClick={addColor}
-                    disabled={!colorDraft.trim()}
-                    className="btn-secondary text-[12px] disabled:opacity-40"
-                    data-testid="allowed-colour-add"
-                  >
-                    Add
-                  </button>
-                </div>
-                <p className="t-tiny text-base-400 mt-1.5">
-                  The finishes offered in the POS colour picker. Remove any this frame doesn&rsquo;t come in.
-                </p>
               </div>
             )}
 

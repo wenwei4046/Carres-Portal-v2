@@ -337,13 +337,18 @@ export default function PosConfigurePage({
   );
 
   const [skuId, setSkuId] = useState<string>("");
-  const [color, setColor] = useState<string>(model.colors?.[0] ?? "");
   const [gap, setGap] = useState<string>(gapChoices[0] ?? "");
   // Divan / leg / fabric are OPTIONAL (2990s "Confirm later", Loo 2026-06-11):
   // "" = customer confirms the dimension later; no surcharge applies.
   const [divan, setDivan] = useState<string>("");
   const [leg, setLeg] = useState<string>("");
+  // Fabric IS the bed's colour / finish (Loo 2026-07-06 — a bed frame follows
+  // the fabric; the separate model.colors picker was removed). The chosen
+  // fabric's description ("Oat weave") is the finish name used for the label
+  // + the plan-view frame tint.
   const [fabricCode, setFabricCode] = useState<string>("");
+  const selectedFabric = fabricOpts.find((f) => f.fabricCode === fabricCode) ?? null;
+  const finishName = selectedFabric?.description || selectedFabric?.fabricCode || "";
   const [qty, setQty] = useState(1);
   const sku = skus.find((s) => s.id === skuId);
   const sp = useSpecials(model, specialAddons);
@@ -410,7 +415,7 @@ export default function PosConfigurePage({
   const sub = sku
     ? [
         footprint ? `${footprint.w}×${footprint.d} cm` : null,
-        isBed && color ? color : null,
+        isBed && finishName ? finishName : null,
         isBed && divan ? `divan ${divan}` : null,
         isBed && gap ? `gap ${gap}` : null,
         isBed && leg ? `leg ${leg}` : null,
@@ -445,7 +450,7 @@ export default function PosConfigurePage({
         ? { options: resolvedOptions.lines, options_total: optionsTotal }
         : {};
     const attrs = isBed
-      ? { color, gap, ...optionsPatch, ...sp.attrsPatch }
+      ? { gap, ...optionsPatch, ...sp.attrsPatch }
       : sp.picks.length > 0
         ? sp.attrsPatch
         : null;
@@ -456,7 +461,7 @@ export default function PosConfigurePage({
       attrs,
       unitPrice,
       label: isBed
-        ? `${model.name} · ${sku.variant} · ${color}${gap ? ` · gap ${gap}` : ""}`
+        ? `${model.name} · ${sku.variant}${finishName ? ` · ${finishName}` : ""}${gap ? ` · gap ${gap}` : ""}`
         : `${model.name} · ${sku.variant}`,
     });
     onClose();
@@ -557,7 +562,7 @@ export default function PosConfigurePage({
               </span>
             </div>
             {isBed ? (
-              <BedPlan footprint={footprint} colourName={color} />
+              <BedPlan footprint={footprint} colourName={finishName} />
             ) : (
               <MattressPlan footprint={footprint} />
             )}
@@ -599,25 +604,47 @@ export default function PosConfigurePage({
               )}
             </div>
 
-            {/* Colour / finish — bed frames only */}
-            {isBed && (model.colors?.length ?? 0) > 0 && (
-              <div className="cfg-section">
+            {/* Fabric / finish — bed frames whose model offers master fabrics
+                (opt-in Modular ticks). This IS the bed's colour/finish: a frame
+                follows the fabric, priced by its bedframe tier delta (Loo
+                2026-07-06 — the separate model.colors picker was removed). */}
+            {isBed && fabricOpts.length > 0 && (
+              <div className="cfg-section" data-testid="cfg-fabric-section">
                 <div className="cfg-section__head">
-                  <span className="pos-eyebrow">Colour / finish</span>
-                  <span className="cfg-section__detail">{color || "—"}</span>
+                  <span className="pos-eyebrow">Fabric / finish</span>
+                  <span className="cfg-section__detail">
+                    {selectedFabric
+                      ? selectedFabric.description || selectedFabric.fabricCode
+                      : "Confirm later"}
+                  </span>
                 </div>
                 <div className="cfg-swatchRow">
-                  {(model.colors ?? []).map((c) => (
-                    <button
-                      key={c}
-                      className={`cfg-sw ${color === c ? "is-on" : ""}`}
-                      onClick={() => setColor(c)}
-                      data-testid={`cfg-colour-${c}`}
-                    >
-                      <span className="cfg-sw__chip" style={{ background: hexForColourName(c) }}></span>
-                      <span className="cfg-sw__name">{c}</span>
-                    </button>
-                  ))}
+                  <button
+                    className={`cfg-sw ${fabricCode === "" ? "is-on" : ""}`}
+                    onClick={() => setFabricCode("")}
+                    data-testid="cfg-fabric-later"
+                  >
+                    <span className="cfg-sw__name">Confirm later</span>
+                  </button>
+                  {fabricOpts.map((f) => {
+                    const delta = fabricDeltaByCode.get(f.fabricCode) ?? 0;
+                    const nm = f.description || f.fabricCode;
+                    return (
+                      <button
+                        key={f.id}
+                        className={`cfg-sw ${fabricCode === f.fabricCode ? "is-on" : ""}`}
+                        onClick={() => setFabricCode(f.fabricCode)}
+                        data-testid={`cfg-fabric-${f.fabricCode}`}
+                      >
+                        <span className="cfg-sw__chip" style={{ background: hexForColourName(nm) }}></span>
+                        <span className="cfg-sw__name">
+                          {f.fabricCode}
+                          {f.description ? ` · ${f.description}` : ""}
+                          {delta > 0 ? ` +RM${delta.toLocaleString("en-MY")}` : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -719,48 +746,6 @@ export default function PosConfigurePage({
                     </button>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Fabric — bed frames whose model offers master fabrics (opt-in
-                Modular ticks); priced by the fabric's bedframe tier delta. */}
-            {isBed && fabricOpts.length > 0 && (
-              <div className="cfg-section">
-                <div className="cfg-section__head">
-                  <span className="pos-eyebrow">Fabric</span>
-                  <span className="cfg-section__detail">
-                    {fabricCode
-                      ? fabricOpts.find((f) => f.fabricCode === fabricCode)?.description ?? fabricCode
-                      : "Confirm later"}
-                  </span>
-                </div>
-                <select
-                  value={fabricCode}
-                  onChange={(e) => setFabricCode(e.target.value)}
-                  className="cfg-select"
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    border: "1.5px solid var(--line, #d9d2c7)",
-                    background: "var(--pos-panel, #fff)",
-                    fontSize: 13,
-                  }}
-                  aria-label="Fabric"
-                  data-testid="cfg-fabric"
-                >
-                  <option value="">Confirm later — customer to confirm</option>
-                  {fabricOpts.map((f) => {
-                    const delta = fabricDeltaByCode.get(f.fabricCode) ?? 0;
-                    return (
-                      <option key={f.id} value={f.fabricCode}>
-                        {f.fabricCode}
-                        {f.description ? ` — ${f.description}` : ""}
-                        {delta > 0 ? ` (+RM ${delta.toLocaleString("en-MY")})` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
               </div>
             )}
 

@@ -1,10 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ComboDto } from "@carres/shared";
 import {
   DRAFT_STORAGE_KEY,
   type WizardDraft,
   clearDraft,
-  comboToDraftLines,
   composeEmergency,
   dataUrlToBlob,
   emptyDraft,
@@ -522,97 +520,5 @@ describe("composeEmergency", () => {
     const c = validDraft().customer;
     c.emergencyPhone = "";
     expect(composeEmergency(c)).toBe("Tan Junior · Spouse");
-  });
-});
-
-describe("comboToDraftLines — explode a 套餐 into component DraftLines", () => {
-  function combo(over: Partial<ComboDto> = {}): ComboDto {
-    return {
-      id: "c-id",
-      comboKey: "bedroom-set",
-      name: "Bedroom Set",
-      comboPrice: 5000,
-      cost: null,
-      active: true,
-      effectiveFrom: "2026-06-20",
-      components: [
-        { sku: "MAT-Q", qty: 1, sortOrder: 0 },
-        { sku: "FRAME-Q", qty: 1, sortOrder: 1 },
-      ],
-      ...over,
-    };
-  }
-  // Prices chosen so the proportional split is clean: 3000 + 2000 = 5000 weight.
-  const PRICES: Record<string, number> = { "MAT-Q": 3000, "FRAME-Q": 2000 };
-  const LABELS: Record<string, string> = { "MAT-Q": "Cloud · Queen", "FRAME-Q": "Oak Frame · Queen" };
-  const lookup = (sku: string) => ({ price: PRICES[sku] ?? NaN, label: LABELS[sku] ?? sku });
-
-  it("produces one DraftLine per component, stamped with combo_key + combo_label", () => {
-    const lines = comboToDraftLines(combo(), lookup);
-    expect(lines).toHaveLength(2);
-    for (const l of lines) {
-      expect(l.attrs).toEqual({ combo_key: "bedroom-set", combo_label: "Bedroom Set" });
-    }
-    expect(lines.map((l) => l.sku).sort()).toEqual(["FRAME-Q", "MAT-Q"]);
-  });
-
-  it("each line gets a fresh, unique localId", () => {
-    const lines = comboToDraftLines(combo(), lookup);
-    expect(lines[0].localId).toBeTruthy();
-    expect(lines[1].localId).toBeTruthy();
-    expect(lines[0].localId).not.toBe(lines[1].localId);
-  });
-
-  it("splits comboPrice across components so Σ unitPrice×qty === comboPrice (all qty 1)", () => {
-    const lines = comboToDraftLines(combo(), lookup);
-    const total = lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-    expect(Math.round(total * 100) / 100).toBe(5000);
-    // proportional to catalog value: 3000/5000 of 5000 = 3000, 2000.
-    const byKey = Object.fromEntries(lines.map((l) => [l.sku, l.unitPrice]));
-    expect(byKey["MAT-Q"]).toBe(3000);
-    expect(byKey["FRAME-Q"]).toBe(2000);
-  });
-
-  it("labels each line from the lookup, falling back to the sku code", () => {
-    const lines = comboToDraftLines(combo(), lookup);
-    const matLine = lines.find((l) => l.sku === "MAT-Q")!;
-    expect(matLine.label).toBe("Cloud · Queen");
-    // A sku with no label in the lookup falls back to the sku string.
-    const noLabel = comboToDraftLines(
-      combo({ components: [{ sku: "MYSTERY", qty: 1, sortOrder: 0 }] }),
-      () => ({ price: 100, label: "" }),
-    );
-    expect(noLabel[0].label).toBe("MYSTERY");
-  });
-
-  it("carries the component qty onto the DraftLine", () => {
-    const lines = comboToDraftLines(
-      combo({
-        comboPrice: 900,
-        components: [{ sku: "MAT-Q", qty: 2, sortOrder: 0 }],
-      }),
-      lookup,
-    );
-    expect(lines).toHaveLength(1);
-    expect(lines[0].qty).toBe(2);
-    // single all-weight component → absorbs the full combo price as 450/unit.
-    expect(lines[0].unitPrice * lines[0].qty).toBe(900);
-  });
-
-  it("a component absent from the catalog (NaN price) is priced 0; the rest absorb the total", () => {
-    const lines = comboToDraftLines(
-      combo({ components: [{ sku: "MAT-Q", qty: 1, sortOrder: 0 }, { sku: "GONE", qty: 1, sortOrder: 1 }] }),
-      (sku) => ({ price: sku === "MAT-Q" ? 3000 : NaN, label: sku }),
-    );
-    const total = lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-    // combo total preserved; the present component absorbs everything.
-    expect(Math.round(total * 100) / 100).toBe(5000);
-    const gone = lines.find((l) => l.sku === "GONE")!;
-    expect(gone.unitPrice).toBe(0);
-  });
-
-  it("returns [] for an empty combo", () => {
-    const lines = comboToDraftLines(combo({ components: [] }), lookup);
-    expect(lines).toEqual([]);
   });
 });

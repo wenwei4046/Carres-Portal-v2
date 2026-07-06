@@ -38,9 +38,6 @@ import {
   type CatalogFabricsHistoryDto,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
-  type ComboDto,
-  type ComboCreateInput,
-  type ComboPatchInput,
   type SofaComboDto,
   type SofaComboCreateInput,
   type SofaComboPatchInput,
@@ -5141,43 +5138,6 @@ export function useDeleteSofaFabric() {
 // 0176 — Alias so callers can use the Task-5 brief's naming convention.
 // Both names are exported; the underlying hook is the same.
 export { usePatchSofaFabric as useUpdateSofaFabric };
-
-// ---------------------------------------------------------------------------
-// 0177 — fixed-set combos (套餐). Three CRUD mutations mirroring the sofa-fabric
-// hooks: POST creates a combo + its components, PATCH replaces the scalar fields
-// and/or the full component set, DELETE soft-deletes (active=false). All three
-// are principal-only at the API/RLS layer (combos_write_principal); the UI gate
-// in CombosTab is just a friendly read-only veneer. Each invalidates the whole
-// `['catalog']` tree so the admin bundle re-fetches (combos ride in the bundle —
-// no dedicated query key needed).
-// ---------------------------------------------------------------------------
-
-export function useCreateCombo() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: ComboCreateInput) =>
-      apiFetch<{ combo: ComboDto }>("/api/catalog/combos", catalogJson("POST", input)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
-  });
-}
-
-export function useUpdateCombo() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: ComboPatchInput }) =>
-      apiFetch<{ combo: ComboDto }>(`/api/catalog/combos/${id}`, catalogJson("PATCH", patch)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
-  });
-}
-
-export function useDeleteCombo() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) =>
-      apiFetch<{ ok: true }>(`/api/catalog/combos/${id}`, catalogJson("DELETE")),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
-  });
-}
 
 // ---------------------------------------------------------------------------
 // 0179 — sofa combos (sofa engine Phase 2). Slots = ordered OR-sets of
