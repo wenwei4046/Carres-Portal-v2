@@ -38,9 +38,11 @@ import PoolPanel from "./PoolPanel";
  *               from the Maintenance tab to mirror the 2990s sidebar.
  */
 
+// NOTE (Loo 2026-07-06): "total_height" is deliberately NOT a section — total
+// height is COMPUTED at POS (divan + leg), never authored/picked. The 0201
+// `total_height` pool rows stay dormant in the DB.
 type SpecialKey =
   | "divan_height"
-  | "total_height"
   | "gap"
   | "bedframe_leg_height"
   | "sofa_size"
@@ -65,7 +67,6 @@ export default function SpecialAddonsTab({
       title: "Bedframe",
       items: [
         { key: "divan_height", label: "Divan Heights", count: byPool("divan_height").length },
-        { key: "total_height", label: "Total Heights", count: byPool("total_height").length },
         { key: "gap", label: "Gaps", count: byPool("gap").length },
         {
           key: "bedframe_leg_height",
@@ -104,16 +105,6 @@ export default function SpecialAddonsTab({
             title="Divan Heights"
             description="Bedframe divan height options with surcharge pricing."
             entries={byPool("divan_height")}
-            isPrincipal={isPrincipal}
-          />
-        )}
-        {active === "total_height" && (
-          <PoolPanel
-            pool="total_height"
-            variant="priced"
-            title="Total Heights"
-            description="Bedframe total height options (divan + mattress) with surcharge pricing."
-            entries={byPool("total_height")}
             isPrincipal={isPrincipal}
           />
         )}
