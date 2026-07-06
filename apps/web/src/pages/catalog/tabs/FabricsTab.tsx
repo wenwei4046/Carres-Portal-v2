@@ -9,7 +9,7 @@ import { CodeChip } from "../components/atoms";
 import MaintenanceSidebar, {
   type MaintenanceSidebarGroup,
 } from "../components/MaintenanceSidebar";
-import { FabricTierDeltasCard } from "./MaintenanceTab";
+import FabricTierDeltasCard from "./FabricTierDeltasCard";
 
 /**
  * Fabrics tab (0202) — the 2990s "Products › Fabrics" port. Left sidebar
@@ -24,7 +24,8 @@ import { FabricTierDeltasCard } from "./MaintenanceTab";
  *     stays per-model sofa_fabrics + the 0176 tier deltas (2990s keeps the
  *     same split: cost tiers on fabric_trackings, selling tiers elsewhere).
  *   • Fabric Pricing — the existing 0176 global P2/P3 delta editor
- *     (FabricTierDeltasCard, shared with Maintenance › Fabric Tiers).
+ *     (FabricTierDeltasCard — this is its only entry point since the
+ *     Maintenance tab's duplicate "Fabric Tiers" item was removed).
  */
 
 type FabricsKey = "fabrics" | "pricing";
