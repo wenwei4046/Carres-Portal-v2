@@ -150,6 +150,29 @@ export default function DealerPos({
     return claimGroupRef.current;
   }, []);
 
+  // Trap the browser Back button inside the POS flow: on the Customer (2) or
+  // Confirm (3) step, Back returns to the Catalog (step 1) instead of leaving
+  // the POS entirely (Loo 2026-07-06 — it was jumping back to the portal). One
+  // guard history entry is armed the first time we leave step 1, so 2↔3 moves
+  // don't pollute history.
+  const posBackGuardRef = useRef(false);
+  useEffect(() => {
+    if (submitted || step === 1) {
+      posBackGuardRef.current = false;
+      return;
+    }
+    if (!posBackGuardRef.current) {
+      window.history.pushState(null, "");
+      posBackGuardRef.current = true;
+    }
+    const onPopState = () => {
+      posBackGuardRef.current = false;
+      setStep(1);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [step, submitted]);
+
   // POS-parity (2990s) — an INTERNAL operator (principal, no JWT dealer) who
   // wasn't handed an acting dealer by the caller picks the dealer IN-FLOW at
   // the CUSTOMER step; the pick lives on the draft so it survives refresh.

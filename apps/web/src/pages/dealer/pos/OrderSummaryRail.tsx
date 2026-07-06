@@ -3,6 +3,7 @@ import type { CatalogResponse } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import type { WizardDraft } from "../new-order/draft";
 import { cartTotalExStair } from "./cart";
+import { previewDefaultGifts } from "./free-line";
 
 /**
  * Right-hand Order summary rail (02 Customer + 03 Confirm) — prototype skin
@@ -37,7 +38,12 @@ export default function OrderSummaryRail({
   const itemsSubtotal = cartTotalExStair(draft.lines, draft.addons);
   const c = draft.customer;
   const customerCaptured = c.name.trim().length > 0 || c.phone.trim().length > 0;
-  const itemCount = draft.lines.reduce((s, l) => s + l.qty, 0);
+  // Default free gifts the server WILL append at submit — show them here as RM0
+  // line items so the summary (the SO preview) matches what's booked. Same pure
+  // resolver the cart uses; the client never sends a gift line (server-appended).
+  const giftRows = useMemo(() => previewDefaultGifts(draft.lines, catalog), [draft.lines, catalog]);
+  const itemCount =
+    draft.lines.reduce((s, l) => s + l.qty, 0) + giftRows.reduce((s, g) => s + g.qty, 0);
 
   return (
     <aside className="summary" data-testid="pos-order-summary">
@@ -75,6 +81,32 @@ export default function OrderSummaryRail({
                     <span className="summary__item-price">
                       <sup>RM</sup>
                       {(l.unitPrice * l.qty).toLocaleString("en-MY")}
+                    </span>
+                  </div>
+                );
+              })}
+              {/* Default free gifts (server-appended at submit) — shown as RM0
+                  items so "Convert to Sales Order" clearly carries them. */}
+              {giftRows.map((g) => {
+                const photo = photoBySku.get(g.giftSku);
+                return (
+                  <div key={`gift-${g.sourceModelId}-${g.giftSku}`} className="summary__item" data-testid={`summary-gift-${g.giftSku}`}>
+                    <div
+                      className="summary__item-photo"
+                      style={
+                        photo
+                          ? { backgroundImage: `url(${photo})` }
+                          : { background: "var(--c-beige)" }
+                      }
+                    />
+                    <div className="summary__item-main">
+                      <div className="summary__item-name">{g.name}</div>
+                      <div className="summary__item-meta">
+                        qty {g.qty} · Free gift{g.campaign ? ` · ${g.campaign}` : ""}
+                      </div>
+                    </div>
+                    <span className="summary__item-price" style={{ color: "var(--success, #16a34a)" }}>
+                      FREE
                     </span>
                   </div>
                 );
