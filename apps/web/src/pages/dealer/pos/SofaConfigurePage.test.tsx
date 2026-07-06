@@ -252,8 +252,8 @@ describe("SofaConfigurePage", () => {
     pwpMock.current = { data: { vouchers: [] }, isFetching: false };
     renderPage();
     expect(screen.getByTestId("sofa-qp-fabric-defer").getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByTestId("sofa-qp-fabric-f-1"));
-    expect(screen.getByTestId("sofa-qp-fabric-f-1").getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByTestId("sofa-qp-fabric-sf:f-1"));
+    expect(screen.getByTestId("sofa-qp-fabric-sf:f-1").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("sofa-qp-fabric-defer").getAttribute("aria-pressed")).toBe("false");
   });
 

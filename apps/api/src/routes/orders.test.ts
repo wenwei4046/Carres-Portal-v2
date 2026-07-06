@@ -2756,3 +2756,136 @@ describe("POST /api/orders — internal role places on behalf of a picked dealer
     expect(sb._rpcCalls).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 0201/0202-wiring — option picks (divan / leg / fabric) trust gate + the sofa
+// build leg-height surcharge riding the P4 drift gate.
+// ---------------------------------------------------------------------------
+
+describe("POST /api/orders — option picks recompute (0201/0202 wiring)", () => {
+  const NEW_ID = "11111111-1111-1111-1111-111111111111";
+  const rpcOk = { id: NEW_ID, so: 1401, placed_at: "2026-07-06T00:00:00Z" };
+
+  const OPTION_POOLS = {
+    catalog_option_pools: {
+      list: [
+        { id: "00000000-0000-4000-8000-000000000901", pool: "divan_height", value: '10"', label: null, dimensions: null, surcharge: "125", active: true, sort_order: 1, created_at: "2026-07-05T00:00:00Z", updated_at: "2026-07-05T00:00:00Z", updated_by: null },
+        { id: "00000000-0000-4000-8000-000000000902", pool: "bedframe_leg_height", value: '4"', label: null, dimensions: null, surcharge: "60", active: true, sort_order: 2, created_at: "2026-07-05T00:00:00Z", updated_at: "2026-07-05T00:00:00Z", updated_by: null },
+        { id: "00000000-0000-4000-8000-000000000903", pool: "sofa_leg_height", value: '6"', label: null, dimensions: null, surcharge: "90", active: true, sort_order: 3, created_at: "2026-07-05T00:00:00Z", updated_at: "2026-07-05T00:00:00Z", updated_by: null },
+      ],
+    },
+  };
+
+  function bedframeOptionsBody(unitPrice: number, optionsTotal: number) {
+    return validCreateBody({
+      delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+      lines: [
+        {
+          sku: "BF-KAYU-Q",
+          qty: 1,
+          unitPrice,
+          attrs: {
+            color: "Walnut",
+            gap: '12"',
+            options: [
+              { kind: "divan_height", value: '10"', surcharge: 125 },
+              { kind: "bedframe_leg_height", value: '4"', surcharge: 60 },
+            ],
+            options_total: optionsTotal,
+          },
+        },
+      ],
+    });
+  }
+
+  it("accepts an honest options total and canonicalises attrs.options", async () => {
+    const sb = buildSbForSofa({ tables: sofaTables(OPTION_POOLS), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(bedframeOptionsBody(2185, 185)),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const payload = sb._rpcCalls[0]!.payload as {
+      lines: Array<{ sku: string; unit_price: number; attrs: Record<string, unknown> }>;
+    };
+    expect(payload.lines[0]!.unit_price).toBe(2185);
+    expect(payload.lines[0]!.attrs).toMatchObject({
+      color: "Walnut",
+      gap: '12"',
+      options_total: 185,
+    });
+    expect(payload.lines[0]!.attrs.options).toEqual([
+      { kind: "divan_height", value: '10"', surcharge: 125 },
+      { kind: "bedframe_leg_height", value: '4"', surcharge: 60 },
+    ]);
+  });
+
+  it("rejects a tampered options total with 422 options_price_drift and does NOT create", async () => {
+    const sb = buildSbForSofa({ tables: sofaTables(OPTION_POOLS), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(bedframeOptionsBody(2005, 5)),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; serverTotal: number };
+    expect(body.code).toBe("options_price_drift");
+    expect(body.serverTotal).toBe(185);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+
+  it("sofa build: attrs.leg_height joins the drift-gated server total + rides the exploded lines", async () => {
+    // à-la-carte 1600 + leg 6" surcharge 90 → server total 1690.
+    const sb = buildSbForSofa({ tables: sofaTables(OPTION_POOLS), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(1690, { leg_height: '6"', leg_surcharge: 90 })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const payload = sb._rpcCalls[0]!.payload as {
+      lines: Array<{ unit_price: number; attrs: Record<string, unknown> }>;
+    };
+    expect(payload.lines).toHaveLength(2);
+    expect(payload.lines.reduce((s, l) => s + l.unit_price, 0)).toBe(1690);
+    // Leg attrs ride every exploded line (server-resolved surcharge).
+    expect(payload.lines[0]!.attrs).toMatchObject({ leg_height: '6"', leg_surcharge: 90 });
+    expect(payload.lines[1]!.attrs).toMatchObject({ leg_height: '6"', leg_surcharge: 90 });
+  });
+
+  it("sofa build: a client leg claim the pool can't justify drifts and rejects", async () => {
+    // No leg pool row in the mock → server prices leg 0 → total 1600 ≠ 1690.
+    const sb = buildSbForSofa({ tables: sofaTables(), rpcResult: rpcOk });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(buildOrderBody(1690, { leg_height: '6"', leg_surcharge: 90 })),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; serverTotal: number };
+    expect(body.code).toBe("sofa_price_drift");
+    expect(body.serverTotal).toBe(1600);
+    expect(sb._rpcCalls).toHaveLength(0);
+  });
+});
