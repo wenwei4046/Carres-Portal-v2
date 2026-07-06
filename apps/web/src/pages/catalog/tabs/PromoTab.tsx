@@ -133,8 +133,16 @@ function accessorySkus(catalog: CatalogResponse): ProductSkuDto[] {
   return catalog.skus.filter((s) => catByModel.get(s.modelId) === "accessory");
 }
 
-const skuDisplay = (s: ProductSkuDto): string =>
-  (s.description && s.description.trim()) || s.sku;
+/** Friendly name for a gift accessory SKU: its description → the accessory's
+ *  MODEL name (an accessory is one model = one product, e.g. "Pasir Wool Rug")
+ *  → bare code. Never surface a raw SKU code when a human name exists
+ *  (Loo 2026-07-06: "Free gift: ACC-601"). */
+const skuDisplay = (s: ProductSkuDto, catalog: CatalogResponse): string => {
+  const desc = (s.description ?? "").trim();
+  if (desc) return desc;
+  const model = catalog.models.find((m) => m.id === s.modelId);
+  return (model && modelLabel(model)) || s.sku;
+};
 
 /** Collapse a draft refinement to a persistable one, or undefined when it
  *  carries no real list (an empty 'variant'/'combo'/'compartment' would never
@@ -280,7 +288,7 @@ function DefaultGiftsSection({
                         // 2990s parity: show "qty× accessory-name"; the campaign
                         // label is a remark in parentheses, never the name.
                         const sku = accSkus.find((s) => s.sku === g.giftSku);
-                        const name = sku ? skuDisplay(sku) : g.giftSku;
+                        const name = sku ? skuDisplay(sku, catalog) : g.giftSku;
                         return `${g.qty}× ${name}${g.label ? ` (${g.label})` : ""}`;
                       })
                       .join(", ")}
@@ -510,7 +518,7 @@ function GiftRow({
             <option value="">Pick an accessory…</option>
             {accSkus.map((s) => (
               <option key={s.sku} value={s.sku}>
-                {skuDisplay(s)}
+                {skuDisplay(s, catalog)}
               </option>
             ))}
           </select>
@@ -743,7 +751,7 @@ function BulkGwpModal({
                 <option value="">Choose accessory…</option>
                 {accSkus.map((s) => (
                   <option key={s.sku} value={s.sku}>
-                    {skuDisplay(s)}
+                    {skuDisplay(s, catalog)}
                   </option>
                 ))}
               </select>
