@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import type {
+  CatalogFabricDto,
+  CatalogOptionPoolDto,
   FabricTierConfigDto,
   FabricTierGlobalConfig,
   ModelFabricTierOverrideDto,
@@ -16,6 +18,8 @@ import type {
   SofaHeight,
 } from "@carres/shared";
 import {
+  activeSofaHeights,
+  allowedPoolValues,
   analyzeSofa,
   canMirror,
   findModule,
@@ -24,10 +28,10 @@ import {
   moduleFootprint,
   resolveFabricDelta,
   ROOM_H,
-  SOFA_HEIGHTS,
 } from "@carres/shared";
 import { usePwpAvailableForPhone } from "@/lib/queries";
 import type { DraftLine } from "../new-order/draft";
+import { sellingFabricsFor } from "../sofa-build/selling-fabrics";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
 import SofaPlanView from "../sofa-build/SofaPlanView";
@@ -224,6 +228,8 @@ export default function SofaConfigurePage({
   meta,
   skus,
   fabrics,
+  masterFabrics,
+  optionPools,
   fabricTierConfig,
   modelFabricTierOverrides,
   sofaCompartments,
@@ -236,6 +242,10 @@ export default function SofaConfigurePage({
   meta: ModelMeta | undefined;
   skus: ProductSkuDto[];
   fabrics: SofaFabricDto[];
+  /** 0202-wiring — the master Fabrics tab list (per-model opt-in ticks). */
+  masterFabrics?: CatalogFabricDto[] | null;
+  /** 0201-wiring — Maintenance pools (sofa sizes + leg heights). */
+  optionPools?: CatalogOptionPoolDto[] | null;
   fabricTierConfig?: FabricTierGlobalConfig | null;
   modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
   sofaCompartments: SofaCompartmentDto[];
@@ -245,6 +255,19 @@ export default function SofaConfigurePage({
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
+  // 0201/0202-wiring — the Maintenance-authored option sources:
+  //   sizes (seat heights) = the ACTIVE `sofa_size` pool values;
+  //   leg heights = `sofa_leg_height` pool ∩ this model's Modular ticks;
+  //   fabrics = legacy per-model rows + the model's opted-in master fabrics.
+  const offeredHeights = useMemo(() => activeSofaHeights(optionPools), [optionPools]);
+  const legOpts = useMemo(
+    () => allowedPoolValues(model, "sofa_leg_height", optionPools),
+    [model, optionPools],
+  );
+  const sellingFabrics = useMemo(
+    () => sellingFabricsFor(model, fabrics, masterFabrics),
+    [model, fabrics, masterFabrics],
+  );
   const picks: QuickPick[] = useMemo(
     () =>
       sofaCombos
@@ -329,23 +352,28 @@ export default function SofaConfigurePage({
     picks[0] ??
     null;
 
-  // ── Quick-pick direct-add controls (seat height · fabric · remark) ──────
-  const [qpHeight, setQpHeight] = useState<SofaHeight>("24");
-  const [qpFabricId, setQpFabricId] = useState<string>(QP_FABRIC_DEFER);
+  // ── Quick-pick direct-add controls (seat height · fabric · leg · remark) ──
+  const [qpHeight, setQpHeight] = useState<SofaHeight>(offeredHeights[0] ?? "24");
+  const [qpFabricKey, setQpFabricKey] = useState<string>(QP_FABRIC_DEFER);
+  const [qpLeg, setQpLeg] = useState<string>("");
   const [qpRemark, setQpRemark] = useState("");
 
-  // Heights this preset is priced for; fall back to the first priced one.
+  // Heights = the ACTIVE Maintenance sofa sizes this preset is priced for.
   const heroHeights = heroPick
-    ? SOFA_HEIGHTS.filter((h) => heroPick.combo.pricesByHeight[h] != null)
+    ? offeredHeights.filter((h) => heroPick.combo.pricesByHeight[h] != null)
     : [];
   const effHeight = heroHeights.includes(qpHeight) ? qpHeight : heroHeights[0] ?? qpHeight;
-  const qpDeferred = qpFabricId === QP_FABRIC_DEFER;
-  const qpFabric = qpDeferred ? null : fabrics.find((f) => f.id === qpFabricId) ?? null;
+  const qpDeferred = qpFabricKey === QP_FABRIC_DEFER;
+  const qpFabric = qpDeferred
+    ? null
+    : sellingFabrics.find((f) => f.key === qpFabricKey) ?? null;
   const qpDelta = qpFabric
     ? resolveFabricDelta(qpFabric.tier, fabricTierOverride, fabricTierConfig ?? null)
     : 0;
+  // Leg-height surcharge (0201 pool; server re-verifies via computeSofaPrice).
+  const qpLegDelta = qpLeg ? legOpts.find((o) => o.value === qpLeg)?.surcharge ?? 0 : 0;
   const heroBase = heroPick ? heroPick.combo.pricesByHeight[effHeight] ?? null : null;
-  const qpTotal = heroBase !== null ? heroBase + qpDelta : null;
+  const qpTotal = heroBase !== null ? heroBase + qpDelta + qpLegDelta : null;
 
   // The hero layout seeded at the chosen depth — ONE joined plan view + bbox dims.
   const heroCells = heroPick
@@ -365,10 +393,13 @@ export default function SofaConfigurePage({
         height: effHeight,
         fabricTier: qpFabric?.tier ?? "PRICE_1",
         fabricId: qpFabric?.id ?? null,
-        fabricName: qpFabric?.fabricName ?? null,
+        fabricCode: qpFabric?.code ?? null,
+        fabricName: qpFabric?.name ?? null,
         fabricSurcharge: qpDelta,
         fabricDeferred: qpDeferred,
-        total: base + qpDelta,
+        legHeight: qpLeg || null,
+        legSurcharge: qpLegDelta,
+        total: base + qpDelta + qpLegDelta,
         priceBasis: "combo",
       },
       model,
@@ -639,29 +670,29 @@ export default function SofaConfigurePage({
                 aria-label="Fabric option"
                 data-testid="sofa-qp-fabric"
               >
-                {fabrics.map((f) => {
+                {sellingFabrics.map((f) => {
                   const delta = resolveFabricDelta(
                     f.tier,
                     fabricTierOverride,
                     fabricTierConfig ?? null,
                   );
-                  const on = qpFabricId === f.id;
+                  const on = qpFabricKey === f.key;
                   return (
                     <button
-                      key={f.id}
+                      key={f.key}
                       type="button"
-                      onClick={() => setQpFabricId(f.id)}
+                      onClick={() => setQpFabricKey(f.key)}
                       aria-pressed={on}
                       className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
                         on ? "border-primary text-primary" : "border-base-300 text-base-700"
                       }`}
-                      data-testid={`sofa-qp-fabric-${f.id}`}
+                      data-testid={`sofa-qp-fabric-${f.key}`}
                     >
                       <span
                         className="h-3 w-3 rounded-full border border-base-300"
-                        style={{ background: f.colors?.[0] ?? "#CBAA7C" }}
+                        style={{ background: f.swatch ?? "#CBAA7C" }}
                       />
-                      {f.fabricName}
+                      {f.name}
                       <span className="t-micro text-base-400">
                         {delta > 0 ? `+RM ${delta.toLocaleString("en-MY")}` : "Included"}
                       </span>
@@ -670,7 +701,7 @@ export default function SofaConfigurePage({
                 })}
                 <button
                   type="button"
-                  onClick={() => setQpFabricId(QP_FABRIC_DEFER)}
+                  onClick={() => setQpFabricKey(QP_FABRIC_DEFER)}
                   aria-pressed={qpDeferred}
                   className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
                     qpDeferred ? "border-primary text-primary" : "border-base-300 text-base-700"
@@ -681,6 +712,46 @@ export default function SofaConfigurePage({
                   <span className="t-micro text-base-400">customer to confirm</span>
                 </button>
               </div>
+
+              {/* Leg height — the sofa_leg_height pool ∩ Modular ticks (0201).
+                  Optional; the surcharge joins the drift-gated build total. */}
+              {legOpts.length > 0 && (
+                <>
+                  <div className="sof-qp__railHead" style={{ marginTop: 16 }}>
+                    <span className="pos-eyebrow">Leg height</span>
+                    <span className="sof-qp__railDetail">optional · confirm later</span>
+                  </div>
+                  <div
+                    style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+                    role="group"
+                    aria-label="Leg height"
+                    data-testid="sofa-qp-legs"
+                  >
+                    {legOpts.map((o) => {
+                      const on = qpLeg === o.value;
+                      return (
+                        <button
+                          key={o.id}
+                          type="button"
+                          onClick={() => setQpLeg(on ? "" : o.value)}
+                          aria-pressed={on}
+                          className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
+                            on ? "border-primary text-primary" : "border-base-300 text-base-700"
+                          }`}
+                          data-testid={`sofa-qp-leg-${o.value}`}
+                        >
+                          {o.value}
+                          <span className="t-micro text-base-400">
+                            {o.surcharge != null && o.surcharge !== 0
+                              ? `+RM ${o.surcharge.toLocaleString("en-MY")}`
+                              : "Included"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
 
               {/* Remark */}
               <div className="sof-qp__railHead" style={{ marginTop: 16 }}>
@@ -779,6 +850,9 @@ export default function SofaConfigurePage({
             fabricTierConfig={fabricTierConfig as FabricTierConfigDto | null | undefined}
             fabricTierOverride={fabricTierOverride}
             sofaFabrics={fabrics}
+            sellingFabrics={sellingFabrics}
+            legHeightOptions={legOpts}
+            heights={offeredHeights}
             onAddBuild={(payload) => {
               const line = buildToDraftLine(payload, model, skus);
               if (line) {

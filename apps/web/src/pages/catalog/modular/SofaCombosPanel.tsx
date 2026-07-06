@@ -2,15 +2,17 @@ import { useMemo, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import type {
+  CatalogOptionPoolDto,
   SofaCompartmentDto,
   ModelSofaCompartmentDto,
   SofaComboDto,
+  SofaHeight,
   FabricTierValue,
 } from "@carres/shared";
 import {
+  activeSofaHeights,
   sofaComboCreateInput,
   sofaComboPatchInput,
-  SOFA_HEIGHTS,
   resolveCompartmentPrice,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
@@ -53,8 +55,11 @@ function slotsSummary(slots: string[][]): string {
 }
 
 /** A short summary of which heights carry a price, e.g. "24, 28, 32". */
-function pricedHeights(pricesByHeight: Record<string, number | null>): string {
-  const set = SOFA_HEIGHTS.filter((h) => typeof pricesByHeight[h] === "number");
+function pricedHeights(
+  pricesByHeight: Record<string, number | null>,
+  heights: readonly SofaHeight[],
+): string {
+  const set = heights.filter((h) => typeof pricesByHeight[h] === "number");
   return set.length === 0 ? "none" : set.join(", ");
 }
 
@@ -63,6 +68,7 @@ export default function SofaCombosPanel({
   offered,
   pool,
   combos,
+  optionPools,
   isPrincipal,
 }: {
   modelId: string;
@@ -72,8 +78,14 @@ export default function SofaCombosPanel({
   pool: SofaCompartmentDto[];
   /** All sofa combos in the bundle (we filter to this model). */
   combos: SofaComboDto[];
+  /** 0201-wiring — the Maintenance option pools; the ACTIVE `sofa_size` values
+   *  drive which seat-height columns the price grid offers. */
+  optionPools?: CatalogOptionPoolDto[] | null;
   isPrincipal: boolean;
 }) {
+  // The seat-height axis = the ACTIVE Maintenance sofa sizes (falls back to
+  // the full canonical axis when the pool is empty/absent).
+  const heights = useMemo(() => activeSofaHeights(optionPools), [optionPools]);
   const del = useDeleteSofaCombo();
   // null = closed · "new" = create · a SofaComboDto = edit that combo
   const [editing, setEditing] = useState<SofaComboDto | "new" | null>(null);
@@ -171,7 +183,7 @@ export default function SofaCombosPanel({
                 <div className="t-tiny text-base-400 truncate">{slotsSummary(combo.slots)}</div>
               )}
             </div>
-            <div className="t-tiny text-base-600 t-num">{pricedHeights(combo.pricesByHeight)}</div>
+            <div className="t-tiny text-base-600 t-num">{pricedHeights(combo.pricesByHeight, heights)}</div>
             <div className="t-tiny text-base-600">{combo.tier ? combo.tier.replace("PRICE_", "P") : "Any"}</div>
             <div className="text-right flex justify-end items-center gap-3">
               {isPrincipal ? (
@@ -208,6 +220,7 @@ export default function SofaCombosPanel({
         <SofaComboEditor
           modelId={modelId}
           offeredCodes={offeredCodes}
+          heights={heights}
           combo={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
         />
@@ -229,11 +242,14 @@ interface OfferedCode {
 function SofaComboEditor({
   modelId,
   offeredCodes,
+  heights,
   combo,
   onClose,
 }: {
   modelId: string;
   offeredCodes: OfferedCode[];
+  /** The seat-height columns to offer (ACTIVE Maintenance sofa sizes). */
+  heights: readonly SofaHeight[];
   combo: SofaComboDto | null;
   onClose: () => void;
 }) {
@@ -246,10 +262,10 @@ function SofaComboEditor({
   const [slots, setSlots] = useState<string[][]>(
     combo ? combo.slots.map((s) => [...s]) : [[]],
   );
-  // prices-by-height: a string per SOFA_HEIGHTS ("" = null = n/a at that height).
+  // prices-by-height: a string per offered height ("" = null = n/a at that height).
   const [prices, setPrices] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
-    for (const h of SOFA_HEIGHTS) {
+    for (const h of heights) {
       const v = combo?.pricesByHeight?.[h];
       init[h] = typeof v === "number" ? String(v) : "";
     }
@@ -261,7 +277,7 @@ function SofaComboEditor({
   // cost never feeds checkout / order / finance pricing.
   const [costs, setCosts] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
-    for (const h of SOFA_HEIGHTS) {
+    for (const h of heights) {
       const v = combo?.costByHeight?.[h];
       init[h] = typeof v === "number" ? String(v) : "";
     }
@@ -294,7 +310,7 @@ function SofaComboEditor({
 
   const pricesByHeight = useMemo(() => {
     const out: Record<string, number | null> = {};
-    for (const h of SOFA_HEIGHTS) {
+    for (const h of heights) {
       const raw = prices[h]?.trim() ?? "";
       out[h] = raw === "" ? null : Number(raw);
     }
@@ -306,7 +322,7 @@ function SofaComboEditor({
   const costByHeight = useMemo<Record<string, number | null> | null>(() => {
     const out: Record<string, number | null> = {};
     let anyCost = false;
-    for (const h of SOFA_HEIGHTS) {
+    for (const h of heights) {
       const raw = costs[h]?.trim() ?? "";
       if (raw === "") {
         out[h] = null;
@@ -487,8 +503,8 @@ function SofaComboEditor({
         {/* Prices-by-height grid */}
         <div>
           <span className="label block mb-1.5">Combo price by seat height (RM)</span>
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${SOFA_HEIGHTS.length}, minmax(0,1fr))` }}>
-            {SOFA_HEIGHTS.map((h) => {
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${heights.length}, minmax(0,1fr))` }}>
+            {heights.map((h) => {
               const raw = prices[h]?.trim() ?? "";
               const priceNum = raw === "" ? null : Number(raw);
               const saves =
@@ -532,8 +548,8 @@ function SofaComboEditor({
         {/* Cost-by-height grid (0183, principal-only benchmark, display-only) */}
         <div>
           <span className="label block mb-1.5">Cost benchmark by seat height (RM)</span>
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${SOFA_HEIGHTS.length}, minmax(0,1fr))` }}>
-            {SOFA_HEIGHTS.map((h) => {
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${heights.length}, minmax(0,1fr))` }}>
+            {heights.map((h) => {
               const priceRaw = prices[h]?.trim() ?? "";
               const priceNum = priceRaw === "" ? null : Number(priceRaw);
               const costRaw = costs[h]?.trim() ?? "";

@@ -1,5 +1,6 @@
 import {
   Adapters,
+  CATALOG_OPTION_POOLS,
   DB,
   FABRIC_TIER_ADDON_CONFIG,
   MODEL_FABRIC_TIER_OVERRIDES,
@@ -152,13 +153,17 @@ export async function recomputeAndExplodeSofaBuildLines(
       })),
       fabricTier: parsed.data.fabric_tier ?? null,
       height: build.height,
+      // 0201-wiring — the chosen sofa_leg_height pool value. The engine prices
+      // an unknown/inactive value at 0, so a fudged claim drifts + rejects.
+      legHeight: parsed.data.leg_height ?? null,
       buildKey:
         typeof line.attrs?.sofa_build_key === "string"
           ? line.attrs.sofa_build_key
           : undefined,
       asOf,
     };
-    const serverTotal = round2(computeSofaPrice(sofaBuild, ctx.snapshot).total);
+    const priceResult = computeSofaPrice(sofaBuild, ctx.snapshot);
+    const serverTotal = round2(priceResult.total);
 
     // 5. Drift gate.
     if (!sofaPriceWithinTolerance(line.unitPrice, serverTotal)) {
@@ -181,6 +186,8 @@ export async function recomputeAndExplodeSofaBuildLines(
     // same fabric; the operation CreatePOModal cascade keys off them per line).
     // Read fabric_id/name/surcharge from the raw attrs (the schema .passthrough()s
     // them but doesn't type them); fabric_tier is the typed, validated field.
+    // Leg attrs ride the same way (whole-sofa; leg_surcharge = the SERVER-resolved
+    // pool surcharge, not the client claim).
     const exploded = explodeSofaBuildToOrderLines(sofaBuild, serverTotal, {
       priceLookup,
       codeToSku: (code) => codeToSku.get(code) ?? null,
@@ -189,6 +196,9 @@ export async function recomputeAndExplodeSofaBuildLines(
         fabric_name: line.attrs?.fabric_name ?? null,
         fabric_surcharge: line.attrs?.fabric_surcharge ?? 0,
         fabric_tier: parsed.data.fabric_tier ?? null,
+        ...(parsed.data.leg_height
+          ? { leg_height: parsed.data.leg_height, leg_surcharge: priceResult.legDelta }
+          : {}),
       },
     });
 
@@ -232,7 +242,7 @@ type FetchResult =
  * error fails CLOSED (`{ ok: false }`).
  */
 async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<FetchResult> {
-  const [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR] =
+  const [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR, legPoolR] =
     await Promise.all([
       sb.from(SOFA_COMPARTMENTS).select("*"),
       sb.from(MODEL_SOFA_COMPARTMENTS).select("*").eq("model_id", modelId),
@@ -256,9 +266,12 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
         .eq("model_id", modelId)
         .not("compartment_id", "is", null)
         .is("discontinued_at", null),
+      // 0201-wiring — the sofa_leg_height pool rows so a build's legHeight
+      // surcharge joins the drift-gated total (computeSofaPrice legDelta).
+      sb.from(CATALOG_OPTION_POOLS).select("*").eq("pool", "sofa_leg_height"),
     ]);
 
-  for (const r of [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR]) {
+  for (const r of [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR, legPoolR]) {
     if (r.error) return { ok: false, message: r.error.message };
   }
 
@@ -304,6 +317,11 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
           tierOverrideR.data as DB.ModelFabricTierOverrideRow,
         )
       : null,
+    // 0201-wiring — the leg-height pool (structural subset: value/surcharge/
+    // active are all the engine reads).
+    legHeightPool: (legPoolR.data ?? []).map((r) =>
+      Adapters.catalogOptionPoolFromRow(r as DB.CatalogOptionPoolRow),
+    ),
   };
 
   // Compartment code → real sku, via the pool (sku rows carry compartment_id).

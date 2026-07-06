@@ -334,9 +334,21 @@ export interface SofaBuild {
   fabricTier?: FabricTier | null;
   /** Chosen seat-height key (combo lookup axis). */
   height: string;
+  /** 0201-wiring — the chosen leg-height pool VALUE (`sofa_leg_height`).
+   *  `null`/unset → no leg surcharge. An unknown/inactive value also prices 0,
+   *  so a client-claimed surcharge on a bad value fails the drift gate. */
+  legHeight?: string | null;
   /** Optional group key carried into the explode (regroup the visual sofa). */
   buildKey?: string;
   asOf?: string;
+}
+
+/** One `sofa_leg_height` pool row as the engine consumes it (a structural
+ *  subset of `CatalogOptionPool` so DTO rows pass straight through). */
+export interface SofaLegHeightOption {
+  value: string;
+  surcharge: number | null;
+  active: boolean;
 }
 
 /** The catalog snapshot the engine prices against (all numeric MYR at rest). */
@@ -351,6 +363,9 @@ export interface SofaPricingSnapshot {
   fabricTierOverride?: FabricTierOverride | null;
   /** Global fabric-tier delta config singleton (0176). */
   fabricTierConfig?: FabricTierGlobalConfig | null;
+  /** 0201-wiring — the `sofa_leg_height` pool rows (Maintenance Special
+   *  Add-ons › Sofa › Leg Heights). Absent/empty → leg picks price 0. */
+  legHeightPool?: SofaLegHeightOption[] | null;
 }
 
 export type SofaPriceBasis = "combo" | "a_la_carte";
@@ -369,6 +384,8 @@ export interface SofaPriceResult {
   reclinerExtra: number;
   /** Fabric-tier P2/P3 delta (RM). */
   fabricDelta: number;
+  /** Leg-height surcharge (RM) from the `sofa_leg_height` pool (0201-wiring). */
+  legDelta: number;
   /** Final RM price, rounded to 2dp once. */
   total: number;
   /** The build-cell indices the combo consumed (when basis === 'combo'). */
@@ -478,7 +495,18 @@ export function computeSofaPrice(
   );
   const fabricDeltaCents = toCents(fabricDeltaMyr);
 
-  const totalCents = baseCents + reclinerCents + fabricDeltaCents;
+  // Leg-height surcharge (0201-wiring) — the chosen `sofa_leg_height` pool
+  // value's surcharge, whole-sofa (like the fabric delta). Unknown / inactive
+  // value → 0, so a client-claimed surcharge on a bad value drifts + rejects.
+  let legDeltaCents = 0;
+  if (build.legHeight) {
+    const leg = (snapshot.legHeightPool ?? []).find(
+      (o) => o.active && o.value === build.legHeight,
+    );
+    legDeltaCents = toCents(leg?.surcharge ?? 0);
+  }
+
+  const totalCents = baseCents + reclinerCents + fabricDeltaCents + legDeltaCents;
 
   return {
     aLaCarteSum: toMyr(aLaCarteCents),
@@ -489,6 +517,7 @@ export function computeSofaPrice(
     comboExtras,
     reclinerExtra: toMyr(reclinerCents),
     fabricDelta: toMyr(fabricDeltaCents),
+    legDelta: toMyr(legDeltaCents),
     total: toMyr(totalCents),
     matchedCellIndices,
   };

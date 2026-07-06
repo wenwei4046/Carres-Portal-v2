@@ -37,6 +37,14 @@ export const allowedOptionsSchema = z
     gaps: z.array(z.string()).optional(),
     // 0181 — special add-on codes this model offers (per-model attach).
     specials: z.array(z.string()).optional(),
+    // 0201-wiring (2026-07-06, 2990s parity) — per-model POS gating of the
+    // Maintenance option pools. divan/leg ticks: EMPTY/ABSENT = no restriction
+    // (every active pool option shows at POS); a non-empty list narrows.
+    divan_heights: z.array(z.string()).optional(),
+    leg_heights: z.array(z.string()).optional(),
+    // 0202 — fabric CODES this model offers (catalog_fabrics.fabric_code).
+    // OPT-IN: empty/absent = the model shows no fabric choice at POS.
+    fabrics: z.array(z.string()).optional(),
   })
   .passthrough();
 export type AllowedOptions = z.infer<typeof allowedOptionsSchema>;
