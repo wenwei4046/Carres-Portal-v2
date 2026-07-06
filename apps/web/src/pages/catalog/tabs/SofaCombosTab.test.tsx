@@ -68,23 +68,38 @@ describe("SofaCombosTab", () => {
     expect(screen.getByTestId("sofa-combos-model")).toBeInTheDocument();
   });
 
-  it("principal: hosts the panel with the New sofa combo control", () => {
-    render(wrap(<SofaCombosTab catalog={makeCatalog()} isPrincipal={true} />));
-    expect(screen.getByTestId("sofa-combo-add")).toBeInTheDocument();
-  });
-
-  it("non-principal: read-only (no New control)", () => {
-    render(wrap(<SofaCombosTab catalog={makeCatalog()} isPrincipal={false} />));
-    expect(screen.queryByTestId("sofa-combo-add")).not.toBeInTheDocument();
-  });
-
-  it("renders each combo as a card in the 2-column grid", () => {
+  it("principal: a model group hosts the New combo control", () => {
     render(
       wrap(<SofaCombosTab catalog={makeCatalog({ sofaCombos: [sampleCombo] })} isPrincipal={true} />),
     );
+    expect(screen.getByTestId("sofa-combo-add")).toBeInTheDocument();
+  });
+
+  it("non-principal: read-only (no New control) even when a model has combos", () => {
+    render(
+      wrap(<SofaCombosTab catalog={makeCatalog({ sofaCombos: [sampleCombo] })} isPrincipal={false} />),
+    );
+    expect(screen.getByText("Corner Set")).toBeInTheDocument();
+    expect(screen.queryByTestId("sofa-combo-add")).not.toBeInTheDocument();
+  });
+
+  it("groups combos under a per-model heading and renders each as a card", () => {
+    render(
+      wrap(<SofaCombosTab catalog={makeCatalog({ sofaCombos: [sampleCombo] })} isPrincipal={true} />),
+    );
+    // per-model heading carries the pricing-combo count.
+    expect(screen.getByText(/\(1 combo\)/)).toBeInTheDocument();
     expect(screen.getByTestId("sofa-combos-grid")).toBeInTheDocument();
     expect(screen.getByTestId("sofa-combo-row-sc-1")).toBeInTheDocument();
     expect(screen.getByText("Corner Set")).toBeInTheDocument();
+  });
+
+  it("a Quick Pick preset is not shown as a pricing combo", () => {
+    const qp = { ...sampleCombo, id: "sc-qp", isQuickPick: true };
+    render(wrap(<SofaCombosTab catalog={makeCatalog({ sofaCombos: [qp] })} isPrincipal={true} />));
+    expect(screen.queryByTestId("sofa-combo-row-sc-qp")).not.toBeInTheDocument();
+    // no pricing combos → the "pick a model" empty state.
+    expect(screen.getByText(/No sofa combos yet/i)).toBeInTheDocument();
   });
 
   it("shows a friendly empty state when there are no sofa models", () => {

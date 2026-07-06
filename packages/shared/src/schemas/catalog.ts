@@ -485,6 +485,10 @@ export const sofaComboSchema = z.object({
   // 0206 — Quick Pick preset flag. Optional so pre-0206 fixtures still parse;
   // the API adapter always emits it (?? false).
   isQuickPick: z.boolean().optional(),
+  // 0179 audit timestamps — surfaced (additive, optional) for the simple
+  // per-combo History view. The API adapter emits them; older fixtures omit them.
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 export type SofaComboDto = z.infer<typeof sofaComboSchema>;
 
