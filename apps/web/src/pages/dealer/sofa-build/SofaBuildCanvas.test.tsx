@@ -138,6 +138,16 @@ describe("SofaBuildCanvas", () => {
     expect(heightSel.value).toBe("24");
   });
 
+  it("clicking empty canvas deselects — the floating rotate/delete tools dismiss", () => {
+    renderCanvas();
+    addModule("1S"); // addModule auto-selects → tools visible
+    const cell = screen.getAllByTestId(/^sofa-cell-sc_/)[0]!;
+    const id = cell.getAttribute("data-testid")!.replace("sofa-cell-", "");
+    expect(screen.getByTestId(`sofa-cell-delete-${id}`)).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByTestId("sofa-build-room"));
+    expect(screen.queryByTestId(`sofa-cell-delete-${id}`)).not.toBeInTheDocument();
+  });
+
   it("disables Add with a reason for a non-closed build (no-arms piece alone)", () => {
     renderCanvas();
     addModule("1NA"); // no arms → never closes alone

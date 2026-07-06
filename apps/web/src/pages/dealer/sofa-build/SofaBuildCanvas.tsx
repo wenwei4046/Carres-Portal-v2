@@ -525,7 +525,21 @@ export default function SofaBuildCanvas({
         </aside>
 
         {/* Center room */}
-        <main className="flex min-w-0 flex-1 items-center justify-center overflow-hidden p-4">
+        <main
+          className="flex min-w-0 flex-1 items-center justify-center overflow-hidden p-4"
+          onPointerDown={(e) => {
+            // 2990s parity (CustomBuilder stage onPointerDown): a click on
+            // EMPTY canvas — the room itself or the space around it —
+            // deselects, dismissing the floating rotate/delete tools (Loo
+            // 2026-07-06 — they blocked the view). Clicks on cells/tools
+            // target their own elements, so this never fires for them; the
+            // grid overlay is pointer-events:none, so empty-room clicks
+            // target the room div itself.
+            if (e.target === e.currentTarget || e.target === stageRef.current) {
+              setSelectedId(null);
+            }
+          }}
+        >
           <div
             ref={stageRef}
             className="sof-cv__room"
