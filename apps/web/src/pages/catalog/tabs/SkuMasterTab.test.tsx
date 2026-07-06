@@ -179,13 +179,40 @@ const SKU_MAT2: ProductSkuDto = {
   supplierId: null,
 };
 
-function makeCatalog(skus: ProductSkuDto[], models: ProductModelDto[] = [MODEL_MAT, MODEL_SOFA]): CatalogResponse {
+// 0204 — a compartment sofa SKU (compartmentId set) with a partial per-size map.
+const SKU_SOFA_COMP: ProductSkuDto = {
+  id: "s5",
+  modelId: "m-sofa",
+  sku: "LUNA-1A(LHF)",
+  variant: "1A(LHF)",
+  variantKind: "part",
+  price: 1490,
+  cost: null,
+  supplierId: null,
+  compartmentId: "comp-1",
+  pricesBySize: { "24": 900, "99": 555 }, // "99" = orphaned key (not in the pool)
+};
+
+/** The sofa_size pool (Special Add-ons → SOFA → Sizes) — drives the size columns. */
+const SOFA_SIZE_POOLS = [
+  { id: "p1", pool: "sofa_size" as const, value: "24", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 1 },
+  { id: "p2", pool: "sofa_size" as const, value: "32", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 2 },
+  { id: "p3", pool: "sofa_size" as const, value: "Flat", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 3 },
+  { id: "p4", pool: "sofa_size" as const, value: "RETIRED", label: null, dimensions: null, surcharge: null, active: false, sortOrder: 4 },
+];
+
+function makeCatalog(
+  skus: ProductSkuDto[],
+  models: ProductModelDto[] = [MODEL_MAT, MODEL_SOFA],
+  optionPools?: CatalogResponse["optionPools"],
+): CatalogResponse {
   return {
     models,
     skus,
     sofaFabrics: [],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
+    ...(optionPools ? { optionPools } : {}),
   };
 }
 
@@ -550,6 +577,84 @@ describe("SkuMasterTab — Export / Import buttons", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
     fireEvent.click(screen.getByTestId("sku-import"));
     expect(screen.getByTestId("import-pick-file")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0204 — sofa-size grid: one price column per `sofa_size` pool value when the
+// Sofa category is filtered (Loo 2026-07-06).
+// ---------------------------------------------------------------------------
+describe("SkuMasterTab — per-size sofa pricing grid (0204)", () => {
+  const sofaCatalog = () =>
+    makeCatalog([SKU_SOFA_COMP, SKU_SOFA], [MODEL_MAT, MODEL_SOFA], SOFA_SIZE_POOLS);
+
+  function openSofa() {
+    fireEvent.click(screen.getByRole("button", { name: "Sofa" }));
+  }
+
+  it("Sofa filter + pool → one column per ACTIVE size; compartment cells show explicit vs inherited", () => {
+    render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
+    openSofa();
+    // Columns follow the pool (active only, pool order).
+    expect(screen.getByTestId("sku-size-col-24")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-size-col-32")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-size-col-Flat")).toBeInTheDocument();
+    expect(screen.queryByTestId("sku-size-col-RETIRED")).not.toBeInTheDocument();
+    // Compartment row: explicit 900 at 24; 32 inherits the base 1,490 (muted parens).
+    expect(screen.getByTestId("sku-size-LUNA-1A(LHF)-24").textContent).toContain("900");
+    expect(screen.getByTestId("sku-size-LUNA-1A(LHF)-32").textContent).toContain("(RM 1,490.00)");
+    // Flat (non-compartment) sofa SKU keeps ONE price spanning the size tracks.
+    expect(screen.getByTestId("sku-flat-price-LUNA-3S").textContent).toContain("4,200");
+    expect(screen.getByTestId("sofa-size-mode-hint")).toBeInTheDocument();
+  });
+
+  it("non-sofa categories keep the normal grid even when the pool exists", () => {
+    render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
+    expect(screen.queryByTestId("sku-size-col-24")).not.toBeInTheDocument(); // "All"
+    fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
+    expect(screen.queryByTestId("sku-size-col-24")).not.toBeInTheDocument();
+  });
+
+  it("Sofa filter WITHOUT a pool keeps the normal grid", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_SOFA_COMP, SKU_SOFA])} />));
+    openSofa();
+    expect(screen.queryByTestId("sku-size-col-24")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sku-row-LUNA-1A(LHF)")).toBeInTheDocument();
+  });
+
+  it("Edit Prices: a size-cell blur PATCHes the FULL map — composed edits + ORPHANED keys preserved", async () => {
+    render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
+    openSofa();
+    fireEvent.click(screen.getByTestId("sku-edit-prices"));
+    const input32 = screen.getByLabelText("LUNA-1A(LHF) price at 32");
+    fireEvent.change(input32, { target: { value: "1200" } });
+    fireEvent.blur(input32);
+    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
+    const call = mockPatchMutate.mock.calls[0][0];
+    expect(call.id).toBe("s5");
+    // Full map: existing 24 kept, new 32 added, orphan "99" (not in the pool)
+    // preserved — a cell edit never erases an orphaned size price.
+    expect(call.patch.pricesBySize).toEqual({ "24": 900, "32": 1200, "99": 555 });
+  });
+
+  it("Edit Prices: blanking a size removes its key (falls back to the base price)", async () => {
+    render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
+    openSofa();
+    fireEvent.click(screen.getByTestId("sku-edit-prices"));
+    const input24 = screen.getByLabelText("LUNA-1A(LHF) price at 24");
+    fireEvent.change(input24, { target: { value: "" } });
+    fireEvent.blur(input24);
+    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
+    const call = mockPatchMutate.mock.calls[0][0];
+    expect(call.patch.pricesBySize).toEqual({ "99": 555 });
+  });
+
+  it("Edit Prices: blur without a change is a no-op (no PATCH)", () => {
+    render(wrap(<SkuMasterTab catalog={sofaCatalog()} />));
+    openSofa();
+    fireEvent.click(screen.getByTestId("sku-edit-prices"));
+    fireEvent.blur(screen.getByLabelText("LUNA-1A(LHF) price at 24"));
+    expect(mockPatchMutate).not.toHaveBeenCalled();
   });
 });
 
