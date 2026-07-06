@@ -482,6 +482,9 @@ export const sofaComboSchema = z.object({
   effectiveFrom: z.string(),
   active: z.boolean(),
   discontinuedAt: z.string().nullable(),
+  // 0206 — Quick Pick preset flag. Optional so pre-0206 fixtures still parse;
+  // the API adapter always emits it (?? false).
+  isQuickPick: z.boolean().optional(),
 });
 export type SofaComboDto = z.infer<typeof sofaComboSchema>;
 
@@ -505,6 +508,9 @@ export const sofaComboCreateInput = z
     label: z.string().trim().max(200).nullable().optional(),
     effectiveFrom: z.string().optional(),
     active: z.boolean().optional(),
+    // 0206 — true = author a Quick Pick preset (shown in POS Quick pick, no
+    // price); false/omit = a pricing-only combo. Defaults false at the DB.
+    isQuickPick: z.boolean().optional(),
   })
   .strict();
 export type SofaComboCreateInput = z.infer<typeof sofaComboCreateInput>;
