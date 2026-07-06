@@ -715,7 +715,7 @@ export default function SofaConfigurePage({
                       data-testid={`sofa-quick-pick-${p.combo.id}`}
                     >
                       <span className="sof-qp__art" style={{ gap: 2 }}>
-                        <SofaPlanView cells={cardCells} depth="24" className="h-12 w-auto" />
+                        <SofaPlanView cells={cardCells} depth="24" className="h-full w-full" />
                       </span>
                       <span className="sof-qp__cardBody">
                         <span className="sof-qp__cardLabel">{p.title}</span>
