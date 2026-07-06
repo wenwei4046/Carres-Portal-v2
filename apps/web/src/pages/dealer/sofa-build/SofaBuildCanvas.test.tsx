@@ -180,7 +180,8 @@ describe("SofaBuildCanvas", () => {
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
   });
 
-  it("a CLOSED sofa drags as ONE piece — grabbing any cell moves the whole group", () => {
+  /** A flush 1A(LHF)+1A(RHF) pair = ONE closed sofa, pre-placed. */
+  function renderClosedPair() {
     render(
       <SofaBuildCanvas
         model={MODEL}
@@ -199,7 +200,11 @@ describe("SofaBuildCanvas", () => {
         ]}
       />,
     );
-    const [c1, c2] = screen.getAllByTestId(/^sofa-cell-sc_/);
+    return screen.getAllByTestId(/^sofa-cell-sc_/);
+  }
+
+  it("a CLOSED sofa drags as ONE piece — grabbing any cell moves the whole group", () => {
+    const [c1, c2] = renderClosedPair();
     expect(c1).toHaveStyle({ left: "100px" });
     expect(c2).toHaveStyle({ left: "195px" });
     firePointer(c1!, "pointerdown", 0, 0);
@@ -208,6 +213,44 @@ describe("SofaBuildCanvas", () => {
     // BOTH cells translate by the same delta (no snap targets, room clamp inert)
     expect(c1).toHaveStyle({ left: "160px", top: "140px" });
     expect(c2).toHaveStyle({ left: "255px", top: "140px" });
+  });
+
+  it("clicking a complete sofa selects the WHOLE item — group toolbar, no per-cell pill", () => {
+    const [c1] = renderClosedPair();
+    firePointer(c1!, "pointerdown", 0, 0);
+    firePointer(c1!, "pointerup", 0, 0);
+    const tools = screen.getByTestId("sofa-group-tools");
+    expect(within(tools).getByTestId("sofa-group-rotate")).toBeInTheDocument();
+    expect(within(tools).getByTestId("sofa-group-edit")).toHaveTextContent("Edit modules");
+    expect(within(tools).getByTestId("sofa-group-delete")).toBeInTheDocument();
+    // the whole item is selected — no single-module rotate/delete pill
+    expect(screen.queryAllByTestId(/^sofa-cell-delete-/)).toHaveLength(0);
+  });
+
+  it("group rotate turns the whole sofa 90° about its centre", () => {
+    const [c1, c2] = renderClosedPair();
+    firePointer(c1!, "pointerdown", 0, 0);
+    firePointer(c1!, "pointerup", 0, 0);
+    fireEvent.click(screen.getByTestId("sofa-group-rotate"));
+    // 190×95 bbox centred at (195, 147.5) → a 95×190 vertical stack
+    expect(c1).toHaveStyle({ left: "147.5px", top: "52.5px" });
+    expect(c2).toHaveStyle({ left: "147.5px", top: "147.5px" });
+  });
+
+  it("Edit modules unlocks per-module editing — single select + single drag", () => {
+    const [c1, c2] = renderClosedPair();
+    firePointer(c1!, "pointerdown", 0, 0);
+    firePointer(c1!, "pointerup", 0, 0);
+    fireEvent.click(screen.getByTestId("sofa-group-edit"));
+    expect(screen.queryByTestId("sofa-group-tools")).not.toBeInTheDocument();
+    // dragging one module now moves ONLY that module (pull it out of the sofa)
+    firePointer(c2!, "pointerdown", 0, 0);
+    firePointer(c2!, "pointermove", 0, 150);
+    firePointer(c2!, "pointerup", 0, 150);
+    expect(c1).toHaveStyle({ left: "100px", top: "100px" });
+    expect(c2).toHaveStyle({ top: "250px" });
+    // and the single-module pill is reachable again
+    expect(screen.queryAllByTestId(/^sofa-cell-delete-/)).toHaveLength(1);
   });
 
   it("an UNCLOSED pair still drags per-cell (assembly mode)", () => {
