@@ -78,10 +78,12 @@ function deriveLineInput(line: RecomputableLine, skuInfo: Map<string, SkuInfo>):
   const attrs = (line.attrs ?? {}) as Record<string, unknown>;
   const info = skuInfo.get(line.sku) ?? null;
   const qty = Number(line.qty ?? 1);
-  // One-way guard (F1): a line already FREE (a campaign-freed item carrying
-  // attrs.free_item, or an appended RM0 gift carrying attrs.free_gift) is flagged
-  // so the SHARED resolver skips it — a free line never triggers a default gift.
-  const free = Boolean(attrs.free_item) || Boolean(attrs.free_gift);
+  // Only an APPENDED gift line (`attrs.free_gift`) is flagged so the SHARED
+  // resolver skips it — a gift must never spawn another gift (no recursion). A
+  // campaign-freed PAID item (`attrs.free_item`) STILL keeps its default gift:
+  // making the mattress free via a "Make free" campaign must not strip the GWP
+  // the SKU comes with (Loo 2026-07-06).
+  const free = Boolean(attrs.free_gift);
 
   // Defensive: a still-un-exploded sofa build line carries the full descriptor.
   const sofaBuild = attrs.sofa_build as { cells?: Array<{ moduleCode?: unknown }> } | undefined;

@@ -5,7 +5,7 @@
  *   · no combos → lands straight on Customize (Quick pick tab disabled)
  *   · comboSeedCells lays modules flush left→right, tops aligned
  */
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import type {
   CatalogFabricDto,
@@ -20,11 +20,17 @@ import { analyzeSofa, findModule, groupSofas, moduleFootprint } from "@carres/sh
 
 // Mock the PWP availability hook (usePwpAvailableForPhone) so the component's
 // useQuery has no QueryClient dependency + the voucher result is controllable.
-const { pwpMock } = vi.hoisted(() => ({
+const { pwpMock, roleMock } = vi.hoisted(() => ({
   pwpMock: { current: { data: { vouchers: [] as { code: string }[] }, isFetching: false } },
+  roleMock: { current: null as string | null },
 }));
 vi.mock("@/lib/queries", () => ({
   usePwpAvailableForPhone: () => pwpMock.current,
+}));
+// The principal-only "Create combo" gate reads useAuth((s) => s.role).
+vi.mock("@/lib/auth", () => ({
+  useAuth: (selector: (s: { role: string | null }) => unknown) =>
+    selector({ role: roleMock.current }),
 }));
 
 import SofaConfigurePage, { comboSeedCells } from "./SofaConfigurePage";
@@ -37,6 +43,11 @@ beforeAll(() => {
       disconnect() {}
     };
   }
+});
+
+// Default to a non-principal role; the Create-combo gate tests opt in.
+beforeEach(() => {
+  roleMock.current = null;
 });
 
 const MODEL: ProductModelDto = {
@@ -211,7 +222,7 @@ describe("SofaConfigurePage", () => {
     expect(within(grid).getByText(/From RM 2,990/)).toBeTruthy();
   });
 
-  it("Customize header shows the model's FULL size chips and drives the canvas picker", () => {
+  it("Customize header size chips drive the size; the redundant bottom picker is gone", () => {
     renderPage();
     fireEvent.click(screen.getByTestId("sofa-mode-custom"));
     const chips = screen.getByTestId("sofa-cust-sizes");
@@ -219,7 +230,25 @@ describe("SofaConfigurePage", () => {
     expect(within(chips).getByTestId("sofa-cust-size-26")).toBeInTheDocument();
     expect(within(chips).getByTestId("sofa-cust-size-37")).toBeInTheDocument();
     fireEvent.click(within(chips).getByTestId("sofa-cust-size-26"));
-    expect((screen.getByTestId("sofa-build-height") as HTMLSelectElement).value).toBe("26");
+    expect(within(chips).getByTestId("sofa-cust-size-26").getAttribute("aria-pressed")).toBe("true");
+    // the header chips own the size now → the canvas's bottom picker is removed
+    expect(screen.queryByTestId("sofa-build-height")).toBeNull();
+  });
+
+  it("Create combo: the button is hidden for a non-principal in Customize", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    roleMock.current = "dealer";
+    renderPage();
+    fireEvent.click(screen.getByTestId("sofa-mode-custom"));
+    expect(screen.queryByTestId("sofa-build-create-combo")).toBeNull();
+  });
+
+  it("Create combo: a principal sees the button in Customize", () => {
+    pwpMock.current = { data: { vouchers: [] }, isFetching: false };
+    roleMock.current = "principal";
+    renderPage();
+    fireEvent.click(screen.getByTestId("sofa-mode-custom"));
+    expect(screen.getByTestId("sofa-build-create-combo")).toBeInTheDocument();
   });
 
   it("card click SELECTS; Customize → loads the canvas pre-seeded as ONE connected sofa", () => {

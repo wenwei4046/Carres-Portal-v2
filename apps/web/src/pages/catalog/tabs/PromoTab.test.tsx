@@ -99,13 +99,15 @@ beforeEach(() => {
 // Principal-gating
 // ---------------------------------------------------------------------------
 describe("PromoTab — gating", () => {
-  it("principal: shows the gift model picker + the three 2990s header buttons + New Free Item", () => {
+  it("principal: shows the four header entry buttons (PWP / Promo / Free Gift / Free Item)", () => {
     render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
-    expect(screen.getByTestId("promo-gift-model-select")).toBeInTheDocument();
-    expect(screen.getByTestId("campaign-add")).toBeInTheDocument();
     expect(screen.getByTestId("pwp-add")).toBeInTheDocument();
     expect(screen.getByTestId("promo-add")).toBeInTheDocument();
-    expect(screen.getByTestId("gwp-add")).toBeInTheDocument();
+    expect(screen.getByTestId("gwp-add")).toBeInTheDocument(); // "+ New Free Gift"
+    expect(screen.getByTestId("campaign-add")).toBeInTheDocument(); // "+ New Free Item"
+    // the old inline "Add gifts to a model" picker is gone — every add lives in
+    // the header row now.
+    expect(screen.queryByTestId("promo-gift-model-select")).not.toBeInTheDocument();
   });
 
   it("non-principal: no gift picker, no campaign add, no rule add; existing config read-only", () => {
@@ -156,15 +158,23 @@ describe("PromoTab — gating", () => {
 // Default free gifts
 // ---------------------------------------------------------------------------
 describe("PromoTab — default free gifts", () => {
-  it("add a gift to a model → Save calls useUpsertModelFreeGifts with the payload", async () => {
-    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+  it("Edit a model's gifts → Save calls useUpsertModelFreeGifts with the payload", async () => {
+    // Adding a gift to a NEW model is done from the header "+ New Free Gift"
+    // modal (covered below); the per-model editor is reached via each card's
+    // Edit. Seed one config, Edit it, tweak the row, Save.
+    render(
+      wrap(
+        <PromoTab
+          catalog={makeCatalog({
+            modelDefaultFreeGifts: [{ modelId: MATTRESS_MODEL, gifts: [{ giftSku: "PILLOW", qty: 1 }] }],
+          })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId(`gift-edit-${MATTRESS_MODEL}`));
 
-    // pick the mattress model + Configure
-    fireEvent.change(screen.getByTestId("promo-gift-model-select"), { target: { value: MATTRESS_MODEL } });
-    fireEvent.click(screen.getByTestId("promo-gift-add"));
-
-    // pick the accessory gift + qty 2 + label
-    fireEvent.change(screen.getByTestId("gift-row-sku-0"), { target: { value: "PILLOW" } });
+    // editor pre-fills row 0 = PILLOW; bump qty to 2 + add a label
     fireEvent.change(screen.getByTestId("gift-row-qty-0"), { target: { value: "2" } });
     fireEvent.change(screen.getByTestId("gift-row-label-0"), { target: { value: "Free pillow" } });
 
@@ -176,10 +186,20 @@ describe("PromoTab — default free gifts", () => {
     expect(arg.input.gifts).toEqual([{ giftSku: "PILLOW", qty: 2, label: "Free pillow" }]);
   });
 
-  it("Save is disabled until at least one row has a gift SKU", () => {
-    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
-    fireEvent.change(screen.getByTestId("promo-gift-model-select"), { target: { value: MATTRESS_MODEL } });
-    fireEvent.click(screen.getByTestId("promo-gift-add"));
+  it("Save is disabled when a gift row has no SKU", () => {
+    render(
+      wrap(
+        <PromoTab
+          catalog={makeCatalog({
+            modelDefaultFreeGifts: [{ modelId: MATTRESS_MODEL, gifts: [{ giftSku: "PILLOW", qty: 1 }] }],
+          })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId(`gift-edit-${MATTRESS_MODEL}`));
+    // clear the only row's SKU → nothing valid to save
+    fireEvent.change(screen.getByTestId("gift-row-sku-0"), { target: { value: "" } });
     expect(screen.getByTestId("gift-save")).toBeDisabled();
   });
 
@@ -206,10 +226,17 @@ describe("PromoTab — default free gifts", () => {
     // real King/Queen SKUs — the "Only for specific sizes" tick showed nothing.
     // makeCatalog's mattress model has NO allowedOptions; its MATT-A sku carries
     // variant "S" (variantKind "size") → the chip must still render.
-    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
-    fireEvent.change(screen.getByTestId("promo-gift-model-select"), { target: { value: MATTRESS_MODEL } });
-    fireEvent.click(screen.getByTestId("promo-gift-add"));
-    fireEvent.change(screen.getByTestId("gift-row-sku-0"), { target: { value: "PILLOW" } });
+    render(
+      wrap(
+        <PromoTab
+          catalog={makeCatalog({
+            modelDefaultFreeGifts: [{ modelId: MATTRESS_MODEL, gifts: [{ giftSku: "PILLOW", qty: 1 }] }],
+          })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId(`gift-edit-${MATTRESS_MODEL}`));
     fireEvent.click(screen.getByTestId("gift-row-cond-toggle-0"));
 
     // The SKU-derived size chip "S" renders and ticks into the payload.
@@ -222,14 +249,14 @@ describe("PromoTab — default free gifts", () => {
 
   it("a size condition rides into the saved payload", async () => {
     // give the model an offered size so the variant refinement renders chips
-    const catalog = makeCatalog();
+    const catalog = makeCatalog({
+      modelDefaultFreeGifts: [{ modelId: MATTRESS_MODEL, gifts: [{ giftSku: "PILLOW", qty: 1 }] }],
+    });
     catalog.models = catalog.models.map((m) =>
       m.id === MATTRESS_MODEL ? { ...m, allowedOptions: { sizes: ["King", "Queen"] } } : m,
     );
     render(wrap(<PromoTab catalog={catalog} isPrincipal={true} />));
-    fireEvent.change(screen.getByTestId("promo-gift-model-select"), { target: { value: MATTRESS_MODEL } });
-    fireEvent.click(screen.getByTestId("promo-gift-add"));
-    fireEvent.change(screen.getByTestId("gift-row-sku-0"), { target: { value: "PILLOW" } });
+    fireEvent.click(screen.getByTestId(`gift-edit-${MATTRESS_MODEL}`));
 
     // turn on the condition + tick King
     fireEvent.click(screen.getByTestId("gift-row-cond-toggle-0"));

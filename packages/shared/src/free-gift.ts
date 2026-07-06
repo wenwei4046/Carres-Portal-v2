@@ -62,11 +62,13 @@ export interface DesiredFreeGift {
 export interface FreeGiftLineInput extends RuleLineInput {
   qty: number;
   buildKey?: string | null;
-  /** A FREE line (a campaign-freed item carrying `attrs.free_item`, or an
-   *  appended RM0 gift carrying `attrs.free_gift`). One-way guard: a free line
-   *  NEVER triggers a default gift (the 2990s rule). The single source of this
-   *  guard lives here in the SHARED resolver so both the POS preview and the
-   *  server resolver share it; the callers just set the flag. */
+  /** Set ONLY for an APPENDED gift line (`attrs.free_gift`): such a line never
+   *  triggers another gift, so a gift can't spawn a gift (no recursion). The
+   *  guard lives here in the SHARED resolver so the POS preview + the server
+   *  resolver share it; the callers just set the flag.
+   *  NOTE: a campaign-freed PAID item (`attrs.free_item`) is NOT flagged — it
+   *  still keeps its default gift, so "Make free" never strips the SKU's GWP
+   *  (Loo 2026-07-06). */
   free?: boolean;
 }
 

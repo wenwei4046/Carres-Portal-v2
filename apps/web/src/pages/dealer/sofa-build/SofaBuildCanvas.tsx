@@ -121,6 +121,7 @@ export default function SofaBuildCanvas({
   heightValue,
   onHeightChange,
   onAddBuild,
+  onCreateCombo,
   onClose,
   embedded = false,
   initialCells,
@@ -158,6 +159,10 @@ export default function SofaBuildCanvas({
   heightValue?: string;
   onHeightChange?: (h: string) => void;
   onAddBuild: (payload: SofaBuildAddPayload) => void;
+  /** Principal-only: capture the CURRENT arrangement as a sofa combo. When
+   *  provided, a "Create combo" button appears beside Add to cart (enabled once
+   *  the build is a valid connected sofa). Absent → no button (dealer flow). */
+  onCreateCombo?: (moduleCodes: string[]) => void;
   onClose: () => void;
   /** POS-parity (sofa configure page) — render as a FILL panel inside a parent
    *  page (no fixed overlay, no own header; the page owns the chrome). The
@@ -1009,22 +1014,26 @@ export default function SofaBuildCanvas({
         )}
 
         {/* Size picker — the ACTIVE Maintenance sofa sizes (0201 + 0204: also
-            the per-size à-la-carte price axis) */}
-        <label className="flex items-center gap-2 t-small text-base-600">
-          Size
-          <select
-            value={height}
-            onChange={(e) => setHeight(e.target.value)}
-            className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small font-mono"
-            data-testid="sofa-build-height"
-          >
-            {heightChoices.map((h) => (
-              <option key={h} value={h}>
-                {/^\d+$/.test(h) ? `${h}″` : h}
-              </option>
-            ))}
-          </select>
-        </label>
+            the per-size à-la-carte price axis). Shown ONLY when the size is
+            uncontrolled; the POS configurator drives it from the top-bar size
+            chips, so a bottom picker there is redundant (Loo 2026-07-06). */}
+        {heightValue === undefined && (
+          <label className="flex items-center gap-2 t-small text-base-600">
+            Size
+            <select
+              value={height}
+              onChange={(e) => setHeight(e.target.value)}
+              className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small font-mono"
+              data-testid="sofa-build-height"
+            >
+              {heightChoices.map((h) => (
+                <option key={h} value={h}>
+                  {/^\d+$/.test(h) ? `${h}″` : h}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {/* Price + combo badge */}
         <div className="ml-auto flex items-center gap-3">
@@ -1050,6 +1059,18 @@ export default function SofaBuildCanvas({
               RM {fmtRM(priceResult.total)}
             </div>
           </div>
+          {onCreateCombo && (
+            <button
+              type="button"
+              onClick={() => onCreateCombo(cells.map((c) => c.moduleCode))}
+              disabled={!canAdd}
+              className="btn btn--secondary btn--lg"
+              data-testid="sofa-build-create-combo"
+              title="Save this arrangement as a priced combo (principal)"
+            >
+              Create combo
+            </button>
+          )}
           <button
             type="button"
             onClick={handleAdd}
