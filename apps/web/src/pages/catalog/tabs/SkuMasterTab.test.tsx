@@ -90,6 +90,13 @@ vi.mock("@/lib/queries", () => ({
     mutateAsync: vi.fn().mockResolvedValue({ offered: 0, failed: [] }),
     isPending: false,
   }),
+  // Mattress/bedframe size path (Loo 2026-07-06) — NewSkuModal calls this hook
+  // unconditionally; the size-flow behaviour is covered in NewSkuModal.test.tsx.
+  useGenerateSkus: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ ok: true, generated: 0, skipped: 0 }),
+    isPending: false,
+  }),
   useImportSkus: () => ({
     mutate: vi.fn(),
     mutateAsync: mockImportMutateAsync,

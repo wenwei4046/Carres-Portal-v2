@@ -1,10 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { ProductCategory, ProductModelDto, SofaCompartmentDto, VariantKind } from "@carres/shared";
+import type {
+  CatalogOptionPoolDto,
+  ProductCategory,
+  ProductModelDto,
+  SofaCompartmentDto,
+  VariantKind,
+} from "@carres/shared";
 import { PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useCreateCatalogModel, useCreateCatalogSku, useOfferModelCompartments } from "@/lib/queries";
+import {
+  useCreateCatalogModel,
+  useCreateCatalogSku,
+  useGenerateSkus,
+  useOfferModelCompartments,
+} from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CATEGORY_LABEL, CodeChip } from "../components/atoms";
 
@@ -29,6 +40,12 @@ import { CATEGORY_LABEL, CodeChip } from "../components/atoms";
  * every offer auto-generates its real `{MODEL_KEY}-{code}` SKU server-side
  * with description "Sofa {Name} {code}" (all editable later in SKU Master).
  * Untick ALL compartments to fall back to the classic single flat SKU.
+ *
+ * MATTRESS / BEDFRAME (Loo 2026-07-06) -- the size field surfaces the
+ * category's size POOL (Special Add-ons → Sizes: S / SS / Q / K / SK …) as
+ * chips, default all selected. Creating makes the model + ONE SKU PER TICKED
+ * SIZE via the existing generate-skus endpoint (one optional price seeds them
+ * all); pool edits auto-follow. Untick all → the classic single-SKU flow.
  */
 
 type Mode = "new" | "existing";
@@ -51,12 +68,16 @@ function variantKindFor(category: ProductCategory, model?: ProductModelDto): Var
 export default function NewSkuModal({
   models,
   sofaCompartments = [],
+  optionPools = [],
   onClose,
 }: {
   models: ProductModelDto[];
   /** Compartment pool (catalog bundle) — drives the sofa "pick compartments →
    *  auto-generate SKUs" path. Optional so non-catalog callers stay valid. */
   sofaCompartments?: SofaCompartmentDto[];
+  /** Maintenance option pools (catalog bundle) — the mattress/bedframe SIZE
+   *  chips read `mattress_size` / `bedframe_size` from here. */
+  optionPools?: CatalogOptionPoolDto[];
   onClose: () => void;
 }) {
   // Phase 2 (0175): price + cost are principal-only ("Master Admin"). A
@@ -67,6 +88,7 @@ export default function NewSkuModal({
   const createModel = useCreateCatalogModel();
   const createSku = useCreateCatalogSku();
   const offerCompartments = useOfferModelCompartments();
+  const generateSkus = useGenerateSkus();
   const [mode, setMode] = useState<Mode>("new");
 
   // shared fields
@@ -94,8 +116,30 @@ export default function NewSkuModal({
   );
   // Compartment-path retry anchor: once the model row exists, a retry must NOT
   // re-insert it (23505 on the unique (category, model_key) constraint) — it
-  // only re-offers the still-selected (= failed) compartments.
+  // only re-offers the still-selected (= failed) compartments / re-runs the
+  // idempotent generate-skus (existing codes are skipped).
   const [createdModelId, setCreatedModelId] = useState<string | null>(null);
+
+  // Mattress/bedframe SIZE pool (Special Add-ons → Sizes; Loo 2026-07-06) —
+  // the size field becomes pool chips, default ALL selected. Pool edits
+  // auto-follow; other categories keep the free-text size field.
+  const sizePool = useMemo(() => {
+    const pool =
+      category === "mattress" ? "mattress_size" : category === "bedframe" ? "bedframe_size" : null;
+    if (!pool) return [] as CatalogOptionPoolDto[];
+    return optionPools
+      .filter((p) => p.pool === pool && p.active)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value));
+  }, [optionPools, category]);
+  const [selectedSizes, setSelectedSizes] = useState<Set<string>>(
+    () => new Set(sizePool.map((p) => p.value)),
+  );
+  // Category flips swap the pool (mattress ↔ bedframe ↔ none) — re-default to
+  // "all of the new pool". Locked once the model exists (category is disabled).
+  useEffect(() => {
+    if (createdModelId === null) setSelectedSizes(new Set(sizePool.map((p) => p.value)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
 
   const sortedModels = useMemo(
     () =>
@@ -126,14 +170,29 @@ export default function NewSkuModal({
   const compFlow = compSection && (selectedComps.size > 0 || createdModelId !== null);
   const firstSelectedCode = compPool.find((c) => selectedComps.has(c.id))?.code ?? "";
 
+  // Mattress/bedframe size path — internal-open (generate-skus is the same
+  // endpoint the Modular "New Model" uses; a non-principal generates UNPRICED).
+  const sizeSection = mode === "new" && sizePool.length > 0;
+  const sizeFlow = sizeSection && (selectedSizes.size > 0 || createdModelId !== null);
+  const firstSelectedSize = sizePool.find((p) => selectedSizes.has(p.value))?.value ?? "";
+
   const valid = compFlow
     ? name.trim().length >= 2 && modelKey.length >= 2 && selectedComps.size > 0
-    : variant.trim().length > 0 &&
-      // Price/cost only gate validity when the principal can actually set them.
-      (!isPrincipal || (priceOk && costOk)) &&
-      (mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel);
+    : sizeFlow
+      ? name.trim().length >= 2 &&
+        modelKey.length >= 2 &&
+        selectedSizes.size > 0 &&
+        (!isPrincipal || priceOk)
+      : variant.trim().length > 0 &&
+        // Price/cost only gate validity when the principal can actually set them.
+        (!isPrincipal || (priceOk && costOk)) &&
+        (mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel);
 
-  const pending = createModel.isPending || createSku.isPending || offerCompartments.isPending;
+  const pending =
+    createModel.isPending ||
+    createSku.isPending ||
+    offerCompartments.isPending ||
+    generateSkus.isPending;
 
   async function submit() {
     if (!valid) return;
@@ -169,6 +228,34 @@ export default function NewSkuModal({
         }
         toast.success(
           `Created ${name.trim()} + ${ids.length} compartment SKU${ids.length === 1 ? "" : "s"}`,
+        );
+        onClose();
+        return;
+      }
+
+      // Mattress/bedframe size path — create the model (sizes seed the Modular
+      // pool) then materialize ONE SKU PER TICKED SIZE ({MODEL_KEY}-{size}) via
+      // the idempotent generate-skus endpoint. One optional price seeds all.
+      if (sizeFlow) {
+        const sizes = sizePool.filter((p) => selectedSizes.has(p.value)).map((p) => p.value);
+        let sizeModelId = createdModelId;
+        if (!sizeModelId) {
+          const res = await createModel.mutateAsync({
+            category,
+            modelKey,
+            name: name.trim(),
+            allowedOptions: { sizes },
+          });
+          sizeModelId = res.model.id;
+          setCreatedModelId(sizeModelId); // lock identity; a retry only re-generates
+        }
+        const r = await generateSkus.mutateAsync({
+          modelId: sizeModelId,
+          // Non-principal generates UNPRICED (price omitted → server defaults 0).
+          input: { variants: sizes, price: isPrincipal && priceNum > 0 ? priceNum : undefined },
+        });
+        toast.success(
+          `Created ${name.trim()} + ${r.generated} SKU${r.generated === 1 ? "" : "s"}`,
         );
         onClose();
         return;
@@ -236,7 +323,7 @@ export default function NewSkuModal({
           >
             <div className="t-small font-semibold text-amber-800">Model created</div>
             <div className="t-tiny text-amber-700 mt-0.5">
-              The model exists — click create again to retry only the failed compartments.
+              The model exists — click create again to retry the remaining SKUs only.
             </div>
           </div>
         )}
@@ -355,6 +442,76 @@ export default function NewSkuModal({
                 )}
               </div>
             )}
+            {sizeSection && (
+              <div className="block" data-testid="new-sku-sizes">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="label">Sizes</span>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSizes(new Set(sizePool.map((p) => p.value)))}
+                      className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                      data-testid="new-sku-sizes-all"
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSizes(new Set())}
+                      className="t-tiny font-semibold text-base-500 hover:text-base-900 uppercase"
+                      data-testid="new-sku-sizes-none"
+                    >
+                      None
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {sizePool.map((p) => {
+                    const on = selectedSizes.has(p.value);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedSizes((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(p.value)) next.delete(p.value);
+                            else next.add(p.value);
+                            return next;
+                          })
+                        }
+                        aria-pressed={on}
+                        title={p.label ?? p.dimensions ?? p.value}
+                        className={`t-tiny font-mono font-semibold px-2 py-1 rounded-[4px] border transition-colors ${
+                          on
+                            ? "bg-base-900 border-base-900 text-white"
+                            : "bg-white border-base-200 text-base-500 hover:border-base-400"
+                        }`}
+                        data-testid={`new-sku-size-${p.value}`}
+                      >
+                        {p.value}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="t-tiny text-base-500 mt-1.5">
+                  {selectedSizes.size > 0 ? (
+                    <>
+                      Auto-generates{" "}
+                      <span className="text-base-700 font-medium">{selectedSizes.size}</span> SKU
+                      {selectedSizes.size === 1 ? "" : "s"}, e.g.{" "}
+                      <span className="font-mono text-base-700">
+                        {(modelKey || "model").toUpperCase()}-{firstSelectedSize}
+                      </span>
+                      . Untick the sizes this product doesn&apos;t come in — the list follows
+                      Special Add-ons → Sizes.
+                    </>
+                  ) : (
+                    <>None selected — creates a single SKU from the size field below.</>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <label className="block">
@@ -375,9 +532,38 @@ export default function NewSkuModal({
           </label>
         )}
 
+        {/* Size path keeps ONE price field — it seeds every generated SKU. */}
+        {sizeFlow &&
+          (isPrincipal ? (
+            <label className="block">
+              <span className="label block mb-1">Price for every generated SKU (RM, optional)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="0.00"
+                data-testid="new-sku-price"
+                className={INPUT_CLS}
+              />
+            </label>
+          ) : (
+            <div
+              className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2"
+              data-testid="new-sku-price-lock-hint"
+            >
+              <div className="t-small text-base-600">Price</div>
+              <div className="t-tiny text-base-400 mt-0.5">
+                Generated SKUs are created unpriced — the principal (Master Admin) prices them.
+              </div>
+            </div>
+          ))}
+
         {/* Classic single-SKU fields — hidden on the compartment path (codes,
-            descriptions + prices all derive per compartment there). */}
-        {!compFlow && (
+            descriptions + prices all derive per compartment there) AND on the
+            size path (one SKU per ticked size instead). */}
+        {!compFlow && !sizeFlow && (
           <>
             <label className="block">
               <span className="label block mb-1">Size / variant</span>
@@ -457,9 +643,11 @@ export default function NewSkuModal({
         primary={
           compFlow
             ? `Create model + ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
-            : mode === "new"
-              ? "Create product + SKU"
-              : "Add SKU"
+            : sizeFlow
+              ? `Create model + ${selectedSizes.size} SKU${selectedSizes.size === 1 ? "" : "s"}`
+              : mode === "new"
+                ? "Create product + SKU"
+                : "Add SKU"
         }
         primaryDisabled={!valid}
         primaryPending={pending}
