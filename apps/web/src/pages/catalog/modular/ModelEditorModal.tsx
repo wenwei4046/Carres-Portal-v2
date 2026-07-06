@@ -190,10 +190,15 @@ export default function ModelEditorModal({
     [catalog.modelSofaCompartments, model.id],
   );
 
+  // Compartment-linked SKUs are EXCLUDED (Loo 2026-07-06: they duplicated the
+  // Compartments chips above — ticking a compartment IS what creates/retires
+  // that SKU, and their pos_active is meaningless by design (they never show
+  // in the flat POS grid; the builder reads the offered rows). A pure
+  // compartment sofa therefore shows no Variant SKUs section at all.
   const liveSkus = useMemo(
     () =>
       skus
-        .filter((s) => !s.discontinuedAt)
+        .filter((s) => !s.discontinuedAt && s.compartmentId == null)
         .sort((a, b) => a.variant.localeCompare(b.variant, undefined, { numeric: true })),
     [skus],
   );

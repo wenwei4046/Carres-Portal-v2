@@ -140,6 +140,18 @@ beforeEach(() => {
 });
 
 describe("ModelEditorModal — sofa (2990s arrangement)", () => {
+  it("compartment-linked SKUs never render as Variant SKUs (they mirror the chips)", () => {
+    // Loo 2026-07-06: the synced {MODEL}-{code} rows duplicated the
+    // Compartments section — a pure compartment sofa shows NO sku list.
+    const compSkus: ProductSkuDto[] = [
+      { id: "cs1", modelId: "m-sofa", sku: "5539-1A(LHF)", variant: "1A(LHF)", variantKind: "part", price: 1490, cost: null, supplierId: null, posActive: false, compartmentId: "c1" },
+      { id: "cs2", modelId: "m-sofa", sku: "5539-2S", variant: "2S", variantKind: "part", price: 2490, cost: null, supplierId: null, posActive: true, compartmentId: "c2" },
+    ];
+    renderModal(SOFA, compSkus);
+    expect(screen.queryByTestId("model-skus")).toBeNull();
+    expect(screen.queryByTestId("sku-row-5539-1A(LHF)")).toBeNull();
+  });
+
   it("renders photo/name/description + Seat sizes · Compartments · Legs · Specials · Fabrics-by-series", () => {
     renderModal(SOFA);
     expect(screen.getByTestId("model-photo")).toBeInTheDocument();
