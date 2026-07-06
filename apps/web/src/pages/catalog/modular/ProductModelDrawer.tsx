@@ -9,19 +9,10 @@ import type {
   SofaFabricDto,
   SofaCompartmentDto,
   ModelSofaCompartmentDto,
-  SpecialAddonDto,
   CatalogOptionPoolDto,
   FabricTierValue,
 } from "@carres/shared";
-import {
-  allowedFabricsFor,
-  deriveSkuCode,
-  fabricTierFor,
-  poolTicksFor,
-  resolveFabricDelta,
-  tickKeyFor,
-  type OptionPoolPickKind,
-} from "@carres/shared";
+import { deriveSkuCode } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
   useCreateSofaFabric,
@@ -61,9 +52,8 @@ import SofaCombosPanel from "./SofaCombosPanel";
 
 type OptionAxis = "sizes" | "compartments" | "colors" | "gaps";
 
-// Bedframe GAPS moved out of the free-text axes (0201-wiring): they are now a
-// pool-driven tick section (master Gaps pool ∩ per-model ticks), like divan /
-// leg heights — see PoolTickSection below.
+// Bedframe GAPS are gated in the Allowed Options modal (master Gaps pool ∩
+// per-model ticks), not authored as free text here.
 const AXES_BY_CATEGORY: Record<ProductCategory, OptionAxis[]> = {
   mattress: ["sizes"],
   bedframe: ["sizes", "colors"],
@@ -177,6 +167,7 @@ export default function ProductModelDrawer({
 
         <div className="p-6 flex flex-col gap-6">
           <PhotoCard model={model} />
+          <NameField model={model} />
           <BlurbField model={model} />
 
           {axes.map((axis) =>
@@ -200,34 +191,6 @@ export default function ProductModelDrawer({
             <p className="t-tiny text-base-400">
               No variant axes for {CATEGORY_LABEL[model.category]} — manage its SKUs in SKU Master.
             </p>
-          )}
-
-          {/* 0201-wiring — POS option activation (2990s parity). The Special
-              Add-ons tab authors the MASTER pools; these ticks gate them per
-              model; the POS shows the gated set. Bedframe: divan / gap / leg.
-              Sofa: leg. Empty ticks = every active master option (default). */}
-          {model.category === "bedframe" && catalog && (
-            <>
-              <PoolTickSection
-                model={model}
-                pool="divan_height"
-                title="Divan heights"
-                pools={catalog.optionPools ?? []}
-              />
-              <PoolTickSection
-                model={model}
-                pool="gap"
-                title="Gaps"
-                pools={catalog.optionPools ?? []}
-              />
-              <PoolTickSection
-                model={model}
-                pool="bedframe_leg_height"
-                title="Leg heights"
-                pools={catalog.optionPools ?? []}
-              />
-              <FabricTicksSection model={model} catalog={catalog} />
-            </>
           )}
 
           <VariantSkuTable skus={skus} />
@@ -256,20 +219,6 @@ export default function ProductModelDrawer({
             />
           )}
 
-          {/* 0201-wiring — sofa POS options: leg heights (pool ∩ ticks, feeds
-              the builder's leg picker) + master fabric offering (opt-in). */}
-          {model.category === "sofa" && catalog && (
-            <>
-              <PoolTickSection
-                model={model}
-                pool="sofa_leg_height"
-                title="Leg heights"
-                pools={catalog.optionPools ?? []}
-              />
-              <FabricTicksSection model={model} catalog={catalog} />
-            </>
-          )}
-
           {/* Sofa combos panel (0179) — sofa models only */}
           {model.category === "sofa" && catalog && (
             <SofaCombosPanel
@@ -279,18 +228,6 @@ export default function ProductModelDrawer({
               combos={catalog.sofaCombos ?? []}
               optionPools={catalog.optionPools}
               isPrincipal={isPrincipal ?? false}
-            />
-          )}
-
-          {/* Special add-ons offered (0181) — any category. Internal-editable
-              (which add-ons this model offers); the add-ons themselves are
-              principal-authored in the Special Add-ons tab. */}
-          {catalog && (
-            <SpecialAddonsOfferedPanel
-              model={model}
-              pool={(catalog.specialAddons ?? []).filter(
-                (a) => a.active && a.categories.includes(model.category),
-              )}
             />
           )}
 
@@ -399,6 +336,42 @@ function PhotoCard({ model }: { model: ProductModelDto }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Name (rename lived on the old Modular table row — the card wall has no
+// inline edit, so the setup drawer hosts it now)
+// ---------------------------------------------------------------------------
+
+function NameField({ model }: { model: ProductModelDto }) {
+  const patch = usePatchCatalogModel();
+  function commit(raw: string) {
+    const next = raw.trim();
+    if (next.length < 2 || next === model.name) return;
+    patch.mutate(
+      { id: model.id, patch: { name: next } },
+      {
+        onSuccess: () => toast.success("Name updated"),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+  return (
+    <label className="block">
+      <span className="label block mb-1">Name</span>
+      <input
+        defaultValue={model.name}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        aria-label={`Edit ${model.name} name`}
+        className={INPUT_CLS}
+        data-testid="model-name-input"
+      />
+    </label>
   );
 }
 
@@ -577,314 +550,6 @@ function SizeActivePool({
       <p className="t-tiny text-base-400 mt-1.5">
         Turning a size on/off shows or hides every SKU of that size from dealers.
       </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 0181 — Special add-ons offered: which (principal-authored, category-matching)
-// special add-ons this model offers at POS. Writes allowed_options.specials
-// (codes). Internal-editable (model patch is internal); the add-on defs + prices
-// are principal-only (Special Add-ons tab).
-// ---------------------------------------------------------------------------
-
-function SpecialAddonsOfferedPanel({
-  model,
-  pool,
-}: {
-  model: ProductModelDto;
-  pool: SpecialAddonDto[];
-}) {
-  const patch = usePatchCatalogModel();
-  const offered: string[] = (model.allowedOptions?.specials ?? []) as string[];
-
-  function toggle(code: string) {
-    const next = offered.includes(code) ? offered.filter((c) => c !== code) : [...offered, code];
-    const allowedOptions: AllowedOptions = { ...(model.allowedOptions ?? {}), specials: next };
-    patch.mutate(
-      { id: model.id, patch: { allowedOptions } },
-      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
-    );
-  }
-
-  const fmt = (n: number) => `${n < 0 ? "−" : "+"}RM ${Math.abs(n).toLocaleString("en-MY")}`;
-
-  return (
-    <div>
-      <div className="label mb-1">Special add-ons offered</div>
-      <p className="t-tiny text-base-500 mb-2">
-        Tick which special add-ons this model offers at POS. Author them in the Special Add-ons tab.
-      </p>
-      {pool.length === 0 ? (
-        <p className="t-tiny text-base-400">
-          No special add-ons for {CATEGORY_LABEL[model.category]} yet.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          {pool.map((a) => (
-            <label
-              key={a.id}
-              className="flex items-center gap-2 t-small"
-              data-testid={`model-special-${a.code}`}
-            >
-              <input
-                type="checkbox"
-                checked={offered.includes(a.code)}
-                onChange={() => toggle(a.code)}
-              />
-              <span className="text-base-800">{a.label}</span>
-              <span className="t-tiny text-base-400">
-                {fmt(a.sellingPrice)}
-                {a.optionGroups.length > 0 ? ` · ${a.optionGroups.length}Q` : ""}
-              </span>
-            </label>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// 0201-wiring — PoolTickSection: gate a MASTER option pool (Special Add-ons
-// tab) per model. Chips show every ACTIVE master option; the ON set is the
-// model's allowed_options ticks — EMPTY ticks = no restriction (all offered,
-// the 2990s default). Toggling writes the explicit tick list. Prices live on
-// the pool rows (principal-authored); offering is internal-editable like the
-// special-addons ticks.
-// ---------------------------------------------------------------------------
-
-function PoolTickSection({
-  model,
-  pool,
-  title,
-  pools,
-}: {
-  model: ProductModelDto;
-  pool: OptionPoolPickKind;
-  title: string;
-  pools: CatalogOptionPoolDto[];
-}) {
-  const patch = usePatchCatalogModel();
-  const master = useMemo(
-    () =>
-      pools
-        .filter((p) => p.pool === pool && p.active)
-        .slice()
-        .sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value)),
-    [pools, pool],
-  );
-  const ticks = poolTicksFor(model, pool);
-  const usingDefault = ticks.length === 0;
-  const onSet = new Set(
-    usingDefault ? master.map((p) => p.value) : ticks,
-  );
-
-  function toggle(value: string) {
-    const next = new Set(onSet);
-    if (next.has(value)) next.delete(value);
-    else next.add(value);
-    // Persist the EXPLICIT list (master order). Turning the last chip off
-    // stores [] … which reads as "no restriction" again — so block it with a
-    // toast instead of silently flipping back to all-on.
-    const explicit = master.map((p) => p.value).filter((v) => next.has(v));
-    if (explicit.length === 0) {
-      toast.error(`At least one ${title.toLowerCase()} option must stay on (empty = all).`);
-      return;
-    }
-    const key = tickKeyFor(pool);
-    const allowedOptions: AllowedOptions = {
-      ...(model.allowedOptions ?? {}),
-      [key]: explicit,
-    };
-    patch.mutate(
-      { id: model.id, patch: { allowedOptions } },
-      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
-    );
-  }
-
-  const fmt = (n: number) => `${n < 0 ? "−" : "+"}RM ${Math.abs(n).toLocaleString("en-MY")}`;
-
-  return (
-    <div data-testid={`pool-ticks-${pool}`}>
-      <div className="flex items-center justify-between mb-1">
-        <div className="label">{title}</div>
-        <span className="t-tiny text-base-400">
-          {usingDefault ? "All offered (default)" : `${onSet.size} of ${master.length} offered`}
-        </span>
-      </div>
-      <p className="t-tiny text-base-500 mb-2">
-        Which {title.toLowerCase()} this model offers at POS. Author the options (and
-        prices) in Special Add-ons.
-      </p>
-      {master.length === 0 ? (
-        <p className="t-tiny text-base-400">
-          No {title.toLowerCase()} in the pool yet — add them in the Special Add-ons tab.
-        </p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {master.map((p) => {
-            const on = onSet.has(p.value);
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => toggle(p.value)}
-                disabled={patch.isPending}
-                aria-pressed={on}
-                className={`t-tiny font-semibold px-2.5 py-1 rounded-full border transition-colors ${
-                  on
-                    ? "bg-base-900 text-white border-base-900"
-                    : "bg-white text-base-500 border-base-300 hover:border-base-500"
-                }`}
-                data-testid={`pool-tick-${pool}-${p.value}`}
-              >
-                {p.value}
-                {p.surcharge != null && p.surcharge !== 0 && (
-                  <span className={`ml-1 font-normal ${on ? "text-white/70" : "text-base-400"}`}>
-                    {fmt(p.surcharge)}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 0202-wiring — FabricTicksSection: which MASTER fabrics (Fabrics tab) this
-// model offers at POS. OPT-IN by fabric code (empty = no fabric choice — a
-// wooden frame shouldn't ask for upholstery). The price shown = the fabric's
-// tier delta for THIS model's category (0176 override → global config).
-// ---------------------------------------------------------------------------
-
-function FabricTicksSection({
-  model,
-  catalog,
-}: {
-  model: ProductModelDto;
-  catalog: CatalogResponse;
-}) {
-  const patch = usePatchCatalogModel();
-  const [search, setSearch] = useState("");
-  const master = useMemo(
-    () =>
-      (catalog.fabrics ?? [])
-        .filter((f) => f.active)
-        .slice()
-        .sort((a, b) => a.sortOrder - b.sortOrder || a.fabricCode.localeCompare(b.fabricCode)),
-    [catalog.fabrics],
-  );
-  const offered = allowedFabricsFor(model, catalog.fabrics ?? []);
-  const offeredCodes = new Set(offered.map((f) => f.fabricCode));
-  const override =
-    (catalog.modelFabricTierOverrides ?? []).find((o) => o.modelId === model.id) ?? null;
-
-  function write(codes: string[]) {
-    const allowedOptions: AllowedOptions = {
-      ...(model.allowedOptions ?? {}),
-      fabrics: codes,
-    };
-    patch.mutate(
-      { id: model.id, patch: { allowedOptions } },
-      { onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Update failed") },
-    );
-  }
-
-  function toggle(code: string) {
-    const next = new Set(offeredCodes);
-    if (next.has(code)) next.delete(code);
-    else next.add(code);
-    write(master.map((f) => f.fabricCode).filter((c) => next.has(c)));
-  }
-
-  const q = search.trim().toLowerCase();
-  const visible = q
-    ? master.filter(
-        (f) =>
-          f.fabricCode.toLowerCase().includes(q) ||
-          (f.description ?? "").toLowerCase().includes(q) ||
-          (f.series ?? "").toLowerCase().includes(q),
-      )
-    : master;
-
-  return (
-    <div data-testid="fabric-ticks">
-      <div className="flex items-center justify-between mb-1">
-        <div className="label">Fabric option (master list)</div>
-        <div className="flex gap-2 items-center">
-          <span className="t-tiny text-base-400">
-            {offeredCodes.size === 0 ? "Not offered" : `${offeredCodes.size} offered`}
-          </span>
-          <button
-            type="button"
-            onClick={() => write(master.map((f) => f.fabricCode))}
-            disabled={patch.isPending || master.length === 0}
-            className="btn-ghost text-[11px]"
-            data-testid="fabric-ticks-all-on"
-          >
-            All on
-          </button>
-          <button
-            type="button"
-            onClick={() => write([])}
-            disabled={patch.isPending}
-            className="btn-ghost text-[11px]"
-          >
-            All off
-          </button>
-        </div>
-      </div>
-      <p className="t-tiny text-base-500 mb-2">
-        Tick which Fabrics-tab fabrics this model offers at POS (none ticked = the POS
-        shows no fabric choice). The +RM comes from the fabric&apos;s{" "}
-        {model.category === "bedframe" ? "bedframe" : "sofa"} tier.
-      </p>
-      {master.length === 0 ? (
-        <p className="t-tiny text-base-400">No fabrics in the master list yet — author them in the Fabrics tab.</p>
-      ) : (
-        <>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search fabrics…"
-            aria-label="Search fabrics to offer"
-            className={`${INPUT_CLS} max-w-[240px] mb-2`}
-          />
-          <div className="border border-base-200 rounded-[4px] max-h-56 overflow-y-auto">
-            {visible.length === 0 && (
-              <div className="t-tiny text-base-400 px-3 py-2">No fabrics match the search.</div>
-            )}
-            {visible.map((f) => {
-              const tier = fabricTierFor(model.category, f);
-              const delta = resolveFabricDelta(tier, override, catalog.fabricTierConfig ?? null);
-              return (
-                <label
-                  key={f.id}
-                  className="flex items-center gap-2 t-small px-3 py-1.5 border-b border-base-100 last:border-b-0 cursor-pointer"
-                  data-testid={`fabric-tick-${f.fabricCode}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={offeredCodes.has(f.fabricCode)}
-                    disabled={patch.isPending}
-                    onChange={() => toggle(f.fabricCode)}
-                  />
-                  <CodeChip>{f.fabricCode}</CodeChip>
-                  <span className="text-base-700 truncate flex-1">{f.description ?? "—"}</span>
-                  <span className="t-tiny text-base-400 shrink-0">
-                    {tier.replace("PRICE_", "P")}
-                    {delta > 0 ? ` · +RM ${delta.toLocaleString("en-MY")}` : ""}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </>
-      )}
     </div>
   );
 }

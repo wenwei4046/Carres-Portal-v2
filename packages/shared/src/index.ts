@@ -640,6 +640,7 @@ export {
   allowedFabricsFor,
   fabricTierFor,
   activeSofaHeights,
+  gatedSofaHeights,
   resolveOptionsTotal,
   inchesOf,
   computedTotalHeight,
