@@ -156,6 +156,14 @@ export default function SofaCombosPanel({
             const priced = heights
               .filter((h) => typeof combo.pricesByHeight[h] === "number")
               .map((h) => ({ h, price: combo.pricesByHeight[h] as number }));
+            // Same for the PWP reward price (0186) — the price a customer pays
+            // when this combo is redeemed as a PWP reward; shown as a distinct row.
+            const pwp = combo.pwpPricesByHeight;
+            const pwpPriced = pwp
+              ? heights
+                  .filter((h) => typeof pwp[h] === "number")
+                  .map((h) => ({ h, price: pwp[h] as number }))
+              : [];
             return (
               <div
                 key={combo.id}
@@ -195,6 +203,27 @@ export default function SofaCombosPanel({
                 ) : (
                   <div className="t-tiny text-base-400">
                     No price set at any of this model&apos;s seat heights.
+                  </div>
+                )}
+
+                {/* PWP reward price per seat height (0186) — the discounted price
+                    the customer pays when this combo is redeemed as a PWP reward.
+                    Only shown when at least one height has a PWP price. */}
+                {pwpPriced.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="t-micro text-primary font-semibold">PWP</span>
+                    {pwpPriced.map(({ h, price }) => (
+                      <span
+                        key={h}
+                        className="inline-flex items-baseline gap-1 rounded-[4px] border border-primary/30 bg-primary/10 px-2 py-1"
+                        data-testid={`sofa-combo-pwp-chip-${combo.id}-${h}`}
+                      >
+                        <span className="t-tiny text-base-500">{h}&Prime;</span>
+                        <span className="t-tiny t-num font-semibold text-primary">
+                          RM {fmtRM(price)}
+                        </span>
+                      </span>
+                    ))}
                   </div>
                 )}
 
