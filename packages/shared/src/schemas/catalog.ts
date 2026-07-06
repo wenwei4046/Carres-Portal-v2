@@ -864,6 +864,10 @@ export const pwpReserveInputSchema = z
      *  a free reward must never mint a promo voucher that funds the next free
      *  reward (2990s one-way parity). PWP rules still reserve (chainable). */
     rewardLine: z.boolean().optional(),
+    /** The trigger line's built module codes when it is a SOFA BUILD — lets the
+     *  reserve route match COMBO-scope trigger targets (a flat sku carries no
+     *  build, so combo triggers otherwise never mint). Absent for flat lines. */
+    builtCompartments: z.array(z.string()).max(60).optional(),
   })
   .strict();
 export type PwpReserveInput = z.infer<typeof pwpReserveInputSchema>;

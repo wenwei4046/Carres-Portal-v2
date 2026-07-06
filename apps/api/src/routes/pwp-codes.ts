@@ -5,6 +5,7 @@ import {
   DB,
   PWP_CODES,
   PWP_RULES,
+  SOFA_COMBO_PRICING,
   lineMatchesTargets,
   pwpReserveInputSchema,
   pwpCodesResponseSchema,
@@ -96,14 +97,20 @@ pwpCodesRouter.post("/reserve", async (c) => {
       message: "Invalid reserve input: " + parsed.error.issues[0]?.message,
     });
   }
-  const { cartLineKey, sku, qty, rewardLine } = parsed.data;
+  const { cartLineKey, sku, qty, rewardLine, builtCompartments } = parsed.data;
   const sb = userClient(c.env, auth.jwt);
 
-  // 1. Resolve the trigger sku → { category, modelId, variant }.
+  // 1. Resolve the trigger sku → { category, modelId, variant }. A sofa BUILD
+  //    trigger additionally carries its built module codes (client-sent, but
+  //    harmless to trust here: a fudged list only mints RESERVED codes that the
+  //    order-path grant re-validates against the REAL build before any claim).
   const skuRes = await resolveSkuInfo(sb, [sku]);
   if (!skuRes.ok) throw new HTTPException(500, { message: skuRes.message });
   const info = skuRes.skuInfo.get(sku) ?? null;
-  const triggerLine = deriveRuleLine(info);
+  const triggerLine: RuleLineInput = {
+    ...deriveRuleLine(info),
+    builtCompartments: (builtCompartments ?? []).map((m) => m.trim()).filter(Boolean),
+  };
 
   // 2. ACTIVE pwp_rules (RLS). The adapter parses RuleTargets.
   const rulesR = await sb.from(PWP_RULES).select("*").eq("active", true);
@@ -116,7 +123,32 @@ pwpCodesRouter.post("/reserve", async (c) => {
   //    each a flat trigger; an empty comboMap means a combo target never matches
   //    here, which is correct for the flat-line reserve.) Builds a per-rule target
   //    count = qtyPerTrigger × qty.
-  const emptyCombos = new Map<string, string[][]>();
+  // COMBO-scope trigger targets need each combo's slots to match a BUILD
+  // trigger. Load them only when a build is in play AND some rule references a
+  // combo trigger (flat-line reserves keep the zero-read path).
+  let comboModulesById = new Map<string, string[][]>();
+  const triggerComboIds = new Set<string>();
+  if (triggerLine.builtCompartments.length > 0) {
+    for (const rule of rules) {
+      for (const t of rule.triggerTargets) {
+        if (t.scope === "combo") for (const id of t.comboIds ?? []) triggerComboIds.add(id);
+      }
+    }
+  }
+  if (triggerComboIds.size > 0) {
+    const { data, error } = await sb
+      .from(SOFA_COMBO_PRICING)
+      .select("id, slots")
+      .in("id", Array.from(triggerComboIds));
+    if (error) throw new HTTPException(500, { message: error.message });
+    comboModulesById = new Map(
+      ((data ?? []) as Array<{ id: string; slots: string[][] | null }>).map((r) => [
+        r.id,
+        r.slots ?? [],
+      ]),
+    );
+  }
+
   const matched: Array<{ rule: PwpRule; target: number }> = [];
   for (const rule of rules) {
     // 2990s one-way parity: a trigger line that is ITSELF a reward never mints
@@ -125,7 +157,7 @@ pwpCodesRouter.post("/reserve", async (c) => {
     // this line are trimmed as strays below.
     if (rewardLine && rule.type === "promo") continue;
     if (upper(triggerLine.category) !== upper(rule.triggerCategory)) continue;
-    if (!lineMatchesTargets(triggerLine, rule.triggerTargets, emptyCombos)) continue;
+    if (!lineMatchesTargets(triggerLine, rule.triggerTargets, comboModulesById)) continue;
     const qpt = Math.max(1, Math.floor(Number(rule.qtyPerTrigger) || 1));
     matched.push({ rule, target: qpt * qty });
   }
