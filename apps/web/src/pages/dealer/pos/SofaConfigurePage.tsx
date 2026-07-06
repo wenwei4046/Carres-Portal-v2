@@ -31,9 +31,11 @@ import {
   ROOM_H,
 } from "@carres/shared";
 import { usePwpAvailableForPhone } from "@/lib/queries";
+import { useAuth } from "@/lib/auth";
 import type { DraftLine } from "../new-order/draft";
 import { sellingFabricsFor } from "../sofa-build/selling-fabrics";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
+import CreateSofaComboModal from "../sofa-build/CreateSofaComboModal";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
 import SofaPlanView, { PLAN_PAD } from "../sofa-build/SofaPlanView";
 import type { ModelMeta } from "./catalog-index";
@@ -332,6 +334,11 @@ export default function SofaConfigurePage({
   );
 
   const [mode, setMode] = useState<"quick" | "custom">(picks.length > 0 ? "quick" : "custom");
+  // Principal-only "Create combo" (Loo 2026-07-06): a Master Admin can capture
+  // the current Customize build as a priced sofa combo. `comboCodes` = the
+  // arranged compartment codes handed up by the canvas (null = modal closed).
+  const isPrincipal = useAuth((s) => s.role) === "principal";
+  const [comboCodes, setComboCodes] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<Array<{
     moduleCode: string;
     x: number;
@@ -994,9 +1001,18 @@ export default function SofaConfigurePage({
               }
               onClose();
             }}
+            onCreateCombo={isPrincipal ? setComboCodes : undefined}
             onClose={onClose}
           />
         </div>
+      )}
+      {comboCodes && (
+        <CreateSofaComboModal
+          model={model}
+          moduleCodes={comboCodes}
+          heights={offeredHeights}
+          onClose={() => setComboCodes(null)}
+        />
       )}
     </div>,
     document.body,
