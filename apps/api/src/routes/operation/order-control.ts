@@ -5,6 +5,7 @@ import {
   updateOpsOrderControlInput,
   stockEtaImportInput,
   matchStockRows,
+  aggregateStorageFeesByRef,
   type OrderLineRef,
   type StockEtaImportResult,
 } from "@carres/shared";
@@ -54,7 +55,7 @@ orderControlRouter.get("/:id/control", async (c) => {
   const { data, error } = await sb
     .from("ops_order_control")
     .select(
-      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_etas, line_stock_status, called_customer, updated_at, updated_by",
+      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_etas, line_stock_status, called_customer, updated_at, updated_by",
     )
     .eq("order_id", idCheck.data)
     .maybeSingle();
@@ -115,7 +116,7 @@ orderControlRouter.put("/:id/control", async (c) => {
       { onConflict: "order_id" },
     )
     .select(
-      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_etas, line_stock_status, called_customer, updated_at, updated_by",
+      "order_id, stock_location, stock_eta, delivery_time_slot, customer_request, action_for_logistic, carres_remark, warehouse_remark, payment_status, balance, balance_due_date, storage_from, storage_to, storage_fee_override, storage_fee_msbf, storage_fee_sof, logistic_eta, paid_amount, storage_paid, storage_collected_at, storage_waiver_status, storage_waiver_reason, storage_waiver_requested_by, storage_waiver_decided_by, storage_waiver_decided_at, extension_original_date, extension_new_date, extension_reason, extension_note, extension_acknowledged_at, extended_at, extended_by, extension_count, contact_by_days, contact_by_task_at, line_locations, line_etas, line_stock_status, called_customer, updated_at, updated_by",
     )
     .single();
   if (error) {
@@ -156,7 +157,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
       422,
     );
   }
-  const { rows, dryRun = false } = parsed.data;
+  const { rows, storageFees, dryRun = false } = parsed.data;
 
   const sb = userClient(c.env, auth.jwt);
 
@@ -196,69 +197,133 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     }
   }
 
+  // Storage fees (per-ORDER, by Ref) — migration 0200. Resolve each Master
+  // storage-fee row's Ref to an order id (orders.source_ref is a text[]), so it
+  // can be written to ops_order_control.storage_fee_msbf / _sof. Aggregated
+  // server-side too (defence — a Master repeats an order's fee across its lines).
+  const storageAgg = aggregateStorageFeesByRef(storageFees ?? []);
+  const feeByOrder = new Map<string, { msbf?: number; sof?: number }>();
+  let storageUnmatched = 0;
+  if (storageAgg.length > 0) {
+    const { data: orderData, error: ordErr } = await sb
+      .from("orders")
+      .select("id, source_ref");
+    if (ordErr) {
+      const m = mapPgError(ordErr);
+      return c.json(m.body, m.status);
+    }
+    const orderByRef = new Map<string, string>();
+    for (const o of orderData ?? []) {
+      for (const ref of (o.source_ref as string[] | null) ?? []) {
+        orderByRef.set(String(ref).trim().toUpperCase(), o.id as string);
+      }
+    }
+    for (const f of storageAgg) {
+      const orderId = orderByRef.get(f.ref.trim().toUpperCase());
+      if (!orderId) {
+        storageUnmatched += 1;
+        continue;
+      }
+      const cur = feeByOrder.get(orderId) ?? {};
+      if (f.msbf !== undefined) cur.msbf = f.msbf;
+      if (f.sof !== undefined) cur.sof = f.sof;
+      feeByOrder.set(orderId, cur);
+    }
+  }
+
   const result: StockEtaImportResult = {
     matched: matched.length,
     unmatched: unmatched.length,
     orders: touchedOrders.size,
     written: 0,
+    storageOrders: feeByOrder.size,
+    storageWritten: 0,
+    storageUnmatched,
     sampleUnmatched: unmatched.slice(0, 20),
     dryRun,
   };
 
-  if (dryRun || touchedOrders.size === 0) {
+  if (dryRun || (touchedOrders.size === 0 && feeByOrder.size === 0)) {
     return c.json({ result });
   }
 
-  // Merge into each order's existing line_etas + line_stock_status (never clobber
-  // other lines).
-  const orderIds = [...touchedOrders];
-  const { data: existing, error: exErr } = await sb
-    .from("ops_order_control")
-    .select("order_id, line_etas, line_stock_status")
-    .in("order_id", orderIds);
-  if (exErr) {
-    const m = mapPgError(exErr);
-    return c.json(m.body, m.status);
-  }
-  const existingEtas = new Map<string, Record<string, string>>();
-  const existingStatus = new Map<string, Record<string, string>>();
-  for (const row of existing ?? []) {
-    existingEtas.set(
-      row.order_id as string,
-      (row.line_etas as Record<string, string> | null) ?? {},
-    );
-    existingStatus.set(
-      row.order_id as string,
-      (row.line_stock_status as Record<string, string> | null) ?? {},
-    );
+  // Merge stock ETA/status into each order's existing line_etas + line_stock_status
+  // (never clobber other lines).
+  if (touchedOrders.size > 0) {
+    const orderIds = [...touchedOrders];
+    const { data: existing, error: exErr } = await sb
+      .from("ops_order_control")
+      .select("order_id, line_etas, line_stock_status")
+      .in("order_id", orderIds);
+    if (exErr) {
+      const m = mapPgError(exErr);
+      return c.json(m.body, m.status);
+    }
+    const existingEtas = new Map<string, Record<string, string>>();
+    const existingStatus = new Map<string, Record<string, string>>();
+    for (const row of existing ?? []) {
+      existingEtas.set(
+        row.order_id as string,
+        (row.line_etas as Record<string, string> | null) ?? {},
+      );
+      existingStatus.set(
+        row.order_id as string,
+        (row.line_stock_status as Record<string, string> | null) ?? {},
+      );
+    }
+
+    let written = 0;
+    const upsertRows = orderIds.map((orderId) => {
+      const eta = etaByOrder.get(orderId);
+      const status = statusByOrder.get(orderId);
+      written += Object.keys({ ...eta, ...status }).length;
+      const row: {
+        order_id: string;
+        updated_by: string;
+        line_etas?: Record<string, string>;
+        line_stock_status?: Record<string, string>;
+      } = { order_id: orderId, updated_by: auth.id };
+      if (eta) row.line_etas = { ...(existingEtas.get(orderId) ?? {}), ...eta };
+      if (status)
+        row.line_stock_status = { ...(existingStatus.get(orderId) ?? {}), ...status };
+      return row;
+    });
+
+    const { error: upErr } = await sb
+      .from("ops_order_control")
+      .upsert(upsertRows, { onConflict: "order_id" });
+    if (upErr) {
+      const m = mapPgError(upErr);
+      return c.json(m.body, m.status);
+    }
+    result.written = written;
   }
 
-  let written = 0;
-  const upsertRows = orderIds.map((orderId) => {
-    const eta = etaByOrder.get(orderId);
-    const status = statusByOrder.get(orderId);
-    written += Object.keys({ ...eta, ...status }).length;
-    const row: {
-      order_id: string;
-      updated_by: string;
-      line_etas?: Record<string, string>;
-      line_stock_status?: Record<string, string>;
-    } = { order_id: orderId, updated_by: auth.id };
-    if (eta) row.line_etas = { ...(existingEtas.get(orderId) ?? {}), ...eta };
-    if (status)
-      row.line_stock_status = { ...(existingStatus.get(orderId) ?? {}), ...status };
-    return row;
-  });
-
-  const { error: upErr } = await sb
-    .from("ops_order_control")
-    .upsert(upsertRows, { onConflict: "order_id" });
-  if (upErr) {
-    const m = mapPgError(upErr);
-    return c.json(m.body, m.status);
+  // Write the per-order storage fees (only the columns present; nulls left as-is
+  // so a MS/BF-only order keeps sof null). Overwrites the import columns; never
+  // touches storage_fee_override (the operator's manual value).
+  if (feeByOrder.size > 0) {
+    const feeRows = [...feeByOrder.entries()].map(([orderId, fee]) => {
+      const row: {
+        order_id: string;
+        updated_by: string;
+        storage_fee_msbf?: number;
+        storage_fee_sof?: number;
+      } = { order_id: orderId, updated_by: auth.id };
+      if (fee.msbf !== undefined) row.storage_fee_msbf = fee.msbf;
+      if (fee.sof !== undefined) row.storage_fee_sof = fee.sof;
+      return row;
+    });
+    const { error: feeErr } = await sb
+      .from("ops_order_control")
+      .upsert(feeRows, { onConflict: "order_id" });
+    if (feeErr) {
+      const m = mapPgError(feeErr);
+      return c.json(m.body, m.status);
+    }
+    result.storageWritten = feeByOrder.size;
   }
 
-  result.written = written;
   return c.json({ result });
 });
 

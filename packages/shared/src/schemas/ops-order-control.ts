@@ -90,6 +90,13 @@ export const opsOrderControlSchema = z.object({
    *  the logistic ETA (else today); set = freeze the window at that date. */
   storage_to: isoDate.nullable(),
   storage_fee_override: dbNumeric,
+  /** Master-imported storage fees (migration 0200) — the per-order fee Jess
+   *  already hand-computes in the Master "MS/BF Storage Fees" / "SOF Storage
+   *  Fees" columns. null = not imported. READ-only on the overlay; written by
+   *  the import-stock-eta endpoint. The Storage panel prefers these over the
+   *  auto `computeStorageFee` (a manual override still wins). */
+  storage_fee_msbf: dbNumeric,
+  storage_fee_sof: dbNumeric,
   /** Drawer Master-Sheet redesign (migration 0167): the logistic's committed
    *  delivery date (vs orders.delivery_date = customer deadline), the keyed
    *  amount paid (partial-payment support), and a storage-fee paid status. */

@@ -4,12 +4,16 @@ import {
   normalizePoKey,
   splitPoKeys,
   parseEtaCell,
+  parseMoneyCell,
   normalizeMasterStockStatus,
   masterRecordToStockRow,
   masterRecordToOrderRow,
+  masterRecordToStorageFee,
+  aggregateStorageFeesByRef,
   matchStockRows,
   type OrderLineRef,
   type StockEtaImportRow,
+  type StorageFeeImportRow,
 } from "./stock-eta-import";
 
 describe("excelSerialToISO", () => {
@@ -205,5 +209,73 @@ describe("matchStockRows", () => {
     const out = matchStockRows(rows, lines);
     expect(out.matched).toHaveLength(0);
     expect(out.unmatched[0].reason).toMatch(/PO not found/);
+  });
+});
+
+describe("parseMoneyCell", () => {
+  it("reads a plain number", () => {
+    expect(parseMoneyCell(150)).toBe(150);
+    expect(parseMoneyCell(0)).toBe(0);
+  });
+  it("reads 'RM 150' / 'RM150.00' text", () => {
+    expect(parseMoneyCell("RM 150")).toBe(150);
+    expect(parseMoneyCell("RM150.00")).toBe(150);
+    expect(parseMoneyCell("1,200")).toBe(1200);
+  });
+  it("is null for blank / non-numeric / negative", () => {
+    expect(parseMoneyCell("")).toBeNull();
+    expect(parseMoneyCell(null)).toBeNull();
+    expect(parseMoneyCell("n/a")).toBeNull();
+    expect(parseMoneyCell(-5)).toBeNull();
+  });
+});
+
+describe("masterRecordToStorageFee", () => {
+  it("reads MS/BF + Sofa storage-fee columns by fuzzy header", () => {
+    const out = masterRecordToStorageFee({
+      Ref: "CR1052",
+      "MS/BF Storage Fees": 150,
+      "SOF Storage Fees": "RM 200",
+    });
+    expect(out).toEqual({ ok: true, row: { ref: "CR1052", msbf: 150, sof: 200 } });
+  });
+  it("tolerates header casing / spacing variants", () => {
+    const out = masterRecordToStorageFee({
+      ref: "CR1",
+      "  sofa storage fee ": "200",
+    });
+    expect(out).toEqual({ ok: true, row: { ref: "CR1", sof: 200 } });
+  });
+  it("skips a row with no Ref", () => {
+    const out = masterRecordToStorageFee({ "MS/BF Storage Fees": 150 });
+    expect(out.ok).toBe(false);
+  });
+  it("skips a row with no non-zero fee", () => {
+    const out = masterRecordToStorageFee({
+      Ref: "CR1",
+      "MS/BF Storage Fees": 0,
+      "SOF Storage Fees": "",
+    });
+    expect(out.ok).toBe(false);
+  });
+});
+
+describe("aggregateStorageFeesByRef", () => {
+  it("collapses an order's repeated rows to one fee (max non-zero per category)", () => {
+    const rows: StorageFeeImportRow[] = [
+      { ref: "CR1052", msbf: 150 },
+      { ref: "cr1052", msbf: 150 },
+      { ref: "CR2000", sof: 200 },
+    ];
+    const out = aggregateStorageFeesByRef(rows);
+    expect(out).toHaveLength(2);
+    expect(out.find((r) => r.ref.toUpperCase() === "CR1052")).toEqual({
+      ref: "CR1052",
+      msbf: 150,
+    });
+    expect(out.find((r) => r.ref.toUpperCase() === "CR2000")).toEqual({
+      ref: "CR2000",
+      sof: 200,
+    });
   });
 });

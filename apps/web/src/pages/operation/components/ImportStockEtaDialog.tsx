@@ -3,7 +3,10 @@ import { toast } from "sonner";
 import {
   masterRecordToStockRow,
   masterRecordToOrderRow,
+  masterRecordToStorageFee,
+  aggregateStorageFeesByRef,
   type StockEtaImportRow,
+  type StorageFeeImportRow,
   type StockEtaImportResult,
   type AutocountImportRow,
   type AutocountImportResponse,
@@ -27,6 +30,7 @@ type Stage = "pick" | "preview" | "result";
 interface Parsed {
   orderRows: AutocountImportRow[];
   stockRows: StockEtaImportRow[];
+  storageFees: StorageFeeImportRow[];
 }
 
 async function readMaster(file: File): Promise<Parsed> {
@@ -34,7 +38,7 @@ async function readMaster(file: File): Promise<Parsed> {
   const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
   const name = wb.SheetNames.find((n) => /ops/i.test(n)) ?? wb.SheetNames[0];
   const sheet = name ? wb.Sheets[name] : undefined;
-  if (!sheet) return { orderRows: [], stockRows: [] };
+  if (!sheet) return { orderRows: [], stockRows: [], storageFees: [] };
   // raw:true keeps date cells as Excel serials (the shared parsers convert them).
   const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
     header: 1,
@@ -44,6 +48,7 @@ async function readMaster(file: File): Promise<Parsed> {
   const header = (Array.isArray(aoa[0]) ? aoa[0] : []).map((h) => String(h ?? "").trim());
   const orderRows: AutocountImportRow[] = [];
   const stockRows: StockEtaImportRow[] = [];
+  const feeRows: StorageFeeImportRow[] = [];
   for (let r = 1; r < aoa.length; r++) {
     const cells = aoa[r];
     if (!Array.isArray(cells)) continue;
@@ -58,8 +63,12 @@ async function readMaster(file: File): Promise<Parsed> {
     if (ord.ok) orderRows.push(ord.row);
     const stk = masterRecordToStockRow(rec);
     if (stk.ok) stockRows.push(stk.row);
+    const fee = masterRecordToStorageFee(rec);
+    if (fee.ok) feeRows.push(fee.row);
   }
-  return { orderRows, stockRows };
+  // The Master lists one row per line → an order's storage fee repeats; collapse
+  // to one fee per Ref (max non-zero per category).
+  return { orderRows, stockRows, storageFees: aggregateStorageFeesByRef(feeRows) };
 }
 
 export default function ImportStockEtaDialog({ onClose }: { onClose: () => void }) {
@@ -69,7 +78,11 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
 
   const [stage, setStage] = useState<Stage>("pick");
   const [fileName, setFileName] = useState("");
-  const [parsed, setParsed] = useState<Parsed>({ orderRows: [], stockRows: [] });
+  const [parsed, setParsed] = useState<Parsed>({
+    orderRows: [],
+    stockRows: [],
+    storageFees: [],
+  });
   const [preview, setPreview] = useState<StockEtaImportResult | null>(null);
   const [ordersResult, setOrdersResult] = useState<AutocountImportResponse | null>(null);
   const [stockResult, setStockResult] = useState<StockEtaImportResult | null>(null);
@@ -89,7 +102,11 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
       setFileName(file.name);
       // Dry-run the stock match on the CURRENT orders so the operator sees roughly
       // how many already match (it climbs once the orders are created on commit).
-      const dry = await importEta.mutateAsync({ rows: p.stockRows, dryRun: true });
+      const dry = await importEta.mutateAsync({
+        rows: p.stockRows,
+        storageFees: p.storageFees,
+        dryRun: true,
+      });
       setPreview(dry);
       setStage("preview");
     } catch (e) {
@@ -112,12 +129,17 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
         ? await importOrders.mutateAsync({ sourceSystem: "autocount", rows: parsed.orderRows })
         : null;
       setOrdersResult(ord);
-      // 2) Now set stock ETA + status — matches climb after the create.
-      const stk = await importEta.mutateAsync({ rows: parsed.stockRows });
+      // 2) Now set stock ETA + status + storage fees — matches climb after the create.
+      const stk = await importEta.mutateAsync({
+        rows: parsed.stockRows,
+        storageFees: parsed.storageFees,
+      });
       setStockResult(stk);
       setStage("result");
       toast.success(
-        `${ord ? `${ord.created} order(s) created · ` : ""}${stk.written} stock line(s) set`,
+        `${ord ? `${ord.created} order(s) created · ` : ""}${stk.written} stock line(s) set${
+          stk.storageWritten > 0 ? ` · ${stk.storageWritten} storage fee(s)` : ""
+        }`,
       );
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Import failed");
@@ -176,6 +198,13 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
             <span className="font-mono t-tiny">{fileName}</span> ·{" "}
             <span className="font-semibold text-base-900">{parsed.orderRows.length}</span> order lines ·{" "}
             <span className="font-semibold text-base-900">{parsed.stockRows.length}</span> stock rows
+            {parsed.storageFees.length > 0 && (
+              <>
+                {" "}·{" "}
+                <span className="font-semibold text-base-900">{parsed.storageFees.length}</span>{" "}
+                storage fees
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-2">
@@ -197,6 +226,18 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
             On import: any order the sheet has but the portal is missing gets{" "}
             <span className="font-semibold">created first</span>, then the stock match climbs above
             the {preview.matched} shown (which only counts orders already in the portal).
+            {parsed.storageFees.length > 0 && (
+              <>
+                {" "}
+                Storage fees (MS/BF · Sofa) match{" "}
+                <span className="font-semibold text-base-900">{preview.storageOrders}</span> order
+                {preview.storageOrders === 1 ? "" : "s"} now
+                {preview.storageUnmatched > 0 && (
+                  <> · {preview.storageUnmatched} by Ref not found (climbs after create)</>
+                )}
+                .
+              </>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 mt-1">
@@ -234,6 +275,20 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
                 </>
               )}
             </div>
+            {stockResult.storageWritten > 0 && (
+              <div className="t-small text-base-700 mt-1 pt-1 border-t border-base-200">
+                <span className="font-semibold text-green-700">
+                  {stockResult.storageWritten}
+                </span>{" "}
+                storage fee(s) set from the Master
+                {stockResult.storageUnmatched > 0 && (
+                  <>
+                    {" "}· <span className="text-amber-600">{stockResult.storageUnmatched} Ref
+                    unmatched</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           {stockResult.unmatched > 0 && stockResult.sampleUnmatched.length > 0 && (
             <details className="t-tiny text-base-600">

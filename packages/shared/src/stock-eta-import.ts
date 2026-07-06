@@ -77,6 +77,23 @@ export function parseEtaCell(raw: string | number | undefined | null): string | 
   return null;
 }
 
+/** A money cell (a Master storage-fee column) can arrive as a number, a plain
+ *  numeric string, or "RM 150" / "RM150.00" text. Normalize to a non-negative
+ *  number, or null if blank / unparseable. */
+export function parseMoneyCell(
+  raw: string | number | undefined | null,
+): number | null {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw === "number") return Number.isFinite(raw) && raw >= 0 ? raw : null;
+  const s = raw.trim();
+  if (s === "") return null;
+  // Strip currency symbol / thousands separators, keep digits + one decimal point.
+  const cleaned = s.replace(/rm/i, "").replace(/[,\s]/g, "").trim();
+  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 /** The per-line readiness a Master "Stock Status" (col Z) maps to. */
 export type LineStockStatus = "ready" | "waiting" | "nopo";
 
@@ -222,6 +239,83 @@ export function masterRecordToOrderRow(
 }
 
 // ---------------------------------------------------------------------------
+// Storage fee — the per-ORDER fee Jess hand-computes in the Master's
+// "MS/BF Storage Fees" / "SOF Storage Fees" columns (col AN / AO). Keyed by Ref
+// (order identity), NOT PO (which is per-line). Imported into
+// ops_order_control.storage_fee_msbf / _sof (migration 0200).
+// ---------------------------------------------------------------------------
+
+export interface StorageFeeImportRow {
+  /** orders.source_ref to join on (the Master "Ref"). */
+  ref: string;
+  /** MS/BF storage fee (RM); omitted when blank / zero. */
+  msbf?: number;
+  /** Sofa storage fee (RM); omitted when blank / zero. */
+  sof?: number;
+}
+
+export type StorageFeeRowResult =
+  | { ok: true; row: StorageFeeImportRow }
+  | { ok: false; reason: string };
+
+/** Map ONE raw Master "Ops" record to a per-order storage-fee row. Header match
+ *  is FUZZY (case/space-tolerant): a column whose header contains "storage" +
+ *  "fee" + a category token — ms/bf · mattress · bed → MS/BF; sof · sofa → Sofa —
+ *  so "MS/BF Storage Fees" / "SOF Storage Fees" and close variants all resolve.
+ *  A row with no Ref, or no non-zero fee, is skipped. */
+export function masterRecordToStorageFee(
+  rec: Record<string, string | number>,
+): StorageFeeRowResult {
+  const norm: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(rec)) norm[k.trim().toLowerCase()] = v;
+  const ref = String(norm["ref"] ?? "").trim();
+  if (!ref) return { ok: false, reason: "missing Ref" };
+
+  let msbfCell: string | number | undefined;
+  let sofCell: string | number | undefined;
+  for (const [k, v] of Object.entries(norm)) {
+    if (!(k.includes("storage") && k.includes("fee"))) continue;
+    // Sofa first (its token is distinctive); else the mattress/bed-frame column.
+    if (sofCell === undefined && k.includes("sof")) sofCell = v;
+    else if (
+      msbfCell === undefined &&
+      (k.includes("ms/bf") ||
+        k.includes("ms\\bf") ||
+        k.includes("msbf") ||
+        k.includes("mattress") ||
+        k.includes("bed"))
+    )
+      msbfCell = v;
+  }
+  const msbf = parseMoneyCell(msbfCell);
+  const sof = parseMoneyCell(sofCell);
+  if ((msbf ?? 0) <= 0 && (sof ?? 0) <= 0) {
+    return { ok: false, reason: "no storage fee" };
+  }
+  const row: StorageFeeImportRow = { ref };
+  if (msbf && msbf > 0) row.msbf = msbf;
+  if (sof && sof > 0) row.sof = sof;
+  return { ok: true, row };
+}
+
+/** Aggregate per-order storage-fee rows by Ref (a Master lists one row per line,
+ *  so an order's fee may repeat across its rows). Takes the MAX non-zero per
+ *  category → robust whether the fee sits on every row or only one. */
+export function aggregateStorageFeesByRef(
+  rows: StorageFeeImportRow[],
+): StorageFeeImportRow[] {
+  const byRef = new Map<string, StorageFeeImportRow>();
+  for (const r of rows) {
+    const key = r.ref.trim().toUpperCase();
+    const cur = byRef.get(key) ?? { ref: r.ref };
+    if (r.msbf && (!cur.msbf || r.msbf > cur.msbf)) cur.msbf = r.msbf;
+    if (r.sof && (!cur.sof || r.sof > cur.sof)) cur.sof = r.sof;
+    byRef.set(key, cur);
+  }
+  return [...byRef.values()];
+}
+
+// ---------------------------------------------------------------------------
 // Pure matcher — join import rows to portal order lines by PO + token overlap
 // ---------------------------------------------------------------------------
 
@@ -329,9 +423,22 @@ export const stockEtaImportRowSchema = z
   .strict();
 export type StockEtaImportRowParsed = z.infer<typeof stockEtaImportRowSchema>;
 
+export const storageFeeImportRowSchema = z
+  .object({
+    ref: z.string().trim().min(1).max(60),
+    msbf: z.number().min(0).max(9_999_999).optional(),
+    sof: z.number().min(0).max(9_999_999).optional(),
+  })
+  .strict();
+export type StorageFeeImportRowParsed = z.infer<typeof storageFeeImportRowSchema>;
+
 export const stockEtaImportInput = z
   .object({
     rows: z.array(stockEtaImportRowSchema).min(1).max(2000),
+    /** Per-order storage fees from the Master's MS/BF / SOF Storage-Fees columns
+     *  (migration 0200) — keyed by Ref, written to ops_order_control. Optional so
+     *  a Master without those columns still imports stock ETA/status. */
+    storageFees: z.array(storageFeeImportRowSchema).max(2000).optional(),
     /** Preview only — compute + return counts, write nothing. */
     dryRun: z.boolean().optional(),
   })
@@ -347,6 +454,12 @@ export interface StockEtaImportResult {
   orders: number;
   /** Line ETAs actually written (0 on a dry run). */
   written: number;
+  /** Orders whose storage fee (MS/BF or Sofa) was matched by Ref. */
+  storageOrders: number;
+  /** Orders whose storage fee was actually written (0 on a dry run). */
+  storageWritten: number;
+  /** Storage-fee rows whose Ref matched no order (with a short why). */
+  storageUnmatched: number;
   /** A short sample of unmatched rows, to spot a bad PO/name in the sheet. */
   sampleUnmatched: { po: string; sku: string; reason: string }[];
   dryRun: boolean;

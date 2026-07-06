@@ -25,6 +25,7 @@ import {
   type SkuImportRow,
   type SkuImportResult,
   type StockEtaImportRow,
+  type StorageFeeImportRow,
   type StockEtaImportResult,
   type AutocountImportInput,
   type AutocountImportResponse,
@@ -4918,7 +4919,11 @@ export function useImportOrders() {
 export function useImportStockEta() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { rows: StockEtaImportRow[]; dryRun?: boolean }) =>
+    mutationFn: (input: {
+      rows: StockEtaImportRow[];
+      storageFees?: StorageFeeImportRow[];
+      dryRun?: boolean;
+    }) =>
       apiFetch<{ result: StockEtaImportResult }>(
         "/api/operation/orders/import-stock-eta",
         catalogJson("POST", input),

@@ -917,7 +917,18 @@ export function StorageControlFields({
           year: "2-digit",
         })
       : "—";
-  const incurred = draft.storage_from.trim() !== "";
+  // Master-imported storage fees (migration 0200, Jess 2026-07-06) — the fee Jess
+  // hand-computes in the Master. When present it REPLACES the auto number in the
+  // tile + is the Charge default (a manual override still wins); and a Master fee
+  // auto-counts the order as incurred (Jess: "有费用自动标 incurred").
+  const impMsbf = form.control?.storage_fee_msbf ?? null;
+  const impSof = form.control?.storage_fee_sof ?? null;
+  const hasImportedFee = (impMsbf ?? 0) > 0 || (impSof ?? 0) > 0;
+  const dispMsbf = impMsbf ?? storage.msbf;
+  const dispSof = impSof ?? storage.sof;
+  // Effective auto/imported total (before a manual override) — imported wins.
+  const effAutoTotal = hasImportedFee ? (impMsbf ?? 0) + (impSof ?? 0) : storage.total;
+  const incurred = draft.storage_from.trim() !== "" || hasImportedFee;
   // Storage alert (Jess) — countdown to the To date, SAME pills as the Deadline
   // column (amber pill-warning / red pill-overdue + ⚠), NOT emoji. Shows only
   // when ≤3 days out, overdue, OR the logistic ETA is missing / later than To
@@ -1002,31 +1013,49 @@ export function StorageControlFields({
           >
             {hasMsbf && (
               <div className="rounded-md border border-base-100 bg-base-50 px-2 py-1.5">
-                <div className="text-[10px] uppercase tracking-[0.04em] text-base-400">
-                  MS / BF
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] uppercase tracking-[0.04em] text-base-400">
+                    MS / BF
+                  </span>
+                  {impMsbf != null && (
+                    <span className="text-[9px] uppercase tracking-[0.04em] text-primary font-semibold">
+                      Master
+                    </span>
+                  )}
                 </div>
                 <div className="text-[13px] font-semibold text-base-900">
-                  RM {storage.msbf.toLocaleString()}
+                  RM {dispMsbf.toLocaleString()}
                 </div>
                 <div className="text-[10px] text-base-500">
-                  {storage.msbf > 0
-                    ? `${storage.msbfMonths} mth × RM150`
-                    : `free until ${fmtShort(storage.freeUntilMsbf)}`}
+                  {impMsbf != null
+                    ? "imported fee"
+                    : storage.msbf > 0
+                      ? `${storage.msbfMonths} mth × RM150`
+                      : `free until ${fmtShort(storage.freeUntilMsbf)}`}
                 </div>
               </div>
             )}
             {hasSof && (
               <div className="rounded-md border border-base-100 bg-base-50 px-2 py-1.5">
-                <div className="text-[10px] uppercase tracking-[0.04em] text-base-400">
-                  Sofa
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] uppercase tracking-[0.04em] text-base-400">
+                    Sofa
+                  </span>
+                  {impSof != null && (
+                    <span className="text-[9px] uppercase tracking-[0.04em] text-primary font-semibold">
+                      Master
+                    </span>
+                  )}
                 </div>
                 <div className="text-[13px] font-semibold text-base-900">
-                  RM {storage.sof.toLocaleString()}
+                  RM {dispSof.toLocaleString()}
                 </div>
                 <div className="text-[10px] text-base-500">
-                  {storage.sofCharged
-                    ? "flat RM200 / order"
-                    : `free until ${fmtShort(storage.freeUntilSof)}`}
+                  {impSof != null
+                    ? "imported fee"
+                    : storage.sofCharged
+                      ? "flat RM200 / order"
+                      : `free until ${fmtShort(storage.freeUntilSof)}`}
                 </div>
               </div>
             )}
@@ -1038,8 +1067,8 @@ export function StorageControlFields({
               value={draft.storage_fee_override}
               onChange={(e) => set("storage_fee_override", e.target.value)}
               placeholder={
-                storage.total > 0
-                  ? `auto RM ${storage.total.toLocaleString()} (${storage.days}d)`
+                effAutoTotal > 0
+                  ? `${hasImportedFee ? "Master" : "auto"} RM ${effAutoTotal.toLocaleString()}${hasImportedFee ? "" : ` (${storage.days}d)`}`
                   : "override auto"
               }
               className={CELL}
@@ -1060,7 +1089,7 @@ export function StorageControlFields({
             <StorageCollectWaiver
               orderId={orderId}
               control={form.control}
-              charge={draft.storage_fee_override.trim() ? Number(draft.storage_fee_override) : storage.total}
+              charge={draft.storage_fee_override.trim() ? Number(draft.storage_fee_override) : effAutoTotal}
             />
           )}
           {orderId && (
