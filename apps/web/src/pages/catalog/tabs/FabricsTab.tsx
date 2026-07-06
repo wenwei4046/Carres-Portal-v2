@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/api";
 import {
   useBatchSaveCatalogFabrics,
   useCatalogFabricsHistory,
+  useUpdateSofaCompartment,
   useUpsertModelFabricTierOverride,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
@@ -108,6 +109,7 @@ export default function FabricsTab({
           <div className="max-w-[680px] flex flex-col gap-6">
             <FabricTierDeltasCard catalog={catalog} isPrincipal={isPrincipal} />
             <PerModelTierOverride catalog={catalog} isPrincipal={isPrincipal} />
+            <PerCompartmentSpecialPrice catalog={catalog} isPrincipal={isPrincipal} />
           </div>
         )}
       </div>
@@ -232,6 +234,143 @@ function PerModelTierOverride({
           </button>
         )}
       </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-compartment fabric-tier special (0205) — the highest-precedence delta,
+// keyed on a COMPARTMENT (not a model). When any sofa build uses this
+// compartment, its P2 / P3 special REPLACES the per-model / global delta for
+// the whole sofa (highest wins if a build spans several). Blank = no special.
+// Stored on the sofa_compartments pool row; reuses the compartment PATCH.
+// ---------------------------------------------------------------------------
+
+function PerCompartmentSpecialPrice({
+  catalog,
+  isPrincipal,
+}: {
+  catalog: CatalogResponse;
+  isPrincipal: boolean;
+}) {
+  const patch = useUpdateSofaCompartment();
+  const compartments = useMemo(
+    () =>
+      (catalog.sofaCompartments ?? [])
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)),
+    [catalog.sofaCompartments],
+  );
+  const [compartmentId, setCompartmentId] = useState<string>(compartments[0]?.id ?? "");
+  // Keep a valid selection if the pool changes under us (add / remove).
+  useEffect(() => {
+    if (compartments.length && !compartments.some((c) => c.id === compartmentId)) {
+      setCompartmentId(compartments[0]!.id);
+    }
+  }, [compartments, compartmentId]);
+
+  const current = compartments.find((c) => c.id === compartmentId) ?? null;
+
+  const [t2, setT2] = useState("");
+  const [t3, setT3] = useState("");
+  useEffect(() => {
+    setT2(current?.specialTier2Delta != null ? String(current.specialTier2Delta) : "");
+    setT3(current?.specialTier3Delta != null ? String(current.specialTier3Delta) : "");
+  }, [compartmentId, current?.specialTier2Delta, current?.specialTier3Delta]);
+
+  const t2Num = t2.trim() === "" ? null : Number(t2);
+  const t3Num = t3.trim() === "" ? null : Number(t3);
+  const valid =
+    (t2Num === null || (Number.isFinite(t2Num) && t2Num >= 0)) &&
+    (t3Num === null || (Number.isFinite(t3Num) && t3Num >= 0));
+  const dirty =
+    t2Num !== (current?.specialTier2Delta ?? null) ||
+    t3Num !== (current?.specialTier3Delta ?? null);
+
+  function save() {
+    if (!valid || !dirty || !compartmentId) return;
+    patch.mutate(
+      { id: compartmentId, patch: { specialTier2Delta: t2Num, specialTier3Delta: t3Num } },
+      {
+        onSuccess: () => toast.success("Compartment special saved"),
+        onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Save failed"),
+      },
+    );
+  }
+
+  return (
+    <section data-testid="per-compartment-special-price">
+      <div className="t-h4 font-display text-base-900 mb-1">Per-compartment special price</div>
+      <p className="t-tiny text-base-500 mb-2 max-w-[520px]">
+        When any sofa build uses this compartment, its P2 / P3 fabric premium
+        replaces the per-model / global deltas above for the whole sofa (highest
+        wins if a build spans several). Blank = no special.
+        {!isPrincipal && " Master Admin only — read-only for your role."}
+      </p>
+      {compartments.length === 0 ? (
+        <div className="bg-white border border-base-200 rounded-[4px] p-4 t-small text-base-500">
+          No compartments yet — add them in the Maintenance tab first.
+        </div>
+      ) : (
+        <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-wrap gap-4 items-end">
+          <label className="block">
+            <span className="label block mb-1">Compartment</span>
+            <select
+              value={compartmentId}
+              onChange={(e) => setCompartmentId(e.target.value)}
+              className={`${INPUT_CLS} w-52`}
+              data-testid="compartment-special-select"
+            >
+              {compartments.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code}
+                  {c.description ? ` — ${c.description}` : ""}
+                  {c.active ? "" : " (off)"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="label block mb-1">P2 special (RM)</span>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={t2}
+              disabled={!isPrincipal}
+              onChange={(e) => setT2(e.target.value)}
+              placeholder="none"
+              className={`${INPUT_CLS} w-28 disabled:opacity-60`}
+              data-testid="compartment-special-t2"
+            />
+          </label>
+          <label className="block">
+            <span className="label block mb-1">P3 special (RM)</span>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={t3}
+              disabled={!isPrincipal}
+              onChange={(e) => setT3(e.target.value)}
+              placeholder="none"
+              className={`${INPUT_CLS} w-28 disabled:opacity-60`}
+              data-testid="compartment-special-t3"
+            />
+          </label>
+          {isPrincipal && (
+            <button
+              type="button"
+              onClick={save}
+              disabled={!valid || !dirty || patch.isPending}
+              className="btn-primary text-[12px] disabled:opacity-40"
+              data-testid="compartment-special-save"
+            >
+              {patch.isPending ? "Saving…" : "Save special"}
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }

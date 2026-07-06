@@ -441,6 +441,10 @@ export const sofaCompartmentSchema = z.object({
   defaultPrice: z.number(),
   sortOrder: z.number().int(),
   active: z.boolean(),
+  // 0205 — per-compartment fabric-tier P2/P3 delta override (RM, null = inherit).
+  // Optional so pre-0205 fixtures still parse; the API adapter always emits both.
+  specialTier2Delta: z.number().nullable().optional(),
+  specialTier3Delta: z.number().nullable().optional(),
 });
 export type SofaCompartmentDto = z.infer<typeof sofaCompartmentSchema>;
 
@@ -479,6 +483,11 @@ export const sofaCompartmentCreateInput = z
     iconUrl: z.string().trim().max(500).nullable().optional(),
     sortOrder: z.number().int().optional(),
     active: z.boolean().optional(),
+    // 0205 — per-compartment fabric-tier P2/P3 delta override (RM, >= 0, null =
+    // inherit). Tunes the whole-sofa FABRIC premium, not the compartment module
+    // price. Reachable on PATCH too via sofaCompartmentPatchInput (create.partial).
+    specialTier2Delta: z.number().nonnegative().nullable().optional(),
+    specialTier3Delta: z.number().nonnegative().nullable().optional(),
   })
   .strict();
 export type SofaCompartmentCreateInput = z.infer<typeof sofaCompartmentCreateInput>;
