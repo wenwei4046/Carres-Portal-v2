@@ -3,16 +3,17 @@ import type { CatalogResponse } from "@carres/shared";
 import SofaCombosPanel from "../modular/SofaCombosPanel";
 
 /**
- * Sofa Combos tab (the renamed "Combos" tab). The old "Overall Combo" feature
- * (a fixed-set SKU bundle sold at one price, migration 0177) was removed
- * 2026-07-06 — it was written in error and never used. This tab now hosts ONLY
- * sofa combos.
+ * Sofa Combos tab (the renamed "Combos" tab). Hosts ONLY sofa combos
+ * (migration 0179) — the old fixed-set "Overall Combo" (0177) was removed
+ * 2026-07-06.
  *
- * A sofa combo = a matched-shape compartment bundle priced per seat height
- * (migration 0179): pick a sofa model, then author/edit its combos in the panel
- * below. The list is a 2-column card grid. Principal-gated
- * (sofa_combo_pricing_write_principal RLS + the API's 403 are the real
- * boundary); a non-principal gets a friendly read-only view.
+ * Layout (Loo 2026-07-07, matching the 2990s reference): combos are GROUPED BY
+ * base model — a "Model (N combos)" heading per model, then that model's combo
+ * cards. The Model dropdown filters to one model or shows "All base models".
+ * Each card shows the full seat-height price grid + PWP + effective date + Edit
+ * / History; delete is the trash icon. Only PRICING combos appear here — Quick
+ * Pick presets (is_quick_pick) live in the POS Quick pick tab, not this pricing
+ * view. Principal-gated (RLS + API 403 are the real boundary).
  */
 export default function SofaCombosTab({
   catalog,
@@ -28,23 +29,29 @@ export default function SofaCombosTab({
         .sort((a, b) => a.name.localeCompare(b.name)),
     [catalog.models],
   );
-  const offeredCountByModel = useMemo(() => {
+  const combos = catalog.sofaCombos ?? [];
+
+  // Pricing-combo count per model (Quick Pick presets excluded — they belong to
+  // the POS Quick pick tab). Drives the dropdown counts + which models to show.
+  const pricingCountByModel = useMemo(() => {
     const m = new Map<string, number>();
-    for (const o of catalog.modelSofaCompartments ?? []) {
-      m.set(o.modelId, (m.get(o.modelId) ?? 0) + 1);
+    for (const c of combos) {
+      if (c.isQuickPick) continue;
+      m.set(c.modelId, (m.get(c.modelId) ?? 0) + 1);
     }
     return m;
-  }, [catalog.modelSofaCompartments]);
+  }, [combos]);
 
-  // Default to the first sofa model that actually offers compartments (a combo
-  // needs offered codes for its slots); fall back to the first sofa model.
-  const [modelId, setModelId] = useState<string>(
-    () =>
-      sofaModels.find((m) => (offeredCountByModel.get(m.id) ?? 0) > 0)?.id ??
-      sofaModels[0]?.id ??
-      "",
-  );
-  const model = sofaModels.find((m) => m.id === modelId) ?? null;
+  // "" = All base models; else a specific model id.
+  const [selected, setSelected] = useState<string>("");
+
+  // When "All": every sofa model that HAS ≥1 pricing combo (matches the
+  // reference — only models with combos are listed). When a specific model is
+  // picked: just that one (even with 0 combos, so you can create the first).
+  const modelsToShow = useMemo(() => {
+    if (selected) return sofaModels.filter((m) => m.id === selected);
+    return sofaModels.filter((m) => (pricingCountByModel.get(m.id) ?? 0) > 0);
+  }, [selected, sofaModels, pricingCountByModel]);
 
   return (
     <section className="max-w-[1600px]" data-testid="sofa-combos-section">
@@ -54,28 +61,30 @@ export default function SofaCombosTab({
           <label className="inline-flex items-center gap-2">
             <span className="label">Model</span>
             <select
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value)}
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
               className="px-3 py-1.5 border border-base-300 rounded-[4px] text-[13px] bg-white outline-none focus:border-base-500"
               aria-label="Sofa model"
               data-testid="sofa-combos-model"
             >
-              {sofaModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                  {(offeredCountByModel.get(m.id) ?? 0) > 0
-                    ? ` (${offeredCountByModel.get(m.id)} compartments)`
-                    : ""}
-                </option>
-              ))}
+              <option value="">All base models</option>
+              {sofaModels.map((m) => {
+                const n = pricingCountByModel.get(m.id) ?? 0;
+                return (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                    {n > 0 ? ` (${n})` : ""}
+                  </option>
+                );
+              })}
             </select>
           </label>
         )}
       </div>
-      <p className="t-tiny text-base-500 mb-4">
-        Matched-shape compartment bundles priced per seat height. When a build matches a
-        combo&apos;s slots, the combo price for the chosen height wins over à-la-carte. Offer
-        compartments to the model in Modular first. Pricing is principal-only.
+      <p className="t-tiny text-base-500 mb-6">
+        Matched-shape compartment bundles priced per seat height, grouped by base model. When a
+        build matches a combo&apos;s slots, the combo price for the chosen height wins over
+        à-la-carte. Offer compartments to the model in Modular first. Pricing is principal-only.
         {!isPrincipal && " Read-only for your role."}
       </p>
 
@@ -83,17 +92,24 @@ export default function SofaCombosTab({
         <div className="t-small text-base-500 border border-base-200 rounded-[6px] px-3 py-6 text-center">
           No sofa models yet. Add a sofa model in Modular first.
         </div>
-      ) : model ? (
-        <SofaCombosPanel
-          key={model.id}
-          modelId={model.id}
-          pool={catalog.sofaCompartments ?? []}
-          offered={(catalog.modelSofaCompartments ?? []).filter((o) => o.modelId === model.id)}
-          combos={catalog.sofaCombos ?? []}
-          optionPools={catalog.optionPools}
-          isPrincipal={isPrincipal}
-        />
-      ) : null}
+      ) : modelsToShow.length === 0 ? (
+        <div className="t-small text-base-500 border border-base-200 rounded-[6px] px-3 py-6 text-center">
+          No sofa combos yet. Pick a model from the dropdown above to create one.
+        </div>
+      ) : (
+        modelsToShow.map((m) => (
+          <SofaCombosPanel
+            key={m.id}
+            modelId={m.id}
+            modelName={m.name}
+            pool={catalog.sofaCompartments ?? []}
+            offered={(catalog.modelSofaCompartments ?? []).filter((o) => o.modelId === m.id)}
+            combos={combos}
+            optionPools={catalog.optionPools}
+            isPrincipal={isPrincipal}
+          />
+        ))
+      )}
     </section>
   );
 }

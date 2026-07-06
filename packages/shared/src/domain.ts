@@ -342,6 +342,9 @@ export interface SofaCombo {
    *  matched combo (hidden from Quick pick). Optional: the adapter always emits
    *  it (`?? false`); only pre-0206 test fixtures omit it. */
   isQuickPick?: boolean;
+  /** 0179 audit timestamps — surfaced for the simple per-combo History view. */
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface FloorConfig {
