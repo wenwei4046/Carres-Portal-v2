@@ -34,7 +34,7 @@ import type { DraftLine } from "../new-order/draft";
 import { sellingFabricsFor } from "../sofa-build/selling-fabrics";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
-import SofaPlanView from "../sofa-build/SofaPlanView";
+import SofaPlanView, { PLAN_PAD } from "../sofa-build/SofaPlanView";
 import type { ModelMeta } from "./catalog-index";
 
 /**
@@ -790,8 +790,26 @@ export default function SofaConfigurePage({
                       {heroDims.w} cm
                     </span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {/* ONE joined sofa — all modules in a single to-scale SVG */}
-                      <SofaPlanView cells={heroCells} depth={effHeight} className="h-64 w-auto" />
+                      {/* ONE joined sofa — all modules in a single to-scale SVG.
+                          Sized by .sof-qp__heroBox (min(55cqh, 80cqw/AR) inside
+                          the size-container heroFrame) so the sofa FILLS the
+                          stage like the 2990s hero, instead of a fixed 256px
+                          strip (Loo 2026-07-06 — "ratio 太小"). AR includes the
+                          SVG's own PLAN_PAD breathing room so the box matches
+                          the viewBox exactly (no letterbox). */}
+                      <div
+                        className="sof-qp__heroBox"
+                        style={
+                          {
+                            aspectRatio: `${heroDims.w + PLAN_PAD * 2} / ${heroDims.d + PLAN_PAD * 2}`,
+                            "--qp-ar": String(
+                              (heroDims.w + PLAN_PAD * 2) / Math.max(1, heroDims.d + PLAN_PAD * 2),
+                            ),
+                          } as React.CSSProperties
+                        }
+                      >
+                        <SofaPlanView cells={heroCells} depth={effHeight} className="h-full w-full" />
+                      </div>
                       {/* depth callout */}
                       <span
                         className="t-tiny font-mono"

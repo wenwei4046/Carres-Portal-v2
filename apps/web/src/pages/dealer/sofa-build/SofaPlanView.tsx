@@ -30,6 +30,10 @@ export interface PlanCell {
   rot: Rot;
 }
 
+/** Breathing room around the layout inside the viewBox, in cm per side — the
+ *  SVG's intrinsic aspect is (bbox.w + 2·PAD) / (bbox.h + 2·PAD). */
+export const PLAN_PAD = 4;
+
 export default function SofaPlanView({
   cells,
   depth = "24",
@@ -70,7 +74,7 @@ export default function SofaPlanView({
 
   if (geom.items.length === 0) return null;
 
-  const PAD = 4;
+  const PAD = PLAN_PAD;
   const vbW = geom.w + PAD * 2;
   const vbH = geom.h + PAD * 2;
   // Normalised cell origin inside the viewBox.
