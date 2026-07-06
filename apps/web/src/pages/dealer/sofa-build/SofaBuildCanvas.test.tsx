@@ -180,6 +180,42 @@ describe("SofaBuildCanvas", () => {
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
   });
 
+  it("Expand room grows the floor 1.5× (same ratio); Reset restores 600×480", () => {
+    renderCanvas();
+    const room = screen.getByTestId("sofa-build-room");
+    expect(room).toHaveStyle({ width: "600px", height: "480px" });
+    fireEvent.click(screen.getByTestId("sofa-room-expand"));
+    expect(room).toHaveStyle({ width: "900px", height: "720px" });
+    expect(screen.getByTestId("sofa-room-expand")).toHaveTextContent("Reset room");
+    fireEvent.click(screen.getByTestId("sofa-room-expand"));
+    expect(room).toHaveStyle({ width: "600px", height: "480px" });
+  });
+
+  it("controlled size: heightValue drives the picker; changes report via onHeightChange", () => {
+    const onHeightChange = vi.fn();
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        heights={["24", "26", "Flat"]}
+        heightValue="26"
+        onHeightChange={onHeightChange}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    const sel = screen.getByTestId("sofa-build-height") as HTMLSelectElement;
+    expect(sel.value).toBe("26");
+    fireEvent.change(sel, { target: { value: "Flat" } });
+    expect(onHeightChange).toHaveBeenCalledWith("Flat");
+  });
+
   /** A flush 1A(LHF)+1A(RHF) pair = ONE closed sofa, pre-placed. */
   function renderClosedPair() {
     render(

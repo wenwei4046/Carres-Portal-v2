@@ -197,6 +197,17 @@ describe("SofaConfigurePage", () => {
     expect(within(grid).getByText(/From RM 2,990/)).toBeTruthy();
   });
 
+  it("Customize header shows the model's FULL size chips and drives the canvas picker", () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId("sofa-mode-custom"));
+    const chips = screen.getByTestId("sofa-cust-sizes");
+    // no option pools in the fixture → the full canonical axis, incl 26/37
+    expect(within(chips).getByTestId("sofa-cust-size-26")).toBeInTheDocument();
+    expect(within(chips).getByTestId("sofa-cust-size-37")).toBeInTheDocument();
+    fireEvent.click(within(chips).getByTestId("sofa-cust-size-26"));
+    expect((screen.getByTestId("sofa-build-height") as HTMLSelectElement).value).toBe("26");
+  });
+
   it("card click SELECTS; Customize → loads the canvas pre-seeded as ONE connected sofa", () => {
     renderPage();
     fireEvent.click(screen.getByTestId(`sofa-quick-pick-${COMBO.id}`));
