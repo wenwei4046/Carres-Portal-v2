@@ -360,6 +360,10 @@ export default function CatalogStep({
                 meta={index.meta.get(configureModel.id)}
                 skus={index.skusByModel.get(configureModel.id) ?? []}
                 specialAddons={catalog.specialAddons}
+                optionPools={catalog.optionPools}
+                fabrics={catalog.fabrics}
+                fabricTierConfig={catalog.fabricTierConfig}
+                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
                 onAdd={addLine}
                 onClose={() => setConfigureModelId(null)}
               />
@@ -372,6 +376,8 @@ export default function CatalogStep({
                 meta={index.meta.get(configureModel.id)}
                 skus={index.skusByModel.get(configureModel.id) ?? []}
                 fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
+                masterFabrics={catalog.fabrics}
+                optionPools={catalog.optionPools}
                 fabricTierConfig={catalog.fabricTierConfig}
                 modelFabricTierOverrides={catalog.modelFabricTierOverrides}
                 sofaCompartments={catalog.sofaCompartments ?? []}

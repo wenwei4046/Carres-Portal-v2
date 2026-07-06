@@ -302,8 +302,8 @@ describe("SofaConfigurePage", () => {
     pwpMock.current = { data: { vouchers: [] }, isFetching: false };
     renderPage();
     expect(screen.getByTestId("sofa-qp-fabric-defer").getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByTestId("sofa-qp-fabric-f-1"));
-    expect(screen.getByTestId("sofa-qp-fabric-f-1").getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByTestId("sofa-qp-fabric-sf:f-1"));
+    expect(screen.getByTestId("sofa-qp-fabric-sf:f-1").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("sofa-qp-fabric-defer").getAttribute("aria-pressed")).toBe("false");
   });
 
@@ -313,6 +313,14 @@ describe("SofaConfigurePage", () => {
     expect(screen.getByTestId("sofa-plan-view")).toBeTruthy();
     expect(screen.getByTestId("sofa-plan-width").textContent).toMatch(/\d+ cm/);
     expect(screen.getByTestId("sofa-plan-depth").textContent).toMatch(/\d+ cm/);
+    // The hero SVG fills the stage-sized .sof-qp__heroBox (2990s hero presence),
+    // not a fixed-height strip. Box aspect = layout bbox + the SVG's own pad.
+    const box = screen
+      .getByTestId("sofa-plan-view")
+      .querySelector(".sof-qp__heroBox") as HTMLElement;
+    expect(box).toBeTruthy();
+    expect(box.style.aspectRatio).toMatch(/^\d+ \/ \d+$/);
+    expect(box.querySelector('[data-testid="sofa-plan-svg"]')).toBeTruthy();
   });
 
   it("shows the INSERT PWP code input by default", () => {

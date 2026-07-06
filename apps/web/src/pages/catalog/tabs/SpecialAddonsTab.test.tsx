@@ -19,6 +19,8 @@ vi.mock("@/lib/queries", () => ({
   useCreateAddon: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   usePatchAddon: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useDeleteAddon: () => ({ mutate: vi.fn(), isPending: false }),
+  // Stair-carry fee (hosted in the Order Add-ons panel since 2026-07-06).
+  usePatchFloorConfig: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const SA: SpecialAddonDto = {
@@ -93,5 +95,16 @@ describe("SpecialAddonsTab", () => {
     fireEvent.change(screen.getByTestId("special-label"), { target: { value: "X Thing" } });
     // no category picked yet → Create disabled
     expect(screen.getByText("Create").closest("button")).toBeDisabled();
+  });
+
+  it("Order Add-ons panel hosts the stair-carry fee editor (moved from Delivery)", () => {
+    render(<SpecialAddonsTab catalog={catalog([])} isPrincipal={true} />);
+    fireEvent.click(screen.getByTestId("maint-nav-order"));
+    const stair = screen.getByTestId("stair-carry-section");
+    expect(stair).toBeInTheDocument();
+    expect(stair).toHaveTextContent("Stair-carry fee");
+    // seeded from the catalog's floor_config (freeUpToFloor 1 / RM 50 per floor)
+    expect(screen.getByDisplayValue("1")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("50")).toBeInTheDocument();
   });
 });

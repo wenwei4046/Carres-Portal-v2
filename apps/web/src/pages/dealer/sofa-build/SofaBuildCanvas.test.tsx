@@ -129,8 +129,9 @@ describe("SofaBuildCanvas", () => {
     renderCanvas();
     addModule("1S"); // 1500
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
-    // switch to PRICE_2 fabric → +300 global delta
-    fireEvent.change(screen.getByTestId("sofa-build-fabric"), { target: { value: "f-2" } });
+    // switch to PRICE_2 fabric → +300 global delta (select values are the
+    // unified selling-fabric KEYS: `sf:<sofa_fabrics id>` / `cf:<fabric code>`)
+    fireEvent.change(screen.getByTestId("sofa-build-fabric"), { target: { value: "sf:f-2" } });
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,800.00");
     // height picker present with the canonical heights
     const heightSel = screen.getByTestId("sofa-build-height") as HTMLSelectElement;

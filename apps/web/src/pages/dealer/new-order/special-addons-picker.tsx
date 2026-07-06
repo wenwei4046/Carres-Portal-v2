@@ -81,8 +81,33 @@ export function specialsFromAttrs(attrs: Record<string, unknown> | null | undefi
   return Array.isArray(s) ? (s as SpecialAttrLine[]) : [];
 }
 
-/** Render a line's picked special add-ons as compact description rows (cart +
- *  order detail). Renders nothing when the line has no specials. */
+/** An option pick as stored in attrs.options[] (0201/0202 wiring) — divan /
+ *  leg heights + master fabric. Read tolerantly off the free jsonb. */
+interface OptionAttrLine {
+  kind?: string;
+  value?: string;
+  label?: string;
+  surcharge?: number;
+}
+
+const OPTION_KIND_LABEL: Record<string, string> = {
+  divan_height: "Divan",
+  bedframe_leg_height: "Leg",
+  sofa_leg_height: "Leg",
+  fabric: "Fabric",
+};
+
+/** Read the option picks off a line's attrs (tolerant). */
+export function optionsFromAttrs(attrs: Record<string, unknown> | null | undefined): OptionAttrLine[] {
+  if (!attrs) return [];
+  const o = (attrs as { options?: unknown }).options;
+  return Array.isArray(o) ? (o as OptionAttrLine[]) : [];
+}
+
+/** Render a line's picked special add-ons AND option picks (divan / leg /
+ *  fabric — 0201/0202 wiring) as compact description rows (cart + order
+ *  detail). A sofa-build leg (`attrs.leg_height`) renders too. Renders
+ *  nothing when the line carries none of them. */
 export function SpecialsSummary({
   attrs,
   className,
@@ -91,21 +116,38 @@ export function SpecialsSummary({
   className?: string;
 }) {
   const lines = specialsFromAttrs(attrs);
-  if (lines.length === 0) return null;
+  const options = optionsFromAttrs(attrs);
+  // Sofa-build leg rides flat attr keys (the engine, not attrs.options).
+  const legHeight = typeof attrs?.leg_height === "string" ? attrs.leg_height : null;
+  const legSurcharge = typeof attrs?.leg_surcharge === "number" ? attrs.leg_surcharge : 0;
+  if (lines.length === 0 && options.length === 0 && !legHeight) return null;
+  const fmtSur = (n: number | undefined): string =>
+    typeof n === "number" && n !== 0
+      ? ` · ${n < 0 ? "−" : "+"}RM ${Math.abs(n).toLocaleString()}`
+      : "";
   return (
     <div className={className ?? "mt-1 flex flex-col gap-0.5"} data-testid="specials-summary">
+      {options.map((o, i) => (
+        <div key={`o${i}`} className="t-tiny text-base-500">
+          + {OPTION_KIND_LABEL[o.kind ?? ""] ?? o.kind ?? "Option"} {o.value ?? ""}
+          {o.label ? ` — ${o.label}` : ""}
+          {fmtSur(o.surcharge)}
+        </div>
+      ))}
+      {legHeight && (
+        <div className="t-tiny text-base-500" data-testid="leg-summary">
+          + Leg {legHeight}
+          {fmtSur(legSurcharge)}
+        </div>
+      )}
       {lines.map((s, i) => {
         const desc = s.soDescription || s.label || s.code || "Add-on";
         const choices = (s.choiceLabels ?? []).filter(Boolean);
-        const sur =
-          typeof s.surcharge === "number" && s.surcharge !== 0
-            ? ` · ${s.surcharge < 0 ? "−" : "+"}RM ${Math.abs(s.surcharge).toLocaleString()}`
-            : "";
         return (
           <div key={i} className="t-tiny text-base-500">
             + {desc}
             {choices.length ? ` (${choices.join(", ")})` : ""}
-            {sur}
+            {fmtSur(s.surcharge)}
           </div>
         );
       })}

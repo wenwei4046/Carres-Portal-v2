@@ -629,6 +629,33 @@ export type { CatalogFabric, CatalogFabricsHistory } from "./domain";
 export { catalogFabricFromRow, catalogFabricsHistoryFromRow } from "./adapters";
 export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
 
+// 0201/0202-wiring (2026-07-06) — Maintenance option pools → Modular per-model
+// gating → POS → Hono recompute. PURE: the POS preview and the server
+// option-picks recompute share `resolveOptionsTotal` (honest pricing, one
+// resolver both sides — the specials/sofa pattern).
+export {
+  poolTicksFor,
+  tickKeyFor,
+  allowedPoolValues,
+  allowedFabricsFor,
+  fabricTierFor,
+  activeSofaHeights,
+  resolveOptionsTotal,
+  inchesOf,
+  computedTotalHeight,
+  optionPickAttrSchema,
+  optionsAttrsSchema,
+  OPTION_PICK_KINDS,
+  type OptionPoolPickKind,
+  type OptionPickKind,
+  type OptionPickAttr,
+  type OptionsAttrs,
+  type OptionPick,
+  type OptionResolveContext,
+  type ResolvedOptionLine,
+  type OptionsTotalResult,
+} from "./option-picks";
+
 // 0184 — 2990s Products parity Phase 6: the unified RuleTarget matcher (PURE,
 // shared by the delivery-fee subsystem and any future rule consumer). Combo
 // subset-matching delegates to the existing `matchSofaCombo`; compartment
@@ -739,6 +766,7 @@ export {
   type SofaComboPick,
   type SofaBuildCell,
   type SofaBuild,
+  type SofaLegHeightOption,
   type SofaPricingSnapshot,
   type SofaPriceBasis,
   type SofaPriceResult,
