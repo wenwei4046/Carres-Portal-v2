@@ -21,28 +21,6 @@ function catalog(): CatalogResponse {
   };
 }
 
-/** Catalog with one active combo over the two mattress SKUs. */
-function catalogWithCombo(): CatalogResponse {
-  return {
-    ...catalog(),
-    combos: [
-      {
-        id: "cA",
-        comboKey: "twin-set",
-        name: "Twin Mattress Set",
-        comboPrice: 6000,
-        cost: null,
-        active: true,
-        effectiveFrom: "2026-06-20",
-        components: [
-          { sku: "CLOUD-QUEEN", qty: 1, sortOrder: 0 },
-          { sku: "CLOUD-KING", qty: 1, sortOrder: 1 },
-        ],
-      },
-    ],
-  };
-}
-
 /** Catalog with one single-sku accessory (no options to pick). */
 function catalogWithAccessory(): CatalogResponse {
   return {
@@ -117,53 +95,6 @@ describe("CatalogStep", () => {
     expect(next.lines).toHaveLength(1);
     expect(next.lines[0].sku).toBe("CLOUD-QUEEN");
     expect(next.lines[0].unitPrice).toBe(2890);
-  });
-
-  it("renders NO Combos section when catalog.combos is empty", () => {
-    render(
-      <CatalogStep
-        draft={emptyDraft()}
-        onChange={() => {}}
-        catalog={catalog()}
-        onProceed={() => {}}
-        cartOpen={false}
-        onCartOpenChange={() => {}}
-      />,
-    );
-    expect(screen.queryByTestId("pos-combos-section")).toBeNull();
-  });
-
-  it("renders a combo card and folds its component lines into the cart on Add", () => {
-    const onChange = vi.fn();
-    render(
-      <CatalogStep
-        draft={emptyDraft()}
-        onChange={onChange}
-        catalog={catalogWithCombo()}
-        onProceed={() => {}}
-        cartOpen={false}
-        onCartOpenChange={() => {}}
-      />,
-    );
-
-    // Combos section + card present (name + fixed price).
-    expect(screen.getByTestId("pos-combos-section")).toBeTruthy();
-    const card = screen.getByTestId("pos-combo-twin-set");
-    expect(card).toBeTruthy();
-    expect(screen.getByText("Twin Mattress Set")).toBeTruthy();
-
-    // Clicking the card explodes the combo into 2 component lines in the cart.
-    fireEvent.click(card);
-    expect(onChange).toHaveBeenCalledTimes(1);
-    const next = onChange.mock.calls[0][0];
-    expect(next.lines).toHaveLength(2);
-    // Both carry the combo_key, and Σ unitPrice×qty === comboPrice.
-    for (const l of next.lines) {
-      expect(l.attrs.combo_key).toBe("twin-set");
-      expect(l.attrs.combo_label).toBe("Twin Mattress Set");
-    }
-    const total = next.lines.reduce((s: number, l: { unitPrice: number; qty: number }) => s + l.unitPrice * l.qty, 0);
-    expect(Math.round(total * 100) / 100).toBe(6000);
   });
 
   it("renders the empty-search state (after debounce)", async () => {

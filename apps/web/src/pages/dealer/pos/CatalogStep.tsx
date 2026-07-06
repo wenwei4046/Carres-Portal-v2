@@ -3,21 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type {
   CatalogResponse,
-  ComboDto,
   ProductCategory,
   ProductModelDto,
   PwpCodeDto,
   PwpDiscoverDto,
 } from "@carres/shared";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { comboToDraftLines, type DraftLine, type WizardDraft } from "../new-order/draft";
+import { type DraftLine, type WizardDraft } from "../new-order/draft";
 import { lockedCategoriesFor, newLocalId } from "../new-order/configurators";
 import { offeredSpecialsFor } from "../new-order/special-addons-picker";
 import { buildCatalogIndex } from "./catalog-index";
 import { cartItemCount, cartTotalExStair, mergeLine } from "./cart";
 import PosSidebar, { type RailEntry, type RailKey } from "./PosSidebar";
 import ProductCard from "./ProductCard";
-import ComboCard from "./ComboCard";
 import ConfigureDrawer from "./ConfigureDrawer";
 import PosConfigurePage from "./PosConfigurePage";
 import SofaConfigurePage from "./SofaConfigurePage";
@@ -202,37 +200,6 @@ export default function CatalogStep({
     setConfigureModelId(model.id);
   }
 
-  // Explode a combo into its component DraftLines (split price) and fold ALL of
-  // them into the cart via mergeLine. attrs.combo_key keeps them grouped + lets
-  // CartDrawer offer one "Remove combo". Re-adding the same combo bumps qty via
-  // mergeLine (acceptable v1). The exploded lines carry the SELLING price from
-  // the catalog; a component SKU missing from the bundle is priced 0 by
-  // explodeCombo and the rest absorb the combo total (accepted v1 behaviour).
-  function addCombo(combo: ComboDto) {
-    const cls = comboToDraftLines(combo, (sku) => ({
-      price: index.skuPrice.get(sku) ?? NaN,
-      label: index.skuLabel.get(sku) ?? sku,
-    }));
-    let lines = draft.lines;
-    for (const l of cls) lines = mergeLine(lines, l);
-    onChange({ ...draft, lines });
-    setPulse(true);
-    window.setTimeout(() => setPulse(false), 220);
-    toast.success(`Added "${combo.name}" (${cls.length} item${cls.length === 1 ? "" : "s"})`);
-  }
-
-  // Combos shown only on the "All" rail (combos aren't a product category) and
-  // filtered by the same search box (match on name or comboKey).
-  const shownCombos =
-    activeRail === "all"
-      ? index.combos.filter(
-          (c) =>
-            !search ||
-            c.name.toLowerCase().includes(search) ||
-            c.comboKey.toLowerCase().includes(search),
-        )
-      : [];
-
   const configureModel = configureModelId
     ? index.productModels.find((m) => m.id === configureModelId) ?? null
     : null;
@@ -303,7 +270,7 @@ export default function CatalogStep({
 
           {activeRail === "addons" ? (
             <AddonsPanel addons={activeAddons} draft={draft} onChange={onChange} />
-          ) : shownModels.length === 0 && shownCombos.length === 0 ? (
+          ) : shownModels.length === 0 ? (
             <div className="cat-empty">
               <h4>No pieces match.</h4>
               <p>Try clearing the search or pick a different category.</p>
@@ -319,35 +286,17 @@ export default function CatalogStep({
               )}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              {/* Combos (套餐) — featured bundle row, "All" rail only. */}
-              {shownCombos.length > 0 && (
-                <section data-testid="pos-combos-section">
-                  <div className="cat-side__heading" style={{ padding: "0 2px 8px" }}>
-                    Combos · {shownCombos.length} bundle{shownCombos.length === 1 ? "" : "s"}
-                  </div>
-                  <div className="cat-grid">
-                    {shownCombos.map((combo) => (
-                      <ComboCard key={combo.id} combo={combo} onAdd={() => addCombo(combo)} />
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {shownModels.length > 0 && (
-                <div className="cat-grid">
-                  {shownModels.map((model) => (
-                    <ProductCard
-                      key={model.id}
-                      model={model}
-                      meta={index.meta.get(model.id)!}
-                      locked={lockedCats.has(model.category)}
-                      inCart={modelIdsInCart.has(model.id)}
-                      onConfigure={() => handleConfigure(model)}
-                    />
-                  ))}
-                </div>
-              )}
+            <div className="cat-grid">
+              {shownModels.map((model) => (
+                <ProductCard
+                  key={model.id}
+                  model={model}
+                  meta={index.meta.get(model.id)!}
+                  locked={lockedCats.has(model.category)}
+                  inCart={modelIdsInCart.has(model.id)}
+                  onConfigure={() => handleConfigure(model)}
+                />
+              ))}
             </div>
           )}
         </div>

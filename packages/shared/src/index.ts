@@ -124,11 +124,6 @@ export {
   fabricTierSchema,
   fabricTierConfigSchema,
   modelFabricTierOverrideSchema,
-  // 0177 — combo (套餐) schemas.
-  comboComponentSchema,
-  comboSchema,
-  comboCreateInput,
-  comboPatchInput,
   // 0178 — sofa compartment pool + per-model offered schemas.
   sofaCompartmentSchema,
   sofaCompartmentCreateInput,
@@ -172,11 +167,6 @@ export {
   type FabricTierValue,
   type FabricTierConfigDto,
   type ModelFabricTierOverrideDto,
-  // 0177 — combo (套餐) Dto types.
-  type ComboComponentDto,
-  type ComboDto,
-  type ComboCreateInput,
-  type ComboPatchInput,
   // 0178 — sofa compartment Dto + input types.
   type SofaCompartmentDto,
   type SofaCompartmentCreateInput,
@@ -577,29 +567,16 @@ export {
   type FabricTierGlobalConfig,
 } from "./fabric-tier";
 
-// Migration 0177 — combo (套餐) price-split helper + types. `explodeCombo` is
-// the pure split used by the POS (web Task 4) to fan a combo into N order lines.
-export {
-  explodeCombo,
-  type ExplodedComboLine,
-} from "./combo";
-
-// 0177 — combo domain types (camelCased). Top-level alias so consumers can
-// `import type { Combo } from "@carres/shared"` without dipping into Domain.*
-// (mirrors how CostSource is surfaced above). The zod schemas + Dto types live
-// in the schemas/catalog export block.
-export type { Combo, ComboComponent } from "./domain";
-
 // 0178 — sofa compartment domain types (camelCased). Top-level alias so the API
 // + web can `import type { SofaCompartment } from "@carres/shared"` without
-// dipping into Domain.* (mirrors the Combo alias above). The zod schemas + Dto
+// dipping into Domain.* (mirrors the CostSource alias above). The zod schemas + Dto
 // types live in the schemas/catalog export block; the adapters are reached via
-// Adapters.* like comboFromRow / fabricTierConfigFromRow.
+// Adapters.* like fabricTierConfigFromRow.
 export type { SofaCompartment, ModelSofaCompartment } from "./domain";
 
 // 0179 — sofa engine Phase 2: sofa combo domain type + the row→domain adapter +
 // the canonical seat-height axis. `sofaComboFromRow` is also reachable via
-// `Adapters.*` (like comboFromRow); the top-level alias mirrors the Combo/
+// `Adapters.*` (like fabricTierConfigFromRow); the top-level alias mirrors the
 // SofaCompartment surfacing above so the API + web can import it directly.
 export type { SofaCombo } from "./domain";
 export { sofaComboFromRow } from "./adapters";
@@ -692,7 +669,7 @@ export {
 // 0184 — the special-delivery-rule domain row type (camelCased). The config
 // domain type ships from the delivery-fee block above; the row→domain adapters
 // (deliveryFeeConfigFromRow / specialDeliveryFeeRuleFromRow) are reached via
-// `Adapters.*` like comboFromRow.
+// `Adapters.*` like sofaComboFromRow.
 export type { SpecialDeliveryFeeRule } from "./domain";
 
 // 0185 — 2990s Products parity Phase 7: Default Free Gifts + Free Item Campaigns

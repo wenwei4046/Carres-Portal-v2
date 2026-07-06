@@ -39,7 +39,6 @@ function catalog(over?: Partial<CatalogResponse>): CatalogResponse {
     sofaFabrics: [],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
-    combos: [],
     sofaCombos: [],
     modelDefaultFreeGifts: [],
     freeItemCampaigns: [],
