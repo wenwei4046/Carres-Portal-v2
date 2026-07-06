@@ -347,6 +347,9 @@ export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
     discontinuedAt: r.discontinued_at ?? null,
     // 0206 — Quick Pick preset flag; column is NOT NULL default false.
     isQuickPick: r.is_quick_pick ?? false,
+    // 0179 audit timestamps — feed the simple per-combo History view.
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
   };
 };
 

@@ -79,6 +79,7 @@ function renderPanel(opts?: { isPrincipal?: boolean; combos?: SofaComboDto[] }) 
     wrap(
       <SofaCombosPanel
         modelId={MODEL}
+        modelName="Corner Sofa"
         pool={pool}
         offered={offered}
         combos={opts?.combos ?? []}
@@ -124,27 +125,46 @@ describe("SofaCombosPanel — principal-gating", () => {
     expect(screen.getByTestId("sofa-combo-delete-sc-1")).toBeInTheDocument();
   });
 
-  it("shows each priced seat height as a price chip on the card (no drill-in)", () => {
+  it("shows each priced seat height in the card's full price grid (no drill-in)", () => {
     renderPanel({ isPrincipal: true, combos: [sampleCombo] });
     // sampleCombo pricesByHeight: 28 -> 2640, 32 -> 2800.
-    expect(screen.getByTestId("sofa-combo-price-chip-sc-1-28")).toHaveTextContent("2,640");
-    expect(screen.getByTestId("sofa-combo-price-chip-sc-1-32")).toHaveTextContent("2,800");
-    // a height with no price gets no chip.
-    expect(screen.queryByTestId("sofa-combo-price-chip-sc-1-24")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sofa-combo-price-sc-1-28")).toHaveTextContent("2,640");
+    expect(screen.getByTestId("sofa-combo-price-sc-1-32")).toHaveTextContent("2,800");
+    // a height with no price shows a — cell (the cell exists, no price testid).
+    expect(screen.getByTestId("sofa-combo-cell-sc-1-24")).toHaveTextContent("—");
+    expect(screen.queryByTestId("sofa-combo-price-sc-1-24")).not.toBeInTheDocument();
   });
 
   it("shows the PWP reward price per height on the card when set", () => {
     const pwpCombo = { ...sampleCombo, id: "sc-pwp", pwpPricesByHeight: { "28": 2000 } };
     renderPanel({ isPrincipal: true, combos: [pwpCombo] });
-    expect(screen.getByTestId("sofa-combo-pwp-chip-sc-pwp-28")).toHaveTextContent("2,000");
-    // no PWP chip at a height with no PWP price.
-    expect(screen.queryByTestId("sofa-combo-pwp-chip-sc-pwp-32")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sofa-combo-pwp-sc-pwp-28")).toHaveTextContent("2,000");
+    // no PWP entry at a height with no PWP price.
+    expect(screen.queryByTestId("sofa-combo-pwp-sc-pwp-32")).not.toBeInTheDocument();
   });
 
-  it("shows NO PWP chips when the combo has no PWP prices set", () => {
+  it("shows NO PWP entries when the combo has no PWP prices set", () => {
     // sampleCombo.pwpPricesByHeight is null.
     renderPanel({ isPrincipal: true, combos: [sampleCombo] });
-    expect(screen.queryByTestId("sofa-combo-pwp-chip-sc-1-28")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sofa-combo-pwp-sc-1-28")).not.toBeInTheDocument();
+  });
+
+  it("BUG FIX: a Quick Pick preset (isQuickPick) does NOT show in the pricing panel", () => {
+    const quickPick = { ...sampleCombo, id: "sc-qp", isQuickPick: true } as SofaComboDto;
+    renderPanel({ isPrincipal: true, combos: [sampleCombo, quickPick] });
+    // the pricing combo shows...
+    expect(screen.getByTestId("sofa-combo-row-sc-1")).toBeInTheDocument();
+    // ...but the Quick Pick preset is filtered out (it lives in the POS tab).
+    expect(screen.queryByTestId("sofa-combo-row-sc-qp")).not.toBeInTheDocument();
+  });
+
+  it("History: clicking History opens a dialog with the combo's key dates", () => {
+    renderPanel({ isPrincipal: true, combos: [sampleCombo] });
+    fireEvent.click(screen.getByTestId("sofa-combo-history-sc-1"));
+    const dialog = screen.getByTestId("sofa-combo-history-modal-sc-1");
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.textContent).toContain("Effective from");
+    expect(dialog.textContent).toContain("Last updated");
   });
 });
 
