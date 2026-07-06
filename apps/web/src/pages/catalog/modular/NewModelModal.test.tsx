@@ -55,11 +55,12 @@ describe("NewModelModal", () => {
     fireEvent.change(screen.getByTestId("new-model-price"), { target: { value: "2990" } });
     fireEvent.click(screen.getByText("Create model + 2 SKUs"));
     await waitFor(() => expect(createModelAsync).toHaveBeenCalledOnce());
-    expect(createModelAsync.mock.calls[0][0].allowedOptions).toEqual({ sizes: ["K", "Q"] }); // deduped
+    // Mattress sizes normalize to canonical full names (K → King) + dedup.
+    expect(createModelAsync.mock.calls[0][0].allowedOptions).toEqual({ sizes: ["King", "Queen"] });
     await waitFor(() => expect(generateSkusAsync).toHaveBeenCalledOnce());
     expect(generateSkusAsync.mock.calls[0][0]).toEqual({
       modelId: "m-new",
-      input: { variants: ["K", "Q"], price: 2990 },
+      input: { variants: ["King", "Queen"], price: 2990 },
     });
   });
 

@@ -7,7 +7,7 @@ import type {
   SofaCompartmentDto,
   VariantKind,
 } from "@carres/shared";
-import { PRODUCT_CATEGORIES } from "@carres/shared";
+import { PRODUCT_CATEGORIES, canonicalSize } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
@@ -151,8 +151,13 @@ export default function NewSkuModal({
   const existingModel = sortedModels.find((m) => m.id === modelId);
 
   const modelKey = mode === "new" ? deriveModelKey(name) : existingModel?.modelKey ?? "";
+  // Mattress/bedframe sizes get a SHORT code suffix server-side (a typed "King"
+  // becomes `-K`); preview that so the code shown matches what's created.
+  const effectiveCategory = mode === "new" ? category : existingModel?.category;
+  const isBedVariant = effectiveCategory === "mattress" || effectiveCategory === "bedframe";
+  const codeSuffix = isBedVariant ? canonicalSize(variant.trim()).code : variant.trim();
   const codePreview =
-    modelKey && variant.trim() ? `${modelKey.toUpperCase()}-${variant.trim()}` : "";
+    modelKey && variant.trim() ? `${modelKey.toUpperCase()}-${codeSuffix}` : "";
 
   const priceNum = price.trim() === "" ? 0 : Number(price);
   const priceOk = Number.isFinite(priceNum) && priceNum >= 0;
@@ -237,7 +242,13 @@ export default function NewSkuModal({
       // pool) then materialize ONE SKU PER TICKED SIZE ({MODEL_KEY}-{size}) via
       // the idempotent generate-skus endpoint. One optional price seeds all.
       if (sizeFlow) {
-        const sizes = sizePool.filter((p) => selectedSizes.has(p.value)).map((p) => p.value);
+        // Store the FULL name (Single / Super Single / Queen / King) as the size
+        // — the server keeps the SKU code short (`-K`) but the SIZE reads the
+        // full name. allowed_options.sizes must match the variants for the
+        // sizes-active cascade, so both carry the canonical name.
+        const sizes = sizePool
+          .filter((p) => selectedSizes.has(p.value))
+          .map((p) => canonicalSize(p.value).name);
         let sizeModelId = createdModelId;
         if (!sizeModelId) {
           const res = await createModel.mutateAsync({
@@ -481,15 +492,15 @@ export default function NewSkuModal({
                           })
                         }
                         aria-pressed={on}
-                        title={p.label ?? p.dimensions ?? p.value}
-                        className={`t-tiny font-mono font-semibold px-2 py-1 rounded-[4px] border transition-colors ${
+                        title={[p.value, p.label ?? p.dimensions].filter(Boolean).join(" · ")}
+                        className={`t-tiny font-semibold px-2 py-1 rounded-[4px] border transition-colors ${
                           on
                             ? "bg-base-900 border-base-900 text-white"
                             : "bg-white border-base-200 text-base-500 hover:border-base-400"
                         }`}
                         data-testid={`new-sku-size-${p.value}`}
                       >
-                        {p.value}
+                        {canonicalSize(p.value).name}
                       </button>
                     );
                   })}
