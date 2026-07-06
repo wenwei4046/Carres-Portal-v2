@@ -271,6 +271,29 @@ pwpCodesRouter.get("/available", async (c) => {
   return c.json(pwpDiscoverResponseSchema.parse({ vouchers }));
 });
 
+/* ─── GET /by-order/:orderId — the vouchers EARNED on one order (0204) ──────── */
+
+// 2990s parity (Loo 2026-07-06): the reference prints a customer's earned
+// voucher codes on the SO so they physically carry them. This is the v2
+// surface: the POS ThankYou screen (and any reprint) lists the codes whose
+// carry-forward `source_order_id` is this order. Owner/dealer-scoped via the
+// pwp_codes RLS (the creating salesperson owns the codes they just minted) —
+// plain table read under the user JWT, no DEFINER needed, never service_role.
+// DORMANT: an order with no carried vouchers returns `{ codes: [] }`.
+pwpCodesRouter.get("/by-order/:orderId", async (c) => {
+  const auth = c.var.auth;
+  const orderId = c.req.param("orderId");
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from(PWP_CODES)
+    .select("*")
+    .eq("source_order_id", orderId)
+    .in("status", ["AVAILABLE", "USED"]);
+  if (error) throw new HTTPException(500, { message: error.message });
+  const codes = ((data ?? []) as DB.PwpCodeRow[]).map((r) => Adapters.pwpCodeFromRow(r));
+  return c.json(pwpCodesResponseSchema.parse({ codes }));
+});
+
 /* ─── GET /mine — the reconciler's read (+ owner-scoped self-heal) ──────────── */
 
 pwpCodesRouter.get("/mine", async (c) => {

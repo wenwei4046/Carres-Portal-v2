@@ -159,6 +159,7 @@ export const qk = {
    *  active (DORMANT carts make zero discovery traffic). */
   pwpAvailable: (sel: { phone?: string | null; code?: string | null; name?: string | null }) =>
     ["pwp-codes", "available", sel.phone ?? null, sel.code ?? null, sel.name ?? null] as const,
+  pwpByOrder: (orderId: string) => ["pwp-codes", "by-order", orderId] as const,
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
   // ripples to dealers + dashboard) without touching dealer/order caches.
@@ -1129,6 +1130,26 @@ export function usePwpAvailableForPhone(
     // Default off unless a selector exists; the caller AND-gates with PWP-active.
     enabled: Boolean(phone || code),
     staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/**
+ * usePwpCodesByOrder — GET /api/pwp-codes/by-order/:orderId. The vouchers EARNED
+ * on one order (carry-forward `source_order_id` = this order) — the 2990s
+ * "codes printed on the SO" surface (Loo 2026-07-06): the POS ThankYou screen
+ * lists them so the customer walks away with the code. Owner/dealer-scoped via
+ * RLS; an order with no carried vouchers returns `{ codes: [] }`.
+ */
+export function usePwpCodesByOrder(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<PwpCodesResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.pwpByOrder(orderId ?? ""),
+    queryFn: () => apiFetch<PwpCodesResponse>(`/api/pwp-codes/by-order/${orderId}`),
+    enabled: Boolean(orderId),
+    staleTime: 30_000,
     ...opts,
   });
 }
