@@ -1062,9 +1062,12 @@ function DrawerBody({
 
           {/* Panel 2 — Warehouse stock. StockPickerGrid owns its own dark-slate
               pinned header + funnel filters + Reserve, styled as a 12px card; it
-              grows to fill the leftover height. No active line → a placeholder. */}
+              GROWS to fill the leftover left-column height so the column bottom
+              lines up with the right side and the page stays one-screen (P1a had
+              capped it to a fixed 340px, which left a big void below). No active
+              line → a placeholder that also grows. */}
           {activeLineSku && stage !== "delivered" ? (
-            <div className="h-[340px] min-h-0 flex flex-col shrink-0">
+            <div className="flex-1 min-h-0 flex flex-col">
               <StockPickerGrid
                 sku={activeLineSku}
                 soRef={soRef}
@@ -1078,7 +1081,7 @@ function DrawerBody({
               />
             </div>
           ) : (
-            <Panel title="Warehouse stock" summary={<MiniBadge tone="muted">—</MiniBadge>}>
+            <Panel title="Warehouse stock" grow summary={<MiniBadge tone="muted">—</MiniBadge>}>
               <div className="flex-1 grid place-items-center t-tiny text-base-400 p-6">
                 {stage === "delivered"
                   ? "Delivered — stock settled."
