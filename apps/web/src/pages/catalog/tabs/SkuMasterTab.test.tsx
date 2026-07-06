@@ -17,7 +17,6 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CatalogResponse } from "@carres/shared";
 import SkuMasterTab from "./SkuMasterTab";
-import EditSkuModal from "./EditSkuModal";
 import NewSkuModal from "./NewSkuModal";
 import type { ProductSkuDto, ProductModelDto } from "@carres/shared";
 
@@ -43,6 +42,7 @@ vi.mock("@/lib/auth", () => ({
 // ---------------------------------------------------------------------------
 const mockPatchMutate = vi.fn();
 const mockPatchMutateAsync = vi.fn();
+const mockPatchModelMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
 const mockCreateSkuMutateAsync = vi.fn();
 const mockImportMutateAsync = vi.fn();
@@ -68,7 +68,7 @@ vi.mock("@/lib/queries", () => ({
     isPending: false,
   }),
   usePatchCatalogModel: () => ({
-    mutate: vi.fn(),
+    mutate: mockPatchModelMutate,
     mutateAsync: vi.fn().mockResolvedValue({}),
     isPending: false,
   }),
@@ -88,6 +88,13 @@ vi.mock("@/lib/queries", () => ({
   useOfferModelCompartments: () => ({
     mutate: vi.fn(),
     mutateAsync: vi.fn().mockResolvedValue({ offered: 0, failed: [] }),
+    isPending: false,
+  }),
+  // Mattress/bedframe size path (Loo 2026-07-06) — NewSkuModal calls this hook
+  // unconditionally; the size-flow behaviour is covered in NewSkuModal.test.tsx.
+  useGenerateSkus: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({ ok: true, generated: 0, skipped: 0 }),
     isPending: false,
   }),
   useImportSkus: () => ({
@@ -227,6 +234,7 @@ function wrap(ui: React.ReactNode) {
 beforeEach(() => {
   mockPatchMutate.mockReset();
   mockPatchMutateAsync.mockReset();
+  mockPatchModelMutate.mockReset();
   mockCreateSkuMutateAsync.mockReset();
   mockCreateSkuMutateAsync.mockResolvedValue({ sku: { id: "s-new" } });
   mockImportMutateAsync.mockReset();
@@ -238,7 +246,7 @@ beforeEach(() => {
 });
 
 describe("SkuMasterTab — cost column removed (Loo 2026-07-06), margin kept", () => {
-  it("renders NO cost cell and no Cost header — cost lives only in the Edit modal now", () => {
+  it("renders NO cost cell and no Cost header (cost edits live in Import/API only)", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
     expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
     expect(screen.queryByText("Cost")).not.toBeInTheDocument();
@@ -287,173 +295,75 @@ describe("SkuMasterTab — Edit Prices mode (price only; cost input removed)", (
   });
 });
 
-describe("EditSkuModal — cost field + margin round-trip", () => {
-  it("renders cost field pre-filled with existing cost", () => {
-    render(
-      wrap(
-        <EditSkuModal
-          sku={SKU_COST_SET}
-          model={MODEL_MAT}
-          onClose={() => {}}
-        />,
-      ),
-    );
-    const costInput = screen.getByTestId("edit-sku-cost") as HTMLInputElement;
-    expect(costInput.value).toBe("2100");
+// ---------------------------------------------------------------------------
+// Loo 2026-07-06 — STATUS column removed (ON/OFF lives in the Modular tab;
+// pos_active data itself untouched) + the row Edit button is INLINE editing
+// (code via variant re-derive / description / category), no modal.
+// ---------------------------------------------------------------------------
+describe("SkuMasterTab — no STATUS column", () => {
+  it("renders no Status header and no ON/OFF pill", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_SOFA])} />));
+    expect(screen.queryByText("Status")).not.toBeInTheDocument();
+    expect(screen.queryByText("ON")).not.toBeInTheDocument();
+    expect(screen.queryByText("OFF")).not.toBeInTheDocument();
+  });
+});
+
+describe("SkuMasterTab — inline row editing (no modal)", () => {
+  it("Edit flips the row to inline inputs (code / description / category); Done flips back", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    // No dialog — inline inputs instead.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("CLOUD-KING code")).toBeInTheDocument();
+    expect(screen.getByLabelText("CLOUD-KING description")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-category-select-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-edit-CLOUD-KING")).toHaveTextContent("Done");
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    expect(screen.queryByLabelText("CLOUD-KING code")).not.toBeInTheDocument();
   });
 
-  it("renders cost field blank when cost is null", () => {
-    render(
-      wrap(
-        <EditSkuModal
-          sku={SKU_COST_NULL}
-          model={MODEL_MAT}
-          onClose={() => {}}
-        />,
-      ),
-    );
-    const costInput = screen.getByTestId("edit-sku-cost") as HTMLInputElement;
-    expect(costInput.value).toBe("");
+  it("code edit commits the VARIANT segment on blur (server re-derives the code)", async () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    const code = screen.getByLabelText("CLOUD-KING code");
+    fireEvent.change(code, { target: { value: "KING-XL" } });
+    fireEvent.blur(code);
+    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
+    const call = mockPatchMutate.mock.calls[0][0];
+    expect(call.id).toBe("s2");
+    expect(call.patch).toEqual({ variant: "KING-XL" });
   });
 
-  it("shows live plan margin when price + cost are set", () => {
-    render(
-      wrap(
-        <EditSkuModal
-          sku={SKU_COST_SET}
-          model={MODEL_MAT}
-          onClose={() => {}}
-        />,
-      ),
-    );
-    // price=3500 cost=2100 → margin=1400 (40%)
-    const marginEl = screen.getByTestId("edit-sku-margin");
-    expect(marginEl.textContent).toContain("1,400");
-    expect(marginEl.textContent).toContain("40.0%");
+  it("description edit commits on blur; blank clears to null", async () => {
+    const withDesc = { ...SKU_COST_SET, description: "old text" };
+    render(wrap(<SkuMasterTab catalog={makeCatalog([withDesc])} />));
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    const desc = screen.getByLabelText("CLOUD-KING description");
+    fireEvent.change(desc, { target: { value: "  " } });
+    fireEvent.blur(desc);
+    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
+    expect(mockPatchMutate.mock.calls[0][0].patch).toEqual({ description: null });
   });
 
-  it("shows 'set cost to compute' hint when cost is null", () => {
-    render(
-      wrap(
-        <EditSkuModal
-          sku={SKU_COST_NULL}
-          model={MODEL_MAT}
-          onClose={() => {}}
-        />,
-      ),
-    );
-    expect(screen.getByText(/set cost to compute/)).toBeInTheDocument();
+  it("category change PATCHes the MODEL (moves all its SKUs)", async () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.change(screen.getByTestId("sku-category-select-CLOUD-KING"), {
+      target: { value: "accessory" },
+    });
+    await waitFor(() => expect(mockPatchModelMutate).toHaveBeenCalledOnce());
+    const call = mockPatchModelMutate.mock.calls[0][0];
+    expect(call.id).toBe("m-mat");
+    expect(call.patch).toEqual({ category: "accessory" });
   });
 
-  it("uses 'base margin' label for sofa model", () => {
-    render(
-      wrap(
-        <EditSkuModal
-          sku={SKU_SOFA}
-          model={MODEL_SOFA}
-          onClose={() => {}}
-        />,
-      ),
-    );
-    expect(screen.getByText("base margin")).toBeInTheDocument();
-  });
-
-  it("uses 'plan margin' label for non-sofa model", () => {
-    render(
-      wrap(
-        <EditSkuModal
-          sku={SKU_COST_SET}
-          model={MODEL_MAT}
-          onClose={() => {}}
-        />,
-      ),
-    );
-    expect(screen.getByText("plan margin")).toBeInTheDocument();
-  });
-
-  it("sends cost: null when cost field is cleared and Save is clicked", async () => {
-    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_SET });
-    const onClose = vi.fn();
-    render(
-      wrap(
-        <EditSkuModal
-          sku={SKU_COST_SET}
-          model={MODEL_MAT}
-          onClose={onClose}
-        />,
-      ),
-    );
-    // Clear the cost field
-    fireEvent.change(screen.getByTestId("edit-sku-cost"), { target: { value: "" } });
-    fireEvent.click(screen.getByText("Save"));
-    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
-    const args = mockPatchMutateAsync.mock.calls[0][0];
-    expect(args.patch.cost).toBeNull();
-  });
-
-  it("sends cost: number when cost field is changed and Save is clicked", async () => {
-    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_NULL });
-    const onClose = vi.fn();
-    render(
-      wrap(
-        <EditSkuModal
-          sku={SKU_COST_NULL}
-          model={MODEL_MAT}
-          onClose={onClose}
-        />,
-      ),
-    );
-    fireEvent.change(screen.getByTestId("edit-sku-cost"), { target: { value: "1800" } });
-    fireEvent.click(screen.getByText("Save"));
-    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
-    const args = mockPatchMutateAsync.mock.calls[0][0];
-    expect(args.patch.cost).toBe(1800);
-  });
-
-  // 0186 — PWP reward price round-trip, same gate/shape as cost.
-  it("renders the PWP price field for a principal (blank when unset)", () => {
-    mockRole = "principal";
-    render(wrap(<EditSkuModal sku={SKU_COST_NULL} model={MODEL_MAT} onClose={() => {}} />));
-    const pwpInput = screen.getByTestId("edit-sku-pwp-price") as HTMLInputElement;
-    expect(pwpInput).toBeInTheDocument();
-    expect(pwpInput.value).toBe("");
-  });
-
-  it("sends pwpPrice: number when the PWP price field is set and Save is clicked", async () => {
-    mockRole = "principal";
-    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_NULL });
-    render(wrap(<EditSkuModal sku={SKU_COST_NULL} model={MODEL_MAT} onClose={vi.fn()} />));
-    fireEvent.change(screen.getByTestId("edit-sku-pwp-price"), { target: { value: "999" } });
-    fireEvent.click(screen.getByText("Save"));
-    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
-    const args = mockPatchMutateAsync.mock.calls[0][0];
-    expect(args.patch.pwpPrice).toBe(999);
-  });
-
-  it("does NOT send pwpPrice when it is left unchanged", async () => {
-    mockRole = "principal";
-    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_NULL });
-    render(wrap(<EditSkuModal sku={SKU_COST_NULL} model={MODEL_MAT} onClose={vi.fn()} />));
-    // change only the description; pwpPrice untouched (was null → stays unset)
-    fireEvent.change(screen.getByTestId("edit-sku-description"), { target: { value: "x" } });
-    fireEvent.click(screen.getByText("Save"));
-    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
-    const args = mockPatchMutateAsync.mock.calls[0][0];
-    expect(args.patch).not.toHaveProperty("pwpPrice");
-  });
-
-  it("non-principal gets a read-only PWP price (no input) + never sends it", async () => {
-    mockRole = "operation";
-    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_SET });
-    const skuWithPwp: ProductSkuDto = { ...SKU_COST_SET, pwpPrice: 1500 };
-    render(wrap(<EditSkuModal sku={skuWithPwp} model={MODEL_MAT} onClose={vi.fn()} />));
-    expect(screen.queryByTestId("edit-sku-pwp-price")).not.toBeInTheDocument();
-    expect(screen.getByTestId("edit-sku-pwp-price-readonly").textContent).toContain("1,500");
-    fireEvent.change(screen.getByTestId("edit-sku-description"), { target: { value: "y" } });
-    fireEvent.click(screen.getByText("Save"));
-    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
-    const args = mockPatchMutateAsync.mock.calls[0][0];
-    expect(args.patch).not.toHaveProperty("pwpPrice");
+  it("unchanged blur is a no-op (no PATCH)", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    fireEvent.blur(screen.getByLabelText("CLOUD-KING code"));
+    fireEvent.blur(screen.getByLabelText("CLOUD-KING description"));
+    expect(mockPatchMutate).not.toHaveBeenCalled();
   });
 });
 
@@ -478,32 +388,6 @@ describe("0175 — price/cost lock (non-principal read-only)", () => {
     // The row renders read-only (no inline inputs anywhere).
     const row = screen.getByTestId("sku-row-CLOUD-KING");
     expect(row.querySelector('input[type="number"]')).toBeNull();
-  });
-
-  it("EditSkuModal: non-principal gets read-only price/cost, no input fields", () => {
-    mockRole = "operation";
-    render(wrap(<EditSkuModal sku={SKU_COST_SET} model={MODEL_MAT} onClose={() => {}} />));
-    expect(screen.queryByTestId("edit-sku-price")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("edit-sku-cost")).not.toBeInTheDocument();
-    expect(screen.getByTestId("edit-sku-price-readonly").textContent).toContain("3,500");
-    expect(screen.getByTestId("edit-sku-cost-readonly").textContent).toContain("2,100");
-    // Name is still editable for internal users.
-    expect(screen.getByTestId("edit-sku-name")).toBeInTheDocument();
-  });
-
-  it("EditSkuModal: non-principal Save never sends price/cost (only description/name)", async () => {
-    mockRole = "operation";
-    mockPatchMutateAsync.mockResolvedValue({ sku: SKU_COST_SET });
-    render(wrap(<EditSkuModal sku={SKU_COST_SET} model={MODEL_MAT} onClose={vi.fn()} />));
-    fireEvent.change(screen.getByTestId("edit-sku-description"), {
-      target: { value: "new desc" },
-    });
-    fireEvent.click(screen.getByText("Save"));
-    await waitFor(() => expect(mockPatchMutateAsync).toHaveBeenCalledOnce());
-    const args = mockPatchMutateAsync.mock.calls[0][0];
-    expect(args.patch.description).toBe("new desc");
-    expect(args.patch).not.toHaveProperty("price");
-    expect(args.patch).not.toHaveProperty("cost");
   });
 
   it("NewSkuModal: non-principal sees NO price/cost inputs (shows lock hint)", () => {

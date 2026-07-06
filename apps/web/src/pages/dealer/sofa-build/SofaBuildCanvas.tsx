@@ -6,7 +6,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { X, RotateCw, Trash2 } from "lucide-react";
+import { X, RotateCw, Trash2, Ungroup } from "lucide-react";
 import type {
   ProductModelDto,
   ProductSkuDto,
@@ -198,6 +198,13 @@ export default function SofaBuildCanvas({
     (initialCells ?? []).map((c) => ({ ...c, id: nextCellId() })),
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Complete-sofa item selection (Loo 2026-07-06): clicking a CLOSED sofa
+  // selects the WHOLE group (anchored by the clicked cell's id) and shows a
+  // group toolbar — rotate-whole · Edit modules · delete-whole. "Edit modules"
+  // opts the group's cells into per-module editing (select / rotate / delete /
+  // drag one piece out) until the next empty-canvas click re-locks everything.
+  const [groupAnchorId, setGroupAnchorId] = useState<string | null>(null);
+  const [editModeIds, setEditModeIds] = useState<Set<string>>(new Set());
   // 0201-wiring + 0204 — the size axis follows the ACTIVE Maintenance sofa
   // sizes when the caller passes them (per-size prices key off those exact
   // values); legacy callers keep the full canonical axis.
@@ -282,6 +289,45 @@ export default function SofaBuildCanvas({
     if (selectedId === id) setSelectedId(null);
   };
 
+  /** Rotate a whole CLOSED sofa 90° CW about its bbox centre — every cell
+   *  turns and orbits together, then the group shifts back inside the room. */
+  const rotateGroup = (group: GeoCell[]) => {
+    const bb = cellsBbox(group, depth);
+    if (!bb) return;
+    const cx = bb.x + bb.w / 2;
+    const cy = bb.y + bb.h / 2;
+    // Rotated group bbox = w/h swapped about the same centre; clamp into room.
+    const nbb = { x: cx - bb.h / 2, y: cy - bb.w / 2, w: bb.h, h: bb.w };
+    const shiftX = nbb.x < 0 ? -nbb.x : nbb.x + nbb.w > ROOM_W ? ROOM_W - nbb.x - nbb.w : 0;
+    const shiftY = nbb.y < 0 ? -nbb.y : nbb.y + nbb.h > ROOM_H ? ROOM_H - nbb.y - nbb.h : 0;
+    const ids = new Set(group.map((g) => g.id));
+    setCells((prev) =>
+      prev.map((c) => {
+        if (c.id == null || !ids.has(c.id)) return c;
+        const fp = moduleFootprint(
+          findModule(c.moduleCode) ?? { w: 95, d: 95, cushions: 0 },
+          c.rot,
+          depth,
+        );
+        const dx = c.x + fp.w / 2 - cx;
+        const dy = c.y + fp.h / 2 - cy;
+        // 90° CW about the centre: (dx, dy) → (-dy, dx); footprint w/h swap.
+        return {
+          ...c,
+          rot: ((c.rot + 90) % 360) as Rot,
+          x: cx - dy - fp.h / 2 + shiftX,
+          y: cy + dx - fp.w / 2 + shiftY,
+        };
+      }),
+    );
+  };
+
+  const removeGroup = (group: GeoCell[]) => {
+    const ids = new Set(group.map((g) => g.id));
+    setCells((prev) => prev.filter((c) => c.id == null || !ids.has(c.id)));
+    setGroupAnchorId(null);
+  };
+
   /* ─── Drag (native pointer-capture) ──────────────────────────────── */
 
   const onCellPointerDown = (id: string, e: ReactPointerEvent<HTMLDivElement>) => {
@@ -293,17 +339,24 @@ export default function SofaBuildCanvas({
     } catch {
       /* jsdom / unsupported — drag still works via move/up on the same element */
     }
-    setSelectedId(id);
-    // Complete-sofa lock (2990s parity, Loo 2026-07-06): grabbing any cell of
-    // a CLOSED sofa drags the WHOLE group — a finished sofa moves as one
-    // piece. Loose / unclosed pieces keep per-cell dragging for assembly.
+    // Complete-sofa lock (2990s parity, Loo 2026-07-06): a CLOSED sofa is ONE
+    // item — grabbing any cell selects + drags the WHOLE group, unless the
+    // user opened it via "Edit modules" (then cells select/drag individually).
     const analysis = analyses.find((a) => a.group.some((g) => g.id === id));
-    const group =
-      analysis && analysis.closed && analysis.group.length > 1
-        ? analysis.group
-            .filter((g): g is GeoCell & { id: string } => g.id != null)
-            .map((g) => ({ id: g.id, x: g.x, y: g.y }))
-        : [{ id, x: cell.x, y: cell.y }];
+    const wholeItem =
+      !!analysis && analysis.closed && analysis.group.length > 1 && !editModeIds.has(id);
+    if (wholeItem) {
+      setSelectedId(null);
+      setGroupAnchorId(id);
+    } else {
+      setSelectedId(id);
+      setGroupAnchorId(null);
+    }
+    const group = wholeItem
+      ? analysis.group
+          .filter((g): g is GeoCell & { id: string } => g.id != null)
+          .map((g) => ({ id: g.id, x: g.x, y: g.y }))
+      : [{ id, x: cell.x, y: cell.y }];
     dragRef.current = {
       id,
       pid: e.pointerId,
@@ -583,6 +636,8 @@ export default function SofaBuildCanvas({
             // target the room div itself.
             if (e.target === e.currentTarget || e.target === stageRef.current) {
               setSelectedId(null);
+              setGroupAnchorId(null);
+              setEditModeIds(new Set()); // re-lock any "Edit modules" groups
             }
           }}
         >
@@ -622,6 +677,11 @@ export default function SofaBuildCanvas({
             {analyses.map((a, gi) => {
               const bb = cellsBbox(a.group, depth);
               if (!bb) return null;
+              const isSelectedGroup =
+                groupAnchorId != null &&
+                a.closed &&
+                a.group.length > 1 &&
+                a.group.some((g) => g.id === groupAnchorId);
               return (
                 <div key={`g${gi}`}>
                   {a.closed && (
@@ -630,6 +690,62 @@ export default function SofaBuildCanvas({
                       style={{ left: bb.x - 6, top: bb.y - 6, width: bb.w + 12, height: bb.h + 12 }}
                       data-testid="sofa-group-outline"
                     />
+                  )}
+                  {/* Complete-sofa toolbar — the whole item rotates / unlocks /
+                      deletes; "Edit modules" opens per-module editing. */}
+                  {isSelectedGroup && (
+                    <div
+                      className="sof-cv__tools"
+                      style={{ left: bb.x + bb.w / 2, top: bb.y - 44 }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      data-cell-tool
+                      data-testid="sofa-group-tools"
+                    >
+                      <button
+                        type="button"
+                        data-cell-tool
+                        onClick={() => rotateGroup(a.group)}
+                        className="sof-cv__btn"
+                        aria-label="Rotate sofa"
+                        title="Rotate the whole sofa 90° CW"
+                        data-testid="sofa-group-rotate"
+                      >
+                        <RotateCw size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        data-cell-tool
+                        onClick={() => {
+                          setEditModeIds((prev) => {
+                            const next = new Set(prev);
+                            a.group.forEach((g) => {
+                              if (g.id != null) next.add(g.id);
+                            });
+                            return next;
+                          });
+                          setGroupAnchorId(null);
+                        }}
+                        className="sof-cv__btn"
+                        style={{ width: "auto", padding: "0 10px", gap: 5 }}
+                        aria-label="Edit modules"
+                        title="Unlock — select / move / rotate the modules individually"
+                        data-testid="sofa-group-edit"
+                      >
+                        <Ungroup size={13} />
+                        <span className="t-tiny font-medium">Edit modules</span>
+                      </button>
+                      <button
+                        type="button"
+                        data-cell-tool
+                        onClick={() => removeGroup(a.group)}
+                        className="sof-cv__btn sof-cv__btn--del"
+                        aria-label="Delete sofa"
+                        title="Remove the whole sofa"
+                        data-testid="sofa-group-delete"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   )}
                   {/* width callout (top) — design tick · line · boxed label */}
                   <div

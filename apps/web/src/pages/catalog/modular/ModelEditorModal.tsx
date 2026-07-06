@@ -18,7 +18,7 @@ import {
   useUpsertModelSofaCompartment,
 } from "@/lib/queries";
 import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
-import { CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../components/atoms";
+import { CATEGORY_LABEL, CodeChip } from "../components/atoms";
 
 /**
  * ModelEditorModal — THE one centered Modular editor (Loo 2026-07-06: "merge
@@ -190,13 +190,16 @@ export default function ModelEditorModal({
     [catalog.modelSofaCompartments, model.id],
   );
 
+  // NO Variant SKUs list anywhere (Loo 2026-07-06): for mattress/bedframe the
+  // Sizes chips ARE the per-size ON/OFF (they cascade pos_active); for sofa the
+  // Compartments chips own it; SKU-level control lives in SKU Master. Flat
+  // categories (accessory/service) keep ONE switch — Activate/Deactivate in
+  // POS — which bulk-flips the model's live SKUs on Save.
   const liveSkus = useMemo(
-    () =>
-      skus
-        .filter((s) => !s.discontinuedAt)
-        .sort((a, b) => a.variant.localeCompare(b.variant, undefined, { numeric: true })),
+    () => skus.filter((s) => !s.discontinuedAt && s.compartmentId == null),
     [skus],
   );
+  const anyPosActive = liveSkus.some((s) => s.posActive !== false);
 
   /* ─── draft state (photo is the only instant op) ─────────────────────── */
 
@@ -209,10 +212,8 @@ export default function ModelEditorModal({
   );
   const [specials, setSpecials] = useState<string[]>(() => opts.specials ?? []);
   const [fabrics, setFabrics] = useState<string[]>(() => opts.fabrics ?? []);
-  // Per-SKU ON/OFF draft — desired pos_active by sku id.
-  const [skuOn, setSkuOn] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(liveSkus.map((s) => [s.id, s.posActive !== false])),
-  );
+  // Flat categories — the single Activate/Deactivate-in-POS switch draft.
+  const [showInPos, setShowInPos] = useState<boolean>(anyPosActive);
   const [saving, setSaving] = useState(false);
 
   const setFabricsBulk = (codes: string[], on: boolean) =>
@@ -222,9 +223,6 @@ export default function ModelEditorModal({
       else codes.forEach((c) => next.delete(c));
       return [...next];
     });
-
-  const setAllSkus = (on: boolean) =>
-    setSkuOn(Object.fromEntries(liveSkus.map((s) => [s.id, on])));
 
   /* ─── photo (instant — file uploads don't batch) ─────────────────────── */
 
@@ -293,11 +291,11 @@ export default function ModelEditorModal({
           }
         }
       }
-      // Per-SKU ON/OFF diff.
-      const skuFlips = liveSkus.filter((s) => (s.posActive !== false) !== (skuOn[s.id] ?? true));
-      if (skuFlips.length > 0) {
+      // Flat categories — the single switch bulk-flips the live SKUs.
+      if (isFlat && showInPos !== anyPosActive) {
+        const flips = liveSkus.filter((s) => (s.posActive !== false) !== showInPos);
         const results = await Promise.allSettled(
-          skuFlips.map((s) => patchSku.mutateAsync({ id: s.id, patch: { posActive: skuOn[s.id] } })),
+          flips.map((s) => patchSku.mutateAsync({ id: s.id, patch: { posActive: showInPos } })),
         );
         const failed = results.filter((r) => r.status === "rejected").length;
         if (failed > 0) throw new Error(`${failed} SKU${failed === 1 ? "" : "s"} failed to update`);
@@ -524,57 +522,34 @@ export default function ModelEditorModal({
           </>
         )}
 
-        {/* Variant SKUs — ON/OFF only (prices + creation live in SKU Master) */}
-        {liveSkus.length > 0 && (
-          <div data-testid="model-skus">
-            <SectionHead
-              label={`Variant SKUs (${liveSkus.length})`}
-              right={
-                <span className="flex gap-1.5">
-                  <button type="button" onClick={() => setAllSkus(true)} className="btn-ghost text-[11px]">
-                    All on
-                  </button>
-                  <button type="button" onClick={() => setAllSkus(false)} className="btn-ghost text-[11px]">
-                    All off
-                  </button>
-                </span>
-              }
-            />
-            <div className="border border-base-200 rounded-[4px] overflow-hidden max-h-56 overflow-y-auto">
-              {liveSkus.map((sku) => {
-                const on = skuOn[sku.id] ?? true;
-                return (
-                  <div
-                    key={sku.id}
-                    className="grid items-center gap-3 px-3 py-1.5 border-b border-base-100 last:border-b-0"
-                    style={{ gridTemplateColumns: "1fr 90px 64px" }}
-                    data-testid={`sku-row-${sku.sku}`}
-                  >
-                    <div className="min-w-0">
-                      <div className="t-small text-base-800">{sku.variant}</div>
-                      <div className="font-mono text-[10px] text-base-500">{sku.sku}</div>
-                    </div>
-                    <div className="text-right t-num text-[11px] text-base-700">
-                      {sku.price === 0 ? <span className="text-base-400">—</span> : sku.price.toFixed(2)}
-                    </div>
-                    <div className="text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSkuOn((prev) => ({ ...prev, [sku.id]: !on }))}
-                        aria-pressed={on}
-                        title="Toggle visible to dealers (applies on Save)"
-                        data-testid={`sku-toggle-${sku.sku}`}
-                      >
-                        <SkuStatusPill posActive={on} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Flat categories (accessory / service) — ONE function: Activate /
+            Deactivate in POS. No option pools, no SKU list (prices + new SKUs
+            live in SKU Master). */}
+        {isFlat && (
+          <div
+            className="flex items-center justify-between gap-3 p-4 border border-base-200 rounded-[4px] bg-base-50"
+            data-testid="flat-show-in-pos"
+          >
+            <div>
+              <div className="t-small font-semibold text-base-900">Activate in POS</div>
+              <div className="t-tiny text-base-500 mt-0.5">
+                {showInPos
+                  ? "On — sales staff can add this to an order."
+                  : "Off — hidden from the POS catalog."}
+                {liveSkus.length === 0 && " (No SKUs yet — add one in SKU Master first.)"}
+              </div>
             </div>
-            <p className="t-tiny text-base-400 mt-1.5">
-              Prices + new SKUs are managed in SKU Master.
-            </p>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showInPos}
+              onClick={() => setShowInPos((v) => !v)}
+              disabled={liveSkus.length === 0}
+              className={`t-small font-semibold px-4 py-1.5 rounded-full border transition-colors disabled:opacity-50 ${showInPos ? "bg-base-900 text-white border-base-900" : CHIP_OFF}`}
+              data-testid="flat-show-in-pos-switch"
+            >
+              {showInPos ? "On" : "Off"}
+            </button>
           </div>
         )}
 

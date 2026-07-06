@@ -179,7 +179,9 @@ function ModelCard({
   skus: ProductSkuDto[];
   onOpen: () => void;
 }) {
-  const liveSkus = skus.filter((s) => !s.discontinuedAt);
+  // Compartment-linked SKUs don't count here (they mirror the Compartments
+  // ticks, not sellable flat variants — same exclusion as the editor modal).
+  const liveSkus = skus.filter((s) => !s.discontinuedAt && s.compartmentId == null);
   const hidden = liveSkus.length > 0 && !liveSkus.some((s) => s.posActive !== false);
 
   return (

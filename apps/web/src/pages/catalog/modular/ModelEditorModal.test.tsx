@@ -140,6 +140,17 @@ beforeEach(() => {
 });
 
 describe("ModelEditorModal — sofa (2990s arrangement)", () => {
+  it("NO Variant SKUs list — the chips own visibility (Loo 2026-07-06)", () => {
+    const compSkus: ProductSkuDto[] = [
+      { id: "cs1", modelId: "m-sofa", sku: "5539-1A(LHF)", variant: "1A(LHF)", variantKind: "part", price: 1490, cost: null, supplierId: null, posActive: false, compartmentId: "c1" },
+      { id: "cs2", modelId: "m-sofa", sku: "5539-2S", variant: "2S", variantKind: "part", price: 2490, cost: null, supplierId: null, posActive: true, compartmentId: "c2" },
+    ];
+    renderModal(SOFA, compSkus);
+    expect(screen.queryByTestId("model-skus")).toBeNull();
+    expect(screen.queryByTestId("flat-show-in-pos")).toBeNull();
+    expect(screen.queryByText(/Variant SKUs/i)).toBeNull();
+  });
+
   it("renders photo/name/description + Seat sizes · Compartments · Legs · Specials · Fabrics-by-series", () => {
     renderModal(SOFA);
     expect(screen.getByTestId("model-photo")).toBeInTheDocument();
@@ -208,10 +219,13 @@ describe("ModelEditorModal — sofa (2990s arrangement)", () => {
   });
 });
 
-describe("ModelEditorModal — bedframe", () => {
-  it("no Compartments; sizes = model axis ∪ variants; changed sizes cascade on Save", async () => {
+describe("ModelEditorModal — bedframe / mattress", () => {
+  it("no Compartments, NO sku list; sizes = model axis ∪ variants; changed sizes cascade on Save", async () => {
     renderModal(BED, BED_SKUS);
     expect(screen.queryByTestId("allowed-compartments")).toBeNull();
+    // The Sizes chips ARE the per-size ON/OFF — no duplicate Variant SKUs list.
+    expect(screen.queryByText(/Variant SKUs/i)).toBeNull();
+    expect(screen.queryByTestId("flat-show-in-pos")).toBeNull();
     expect(screen.getByTestId("allowed-sizes")).toHaveTextContent("Sizes");
     expect(screen.getByTestId("allowed-size-Queen").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("allowed-size-King").getAttribute("aria-pressed")).toBe("false");
@@ -224,27 +238,31 @@ describe("ModelEditorModal — bedframe", () => {
       modelId: "m-bed",
       input: { sizes: ["Queen", "King"] },
     });
+    expect(mockPatchSku).not.toHaveBeenCalled();
   });
 });
 
-describe("ModelEditorModal — variant SKU ON/OFF (draft, applies on Save)", () => {
-  it("accessory: no tick sections; SKU pills flip pos_active via Save diffs", async () => {
+describe("ModelEditorModal — flat categories (accessory / service)", () => {
+  it("ONE Activate-in-POS switch, no tick sections, no sku list; Save bulk-flips", async () => {
     renderModal(ACC, ACC_SKUS);
     expect(screen.queryByTestId("allowed-sizes")).toBeNull();
     expect(screen.queryByTestId("allowed-fabrics")).toBeNull();
-    // draft-toggle one SKU off, save → exactly ONE patchSku call
-    fireEvent.click(screen.getByTestId("sku-toggle-PILLOW-1"));
+    expect(screen.queryByText(/Variant SKUs/i)).toBeNull();
+    const sw = screen.getByTestId("flat-show-in-pos-switch");
+    expect(sw.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(sw); // Deactivate in POS
     fireEvent.click(screen.getByTestId("model-editor-save"));
-    await waitFor(() => expect(mockPatchSku).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockPatchSku).toHaveBeenCalledTimes(2));
     expect(mockPatchSku).toHaveBeenCalledWith({ id: "a1", patch: { posActive: false } });
+    expect(mockPatchSku).toHaveBeenCalledWith({ id: "a2", patch: { posActive: false } });
     // name unchanged → no model PATCH at all
     expect(mockPatchModel).not.toHaveBeenCalled();
   });
 
-  it("All off flips every SKU in one save", async () => {
+  it("switch untouched → Save writes nothing to SKUs", async () => {
     renderModal(ACC, ACC_SKUS);
-    fireEvent.click(screen.getByText("All off"));
     fireEvent.click(screen.getByTestId("model-editor-save"));
-    await waitFor(() => expect(mockPatchSku).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByTestId("model-editor-save")).toBeTruthy());
+    expect(mockPatchSku).not.toHaveBeenCalled();
   });
 });

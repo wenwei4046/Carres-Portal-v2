@@ -6,29 +6,30 @@ import type {
   ProductModelDto,
   ProductSkuDto,
 } from "@carres/shared";
-import { activeSofaSizes, PRODUCT_CATEGORIES } from "@carres/shared";
+import { activeSofaSizes, deriveSkuCode, PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useDeleteCatalogSku, usePatchCatalogSku } from "@/lib/queries";
+import { useDeleteCatalogSku, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
-import { CategoryChip, CATEGORY_LABEL, CodeChip, SkuStatusPill } from "../components/atoms";
+import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
 import { skuMargin } from "../margin";
 import NewSkuModal from "./NewSkuModal";
-import EditSkuModal from "./EditSkuModal";
 import ImportSkusDialog from "./ImportSkusDialog";
 import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
 
 /**
  * SKU Master — flat product table for the Master Admin. Columns: Product code ·
- * Description · Product name · Category · Size · Price · Margin · Status.
- * (The COST column was dropped 2026-07-06 — Loo: not needed for now. Cost
- * itself survives in the schema + Edit modal + import; only the list column
- * went, so margin still renders for SKUs whose cost is set elsewhere.)
- * Filter by category + model pills + free-text search; picking a category
- * reveals a second pill row of that category's model names (shown even for a
- * single model — e.g. Sofa → Booqit). "Edit Prices" flips the Price cell to an
- * inline input (commit on blur, verified by the catalog re-fetch the patch
- * triggers). Price 0 renders as a muted "not set" — NEVER coerced to 0.
+ * Description · Product name · Category · Size · Price · Margin.
+ * (The COST column was dropped 2026-07-06 — Loo: not needed for now — and the
+ * STATUS column followed the same day: POS ON/OFF belongs to the Modular tab;
+ * `pos_active` itself is untouched — the Modular toggle + the POS bundle
+ * filter keep reading it. Discontinued rows still dim to 50% opacity.)
+ *
+ * Row "Edit" (Loo 2026-07-06) = INLINE editing, no modal: the row's code
+ * (its variant segment — the server re-derives `{MODEL_KEY}-{variant}`),
+ * description, and product category flip to inputs that commit on blur.
+ * "Edit Prices" separately flips the Price cells to inline inputs. Price 0
+ * renders as a muted "not set" — NEVER coerced to 0.
  *
  * Performance: the live catalog has 1000+ SKUs. We render at most VISIBLE_CAP
  * rows and show a "refine your filter" banner past that, rather than mount
@@ -36,11 +37,11 @@ import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
  */
 
 const VISIBLE_CAP = 300;
-// 11 tracks: checkbox · code · desc · product · category · size · price · pwp · margin · status · edit
+// 10 tracks: checkbox · code · desc · product · category · size · price · pwp · margin · edit
 // (PWP = the 0186 per-SKU PWP reward price, 2990s "PWP Price" column. The sofa
 // per-size grid variant deliberately has NO pwp column — a sofa's PWP price
 // lives on the matched COMBO (pwp_prices_by_height), never on component SKUs.)
-const GRID_COLS = "32px 150px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 90px 92px 60px";
+const GRID_COLS = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 90px 60px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -72,7 +73,9 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [editRow, setEditRow] = useState<FlatRow | null>(null);
+  // Inline row editing (Loo 2026-07-06) — at most ONE row at a time; the Edit
+  // button toggles it. No modal.
+  const [inlineEditId, setInlineEditId] = useState<string | null>(null);
 
   const del = useDeleteCatalogSku();
 
@@ -116,7 +119,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     category === "sofa" &&
     (catalog.optionPools ?? []).some((p) => p.pool === "sofa_size" && p.active);
   const gridCols = sofaSizeMode
-    ? `32px 150px minmax(200px,1.2fr) ${sofaSizes.map(() => "minmax(84px,1fr)").join(" ")} 92px 60px`
+    ? `32px 170px minmax(200px,1.2fr) ${sofaSizes.map(() => "minmax(84px,1fr)").join(" ")} 60px`
     : GRID_COLS;
 
   // Switching category invalidates a model pick from the previous category —
@@ -354,7 +357,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
                   {s}
                 </div>
               ))}
-              <div className="label">Status</div>
               <div className="label" />
             </>
           ) : (
@@ -367,7 +369,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               <div className="label text-right">Price</div>
               <div className="label text-right">PWP Price</div>
               <div className="label text-right">Margin</div>
-              <div className="label">Status</div>
               <div className="label" />
             </>
           )}
@@ -386,7 +387,8 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             editMode={editMode && isPrincipal}
             selected={selected.has(r.sku.id)}
             onToggle={toggleRow}
-            onEdit={setEditRow}
+            inlineEdit={inlineEditId === r.sku.id}
+            onToggleInline={(id) => setInlineEditId((cur) => (cur === id ? null : id))}
             sofaSizes={sofaSizeMode ? sofaSizes : null}
             gridCols={gridCols}
           />
@@ -397,13 +399,11 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         <NewSkuModal
           models={catalog.models}
           sofaCompartments={catalog.sofaCompartments ?? []}
+          optionPools={catalog.optionPools ?? []}
           onClose={() => setNewOpen(false)}
         />
       )}
       {importOpen && <ImportSkusDialog onClose={() => setImportOpen(false)} />}
-      {editRow && (
-        <EditSkuModal sku={editRow.sku} model={editRow.model} onClose={() => setEditRow(null)} />
-      )}
     </div>
   );
 }
@@ -413,7 +413,8 @@ const SkuRowView = memo(function SkuRowView({
   editMode,
   selected,
   onToggle,
-  onEdit,
+  inlineEdit,
+  onToggleInline,
   sofaSizes,
   gridCols,
 }: {
@@ -421,17 +422,124 @@ const SkuRowView = memo(function SkuRowView({
   editMode: boolean;
   selected: boolean;
   onToggle: (id: string) => void;
-  onEdit: (row: FlatRow) => void;
+  /** Loo 2026-07-06 — row-level inline editing (code / description / category),
+   *  toggled by the row's Edit button. No modal. */
+  inlineEdit: boolean;
+  onToggleInline: (id: string) => void;
   /** 0204 — non-null = render the sofa-size grid variant (one price cell per
    *  pool size for compartment SKUs; flat SKUs span the size tracks). */
   sofaSizes: string[] | null;
   gridCols: string;
 }) {
-  const { sku, category, productName } = row;
+  const { sku, model, category, productName } = row;
   const patch = usePatchCatalogSku();
+  const patchModel = usePatchCatalogModel();
   const discontinued = !!sku.discontinuedAt;
   const margin = skuMargin(sku.price, sku.cost);
   const marginLabel = category === "sofa" ? "base margin" : "plan margin";
+  const modelKeyPrefix = model ? `${model.modelKey.toUpperCase()}-` : "";
+
+  /** Commit the code's VARIANT segment — the server re-derives the full sku as
+   *  `{MODEL_KEY}-{variant}` (the only sanctioned code-rename path). Historical
+   *  orders/POs keep the OLD code string; a compartment re-offer re-asserts the
+   *  compartment's own code. */
+  function commitVariant(raw: string) {
+    const v = raw.trim();
+    if (v === "" || v === sku.variant) return;
+    patch.mutate(
+      { id: sku.id, patch: { variant: v } },
+      {
+        onSuccess: () =>
+          toast.success(`${sku.sku} → ${model ? deriveSkuCode(model.modelKey, v) : v}`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  function commitDescription(raw: string) {
+    const d = raw.trim();
+    if (d === (sku.description ?? "")) return;
+    patch.mutate(
+      { id: sku.id, patch: { description: d || null } },
+      {
+        onSuccess: () => toast.success(`${sku.sku} · description updated`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  /** Category lives on the MODEL — changing it moves the model AND all its
+   *  sibling SKUs to the new category (say so in the toast). */
+  function commitCategory(next: string) {
+    if (!model || next === model.category) return;
+    patchModel.mutate(
+      { id: model.id, patch: { category: next as ProductCategory } },
+      {
+        onSuccess: () =>
+          toast.success(`${model.name} moved to ${CATEGORY_LABEL[next as ProductCategory]} (all its SKUs)`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  /** Inline CODE cell: fixed `{MODEL_KEY}-` prefix + an editable variant input. */
+  const codeCell = inlineEdit ? (
+    <div className="flex items-center gap-0.5 min-w-0">
+      {modelKeyPrefix && (
+        <span className="t-tiny font-mono text-base-400 shrink-0" title="Model prefix — fixed">
+          {modelKeyPrefix}
+        </span>
+      )}
+      <input
+        defaultValue={sku.variant}
+        onBlur={(e) => commitVariant(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        aria-label={`${sku.sku} code`}
+        title="Edits the code's variant segment — the full code re-derives as MODELKEY-variant"
+        className={`${INPUT_CLS} t-num text-[12px] min-w-0`}
+      />
+    </div>
+  ) : (
+    <div>
+      <CodeChip>{sku.sku}</CodeChip>
+    </div>
+  );
+
+  /** Inline DESCRIPTION cell. */
+  const descriptionCell = inlineEdit ? (
+    <input
+      defaultValue={sku.description ?? ""}
+      placeholder="—"
+      onBlur={(e) => commitDescription(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      aria-label={`${sku.sku} description`}
+      className={`${INPUT_CLS} t-small text-[12px]`}
+    />
+  ) : (
+    <div className="t-small text-base-700 truncate" title={sku.description ?? ""}>
+      {sku.description || <span className="text-base-400">—</span>}
+    </div>
+  );
+
+  const editButton = (
+    <div className="text-right">
+      <button
+        type="button"
+        onClick={() => onToggleInline(sku.id)}
+        className={`${inlineEdit ? "btn-primary" : "btn-ghost"} text-[11px]`}
+        data-testid={`sku-edit-${sku.sku}`}
+      >
+        {inlineEdit ? "Done" : "Edit"}
+      </button>
+    </div>
+  );
 
   function commitPrice(raw: string) {
     const trimmed = raw.trim();
@@ -489,12 +597,8 @@ const SkuRowView = memo(function SkuRowView({
           checked={selected}
           onChange={() => onToggle(sku.id)}
         />
-        <div>
-          <CodeChip>{sku.sku}</CodeChip>
-        </div>
-        <div className="t-small text-base-700 truncate" title={sku.description ?? ""}>
-          {sku.description || <span className="text-base-400">—</span>}
-        </div>
+        {codeCell}
+        {descriptionCell}
         {sku.compartmentId != null ? (
           <CompartmentSizeCells sku={sku} sizes={sofaSizes} editMode={editMode} />
         ) : (
@@ -524,23 +628,7 @@ const SkuRowView = memo(function SkuRowView({
             )}
           </div>
         )}
-        <div>
-          {discontinued ? (
-            <span className="pill pill-neutral">Discontinued</span>
-          ) : (
-            <SkuStatusPill posActive={sku.posActive !== false} />
-          )}
-        </div>
-        <div className="text-right">
-          <button
-            type="button"
-            onClick={() => onEdit(row)}
-            className="btn-ghost text-[11px]"
-            data-testid={`sku-edit-${sku.sku}`}
-          >
-            Edit
-          </button>
-        </div>
+        {editButton}
       </div>
     );
   }
@@ -557,18 +645,31 @@ const SkuRowView = memo(function SkuRowView({
         checked={selected}
         onChange={() => onToggle(sku.id)}
       />
-      <div>
-        <CodeChip>{sku.sku}</CodeChip>
-      </div>
-      <div className="t-small text-base-700 truncate" title={sku.description ?? ""}>
-        {sku.description || <span className="text-base-400">—</span>}
-      </div>
+      {codeCell}
+      {descriptionCell}
       <div className="t-small text-base-800 truncate" title={productName}>
         {productName}
       </div>
-      <div className="t-tiny text-base-600">
-        {category ? CATEGORY_LABEL[category] : "—"}
-      </div>
+      {inlineEdit && model ? (
+        <select
+          defaultValue={model.category}
+          onChange={(e) => commitCategory(e.target.value)}
+          aria-label={`${sku.sku} category`}
+          title="Category lives on the product — changing it moves ALL of this product's SKUs"
+          className={`${INPUT_CLS} t-tiny`}
+          data-testid={`sku-category-select-${sku.sku}`}
+        >
+          {PRODUCT_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {CATEGORY_LABEL[c]}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <div className="t-tiny text-base-600">
+          {category ? CATEGORY_LABEL[category] : "—"}
+        </div>
+      )}
       <div className="t-small text-base-700">{sku.variant}</div>
 
       {/* Price */}
@@ -635,23 +736,7 @@ const SkuRowView = memo(function SkuRowView({
         )}
       </div>
 
-      <div>
-        {discontinued ? (
-          <span className="pill pill-neutral">Discontinued</span>
-        ) : (
-          <SkuStatusPill posActive={sku.posActive !== false} />
-        )}
-      </div>
-      <div className="text-right">
-        <button
-          type="button"
-          onClick={() => onEdit(row)}
-          className="btn-ghost text-[11px]"
-          data-testid={`sku-edit-${sku.sku}`}
-        >
-          Edit
-        </button>
-      </div>
+      {editButton}
     </div>
   );
 });

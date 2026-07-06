@@ -31,6 +31,7 @@ vi.mock("@/lib/auth", () => ({
 const mockCreateModelMutateAsync = vi.fn();
 const mockCreateSkuMutateAsync = vi.fn();
 const mockOfferMutateAsync = vi.fn();
+const mockGenerateSkusMutateAsync = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   useCreateCatalogModel: () => ({
@@ -46,6 +47,11 @@ vi.mock("@/lib/queries", () => ({
   useOfferModelCompartments: () => ({
     mutate: vi.fn(),
     mutateAsync: mockOfferMutateAsync,
+    isPending: false,
+  }),
+  useGenerateSkus: () => ({
+    mutate: vi.fn(),
+    mutateAsync: mockGenerateSkusMutateAsync,
     isPending: false,
   }),
 }));
@@ -90,7 +96,17 @@ beforeEach(() => {
   mockCreateModelMutateAsync.mockReset().mockResolvedValue({ model: { id: "m-new" } });
   mockCreateSkuMutateAsync.mockReset().mockResolvedValue({});
   mockOfferMutateAsync.mockReset().mockResolvedValue({ offered: 2, failed: [] });
+  mockGenerateSkusMutateAsync.mockReset().mockResolvedValue({ ok: true, generated: 2, skipped: 0 });
 });
+
+/** Mattress + bedframe size pools (Special Add-ons → Sizes). */
+const SIZE_POOLS = [
+  { id: "ms1", pool: "mattress_size" as const, value: "S", label: "Single", dimensions: null, surcharge: null, active: true, sortOrder: 1 },
+  { id: "ms2", pool: "mattress_size" as const, value: "Q", label: "Queen", dimensions: null, surcharge: null, active: true, sortOrder: 2 },
+  { id: "ms3", pool: "mattress_size" as const, value: "K", label: "King", dimensions: null, surcharge: null, active: true, sortOrder: 3 },
+  { id: "ms4", pool: "mattress_size" as const, value: "OLD", label: null, dimensions: null, surcharge: null, active: false, sortOrder: 4 },
+  { id: "bs1", pool: "bedframe_size" as const, value: "K", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 1 },
+];
 
 describe("NewSkuModal — sofa compartment picker", () => {
   it("category Sofa surfaces the ACTIVE pool as chips, all selected by default", () => {
@@ -220,5 +236,87 @@ describe("NewSkuModal — sofa compartment picker", () => {
     expect(screen.getByText(/No compartments in the pool yet/)).toBeInTheDocument();
     expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
     expect(screen.getByText("Create product + SKU")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Loo 2026-07-06 — mattress/bedframe: the size field becomes POOL CHIPS
+// (Special Add-ons → Sizes), default all selected; create = model + one SKU
+// per ticked size via generate-skus.
+// ---------------------------------------------------------------------------
+describe("NewSkuModal — mattress/bedframe size chips", () => {
+  it("mattress surfaces the ACTIVE mattress_size pool, all selected; classic size field hidden", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    // default category = mattress
+    expect(screen.getByTestId("new-sku-sizes")).toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-size-S")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("new-sku-size-Q")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("new-sku-size-K")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByTestId("new-sku-size-OLD")).not.toBeInTheDocument(); // inactive
+    expect(screen.queryByTestId("new-sku-variant")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("new-sku-cost")).not.toBeInTheDocument();
+    // the one price field that seeds every generated SKU stays (principal)
+    expect(screen.getByTestId("new-sku-price")).toBeInTheDocument();
+    expect(screen.getByText("Create model + 3 SKUs")).toBeInTheDocument();
+  });
+
+  it("bedframe reads the bedframe_size pool; category switch re-defaults the selection", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-sizes-none"));
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "bedframe" } });
+    expect(screen.getByTestId("new-sku-size-K")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByTestId("new-sku-size-S")).not.toBeInTheDocument(); // mattress-only value
+    expect(screen.getByText("Create model + 1 SKU")).toBeInTheDocument();
+  });
+
+  it("submit creates the model (sizes seed allowed_options) + generate-skus with the ticked sizes + price", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
+    fireEvent.click(screen.getByTestId("new-sku-size-Q")); // untick Q → S + K remain
+    fireEvent.change(screen.getByTestId("new-sku-price"), { target: { value: "1990" } });
+    fireEvent.click(screen.getByText("Create model + 2 SKUs"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mockCreateModelMutateAsync).toHaveBeenCalledWith({
+      category: "mattress",
+      modelKey: "lumi-firmcare",
+      name: "Lumi FirmCare",
+      allowedOptions: { sizes: ["S", "K"] },
+    });
+    expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith({
+      modelId: "m-new",
+      input: { variants: ["S", "K"], price: 1990 },
+    });
+    expect(mockCreateSkuMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("non-principal generates UNPRICED (price omitted) with a lock hint", async () => {
+    mockRole = "operation";
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={onClose} />);
+    expect(screen.queryByTestId("new-sku-price")).not.toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-price-lock-hint")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Lumi FirmCare" } });
+    fireEvent.click(screen.getByText("Create model + 3 SKUs"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith({
+      modelId: "m-new",
+      input: { variants: ["S", "Q", "K"], price: undefined },
+    });
+  });
+
+  it("None → falls back to the classic single-SKU flow; no pool prop → classic flow", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("new-sku-sizes-none"));
+    expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
+    expect(screen.getByText("Create product + SKU")).toBeInTheDocument();
+  });
+
+  it("accessory/service categories never show the size chips", () => {
+    render(<NewSkuModal models={MODELS} optionPools={SIZE_POOLS} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "accessory" } });
+    expect(screen.queryByTestId("new-sku-sizes")).not.toBeInTheDocument();
+    expect(screen.getByTestId("new-sku-variant")).toBeInTheDocument();
   });
 });
