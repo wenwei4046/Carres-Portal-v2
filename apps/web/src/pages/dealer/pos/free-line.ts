@@ -75,9 +75,11 @@ export function toFreeGiftLineInput(
   const modelId = skuRow?.modelId ?? null;
   const category = modelId ? (categoryByModel(catalog).get(modelId) ?? "") : "";
   const qty = Number(line.qty ?? 1);
-  // One-way guard (F1): flag a line already FREE so the SHARED resolver skips it
-  // as a trigger — the single source of the guard lives in resolveDefaultFreeGifts.
-  const free = Boolean(attrs.free_item) || Boolean(attrs.free_gift);
+  // Only an APPENDED gift line (`attrs.free_gift`) is flagged so the SHARED
+  // resolver skips it (a gift never spawns another gift). A campaign-freed PAID
+  // item (`attrs.free_item`) STILL keeps its default gift — the GWP stays even
+  // after "Make free" (Loo 2026-07-06). Mirrors the server's deriveLineInput.
+  const free = Boolean(attrs.free_gift);
 
   // A sofa BUILD line (the SofaBuildCanvas single line) carries the full
   // geometry descriptor; its built compartments are the cell module codes.
