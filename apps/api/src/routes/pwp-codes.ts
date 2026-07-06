@@ -96,7 +96,7 @@ pwpCodesRouter.post("/reserve", async (c) => {
       message: "Invalid reserve input: " + parsed.error.issues[0]?.message,
     });
   }
-  const { cartLineKey, sku, qty } = parsed.data;
+  const { cartLineKey, sku, qty, rewardLine } = parsed.data;
   const sb = userClient(c.env, auth.jwt);
 
   // 1. Resolve the trigger sku → { category, modelId, variant }.
@@ -119,6 +119,11 @@ pwpCodesRouter.post("/reserve", async (c) => {
   const emptyCombos = new Map<string, string[][]>();
   const matched: Array<{ rule: PwpRule; target: number }> = [];
   for (const rule of rules) {
+    // 2990s one-way parity: a trigger line that is ITSELF a reward never mints
+    // PROMO vouchers (a free reward funding the next free reward). PWP rules
+    // still reserve — chaining is intentional. Unmatched promo reservations for
+    // this line are trimmed as strays below.
+    if (rewardLine && rule.type === "promo") continue;
     if (upper(triggerLine.category) !== upper(rule.triggerCategory)) continue;
     if (!lineMatchesTargets(triggerLine, rule.triggerTargets, emptyCombos)) continue;
     const qpt = Math.max(1, Math.floor(Number(rule.qtyPerTrigger) || 1));
@@ -248,6 +253,7 @@ pwpCodesRouter.get("/available", async (c) => {
   const url = new URL(c.req.url);
   const phone = url.searchParams.get("phone"); // raw; canonicalized in the RPC
   const code = url.searchParams.get("code");
+  const name = url.searchParams.get("name"); // 0204 — drives name_matches (raw)
   // No selector → no discovery (the RPC also short-circuits, but skip the call).
   if (!phone && !code) {
     return c.json(pwpDiscoverResponseSchema.parse({ vouchers: [] }));
@@ -256,6 +262,7 @@ pwpCodesRouter.get("/available", async (c) => {
   const { data, error } = await sb.rpc("pwp_discover_available", {
     p_phone: phone ?? null,
     p_code: code ?? null,
+    p_name: name ?? null,
   });
   if (error) throw new HTTPException(500, { message: error.message });
   // The RPC already returns the STRIPPED shape — map snake→camel into the discover

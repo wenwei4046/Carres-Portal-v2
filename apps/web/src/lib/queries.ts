@@ -157,8 +157,8 @@ export const qk = {
    *  auto-suggest + manual-entry affordance cache distinctly per lookup. The
    *  stripped (no-PII) DTO. Only enabled when a selector is present + PWP is
    *  active (DORMANT carts make zero discovery traffic). */
-  pwpAvailable: (sel: { phone?: string | null; code?: string | null }) =>
-    ["pwp-codes", "available", sel.phone ?? null, sel.code ?? null] as const,
+  pwpAvailable: (sel: { phone?: string | null; code?: string | null; name?: string | null }) =>
+    ["pwp-codes", "available", sel.phone ?? null, sel.code ?? null, sel.name ?? null] as const,
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
   // ripples to dealers + dashboard) without touching dealer/order caches.
@@ -1107,17 +1107,21 @@ export function useFreePwpCode(
  * freshly-redeemed voucher drops out of the suggestion promptly on re-fetch.
  */
 export function usePwpAvailableForPhone(
-  selector: { phone?: string | null; code?: string | null },
+  selector: { phone?: string | null; code?: string | null; name?: string | null },
   opts?: Partial<UseQueryOptions<PwpDiscoverResponse>>,
 ) {
   const phone = (selector.phone ?? "").trim();
   const code = (selector.code ?? "").trim();
+  // 0204 — the customer NAME rides along so the server can compute nameMatches
+  // (the 2990s name+phone identity). Never a selector on its own.
+  const name = (selector.name ?? "").trim();
   return useQuery({
-    queryKey: qk.pwpAvailable({ phone: phone || null, code: code || null }),
+    queryKey: qk.pwpAvailable({ phone: phone || null, code: code || null, name: name || null }),
     queryFn: () => {
       const params = new URLSearchParams();
       if (phone) params.set("phone", phone);
       if (code) params.set("code", code);
+      if (name) params.set("name", name);
       return apiFetch<PwpDiscoverResponse>(
         `/api/pwp-codes/available${params.toString() ? `?${params.toString()}` : ""}`,
       );

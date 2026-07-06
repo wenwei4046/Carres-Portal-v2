@@ -467,7 +467,7 @@ describe("GET /api/pwp-codes/available", () => {
     const call = (sb._rpcCalls as Array<{ name: string; args: { p_phone: string | null; p_code: string | null } }>).find(
       (c) => c.name === "pwp_discover_available",
     );
-    expect(call?.args).toEqual({ p_phone: "+60 12-345 6789", p_code: null });
+    expect(call?.args).toEqual({ p_phone: "+60 12-345 6789", p_code: null, p_name: null });
   });
 
   it("?code= with a mismatched phone → row returned with phoneMatches=false, NO raw phone in payload", async () => {

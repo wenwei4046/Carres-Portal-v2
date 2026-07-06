@@ -807,10 +807,11 @@ function PwpCrossOrderRow({
     return { rule, price: pwpRewardPrice(line, catalog, rule) ?? 0 };
   }
 
-  // Auto-suggest: phone-matched AVAILABLE vouchers whose rule covers this line +
-  // not already bound to another reward line in this cart.
+  // Auto-suggest: identity-matched (phone AND name — the 2990s name+phone
+  // binding, 0204) AVAILABLE vouchers whose rule covers this line + not already
+  // bound to another reward line in this cart.
   const suggestions = availableVouchers.filter(
-    (v) => v.phoneMatches && !consumedCodes.has(v.code) && ruleForVoucher(v) !== null,
+    (v) => v.phoneMatches && v.nameMatches && !consumedCodes.has(v.code) && ruleForVoucher(v) !== null,
   );
 
   function bind(v: PwpDiscoverDto) {
@@ -834,7 +835,7 @@ function PwpCrossOrderRow({
         setManualError("This voucher is already applied to a line in this cart.");
         return;
       }
-      if (!v.phoneMatches) {
+      if (!v.phoneMatches || !v.nameMatches) {
         setManualError("This voucher belongs to a different customer.");
         return;
       }

@@ -715,7 +715,7 @@ export type { PwpCode } from "./domain";
 // the legacy digits-only `phoneKey` (promoted from delivery-fee-recompute). The
 // stripped DISCOVERY adapter (`pwpDiscoverFromRow`) + its camelCase domain type —
 // the ONLY pwp_codes-derived shape a non-owner client receives (no PII).
-export { phoneKey, phoneKeyMy } from "./phone";
+export { phoneKey, phoneKeyMy, nameKey } from "./phone";
 export { pwpDiscoverFromRow } from "./adapters";
 export type { PwpDiscover } from "./domain";
 

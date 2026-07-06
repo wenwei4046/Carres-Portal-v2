@@ -71,7 +71,10 @@ export type PwpRejectCode =
   /** claimed but resolvePwp did not grant it (scope mismatch OR allowance
    *  exhausted OR a 'pwp' reward whose pwp_price is NULL OR granted by a rule
    *  other than the claimed one) */
-  | "pwp_not_eligible";
+  | "pwp_not_eligible"
+  /** a reward line must be quantity 1 (2990s parity — one voucher funds one
+   *  unit; qty>1 would milk a single grant for multiple units at PWP price) */
+  | "pwp_reward_qty_not_one";
 
 export type PwpRecomputeOutcome =
   | { status: "ok"; lines: RecomputableLine[] }
@@ -228,6 +231,16 @@ export async function recomputePwpLines(
           "A line with special add-ons cannot be made a PWP/promo reward — remove the add-ons first.",
       };
     }
+    // 2990s parity: a PWP/promo reward line must be quantity 1 — one voucher
+    // funds exactly one unit. Without this, a tampered qty=2 line gets two
+    // units at the PWP price off a single grant (2990s rejects at confirm).
+    if (Number(lines[i]!.qty ?? 1) !== 1) {
+      return {
+        status: "bad_request",
+        code: "pwp_reward_qty_not_one",
+        message: "A PWP/promo reward line must be quantity 1.",
+      };
+    }
     const pwp = (attrs as { pwp?: { ruleId?: unknown; code?: unknown; claimGroup?: unknown; crossOrder?: unknown } } | null)?.pwp;
     const ruleId = typeof pwp?.ruleId === "string" ? pwp.ruleId.trim() : "";
     if (!ruleId) {
@@ -360,11 +373,13 @@ export async function recomputePwpLines(
       forced = 0;
     } else {
       const p = pwpPriceBySku.get(lines[claim.index]!.sku);
-      if (p == null) {
+      // 2990s parity: pwp_price = 0 means "not set" for a 'pwp' rule (only a
+      // 'promo' may redeem free). Reject <= 0, not just NULL.
+      if (p == null || p <= 0) {
         return {
           status: "bad_request",
           code: "pwp_not_eligible",
-          message: "No PWP price is configured for this reward.",
+          message: "No PWP price is configured for this reward (set it in SKU Master).",
         };
       }
       forced = p;

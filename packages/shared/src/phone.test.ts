@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { phoneKey, phoneKeyMy } from "./phone";
+import { nameKey, phoneKey, phoneKeyMy } from "./phone";
 
 // A pure JS re-implementation of the SQL twin `public.pwp_phone_key` (migration
 // 0188) — byte-for-byte the same three regexp_replace steps in the same order:
@@ -106,4 +106,32 @@ describe("phoneKeyMy (JS) === pwp_phone_key (SQL) — the cross-twin parity gate
   it.each(cases.map((c) => [c] as const))("agrees on %j", (input) => {
     expect(phoneKeyMy(input)).toBe(sqlPwpPhoneKey(input));
   });
+});
+
+describe("nameKey (0204 — the NAME half of the voucher identity)", () => {
+  // The SQL twin is pwp_name_key(text) = lower(btrim(coalesce(p,''))) —
+  // migration 0204. Keep both in sync if either changes.
+  const sqlPwpNameKey = (p: string | null): string => (p ?? "").trim().toLowerCase();
+
+  it("lowercases + trims so differently-typed names of the same customer agree", () => {
+    expect(nameKey("  Ali Tan ")).toBe("ali tan");
+    expect(nameKey("ALI TAN")).toBe(nameKey("ali tan"));
+  });
+
+  it("different names on the SAME phone stay distinct (2990s identity rule)", () => {
+    expect(nameKey("Ali Tan")).not.toBe(nameKey("Siti Lim"));
+  });
+
+  it("null / undefined / empty → '' (no usable name = legacy phone-only binding)", () => {
+    expect(nameKey(null)).toBe("");
+    expect(nameKey(undefined)).toBe("");
+    expect(nameKey("   ")).toBe("");
+  });
+
+  it.each([["  Ali Tan "], ["ALI TAN"], [""], ["   "], ["李小明"]])(
+    "agrees with the SQL twin on %j",
+    (input) => {
+      expect(nameKey(input)).toBe(sqlPwpNameKey(input));
+    },
+  );
 });

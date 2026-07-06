@@ -5,6 +5,7 @@ import {
   PWP_CODES,
   PWP_RULES,
   lineMatchesTargets,
+  nameKey,
   phoneKeyMy,
   type PwpRule,
   type RuleLineInput,
@@ -62,6 +63,10 @@ export type SweepArgs = {
   /** The order's customer phone (raw; canonicalized via `phoneKeyMy`). NULL/empty
    *  → no binding possible → a would-carry code is DELETEd + a soft-warning. */
   customerPhone: string | null;
+  /** The order's customer name (raw; canonicalized via `nameKey`). 0204: stamped
+   *  as the NAME half of the 2990s name+phone voucher identity — a later claim
+   *  must present the SAME name (shared phone + different name ≠ same customer). */
+  customerName: string | null;
   /** The fully-verified order line set (post sofa-explode + special + free + gift),
    *  used to SERVER-DERIVE which RESERVED codes belong to this submit. */
   finalLines: RecomputableLine[];
@@ -144,13 +149,23 @@ export async function sweepReservedForSubmit(
   }
   const emptyCombos = new Map<string, string[][]>();
   const triggerSkus = new Set<string>();
+  // 2990s promo one-way backstop: a line that is ITSELF a reward (a claimed
+  // PWP/promo line, a free-item line, or an appended free gift) never opens a
+  // PROMO trigger — otherwise a free reward mints a promo voucher that funds
+  // the next free reward, forever. Track which trigger SKUs come from at least
+  // one genuine NON-reward line; a promo code whose trigger is reward-only is
+  // deleted at the partition below (2990s deletes such codes at confirm).
+  const nonRewardTriggerSkus = new Set<string>();
   for (const line of args.finalLines) {
     const info = skuRes.skuInfo.get(line.sku) ?? null;
     const rl = deriveRuleLine(info);
+    const attrs = (line.attrs ?? {}) as Record<string, unknown>;
+    const isRewardLine = Boolean(attrs.pwp || attrs.free_item || attrs.free_gift);
     for (const rule of activeRules) {
       if (upper(rl.category) !== upper(rule.triggerCategory)) continue;
       if (!lineMatchesTargets(rl, rule.triggerTargets, emptyCombos)) continue;
       triggerSkus.add(line.sku);
+      if (!isRewardLine) nonRewardTriggerSkus.add(line.sku);
       break;
     }
   }
@@ -169,12 +184,23 @@ export async function sweepReservedForSubmit(
   //    rule is active AND carry_forward AND a customer phone is captured; else it
   //    is deleted (rule inactive / no-carry, OR would-carry but no phone → warn).
   const boundPhone = phoneKeyMy(args.customerPhone);
+  const boundName = nameKey(args.customerName) || null; // NULL = phone-only (legacy shape)
   // Group carried codes by rule so a per-rule carry_forward_days expiry applies.
   const carryByRule = new Map<string, string[]>();
   const toDelete: string[] = [];
   let skippedForNoPhone = 0;
   for (const r of inScope) {
     const rule = r.rule_id ? activeById.get(r.rule_id) : undefined;
+    // Promo one-way (2990s confirm backstop): a promo code whose trigger SKU
+    // never appears as a genuine non-reward line in this order was reserved off
+    // a reward line — delete it, never carry it forward.
+    if (
+      rule?.type === "promo" &&
+      !(r.trigger_item_code != null && nonRewardTriggerSkus.has(r.trigger_item_code))
+    ) {
+      toDelete.push(r.code);
+      continue;
+    }
     if (rule && rule.carryForward !== false) {
       if (boundPhone) {
         const arr = carryByRule.get(rule.id) ?? [];
@@ -205,6 +231,7 @@ export async function sweepReservedForSubmit(
         status: "AVAILABLE",
         source_order_id: args.orderId,
         bound_customer_phone: boundPhone,
+        bound_customer_name: boundName, // 0204 — the NAME half of the identity
         owner_dealer_id: args.ownerDealerId,
         expires_at: expiresAt,
         cart_line_key: null, // detach from the dead cart line (discovery keys on phone)
