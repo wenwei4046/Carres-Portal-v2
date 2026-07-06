@@ -29,10 +29,16 @@ const MODEL: ProductModelDto = {
 
 const CODES = ["1B(LHF)", "CNR", "2A(RHF)"];
 
-function renderModal() {
+function renderModal(kind?: "combo" | "quick_pick") {
   const onClose = vi.fn();
   render(
-    <CreateSofaComboModal model={MODEL} moduleCodes={CODES} heights={["24", "28"]} onClose={onClose} />,
+    <CreateSofaComboModal
+      model={MODEL}
+      moduleCodes={CODES}
+      heights={["24", "28"]}
+      kind={kind}
+      onClose={onClose}
+    />,
   );
   return { onClose };
 }
@@ -71,6 +77,7 @@ describe("CreateSofaComboModal", () => {
       pwpPricesByHeight: null,
       label: "1B(LHF) + CNR + 2A(RHF)",
       active: true,
+      isQuickPick: false,
     });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
@@ -86,5 +93,27 @@ describe("CreateSofaComboModal", () => {
     const arg = mockCreate.mock.calls[0]![0];
     expect(arg.pricesByHeight).toEqual({ "24": 2990 });
     expect(arg.pwpPricesByHeight).toEqual({ "24": 2490 });
+  });
+
+  // 0206 — quick_pick kind: a price-less layout preset.
+  it("quick_pick kind: no price grid; saves a price-less preset with isQuickPick", async () => {
+    const { onClose } = renderModal("quick_pick");
+    // The price grid is replaced by an explanatory note; no price inputs.
+    expect(screen.queryByTestId("create-combo-price-24")).toBeNull();
+    expect(screen.getByTestId("create-quickpick-note")).toBeInTheDocument();
+    // Save is enabled immediately — a quick pick needs no price.
+    expect((screen.getByTestId("create-combo-save") as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByTestId("create-combo-save"));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledWith({
+      modelId: MODEL.id,
+      slots: [["1B(LHF)"], ["CNR"], ["2A(RHF)"]],
+      pricesByHeight: {},
+      pwpPricesByHeight: null,
+      label: "1B(LHF) + CNR + 2A(RHF)",
+      active: true,
+      isQuickPick: true,
+    });
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });

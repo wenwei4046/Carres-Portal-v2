@@ -245,6 +245,37 @@ describe("SofaBuildCanvas", () => {
     expect(onCreateCombo).toHaveBeenCalledWith(["1S"]);
   });
 
+  // 0206 — the parallel "Create quick pick" button.
+  it("Create quick pick: no button without onCreateQuickPick (dealer flow)", () => {
+    renderCanvas();
+    addModule("1S");
+    expect(screen.queryByTestId("sofa-build-create-quickpick")).toBeNull();
+  });
+
+  it("Create quick pick: with onCreateQuickPick, a valid build hands up its module codes", () => {
+    const onCreateQuickPick = vi.fn();
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        onCreateQuickPick={onCreateQuickPick}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    addModule("1S");
+    const btn = screen.getByTestId("sofa-build-create-quickpick");
+    expect(btn).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(onCreateQuickPick).toHaveBeenCalledWith(["1S"]);
+  });
+
   /** A flush 1A(LHF)+1A(RHF) pair = ONE closed sofa, pre-placed. */
   function renderClosedPair() {
     render(
