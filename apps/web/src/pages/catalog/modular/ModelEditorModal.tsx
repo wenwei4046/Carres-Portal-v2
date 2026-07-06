@@ -157,6 +157,11 @@ export default function ModelEditorModal({
     : isBed
       ? poolValues("bedframe_leg_height")
       : [];
+  // Bedframe-only pools (the POS bed configurator gates divan / gap by these
+  // ticks, same tick pattern as leg heights). Divan/gap live under the
+  // allowed_options `divan_heights` / `gaps` keys.
+  const divanPool = isBed ? poolValues("divan_height") : [];
+  const gapPool = isBed ? poolValues("gap") : [];
 
   const specialsPool = useMemo(
     () =>
@@ -224,6 +229,19 @@ export default function ModelEditorModal({
   const [legHeights, setLegHeights] = useState<string[]>(() =>
     Array.isArray(opts.leg_heights) ? opts.leg_heights : legPool,
   );
+  // Divan / gap ticks: exact-set (absent = all, [] = none), seeded like legs so
+  // an unconfigured model shows the full active pool. Gap keeps the legacy
+  // model.gaps column as the fallback tick source (pre-0201 bedframes).
+  const [divanHeights, setDivanHeights] = useState<string[]>(() =>
+    Array.isArray(opts.divan_heights) ? opts.divan_heights : divanPool,
+  );
+  const [gaps, setGaps] = useState<string[]>(() =>
+    Array.isArray(opts.gaps)
+      ? opts.gaps
+      : model.gaps && model.gaps.length > 0
+        ? model.gaps
+        : gapPool,
+  );
   const [specials, setSpecials] = useState<string[]>(() => opts.specials ?? []);
   const [fabrics, setFabrics] = useState<string[]>(() => opts.fabrics ?? []);
   // Flat categories — the single Activate/Deactivate-in-POS switch draft.
@@ -278,6 +296,8 @@ export default function ModelEditorModal({
           ...opts,
           sizes,
           ...(legPool.length > 0 ? { leg_heights: legHeights } : {}),
+          ...(divanPool.length > 0 ? { divan_heights: divanHeights } : {}),
+          ...(gapPool.length > 0 ? { gaps } : {}),
           ...(specialsPool.length > 0 ? { specials } : {}),
           ...(fabricSeries.length > 0 ? { fabrics } : {}),
         };
@@ -468,6 +488,48 @@ export default function ModelEditorModal({
                     />
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Divan height — bedframe pool ticks (exact-set, absent = all). */}
+            {divanPool.length > 0 && (
+              <div data-testid="allowed-divans">
+                <SectionHead label="Divan heights" />
+                <div className="flex flex-wrap gap-1.5">
+                  {divanPool.map((v) => (
+                    <Chip
+                      key={v}
+                      on={divanHeights.includes(v)}
+                      label={v}
+                      onToggle={() => setDivanHeights((s) => toggled(s, v))}
+                      testid={`allowed-divan-${v}`}
+                    />
+                  ))}
+                </div>
+                <p className="t-tiny text-base-400 mt-1.5">
+                  Turning a height off hides it from the POS divan picker. All off = every height.
+                </p>
+              </div>
+            )}
+
+            {/* Mattress gap — bedframe pool ticks (legacy model.gaps fallback). */}
+            {gapPool.length > 0 && (
+              <div data-testid="allowed-gaps">
+                <SectionHead label="Mattress gaps" />
+                <div className="flex flex-wrap gap-1.5">
+                  {gapPool.map((v) => (
+                    <Chip
+                      key={v}
+                      on={gaps.includes(v)}
+                      label={v}
+                      onToggle={() => setGaps((s) => toggled(s, v))}
+                      testid={`allowed-gap-${v}`}
+                    />
+                  ))}
+                </div>
+                <p className="t-tiny text-base-400 mt-1.5">
+                  Turning a gap off hides it from the POS gap picker. All off = every gap.
+                </p>
               </div>
             )}
 

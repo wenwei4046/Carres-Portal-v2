@@ -98,6 +98,10 @@ function makeCatalog(over?: Partial<CatalogResponse>): CatalogResponse {
       { id: "p4", pool: "sofa_leg_height", value: "No Leg", label: null, dimensions: null, surcharge: null, active: true, sortOrder: 1 },
       { id: "p5", pool: "sofa_leg_height", value: '6"', label: null, dimensions: null, surcharge: 90, active: true, sortOrder: 2 },
       { id: "p6", pool: "bedframe_leg_height", value: '4"', label: null, dimensions: null, surcharge: 60, active: true, sortOrder: 1 },
+      { id: "p7", pool: "divan_height", value: '4"', label: null, dimensions: null, surcharge: null, active: true, sortOrder: 1 },
+      { id: "p8", pool: "divan_height", value: '6"', label: null, dimensions: null, surcharge: 125, active: true, sortOrder: 2 },
+      { id: "p9", pool: "gap", value: '10"', label: null, dimensions: null, surcharge: null, active: true, sortOrder: 1 },
+      { id: "p10", pool: "gap", value: '12"', label: null, dimensions: null, surcharge: null, active: true, sortOrder: 2 },
     ],
     sofaCompartments: [
       { id: "c1", code: "1A(LHF)", description: null, seatCount: 1, armConfig: "left", iconUrl: null, defaultPrice: 0, sortOrder: 1, active: true },
@@ -252,6 +256,35 @@ describe("ModelEditorModal — bedframe / mattress", () => {
       input: { sizes: ["Queen"] },
     });
     expect(mockPatchSku).not.toHaveBeenCalled();
+  });
+
+  it("bedframe: Divan / Gap tick sections render and save (Loo 2026-07-06)", async () => {
+    // divan/gap seed from the pool (absent ticks = all).
+    renderModal({ ...BED, allowedOptions: { sizes: [] } }, BED_SKUS);
+    expect(screen.getByTestId('allowed-divan-4"').getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId('allowed-divan-6"').getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId('allowed-gap-10"').getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(screen.getByTestId('allowed-divan-6"')); // 6" off
+    fireEvent.click(screen.getByTestId("model-editor-save"));
+    await waitFor(() => expect(mockPatchModel).toHaveBeenCalledTimes(1));
+    const [{ patch }] = mockPatchModel.mock.calls[0];
+    expect(patch.allowedOptions.divan_heights).toEqual(['4"']);
+    expect(patch.allowedOptions.gaps).toEqual(['10"', '12"']);
+  });
+
+  it("bedframe: NO Colour section — finish comes from Fabrics (Loo 2026-07-06)", () => {
+    // model.colors is dead: a bedframe with colours set still shows NO colour editor.
+    renderModal({ ...BED, allowedOptions: { sizes: [] }, colors: ["Natural oak"] }, BED_SKUS);
+    expect(screen.queryByTestId("allowed-colours")).toBeNull();
+  });
+
+  it("mattress: no Colour / Divan / Gap sections (bedframe-only)", () => {
+    const MATT: ProductModelDto = { ...BED, id: "m-matt", category: "mattress", modelKey: "matt" };
+    renderModal({ ...MATT, allowedOptions: { sizes: [] } }, []);
+    expect(screen.queryByTestId("allowed-colours")).toBeNull();
+    expect(screen.queryByTestId("allowed-divans")).toBeNull();
+    expect(screen.queryByTestId("allowed-gaps")).toBeNull();
   });
 });
 
