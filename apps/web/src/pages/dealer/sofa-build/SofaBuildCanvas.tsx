@@ -6,7 +6,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { X, RotateCw, Trash2, Ungroup } from "lucide-react";
+import { X, RotateCw, Trash2, Ungroup, Maximize2, Minimize2 } from "lucide-react";
 import type {
   ProductModelDto,
   ProductSkuDto,
@@ -115,6 +115,8 @@ export default function SofaBuildCanvas({
   sellingFabrics,
   legHeightOptions,
   heights,
+  heightValue,
+  onHeightChange,
   onAddBuild,
   onClose,
   embedded = false,
@@ -147,6 +149,11 @@ export default function SofaBuildCanvas({
    *  options AND the per-size à-la-carte price axis (prices_by_size keys off
    *  these exact values). Absent → the canonical SOFA_HEIGHTS fallback. */
   heights?: readonly string[];
+  /** Optional CONTROLLED size (with `onHeightChange`) — lets the host page
+   *  render its own size chips in the header driving the same state as the
+   *  bottom-bar picker. Absent → the canvas keeps its internal size state. */
+  heightValue?: string;
+  onHeightChange?: (h: string) => void;
   onAddBuild: (payload: SofaBuildAddPayload) => void;
   onClose: () => void;
   /** POS-parity (sofa configure page) — render as a FILL panel inside a parent
@@ -212,9 +219,17 @@ export default function SofaBuildCanvas({
     () => (heights && heights.length > 0 ? heights : SOFA_HEIGHTS),
     [heights],
   );
-  const [height, setHeight] = useState<string>(
+  // Size is optionally CONTROLLED (heightValue + onHeightChange) so the host
+  // page can render its own size chips in the header (Loo 2026-07-06) — the
+  // bottom-bar picker and the header chips then drive the same state.
+  const [heightState, setHeightState] = useState<string>(
     heightChoices.includes("24") ? "24" : heightChoices[0]!,
   );
+  const height = heightValue ?? heightState;
+  const setHeight = (h: string) => {
+    setHeightState(h);
+    onHeightChange?.(h);
+  };
   // 0202-wiring — one unified selling-fabric list (legacy per-model rows +
   // opted-in master fabrics); callers that don't pass it keep legacy rows only.
   const fabricChoices = useMemo<SellingFabric[]>(
@@ -238,7 +253,15 @@ export default function SofaBuildCanvas({
   const [draftDelta, setDraftDelta] = useState<{ ids: string[]; dx: number; dy: number } | null>(null);
   const dragRef = useRef<DragState | null>(null);
 
-  /* ─── Room scale (fit the 600×480 stage into the viewport) ───────── */
+  /* ─── Room scale (fit the stage into the viewport) ───────────────── */
+
+  // Expand room (2990s CustomBuilder parity, Loo 2026-07-06): 1× = the single-
+  // sofa 600×480 room; 1.5× = 900×720 (2.25× the area) for laying out three
+  // to four sofa sets. Same ratio, more floor — the fit-to-viewport transform
+  // below re-fits automatically.
+  const [roomScale, setRoomScale] = useState(1);
+  const roomW = ROOM_W * roomScale;
+  const roomH = ROOM_H * roomScale;
 
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [visualScale, setVisualScale] = useState(1);
@@ -248,7 +271,7 @@ export default function SofaBuildCanvas({
     const el = stageRef.current?.parentElement;
     if (!el || typeof ResizeObserver === "undefined") return;
     const apply = (width: number, vpH: number) => {
-      const s = Math.min(width / ROOM_W, vpH / ROOM_H, 1.4);
+      const s = Math.min(width / roomW, vpH / roomH, 1.4);
       const safe = Number.isFinite(s) && s > 0 ? s : 1;
       visualScaleRef.current = safe;
       setVisualScale(safe);
@@ -260,7 +283,31 @@ export default function SofaBuildCanvas({
     ro.observe(el);
     apply(el.clientWidth, el.clientHeight);
     return () => ro.disconnect();
-  }, []);
+  }, [roomW, roomH]);
+
+  /** Toggle 1× ↔ 1.5×; shrinking clamps any cell back inside the small room. */
+  const toggleRoom = () => {
+    setRoomScale((s) => {
+      const next = s === 1 ? 1.5 : 1;
+      if (next === 1) {
+        setCells((prev) =>
+          prev.map((c) => {
+            const fp = moduleFootprint(
+              findModule(c.moduleCode) ?? { w: 95, d: 95, cushions: 0 },
+              c.rot,
+              depth,
+            );
+            return {
+              ...c,
+              x: Math.max(0, Math.min(c.x, ROOM_W - fp.w)),
+              y: Math.max(0, Math.min(c.y, ROOM_H - fp.h)),
+            };
+          }),
+        );
+      }
+      return next;
+    });
+  };
 
   /* ─── Place / rotate / delete ────────────────────────────────────── */
 
@@ -271,11 +318,11 @@ export default function SofaBuildCanvas({
       const id = nextCellId();
       setCells((prev) => [
         ...prev,
-        { id, moduleCode: code, x: ROOM_W / 2 - fp.w / 2, y: ROOM_H / 2 - fp.h / 2, rot: 0 },
+        { id, moduleCode: code, x: roomW / 2 - fp.w / 2, y: roomH / 2 - fp.h / 2, rot: 0 },
       ]);
       setSelectedId(id);
     },
-    [depth],
+    [depth, roomW, roomH],
   );
 
   const rotateCell = (id: string) => {
@@ -298,8 +345,8 @@ export default function SofaBuildCanvas({
     const cy = bb.y + bb.h / 2;
     // Rotated group bbox = w/h swapped about the same centre; clamp into room.
     const nbb = { x: cx - bb.h / 2, y: cy - bb.w / 2, w: bb.h, h: bb.w };
-    const shiftX = nbb.x < 0 ? -nbb.x : nbb.x + nbb.w > ROOM_W ? ROOM_W - nbb.x - nbb.w : 0;
-    const shiftY = nbb.y < 0 ? -nbb.y : nbb.y + nbb.h > ROOM_H ? ROOM_H - nbb.y - nbb.h : 0;
+    const shiftX = nbb.x < 0 ? -nbb.x : nbb.x + nbb.w > roomW ? roomW - nbb.x - nbb.w : 0;
+    const shiftY = nbb.y < 0 ? -nbb.y : nbb.y + nbb.h > roomH ? roomH - nbb.y - nbb.h : 0;
     const ids = new Set(group.map((g) => g.id));
     setCells((prev) =>
       prev.map((c) => {
@@ -407,8 +454,8 @@ export default function SofaBuildCanvas({
       );
       let fdx = delta.dx + snap.dx;
       let fdy = delta.dy + snap.dy;
-      fdx = Math.max(-bb.x, Math.min(fdx, ROOM_W - bb.w - bb.x));
-      fdy = Math.max(-bb.y, Math.min(fdy, ROOM_H - bb.h - bb.y));
+      fdx = Math.max(-bb.x, Math.min(fdx, roomW - bb.w - bb.x));
+      fdy = Math.max(-bb.y, Math.min(fdy, roomH - bb.h - bb.y));
       setCells((prev) =>
         prev.map((c) =>
           c.id != null && ids.has(c.id) ? { ...c, x: c.x + fdx, y: c.y + fdy } : c,
@@ -430,8 +477,8 @@ export default function SofaBuildCanvas({
     const snap = findSnap({ x: draftX, y: draftY, w: fp.w, h: fp.h }, cells, primary.id, depth);
     let finalX = draftX + snap.dx;
     let finalY = draftY + snap.dy;
-    finalX = Math.max(0, Math.min(finalX, ROOM_W - fp.w));
-    finalY = Math.max(0, Math.min(finalY, ROOM_H - fp.h));
+    finalX = Math.max(0, Math.min(finalX, roomW - fp.w));
+    finalY = Math.max(0, Math.min(finalY, roomH - fp.h));
 
     // Auto-mirror on arm-conflict: if the placed cell has an arm touching a
     // neighbour but its mirror code resolves the conflict, swap LHF↔RHF.
@@ -625,7 +672,7 @@ export default function SofaBuildCanvas({
 
         {/* Center room */}
         <main
-          className="flex min-w-0 flex-1 items-center justify-center overflow-hidden p-4"
+          className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-4"
           onPointerDown={(e) => {
             // 2990s parity (CustomBuilder stage onPointerDown): a click on
             // EMPTY canvas — the room itself or the space around it —
@@ -641,12 +688,34 @@ export default function SofaBuildCanvas({
             }
           }}
         >
+          {/* Expand room — 2990s parity: 1× single-sofa ↔ 1.5× multi-sofa floor */}
+          <button
+            type="button"
+            onClick={toggleRoom}
+            className="absolute right-4 top-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-base-300 bg-white px-3 py-1.5 t-tiny font-medium text-base-600 shadow-sm hover:text-base-900"
+            title={
+              roomScale === 1
+                ? "Expand room (lay out multiple sofas)"
+                : "Reset to single-sofa room"
+            }
+            data-testid="sofa-room-expand"
+          >
+            {roomScale === 1 ? (
+              <>
+                <Maximize2 size={13} strokeWidth={1.75} /> Expand room
+              </>
+            ) : (
+              <>
+                <Minimize2 size={13} strokeWidth={1.75} /> Reset room
+              </>
+            )}
+          </button>
           <div
             ref={stageRef}
             className="sof-cv__room"
             style={{
-              width: ROOM_W,
-              height: ROOM_H,
+              width: roomW,
+              height: roomH,
               transform: `scale(${visualScale})`,
               transformOrigin: "center center",
               overflow: "visible",

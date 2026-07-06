@@ -292,6 +292,12 @@ export default function SofaConfigurePage({
     () => sellingFabricsFor(model, fabrics, masterFabrics),
     [model, fabrics, masterFabrics],
   );
+  // Customize size — CONTROLLED here so the header chips (Loo 2026-07-06) and
+  // the canvas's bottom-bar picker drive the same value; survives the canvas
+  // remount when a quick pick is loaded (seedKey).
+  const [custSize, setCustSize] = useState<string>(() =>
+    sofaSizes.includes("24") ? "24" : sofaSizes[0] ?? "24",
+  );
   const picks: QuickPick[] = useMemo(
     () =>
       sofaCombos
@@ -464,7 +470,10 @@ export default function SofaConfigurePage({
             <span className="sof-flow__crumbDot" />
             {model.name}
           </span>
-          {/* Seat-size toggle — top-left, beside the mode tabs (prototype). */}
+          {/* Seat-size toggle — top-left, beside the mode tabs (prototype).
+              Quick pick: combo-priced sizes only (a chip must be sellable at
+              its combo price). Customize: the model's FULL gated size axis —
+              same chips drive the canvas's controlled size (Loo 2026-07-06). */}
           {mode === "quick" && heroHeights.length > 0 && (
             <span
               className="sof-flow__modeTabs"
@@ -482,6 +491,27 @@ export default function SofaConfigurePage({
                   data-testid={`sofa-qp-height-${h}`}
                 >
                   {h}&Prime;
+                </button>
+              ))}
+            </span>
+          )}
+          {mode === "custom" && sofaSizes.length > 0 && (
+            <span
+              className="sof-flow__modeTabs"
+              role="group"
+              aria-label="Seat size"
+              data-testid="sofa-cust-sizes"
+            >
+              {sofaSizes.map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  className={`sof-flow__modeTab ${custSize === h ? "is-on" : ""}`}
+                  aria-pressed={custSize === h}
+                  onClick={() => setCustSize(h)}
+                  data-testid={`sofa-cust-size-${h}`}
+                >
+                  {/^\d+$/.test(h) ? <>{h}&Prime;</> : h}
                 </button>
               ))}
             </span>
@@ -907,6 +937,8 @@ export default function SofaConfigurePage({
             sellingFabrics={sellingFabrics}
             legHeightOptions={legOpts}
             heights={sofaSizes}
+            heightValue={custSize}
+            onHeightChange={setCustSize}
             onAddBuild={(payload) => {
               const line = buildToDraftLine(payload, model, skus);
               if (line) {
