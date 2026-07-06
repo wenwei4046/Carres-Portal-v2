@@ -764,6 +764,9 @@ export {
   explodeSofaBuildToOrderLines,
   sofaPriceWithinTolerance,
   SOFA_PRICE_DRIFT_TOLERANCE,
+  // 0186 — sofa-as-PWP-reward: the merged charged map + the snapshot swap.
+  comboChargedPrices,
+  pwpSwappedCombos,
   type SofaComboLike,
   type PickSofaComboArgs,
   type SofaComboPick,
