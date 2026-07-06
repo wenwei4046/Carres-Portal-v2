@@ -298,40 +298,6 @@ export interface CatalogFabricRow {
 }
 
 /**
- * `combos` (migration 0177). A fixed-set bundle (套餐) sold at one
- * `combo_price`. Components live in `combo_components`. `combo_key` is the
- * stable kebab-case identifier; `active` + `discontinued_at` mirror the
- * sell-side ON/OFF + soft-delete convention used elsewhere in the catalog.
- */
-export interface ComboRow {
-  id: string;
-  combo_key: string;
-  name: string;
-  combo_price: number;
-  // 0183 — principal-only cost benchmark (RM) companion to combo_price.
-  // null = unset. Benchmark only — never charged, no order/finance/PO consumer.
-  cost: number | null;
-  active: boolean;
-  effective_from: string;
-  discontinued_at: string | null;
-  created_at: string;
-  updated_at: string;
-  updated_by: string | null;
-}
-
-/**
- * `combo_components` (migration 0177). One component SKU of a combo. `qty` is
- * how many of that SKU the combo bundles; `sort_order` drives the deterministic
- * order explodeCombo() uses (last component absorbs the rounding residue).
- */
-export interface ComboComponentRow {
-  combo_id: string;
-  sku: string;
-  qty: number;
-  sort_order: number;
-}
-
-/**
  * `sofa_compartments` (migration 0178, sofa engine Phase 1). The principal-owned
  * compartment pool / type catalog — every sofa segment type (e.g. `1A(LHF)`,
  * `1NA`, `2A(RHF)`) with a description + default price. A model declares which

@@ -34,6 +34,7 @@ import {
   reflowCellsForDepth,
   classifySofaCompartment,
   computeSofaPrice,
+  resolveFabricDelta,
   ROOM_W,
   ROOM_H,
   type SofaBuild,
@@ -42,6 +43,7 @@ import {
 import CompartmentSilhouette from "./CompartmentSilhouette";
 import ModulePaletteItem from "./ModulePaletteItem";
 import { sellingFabricsFor, type SellingFabric } from "./selling-fabrics";
+import { useSeriesFabric, FABRIC_KIV } from "./use-series-fabric";
 
 /**
  * <SofaBuildCanvas> — the full-screen drag plan-view sofa builder (Phase 3,
@@ -81,8 +83,6 @@ export interface SofaBuildAddPayload {
   priceBasis: "combo" | "a_la_carte";
 }
 
-/** Fabric-select sentinel — "Confirm later, customer to confirm". */
-const FABRIC_DEFER = "__defer__";
 
 interface DragState {
   /** The primary cell id under the pointer. */
@@ -249,7 +249,9 @@ export default function SofaBuildCanvas({
     () => sellingFabrics ?? sellingFabricsFor(model, sofaFabrics, null),
     [sellingFabrics, model, sofaFabrics],
   );
-  const [fabricKey, setFabricKey] = useState<string>(fabricChoices[0]?.key ?? "");
+  // Fabric Series → Colour with two-level KIV — the SAME hook the POS quick-pick
+  // rail uses, so the two fabric pickers are identical (Loo 2026-07-06).
+  const fab = useSeriesFabric(fabricChoices);
   // 0201-wiring — leg height ('' = confirm later / none).
   const [legHeight, setLegHeight] = useState<string>("");
   const legOpts = legHeightOptions ?? [];
@@ -266,10 +268,10 @@ export default function SofaBuildCanvas({
     prevDepthRef.current = depth;
     setCells((cs) => reflowCellsForDepth(cs, prev, depth));
   }, [depth]);
-  // "Confirm later" — salesperson defers the fabric; the sofa still adds to
-  // cart, priced at the base tier, flagged for the customer to confirm.
-  const fabricDeferred = fabricKey === FABRIC_DEFER;
-  const fabric = fabricDeferred ? null : fabricChoices.find((f) => f.key === fabricKey) ?? null;
+  // KIV (series or colour) → no concrete fabric → base tier; the sofa still adds
+  // to cart, flagged for the customer to confirm the colour.
+  const fabric = fab.fabric;
+  const fabricDeferred = fab.deferred;
   const fabricTier: FabricTierValue = fabric?.tier ?? "PRICE_1";
 
   // Live drag override — carries the in-flight translation for the dragging
@@ -614,7 +616,8 @@ export default function SofaBuildCanvas({
       fabricId: fabric?.id ?? null,
       fabricCode: fabric?.code ?? null,
       fabricName: fabric?.name ?? null,
-      fabricSeries: fabric?.series ?? null,
+      // The series is recorded even when the colour is still KIV.
+      fabricSeries: fab.fabricSeries,
       fabricSurcharge: priceResult.fabricDelta,
       fabricDeferred,
       legHeight: legHeight || null,
@@ -919,14 +922,6 @@ export default function SofaBuildCanvas({
                       className="h-full w-full"
                     />
                   </div>
-                  {matched && (
-                    <span
-                      className="pill pill-confirmed pointer-events-none absolute -top-2 left-1 scale-90"
-                      data-testid="sofa-cell-combo-badge"
-                    >
-                      Combo
-                    </span>
-                  )}
                   {selected && (
                     <div
                       className="sof-cv__tools"
@@ -969,28 +964,58 @@ export default function SofaBuildCanvas({
         className="flex shrink-0 flex-wrap items-center gap-4 px-5 py-3"
         style={{ borderTop: "1px solid var(--line)", background: "var(--pos-panel, #fff)" }}
       >
-        {/* Fabric picker — optional, deferrable to the customer. One unified
-            list: legacy per-model rows + the model's opted-in master fabrics. */}
-        <label className="flex items-center gap-2 t-small text-base-600">
-          <span className="flex flex-col leading-tight">
-            Fabric
-            <span className="t-micro text-base-400">Optional · KIV to defer</span>
-          </span>
-          <select
-            value={fabricKey}
-            onChange={(e) => setFabricKey(e.target.value)}
-            className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
-            data-testid="sofa-build-fabric"
-          >
-            {fabricChoices.length === 0 && <option value="">— none —</option>}
-            {fabricChoices.map((f) => (
-              <option key={f.key} value={f.key}>
-                {f.name} · {f.tier.replace("PRICE_", "P")}
-              </option>
-            ))}
-            <option value={FABRIC_DEFER}>KIV — colour to confirm</option>
-          </select>
-        </label>
+        {/* Fabric picker — Series → Colour, both deferrable via KIV. IDENTICAL
+            to the POS quick-pick rail (shared useSeriesFabric hook): pick a
+            series, then its colour; either level can stay KIV so the sofa still
+            adds to cart. One series → the series step auto-collapses. */}
+        {fabricChoices.length > 0 && (
+          <label className="flex items-center gap-2 t-small text-base-600">
+            <span className="flex flex-col leading-tight">
+              Fabric
+              <span className="t-micro text-base-400">Series · colour · KIV</span>
+            </span>
+            {fab.seriesList.length > 1 && (
+              <select
+                value={fab.series}
+                onChange={(e) => fab.chooseSeries(e.target.value)}
+                aria-label="Fabric series"
+                className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
+                data-testid="sofa-build-fabric-series"
+              >
+                <option value="">KIV · series</option>
+                {fab.seriesList.map((s) => (
+                  <option key={s} value={s}>
+                    {s === "Other" ? "Other" : `${s} series`}
+                  </option>
+                ))}
+              </select>
+            )}
+            {fab.series && (
+              <select
+                value={fab.colourKey}
+                onChange={(e) => fab.setColourKey(e.target.value)}
+                aria-label="Fabric colour"
+                className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
+                data-testid="sofa-build-fabric"
+              >
+                <option value={FABRIC_KIV}>KIV · colour</option>
+                {fab.seriesColours.map((f) => {
+                  const delta = resolveFabricDelta(
+                    f.tier,
+                    fabricTierOverride ?? null,
+                    fabricTierConfig ?? null,
+                  );
+                  return (
+                    <option key={f.key} value={f.key}>
+                      {f.name}
+                      {delta > 0 ? ` · +RM ${delta.toLocaleString("en-MY")}` : " · Included"}
+                    </option>
+                  );
+                })}
+              </select>
+            )}
+          </label>
+        )}
 
         {/* Leg-height picker (0201) — optional; surcharge joins the live total */}
         {legOpts.length > 0 && (

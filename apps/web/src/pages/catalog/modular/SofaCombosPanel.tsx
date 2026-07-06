@@ -132,9 +132,9 @@ export default function SofaCombosPanel({
 
   return (
     <div className="mb-4">
-      <div className="flex items-center justify-between mb-1">
-        <div className="label">Sofa combos</div>
-        {isPrincipal && (
+      {/* New-combo affordance (title + intro live in the hosting tab). */}
+      {isPrincipal && (
+        <div className="flex items-center justify-end mb-3">
           <button
             type="button"
             onClick={() => setEditing("new")}
@@ -143,78 +143,87 @@ export default function SofaCombosPanel({
           >
             <Plus size={13} strokeWidth={2.4} /> New sofa combo
           </button>
-        )}
-      </div>
-      <p className="t-tiny text-base-500 mb-3">
-        Matched-shape bundles priced per seat height. When a build matches a combo&apos;s slots,
-        the combo price for the chosen height wins over à-la-carte. Pricing is principal-only.
-        {!isPrincipal && " Read-only for your role."}
-      </p>
-
-      <div className="border border-base-200 rounded-[4px] overflow-hidden">
-        <div
-          className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
-          style={{ gridTemplateColumns: "minmax(140px,1.4fr) minmax(90px,1fr) 70px 96px" }}
-        >
-          <div className="label">Slots</div>
-          <div className="label">Priced heights</div>
-          <div className="label">Tier</div>
-          <div className="label text-right">{isPrincipal ? "Actions" : "Status"}</div>
         </div>
-        {mine.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-3">
-            No sofa combos yet for this model.
-          </div>
-        )}
-        {mine.map((combo) => (
-          <div
-            key={combo.id}
-            className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 ${
-              combo.active ? "" : "opacity-50"
-            }`}
-            style={{ gridTemplateColumns: "minmax(140px,1.4fr) minmax(90px,1fr) 70px 96px" }}
-            data-testid={`sofa-combo-row-${combo.id}`}
-          >
-            <div className="min-w-0">
-              <div className="t-small font-semibold text-base-900 truncate">
-                {combo.label ?? slotsSummary(combo.slots)}
+      )}
+
+      {/* One card per combo, laid out left-right / left-right (a 2-column grid
+          on wider screens) so each combo reads as a tidy tile instead of a
+          full-width row that wastes the space to its right. */}
+      {mine.length === 0 ? (
+        <div className="t-small text-base-500 border border-base-200 rounded-[6px] px-3 py-6 text-center">
+          No sofa combos yet for this model.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="sofa-combos-grid">
+          {mine.map((combo) => (
+            <div
+              key={combo.id}
+              className={`bg-white border border-base-200 rounded-[6px] p-3 flex flex-col gap-2 ${
+                combo.active ? "" : "opacity-50"
+              }`}
+              data-testid={`sofa-combo-row-${combo.id}`}
+            >
+              {/* Title (label, or the slots summary when unlabelled) + slots sub-line */}
+              <div className="min-w-0">
+                <div className="t-small font-semibold text-base-900 truncate">
+                  {combo.label ?? slotsSummary(combo.slots)}
+                </div>
+                {combo.label && (
+                  <div className="t-tiny text-base-400 font-mono truncate">
+                    {slotsSummary(combo.slots)}
+                  </div>
+                )}
               </div>
-              {combo.label && (
-                <div className="t-tiny text-base-400 truncate">{slotsSummary(combo.slots)}</div>
-              )}
+
+              {/* Meta: priced heights + fabric tier */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 t-tiny">
+                <div>
+                  <span className="text-base-400">Heights </span>
+                  <span className="t-num text-base-700">
+                    {pricedHeights(combo.pricesByHeight, heights)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-base-400">Tier </span>
+                  <span className="text-base-700">
+                    {combo.tier ? combo.tier.replace("PRICE_", "P") : "Any"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status pill + (principal) row actions */}
+              <div className="flex items-center justify-between gap-2 mt-auto pt-2 border-t border-base-100">
+                {combo.active ? (
+                  <span className="pill pill-confirmed">Active</span>
+                ) : (
+                  <span className="pill pill-neutral">Inactive</span>
+                )}
+                {isPrincipal && (
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(combo)}
+                      className="t-tiny font-semibold text-base-700 hover:text-base-900 underline"
+                      data-testid={`sofa-combo-edit-${combo.id}`}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeCombo(combo)}
+                      disabled={del.isPending}
+                      className="btn-danger text-[11px]"
+                      data-testid={`sofa-combo-delete-${combo.id}`}
+                    >
+                      Disable
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="t-tiny text-base-600 t-num">{pricedHeights(combo.pricesByHeight, heights)}</div>
-            <div className="t-tiny text-base-600">{combo.tier ? combo.tier.replace("PRICE_", "P") : "Any"}</div>
-            <div className="text-right flex justify-end items-center gap-3">
-              {isPrincipal ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(combo)}
-                    className="t-tiny font-semibold text-base-700 hover:text-base-900 underline"
-                    data-testid={`sofa-combo-edit-${combo.id}`}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeCombo(combo)}
-                    disabled={del.isPending}
-                    className="btn-danger text-[11px]"
-                    data-testid={`sofa-combo-delete-${combo.id}`}
-                  >
-                    Disable
-                  </button>
-                </>
-              ) : combo.active ? (
-                <span className="pill pill-confirmed">Active</span>
-              ) : (
-                <span className="pill pill-neutral">Inactive</span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {isPrincipal && editing !== null && (
         <SofaComboEditor

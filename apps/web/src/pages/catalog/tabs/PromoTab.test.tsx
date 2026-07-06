@@ -70,7 +70,6 @@ function makeCatalog(overrides?: Partial<CatalogResponse>): CatalogResponse {
     sofaFabrics: [],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
-    combos: [],
     sofaCombos: [],
     sofaCompartments: [],
     modelSofaCompartments: [],

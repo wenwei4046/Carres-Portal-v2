@@ -424,6 +424,8 @@ describe("SofaBuildCanvas", () => {
     const onAddBuild = vi.fn();
     renderCanvas({ onAddBuild });
     addModule("1S");
+    // sole ("Other") series auto-collapses → pick the colour to lock a fabric
+    fireEvent.change(screen.getByTestId("sofa-build-fabric"), { target: { value: "sf:f-1" } });
     const add = screen.getByTestId("sofa-build-add");
     expect(add).not.toBeDisabled();
     expect(add).toHaveTextContent("Add to cart");
@@ -442,17 +444,47 @@ describe("SofaBuildCanvas", () => {
     expect(payload.fabricDeferred).toBe(false);
   });
 
-  it("'Confirm later' defers the fabric: null fabric + base tier + fabricDeferred", () => {
+  it("colour KIV by default defers the fabric: null fabric + base tier + fabricDeferred", () => {
     const onAddBuild = vi.fn();
     renderCanvas({ onAddBuild });
     addModule("1S");
-    fireEvent.change(screen.getByTestId("sofa-build-fabric"), { target: { value: "__defer__" } });
+    // no colour picked → the fabric stays KIV
     fireEvent.click(screen.getByTestId("sofa-build-add"));
     const payload = onAddBuild.mock.calls[0]![0];
     expect(payload.fabricDeferred).toBe(true);
     expect(payload.fabricId).toBeNull();
     expect(payload.fabricName).toBeNull();
     expect(payload.fabricTier).toBe("PRICE_1"); // base tier when deferred
+  });
+
+  it("Fabric: multiple series → a series step appears; picking one reveals its colours + KIV", () => {
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        sellingFabrics={[
+          { key: "cf:EZ-001", name: "EZ-001 Pearl", tier: "PRICE_1", id: null, code: "EZ-001", swatch: null, series: "EZ" },
+          { key: "cf:BF-001", name: "BF-001 Coal", tier: "PRICE_2", id: null, code: "BF-001", swatch: null, series: "BF" },
+        ]}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    const series = screen.getByTestId("sofa-build-fabric-series") as HTMLSelectElement;
+    expect(series.value).toBe(""); // series-level KIV by default
+    expect(screen.queryByTestId("sofa-build-fabric")).toBeNull(); // colours hidden until a series
+    fireEvent.change(series, { target: { value: "EZ" } });
+    const colour = screen.getByTestId("sofa-build-fabric") as HTMLSelectElement;
+    expect(colour.value).toBe("__kiv__");
+    const labels = Array.from(colour.options).map((o) => o.textContent ?? "");
+    expect(labels.some((l) => /EZ-001/.test(l))).toBe(true);
+    expect(labels.some((l) => /BF-001/.test(l))).toBe(false); // only the EZ series
   });
 
   it("shows the matched-combo badge + savings when a combo applies", () => {
@@ -479,8 +511,8 @@ describe("SofaBuildCanvas", () => {
     const badge = screen.getByTestId("sofa-build-combo-badge");
     expect(badge).toHaveTextContent("Combo applied");
     expect(badge).toHaveTextContent("saves RM 500.00"); // 1500 subset − 1000 combo
-    // the matched cell carries a combo badge
-    expect(screen.getByTestId("sofa-cell-combo-badge")).toBeInTheDocument();
+    // the matched cell is highlighted (data-matched) but carries NO "Combo" logo
+    expect(screen.queryByTestId("sofa-cell-combo-badge")).toBeNull();
   });
 
   it("close button fires onClose", () => {
