@@ -345,6 +345,9 @@ describe("sofaCompartmentFromRow", () => {
       default_price: "850.00" as unknown as number,
       sort_order: 3,
       active: true,
+      // 0205 — per-compartment fabric-tier deltas (default null = no special).
+      special_tier2_delta: null,
+      special_tier3_delta: null,
       created_at: "2026-06-21T08:00:00.000Z",
       updated_at: "2026-06-21T08:00:00.000Z",
       updated_by: null,
@@ -364,6 +367,23 @@ describe("sofaCompartmentFromRow", () => {
     expect(typeof out.defaultPrice).toBe("number");
     expect(out.sortOrder).toBe(3);
     expect(out.active).toBe(true);
+    // 0205 — specials default to null (no special) on a plain pool row.
+    expect(out.specialTier2Delta).toBeNull();
+    expect(out.specialTier3Delta).toBeNull();
+  });
+
+  it("0205 — coerces numeric special_tier2/3_delta; keeps null distinct", () => {
+    const out = sofaCompartmentFromRow(
+      baseRow({
+        special_tier2_delta: "500.00" as unknown as number,
+        special_tier3_delta: 800,
+      }),
+    );
+    expect(out.specialTier2Delta).toBe(500);
+    expect(typeof out.specialTier2Delta).toBe("number");
+    expect(out.specialTier3Delta).toBe(800);
+    // an unset special stays null (not 0)
+    expect(sofaCompartmentFromRow(baseRow()).specialTier3Delta).toBeNull();
   });
 
   it("preserves null seatCount/description/armConfig/iconUrl (not coerced to 0/empty)", () => {

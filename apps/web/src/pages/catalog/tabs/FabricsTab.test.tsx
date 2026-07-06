@@ -20,6 +20,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const mockBatchSaveMutate = vi.fn();
 const mockTierConfigMutate = vi.fn();
+const mockCompartmentMutate = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   useBatchSaveCatalogFabrics: () => ({
@@ -46,6 +47,8 @@ vi.mock("@/lib/queries", () => ({
     mutate: mockTierConfigMutate,
     isPending: false,
   }),
+  // Per-compartment fabric-tier special (0205) — reuses the compartment PATCH.
+  useUpdateSofaCompartment: () => ({ mutate: mockCompartmentMutate, isPending: false }),
 }));
 
 const FABRIC_BF: CatalogFabricDto = {
@@ -72,7 +75,10 @@ const FABRIC_CG: CatalogFabricDto = {
   sortOrder: 2,
 };
 
-function makeCatalog(fabrics: CatalogFabricDto[]): CatalogResponse {
+function makeCatalog(
+  fabrics: CatalogFabricDto[],
+  sofaCompartments: CatalogResponse["sofaCompartments"] = [],
+): CatalogResponse {
   return {
     models: [],
     skus: [],
@@ -81,6 +87,7 @@ function makeCatalog(fabrics: CatalogFabricDto[]): CatalogResponse {
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
     fabricTierConfig: { sofaTier2Delta: 100, sofaTier3Delta: 250 },
     fabrics,
+    sofaCompartments,
   };
 }
 
@@ -91,6 +98,7 @@ function wrap(ui: React.ReactNode) {
 
 beforeEach(() => {
   mockBatchSaveMutate.mockReset();
+  mockCompartmentMutate.mockReset();
 });
 
 describe("FabricsTab — view table", () => {

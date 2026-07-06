@@ -348,6 +348,10 @@ export interface SofaCompartmentRow {
   default_price: number;
   sort_order: number;
   active: boolean;
+  // 0205 — per-compartment fabric-tier P2/P3 delta override (nullable = inherit
+  // per-model / global). The highest-precedence fabric-delta layer.
+  special_tier2_delta: number | null;
+  special_tier3_delta: number | null;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
