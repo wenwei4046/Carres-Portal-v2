@@ -1834,6 +1834,9 @@ catalogRouter.post("/sofa-compartments", async (c) => {
       // its DB default (0) as a dormant legacy fallback.
       sort_order: parsed.data.sortOrder ?? 0,
       active: parsed.data.active ?? true,
+      // 0205 — per-compartment fabric-tier delta override (null = inherit).
+      special_tier2_delta: parsed.data.specialTier2Delta ?? null,
+      special_tier3_delta: parsed.data.specialTier3Delta ?? null,
       updated_at: new Date().toISOString(),
       updated_by: c.var.auth.id,
     })
@@ -1861,6 +1864,10 @@ catalogRouter.patch("/sofa-compartments/:id", async (c) => {
   if (parsed.data.iconUrl !== undefined) patch.icon_url = parsed.data.iconUrl;
   if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  // 0205 — per-compartment fabric-tier deltas. `!== undefined` (not `??`) so an
+  // explicit null clears the override back to "inherit per-model / global".
+  if (parsed.data.specialTier2Delta !== undefined) patch.special_tier2_delta = parsed.data.specialTier2Delta;
+  if (parsed.data.specialTier3Delta !== undefined) patch.special_tier3_delta = parsed.data.specialTier3Delta;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
