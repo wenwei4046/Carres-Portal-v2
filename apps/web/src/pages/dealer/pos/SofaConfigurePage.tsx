@@ -194,6 +194,26 @@ export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
 /** Quick-pick fabric-select sentinel — "Confirm later, customer to confirm". */
 const QP_FABRIC_DEFER = "__defer__";
 
+// Hero dimension lines — port of 2990s SofaCellsPreview `showDims`: a measured
+// line with end ticks spanning the sofa's W (above) / D (right), the cm chip
+// riding the line's midpoint. Same ink as the plan-view stroke.
+const DIM_INK = "#2c2c2a";
+const dimTickV: React.CSSProperties = { width: 1.5, height: 8, background: DIM_INK, flexShrink: 0 };
+const dimTickH: React.CSSProperties = { width: 8, height: 1.5, background: DIM_INK, flexShrink: 0 };
+const dimLineH: React.CSSProperties = { flex: 1, height: 1.5, background: DIM_INK };
+const dimLineV: React.CSSProperties = { flex: 1, width: 1.5, background: DIM_INK };
+const dimChip: React.CSSProperties = {
+  position: "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  border: "1px solid var(--line, #d9d2c7)",
+  borderRadius: 4,
+  padding: "1px 6px",
+  background: "var(--pos-panel, #fff)",
+  whiteSpace: "nowrap",
+};
+
 /** Overall bbox of a seeded layout in cm (works for straight runs AND L-shapes).
  *  Drives the to-scale plan-view callouts. */
 function cellsDims(cells: SeedCell[], depth: string): { w: number; d: number } {
@@ -772,58 +792,70 @@ export default function SofaConfigurePage({
             <div className="sof-qp__hero">
               <div className="sof-qp__heroFrame">
                 {heroPick ? (
-                  <div
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
-                    data-testid="sofa-plan-view"
-                  >
-                    {/* width callout */}
-                    <span
-                      className="t-tiny font-mono"
-                      style={{
-                        border: "1px solid var(--line, #d9d2c7)",
-                        borderRadius: 4,
-                        padding: "1px 6px",
-                        background: "var(--pos-panel, #fff)",
-                      }}
-                      data-testid="sofa-plan-width"
+                  <div data-testid="sofa-plan-view">
+                    {/* ONE joined sofa — all modules in a single to-scale SVG.
+                        Sized by .sof-qp__heroBox (min(55cqh, 80cqw/AR) inside
+                        the size-container heroFrame) so the sofa FILLS the
+                        stage like the 2990s hero, instead of a fixed 256px
+                        strip (Loo 2026-07-06 — "ratio 太小"). AR includes the
+                        SVG's own PLAN_PAD breathing room so the box matches
+                        the viewBox exactly (no letterbox). */}
+                    <div
+                      className="sof-qp__heroBox"
+                      style={
+                        {
+                          aspectRatio: `${heroDims.w + PLAN_PAD * 2} / ${heroDims.d + PLAN_PAD * 2}`,
+                          "--qp-ar": String(
+                            (heroDims.w + PLAN_PAD * 2) / Math.max(1, heroDims.d + PLAN_PAD * 2),
+                          ),
+                        } as React.CSSProperties
+                      }
                     >
-                      {heroDims.w} cm
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {/* ONE joined sofa — all modules in a single to-scale SVG.
-                          Sized by .sof-qp__heroBox (min(55cqh, 80cqw/AR) inside
-                          the size-container heroFrame) so the sofa FILLS the
-                          stage like the 2990s hero, instead of a fixed 256px
-                          strip (Loo 2026-07-06 — "ratio 太小"). AR includes the
-                          SVG's own PLAN_PAD breathing room so the box matches
-                          the viewBox exactly (no letterbox). */}
+                      <SofaPlanView cells={heroCells} depth={effHeight} className="h-full w-full" />
+                      {/* Measured dimension lines (2990s showDims) — end ticks
+                          inset by PLAN_PAD so they sit exactly on the sofa's
+                          edges; the cm chip rides the line's midpoint. */}
                       <div
-                        className="sof-qp__heroBox"
-                        style={
-                          {
-                            aspectRatio: `${heroDims.w + PLAN_PAD * 2} / ${heroDims.d + PLAN_PAD * 2}`,
-                            "--qp-ar": String(
-                              (heroDims.w + PLAN_PAD * 2) / Math.max(1, heroDims.d + PLAN_PAD * 2),
-                            ),
-                          } as React.CSSProperties
-                        }
-                      >
-                        <SofaPlanView cells={heroCells} depth={effHeight} className="h-full w-full" />
-                      </div>
-                      {/* depth callout */}
-                      <span
-                        className="t-tiny font-mono"
+                        aria-hidden="true"
                         style={{
-                          border: "1px solid var(--line, #d9d2c7)",
-                          borderRadius: 4,
-                          padding: "1px 6px",
-                          background: "var(--pos-panel, #fff)",
-                          writingMode: "vertical-rl",
+                          position: "absolute",
+                          left: `${(PLAN_PAD / (heroDims.w + PLAN_PAD * 2)) * 100}%`,
+                          right: `${(PLAN_PAD / (heroDims.w + PLAN_PAD * 2)) * 100}%`,
+                          top: -34,
+                          height: 16,
+                          display: "flex",
+                          alignItems: "center",
+                          pointerEvents: "none",
                         }}
-                        data-testid="sofa-plan-depth"
                       >
-                        {heroDims.d} cm
-                      </span>
+                        <span style={dimTickV} />
+                        <span style={dimLineH} />
+                        <span style={dimTickV} />
+                        <span className="t-tiny font-mono" style={dimChip} data-testid="sofa-plan-width">
+                          {heroDims.w} cm
+                        </span>
+                      </div>
+                      <div
+                        aria-hidden="true"
+                        style={{
+                          position: "absolute",
+                          top: `${(PLAN_PAD / (heroDims.d + PLAN_PAD * 2)) * 100}%`,
+                          bottom: `${(PLAN_PAD / (heroDims.d + PLAN_PAD * 2)) * 100}%`,
+                          right: -34,
+                          width: 16,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        <span style={dimTickH} />
+                        <span style={dimLineV} />
+                        <span style={dimTickH} />
+                        <span className="t-tiny font-mono" style={dimChip} data-testid="sofa-plan-depth">
+                          {heroDims.d} cm
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ) : (
