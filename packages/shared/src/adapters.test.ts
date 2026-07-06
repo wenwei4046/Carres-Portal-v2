@@ -1047,6 +1047,7 @@ describe("pwpDiscoverFromRow (0188 — the stripped cross-order DISCOVERY projec
       source_order_id: "00000000-0000-0000-0000-0000000d0aa1",
       expires_at: null,
       phone_matches: true,
+      name_matches: true,
       ...over,
     };
   }
@@ -1062,6 +1063,7 @@ describe("pwpDiscoverFromRow (0188 — the stripped cross-order DISCOVERY projec
       sourceOrderId: "00000000-0000-0000-0000-0000000d0aa1",
       expiresAt: null,
       phoneMatches: true,
+      nameMatches: true,
     });
   });
 

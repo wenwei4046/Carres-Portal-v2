@@ -22,6 +22,7 @@ import MaintenanceSidebar, {
 } from "../components/MaintenanceSidebar";
 import OrderAddonsSection from "./OrderAddonsSection";
 import PoolPanel from "./PoolPanel";
+import StairCarryFeeSection from "./StairCarryFeeSection";
 
 /**
  * Special Add-ons tab — 0201 reshaped to the 2990s reference layout (Loo
@@ -35,12 +36,16 @@ import PoolPanel from "./PoolPanel";
  *               surcharges with one-level follow-up question groups; may be
  *               negative). Unchanged editor, now hosted as a panel.
  *   ORDER ADD-ONS — the order-level addons CRUD (disposal, lift…), moved here
- *               from the Maintenance tab to mirror the 2990s sidebar.
+ *               from the Maintenance tab to mirror the 2990s sidebar. Also
+ *               hosts the stair-carry fee (an order-level charge — moved out
+ *               of the Delivery tab, Loo 2026-07-06).
  */
 
+// NOTE (Loo 2026-07-06): "total_height" is deliberately NOT a section — total
+// height is COMPUTED at POS (divan + leg), never authored/picked. The 0201
+// `total_height` pool rows stay dormant in the DB.
 type SpecialKey =
   | "divan_height"
-  | "total_height"
   | "gap"
   | "bedframe_leg_height"
   | "sofa_size"
@@ -65,7 +70,6 @@ export default function SpecialAddonsTab({
       title: "Bedframe",
       items: [
         { key: "divan_height", label: "Divan Heights", count: byPool("divan_height").length },
-        { key: "total_height", label: "Total Heights", count: byPool("total_height").length },
         { key: "gap", label: "Gaps", count: byPool("gap").length },
         {
           key: "bedframe_leg_height",
@@ -104,16 +108,6 @@ export default function SpecialAddonsTab({
             title="Divan Heights"
             description="Bedframe divan height options with surcharge pricing."
             entries={byPool("divan_height")}
-            isPrincipal={isPrincipal}
-          />
-        )}
-        {active === "total_height" && (
-          <PoolPanel
-            pool="total_height"
-            variant="priced"
-            title="Total Heights"
-            description="Bedframe total height options (divan + mattress) with surcharge pricing."
-            entries={byPool("total_height")}
             isPrincipal={isPrincipal}
           />
         )}
@@ -160,7 +154,12 @@ export default function SpecialAddonsTab({
         {active === "product" && (
           <ProductAddonsPanel catalog={catalog} isPrincipal={isPrincipal} />
         )}
-        {active === "order" && <OrderAddonsSection addons={catalog.addons} />}
+        {active === "order" && (
+          <div className="flex flex-col gap-8">
+            <OrderAddonsSection addons={catalog.addons} />
+            <StairCarryFeeSection catalog={catalog} isPrincipal={isPrincipal} />
+          </div>
+        )}
       </div>
     </div>
   );

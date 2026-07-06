@@ -136,6 +136,7 @@ function args(over: Partial<SweepArgs> = {}): SweepArgs {
     ownerDealerId: DEALER,
     orderId: ORDER,
     customerPhone: "0123456789",
+    customerName: "Ali Tan",
     finalLines: [mattLine()],
     clientCartLineKeys: [],
     ...over,

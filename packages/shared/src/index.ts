@@ -629,6 +629,34 @@ export type { CatalogFabric, CatalogFabricsHistory } from "./domain";
 export { catalogFabricFromRow, catalogFabricsHistoryFromRow } from "./adapters";
 export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
 
+// 0201/0202-wiring (2026-07-06) — Maintenance option pools → Modular per-model
+// gating → POS → Hono recompute. PURE: the POS preview and the server
+// option-picks recompute share `resolveOptionsTotal` (honest pricing, one
+// resolver both sides — the specials/sofa pattern).
+export {
+  poolTicksFor,
+  tickKeyFor,
+  allowedPoolValues,
+  allowedFabricsFor,
+  fabricTierFor,
+  activeSofaHeights,
+  activeSofaSizes,
+  resolveOptionsTotal,
+  inchesOf,
+  computedTotalHeight,
+  optionPickAttrSchema,
+  optionsAttrsSchema,
+  OPTION_PICK_KINDS,
+  type OptionPoolPickKind,
+  type OptionPickKind,
+  type OptionPickAttr,
+  type OptionsAttrs,
+  type OptionPick,
+  type OptionResolveContext,
+  type ResolvedOptionLine,
+  type OptionsTotalResult,
+} from "./option-picks";
+
 // 0184 — 2990s Products parity Phase 6: the unified RuleTarget matcher (PURE,
 // shared by the delivery-fee subsystem and any future rule consumer). Combo
 // subset-matching delegates to the existing `matchSofaCombo`; compartment
@@ -715,7 +743,7 @@ export type { PwpCode } from "./domain";
 // the legacy digits-only `phoneKey` (promoted from delivery-fee-recompute). The
 // stripped DISCOVERY adapter (`pwpDiscoverFromRow`) + its camelCase domain type —
 // the ONLY pwp_codes-derived shape a non-owner client receives (no PII).
-export { phoneKey, phoneKeyMy } from "./phone";
+export { phoneKey, phoneKeyMy, nameKey } from "./phone";
 export { pwpDiscoverFromRow } from "./adapters";
 export type { PwpDiscover } from "./domain";
 
@@ -739,6 +767,7 @@ export {
   type SofaComboPick,
   type SofaBuildCell,
   type SofaBuild,
+  type SofaLegHeightOption,
   type SofaPricingSnapshot,
   type SofaPriceBasis,
   type SofaPriceResult,

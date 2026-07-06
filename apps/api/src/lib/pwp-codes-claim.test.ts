@@ -208,6 +208,7 @@ describe("claimPwpCodesForLines", () => {
         p_claim_group: GROUP,
         p_redeemed_sku: "BED-1",
         p_customer_phone: "+60 12-345 6789",
+        p_customer_name: null, // 0204 — not passed in this fixture (phone-only)
       });
     });
 

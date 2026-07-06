@@ -40,6 +40,7 @@ import {
 } from "@carres/shared";
 import CompartmentSilhouette from "./CompartmentSilhouette";
 import ModulePaletteItem from "./ModulePaletteItem";
+import { sellingFabricsFor, type SellingFabric } from "./selling-fabrics";
 
 /**
  * <SofaBuildCanvas> — the full-screen drag plan-view sofa builder (Phase 3,
@@ -62,10 +63,17 @@ export interface SofaBuildAddPayload {
   height: string;
   fabricTier: FabricTierValue;
   fabricId: string | null;
+  /** 0202-wiring — the master fabric code when the pick came from the Fabrics
+   *  tab list (null for legacy per-model sofa_fabrics picks). */
+  fabricCode: string | null;
   fabricName: string | null;
   fabricSurcharge: number;
   /** True when the salesperson deferred fabric choice (customer to confirm). */
   fabricDeferred: boolean;
+  /** 0201-wiring — the chosen sofa_leg_height pool value + its SERVER-shaped
+   *  surcharge (computeSofaPrice legDelta; already inside `total`). */
+  legHeight: string | null;
+  legSurcharge: number;
   total: number;
   priceBasis: "combo" | "a_la_carte";
 }
@@ -104,7 +112,9 @@ export default function SofaBuildCanvas({
   fabricTierConfig,
   fabricTierOverride,
   sofaFabrics,
-  sizeOptions,
+  sellingFabrics,
+  legHeightOptions,
+  heights,
   onAddBuild,
   onClose,
   embedded = false,
@@ -126,10 +136,17 @@ export default function SofaBuildCanvas({
   fabricTierOverride?: ModelFabricTierOverrideDto | null;
   /** This model's fabrics (drives the fabric picker / tier). */
   sofaFabrics: SofaFabricDto[];
-  /** 0204 — the live `sofa_size` pool values (Special Add-ons → Sizes): the
-   *  size picker's options + the per-size price axis. Absent/empty → the
-   *  legacy hardcoded SOFA_HEIGHTS (pool unconfigured). */
-  sizeOptions?: string[] | null;
+  /** 0202-wiring — the unified selling-fabric list (legacy per-model rows +
+   *  the model's opted-in master fabrics). When absent, derived from
+   *  `sofaFabrics` alone (legacy callers stay byte-identical). */
+  sellingFabrics?: SellingFabric[];
+  /** 0201-wiring — the sofa_leg_height pool rows this model offers (surcharge
+   *  joins the drift-gated total via computeSofaPrice). Absent → no leg picker. */
+  legHeightOptions?: Array<{ id: string; value: string; surcharge: number | null; active: boolean }>;
+  /** 0201-wiring + 0204 — the ACTIVE Maintenance sofa sizes: the size picker's
+   *  options AND the per-size à-la-carte price axis (prices_by_size keys off
+   *  these exact values). Absent → the canonical SOFA_HEIGHTS fallback. */
+  heights?: readonly string[];
   onAddBuild: (payload: SofaBuildAddPayload) => void;
   onClose: () => void;
   /** POS-parity (sofa configure page) — render as a FILL panel inside a parent
@@ -175,20 +192,32 @@ export default function SofaBuildCanvas({
     (initialCells ?? []).map((c) => ({ ...c, id: nextCellId() })),
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // 0204 — size axis = the sofa_size pool when configured (per-size prices key
-  // off those exact values); the hardcoded SOFA_HEIGHTS only as the fallback.
-  const sizes: readonly string[] =
-    sizeOptions && sizeOptions.length > 0 ? sizeOptions : SOFA_HEIGHTS;
-  const [height, setHeight] = useState<string>(() =>
-    sizes.includes("24") ? "24" : sizes[0]!,
+  // 0201-wiring + 0204 — the size axis follows the ACTIVE Maintenance sofa
+  // sizes when the caller passes them (per-size prices key off those exact
+  // values); legacy callers keep the full canonical axis.
+  const heightChoices = useMemo<readonly string[]>(
+    () => (heights && heights.length > 0 ? heights : SOFA_HEIGHTS),
+    [heights],
   );
-  const [fabricId, setFabricId] = useState<string>(sofaFabrics[0]?.id ?? "");
+  const [height, setHeight] = useState<string>(
+    heightChoices.includes("24") ? "24" : heightChoices[0]!,
+  );
+  // 0202-wiring — one unified selling-fabric list (legacy per-model rows +
+  // opted-in master fabrics); callers that don't pass it keep legacy rows only.
+  const fabricChoices = useMemo<SellingFabric[]>(
+    () => sellingFabrics ?? sellingFabricsFor(model, sofaFabrics, null),
+    [sellingFabrics, model, sofaFabrics],
+  );
+  const [fabricKey, setFabricKey] = useState<string>(fabricChoices[0]?.key ?? "");
+  // 0201-wiring — leg height ('' = confirm later / none).
+  const [legHeight, setLegHeight] = useState<string>("");
+  const legOpts = legHeightOptions ?? [];
 
   const depth = height; // seat-depth axis == the chosen height key (cm widening)
   // "Confirm later" — salesperson defers the fabric; the sofa still adds to
   // cart, priced at the base tier, flagged for the customer to confirm.
-  const fabricDeferred = fabricId === FABRIC_DEFER;
-  const fabric = fabricDeferred ? null : sofaFabrics.find((f) => f.id === fabricId) ?? null;
+  const fabricDeferred = fabricKey === FABRIC_DEFER;
+  const fabric = fabricDeferred ? null : fabricChoices.find((f) => f.key === fabricKey) ?? null;
   const fabricTier: FabricTierValue = fabric?.tier ?? "PRICE_1";
 
   // Live drag override — carries the in-flight translation for the dragging
@@ -366,8 +395,14 @@ export default function SofaBuildCanvas({
       sofaCombos: sofaCombos.filter((c) => c.modelId === model.id),
       fabricTierOverride: fabricTierOverride ?? null,
       fabricTierConfig: fabricTierConfig ?? null,
+      // 0201-wiring — the leg surcharge joins the engine total (drift-safe).
+      legHeightPool: legOpts.map((o) => ({
+        value: o.value,
+        surcharge: o.surcharge,
+        active: o.active,
+      })),
     }),
-    [compartmentPool, modelCompartments, sofaCombos, model.id, fabricTierOverride, fabricTierConfig],
+    [compartmentPool, modelCompartments, sofaCombos, model.id, fabricTierOverride, fabricTierConfig, legOpts],
   );
 
   const priceResult = useMemo(() => {
@@ -376,9 +411,10 @@ export default function SofaBuildCanvas({
       cells: cells.map((c) => ({ moduleCode: c.moduleCode, x: c.x, y: c.y, rot: c.rot })),
       fabricTier,
       height,
+      legHeight: legHeight || null,
     };
     return computeSofaPrice(build, snapshot);
-  }, [cells, model.id, fabricTier, height, snapshot]);
+  }, [cells, model.id, fabricTier, height, legHeight, snapshot]);
 
   // Cell indices the winning combo consumed → flame badge on those cells.
   const matchedCellIds = useMemo(() => {
@@ -409,9 +445,12 @@ export default function SofaBuildCanvas({
       height,
       fabricTier,
       fabricId: fabric?.id ?? null,
-      fabricName: fabric?.fabricName ?? null,
+      fabricCode: fabric?.code ?? null,
+      fabricName: fabric?.name ?? null,
       fabricSurcharge: priceResult.fabricDelta,
       fabricDeferred,
+      legHeight: legHeight || null,
+      legSurcharge: priceResult.legDelta,
       total: priceResult.total,
       priceBasis: priceResult.basis,
     });
@@ -516,17 +555,25 @@ export default function SofaBuildCanvas({
                 <span className="sof-cv__gridLegendValue">50 × 50 cm</span>
               </div>
             </div>
-            {/* connected-sofa outlines + dimension callouts */}
+            {/* connected-sofa outlines + dimension callouts. 2990s parity
+                (CustomBuilder :1338 + Loo 2026-07-06 screenshot): only a
+                CLOSED sofa earns a group outline — unjoined/incomplete pieces
+                render clean (dims only), no red ring and no per-group caption.
+                The closure reason lives in ONE place: the Add button's
+                "Resolve · …" label. Arm collisions still paint the cell red
+                via CompartmentSilhouette's violation prop. */}
             {analyses.map((a, gi) => {
               const bb = cellsBbox(a.group, depth);
               if (!bb) return null;
               return (
                 <div key={`g${gi}`}>
-                  <div
-                    className={`pointer-events-none absolute rounded-[6px] border-2 ${a.closed ? "border-primary/40" : "border-danger/50"}`}
-                    style={{ left: bb.x - 6, top: bb.y - 6, width: bb.w + 12, height: bb.h + 12 }}
-                    data-testid="sofa-group-outline"
-                  />
+                  {a.closed && (
+                    <div
+                      className="pointer-events-none absolute rounded-[6px] border-2 border-primary/40"
+                      style={{ left: bb.x - 6, top: bb.y - 6, width: bb.w + 12, height: bb.h + 12 }}
+                      data-testid="sofa-group-outline"
+                    />
+                  )}
                   {/* width callout (top) — design tick · line · boxed label */}
                   <div
                     className="sof-cv__dim sof-cv__dim--top"
@@ -553,15 +600,6 @@ export default function SofaBuildCanvas({
                     </span>
                     <span className="sof-cv__dim__tick sof-cv__dim__tick--b" />
                   </div>
-                  {!a.closed && (
-                    <span
-                      className="pill pill-overdue pointer-events-none absolute"
-                      style={{ left: bb.x, top: bb.y + bb.h + 8 }}
-                      data-testid="sofa-group-not-closed"
-                    >
-                      {a.reason ?? "Not closed"}
-                    </span>
-                  )}
                 </div>
               );
             })}
@@ -660,29 +698,57 @@ export default function SofaBuildCanvas({
         className="flex shrink-0 flex-wrap items-center gap-4 px-5 py-3"
         style={{ borderTop: "1px solid var(--line)", background: "var(--pos-panel, #fff)" }}
       >
-        {/* Fabric picker — optional, deferrable to the customer */}
+        {/* Fabric picker — optional, deferrable to the customer. One unified
+            list: legacy per-model rows + the model's opted-in master fabrics. */}
         <label className="flex items-center gap-2 t-small text-base-600">
           <span className="flex flex-col leading-tight">
             Fabric
             <span className="t-micro text-base-400">Optional · confirm later</span>
           </span>
           <select
-            value={fabricId}
-            onChange={(e) => setFabricId(e.target.value)}
+            value={fabricKey}
+            onChange={(e) => setFabricKey(e.target.value)}
             className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
             data-testid="sofa-build-fabric"
           >
-            {sofaFabrics.length === 0 && <option value="">— none —</option>}
-            {sofaFabrics.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.fabricName} · {f.tier.replace("PRICE_", "P")}
+            {fabricChoices.length === 0 && <option value="">— none —</option>}
+            {fabricChoices.map((f) => (
+              <option key={f.key} value={f.key}>
+                {f.name} · {f.tier.replace("PRICE_", "P")}
               </option>
             ))}
             <option value={FABRIC_DEFER}>Confirm later — customer to confirm</option>
           </select>
         </label>
 
-        {/* Size picker (0204 — options follow the sofa_size pool) */}
+        {/* Leg-height picker (0201) — optional; surcharge joins the live total */}
+        {legOpts.length > 0 && (
+          <label className="flex items-center gap-2 t-small text-base-600">
+            <span className="flex flex-col leading-tight">
+              Leg height
+              <span className="t-micro text-base-400">Optional · confirm later</span>
+            </span>
+            <select
+              value={legHeight}
+              onChange={(e) => setLegHeight(e.target.value)}
+              className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
+              data-testid="sofa-build-leg"
+            >
+              <option value="">Confirm later</option>
+              {legOpts.map((o) => (
+                <option key={o.id} value={o.value}>
+                  {o.value}
+                  {o.surcharge != null && o.surcharge !== 0
+                    ? ` · +RM ${o.surcharge.toLocaleString("en-MY")}`
+                    : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {/* Size picker — the ACTIVE Maintenance sofa sizes (0201 + 0204: also
+            the per-size à-la-carte price axis) */}
         <label className="flex items-center gap-2 t-small text-base-600">
           Size
           <select
@@ -691,7 +757,7 @@ export default function SofaBuildCanvas({
             className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small font-mono"
             data-testid="sofa-build-height"
           >
-            {sizes.map((h) => (
+            {heightChoices.map((h) => (
               <option key={h} value={h}>
                 {/^\d+$/.test(h) ? `${h}″` : h}
               </option>

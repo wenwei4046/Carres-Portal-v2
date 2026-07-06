@@ -76,17 +76,6 @@ export default function CatalogStep({
     [catalog],
   );
   const activeAddons = useMemo(() => catalog.addons.filter((a) => a.active), [catalog.addons]);
-  // 0204 — the live sofa-size axis (Special Add-ons → SOFA → Sizes pool):
-  // the sofa configurator's size options + per-size price keys. Pool edits
-  // reach the POS on the next catalog fetch — no code change needed.
-  const sofaSizes = useMemo(
-    () =>
-      (catalog.optionPools ?? [])
-        .filter((p) => p.pool === "sofa_size" && p.active)
-        .sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value))
-        .map((p) => p.value),
-    [catalog.optionPools],
-  );
 
   const [activeRail, setActiveRail] = useState<RailKey>("all");
   const [rawSearch, setRawSearch] = useState("");
@@ -371,6 +360,10 @@ export default function CatalogStep({
                 meta={index.meta.get(configureModel.id)}
                 skus={index.skusByModel.get(configureModel.id) ?? []}
                 specialAddons={catalog.specialAddons}
+                optionPools={catalog.optionPools}
+                fabrics={catalog.fabrics}
+                fabricTierConfig={catalog.fabricTierConfig}
+                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
                 onAdd={addLine}
                 onClose={() => setConfigureModelId(null)}
               />
@@ -383,12 +376,13 @@ export default function CatalogStep({
                 meta={index.meta.get(configureModel.id)}
                 skus={index.skusByModel.get(configureModel.id) ?? []}
                 fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
+                masterFabrics={catalog.fabrics}
+                optionPools={catalog.optionPools}
                 fabricTierConfig={catalog.fabricTierConfig}
                 modelFabricTierOverrides={catalog.modelFabricTierOverrides}
                 sofaCompartments={catalog.sofaCompartments ?? []}
                 modelCompartments={offered}
                 sofaCombos={catalog.sofaCombos ?? []}
-                sofaSizes={sofaSizes}
                 onAdd={addLine}
                 onClose={() => setConfigureModelId(null)}
               />

@@ -27,6 +27,7 @@ import {
   type LeadTimeViolation,
 } from "../lib/lead-time";
 import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
+import { recomputeOptionPickLines } from "../lib/option-picks-recompute";
 import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
 import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
@@ -362,7 +363,13 @@ ordersRouter.post("/", async (c) => {
   // P8d (§4.2): pass the order's customer phone so a CROSS-order claim
   // (attrs.pwp.crossOrder=true) can assert the phone binding in the DEFINER RPC.
   // A same-cart claim ignores it (byte-identical to P8c).
-  const pwpClaim = await claimPwpCodesForLines(sb, { id: auth.id }, pwp.lines, parsed.data.customer.phone);
+  const pwpClaim = await claimPwpCodesForLines(
+    sb,
+    { id: auth.id },
+    pwp.lines,
+    parsed.data.customer.phone,
+    parsed.data.customer.name, // 0204 — the NAME half of the voucher identity
+  );
   if (pwpClaim.status === "server_error") {
     throw new HTTPException(500, { message: pwpClaim.message });
   }
@@ -461,6 +468,40 @@ ordersRouter.post("/", async (c) => {
     );
   }
 
+  // 0201/0202-wiring (option picks) — honest-pricing trust gate for the
+  // Maintenance-pool options a configured line carries in `attrs.options[]`
+  // (divan_height / bedframe_leg_height / fabric). Same contract as the
+  // special-addon gate above: re-resolve against FRESH pool/fabric rows with
+  // the SAME pure resolver the POS previewed with; a retired value → 400, a
+  // >0.5% (min RM0.01) drift → 422, else unitPrice nudged + attrs canonicalised.
+  // Lines without options pass through verbatim (sofa-build leg heights ride
+  // the sofa recompute, not this array).
+  const optionsRecompute = await recomputeOptionPickLines(sb, specialRecompute.lines);
+  if (optionsRecompute.status === "bad_request") {
+    await rollbackPwpClaims(); // exit 6b (§4.5)
+    throw new HTTPException(400, { message: optionsRecompute.message });
+  }
+  if (optionsRecompute.status === "server_error") {
+    await rollbackPwpClaims(); // exit 6c (§4.5)
+    throw new HTTPException(500, { message: optionsRecompute.message });
+  }
+  if (optionsRecompute.status === "drift") {
+    await rollbackPwpClaims(); // exit 6d (§4.5)
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "options_price_drift",
+        message:
+          `Option price mismatch on '${optionsRecompute.drift.lineSku}': client RM ` +
+          `${optionsRecompute.drift.clientTotal.toFixed(2)} vs server RM ` +
+          `${optionsRecompute.drift.serverTotal.toFixed(2)}. Please reconfigure and retry.`,
+        clientTotal: optionsRecompute.drift.clientTotal,
+        serverTotal: optionsRecompute.drift.serverTotal,
+      },
+      422,
+    );
+  }
+
   // 0185 (default free gifts) — DETERMINISTIC server-appended RM0 lines. Runs
   // AFTER the special-addon recompute (on the post-sofa-explode set) and BEFORE
   // the delivery recompute. The server runs the SAME pure resolver the POS preview
@@ -468,7 +509,7 @@ ordersRouter.post("/", async (c) => {
   // order_line per resolved gift (a real accessory sku, `attrs.free_gift`). A
   // misconfigured gift (giftSku not a real product_skus row) is fail-SOFT (logged
   // + omitted). DORMANT (no gift configured) → returns nothing → byte-identical.
-  const giftResult = await resolveDefaultFreeGiftLines(sb, specialRecompute.lines);
+  const giftResult = await resolveDefaultFreeGiftLines(sb, optionsRecompute.lines);
   if (giftResult.status === "server_error") {
     await rollbackPwpClaims(); // exit 7 (§4.5)
     throw new HTTPException(500, { message: giftResult.message });
@@ -476,7 +517,7 @@ ordersRouter.post("/", async (c) => {
   // The fully-verified line set fed to create_order: paid/freed lines + appended
   // RM0 gift lines. No-funding: gift + free-item lines are EXCLUDED from the
   // delivery charged-category set inside recomputeDeliveryFee.
-  const finalLines = [...specialRecompute.lines, ...giftResult.lines];
+  const finalLines = [...optionsRecompute.lines, ...giftResult.lines];
 
   // 0184 (delivery TRIP fee) — server-authoritative recompute. Re-runs the pure
   // `computeDeliveryFee` against FRESH delivery_fee_config + active
@@ -609,6 +650,7 @@ ordersRouter.post("/", async (c) => {
     ownerDealerId: effectiveDealerId,
     orderId: id,
     customerPhone: parsed.data.customer.phone,
+    customerName: parsed.data.customer.name, // 0204 — the NAME half of the identity
     finalLines,
     clientCartLineKeys: parsed.data.pwpCartLineKeys ?? [],
   });

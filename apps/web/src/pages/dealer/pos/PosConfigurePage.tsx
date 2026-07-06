@@ -1,7 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, LayoutTemplate, Minus, Plus, X } from "lucide-react";
-import type { ProductModelDto, ProductSkuDto, SpecialAddonDto } from "@carres/shared";
+import type {
+  CatalogFabricDto,
+  CatalogOptionPoolDto,
+  FabricTierGlobalConfig,
+  ModelFabricTierOverrideDto,
+  ProductModelDto,
+  ProductSkuDto,
+  SpecialAddonDto,
+} from "@carres/shared";
+import {
+  allowedFabricsFor,
+  allowedPoolValues,
+  computedTotalHeight,
+  fabricTierFor,
+  resolveFabricDelta,
+  resolveOptionsTotal,
+  type OptionPick,
+} from "@carres/shared";
 import type { DraftLine } from "../new-order/draft";
 import { newLocalId } from "../new-order/configurators";
 import { SpecialAddonsPicker, useSpecials } from "../new-order/special-addons-picker";
@@ -268,6 +285,10 @@ export default function PosConfigurePage({
   meta: _meta,
   skus,
   specialAddons,
+  optionPools,
+  fabrics,
+  fabricTierConfig,
+  modelFabricTierOverrides,
   onAdd,
   onClose,
 }: {
@@ -275,18 +296,99 @@ export default function PosConfigurePage({
   meta: ModelMeta | undefined;
   skus: ProductSkuDto[];
   specialAddons?: SpecialAddonDto[] | null;
+  /** 0201-wiring — the Maintenance option pools (divan / gap / leg heights). */
+  optionPools?: CatalogOptionPoolDto[] | null;
+  /** 0202-wiring — the master fabric list (per-model opt-in ticks gate it). */
+  fabrics?: CatalogFabricDto[] | null;
+  fabricTierConfig?: FabricTierGlobalConfig | null;
+  modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
   const isBed = model.category === "bedframe";
   const catLabel = isBed ? "Bed frame" : "Mattress";
 
+  // 0201-wiring — bedframe option pools, gated by the model's Modular ticks
+  // (empty ticks = every active master option; the 2990s default). Gaps keep
+  // the legacy `model.gaps` column as a tick fallback inside allowedPoolValues.
+  const divanOpts = useMemo(
+    () => (isBed ? allowedPoolValues(model, "divan_height", optionPools) : []),
+    [isBed, model, optionPools],
+  );
+  const gapOpts = useMemo(
+    () => (isBed ? allowedPoolValues(model, "gap", optionPools) : []),
+    [isBed, model, optionPools],
+  );
+  // Gap VALUES to render — when the gap pool is absent (legacy caller / fresh
+  // DB) fall back to the model's own gaps column so the section never vanishes.
+  const gapChoices = useMemo(
+    () =>
+      gapOpts.length > 0 ? gapOpts.map((o) => o.value) : isBed ? model.gaps ?? [] : [],
+    [gapOpts, isBed, model.gaps],
+  );
+  const legOpts = useMemo(
+    () => (isBed ? allowedPoolValues(model, "bedframe_leg_height", optionPools) : []),
+    [isBed, model, optionPools],
+  );
+  // 0202-wiring — master fabrics this model offers (opt-in; empty = no section).
+  const fabricOpts = useMemo(
+    () => (isBed ? allowedFabricsFor(model, fabrics) : []),
+    [isBed, model, fabrics],
+  );
+
   const [skuId, setSkuId] = useState<string>("");
   const [color, setColor] = useState<string>(model.colors?.[0] ?? "");
-  const [gap, setGap] = useState<string>(model.gaps?.[0] ?? "");
+  const [gap, setGap] = useState<string>(gapChoices[0] ?? "");
+  // Divan / leg / fabric are OPTIONAL (2990s "Confirm later", Loo 2026-06-11):
+  // "" = customer confirms the dimension later; no surcharge applies.
+  const [divan, setDivan] = useState<string>("");
+  const [leg, setLeg] = useState<string>("");
+  const [fabricCode, setFabricCode] = useState<string>("");
   const [qty, setQty] = useState(1);
   const sku = skus.find((s) => s.id === skuId);
   const sp = useSpecials(model, specialAddons);
+
+  // The option picks + their server-verifiable total — the SAME pure resolver
+  // Hono re-runs on submit (option-picks-recompute), so this preview cannot
+  // drift from the authoritative figure.
+  const fabricTierOverride =
+    (modelFabricTierOverrides ?? []).find((o) => o.modelId === model.id) ?? null;
+  const optionPicks = useMemo<OptionPick[]>(() => {
+    const picks: OptionPick[] = [];
+    if (divan) picks.push({ kind: "divan_height", value: divan });
+    if (leg) picks.push({ kind: "bedframe_leg_height", value: leg });
+    if (fabricCode) picks.push({ kind: "fabric", value: fabricCode });
+    return picks;
+  }, [divan, leg, fabricCode]);
+  const resolvedOptions = useMemo(
+    () =>
+      resolveOptionsTotal(optionPicks, {
+        pools: optionPools ?? [],
+        fabrics: fabrics ?? [],
+        category: model.category,
+        fabricTierOverride,
+        fabricTierConfig: fabricTierConfig ?? null,
+      }),
+    [optionPicks, optionPools, fabrics, model.category, fabricTierOverride, fabricTierConfig],
+  );
+  const optionsTotal = resolvedOptions.total;
+  const totalHeight = computedTotalHeight(divan || null, leg || null);
+  // Display-only per-fabric delta for the dropdown labels (same resolution the
+  // shared resolver applies when the fabric is actually picked).
+  const fabricDeltaByCode = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of fabricOpts) {
+      m.set(
+        f.fabricCode,
+        resolveFabricDelta(
+          fabricTierFor(model.category, f),
+          fabricTierOverride,
+          fabricTierConfig ?? null,
+        ),
+      );
+    }
+    return m;
+  }, [fabricOpts, model.category, fabricTierOverride, fabricTierConfig]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -298,7 +400,7 @@ export default function PosConfigurePage({
 
   const footprint = useMemo(() => footprintForVariant(sku?.variant), [sku?.variant]);
 
-  const unitPrice = (sku?.price ?? 0) + sp.surcharge;
+  const unitPrice = (sku?.price ?? 0) + sp.surcharge + optionsTotal;
   const total = unitPrice * qty;
   const canAdd = !!sku && sp.complete;
 
@@ -309,7 +411,9 @@ export default function PosConfigurePage({
     ? [
         footprint ? `${footprint.w}×${footprint.d} cm` : null,
         isBed && color ? color : null,
+        isBed && divan ? `divan ${divan}` : null,
         isBed && gap ? `gap ${gap}` : null,
+        isBed && leg ? `leg ${leg}` : null,
         qty > 1 ? `× ${qty}` : null,
       ]
         .filter(Boolean)
@@ -319,23 +423,37 @@ export default function PosConfigurePage({
   const breakdown: { label: string; price: number; note?: boolean }[] = sku
     ? [
         { label: `${sku.variant} ${isBed ? "frame" : "mattress"}`, price: sku.price },
+        ...resolvedOptions.lines.map((o) => ({
+          label:
+            o.kind === "fabric"
+              ? `Fabric · ${o.label ?? o.value}`
+              : `${o.kind === "divan_height" ? "Divan" : "Leg"} ${o.value}`,
+          price: o.surcharge,
+        })),
         ...(sp.surcharge > 0 ? [{ label: "Special add-ons", price: sp.surcharge }] : []),
         ...(qty > 1 ? [{ label: `× ${qty} pieces`, price: total - unitPrice }] : []),
       ]
     : [{ label: "Pick a size to see the price", price: 0, note: true }];
 
-  // Same DraftLine as the old drawer configurators — contract untouched.
+  // Same DraftLine as the old drawer configurators — contract untouched. The
+  // option picks ride attrs.options + options_total; the server re-resolves
+  // them on submit (option-picks-recompute) and overwrites with canonical rows.
   function add() {
     if (!sku || !sp.complete) return;
+    const optionsPatch =
+      resolvedOptions.lines.length > 0
+        ? { options: resolvedOptions.lines, options_total: optionsTotal }
+        : {};
+    const attrs = isBed
+      ? { color, gap, ...optionsPatch, ...sp.attrsPatch }
+      : sp.picks.length > 0
+        ? sp.attrsPatch
+        : null;
     onAdd({
       localId: newLocalId(),
       sku: sku.sku,
       qty,
-      attrs: isBed
-        ? { color, gap, ...sp.attrsPatch }
-        : sp.picks.length > 0
-          ? sp.attrsPatch
-          : null,
+      attrs,
       unitPrice,
       label: isBed
         ? `${model.name} · ${sku.variant} · ${color}${gap ? ` · gap ${gap}` : ""}`
@@ -504,8 +622,43 @@ export default function PosConfigurePage({
               </div>
             )}
 
-            {/* Mattress gap — bed frames with gap options */}
-            {isBed && (model.gaps?.length ?? 0) > 0 && (
+            {/* Divan height — bed frames; pool-priced, optional (confirm later) */}
+            {isBed && divanOpts.length > 0 && (
+              <div className="cfg-section">
+                <div className="cfg-section__head">
+                  <span className="pos-eyebrow">Divan height</span>
+                  <span className="cfg-section__detail">{divan || "Confirm later"}</span>
+                </div>
+                <div className="cfg-optGrid cfg-optGrid--5">
+                  <button
+                    className={`cfg-opt cfg-opt--compact ${divan === "" ? "is-on" : ""}`}
+                    onClick={() => setDivan("")}
+                    data-testid="cfg-divan-later"
+                  >
+                    <span className="cfg-opt__title">Later</span>
+                  </button>
+                  {divanOpts.map((o) => (
+                    <button
+                      key={o.id}
+                      className={`cfg-opt cfg-opt--compact ${divan === o.value ? "is-on" : ""}`}
+                      onClick={() => setDivan(o.value)}
+                      data-testid={`cfg-divan-${o.value}`}
+                    >
+                      <span className="cfg-opt__title">{o.value}</span>
+                      {o.surcharge != null && o.surcharge !== 0 && (
+                        <span className="cfg-opt__sub">
+                          +RM{o.surcharge.toLocaleString("en-MY")}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Mattress gap — bed frames; the master Gaps pool ∩ Modular ticks
+                (legacy model.gaps column when no pool is available). */}
+            {isBed && gapChoices.length > 0 && (
               <div className="cfg-section">
                 <div className="cfg-section__head">
                   <span className="pos-eyebrow">Mattress gap</span>
@@ -518,7 +671,7 @@ export default function PosConfigurePage({
                   >
                     <span className="cfg-opt__title">None</span>
                   </button>
-                  {(model.gaps ?? []).map((g) => (
+                  {gapChoices.map((g) => (
                     <button
                       key={g}
                       className={`cfg-opt cfg-opt--compact ${gap === g ? "is-on" : ""}`}
@@ -529,6 +682,85 @@ export default function PosConfigurePage({
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Leg height — bed frames; pool-priced, optional. Total height is
+                COMPUTED (divan + leg) — never an input (Loo 2026-07-06). */}
+            {isBed && legOpts.length > 0 && (
+              <div className="cfg-section">
+                <div className="cfg-section__head">
+                  <span className="pos-eyebrow">Leg height</span>
+                  <span className="cfg-section__detail" data-testid="cfg-total-height">
+                    {totalHeight ? `Total height ${totalHeight}` : leg || "Confirm later"}
+                  </span>
+                </div>
+                <div className="cfg-optGrid cfg-optGrid--5">
+                  <button
+                    className={`cfg-opt cfg-opt--compact ${leg === "" ? "is-on" : ""}`}
+                    onClick={() => setLeg("")}
+                    data-testid="cfg-leg-later"
+                  >
+                    <span className="cfg-opt__title">Later</span>
+                  </button>
+                  {legOpts.map((o) => (
+                    <button
+                      key={o.id}
+                      className={`cfg-opt cfg-opt--compact ${leg === o.value ? "is-on" : ""}`}
+                      onClick={() => setLeg(o.value)}
+                      data-testid={`cfg-leg-${o.value}`}
+                    >
+                      <span className="cfg-opt__title">{o.value}</span>
+                      {o.surcharge != null && o.surcharge !== 0 && (
+                        <span className="cfg-opt__sub">
+                          +RM{o.surcharge.toLocaleString("en-MY")}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Fabric — bed frames whose model offers master fabrics (opt-in
+                Modular ticks); priced by the fabric's bedframe tier delta. */}
+            {isBed && fabricOpts.length > 0 && (
+              <div className="cfg-section">
+                <div className="cfg-section__head">
+                  <span className="pos-eyebrow">Fabric</span>
+                  <span className="cfg-section__detail">
+                    {fabricCode
+                      ? fabricOpts.find((f) => f.fabricCode === fabricCode)?.description ?? fabricCode
+                      : "Confirm later"}
+                  </span>
+                </div>
+                <select
+                  value={fabricCode}
+                  onChange={(e) => setFabricCode(e.target.value)}
+                  className="cfg-select"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: "1.5px solid var(--line, #d9d2c7)",
+                    background: "var(--pos-panel, #fff)",
+                    fontSize: 13,
+                  }}
+                  aria-label="Fabric"
+                  data-testid="cfg-fabric"
+                >
+                  <option value="">Confirm later — customer to confirm</option>
+                  {fabricOpts.map((f) => {
+                    const delta = fabricDeltaByCode.get(f.fabricCode) ?? 0;
+                    return (
+                      <option key={f.id} value={f.fabricCode}>
+                        {f.fabricCode}
+                        {f.description ? ` — ${f.description}` : ""}
+                        {delta > 0 ? ` (+RM ${delta.toLocaleString("en-MY")})` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
             )}
 

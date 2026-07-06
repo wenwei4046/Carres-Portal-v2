@@ -472,6 +472,8 @@ export const pwpDiscoverFromRow = (r: DB.PwpDiscoverRow): D.PwpDiscover => ({
   sourceOrderId: r.source_order_id,
   expiresAt: r.expires_at,
   phoneMatches: r.phone_matches,
+  // 0204 — legacy rows (pre-name-binding RPC) default to true (phone-only).
+  nameMatches: r.name_matches ?? true,
 });
 
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({

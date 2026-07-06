@@ -82,6 +82,7 @@ function snapshotFrom(
     overrides?: Record<string, number | null>;
     fabricTierConfig?: { sofaTier2Delta: number; sofaTier3Delta: number };
     fabricTierOverride?: { tier2Delta: number | null; tier3Delta: number | null };
+    legHeightPool?: Array<{ value: string; surcharge: number | null; active: boolean }>;
   } = {},
 ): SofaPricingSnapshot {
   const compartmentPool: SofaCompartment[] = [];
@@ -98,6 +99,7 @@ function snapshotFrom(
     sofaCombos: opts.combos ?? [],
     fabricTierConfig: opts.fabricTierConfig ?? null,
     fabricTierOverride: opts.fabricTierOverride ?? null,
+    legHeightPool: opts.legHeightPool ?? null,
   };
 }
 
@@ -954,5 +956,81 @@ describe("sofaPriceWithinTolerance", () => {
     expect(sofaPriceWithinTolerance(NaN, 5000)).toBe(false);
     expect(sofaPriceWithinTolerance(5000, NaN)).toBe(false);
     expect(sofaPriceWithinTolerance(5000, -5000)).toBe(false);
+  });
+});
+
+/* ─── legDelta (0201-wiring — sofa_leg_height pool surcharge) ──────────── */
+
+describe("computeSofaPrice — leg-height surcharge (0201-wiring)", () => {
+  const LEG_POOL = [
+    { value: "No Leg", surcharge: null, active: true },
+    { value: '4"', surcharge: 80, active: true },
+    { value: '6"', surcharge: 120, active: true },
+    { value: '2"', surcharge: 40, active: false },
+  ];
+
+  it("adds the chosen leg value's surcharge on top of the base", () => {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      { legHeightPool: LEG_POOL },
+    );
+    const r = computeSofaPrice(build({ legHeight: '4"' }), snap);
+    expect(r.legDelta).toBe(80);
+    expect(r.total).toBe(1880);
+  });
+
+  it("no legHeight (unset/null) → legDelta 0", () => {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      { legHeightPool: LEG_POOL },
+    );
+    expect(computeSofaPrice(build(), snap).legDelta).toBe(0);
+    expect(computeSofaPrice(build({ legHeight: null }), snap).legDelta).toBe(0);
+  });
+
+  it("a null-surcharge pool value (No Leg) prices 0", () => {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      { legHeightPool: LEG_POOL },
+    );
+    const r = computeSofaPrice(build({ legHeight: "No Leg" }), snap);
+    expect(r.legDelta).toBe(0);
+    expect(r.total).toBe(1800);
+  });
+
+  it("unknown or INACTIVE value prices 0 (a client-claimed surcharge drifts)", () => {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      { legHeightPool: LEG_POOL },
+    );
+    expect(computeSofaPrice(build({ legHeight: "Iron" }), snap).legDelta).toBe(0);
+    // '2"' exists but active=false → never priced.
+    expect(computeSofaPrice(build({ legHeight: '2"' }), snap).legDelta).toBe(0);
+  });
+
+  it("absent legHeightPool in the snapshot → 0 (dormant)", () => {
+    const snap = snapshotFrom({ "2A(LHF)": 1000, "L(RHF)": 800 });
+    expect(computeSofaPrice(build({ legHeight: '4"' }), snap).legDelta).toBe(0);
+  });
+
+  it("stacks with combo price AND fabric delta (whole-sofa modifiers)", () => {
+    // combo @28 = 2750; fabric P2 delta = 200; leg 6" = 120 → 3070.
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      {
+        combos: [combo({ tier: null })],
+        fabricTierConfig: { sofaTier2Delta: 200, sofaTier3Delta: 400 },
+        legHeightPool: LEG_POOL,
+      },
+    );
+    const r = computeSofaPrice(
+      build({ fabricTier: "PRICE_2", legHeight: '6"', asOf: ASOF }),
+      snap,
+    );
+    expect(r.basis).toBe("combo");
+    expect(r.comboPrice).toBe(2750);
+    expect(r.fabricDelta).toBe(200);
+    expect(r.legDelta).toBe(120);
+    expect(r.total).toBe(3070);
   });
 });

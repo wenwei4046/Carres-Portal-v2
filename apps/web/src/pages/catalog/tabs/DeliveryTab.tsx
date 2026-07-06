@@ -7,10 +7,8 @@ import type {
   RuleTarget,
   SpecialDeliveryFeeRuleDto,
 } from "@carres/shared";
-import { MAX_DELIVERY_FLOOR } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import {
-  usePatchFloorConfig,
   useUpdateDeliveryFeeConfig,
   useCreateSpecialDeliveryFeeRule,
   useUpdateSpecialDeliveryFeeRule,
@@ -46,9 +44,11 @@ const DEFAULT_DELIVERY_FEE_CONFIG: DeliveryFeeConfigDto = {
  *   • Delivery trip fee — flat per-order base fee + cross-order follow-up rate +
  *     charged categories + lead-day floors (0184).
  *   • Special delivery rules — per-RuleTarget overrides of the base fee (0184).
- *   • Stair-carry fee — floor_config free-floor + per-floor-per-item (0001).
  *
- * All three are principal-gated writes; other roles get a read-only veneer.
+ * (The stair-carry fee is an order-level add-on charge, not trip config — it
+ * lives in Special Add-ons › Order Add-ons since Loo 2026-07-06.)
+ *
+ * Both are principal-gated writes; other roles get a read-only veneer.
  */
 export default function DeliveryTab({
   catalog,
@@ -61,7 +61,6 @@ export default function DeliveryTab({
     <div className="flex flex-col gap-8 max-w-[680px]">
       <DeliveryTripFeeSection catalog={catalog} isPrincipal={isPrincipal} />
       <SpecialDeliveryRulesSection catalog={catalog} isPrincipal={isPrincipal} />
-      <StairCarryFeeSection catalog={catalog} isPrincipal={isPrincipal} />
     </div>
   );
 }
@@ -490,96 +489,3 @@ function RuleForm({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Stair-carry fee (floor_config) — principal-gated
-// ---------------------------------------------------------------------------
-
-function StairCarryFeeSection({
-  catalog,
-  isPrincipal,
-}: {
-  catalog: CatalogResponse;
-  isPrincipal: boolean;
-}) {
-  const patch = usePatchFloorConfig();
-  const fc = catalog.floorConfig;
-  const [freeUpTo, setFreeUpTo] = useState(String(fc.freeUpToFloor));
-  const [perFloor, setPerFloor] = useState(String(fc.perFloorPerItem));
-
-  // Re-sync the inputs if the bundle refetches with new floor_config values
-  // (another session saved, or our own save round-tripped) so the editor never
-  // shows stale numbers against a changed server state.
-  useEffect(() => {
-    setFreeUpTo(String(fc.freeUpToFloor));
-    setPerFloor(String(fc.perFloorPerItem));
-  }, [fc.freeUpToFloor, fc.perFloorPerItem]);
-
-  const freeNum = Number(freeUpTo);
-  const perNum = Number(perFloor);
-  const valid =
-    Number.isInteger(freeNum) &&
-    freeNum >= 0 &&
-    Number.isFinite(perNum) &&
-    perNum >= 0;
-  const dirty = freeNum !== fc.freeUpToFloor || perNum !== fc.perFloorPerItem;
-
-  function save() {
-    if (!valid || !dirty) return;
-    patch.mutate(
-      { freeUpToFloor: freeNum, perFloorPerItem: perNum },
-      {
-        onSuccess: () => toast.success("Delivery fee saved"),
-        onError: (e: unknown) =>
-          toast.error(e instanceof ApiError ? e.message : "Save failed"),
-      },
-    );
-  }
-
-  return (
-    <section>
-      <div className="t-h4 font-display mb-1">Stair-carry fee</div>
-      <p className="t-tiny text-base-500 mb-3">
-        Free up to a floor, then a per-floor-per-item charge. Carres does not
-        stair-carry above floor {MAX_DELIVERY_FLOOR}. Separate from the delivery
-        trip fee — both fold into the order total.
-        {!isPrincipal && " Principal only — read-only for your role."}
-      </p>
-      <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-wrap gap-5 items-end">
-        <label className="block">
-          <span className="label block mb-1">Free up to floor</span>
-          <input
-            type="number"
-            min={0}
-            step="1"
-            value={freeUpTo}
-            disabled={!isPrincipal}
-            onChange={(e) => setFreeUpTo(e.target.value)}
-            className={`${INPUT_CLS} w-32 disabled:opacity-60`}
-          />
-        </label>
-        <label className="block">
-          <span className="label block mb-1">Per floor / item (RM)</span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={perFloor}
-            disabled={!isPrincipal}
-            onChange={(e) => setPerFloor(e.target.value)}
-            className={`${INPUT_CLS} w-32 disabled:opacity-60`}
-          />
-        </label>
-        {isPrincipal && (
-          <button
-            type="button"
-            onClick={save}
-            disabled={!valid || !dirty || patch.isPending}
-            className="btn-primary text-[12px] disabled:opacity-40"
-          >
-            {patch.isPending ? "Saving…" : "Save"}
-          </button>
-        )}
-      </div>
-    </section>
-  );
-}

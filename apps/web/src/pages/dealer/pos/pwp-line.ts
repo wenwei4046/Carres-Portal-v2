@@ -227,6 +227,10 @@ export interface PwpTriggerLine {
   cartLineKey: string;
   sku: string;
   qty: number;
+  /** True when the line is itself a reward (attrs.pwp / free_item / free_gift).
+   *  The reserve route skips PROMO rules for such a line (2990s one-way parity);
+   *  PWP rules still reserve — chaining is intentional. */
+  rewardLine: boolean;
 }
 
 /**
@@ -235,11 +239,11 @@ export interface PwpTriggerLine {
  * over the rule's `triggerTargets`). Mirrors the server reserve route's matcher
  * (`apps/api/src/routes/pwp-codes.ts` step 3) so the POS reconciler and the
  * server agree on which lines own a reservation. Returns `[]` when nothing is
- * configured (DORMANT) — the reconciler then never calls reserve. A free /
- * combo-component / sofa-build line is still scanned (the matcher decides) but a
- * line carrying `attrs.free_item`/`free_gift` (already a reward) is never a
- * trigger (it would self-fund — the shared resolver guards this; here a free
- * line simply won't be RE-reserved for, which is harmless).
+ * configured (DORMANT) — the reconciler then never calls reserve. A line that is
+ * itself a reward (attrs.pwp / free_item / free_gift) is still a PWP trigger
+ * (chainable) but is flagged `rewardLine` so the reserve route skips PROMO rules
+ * for it — the 2990s one-way rule (a free reward must never mint a promo voucher
+ * that funds the next free reward).
  */
 export function triggerLinesInCart(
   lines: DraftLine[],
@@ -263,7 +267,13 @@ export function triggerLinesInCart(
         lineMatchesTargets(ruleLine, r.triggerTargets, comboModulesById),
     );
     if (isTrigger) {
-      out.push({ cartLineKey: line.localId, sku: line.sku, qty: Number(line.qty ?? 1) });
+      const attrs = (line.attrs ?? {}) as Record<string, unknown>;
+      out.push({
+        cartLineKey: line.localId,
+        sku: line.sku,
+        qty: Number(line.qty ?? 1),
+        rewardLine: Boolean(attrs.pwp || attrs.free_item || attrs.free_gift),
+      });
     }
   }
   return out;

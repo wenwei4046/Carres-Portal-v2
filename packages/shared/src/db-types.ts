@@ -576,6 +576,9 @@ export interface PwpDiscoverRow {
   source_order_id: string | null;
   expires_at: string | null;
   phone_matches: boolean;
+  /** 0204 — the NAME half of the 2990s name+phone binding, server-computed.
+   *  A legacy (name-NULL) code reports true (phone-only binding). */
+  name_matches: boolean;
 }
 
 export interface WarehouseRow {

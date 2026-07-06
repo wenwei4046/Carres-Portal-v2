@@ -37,6 +37,14 @@ export const allowedOptionsSchema = z
     gaps: z.array(z.string()).optional(),
     // 0181 — special add-on codes this model offers (per-model attach).
     specials: z.array(z.string()).optional(),
+    // 0201-wiring (2026-07-06, 2990s parity) — per-model POS gating of the
+    // Maintenance option pools. divan/leg ticks: EMPTY/ABSENT = no restriction
+    // (every active pool option shows at POS); a non-empty list narrows.
+    divan_heights: z.array(z.string()).optional(),
+    leg_heights: z.array(z.string()).optional(),
+    // 0202 — fabric CODES this model offers (catalog_fabrics.fabric_code).
+    // OPT-IN: empty/absent = the model shows no fabric choice at POS.
+    fabrics: z.array(z.string()).optional(),
   })
   .passthrough();
 export type AllowedOptions = z.infer<typeof allowedOptionsSchema>;
@@ -831,6 +839,9 @@ export const pwpDiscoverDtoSchema = z.object({
   sourceOrderId: z.string().uuid().nullable(),
   expiresAt: z.string().nullable(),
   phoneMatches: z.boolean(),
+  /** 0204 — the NAME half of the 2990s name+phone binding (server-computed;
+   *  defaults true for pre-0204 API responses). */
+  nameMatches: z.boolean().default(true),
 });
 export type PwpDiscoverDto = z.infer<typeof pwpDiscoverDtoSchema>;
 
@@ -848,6 +859,11 @@ export const pwpReserveInputSchema = z
     cartLineKey: z.string().min(1),
     sku: z.string().min(1),
     qty: z.number().int().positive(),
+    /** True when the trigger line is ITSELF a reward (claimed PWP/promo, free
+     *  item, or appended free gift). The reserve route then skips PROMO rules —
+     *  a free reward must never mint a promo voucher that funds the next free
+     *  reward (2990s one-way parity). PWP rules still reserve (chainable). */
+    rewardLine: z.boolean().optional(),
   })
   .strict();
 export type PwpReserveInput = z.infer<typeof pwpReserveInputSchema>;

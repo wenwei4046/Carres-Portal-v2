@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import type {
+  CatalogFabricDto,
+  CatalogOptionPoolDto,
   FabricTierConfigDto,
   FabricTierGlobalConfig,
   ModelFabricTierOverrideDto,
@@ -16,6 +18,9 @@ import type {
   SofaHeight,
 } from "@carres/shared";
 import {
+  activeSofaHeights,
+  activeSofaSizes,
+  allowedPoolValues,
   analyzeSofa,
   canMirror,
   findModule,
@@ -24,13 +29,13 @@ import {
   moduleFootprint,
   resolveFabricDelta,
   ROOM_H,
-  SOFA_HEIGHTS,
 } from "@carres/shared";
 import { usePwpAvailableForPhone } from "@/lib/queries";
 import type { DraftLine } from "../new-order/draft";
+import { sellingFabricsFor } from "../sofa-build/selling-fabrics";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
-import SofaPlanView from "../sofa-build/SofaPlanView";
+import SofaPlanView, { PLAN_PAD } from "../sofa-build/SofaPlanView";
 import type { ModelMeta } from "./catalog-index";
 
 /**
@@ -114,18 +119,62 @@ function seedClosed(cells: SeedCell[], depth: string): boolean {
 }
 
 /**
- * Lay a combo's modules onto the canvas. Straight runs stay flush left→right;
- * a combo with exactly ONE corner module gets the L treatment — the tail turns
- * south, and we search corner/tail rotations until the SAME arm-cap analysis
- * the canvas enforces reports a closed sofa (the seed validates itself). No
- * closed arrangement, or 2+ corners → the straight fallback and the user
- * rearranges on canvas.
+ * The 2990s corner-L layout (Configurator `cellsFromComboModules`): a 3-piece
+ * Corner + 2-seater + 1-seater combo ALWAYS draws with the 2-seater as the
+ * LONG bar beside the corner and the 1-seater as the SHORT chaise leg dropping
+ * below it — never the other way around. The chaise's hand picks the side:
+ * LHF → corner top-left, chaise bottom-left; RHF → the whole L mirrors.
+ * Cells return in left→right walk order (chaise first for LHF) so the cart
+ * label reads like the customer facing the sofa — leftmost closing side first.
+ * Any other module set → null (caller falls through to the generic seed).
+ */
+function seedCornerL(codes: string[], depth: string): SeedCell[] | null {
+  if (codes.length !== 3) return null;
+  const byGroup = (g: string) => codes.find((c) => findModule(c)?.group === g);
+  const cnr = byGroup("Corner");
+  const two = byGroup("2-seater");
+  const one = byGroup("1-seater");
+  if (!cnr || !two || !one) return null;
+  const cnrFp = moduleFootprint(findModule(cnr)!, 0, depth);
+  const twoFp = moduleFootprint(findModule(two)!, 0, depth);
+  const chaiseW = moduleFootprint(findModule(one)!, 90, depth).w;
+  const x = 60;
+  const y = 60;
+  if (one.includes("RHF")) {
+    // Chaise drops bottom-right: 2-seater · corner (arms N+E) · chaise, outer
+    // edges flush on the right.
+    return [
+      { moduleCode: two, x, y, rot: 0 },
+      { moduleCode: cnr, x: x + twoFp.w, y, rot: 90 },
+      { moduleCode: one, x: x + twoFp.w + cnrFp.w - chaiseW, y: y + cnrFp.h, rot: 90 },
+    ];
+  }
+  // Chaise drops bottom-left: chaise · corner (arms N+W) · 2-seater.
+  return [
+    { moduleCode: one, x, y: y + cnrFp.h, rot: 270 },
+    { moduleCode: cnr, x, y, rot: 0 },
+    { moduleCode: two, x: x + cnrFp.w, y, rot: 0 },
+  ];
+}
+
+/**
+ * Lay a combo's modules onto the canvas. A 3-piece Corner + 2-seater +
+ * 1-seater combo takes the fixed 2990s corner-L (`seedCornerL`) — long bar
+ * beside the corner, chaise below. Straight runs stay flush left→right; any
+ * other combo with exactly ONE corner module gets the generic L treatment —
+ * the tail turns south, and we search corner/tail rotations until the SAME
+ * arm-cap analysis the canvas enforces reports a closed sofa (the seed
+ * validates itself). No closed arrangement, or 2+ corners → the straight
+ * fallback and the user rearranges on canvas.
  */
 export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
   const codes = combo.slots
     .map((s) => s[0])
     .filter((code): code is string => !!code);
   if (codes.length === 0) return [];
+
+  const cornerL = seedCornerL(codes, depth);
+  if (cornerL && seedClosed(cornerL, depth)) return cornerL;
 
   const straight = seedStraight(codes, depth);
   const cornerIdxs = codes
@@ -145,6 +194,26 @@ export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
 
 /** Quick-pick fabric-select sentinel — "Confirm later, customer to confirm". */
 const QP_FABRIC_DEFER = "__defer__";
+
+// Hero dimension lines — port of 2990s SofaCellsPreview `showDims`: a measured
+// line with end ticks spanning the sofa's W (above) / D (right), the cm chip
+// riding the line's midpoint. Same ink as the plan-view stroke.
+const DIM_INK = "#2c2c2a";
+const dimTickV: React.CSSProperties = { width: 1.5, height: 8, background: DIM_INK, flexShrink: 0 };
+const dimTickH: React.CSSProperties = { width: 8, height: 1.5, background: DIM_INK, flexShrink: 0 };
+const dimLineH: React.CSSProperties = { flex: 1, height: 1.5, background: DIM_INK };
+const dimLineV: React.CSSProperties = { flex: 1, width: 1.5, background: DIM_INK };
+const dimChip: React.CSSProperties = {
+  position: "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  border: "1px solid var(--line, #d9d2c7)",
+  borderRadius: 4,
+  padding: "1px 6px",
+  background: "var(--pos-panel, #fff)",
+  whiteSpace: "nowrap",
+};
 
 /** Overall bbox of a seeded layout in cm (works for straight runs AND L-shapes).
  *  Drives the to-scale plan-view callouts. */
@@ -180,12 +249,13 @@ export default function SofaConfigurePage({
   meta,
   skus,
   fabrics,
+  masterFabrics,
+  optionPools,
   fabricTierConfig,
   modelFabricTierOverrides,
   sofaCompartments,
   modelCompartments,
   sofaCombos,
-  sofaSizes,
   onAdd,
   onClose,
 }: {
@@ -193,18 +263,35 @@ export default function SofaConfigurePage({
   meta: ModelMeta | undefined;
   skus: ProductSkuDto[];
   fabrics: SofaFabricDto[];
+  /** 0202-wiring — the master Fabrics tab list (per-model opt-in ticks). */
+  masterFabrics?: CatalogFabricDto[] | null;
+  /** 0201-wiring — Maintenance pools (sofa sizes + leg heights). */
+  optionPools?: CatalogOptionPoolDto[] | null;
   fabricTierConfig?: FabricTierGlobalConfig | null;
   modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
   sofaCompartments: SofaCompartmentDto[];
   /** Already filtered to model.id. */
   modelCompartments: ModelSofaCompartmentDto[];
   sofaCombos: SofaComboDto[];
-  /** 0204 — live `sofa_size` pool values; the Customize canvas's size options
-   *  (+ per-size price axis). Absent/empty → legacy SOFA_HEIGHTS fallback. */
-  sofaSizes?: string[] | null;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
+  // 0201/0202-wiring — the Maintenance-authored option sources:
+  //   COMBO heights (quick-pick tabs) = ACTIVE `sofa_size` ∩ canonical axis;
+  //   à-la-carte SIZES (Customize canvas, 0204) = EVERY active `sofa_size`
+  //     value incl. non-canonical ("Flat") — per-size prices key off these;
+  //   leg heights = `sofa_leg_height` pool ∩ this model's Modular ticks;
+  //   fabrics = legacy per-model rows + the model's opted-in master fabrics.
+  const offeredHeights = useMemo(() => activeSofaHeights(optionPools), [optionPools]);
+  const sofaSizes = useMemo(() => activeSofaSizes(optionPools), [optionPools]);
+  const legOpts = useMemo(
+    () => allowedPoolValues(model, "sofa_leg_height", optionPools),
+    [model, optionPools],
+  );
+  const sellingFabrics = useMemo(
+    () => sellingFabricsFor(model, fabrics, masterFabrics),
+    [model, fabrics, masterFabrics],
+  );
   const picks: QuickPick[] = useMemo(
     () =>
       sofaCombos
@@ -289,23 +376,28 @@ export default function SofaConfigurePage({
     picks[0] ??
     null;
 
-  // ── Quick-pick direct-add controls (seat height · fabric · remark) ──────
-  const [qpHeight, setQpHeight] = useState<SofaHeight>("24");
-  const [qpFabricId, setQpFabricId] = useState<string>(QP_FABRIC_DEFER);
+  // ── Quick-pick direct-add controls (seat height · fabric · leg · remark) ──
+  const [qpHeight, setQpHeight] = useState<SofaHeight>(offeredHeights[0] ?? "24");
+  const [qpFabricKey, setQpFabricKey] = useState<string>(QP_FABRIC_DEFER);
+  const [qpLeg, setQpLeg] = useState<string>("");
   const [qpRemark, setQpRemark] = useState("");
 
-  // Heights this preset is priced for; fall back to the first priced one.
+  // Heights = the ACTIVE Maintenance sofa sizes this preset is priced for.
   const heroHeights = heroPick
-    ? SOFA_HEIGHTS.filter((h) => heroPick.combo.pricesByHeight[h] != null)
+    ? offeredHeights.filter((h) => heroPick.combo.pricesByHeight[h] != null)
     : [];
   const effHeight = heroHeights.includes(qpHeight) ? qpHeight : heroHeights[0] ?? qpHeight;
-  const qpDeferred = qpFabricId === QP_FABRIC_DEFER;
-  const qpFabric = qpDeferred ? null : fabrics.find((f) => f.id === qpFabricId) ?? null;
+  const qpDeferred = qpFabricKey === QP_FABRIC_DEFER;
+  const qpFabric = qpDeferred
+    ? null
+    : sellingFabrics.find((f) => f.key === qpFabricKey) ?? null;
   const qpDelta = qpFabric
     ? resolveFabricDelta(qpFabric.tier, fabricTierOverride, fabricTierConfig ?? null)
     : 0;
+  // Leg-height surcharge (0201 pool; server re-verifies via computeSofaPrice).
+  const qpLegDelta = qpLeg ? legOpts.find((o) => o.value === qpLeg)?.surcharge ?? 0 : 0;
   const heroBase = heroPick ? heroPick.combo.pricesByHeight[effHeight] ?? null : null;
-  const qpTotal = heroBase !== null ? heroBase + qpDelta : null;
+  const qpTotal = heroBase !== null ? heroBase + qpDelta + qpLegDelta : null;
 
   // The hero layout seeded at the chosen depth — ONE joined plan view + bbox dims.
   const heroCells = heroPick
@@ -325,10 +417,13 @@ export default function SofaConfigurePage({
         height: effHeight,
         fabricTier: qpFabric?.tier ?? "PRICE_1",
         fabricId: qpFabric?.id ?? null,
-        fabricName: qpFabric?.fabricName ?? null,
+        fabricCode: qpFabric?.code ?? null,
+        fabricName: qpFabric?.name ?? null,
         fabricSurcharge: qpDelta,
         fabricDeferred: qpDeferred,
-        total: base + qpDelta,
+        legHeight: qpLeg || null,
+        legSurcharge: qpLegDelta,
+        total: base + qpDelta + qpLegDelta,
         priceBasis: "combo",
       },
       model,
@@ -599,29 +694,29 @@ export default function SofaConfigurePage({
                 aria-label="Fabric option"
                 data-testid="sofa-qp-fabric"
               >
-                {fabrics.map((f) => {
+                {sellingFabrics.map((f) => {
                   const delta = resolveFabricDelta(
                     f.tier,
                     fabricTierOverride,
                     fabricTierConfig ?? null,
                   );
-                  const on = qpFabricId === f.id;
+                  const on = qpFabricKey === f.key;
                   return (
                     <button
-                      key={f.id}
+                      key={f.key}
                       type="button"
-                      onClick={() => setQpFabricId(f.id)}
+                      onClick={() => setQpFabricKey(f.key)}
                       aria-pressed={on}
                       className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
                         on ? "border-primary text-primary" : "border-base-300 text-base-700"
                       }`}
-                      data-testid={`sofa-qp-fabric-${f.id}`}
+                      data-testid={`sofa-qp-fabric-${f.key}`}
                     >
                       <span
                         className="h-3 w-3 rounded-full border border-base-300"
-                        style={{ background: f.colors?.[0] ?? "#CBAA7C" }}
+                        style={{ background: f.swatch ?? "#CBAA7C" }}
                       />
-                      {f.fabricName}
+                      {f.name}
                       <span className="t-micro text-base-400">
                         {delta > 0 ? `+RM ${delta.toLocaleString("en-MY")}` : "Included"}
                       </span>
@@ -630,7 +725,7 @@ export default function SofaConfigurePage({
                 })}
                 <button
                   type="button"
-                  onClick={() => setQpFabricId(QP_FABRIC_DEFER)}
+                  onClick={() => setQpFabricKey(QP_FABRIC_DEFER)}
                   aria-pressed={qpDeferred}
                   className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
                     qpDeferred ? "border-primary text-primary" : "border-base-300 text-base-700"
@@ -641,6 +736,46 @@ export default function SofaConfigurePage({
                   <span className="t-micro text-base-400">customer to confirm</span>
                 </button>
               </div>
+
+              {/* Leg height — the sofa_leg_height pool ∩ Modular ticks (0201).
+                  Optional; the surcharge joins the drift-gated build total. */}
+              {legOpts.length > 0 && (
+                <>
+                  <div className="sof-qp__railHead" style={{ marginTop: 16 }}>
+                    <span className="pos-eyebrow">Leg height</span>
+                    <span className="sof-qp__railDetail">optional · confirm later</span>
+                  </div>
+                  <div
+                    style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+                    role="group"
+                    aria-label="Leg height"
+                    data-testid="sofa-qp-legs"
+                  >
+                    {legOpts.map((o) => {
+                      const on = qpLeg === o.value;
+                      return (
+                        <button
+                          key={o.id}
+                          type="button"
+                          onClick={() => setQpLeg(on ? "" : o.value)}
+                          aria-pressed={on}
+                          className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 t-small transition-colors ${
+                            on ? "border-primary text-primary" : "border-base-300 text-base-700"
+                          }`}
+                          data-testid={`sofa-qp-leg-${o.value}`}
+                        >
+                          {o.value}
+                          <span className="t-micro text-base-400">
+                            {o.surcharge != null && o.surcharge !== 0
+                              ? `+RM ${o.surcharge.toLocaleString("en-MY")}`
+                              : "Included"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
 
               {/* Remark */}
               <div className="sof-qp__railHead" style={{ marginTop: 16 }}>
@@ -661,40 +796,70 @@ export default function SofaConfigurePage({
             <div className="sof-qp__hero">
               <div className="sof-qp__heroFrame">
                 {heroPick ? (
-                  <div
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
-                    data-testid="sofa-plan-view"
-                  >
-                    {/* width callout */}
-                    <span
-                      className="t-tiny font-mono"
-                      style={{
-                        border: "1px solid var(--line, #d9d2c7)",
-                        borderRadius: 4,
-                        padding: "1px 6px",
-                        background: "var(--pos-panel, #fff)",
-                      }}
-                      data-testid="sofa-plan-width"
+                  <div data-testid="sofa-plan-view">
+                    {/* ONE joined sofa — all modules in a single to-scale SVG.
+                        Sized by .sof-qp__heroBox (min(55cqh, 80cqw/AR) inside
+                        the size-container heroFrame) so the sofa FILLS the
+                        stage like the 2990s hero, instead of a fixed 256px
+                        strip (Loo 2026-07-06 — "ratio 太小"). AR includes the
+                        SVG's own PLAN_PAD breathing room so the box matches
+                        the viewBox exactly (no letterbox). */}
+                    <div
+                      className="sof-qp__heroBox"
+                      style={
+                        {
+                          aspectRatio: `${heroDims.w + PLAN_PAD * 2} / ${heroDims.d + PLAN_PAD * 2}`,
+                          "--qp-ar": String(
+                            (heroDims.w + PLAN_PAD * 2) / Math.max(1, heroDims.d + PLAN_PAD * 2),
+                          ),
+                        } as React.CSSProperties
+                      }
                     >
-                      {heroDims.w} cm
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {/* ONE joined sofa — all modules in a single to-scale SVG */}
-                      <SofaPlanView cells={heroCells} depth={effHeight} className="h-64 w-auto" />
-                      {/* depth callout */}
-                      <span
-                        className="t-tiny font-mono"
+                      <SofaPlanView cells={heroCells} depth={effHeight} className="h-full w-full" />
+                      {/* Measured dimension lines (2990s showDims) — end ticks
+                          inset by PLAN_PAD so they sit exactly on the sofa's
+                          edges; the cm chip rides the line's midpoint. */}
+                      <div
+                        aria-hidden="true"
                         style={{
-                          border: "1px solid var(--line, #d9d2c7)",
-                          borderRadius: 4,
-                          padding: "1px 6px",
-                          background: "var(--pos-panel, #fff)",
-                          writingMode: "vertical-rl",
+                          position: "absolute",
+                          left: `${(PLAN_PAD / (heroDims.w + PLAN_PAD * 2)) * 100}%`,
+                          right: `${(PLAN_PAD / (heroDims.w + PLAN_PAD * 2)) * 100}%`,
+                          top: -34,
+                          height: 16,
+                          display: "flex",
+                          alignItems: "center",
+                          pointerEvents: "none",
                         }}
-                        data-testid="sofa-plan-depth"
                       >
-                        {heroDims.d} cm
-                      </span>
+                        <span style={dimTickV} />
+                        <span style={dimLineH} />
+                        <span style={dimTickV} />
+                        <span className="t-tiny font-mono" style={dimChip} data-testid="sofa-plan-width">
+                          {heroDims.w} cm
+                        </span>
+                      </div>
+                      <div
+                        aria-hidden="true"
+                        style={{
+                          position: "absolute",
+                          top: `${(PLAN_PAD / (heroDims.d + PLAN_PAD * 2)) * 100}%`,
+                          bottom: `${(PLAN_PAD / (heroDims.d + PLAN_PAD * 2)) * 100}%`,
+                          right: -34,
+                          width: 16,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        <span style={dimTickH} />
+                        <span style={dimLineV} />
+                        <span style={dimTickH} />
+                        <span className="t-tiny font-mono" style={dimChip} data-testid="sofa-plan-depth">
+                          {heroDims.d} cm
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -739,7 +904,9 @@ export default function SofaConfigurePage({
             fabricTierConfig={fabricTierConfig as FabricTierConfigDto | null | undefined}
             fabricTierOverride={fabricTierOverride}
             sofaFabrics={fabrics}
-            sizeOptions={sofaSizes}
+            sellingFabrics={sellingFabrics}
+            legHeightOptions={legOpts}
+            heights={sofaSizes}
             onAddBuild={(payload) => {
               const line = buildToDraftLine(payload, model, skus);
               if (line) {

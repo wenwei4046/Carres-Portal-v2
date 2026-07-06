@@ -6,7 +6,7 @@ import type {
   ProductModelDto,
   ProductSkuDto,
 } from "@carres/shared";
-import { PRODUCT_CATEGORIES } from "@carres/shared";
+import { activeSofaSizes, PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useDeleteCatalogSku, usePatchCatalogSku } from "@/lib/queries";
@@ -102,18 +102,16 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   );
 
   // 0204 (Loo 2026-07-06) — the sofa-size axis (Special Add-ons → SOFA →
-  // Sizes pool). With the Sofa category filtered AND the pool configured, the
-  // grid swaps the single Price column for ONE PRICE COLUMN PER SIZE (2990s
-  // parity) — adding a size to the pool automatically adds a column here.
-  const sofaSizes = useMemo(
-    () =>
-      (catalog.optionPools ?? [])
-        .filter((p) => p.pool === "sofa_size" && p.active)
-        .sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value))
-        .map((p) => p.value),
-    [catalog.optionPools],
-  );
-  const sofaSizeMode = category === "sofa" && sofaSizes.length > 0;
+  // Sizes pool, the SAME `activeSofaSizes` the builder's Customize canvas
+  // offers). With the Sofa category filtered, the grid swaps the single Price
+  // column for ONE PRICE COLUMN PER SIZE (2990s parity) — adding a size to
+  // the pool automatically adds a column here. `activeSofaSizes` falls back
+  // to the canonical SOFA_HEIGHTS when the pool is empty, so the sofa grid
+  // variant only needs the pools field to be present.
+  const sofaSizes = useMemo(() => activeSofaSizes(catalog.optionPools), [catalog.optionPools]);
+  const sofaSizeMode =
+    category === "sofa" &&
+    (catalog.optionPools ?? []).some((p) => p.pool === "sofa_size" && p.active);
   const gridCols = sofaSizeMode
     ? `32px 150px minmax(200px,1.2fr) ${sofaSizes.map(() => "minmax(84px,1fr)").join(" ")} 92px 60px`
     : GRID_COLS;

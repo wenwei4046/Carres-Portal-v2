@@ -70,7 +70,7 @@ const FABRICS: SofaFabricDto[] = [
 function renderCanvas(props?: {
   combos?: SofaComboDto[];
   offered?: ModelSofaCompartmentDto[];
-  sizeOptions?: string[];
+  heights?: string[];
   onAddBuild?: (p: unknown) => void;
   onClose?: () => void;
 }) {
@@ -86,7 +86,7 @@ function renderCanvas(props?: {
       fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
       fabricTierOverride={null}
       sofaFabrics={FABRICS}
-      sizeOptions={props?.sizeOptions}
+      heights={props?.heights}
       onAddBuild={onAddBuild}
       onClose={onClose}
     />,
@@ -132,8 +132,9 @@ describe("SofaBuildCanvas", () => {
     renderCanvas();
     addModule("1S"); // 1500
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
-    // switch to PRICE_2 fabric → +300 global delta
-    fireEvent.change(screen.getByTestId("sofa-build-fabric"), { target: { value: "f-2" } });
+    // switch to PRICE_2 fabric → +300 global delta (select values are the
+    // unified selling-fabric KEYS: `sf:<sofa_fabrics id>` / `cf:<fabric code>`)
+    fireEvent.change(screen.getByTestId("sofa-build-fabric"), { target: { value: "sf:f-2" } });
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,800.00");
     // height picker present with the canonical heights
     const heightSel = screen.getByTestId("sofa-build-height") as HTMLSelectElement;
@@ -141,8 +142,8 @@ describe("SofaBuildCanvas", () => {
   });
 
   // 0204 — the size axis follows the sofa_size pool; per-size prices win.
-  it("sizeOptions drive the size picker (incl. non-numeric 'Flat'), default 24", () => {
-    renderCanvas({ sizeOptions: ["24", "32", "Flat"] });
+  it("heights drive the size picker (incl. non-numeric 'Flat'), default 24", () => {
+    renderCanvas({ heights: ["24", "32", "Flat"] });
     const sel = screen.getByTestId("sofa-build-height") as HTMLSelectElement;
     expect(sel.value).toBe("24");
     expect(Array.from(sel.options).map((o) => o.value)).toEqual(["24", "32", "Flat"]);
@@ -160,7 +161,7 @@ describe("SofaBuildCanvas", () => {
       // Only 1S is size-priced: RM 1,990 at 32; other sizes inherit the flat 1,500.
       skuPricesBySize: p.code === "1S" ? { "32": 1990 } : null,
     }));
-    renderCanvas({ offered, sizeOptions: ["24", "32", "Flat"] });
+    renderCanvas({ offered, heights: ["24", "32", "Flat"] });
     addModule("1S");
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
     fireEvent.change(screen.getByTestId("sofa-build-height"), { target: { value: "32" } });
@@ -178,8 +179,10 @@ describe("SofaBuildCanvas", () => {
     const add = screen.getByTestId("sofa-build-add");
     expect(add).toBeDisabled();
     expect(add).toHaveTextContent(/Resolve/);
-    // the canvas shows a not-closed pill for the group
-    expect(screen.getByTestId("sofa-group-not-closed")).toBeInTheDocument();
+    // 2990s parity: the Add button is the ONLY closure messaging — an
+    // unclosed group gets no red outline and no per-group caption on canvas.
+    expect(screen.queryByTestId("sofa-group-not-closed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sofa-group-outline")).not.toBeInTheDocument();
   });
 
   it("enables Add for a self-closing single piece (1S = both arms) and emits the payload", () => {

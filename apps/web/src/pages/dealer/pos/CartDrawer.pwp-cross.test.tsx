@@ -86,6 +86,7 @@ function voucher(over: Partial<PwpDiscoverDto> & { code: string }): PwpDiscoverD
     sourceOrderId: "99999999-9999-9999-9999-999999999999",
     expiresAt: null,
     phoneMatches: true,
+    nameMatches: true,
     ...over,
   };
 }
