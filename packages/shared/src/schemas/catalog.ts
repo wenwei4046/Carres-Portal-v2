@@ -359,71 +359,6 @@ export const modelFabricTierOverrideSchema = z.object({
 export type ModelFabricTierOverrideDto = z.infer<typeof modelFabricTierOverrideSchema>;
 
 // ---------------------------------------------------------------------------
-// 0177 — fixed-set combos (套餐). A named bundle sold at one combo_price; its
-// component SKUs split the price back out via explodeCombo() at submit time.
-// One schema, two consumers (§9.5): the API validates these and the web form
-// reuses the exact same shapes.
-// ---------------------------------------------------------------------------
-
-/** One component SKU of a combo (mirrors a `combo_components` row, camelCased). */
-export const comboComponentSchema = z.object({
-  sku: z.string(),
-  qty: z.number().int().positive(),
-  sortOrder: z.number().int(),
-});
-export type ComboComponentDto = z.infer<typeof comboComponentSchema>;
-
-/** A combo plus its components (mirrors the `Combo` domain type). */
-export const comboSchema = z.object({
-  id: z.string().uuid(),
-  comboKey: z.string(),
-  name: z.string(),
-  comboPrice: z.number(),
-  // 0183 — principal-only cost benchmark companion to comboPrice; null = unset.
-  cost: z.number().nullable(),
-  active: z.boolean(),
-  effectiveFrom: z.string(),
-  components: z.array(comboComponentSchema),
-});
-export type ComboDto = z.infer<typeof comboSchema>;
-
-/**
- * Create a combo. `comboKey` is optional — the server may derive it from the
- * name. At least one component is required. `sortOrder` is optional per
- * component (the server defaults it from array position).
- */
-export const comboCreateInput = z
-  .object({
-    name: z.string().trim().min(2).max(80),
-    comboPrice: z.number().nonnegative(),
-    // 0183 — optional cost benchmark (principal-only). null/omit = unset.
-    cost: z.number().nonnegative().nullable().optional(),
-    comboKey: z
-      .string()
-      .trim()
-      .min(2)
-      .max(60)
-      .regex(/^[a-z0-9-]+$/, "comboKey must be kebab-case (a-z, 0-9, dash)")
-      .optional(),
-    active: z.boolean().optional(),
-    components: z
-      .array(
-        z.object({
-          sku: z.string().trim().min(1),
-          qty: z.number().int().positive(),
-          sortOrder: z.number().int().optional(),
-        }),
-      )
-      .min(1),
-  })
-  .strict();
-export type ComboCreateInput = z.infer<typeof comboCreateInput>;
-
-/** Patch a combo — every field of create is optional. */
-export const comboPatchInput = comboCreateInput.partial().strict();
-export type ComboPatchInput = z.infer<typeof comboPatchInput>;
-
-// ---------------------------------------------------------------------------
 // 0178 — sofa compartment pool + per-model offered (sofa engine Phase 1).
 // Principal-owned. One schema, two consumers (§9.5): the API validates these
 // and the Maintenance UI reuses the exact same shapes.
@@ -920,9 +855,6 @@ export const catalogResponseSchema = z.object({
   // The API endpoint adds these; pre-0176 clients that don't read them are unaffected.
   fabricTierConfig: fabricTierConfigSchema.optional(),
   modelFabricTierOverrides: z.array(modelFabricTierOverrideSchema).optional(),
-  // 0177 — fixed-set combos (additive, backward-compatible / OPTIONAL).
-  // Pre-0177 clients that don't read `combos` are wholly unaffected.
-  combos: z.array(comboSchema).optional(),
   // 0178 — sofa compartment pool + per-model offered (additive, OPTIONAL).
   // Pre-0178 clients that don't read these are wholly unaffected.
   sofaCompartments: z.array(sofaCompartmentSchema).optional(),
