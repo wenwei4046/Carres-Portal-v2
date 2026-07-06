@@ -36,6 +36,7 @@ import type { DraftLine } from "../new-order/draft";
 import { sellingFabricsFor } from "../sofa-build/selling-fabrics";
 import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
 import CreateSofaComboModal from "../sofa-build/CreateSofaComboModal";
+import { useSeriesFabric, FABRIC_KIV } from "../sofa-build/use-series-fabric";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
 import SofaPlanView, { PLAN_PAD } from "../sofa-build/SofaPlanView";
 import type { ModelMeta } from "./catalog-index";
@@ -194,10 +195,6 @@ export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
   return straight;
 }
 
-/** Quick-pick fabric colour KIV sentinel — the colour is deferred (a series may
- *  still be chosen). Series-level KIV = an empty `qpSeries`; colour-level KIV =
- *  this value in `qpFabricKey`. One KIV concept, two levels. */
-const QP_FABRIC_KIV = "__kiv__";
 
 // Hero dimension lines — port of 2990s SofaCellsPreview `showDims`: a measured
 // line with end ticks spanning the sofa's W (above) / D (right), the cm chip
@@ -296,21 +293,20 @@ export default function SofaConfigurePage({
     () => sellingFabricsFor(model, fabrics, masterFabrics),
     [model, fabrics, masterFabrics],
   );
-  // Fabric SERIES → COLOUR (Loo 2026-07-06). The series step lists the distinct
-  // collections this model offers; legacy per-model rows (no series) bucket under
-  // "Other". One series → the series step auto-collapses to just the colours.
-  const fabricSeriesList = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const f of sellingFabrics) {
-      const s = f.series ?? "Other";
-      if (!seen.has(s)) {
-        seen.add(s);
-        out.push(s);
-      }
-    }
-    return out;
-  }, [sellingFabrics]);
+  // Fabric SERIES → COLOUR with two-level KIV (Loo 2026-07-06). The exact same
+  // hook drives the Customize canvas, so the two surfaces never drift. Aliased
+  // to the quick-pick names below.
+  const {
+    seriesList: fabricSeriesList,
+    series: qpSeries,
+    chooseSeries: chooseQpSeries,
+    colourKey: qpFabricKey,
+    setColourKey: setQpFabricKey,
+    seriesColours,
+    fabric: qpFabric,
+    deferred: qpDeferred,
+    fabricSeries: qpFabricSeries,
+  } = useSeriesFabric(sellingFabrics);
   // Customize size — CONTROLLED here so the header chips (Loo 2026-07-06) and
   // the canvas's bottom-bar picker drive the same value; survives the canvas
   // remount when a quick pick is loaded (seedKey).
@@ -408,35 +404,15 @@ export default function SofaConfigurePage({
 
   // ── Quick-pick direct-add controls (seat height · fabric · leg · remark) ──
   const [qpHeight, setQpHeight] = useState<SofaHeight>(offeredHeights[0] ?? "24");
-  // Fabric = two cascading picks. `qpSeries` "" = series-level KIV (nothing
-  // chosen); a value = a chosen collection. A sole series auto-selects so the
-  // step collapses to just the colour list. `qpFabricKey` = QP_FABRIC_KIV until
-  // a concrete colour is picked (colour-level KIV).
-  const [qpSeries, setQpSeries] = useState<string>(() =>
-    fabricSeriesList.length === 1 ? fabricSeriesList[0]! : "",
-  );
-  const [qpFabricKey, setQpFabricKey] = useState<string>(QP_FABRIC_KIV);
   const [qpLeg, setQpLeg] = useState<string>("");
   const [qpRemark, setQpRemark] = useState("");
-
-  // The colours inside the chosen series (empty until a series is picked).
-  const seriesColours = useMemo(
-    () => (qpSeries ? sellingFabrics.filter((f) => (f.series ?? "Other") === qpSeries) : []),
-    [sellingFabrics, qpSeries],
-  );
 
   // Heights = the ACTIVE Maintenance sofa sizes this preset is priced for.
   const heroHeights = heroPick
     ? offeredHeights.filter((h) => heroPick.combo.pricesByHeight[h] != null)
     : [];
   const effHeight = heroHeights.includes(qpHeight) ? qpHeight : heroHeights[0] ?? qpHeight;
-  // A concrete colour only exists when a series is chosen AND a colour picked;
-  // otherwise the fabric is KIV (series or colour) → no tier delta yet.
-  const qpFabric =
-    qpSeries && qpFabricKey !== QP_FABRIC_KIV
-      ? seriesColours.find((f) => f.key === qpFabricKey) ?? null
-      : null;
-  const qpDeferred = qpFabric == null;
+  // KIV (series or colour) → no concrete fabric → no tier delta yet.
   const qpDelta = qpFabric
     ? resolveFabricDelta(qpFabric.tier, fabricTierOverride, fabricTierConfig ?? null)
     : 0;
@@ -465,9 +441,9 @@ export default function SofaConfigurePage({
         fabricId: qpFabric?.id ?? null,
         fabricCode: qpFabric?.code ?? null,
         fabricName: qpFabric?.name ?? null,
-        // Record the chosen series even when the colour is KIV (the synthetic
-        // "Other" bucket for legacy rows never becomes a real series stamp).
-        fabricSeries: qpSeries && qpSeries !== "Other" ? qpSeries : null,
+        // Record the chosen series even when the colour is KIV (the hook drops
+        // the synthetic "Other" bucket to null).
+        fabricSeries: qpFabricSeries,
         fabricSurcharge: qpDelta,
         fabricDeferred: qpDeferred,
         legHeight: qpLeg || null,
@@ -770,10 +746,7 @@ export default function SofaConfigurePage({
                     {fabricSeriesList.length > 1 && (
                       <select
                         value={qpSeries}
-                        onChange={(e) => {
-                          setQpSeries(e.target.value);
-                          setQpFabricKey(QP_FABRIC_KIV);
-                        }}
+                        onChange={(e) => chooseQpSeries(e.target.value)}
                         aria-label="Fabric series"
                         className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small"
                         style={{ width: "100%" }}
@@ -802,7 +775,7 @@ export default function SofaConfigurePage({
                           style={{ width: "100%" }}
                           data-testid="sofa-qp-fabric"
                         >
-                          <option value={QP_FABRIC_KIV}>KIV · colour to confirm</option>
+                          <option value={FABRIC_KIV}>KIV · colour to confirm</option>
                           {seriesColours.map((f) => {
                             const delta = resolveFabricDelta(
                               f.tier,
