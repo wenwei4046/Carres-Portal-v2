@@ -205,7 +205,21 @@ export default function ModelEditorModal({
 
   const [name, setName] = useState(model.name);
   const [blurb, setBlurb] = useState(model.blurb ?? "");
-  const [sizes, setSizes] = useState<string[]>(() => opts.sizes ?? []);
+  // The size chips mirror what POS actually SELLS. POS gates a bedframe/mattress
+  // size on product_skus.pos_active; allowed_options.sizes is only a cached copy
+  // that can DRIFT (Loo 2026-07-06: Kayu showed every size OFF in Modular while
+  // POS sold them all — allowed_options.sizes had drifted to [] while the SKUs
+  // stayed pos_active=true). So seed a size ON iff it has a live SKU sold in POS.
+  // Sofa seat sizes keep reading allowed_options.sizes — their POS gate IS that
+  // field (gatedSofaHeights), not per-SKU pos_active.
+  const [sizes, setSizes] = useState<string[]>(() => {
+    if (isSofa) return opts.sizes ?? [];
+    const on = new Set<string>();
+    for (const s of skus) {
+      if (s.variantKind === "size" && !s.discontinuedAt && s.posActive !== false) on.add(s.variant);
+    }
+    return [...on];
+  });
   const [compIds, setCompIds] = useState<string[]>(() => offeredCompIds);
   const [legHeights, setLegHeights] = useState<string[]>(() =>
     Array.isArray(opts.leg_heights) ? opts.leg_heights : legPool,
