@@ -463,6 +463,34 @@ describe("findSnap threshold", () => {
     // X overlap present (boxes overlap), so left-flush dx = 0 - 3 = -3 fires.
     expect(s.dx).toBe(-3);
   });
+
+  // Magnet-parallel (Loo 2026-07-06): a side seam pulls the pieces FLUSH even
+  // when the perpendicular offset exceeds SNAP_CM — linked modules never step.
+  it("magnet-parallel: an abutting E/W seam aligns tops beyond SNAP_CM", () => {
+    // Dragged sits 29cm LOWER than the neighbour (beyond the 20cm snap radius)
+    // and 15cm short of abutting. X snaps the seam shut; the magnet then pulls
+    // the tops level.
+    const neighbour: GeoCell = { id: "n", moduleCode: "1A(LHF)", x: 110, y: 0, rot: 0 };
+    const dragged = cellBbox({ moduleCode: "1A(LHF)", x: 0, y: 29, rot: 0 }, "24")!;
+    const s = findSnap(dragged, [neighbour], "me", "24");
+    expect(s.dx).toBe(15); // abut: 110 - 95
+    expect(s.dy).toBe(-29); // magnet: tops level
+  });
+
+  it("magnet-parallel does NOT fire without a side contact", () => {
+    const farNeighbour: GeoCell = { id: "n", moduleCode: "1A(LHF)", x: 150, y: 0, rot: 0 };
+    const dragged = cellBbox({ moduleCode: "1A(LHF)", x: 0, y: 29, rot: 0 }, "24")!;
+    expect(findSnap(dragged, [farNeighbour], "me", "24")).toEqual({ dx: 0, dy: 0 });
+  });
+
+  it("magnet-parallel mirrors on an N/S seam (aligns lefts)", () => {
+    // Neighbour below; dragged 29cm to the right, 15cm above abutting.
+    const below: GeoCell = { id: "n", moduleCode: "1A(LHF)", x: 0, y: 110, rot: 0 };
+    const dragged = cellBbox({ moduleCode: "1A(LHF)", x: 29, y: 0, rot: 0 }, "24")!;
+    const s = findSnap(dragged, [below], "me", "24");
+    expect(s.dy).toBe(15); // abut: 110 - 95
+    expect(s.dx).toBe(-29); // magnet: lefts level
+  });
 });
 
 /* ─── orderSofaCellsLeftToRight ────────────────────────────────────────── */

@@ -621,6 +621,13 @@ export interface SnapDelta {
  * when nothing is close enough. The X-axis snap only fires when the cells
  * overlap on Y (snapping a horizontal seam, not past a remote piece); mirrored
  * on Y. Four edge-alignment candidates per axis (abut + flush).
+ *
+ * Magnet-parallel pass (Loo 2026-07-06; v2 extension over the 2990s port):
+ * once the snapped drop ABUTS a neighbour on a side, the pieces must sit
+ * FLUSH — the perpendicular axis aligns to the neighbour's nearest edge even
+ * beyond SNAP_CM. Side-by-side modules bolt parallel; a stepped seam is never
+ * a valid assembly. The correction is bounded by the pieces' overlap, so it
+ * nudges into alignment — never flings the module.
  */
 export const findSnap = (
   draggedBbox: Bbox,
@@ -695,10 +702,51 @@ export const findSnap = (
     }
   }
 
-  return {
-    dx: bestX < SNAP_CM ? bestDx : 0,
-    dy: bestY < SNAP_CM ? bestDy : 0,
-  };
+  let dx = bestX < SNAP_CM ? bestDx : 0;
+  let dy = bestY < SNAP_CM ? bestDy : 0;
+
+  // Magnet-parallel: at the SNAPPED position, find side-abutting neighbours
+  // and align the perpendicular axis to the nearest edge (tops/bottoms for an
+  // E/W seam, lefts/rights for an N/S seam). Smallest correction wins per axis.
+  const nx1 = ax1 + dx,
+    nx2 = ax2 + dx;
+  const ny1 = ay1 + dy,
+    ny2 = ay2 + dy;
+  let alignX: number | null = null;
+  let alignY: number | null = null;
+  for (const c of otherCells) {
+    if (ignoreId !== undefined && c.id === ignoreId) continue;
+    const b = cellBbox(c, depth);
+    if (!b) continue;
+    const bx1 = b.x,
+      bx2 = b.x + b.w;
+    const by1 = b.y,
+      by2 = b.y + b.h;
+    const yOv = Math.min(ny2, by2) - Math.max(ny1, by1);
+    if (
+      (Math.abs(nx2 - bx1) <= CONTACT_TOL || Math.abs(nx1 - bx2) <= CONTACT_TOL) &&
+      yOv > CONTACT_TOL
+    ) {
+      const dTop = by1 - ny1;
+      const dBot = by2 - ny2;
+      const fix = Math.abs(dTop) <= Math.abs(dBot) ? dTop : dBot;
+      if (alignY === null || Math.abs(fix) < Math.abs(alignY)) alignY = fix;
+    }
+    const xOv = Math.min(nx2, bx2) - Math.max(nx1, bx1);
+    if (
+      (Math.abs(ny2 - by1) <= CONTACT_TOL || Math.abs(ny1 - by2) <= CONTACT_TOL) &&
+      xOv > CONTACT_TOL
+    ) {
+      const dLeft = bx1 - nx1;
+      const dRight = bx2 - nx2;
+      const fix = Math.abs(dLeft) <= Math.abs(dRight) ? dLeft : dRight;
+      if (alignX === null || Math.abs(fix) < Math.abs(alignX)) alignX = fix;
+    }
+  }
+  if (alignY !== null) dy += alignY;
+  if (alignX !== null) dx += alignX;
+
+  return { dx, dy };
 };
 
 /* ─── Sofa analysis (closure / arm violations) ─────────────────────────── */
