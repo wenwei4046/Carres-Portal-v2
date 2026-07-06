@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { BadgePercent, Gift, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type {
   CatalogResponse,
@@ -217,11 +217,14 @@ function DefaultGiftsSection({
     .sort((a, b) => modelLabel(a).localeCompare(modelLabel(b)));
 
   return (
-    <section>
+    <section className="card p-5">
       <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display">Free gifts — per Model</div>
+        <div className="t-h4 font-display flex items-center gap-2">
+          <Gift size={16} strokeWidth={1.75} className="text-primary" />
+          Free gifts — per Model
+        </div>
       </div>
-      <p className="t-tiny text-base-500 mb-3">
+      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
         An accessory auto-added at RM 0 when this Model is placed on an order. Applies to every SKU
         of the Model; a complete sofa of the Model grants its gift once. Changes apply to new orders
         only. Use &ldquo;+ New GWP&rdquo; above to add one gift to many Models at once.
@@ -247,7 +250,7 @@ function DefaultGiftsSection({
       {/* Existing per-model gift configs */}
       <div className="flex flex-col gap-3">
         {configs.length === 0 && editingModelId === null && (
-          <div className="t-small text-base-500 bg-white border border-base-200 rounded-[4px] px-3 py-4">
+          <div className="t-small text-base-500 bg-base-50 border border-base-200 rounded-[4px] px-3 py-4">
             No default gifts configured.
           </div>
         )}
@@ -257,7 +260,7 @@ function DefaultGiftsSection({
           return (
             <div
               key={cfg.modelId}
-              className="bg-white border border-base-200 rounded-[4px] p-3"
+              className="bg-base-50 border border-base-200 rounded-[4px] p-3"
               data-testid={`gift-model-card-${cfg.modelId}`}
             >
               <div className="flex items-center justify-between gap-3">
@@ -301,7 +304,7 @@ function DefaultGiftsSection({
         <div className="mt-3">
           {editingModelId && !modelsWithGifts.has(editingModelId) && modelById.get(editingModelId) ? (
             <div
-              className="bg-white border border-base-200 rounded-[4px] p-3"
+              className="bg-base-50 border border-base-200 rounded-[4px] p-3"
               data-testid={`gift-model-card-${editingModelId}`}
             >
               <div className="t-small font-medium text-base-900 mb-1">
@@ -417,7 +420,7 @@ function ModelGiftsEditor({
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-3 bg-base-50 border border-base-200 rounded-[4px] p-3">
+    <div className="mt-3 flex flex-col gap-3 bg-white border border-base-200 rounded-[4px] p-3">
       {gifts.map((g, i) => (
         <GiftRow
           key={i}
@@ -850,9 +853,12 @@ function FreeItemCampaignsSection({
   const campaigns = catalog.freeItemCampaigns ?? [];
 
   return (
-    <section>
+    <section className="card p-5">
       <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display">Free Item Campaigns</div>
+        <div className="t-h4 font-display flex items-center gap-2">
+          <Tag size={16} strokeWidth={1.75} className="text-primary" />
+          Free Item Campaigns
+        </div>
         {isPrincipal && (
           <button
             type="button"
@@ -864,7 +870,7 @@ function FreeItemCampaignsSection({
           </button>
         )}
       </div>
-      <p className="t-tiny text-base-500 mb-3">
+      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
         A giveaway a salesperson can apply to an eligible cart line ("Make free") — the line books at
         RM0. Set which models / sizes / sofa builds qualify and the per-line free limit. A campaign is
         dormant until you flip it Active.
@@ -875,9 +881,9 @@ function FreeItemCampaignsSection({
         <CampaignForm catalog={catalog} onDone={() => setAdding(false)} />
       )}
 
-      <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
+      <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
         <div
-          className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
+          className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
           style={{ gridTemplateColumns: "minmax(160px,1.6fr) 100px 90px" }}
         >
           <div className="label">Campaign</div>
@@ -917,7 +923,7 @@ function CampaignRow({
 
   if (editing) {
     return (
-      <div className="px-3 py-3 border-b border-base-100 last:border-b-0 bg-base-50">
+      <div className="px-3 py-3 border-b border-base-100 last:border-b-0 bg-white">
         <CampaignForm catalog={catalog} campaign={campaign} onDone={() => setEditing(false)} />
       </div>
     );
@@ -1090,11 +1096,14 @@ function PwpRulesSection({
   const promoRules = rules.filter((r) => r.type === "promo");
 
   return (
-    <section>
+    <section className="card p-5">
       <div className="flex items-center justify-between mb-1">
-        <div className="t-h4 font-display">PWP / Promo rules</div>
+        <div className="t-h4 font-display flex items-center gap-2">
+          <BadgePercent size={16} strokeWidth={1.75} className="text-primary" />
+          PWP / Promo rules
+        </div>
       </div>
-      <p className="t-tiny text-base-500 mb-3">
+      <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
         Pair a trigger product with a reward product. Buying the trigger unlocks the reward up to a
         set count per trigger — sold at the reward SKU's PWP price (set in SKU Master); a Promo may
         redeem free (RM 0). Use &ldquo;+ New PWP&rdquo; / &ldquo;+ New Promo&rdquo; above to create
@@ -1106,9 +1115,9 @@ function PwpRulesSection({
         <PwpRuleForm catalog={catalog} initialKind={newRuleKind} onDone={onCloseNewRule} />
       )}
 
-      <div className="bg-white border border-base-200 rounded-[4px] overflow-hidden">
+      <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
         <div
-          className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
+          className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
           style={{ gridTemplateColumns: "minmax(200px,1.8fr) 70px 90px" }}
         >
           <div className="label">Trigger → reward</div>
@@ -1124,7 +1133,7 @@ function PwpRulesSection({
         ].map(([kind, list]) =>
           list.length === 0 ? null : (
             <div key={kind} data-testid={`pwp-group-${kind}`}>
-              <div className="t-micro text-base-400 px-3 pt-2 pb-1 bg-base-50/40">
+              <div className="t-micro text-base-500 px-3 pt-2 pb-1 bg-base-100/60">
                 {KIND_LABEL[kind]}
               </div>
               {list.map((r) => (
@@ -1160,7 +1169,7 @@ function PwpRuleRow({
 
   if (editing) {
     return (
-      <div className="px-3 py-3 border-b border-base-100 last:border-b-0 bg-base-50">
+      <div className="px-3 py-3 border-b border-base-100 last:border-b-0 bg-white">
         <PwpRuleForm catalog={catalog} rule={rule} onDone={() => setEditing(false)} />
       </div>
     );
