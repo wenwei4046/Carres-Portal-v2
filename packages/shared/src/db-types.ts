@@ -363,6 +363,9 @@ export interface SofaComboPricingRow {
   effective_from: string;
   active: boolean;
   discontinued_at: string | null;
+  // 0206 — true = a Quick Pick layout preset (POS Quick pick tab, authored with
+  // no price); false = a pricing-only matched combo (hidden from Quick pick).
+  is_quick_pick: boolean;
   created_at: string;
   updated_at: string;
   updated_by: string | null;

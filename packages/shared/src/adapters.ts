@@ -345,6 +345,8 @@ export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
     effectiveFrom: r.effective_from,
     active: r.active,
     discontinuedAt: r.discontinued_at ?? null,
+    // 0206 — Quick Pick preset flag; column is NOT NULL default false.
+    isQuickPick: r.is_quick_pick ?? false,
   };
 };
 
