@@ -191,8 +191,10 @@ describe("SofaBuildCanvas", () => {
     expect(room).toHaveStyle({ width: "600px", height: "480px" });
   });
 
-  it("controlled size: heightValue drives the picker; changes report via onHeightChange", () => {
-    const onHeightChange = vi.fn();
+  it("controlled size: the redundant bottom size picker is hidden (the host owns it)", () => {
+    // When the size is controlled (heightValue provided), the host renders its
+    // own size chips, so the canvas footer's picker would be redundant and is
+    // omitted (Loo 2026-07-06).
     render(
       <SofaBuildCanvas
         model={MODEL}
@@ -205,15 +207,42 @@ describe("SofaBuildCanvas", () => {
         sofaFabrics={FABRICS}
         heights={["24", "26", "Flat"]}
         heightValue="26"
-        onHeightChange={onHeightChange}
+        onHeightChange={vi.fn()}
         onAddBuild={vi.fn()}
         onClose={vi.fn()}
       />,
     );
-    const sel = screen.getByTestId("sofa-build-height") as HTMLSelectElement;
-    expect(sel.value).toBe("26");
-    fireEvent.change(sel, { target: { value: "Flat" } });
-    expect(onHeightChange).toHaveBeenCalledWith("Flat");
+    expect(screen.queryByTestId("sofa-build-height")).toBeNull();
+  });
+
+  it("Create combo: no button without onCreateCombo (dealer flow)", () => {
+    renderCanvas();
+    addModule("1S");
+    expect(screen.queryByTestId("sofa-build-create-combo")).toBeNull();
+  });
+
+  it("Create combo: with onCreateCombo, a valid build hands up its module codes", () => {
+    const onCreateCombo = vi.fn();
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        onCreateCombo={onCreateCombo}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    addModule("1S");
+    const btn = screen.getByTestId("sofa-build-create-combo");
+    expect(btn).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(onCreateCombo).toHaveBeenCalledWith(["1S"]);
   });
 
   /** A flush 1A(LHF)+1A(RHF) pair = ONE closed sofa, pre-placed. */
