@@ -103,7 +103,7 @@ describe("PosConfigurePage — mattress", () => {
 });
 
 describe("PosConfigurePage — bed frame", () => {
-  it("carries color + gap in attrs and label, like the drawer", () => {
+  it("carries gap in attrs + label; NO colour picker (finish comes from fabric)", () => {
     const onAdd = vi.fn();
     render(
       <PosConfigurePage
@@ -116,17 +116,18 @@ describe("PosConfigurePage — bed frame", () => {
     );
 
     fireEvent.click(screen.getByTestId("cfg-size-b1"));
-    // Colour defaults to the first option; switch to the second.
-    fireEvent.click(screen.getByTestId("cfg-colour-Natural oak"));
+    // The old model.colors picker is gone (bedModel still carries colours).
+    expect(screen.queryByTestId("cfg-colour-Natural oak")).toBeNull();
     // Gap defaults to the first option ('10"'); switch to '12"'.
     fireEvent.click(screen.getByTestId('cfg-gap-12"'));
 
     fireEvent.click(screen.getByTestId("cfg-add-to-cart"));
     const line = onAdd.mock.calls[0][0];
     expect(line.sku).toBe("JAGER-K");
-    expect(line.attrs).toMatchObject({ color: "Natural oak", gap: '12"' });
+    expect(line.attrs).toMatchObject({ gap: '12"' });
+    expect("color" in line.attrs).toBe(false);
     expect(line.unitPrice).toBe(1990);
-    expect(line.label).toBe('Jager · King · Natural oak · gap 12"');
+    expect(line.label).toBe('Jager · King · gap 12"');
   });
 
   it("renders the plan-view canvas with the frame footprint once sized", () => {
@@ -252,10 +253,10 @@ describe("PosConfigurePage — bed frame Maintenance options (0201/0202)", () =>
     expect(screen.queryByTestId('cfg-gap-16"')).toBeNull();
   });
 
-  it("fabric is OPT-IN: hidden without ticks; priced by bedframeTier when ticked", () => {
+  it("fabric IS the finish: no picker without ticks; series→colour dropdown priced when ticked", () => {
     const onAdd = vi.fn();
     renderBed(onAdd);
-    expect(screen.queryByTestId("cfg-fabric")).toBeNull();
+    expect(screen.queryByTestId("cfg-fabric-section")).toBeNull();
 
     const onAdd2 = vi.fn();
     render(
@@ -270,10 +271,10 @@ describe("PosConfigurePage — bed frame Maintenance options (0201/0202)", () =>
         onClose={() => {}}
       />,
     );
-    const selects = screen.getAllByTestId("cfg-fabric");
-    const select = selects[selects.length - 1]!;
     fireEvent.click(screen.getAllByTestId("cfg-size-b1")[1]!);
-    fireEvent.change(select, { target: { value: "PC151-01" } });
+    // One series ("Other" — PC151-01 has no series) auto-collapses to the colour
+    // dropdown; pick the colour by its hook key (only render 2 has cfg-fabric).
+    fireEvent.change(screen.getByTestId("cfg-fabric"), { target: { value: "cf:PC151-01" } });
     // 1990 + bedframeTier PRICE_2 delta 150 = 2140.
     expect(screen.getAllByTestId("cfg-live-total")[1]!.textContent).toContain("2,140");
     fireEvent.click(screen.getAllByTestId("cfg-add-to-cart")[1]!);

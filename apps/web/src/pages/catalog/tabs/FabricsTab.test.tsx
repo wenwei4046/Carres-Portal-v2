@@ -21,6 +21,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const mockBatchSaveMutate = vi.fn();
 const mockTierConfigMutate = vi.fn();
 const mockCompartmentMutate = vi.fn();
+const mockOverrideMutate = vi.fn();
 
 vi.mock("@/lib/queries", () => ({
   useBatchSaveCatalogFabrics: () => ({
@@ -28,7 +29,7 @@ vi.mock("@/lib/queries", () => ({
     isPending: false,
   }),
   // Per-model tier override (moved here from Modular, Loo 2026-07-06).
-  useUpsertModelFabricTierOverride: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpsertModelFabricTierOverride: () => ({ mutate: mockOverrideMutate, isPending: false }),
   useCatalogFabricsHistory: () => ({
     data: {
       history: [
@@ -99,6 +100,7 @@ function wrap(ui: React.ReactNode) {
 beforeEach(() => {
   mockBatchSaveMutate.mockReset();
   mockCompartmentMutate.mockReset();
+  mockOverrideMutate.mockReset();
 });
 
 describe("FabricsTab — view table", () => {
@@ -214,5 +216,69 @@ describe("FabricsTab — Fabric Pricing sidebar", () => {
     render(wrap(<FabricsTab catalog={makeCatalog([FABRIC_BF])} isPrincipal={true} />));
     fireEvent.click(screen.getByTestId("maint-nav-pricing"));
     expect(screen.getByTestId("fabric-tier-summary")).toBeInTheDocument();
+  });
+});
+
+describe("FabricsTab — Fabric Pricing saved lists (Loo 2026-07-07)", () => {
+  function pricingCatalog(): CatalogResponse {
+    return {
+      ...makeCatalog([FABRIC_BF], [
+        {
+          id: "c1",
+          code: "1A(LHF)",
+          description: "Left hand facing",
+          seatCount: 1,
+          armConfig: null,
+          iconUrl: null,
+          defaultPrice: 0,
+          sortOrder: 1,
+          active: true,
+          specialTier2Delta: 300,
+          specialTier3Delta: null,
+        },
+        {
+          id: "c2",
+          code: "CNR",
+          description: "Corner",
+          seatCount: 1,
+          armConfig: null,
+          iconUrl: null,
+          defaultPrice: 0,
+          sortOrder: 2,
+          active: true,
+          specialTier2Delta: null,
+          specialTier3Delta: null,
+        },
+      ]),
+      models: [
+        { id: "m-sofa", category: "sofa", modelKey: "booqit", name: "Booqit", blurb: null, colors: null, gaps: null, sofaMode: null },
+      ],
+      modelFabricTierOverrides: [{ modelId: "m-sofa", tier2Delta: 250, tier3Delta: null }],
+    };
+  }
+
+  it("lists a saved per-model override and removing it clears the deltas", () => {
+    render(wrap(<FabricsTab catalog={pricingCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("maint-nav-pricing"));
+    const row = screen.getByTestId("tier-override-row-m-sofa");
+    expect(row.textContent).toContain("Booqit");
+    expect(row.textContent).toContain("RM 250");
+    fireEvent.click(screen.getByTestId("tier-override-remove-m-sofa"));
+    expect(mockOverrideMutate).toHaveBeenCalledTimes(1);
+    expect(mockOverrideMutate.mock.calls[0][0]).toEqual({ modelId: "m-sofa", tier2Delta: null, tier3Delta: null });
+  });
+
+  it("lists ONLY compartments with a special (CNR with no special is hidden)", () => {
+    render(wrap(<FabricsTab catalog={pricingCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("maint-nav-pricing"));
+    expect(screen.getByTestId("compartment-special-row-c1").textContent).toContain("1A(LHF)");
+    expect(screen.queryByTestId("compartment-special-row-c2")).not.toBeInTheDocument();
+    // remove clears the special
+    fireEvent.click(screen.getByTestId("compartment-special-remove-c1"));
+    expect(mockCompartmentMutate).toHaveBeenCalledTimes(1);
+    expect(mockCompartmentMutate.mock.calls[0][0]).toEqual({
+      id: "c1",
+      patch: { specialTier2Delta: null, specialTier3Delta: null },
+    });
   });
 });

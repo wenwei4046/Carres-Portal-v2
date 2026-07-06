@@ -3147,10 +3147,12 @@
 }
 .sof-qp__heroBox {
   position: relative;
-  /* aspect-ratio set inline. Anchor to height so all presets display
-     at consistent vertical size; width derives from AR. Cap width too
-     so very wide presets (2S AR≈3.3) don't overflow horizontally. */
-  height: min(55cqh, calc(80cqw / var(--qp-ar, 2)));
+  /* aspect-ratio set inline (the true to-scale sofa ratio — every compartment
+     stays proportional). Anchor to height so all presets display at consistent
+     vertical size; width derives from AR. Cap width too so very wide presets
+     (2S AR≈3.3) don't overflow horizontally. Loo 2026-07-07 — filled the stage
+     more (was 55cqh/80cqw → too much blank space around the plan view). */
+  height: min(78cqh, calc(92cqw / var(--qp-ar, 2)));
   width: auto;
 }
 .sof-qp__heroFrame {

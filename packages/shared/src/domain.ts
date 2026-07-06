@@ -266,35 +266,6 @@ export interface CatalogConfigHistory {
 }
 
 /**
- * One component SKU inside a combo (migration 0177). `qty` = how many of this
- * SKU the bundle contains; `sortOrder` drives the deterministic explode order
- * (the last component absorbs the rounding residue in explodeCombo).
- */
-export interface ComboComponent {
-  sku: string;
-  qty: number;
-  sortOrder: number;
-}
-
-/**
- * A fixed-set combo / bundle (套餐, migration 0177) sold at one `comboPrice`.
- * `comboFromRow` maps the `combos` row; `components` is attached by the caller
- * (the API assembles the nested `combo_components` rows, the same way other
- * nested domain objects are composed).
- */
-export interface Combo {
-  id: string;
-  comboKey: string;
-  name: string;
-  comboPrice: number;
-  // 0183 — principal-only cost benchmark companion to comboPrice; null = unset.
-  cost: number | null;
-  active: boolean;
-  effectiveFrom: string;
-  components: ComboComponent[];
-}
-
-/**
  * A sofa compartment type from the principal-owned pool (migration 0178, sofa
  * engine Phase 1). `defaultPrice` is the pool RM price; a model may override it
  * per compartment via `ModelSofaCompartment`. `code` is the stable unique key.
@@ -366,6 +337,11 @@ export interface SofaCombo {
   effectiveFrom: string;
   active: boolean;
   discontinuedAt: string | null;
+  /** 0206 — true = a Quick Pick layout preset (shown in the POS Quick pick tab;
+   *  authored with no price → prices live when loaded). false = a pricing-only
+   *  matched combo (hidden from Quick pick). Optional: the adapter always emits
+   *  it (`?? false`); only pre-0206 test fixtures omit it. */
+  isQuickPick?: boolean;
 }
 
 export interface FloorConfig {

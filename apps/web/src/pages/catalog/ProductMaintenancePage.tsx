@@ -5,7 +5,7 @@ import { PillTabs, type PillTab } from "./components/PillTabs";
 import SkuMasterTab from "./tabs/SkuMasterTab";
 import ModularTab from "./modular/ModularTab";
 import MaintenanceTab from "./tabs/MaintenanceTab";
-import CombosTab from "./tabs/CombosTab";
+import SofaCombosTab from "./tabs/SofaCombosTab";
 import SpecialAddonsTab from "./tabs/SpecialAddonsTab";
 import FabricsTab from "./tabs/FabricsTab";
 import DeliveryTab from "./tabs/DeliveryTab";
@@ -22,8 +22,9 @@ import PromoTab from "./tabs/PromoTab";
  *   • Delivery    — trip fee + special delivery rules + stair-carry fee (its
  *                   own tab, split out of Maintenance — Loo 2026-07-06).
  *   • Maintenance — option pools (sizes / compartments / supplier categories).
- *   • Combos      — principal-only named SKU sets sold at one combo price; the
- *                   components split that price back out at checkout (0177).
+ *   • Sofa Combos — principal-only matched-shape compartment bundles priced per
+ *                   seat height (0179). (The old fixed-set "Overall Combo" was
+ *                   removed 2026-07-06 — written in error, never used.)
  *
  * Mounts at the unchanged `'catalog'` routing key in BOTH OperationApp and
  * PrincipalApp. The single `useCatalog({ admin: true })` bundle is fetched
@@ -57,7 +58,7 @@ const TABS: readonly PillTab<TabKey>[] = [
   { key: "fabrics", label: "Fabrics" },
   { key: "delivery", label: "Delivery" },
   { key: "maintenance", label: "Maintenance" },
-  { key: "combos", label: "Combos" },
+  { key: "combos", label: "Sofa Combos" },
   { key: "promo", label: "Promo / Free Gifts" },
 ];
 
@@ -113,7 +114,7 @@ export default function ProductMaintenancePage({
             <MaintenanceTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
           {tab === "combos" && (
-            <CombosTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
+            <SofaCombosTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
           {tab === "promo" && (
             <PromoTab catalog={catalogQ.data} isPrincipal={isPrincipal} />

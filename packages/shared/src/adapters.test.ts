@@ -611,6 +611,8 @@ describe("sofaComboFromRow", () => {
       effective_from: "2026-06-21",
       active: true,
       discontinued_at: null,
+      // 0206 — Quick Pick preset flag (column NOT NULL default false).
+      is_quick_pick: false,
       created_at: "2026-06-21T08:00:00.000Z",
       updated_at: "2026-06-21T08:00:00.000Z",
       updated_by: null,
@@ -647,6 +649,12 @@ describe("sofaComboFromRow", () => {
     expect(out.effectiveFrom).toBe("2026-06-21");
     expect(out.active).toBe(true);
     expect(out.discontinuedAt).toBeNull();
+    // 0206 — Quick Pick preset flag maps through (default false here).
+    expect(out.isQuickPick).toBe(false);
+  });
+
+  it("0206 — maps is_quick_pick=true (a Quick Pick preset row)", () => {
+    expect(sofaComboFromRow(baseRow({ is_quick_pick: true })).isQuickPick).toBe(true);
   });
 
   it("defaults slots=[] and pricesByHeight={} when the DB sends null", () => {

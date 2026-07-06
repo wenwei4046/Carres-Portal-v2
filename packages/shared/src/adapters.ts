@@ -277,35 +277,6 @@ export const catalogFabricsHistoryFromRow = (
 });
 
 /**
- * Maps a `combo_components` row to the camelCase domain shape (migration 0177).
- */
-export const comboComponentFromRow = (r: DB.ComboComponentRow): D.ComboComponent => ({
-  sku: r.sku,
-  qty: Number(r.qty),
-  sortOrder: Number(r.sort_order),
-});
-
-/**
- * Maps a `combos` row to the camelCase domain shape (migration 0177).
- * `combo_price` is Postgres numeric — `Number()` normalises the string|number
- * PostgREST surfaces it as. `components` is NOT on the row; the caller attaches
- * the mapped `combo_components` (via comboComponentFromRow) after fetch, so this
- * adapter defaults it to an empty array.
- */
-export const comboFromRow = (r: DB.ComboRow): D.Combo => ({
-  id: r.id,
-  comboKey: r.combo_key,
-  name: r.name,
-  comboPrice: Number(r.combo_price),
-  // 0183 — cost benchmark; null stays null (not coerced to 0) so "unset" is
-  // distinct from "zero cost".
-  cost: r.cost == null ? null : Number(r.cost),
-  active: r.active,
-  effectiveFrom: r.effective_from,
-  components: [],
-});
-
-/**
  * Maps a `sofa_compartments` row to the camelCase domain shape (migration 0178).
  * `default_price` is Postgres numeric(12,2) — `Number()` normalises the
  * string|number PostgREST surfaces it as. `seat_count` is nullable and stays
@@ -374,6 +345,8 @@ export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
     effectiveFrom: r.effective_from,
     active: r.active,
     discontinuedAt: r.discontinued_at ?? null,
+    // 0206 — Quick Pick preset flag; column is NOT NULL default false.
+    isQuickPick: r.is_quick_pick ?? false,
   };
 };
 

@@ -106,8 +106,10 @@ export default function FabricsTab({
       <div className="flex-1 min-w-0 max-w-[980px]">
         {active === "fabrics" && <FabricsPanel fabrics={fabrics} isPrincipal={isPrincipal} />}
         {active === "pricing" && (
-          <div className="max-w-[680px] flex flex-col gap-6">
-            <FabricTierDeltasCard catalog={catalog} isPrincipal={isPrincipal} />
+          <div className="flex flex-col gap-8">
+            <div className="max-w-[680px]">
+              <FabricTierDeltasCard catalog={catalog} isPrincipal={isPrincipal} />
+            </div>
             <PerModelTierOverride catalog={catalog} isPrincipal={isPrincipal} />
             <PerCompartmentSpecialPrice catalog={catalog} isPrincipal={isPrincipal} />
           </div>
@@ -122,6 +124,10 @@ export default function FabricsTab({
 // (Loo 2026-07-06: Modular = ON/OFF · name · description · photo ONLY; money
 // knobs live with the other fabric pricing). Blank delta = inherit global.
 // ---------------------------------------------------------------------------
+
+/** RM delta for a saved-list cell — null means "inherit the global delta". */
+const deltaCell = (n: number | null | undefined) =>
+  n == null ? <span className="text-base-400">global</span> : `RM ${n.toLocaleString("en-MY")}`;
 
 function PerModelTierOverride({
   catalog,
@@ -138,6 +144,19 @@ function PerModelTierOverride({
         .sort((a, b) => a.name.localeCompare(b.name)),
     [catalog.models],
   );
+  const modelById = useMemo(() => new Map(models.map((m) => [m.id, m])), [models]);
+  // Only overrides that actually SET a delta (all-null = inherits global = not
+  // a real override) and belong to a sofa/bedframe model.
+  const saved = useMemo(
+    () =>
+      (catalog.modelFabricTierOverrides ?? [])
+        .filter((o) => (o.tier2Delta != null || o.tier3Delta != null) && modelById.has(o.modelId))
+        .sort((a, b) =>
+          (modelById.get(a.modelId)?.name ?? "").localeCompare(modelById.get(b.modelId)?.name ?? ""),
+        ),
+    [catalog.modelFabricTierOverrides, modelById],
+  );
+
   const [modelId, setModelId] = useState<string>(models[0]?.id ?? "");
   const override =
     (catalog.modelFabricTierOverrides ?? []).find((o) => o.modelId === modelId) ?? null;
@@ -168,71 +187,140 @@ function PerModelTierOverride({
     );
   }
 
+  function remove(mid: string) {
+    upsert.mutate(
+      { modelId: mid, tier2Delta: null, tier3Delta: null },
+      {
+        onSuccess: () => toast.success("Override removed — back to global"),
+        onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Remove failed"),
+      },
+    );
+  }
+
   if (models.length === 0) return null;
 
   return (
     <section data-testid="per-model-tier-override">
       <div className="t-h4 font-display text-base-900 mb-1">Per-model tier override</div>
-      <p className="t-tiny text-base-500 mb-2 max-w-[520px]">
+      <p className="t-tiny text-base-500 mb-3 max-w-[560px]">
         Model-specific premium for P2 / P3 fabrics — overrides the global deltas above.
         Blank = use global.
         {!isPrincipal && " Master Admin only — read-only for your role."}
       </p>
-      <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-wrap gap-4 items-end">
-        <label className="block">
-          <span className="label block mb-1">Model</span>
-          <select
-            value={modelId}
-            onChange={(e) => setModelId(e.target.value)}
-            className={`${INPUT_CLS} w-52`}
-            data-testid="tier-override-model"
-          >
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5 items-start">
+        {/* Editor */}
+        <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-col gap-4">
+          <label className="block">
+            <span className="label block mb-1">Model</span>
+            <select
+              value={modelId}
+              onChange={(e) => setModelId(e.target.value)}
+              className={`${INPUT_CLS} w-full`}
+              data-testid="tier-override-model"
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex gap-3">
+            <label className="block flex-1">
+              <span className="label block mb-1">P2 delta (RM)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={t2}
+                disabled={!isPrincipal}
+                onChange={(e) => setT2(e.target.value)}
+                placeholder="global"
+                className={`${INPUT_CLS} w-full disabled:opacity-60`}
+                data-testid="tier-override-t2"
+              />
+            </label>
+            <label className="block flex-1">
+              <span className="label block mb-1">P3 delta (RM)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={t3}
+                disabled={!isPrincipal}
+                onChange={(e) => setT3(e.target.value)}
+                placeholder="global"
+                className={`${INPUT_CLS} w-full disabled:opacity-60`}
+                data-testid="tier-override-t3"
+              />
+            </label>
+          </div>
+          {isPrincipal && (
+            <button
+              type="button"
+              onClick={save}
+              disabled={!valid || !dirty || upsert.isPending}
+              className="btn-primary text-[12px] self-start disabled:opacity-40"
+              data-testid="tier-override-save"
+            >
+              {upsert.isPending ? "Saving…" : override?.tier2Delta != null || override?.tier3Delta != null ? "Update override" : "Save override"}
+            </button>
+          )}
+        </div>
+
+        {/* Saved overrides list */}
+        <div>
+          <div className="label mb-1.5">Saved overrides</div>
+          <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
+            <div
+              className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
+              style={{ gridTemplateColumns: "minmax(120px,1.4fr) 84px 84px 140px" }}
+            >
+              <div className="label">Model</div>
+              <div className="label text-right">P2</div>
+              <div className="label text-right">P3</div>
+              <div className="label text-right">Actions</div>
+            </div>
+            {saved.length === 0 && (
+              <div className="t-small text-base-500 px-3 py-4" data-testid="tier-override-empty">
+                No overrides — every model uses the global deltas.
+              </div>
+            )}
+            {saved.map((o) => (
+              <div
+                key={o.modelId}
+                className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
+                style={{ gridTemplateColumns: "minmax(120px,1.4fr) 84px 84px 140px" }}
+                data-testid={`tier-override-row-${o.modelId}`}
+              >
+                <div className="t-small text-base-900 truncate">{modelById.get(o.modelId)?.name}</div>
+                <div className="text-right t-small">{deltaCell(o.tier2Delta)}</div>
+                <div className="text-right t-small">{deltaCell(o.tier3Delta)}</div>
+                <div className="text-right flex justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setModelId(o.modelId)}
+                    className="btn-ghost text-[11px]"
+                    data-testid={`tier-override-edit-${o.modelId}`}
+                  >
+                    Edit
+                  </button>
+                  {isPrincipal && (
+                    <button
+                      type="button"
+                      onClick={() => remove(o.modelId)}
+                      disabled={upsert.isPending}
+                      className="btn-danger text-[11px]"
+                      data-testid={`tier-override-remove-${o.modelId}`}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
             ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="label block mb-1">P2 delta (RM)</span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={t2}
-            disabled={!isPrincipal}
-            onChange={(e) => setT2(e.target.value)}
-            placeholder="global"
-            className={`${INPUT_CLS} w-28 disabled:opacity-60`}
-            data-testid="tier-override-t2"
-          />
-        </label>
-        <label className="block">
-          <span className="label block mb-1">P3 delta (RM)</span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={t3}
-            disabled={!isPrincipal}
-            onChange={(e) => setT3(e.target.value)}
-            placeholder="global"
-            className={`${INPUT_CLS} w-28 disabled:opacity-60`}
-            data-testid="tier-override-t3"
-          />
-        </label>
-        {isPrincipal && (
-          <button
-            type="button"
-            onClick={save}
-            disabled={!valid || !dirty || upsert.isPending}
-            className="btn-primary text-[12px] disabled:opacity-40"
-            data-testid="tier-override-save"
-          >
-            {upsert.isPending ? "Saving…" : "Save override"}
-          </button>
-        )}
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -298,10 +386,25 @@ function PerCompartmentSpecialPrice({
     );
   }
 
+  const saved = useMemo(
+    () => compartments.filter((c) => c.specialTier2Delta != null || c.specialTier3Delta != null),
+    [compartments],
+  );
+
+  function remove(id: string) {
+    patch.mutate(
+      { id, patch: { specialTier2Delta: null, specialTier3Delta: null } },
+      {
+        onSuccess: () => toast.success("Special removed"),
+        onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Remove failed"),
+      },
+    );
+  }
+
   return (
     <section data-testid="per-compartment-special-price">
       <div className="t-h4 font-display text-base-900 mb-1">Per-compartment special price</div>
-      <p className="t-tiny text-base-500 mb-2 max-w-[520px]">
+      <p className="t-tiny text-base-500 mb-3 max-w-[560px]">
         When any sofa build uses this compartment, its P2 / P3 fabric premium
         replaces the per-model / global deltas above for the whole sofa (highest
         wins if a build spans several). Blank = no special.
@@ -312,63 +415,129 @@ function PerCompartmentSpecialPrice({
           No compartments yet — add them in the Maintenance tab first.
         </div>
       ) : (
-        <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-wrap gap-4 items-end">
-          <label className="block">
-            <span className="label block mb-1">Compartment</span>
-            <select
-              value={compartmentId}
-              onChange={(e) => setCompartmentId(e.target.value)}
-              className={`${INPUT_CLS} w-52`}
-              data-testid="compartment-special-select"
-            >
-              {compartments.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code}
-                  {c.description ? ` — ${c.description}` : ""}
-                  {c.active ? "" : " (off)"}
-                </option>
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5 items-start">
+          {/* Editor */}
+          <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-col gap-4">
+            <label className="block">
+              <span className="label block mb-1">Compartment</span>
+              <select
+                value={compartmentId}
+                onChange={(e) => setCompartmentId(e.target.value)}
+                className={`${INPUT_CLS} w-full`}
+                data-testid="compartment-special-select"
+              >
+                {compartments.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code}
+                    {c.description ? ` — ${c.description}` : ""}
+                    {c.active ? "" : " (off)"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex gap-3">
+              <label className="block flex-1">
+                <span className="label block mb-1">P2 special (RM)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={t2}
+                  disabled={!isPrincipal}
+                  onChange={(e) => setT2(e.target.value)}
+                  placeholder="none"
+                  className={`${INPUT_CLS} w-full disabled:opacity-60`}
+                  data-testid="compartment-special-t2"
+                />
+              </label>
+              <label className="block flex-1">
+                <span className="label block mb-1">P3 special (RM)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={t3}
+                  disabled={!isPrincipal}
+                  onChange={(e) => setT3(e.target.value)}
+                  placeholder="none"
+                  className={`${INPUT_CLS} w-full disabled:opacity-60`}
+                  data-testid="compartment-special-t3"
+                />
+              </label>
+            </div>
+            {isPrincipal && (
+              <button
+                type="button"
+                onClick={save}
+                disabled={!valid || !dirty || patch.isPending}
+                className="btn-primary text-[12px] self-start disabled:opacity-40"
+                data-testid="compartment-special-save"
+              >
+                {patch.isPending
+                  ? "Saving…"
+                  : current?.specialTier2Delta != null || current?.specialTier3Delta != null
+                    ? "Update special"
+                    : "Save special"}
+              </button>
+            )}
+          </div>
+
+          {/* Saved specials list */}
+          <div>
+            <div className="label mb-1.5">Saved specials</div>
+            <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
+              <div
+                className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200"
+                style={{ gridTemplateColumns: "minmax(120px,1.4fr) 84px 84px 140px" }}
+              >
+                <div className="label">Compartment</div>
+                <div className="label text-right">P2</div>
+                <div className="label text-right">P3</div>
+                <div className="label text-right">Actions</div>
+              </div>
+              {saved.length === 0 && (
+                <div className="t-small text-base-500 px-3 py-4" data-testid="compartment-special-empty">
+                  No compartment specials set.
+                </div>
+              )}
+              {saved.map((c) => (
+                <div
+                  key={c.id}
+                  className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
+                  style={{ gridTemplateColumns: "minmax(120px,1.4fr) 84px 84px 140px" }}
+                  data-testid={`compartment-special-row-${c.id}`}
+                >
+                  <div className="t-small text-base-900 truncate" title={c.description ?? c.code}>
+                    <span className="font-mono">{c.code}</span>
+                    {!c.active && <span className="ml-1 text-base-400">(off)</span>}
+                  </div>
+                  <div className="text-right t-small">{deltaCell(c.specialTier2Delta)}</div>
+                  <div className="text-right t-small">{deltaCell(c.specialTier3Delta)}</div>
+                  <div className="text-right flex justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCompartmentId(c.id)}
+                      className="btn-ghost text-[11px]"
+                      data-testid={`compartment-special-edit-${c.id}`}
+                    >
+                      Edit
+                    </button>
+                    {isPrincipal && (
+                      <button
+                        type="button"
+                        onClick={() => remove(c.id)}
+                        disabled={patch.isPending}
+                        className="btn-danger text-[11px]"
+                        data-testid={`compartment-special-remove-${c.id}`}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
               ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="label block mb-1">P2 special (RM)</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={t2}
-              disabled={!isPrincipal}
-              onChange={(e) => setT2(e.target.value)}
-              placeholder="none"
-              className={`${INPUT_CLS} w-28 disabled:opacity-60`}
-              data-testid="compartment-special-t2"
-            />
-          </label>
-          <label className="block">
-            <span className="label block mb-1">P3 special (RM)</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={t3}
-              disabled={!isPrincipal}
-              onChange={(e) => setT3(e.target.value)}
-              placeholder="none"
-              className={`${INPUT_CLS} w-28 disabled:opacity-60`}
-              data-testid="compartment-special-t3"
-            />
-          </label>
-          {isPrincipal && (
-            <button
-              type="button"
-              onClick={save}
-              disabled={!valid || !dirty || patch.isPending}
-              className="btn-primary text-[12px] disabled:opacity-40"
-              data-testid="compartment-special-save"
-            >
-              {patch.isPending ? "Saving…" : "Save special"}
-            </button>
-          )}
+            </div>
+          </div>
         </div>
       )}
     </section>
