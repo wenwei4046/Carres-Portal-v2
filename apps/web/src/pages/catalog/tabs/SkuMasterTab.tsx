@@ -395,6 +395,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         <NewSkuModal
           models={catalog.models}
           sofaCompartments={catalog.sofaCompartments ?? []}
+          optionPools={catalog.optionPools ?? []}
           onClose={() => setNewOpen(false)}
         />
       )}
