@@ -123,6 +123,15 @@ describe("SofaCombosPanel — principal-gating", () => {
     expect(screen.getByTestId("sofa-combo-edit-sc-1")).toBeInTheDocument();
     expect(screen.getByTestId("sofa-combo-delete-sc-1")).toBeInTheDocument();
   });
+
+  it("shows each priced seat height as a price chip on the card (no drill-in)", () => {
+    renderPanel({ isPrincipal: true, combos: [sampleCombo] });
+    // sampleCombo pricesByHeight: 28 -> 2640, 32 -> 2800.
+    expect(screen.getByTestId("sofa-combo-price-chip-sc-1-28")).toHaveTextContent("2,640");
+    expect(screen.getByTestId("sofa-combo-price-chip-sc-1-32")).toHaveTextContent("2,800");
+    // a height with no price gets no chip.
+    expect(screen.queryByTestId("sofa-combo-price-chip-sc-1-24")).not.toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------
