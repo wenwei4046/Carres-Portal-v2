@@ -136,6 +136,56 @@ describe("comboSeedCells", () => {
     expect(groups).toHaveLength(1); // one connected sofa
     expect(analyzeSofa(groups[0], "24").closed).toBe(true); // no arm collision
   });
+
+  it("a Corner + 2-seater + 1-seater combo draws the 2990s L — 2-seater is the LONG top bar, 1-seater the SHORT chaise leg", () => {
+    const cornerCombo: SofaComboDto = {
+      ...COMBO,
+      slots: [["1B(LHF)"], ["CNR"], ["2A(RHF)"]],
+    };
+    const cells = comboSeedCells(cornerCombo, "24");
+    // Left→right walk order — leftmost closing side (the chaise) first.
+    expect(cells.map((c) => c.moduleCode)).toEqual(["1B(LHF)", "CNR", "2A(RHF)"]);
+    const [one, cnr, two] = cells;
+    const cnrFp = moduleFootprint(findModule("CNR")!, 0, "24");
+    const twoFp = moduleFootprint(findModule("2A(RHF)")!, 0, "24");
+    const oneFp = moduleFootprint(findModule("1B(LHF)")!, 270, "24");
+    // Corner top-left; 2A flush to its right on the SAME row (the long bar).
+    expect(two.y).toBe(cnr.y);
+    expect(two.x).toBe(cnr.x + cnrFp.w);
+    expect(two.rot).toBe(0);
+    // 1B drops straight below the corner (the short chaise leg), back on the outer left.
+    expect(one.x).toBe(cnr.x);
+    expect(one.y).toBe(cnr.y + cnrFp.h);
+    expect(one.rot).toBe(270);
+    // Overall ratio: WIDER than deep (253×200 at 24″) — the old seed drew 200×253.
+    const w = cnrFp.w + twoFp.w;
+    const h = cnrFp.h + oneFp.h;
+    expect(w).toBe(253);
+    expect(h).toBe(200);
+    expect(w).toBeGreaterThan(h);
+  });
+
+  it("an RHF-chaise corner combo mirrors the whole L (2-seater left, chaise drops bottom-right)", () => {
+    const mirrored: SofaComboDto = {
+      ...COMBO,
+      slots: [["2A(LHF)"], ["CNR"], ["1B(RHF)"]],
+    };
+    const cells = comboSeedCells(mirrored, "24");
+    expect(cells.map((c) => c.moduleCode)).toEqual(["2A(LHF)", "CNR", "1B(RHF)"]);
+    const [two, cnr, one] = cells;
+    const twoFp = moduleFootprint(findModule("2A(LHF)")!, 0, "24");
+    const cnrFp = moduleFootprint(findModule("CNR")!, 0, "24");
+    expect(two.rot).toBe(0);
+    expect(cnr.x).toBe(two.x + twoFp.w);
+    expect(cnr.rot).toBe(90); // arms N+E — outward on the mirrored side
+    expect(one.y).toBe(cnr.y + cnrFp.h);
+    expect(one.rot).toBe(90);
+    // Still ONE closed sofa under the canvas's own analysis.
+    const withIds = cells.map((c, i) => ({ ...c, id: String(i) }));
+    const groups = groupSofas(withIds, "24");
+    expect(groups).toHaveLength(1);
+    expect(analyzeSofa(groups[0], "24").closed).toBe(true);
+  });
 });
 
 describe("SofaConfigurePage", () => {

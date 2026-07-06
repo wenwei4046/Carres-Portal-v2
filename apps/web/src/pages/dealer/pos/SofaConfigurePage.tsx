@@ -114,18 +114,62 @@ function seedClosed(cells: SeedCell[], depth: string): boolean {
 }
 
 /**
- * Lay a combo's modules onto the canvas. Straight runs stay flush left→right;
- * a combo with exactly ONE corner module gets the L treatment — the tail turns
- * south, and we search corner/tail rotations until the SAME arm-cap analysis
- * the canvas enforces reports a closed sofa (the seed validates itself). No
- * closed arrangement, or 2+ corners → the straight fallback and the user
- * rearranges on canvas.
+ * The 2990s corner-L layout (Configurator `cellsFromComboModules`): a 3-piece
+ * Corner + 2-seater + 1-seater combo ALWAYS draws with the 2-seater as the
+ * LONG bar beside the corner and the 1-seater as the SHORT chaise leg dropping
+ * below it — never the other way around. The chaise's hand picks the side:
+ * LHF → corner top-left, chaise bottom-left; RHF → the whole L mirrors.
+ * Cells return in left→right walk order (chaise first for LHF) so the cart
+ * label reads like the customer facing the sofa — leftmost closing side first.
+ * Any other module set → null (caller falls through to the generic seed).
+ */
+function seedCornerL(codes: string[], depth: string): SeedCell[] | null {
+  if (codes.length !== 3) return null;
+  const byGroup = (g: string) => codes.find((c) => findModule(c)?.group === g);
+  const cnr = byGroup("Corner");
+  const two = byGroup("2-seater");
+  const one = byGroup("1-seater");
+  if (!cnr || !two || !one) return null;
+  const cnrFp = moduleFootprint(findModule(cnr)!, 0, depth);
+  const twoFp = moduleFootprint(findModule(two)!, 0, depth);
+  const chaiseW = moduleFootprint(findModule(one)!, 90, depth).w;
+  const x = 60;
+  const y = 60;
+  if (one.includes("RHF")) {
+    // Chaise drops bottom-right: 2-seater · corner (arms N+E) · chaise, outer
+    // edges flush on the right.
+    return [
+      { moduleCode: two, x, y, rot: 0 },
+      { moduleCode: cnr, x: x + twoFp.w, y, rot: 90 },
+      { moduleCode: one, x: x + twoFp.w + cnrFp.w - chaiseW, y: y + cnrFp.h, rot: 90 },
+    ];
+  }
+  // Chaise drops bottom-left: chaise · corner (arms N+W) · 2-seater.
+  return [
+    { moduleCode: one, x, y: y + cnrFp.h, rot: 270 },
+    { moduleCode: cnr, x, y, rot: 0 },
+    { moduleCode: two, x: x + cnrFp.w, y, rot: 0 },
+  ];
+}
+
+/**
+ * Lay a combo's modules onto the canvas. A 3-piece Corner + 2-seater +
+ * 1-seater combo takes the fixed 2990s corner-L (`seedCornerL`) — long bar
+ * beside the corner, chaise below. Straight runs stay flush left→right; any
+ * other combo with exactly ONE corner module gets the generic L treatment —
+ * the tail turns south, and we search corner/tail rotations until the SAME
+ * arm-cap analysis the canvas enforces reports a closed sofa (the seed
+ * validates itself). No closed arrangement, or 2+ corners → the straight
+ * fallback and the user rearranges on canvas.
  */
 export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
   const codes = combo.slots
     .map((s) => s[0])
     .filter((code): code is string => !!code);
   if (codes.length === 0) return [];
+
+  const cornerL = seedCornerL(codes, depth);
+  if (cornerL && seedClosed(cornerL, depth)) return cornerL;
 
   const straight = seedStraight(codes, depth);
   const cornerIdxs = codes
