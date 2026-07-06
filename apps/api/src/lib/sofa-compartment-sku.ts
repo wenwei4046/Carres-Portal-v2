@@ -17,9 +17,10 @@ import { mapPgError } from "./route-helpers";
  * Principal-owned + contract-safe: this runs only inside the principal-gated
  * `model_sofa_compartments` route on the principal's USER JWT (never
  * service_role), so the 0175 price-lock trigger allows the price write. The sku
- * is `pos_active = false` — it NEVER appears as a standalone product in the flat
- * POS grid (that is how the builder coexists with the 628 legacy flat sofa SKUs);
- * it is reachable only via the builder + the exploded order lines.
+ * is minted `pos_active = false` (not a standalone flat-grid product); the
+ * Modular tab owns the toggle from then on — a RE-offer preserves it (like
+ * price/cost), because a compartment-only sofa model needs ≥1 POS-visible sku
+ * for the builder's representative cart line (Loo 2026-07-06).
  */
 
 // Sofa is NOT supplierless; service/accessory are (mirror catalog.ts).
@@ -130,10 +131,15 @@ export async function syncCompartmentSku(
     };
   }
 
-  // Upsert on the UNIQUE sku (idempotent re-offer). pos_active=false keeps it
-  // out of the flat POS grid; compartment_id (0178) links it back to its type.
-  // `price` is included ONLY on first insert (no existing row) — a re-offer
-  // preserves the SKU-Master-authored price, exactly like `cost`.
+  // Upsert on the UNIQUE sku (idempotent re-offer); compartment_id (0178)
+  // links it back to its type. `price` AND `pos_active` are included ONLY on
+  // first insert — a re-offer preserves the SKU-Master-authored price (like
+  // `cost`) and the Modular-authored ON/OFF. pos_active matters: a sofa model
+  // with ONLY compartment skus needs ≥1 of them POS-visible or the builder
+  // has no representative sku to hang the cart line on (buildToDraftLine);
+  // the old always-false re-assert kept silently switching rows OFF
+  // (Loo 2026-07-06 — the 1A(LHF) mystery). First insert still defaults OFF;
+  // the principal turns rows ON in the Modular tab.
   const isReoffer = clash != null;
   const { error: upErr } = await sb.from("product_skus").upsert(
     {
@@ -142,9 +148,8 @@ export async function syncCompartmentSku(
       compartment_id: args.compartmentId,
       variant: comp.code,
       variant_kind: "part",
-      ...(isReoffer ? {} : { price: seedPrice }),
+      ...(isReoffer ? {} : { price: seedPrice, pos_active: false }),
       supplier_id: supplierId,
-      pos_active: false,
       // "Sofa {Model} {code}" (Loo 2026-07-06) — the SKU Master row names the
       // model+compartment pair, NOT the pool compartment's own description
       // (e.g. "Sofa Angsa 1A(LHF)", not "Left hand facing").
