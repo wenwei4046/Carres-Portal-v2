@@ -334,6 +334,8 @@ export interface PwpTriggerLine {
    *  The reserve route skips PROMO rules for such a line (2990s one-way parity);
    *  PWP rules still reserve — chaining is intentional. */
   rewardLine: boolean;
+  /** A sofa build's module codes (combo-scope trigger matching); absent for flat lines. */
+  builtCompartments?: string[];
 }
 
 /**
@@ -376,6 +378,9 @@ export function triggerLinesInCart(
         sku: line.sku,
         qty: Number(line.qty ?? 1),
         rewardLine: Boolean(attrs.pwp || attrs.free_item || attrs.free_gift),
+        // A sofa build's module codes ride along so the server reserve can
+        // match COMBO-scope triggers (a flat sku alone can't).
+        ...(li.builtCompartments.length > 0 ? { builtCompartments: li.builtCompartments } : {}),
       });
     }
   }

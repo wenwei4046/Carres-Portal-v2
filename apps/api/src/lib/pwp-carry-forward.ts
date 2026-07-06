@@ -4,6 +4,7 @@ import {
   DB,
   PWP_CODES,
   PWP_RULES,
+  SOFA_COMBO_PRICING,
   lineMatchesTargets,
   nameKey,
   phoneKeyMy,
@@ -147,7 +148,76 @@ export async function sweepReservedForSubmit(
   if (!skuRes.ok) {
     return { status: "server_error", message: skuRes.message, carried: 0, deleted: 0 };
   }
-  const emptyCombos = new Map<string, string[][]>();
+  // Reconstruct sofa BUILDS from the exploded lines (grouped by
+  // attrs.sofa_build_key) so COMBO-scope triggers can classify them. A build's
+  // reserved codes carry the pre-explode REP sku as trigger_item_code, which
+  // never appears post-explode — their scope inclusion rides the client
+  // cart_line_key hint; these groups drive the promo one-way classification.
+  const buildGroups = new Map<
+    string,
+    { codes: string[]; modelId: string | null; isReward: boolean }
+  >();
+  for (const line of args.finalLines) {
+    const attrs = (line.attrs ?? {}) as Record<string, unknown>;
+    const key = typeof attrs.sofa_build_key === "string" ? attrs.sofa_build_key : null;
+    if (!key) continue;
+    const g = buildGroups.get(key) ?? { codes: [], modelId: null, isReward: false };
+    const mc = typeof attrs.module_code === "string" ? attrs.module_code.trim() : "";
+    if (mc) g.codes.push(mc);
+    g.modelId = g.modelId ?? skuRes.skuInfo.get(line.sku)?.modelId ?? null;
+    if (attrs.pwp || attrs.free_item || attrs.free_gift) g.isReward = true;
+    buildGroups.set(key, g);
+  }
+  // Combo slots for combo-scope trigger targets — only queried when builds exist.
+  let comboModulesById = new Map<string, string[][]>();
+  if (buildGroups.size > 0) {
+    const ids = new Set<string>();
+    for (const rule of activeRules) {
+      for (const t of rule.triggerTargets) {
+        if (t.scope === "combo") for (const id of t.comboIds ?? []) ids.add(id);
+      }
+    }
+    if (ids.size > 0) {
+      const { data, error } = await sb
+        .from(SOFA_COMBO_PRICING)
+        .select("id, slots")
+        .in("id", Array.from(ids));
+      if (error) {
+        return { status: "server_error", message: error.message, carried: 0, deleted: 0 };
+      }
+      comboModulesById = new Map(
+        ((data ?? []) as Array<{ id: string; slots: string[][] | null }>).map((r) => [
+          r.id,
+          r.slots ?? [],
+        ]),
+      );
+    }
+  }
+  // Per rule: does ANY genuine NON-reward build in this order match its sofa
+  // trigger? (The promo one-way partition below consults this for codes whose
+  // trigger sku is a build rep sku absent from the exploded line set.)
+  const ruleHasNonRewardBuildTrigger = new Map<string, boolean>();
+  for (const rule of activeRules) {
+    let ok = false;
+    if (upper(rule.triggerCategory) === "SOFA") {
+      for (const g of buildGroups.values()) {
+        if (g.isReward || g.codes.length === 0) continue;
+        const rl: RuleLineInput = {
+          category: "sofa",
+          modelId: g.modelId,
+          sizeCode: null,
+          builtCompartments: g.codes,
+        };
+        if (lineMatchesTargets(rl, rule.triggerTargets, comboModulesById)) {
+          ok = true;
+          break;
+        }
+      }
+    }
+    ruleHasNonRewardBuildTrigger.set(rule.id, ok);
+  }
+
+  const emptyCombos = comboModulesById;
   const triggerSkus = new Set<string>();
   // 2990s promo one-way backstop: a line that is ITSELF a reward (a claimed
   // PWP/promo line, a free-item line, or an appended free gift) never opens a
@@ -196,7 +266,8 @@ export async function sweepReservedForSubmit(
     // a reward line — delete it, never carry it forward.
     if (
       rule?.type === "promo" &&
-      !(r.trigger_item_code != null && nonRewardTriggerSkus.has(r.trigger_item_code))
+      !(r.trigger_item_code != null && nonRewardTriggerSkus.has(r.trigger_item_code)) &&
+      !ruleHasNonRewardBuildTrigger.get(rule.id)
     ) {
       toDelete.push(r.code);
       continue;

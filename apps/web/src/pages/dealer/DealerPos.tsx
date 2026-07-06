@@ -277,7 +277,14 @@ export default function DealerPos({
         if (prev.get(t.cartLineKey) === diffKey) continue; // unchanged → no-op
         inFlightRef.current.add(t.cartLineKey);
         reservePwp.mutate(
-          { cartLineKey: t.cartLineKey, sku: t.sku, qty: t.qty, rewardLine: t.rewardLine },
+          {
+            cartLineKey: t.cartLineKey,
+            sku: t.sku,
+            qty: t.qty,
+            rewardLine: t.rewardLine,
+            // A sofa build's module codes — combo-scope trigger matching.
+            ...(t.builtCompartments?.length ? { builtCompartments: t.builtCompartments } : {}),
+          },
           {
             onSettled: () => {
               inFlightRef.current.delete(t.cartLineKey);
