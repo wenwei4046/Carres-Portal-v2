@@ -104,6 +104,7 @@ export default function SofaBuildCanvas({
   fabricTierConfig,
   fabricTierOverride,
   sofaFabrics,
+  sizeOptions,
   onAddBuild,
   onClose,
   embedded = false,
@@ -125,6 +126,10 @@ export default function SofaBuildCanvas({
   fabricTierOverride?: ModelFabricTierOverrideDto | null;
   /** This model's fabrics (drives the fabric picker / tier). */
   sofaFabrics: SofaFabricDto[];
+  /** 0204 — the live `sofa_size` pool values (Special Add-ons → Sizes): the
+   *  size picker's options + the per-size price axis. Absent/empty → the
+   *  legacy hardcoded SOFA_HEIGHTS (pool unconfigured). */
+  sizeOptions?: string[] | null;
   onAddBuild: (payload: SofaBuildAddPayload) => void;
   onClose: () => void;
   /** POS-parity (sofa configure page) — render as a FILL panel inside a parent
@@ -170,7 +175,13 @@ export default function SofaBuildCanvas({
     (initialCells ?? []).map((c) => ({ ...c, id: nextCellId() })),
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [height, setHeight] = useState<string>(SOFA_HEIGHTS.includes("24") ? "24" : SOFA_HEIGHTS[0]);
+  // 0204 — size axis = the sofa_size pool when configured (per-size prices key
+  // off those exact values); the hardcoded SOFA_HEIGHTS only as the fallback.
+  const sizes: readonly string[] =
+    sizeOptions && sizeOptions.length > 0 ? sizeOptions : SOFA_HEIGHTS;
+  const [height, setHeight] = useState<string>(() =>
+    sizes.includes("24") ? "24" : sizes[0]!,
+  );
   const [fabricId, setFabricId] = useState<string>(sofaFabrics[0]?.id ?? "");
 
   const depth = height; // seat-depth axis == the chosen height key (cm widening)
@@ -468,6 +479,7 @@ export default function SofaBuildCanvas({
                     key={pool.id}
                     compartment={pool}
                     offered={offered}
+                    size={height}
                     onAdd={addCell}
                   />
                 ))}
@@ -670,18 +682,18 @@ export default function SofaBuildCanvas({
           </select>
         </label>
 
-        {/* Height picker */}
+        {/* Size picker (0204 — options follow the sofa_size pool) */}
         <label className="flex items-center gap-2 t-small text-base-600">
-          Seat height
+          Size
           <select
             value={height}
             onChange={(e) => setHeight(e.target.value)}
             className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small font-mono"
             data-testid="sofa-build-height"
           >
-            {SOFA_HEIGHTS.map((h) => (
+            {sizes.map((h) => (
               <option key={h} value={h}>
-                {h}&Prime;
+                {/^\d+$/.test(h) ? `${h}″` : h}
               </option>
             ))}
           </select>

@@ -185,6 +185,7 @@ export default function SofaConfigurePage({
   sofaCompartments,
   modelCompartments,
   sofaCombos,
+  sofaSizes,
   onAdd,
   onClose,
 }: {
@@ -198,6 +199,9 @@ export default function SofaConfigurePage({
   /** Already filtered to model.id. */
   modelCompartments: ModelSofaCompartmentDto[];
   sofaCombos: SofaComboDto[];
+  /** 0204 — live `sofa_size` pool values; the Customize canvas's size options
+   *  (+ per-size price axis). Absent/empty → legacy SOFA_HEIGHTS fallback. */
+  sofaSizes?: string[] | null;
   onAdd: (line: DraftLine) => void;
   onClose: () => void;
 }) {
@@ -735,6 +739,7 @@ export default function SofaConfigurePage({
             fabricTierConfig={fabricTierConfig as FabricTierConfigDto | null | undefined}
             fabricTierOverride={fabricTierOverride}
             sofaFabrics={fabrics}
+            sizeOptions={sofaSizes}
             onAddBuild={(payload) => {
               const line = buildToDraftLine(payload, model, skus);
               if (line) {
