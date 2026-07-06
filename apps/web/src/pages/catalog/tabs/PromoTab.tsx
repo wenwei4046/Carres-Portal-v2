@@ -60,15 +60,17 @@ export default function PromoTab({
   catalog: CatalogResponse;
   isPrincipal: boolean;
 }) {
-  // 2990s parity: the tab header carries the three entry points — New PWP /
-  // New Promo (both preset the rule form's Kind) and New GWP (the bulk
-  // add-a-gift-to-many-Models modal).
+  // 2990s parity: the tab header is the SINGLE home for every "add" — New PWP /
+  // New Promo (both preset the rule form's Kind), New Free Gift (the bulk
+  // add-a-gift-to-Models modal, formerly "GWP"), and New Free Item (the
+  // free-item campaign form). The section cards below carry NO inline adders.
   const [gwpOpen, setGwpOpen] = useState(false);
+  const [campaignOpen, setCampaignOpen] = useState(false);
   const [newRuleKind, setNewRuleKind] = useState<PwpRuleDto["type"] | null>(null);
 
   return (
-    <div className="flex flex-col gap-10 max-w-[720px]">
-      <section className="flex items-start justify-between gap-4 -mb-4">
+    <div className="flex flex-col gap-8 max-w-[1120px]">
+      <section className="flex items-start justify-between gap-4">
         <p className="t-tiny text-base-500 max-w-[440px]">
           Each rule lets a customer who buys a qualifying <b>Trigger</b> redeem a{" "}
           <b>Reward</b>, at the chosen ratio. A <b>PWP</b> redeems at the reward&rsquo;s PWP
@@ -76,7 +78,7 @@ export default function PromoTab({
           the same but may redeem free (RM 0). Changes apply to new orders only.
         </p>
         {isPrincipal && (
-          <div className="flex gap-2 shrink-0">
+          <div className="flex flex-wrap justify-end gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setNewRuleKind("pwp")}
@@ -99,24 +101,41 @@ export default function PromoTab({
               className="btn-ghost text-[12px]"
               data-testid="gwp-add"
             >
-              + New GWP
+              + New Free Gift
+            </button>
+            <button
+              type="button"
+              onClick={() => setCampaignOpen(true)}
+              className="btn-ghost text-[12px]"
+              data-testid="campaign-add"
+            >
+              + New Free Item
             </button>
           </div>
         )}
       </section>
-      <DefaultGiftsSection
-        catalog={catalog}
-        isPrincipal={isPrincipal}
-        gwpOpen={gwpOpen}
-        onCloseGwp={() => setGwpOpen(false)}
-      />
-      <FreeItemCampaignsSection catalog={catalog} isPrincipal={isPrincipal} />
-      <PwpRulesSection
-        catalog={catalog}
-        isPrincipal={isPrincipal}
-        newRuleKind={newRuleKind}
-        onCloseNewRule={() => setNewRuleKind(null)}
-      />
+      {/* Loo 2026-07-06: two-column zigzag so the wide right space isn't wasted.
+          3 cards → [Free gifts] [Free Item Campaigns] / [PWP/Promo rules] [ ]. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <DefaultGiftsSection
+          catalog={catalog}
+          isPrincipal={isPrincipal}
+          gwpOpen={gwpOpen}
+          onCloseGwp={() => setGwpOpen(false)}
+        />
+        <FreeItemCampaignsSection
+          catalog={catalog}
+          isPrincipal={isPrincipal}
+          campaignOpen={campaignOpen}
+          onCloseCampaign={() => setCampaignOpen(false)}
+        />
+        <PwpRulesSection
+          catalog={catalog}
+          isPrincipal={isPrincipal}
+          newRuleKind={newRuleKind}
+          onCloseNewRule={() => setNewRuleKind(null)}
+        />
+      </div>
     </div>
   );
 }
@@ -217,16 +236,12 @@ function DefaultGiftsSection({
   onCloseGwp: () => void;
 }) {
   const configs = (catalog.modelDefaultFreeGifts ?? []).filter((c) => c.gifts.length > 0);
-  const modelsWithGifts = new Set(configs.map((c) => c.modelId));
   const modelById = new Map(catalog.models.map((m) => [m.id, m]));
   const accSkus = accessorySkus(catalog);
 
+  // Only existing configs are edited here (via each card's Edit); adding a gift
+  // to a model is done from the header "+ New Free Gift" modal.
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
-  const [addModelId, setAddModelId] = useState("");
-
-  const addableModels = catalog.models
-    .filter((m) => !m.discontinuedAt && !modelsWithGifts.has(m.id))
-    .sort((a, b) => modelLabel(a).localeCompare(modelLabel(b)));
 
   return (
     <section className="card p-5">
@@ -239,7 +254,7 @@ function DefaultGiftsSection({
       <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
         An accessory auto-added at RM 0 when this Model is placed on an order. Applies to every SKU
         of the Model; a complete sofa of the Model grants its gift once. Changes apply to new orders
-        only. Use &ldquo;+ New GWP&rdquo; above to add one gift to many Models at once.
+        only. Use &ldquo;+ New Free Gift&rdquo; above to add one gift to many Models at once.
         {!isPrincipal && " Principal only — read-only for your role."}
       </p>
 
@@ -319,57 +334,6 @@ function DefaultGiftsSection({
         })}
       </div>
 
-      {/* Add gifts to a new model */}
-      {isPrincipal && (
-        <div className="mt-3">
-          {editingModelId && !modelsWithGifts.has(editingModelId) && modelById.get(editingModelId) ? (
-            <div
-              className="bg-base-50 border border-base-200 rounded-[4px] p-3"
-              data-testid={`gift-model-card-${editingModelId}`}
-            >
-              <div className="t-small font-medium text-base-900 mb-1">
-                {modelLabel(modelById.get(editingModelId)!)}
-              </div>
-              <ModelGiftsEditor
-                model={modelById.get(editingModelId)!}
-                catalog={catalog}
-                accSkus={accSkus}
-                initialGifts={[]}
-                onDone={() => {
-                  setEditingModelId(null);
-                  setAddModelId("");
-                }}
-              />
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <select
-                value={addModelId}
-                onChange={(e) => setAddModelId(e.target.value)}
-                className={`${INPUT_CLS} max-w-[280px]`}
-                aria-label="Pick a model to add gifts to"
-                data-testid="promo-gift-model-select"
-              >
-                <option value="">Add gifts to a model…</option>
-                {addableModels.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {modelLabel(m)} ({m.category})
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={!addModelId || accSkus.length === 0}
-                onClick={() => setEditingModelId(addModelId)}
-                className="btn-primary text-[12px] disabled:opacity-40"
-                data-testid="promo-gift-add"
-              >
-                Configure
-              </button>
-            </div>
-          )}
-        </div>
-      )}
     </section>
   );
 }
@@ -688,7 +652,7 @@ function BulkGwpModal({
   }
 
   return (
-    <Modal title="New GWP — add a free gift to Models" onClose={onClose} size="lg">
+    <Modal title="New Free Gift — add to Models" onClose={onClose} size="lg">
       <p className="t-tiny text-base-500 mb-3">
         Pick the Models, choose the gift, then Add. The gift is appended — a Model can hold several
         (e.g. 2 pillows + a protector). 🎁 marks Models that already have a gift.
@@ -866,11 +830,14 @@ function BulkGwpModal({
 function FreeItemCampaignsSection({
   catalog,
   isPrincipal,
+  campaignOpen,
+  onCloseCampaign,
 }: {
   catalog: CatalogResponse;
   isPrincipal: boolean;
+  campaignOpen: boolean;
+  onCloseCampaign: () => void;
 }) {
-  const [adding, setAdding] = useState(false);
   const campaigns = catalog.freeItemCampaigns ?? [];
 
   return (
@@ -880,26 +847,18 @@ function FreeItemCampaignsSection({
           <Tag size={16} strokeWidth={1.75} className="text-primary" />
           Free Item Campaigns
         </div>
-        {isPrincipal && (
-          <button
-            type="button"
-            onClick={() => setAdding((v) => !v)}
-            className="btn-ghost text-[12px]"
-            data-testid="campaign-add"
-          >
-            {adding ? "Close" : "+ New Free Item"}
-          </button>
-        )}
       </div>
       <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
         A giveaway a salesperson can apply to an eligible cart line ("Make free") — the line books at
         RM0. Set which models / sizes / sofa builds qualify and the per-line free limit. A campaign is
-        dormant until you flip it Active.
+        dormant until you flip it Active. Use &ldquo;+ New Free Item&rdquo; above to add one.
         {!isPrincipal && " Principal only — read-only for your role."}
       </p>
 
-      {adding && isPrincipal && (
-        <CampaignForm catalog={catalog} onDone={() => setAdding(false)} />
+      {campaignOpen && isPrincipal && (
+        <Modal title="New Free Item" onClose={onCloseCampaign} size="lg">
+          <CampaignForm catalog={catalog} onDone={onCloseCampaign} bare />
+        </Modal>
       )}
 
       <div className="bg-base-50 border border-base-200 rounded-[4px] overflow-hidden">
@@ -991,15 +950,19 @@ function CampaignRow({
   );
 }
 
-/** Create / edit a free item campaign. `campaign` present = patch mode. */
+/** Create / edit a free item campaign. `campaign` present = patch mode.
+ *  `bare` = rendered inside a Modal (the "+ New Free Item" header entry point):
+ *  drop the inline card chrome. Inline row Edit keeps the card (bare=false). */
 function CampaignForm({
   catalog,
   campaign,
   onDone,
+  bare = false,
 }: {
   catalog: CatalogResponse;
   campaign?: FreeItemCampaignDto;
   onDone: () => void;
+  bare?: boolean;
 }) {
   const create = useCreateFreeItemCampaign();
   const update = useUpdateFreeItemCampaign();
@@ -1031,7 +994,13 @@ function CampaignForm({
   }
 
   return (
-    <div className="bg-base-50 border border-base-200 rounded-[4px] p-4 mb-3 flex flex-col gap-3">
+    <div
+      className={
+        bare
+          ? "flex flex-col gap-3"
+          : "bg-base-50 border border-base-200 rounded-[4px] p-4 mb-3 flex flex-col gap-3"
+      }
+    >
       <div className="flex flex-wrap gap-4 items-end">
         <label className="block flex-1 min-w-[200px]">
           <span className="label block mb-1">Name</span>
