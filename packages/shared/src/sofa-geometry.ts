@@ -982,10 +982,10 @@ export const analyzeSofa = (group: GeoCell[], depth: Depth): SofaAnalysis => {
     }
   }
 
+  const horizontalDominant = bbW >= bbH;
   let headArm = false;
   let tailArm = false;
   if (group.length > 0) {
-    const horizontalDominant = bbW >= bbH;
     if (horizontalDominant) {
       headArm = outwardArms.some((a) => a.edge === EDGE_W);
       tailArm = outwardArms.some((a) => a.edge === EDGE_E);
@@ -996,19 +996,28 @@ export const analyzeSofa = (group: GeoCell[], depth: Depth): SofaAnalysis => {
   }
 
   const ends = headArm && tailArm;
-  const hasUnclosedOpen =
-    unclosedByDir[EDGE_W] || unclosedByDir[EDGE_N] || unclosedByDir[EDGE_E] || unclosedByDir[EDGE_S];
+  // A finished sofa needs an armrest on its two MAIN ends — the extremities of
+  // its longest (dominant) axis. An exposed open cushion edge on the OFF axis is
+  // a chaise/lounger FOOT: a chaise is open at the foot by design (Loo 2026-07-07:
+  // open-foot chaises are a real Carres product), so it does NOT fail closure.
+  // A bare armless run still fails, because the main-end arm check (`ends`) does.
+  const hasUnclosedOpen = horizontalDominant
+    ? unclosedByDir[EDGE_W] || unclosedByDir[EDGE_E]
+    : unclosedByDir[EDGE_N] || unclosedByDir[EDGE_S];
   let closed = violations.length === 0 && ends && !hasUnclosedOpen;
   let reason: ClosureFailure | null = null;
   if (violations.length > 0) reason = "Arms colliding";
   else if (!headArm && !tailArm) reason = "No arms on either end";
-  else if (!headArm) reason = bbW >= bbH ? "Left end has no arm" : "Top end has no arm";
-  else if (!tailArm) reason = bbW >= bbH ? "Right end has no arm" : "Bottom end has no arm";
+  else if (!headArm) reason = horizontalDominant ? "Left end has no arm" : "Top end has no arm";
+  else if (!tailArm) reason = horizontalDominant ? "Right end has no arm" : "Bottom end has no arm";
   else if (hasUnclosedOpen) {
-    if (unclosedByDir[EDGE_W]) reason = "Left end has no arm";
-    else if (unclosedByDir[EDGE_E]) reason = "Right end has no arm";
-    else if (unclosedByDir[EDGE_N]) reason = "Top end has no arm";
-    else if (unclosedByDir[EDGE_S]) reason = "Bottom end has no arm";
+    reason = horizontalDominant
+      ? unclosedByDir[EDGE_W]
+        ? "Left end has no arm"
+        : "Right end has no arm"
+      : unclosedByDir[EDGE_N]
+        ? "Top end has no arm"
+        : "Bottom end has no arm";
   }
 
   const allAccessories = group.length > 0 && group.every((c) => isAccessoryModule(c.moduleCode));

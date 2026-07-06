@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Plus, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import type {
   CatalogFabricDto,
   CatalogOptionPoolDto,
@@ -30,7 +31,7 @@ import {
   resolveFabricDelta,
   ROOM_H,
 } from "@carres/shared";
-import { usePwpAvailableForPhone } from "@/lib/queries";
+import { useDeleteSofaCombo, usePwpAvailableForPhone } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import type { DraftLine } from "../new-order/draft";
 import { sellingFabricsFor } from "../sofa-build/selling-fabrics";
@@ -336,6 +337,8 @@ export default function SofaConfigurePage({
   // the current Customize build as a priced sofa combo. `comboCodes` = the
   // arranged compartment codes handed up by the canvas (null = modal closed).
   const isPrincipal = useAuth((s) => s.role) === "principal";
+  // 0206 — principal can delete a Quick Pick preset from its card (soft-delete).
+  const deleteCombo = useDeleteSofaCombo();
   // 0206 — one modal, two kinds: "combo" (priced pricing rule) vs "quick_pick"
   // (a price-less layout preset shown in the Quick pick tab).
   const [creating, setCreating] = useState<{
@@ -394,6 +397,17 @@ export default function SofaConfigurePage({
     setSeed(comboSeedCells({ ...pick.combo, slots }, "24"));
     setSeedKey((k) => k + 1);
     setMode("custom");
+  }
+
+  // 0206 — principal deletes a Quick Pick preset (soft-delete via the shared
+  // sofa-combo DELETE). A confirm guards the curated list against a mis-tap.
+  function deletePick(pick: QuickPick) {
+    if (deleteCombo.isPending) return;
+    if (!window.confirm(`Delete quick pick "${pick.title}"?`)) return;
+    deleteCombo.mutate(pick.combo.id, {
+      onSuccess: () => toast.success("Quick pick deleted"),
+      onError: () => toast.error("Could not delete the quick pick."),
+    });
   }
 
   const fabricTierOverride =
@@ -735,6 +749,43 @@ export default function SofaConfigurePage({
                         >
                           <span className={d.flipped ? "" : "is-on"}>L</span>
                           <span className={d.flipped ? "is-on" : ""}>R</span>
+                        </span>
+                      )}
+                      {isPrincipal && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Delete quick pick ${p.title}`}
+                          title="Delete this quick pick"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deletePick(p);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              deletePick(p);
+                            }
+                          }}
+                          data-testid={`sofa-quick-pick-delete-${p.combo.id}`}
+                          style={{
+                            position: "absolute",
+                            top: 8,
+                            left: 8,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 24,
+                            height: 24,
+                            borderRadius: 999,
+                            background: "var(--pos-panel, #fff)",
+                            border: "1px solid var(--line)",
+                            color: "var(--c-burnt, #BC4319)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <Trash2 size={13} strokeWidth={2} />
                         </span>
                       )}
                     </button>

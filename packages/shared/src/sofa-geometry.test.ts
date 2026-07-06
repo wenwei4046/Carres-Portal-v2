@@ -404,15 +404,40 @@ describe("analyzeSofa closure", () => {
     expect(r.reason).toBeNull();
   });
 
-  it("flags an L-shape with an exposed open cushion edge as NOT closed", () => {
+  it("accepts a horizontal L whose chaise FOOT is open (Loo 2026-07-07: open-foot chaises are a real product)", () => {
+    // Long top run (CNR + 2A) armed at BOTH main ends (CNR west arm + 2A east
+    // arm); a short chaise leg (1NA) drops below the corner with an OPEN foot.
+    // The foot is off the main (horizontal) axis → must NOT fail closure.
+    const group: GeoCell[] = [
+      { id: "cnr", moduleCode: "CNR", x: 0, y: 0, rot: 0 },
+      { id: "top", moduleCode: "2A(RHF)", x: 95, y: 0, rot: 0 },
+      { id: "foot", moduleCode: "1NA", x: 0, y: 95, rot: 270 },
+    ];
+    const r = analyzeSofa(group, "24");
+    expect(r.closed).toBe(true);
+    expect(r.reason).toBeNull();
+  });
+
+  it("an off-axis open end is fine when both MAIN-axis ends are armed", () => {
+    // Vertical-dominant L: the main (vertical) run CNR→2A is armed at both ends;
+    // the horizontal 2NA's far end is open but off the main axis → still closed.
     const group: GeoCell[] = [
       { id: "cnr", moduleCode: "CNR", x: 0, y: 0, rot: 0 },
       { id: "2na", moduleCode: "2NA", x: 95, y: 0, rot: 0 },
       { id: "2a", moduleCode: "2A(LHF)", x: 0, y: 95, rot: 270 },
     ];
     const r = analyzeSofa(group, "24");
+    expect(r.closed).toBe(true);
+  });
+
+  it("a MAIN-axis end with no arm still fails (the off-axis exemption never rescues a main end)", () => {
+    // Two armless 1NAs in a row → both main (W/E) ends open + armless → not a sofa.
+    const group: GeoCell[] = [
+      { id: "a", moduleCode: "1NA", x: 0, y: 0, rot: 0 },
+      { id: "b", moduleCode: "1NA", x: 75, y: 0, rot: 0 },
+    ];
+    const r = analyzeSofa(group, "24");
     expect(r.closed).toBe(false);
-    expect(r.reason).toBe("Right end has no arm");
   });
 
   it("accessory open edges do NOT fail closure", () => {
