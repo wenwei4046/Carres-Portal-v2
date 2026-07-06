@@ -19,14 +19,16 @@ import ImportSkusDialog from "./ImportSkusDialog";
 import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
 
 /**
- * SKU Master — flat product table with cost + plan-margin visibility for the
- * Master Admin. Columns: Product code · Description · Product name · Category ·
- * Size · Price · Cost · Margin · Status. Filter by category + model pills +
- * free-text search; picking a category reveals a second pill row of that
- * category's model names (shown even for a single model — e.g. Sofa → Booqit).
- * "Edit Prices" flips the Price and Cost cells to inline inputs (commit on blur,
- * verified by the catalog re-fetch the patch triggers). Price 0 renders as a
- * muted "not set"; Cost null renders as a muted "not set" — NEVER coerced to 0.
+ * SKU Master — flat product table for the Master Admin. Columns: Product code ·
+ * Description · Product name · Category · Size · Price · Margin · Status.
+ * (The COST column was dropped 2026-07-06 — Loo: not needed for now. Cost
+ * itself survives in the schema + Edit modal + import; only the list column
+ * went, so margin still renders for SKUs whose cost is set elsewhere.)
+ * Filter by category + model pills + free-text search; picking a category
+ * reveals a second pill row of that category's model names (shown even for a
+ * single model — e.g. Sofa → Booqit). "Edit Prices" flips the Price cell to an
+ * inline input (commit on blur, verified by the catalog re-fetch the patch
+ * triggers). Price 0 renders as a muted "not set" — NEVER coerced to 0.
  *
  * Performance: the live catalog has 1000+ SKUs. We render at most VISIBLE_CAP
  * rows and show a "refine your filter" banner past that, rather than mount
@@ -34,8 +36,8 @@ import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
  */
 
 const VISIBLE_CAP = 300;
-// 9 columns: checkbox · code · desc · product · category · size · price · cost · margin · status · edit
-const GRID_COLS = "32px 150px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 110px 90px 92px 60px";
+// 10 tracks: checkbox · code · desc · product · category · size · price · margin · status · edit
+const GRID_COLS = "32px 150px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 92px 60px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -324,7 +326,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           <div className="label">Category</div>
           <div className="label">Size</div>
           <div className="label text-right">Price</div>
-          <div className="label text-right">Cost</div>
           <div className="label text-right">Margin</div>
           <div className="label">Status</div>
           <div className="label" />
@@ -401,25 +402,6 @@ const SkuRowView = memo(function SkuRowView({
     );
   }
 
-  function commitCost(raw: string) {
-    const trimmed = raw.trim();
-    // blank input → set cost to null ("not set")
-    const val = trimmed === "" ? null : Number(trimmed);
-    if (val !== null && (!Number.isFinite(val) || val < 0)) {
-      toast.error("Enter a non-negative number");
-      return;
-    }
-    if (val === sku.cost) return;
-    patch.mutate(
-      { id: sku.id, patch: { cost: val } },
-      {
-        onSuccess: () => toast.success(`${sku.sku} · cost updated`),
-        onError: (e: unknown) =>
-          toast.error(e instanceof ApiError ? e.message : "Update failed"),
-      },
-    );
-  }
-
   return (
     <div
       className="grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0"
@@ -465,29 +447,6 @@ const SkuRowView = memo(function SkuRowView({
           <span className="t-tiny text-base-400 italic">price not set</span>
         ) : (
           <span className="t-num text-[12px] text-base-800">{fmtPrice(sku.price)}</span>
-        )}
-      </div>
-
-      {/* Cost */}
-      <div className="text-right" data-testid={`sku-cost-${sku.sku}`}>
-        {editMode ? (
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            defaultValue={sku.cost ?? ""}
-            placeholder="—"
-            onBlur={(e) => commitCost(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-            }}
-            aria-label={`${sku.sku} cost`}
-            className={`${INPUT_CLS} text-right t-num text-[12px]`}
-          />
-        ) : sku.cost === null ? (
-          <span className="t-tiny text-base-400 italic">not set</span>
-        ) : (
-          <span className="t-num text-[12px] text-base-700">{fmtPrice(sku.cost)}</span>
         )}
       </div>
 

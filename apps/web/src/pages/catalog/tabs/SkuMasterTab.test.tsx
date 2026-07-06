@@ -1,12 +1,11 @@
 /**
- * SkuMasterTab — cost + margin rendering tests.
+ * SkuMasterTab — price/margin rendering tests.
  *
- * Covers the Task-1 requirements:
- *  - cost === null renders "not set" (never as "0" or empty)
- *  - cost set renders the RM value
- *  - margin muted when cost is null
- *  - margin shows RM amount + pct when cost is set
- *  - inline edit-mode cost input: blank → null patch, numeric → numeric patch
+ * The COST column was removed from the list 2026-07-06 (Loo: not needed for
+ * now) — cost survives only in the Edit modal + import. Covers:
+ *  - the list renders NO cost cell / header / inline cost input
+ *  - margin muted when cost is null; RM amount + pct when cost is set
+ *  - inline edit-mode price input still works
  *  - Edit modal: cost field renders + round-trips through usePatchCatalogSku
  *
  * Mocking strategy:
@@ -211,19 +210,13 @@ beforeEach(() => {
   mockRole = "principal";
 });
 
-describe("SkuMasterTab — cost column", () => {
-  it("shows 'not set' (muted) when cost is null — never '0' or blank", () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_NULL])} />));
-    const costCell = screen.getByTestId("sku-cost-CLOUD-QUEEN");
-    expect(costCell.textContent).toContain("not set");
-    expect(costCell.textContent).not.toContain("RM 0");
-    expect(costCell.textContent).not.toBe("");
-  });
-
-  it("shows the RM cost value when cost is set", () => {
+describe("SkuMasterTab — cost column removed (Loo 2026-07-06), margin kept", () => {
+  it("renders NO cost cell and no Cost header — cost lives only in the Edit modal now", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    const costCell = screen.getByTestId("sku-cost-CLOUD-KING");
-    expect(costCell.textContent).toContain("2,100");
+    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    expect(screen.queryByText("Cost")).not.toBeInTheDocument();
+    // The row itself still renders (column removal, not row removal).
+    expect(screen.getByTestId("sku-row-CLOUD-KING")).toBeInTheDocument();
   });
 
   it("shows muted '—' in margin column when cost is null", () => {
@@ -258,47 +251,12 @@ describe("SkuMasterTab — cost column", () => {
   });
 });
 
-describe("SkuMasterTab — Edit Prices mode (inline cost editing)", () => {
-  it("shows cost input in Edit Prices mode with defaultValue from sku.cost", () => {
+describe("SkuMasterTab — Edit Prices mode (price only; cost input removed)", () => {
+  it("shows the price input but NO cost input in Edit Prices mode", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
     fireEvent.click(screen.getByTestId("sku-edit-prices"));
-    const costInput = screen.getByLabelText("CLOUD-KING cost") as HTMLInputElement;
-    expect(costInput).toBeTruthy();
-    expect(costInput.value).toBe("2100");
-  });
-
-  it("blank cost input on blur dispatches patch with cost: null", async () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-prices"));
-    const costInput = screen.getByLabelText("CLOUD-KING cost");
-    fireEvent.change(costInput, { target: { value: "" } });
-    fireEvent.blur(costInput);
-    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
-    const call = mockPatchMutate.mock.calls[0][0];
-    expect(call.id).toBe("s2");
-    expect(call.patch.cost).toBeNull();
-  });
-
-  it("numeric cost input on blur dispatches patch with cost: number", async () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_NULL])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-prices"));
-    const costInput = screen.getByLabelText("CLOUD-QUEEN cost");
-    fireEvent.change(costInput, { target: { value: "1500" } });
-    fireEvent.blur(costInput);
-    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
-    const call = mockPatchMutate.mock.calls[0][0];
-    expect(call.id).toBe("s1");
-    expect(call.patch.cost).toBe(1500);
-  });
-
-  it("same cost value on blur does not dispatch patch (no-op)", async () => {
-    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
-    fireEvent.click(screen.getByTestId("sku-edit-prices"));
-    const costInput = screen.getByLabelText("CLOUD-KING cost");
-    // Do NOT change; blur with same value
-    fireEvent.blur(costInput);
-    // no patch dispatch
-    expect(mockPatchMutate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("CLOUD-KING price")).toBeInTheDocument();
+    expect(screen.queryByLabelText("CLOUD-KING cost")).not.toBeInTheDocument();
   });
 });
 
@@ -490,10 +448,9 @@ describe("0175 — price/cost lock (non-principal read-only)", () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
     expect(screen.queryByTestId("sku-edit-prices")).not.toBeInTheDocument();
     expect(screen.getByTestId("sku-price-lock-hint")).toBeInTheDocument();
-    // The cost cell still shows the value read-only (no input).
-    const costCell = screen.getByTestId("sku-cost-CLOUD-KING");
-    expect(costCell.textContent).toContain("2,100");
-    expect(costCell.querySelector("input")).toBeNull();
+    // The row renders read-only (no inline inputs anywhere).
+    const row = screen.getByTestId("sku-row-CLOUD-KING");
+    expect(row.querySelector('input[type="number"]')).toBeNull();
   });
 
   it("EditSkuModal: non-principal gets read-only price/cost, no input fields", () => {
@@ -613,21 +570,21 @@ describe("SkuMasterTab — model filter", () => {
     expect(screen.getByRole("button", { name: "Luna Sofa" })).toBeInTheDocument();
     // Mattress has two models — picking one keeps only its SKU
     fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
-    expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-row-CLOUD-KING")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Carres Dream" }));
-    expect(screen.getByTestId("sku-cost-DREAM-QUEEN")).toBeInTheDocument();
-    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sku-row-DREAM-QUEEN")).toBeInTheDocument();
+    expect(screen.queryByTestId("sku-row-CLOUD-KING")).not.toBeInTheDocument();
   });
 
   it("resets the model pick when the category changes", () => {
     render(wrap(<SkuMasterTab catalog={CATALOG_3()} />));
     fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
     fireEvent.click(screen.getByRole("button", { name: "Carres Dream" }));
-    expect(screen.queryByTestId("sku-cost-CLOUD-KING")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sku-row-CLOUD-KING")).not.toBeInTheDocument();
     // leave and come back — the model pick must not survive the category switch
     fireEvent.click(screen.getByRole("button", { name: "Sofa" }));
     fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
-    expect(screen.getByTestId("sku-cost-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.getByTestId("sku-row-CLOUD-KING")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All Mattress" })).toHaveAttribute(
       "aria-pressed",
       "true",
