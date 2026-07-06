@@ -33,8 +33,9 @@ export interface GiftPreviewRow {
   giftSku: string;
   /** resolved qty for this (source model, gift) row. */
   qty: number;
-  /** display name: the sku's description, else the bare code. The configured
-   *  campaign label is a REMARK (2990s campaignName), never the product name. */
+  /** display name: the sku's description → the accessory's model name → the
+   *  bare code. The configured campaign label is a REMARK (2990s campaignName),
+   *  never the product name. */
   name: string;
   /** the optional campaign remark (e.g. "MING PAO CANADA") — muted suffix. */
   campaign?: string;
@@ -148,10 +149,20 @@ export function previewDefaultGifts(
     return !!s && accessoryModelIds.has(s.modelId);
   };
 
-  // Friendly display name: sku description → bare code. The configured label is
-  // the CAMPAIGN remark (2990s campaignName) — it rides along muted, it never
-  // replaces the product name (Loo 2026-07-06: "Free gift: dfdf").
-  const descBySku = new Map(catalog.skus.map((s) => [s.sku, s.description ?? ""]));
+  // Friendly display name: sku description → the accessory's MODEL name (an
+  // accessory is one model = one product, e.g. "Pasir Wool Rug") → bare code.
+  // Never surface a raw SKU code when a human name exists (Loo 2026-07-06:
+  // "Free gift: ACC-601"). The configured label is the CAMPAIGN remark (2990s
+  // campaignName) — it rides along muted, it never replaces the product name.
+  const modelNameById = new Map(
+    catalog.models.map((m) => [m.id, (m.name || m.modelKey || "").trim()]),
+  );
+  const descBySku = new Map(
+    catalog.skus.map((s) => {
+      const desc = (s.description ?? "").trim();
+      return [s.sku, desc || modelNameById.get(s.modelId) || ""];
+    }),
+  );
   // F7b — one row per (source model, gift sku): do NOT merge the same gift sku
   // across source models (each model's gift is a distinct appended server line).
   const merged = new Map<string, GiftPreviewRow>();
