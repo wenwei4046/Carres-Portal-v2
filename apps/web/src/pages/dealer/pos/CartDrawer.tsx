@@ -420,6 +420,9 @@ export default function CartDrawer({
                         <span className="t-small text-base-700 truncate">
                           Free gift: {g.name}
                           {g.qty > 1 && <span className="text-base-500"> ×{g.qty}</span>}
+                          {g.campaign && (
+                            <span className="text-base-400"> · {g.campaign}</span>
+                          )}
                         </span>
                       </div>
                       <span className="pill pill-confirmed shrink-0">FREE</span>

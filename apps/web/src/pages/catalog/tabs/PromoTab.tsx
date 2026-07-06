@@ -275,7 +275,15 @@ function DefaultGiftsSection({
                   <div className="t-tiny text-base-500">
                     {cfg.gifts.length} gift{cfg.gifts.length === 1 ? "" : "s"}
                     {" · "}
-                    {cfg.gifts.map((g) => `${g.label || g.giftSku} ×${g.qty}`).join(", ")}
+                    {cfg.gifts
+                      .map((g) => {
+                        // 2990s parity: show "qty× accessory-name"; the campaign
+                        // label is a remark in parentheses, never the name.
+                        const sku = accSkus.find((s) => s.sku === g.giftSku);
+                        const name = sku ? skuDisplay(sku) : g.giftSku;
+                        return `${g.qty}× ${name}${g.label ? ` (${g.label})` : ""}`;
+                      })
+                      .join(", ")}
                   </div>
                 </div>
                 {isPrincipal && !editing && (

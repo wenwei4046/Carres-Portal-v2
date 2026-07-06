@@ -33,8 +33,11 @@ export interface GiftPreviewRow {
   giftSku: string;
   /** resolved qty for this (source model, gift) row. */
   qty: number;
-  /** display name: configured label, else the sku's description, else the code. */
+  /** display name: the sku's description, else the bare code. The configured
+   *  campaign label is a REMARK (2990s campaignName), never the product name. */
   name: string;
+  /** the optional campaign remark (e.g. "MING PAO CANADA") — muted suffix. */
+  campaign?: string;
   /** the product_models.id of the paid line that triggered this gift (rows are
    *  kept separate per source model — the same gift sku from two models = two
    *  rows = two appended server lines). */
@@ -145,18 +148,27 @@ export function previewDefaultGifts(
     return !!s && accessoryModelIds.has(s.modelId);
   };
 
-  // Friendly display name: configured label → sku description → bare code.
+  // Friendly display name: sku description → bare code. The configured label is
+  // the CAMPAIGN remark (2990s campaignName) — it rides along muted, it never
+  // replaces the product name (Loo 2026-07-06: "Free gift: dfdf").
   const descBySku = new Map(catalog.skus.map((s) => [s.sku, s.description ?? ""]));
   // F7b — one row per (source model, gift sku): do NOT merge the same gift sku
   // across source models (each model's gift is a distinct appended server line).
   const merged = new Map<string, GiftPreviewRow>();
   for (const d of desired) {
     if (!isAccessorySku(d.giftSku)) continue;
-    const name = d.label || descBySku.get(d.giftSku) || d.giftSku;
+    const name = descBySku.get(d.giftSku) || d.giftSku;
     const key = `${d.sourceModelId}__${d.giftSku}`;
     const cur = merged.get(key);
     if (cur) cur.qty += d.qty;
-    else merged.set(key, { giftSku: d.giftSku, qty: d.qty, name, sourceModelId: d.sourceModelId });
+    else
+      merged.set(key, {
+        giftSku: d.giftSku,
+        qty: d.qty,
+        name,
+        ...(d.label ? { campaign: d.label } : {}),
+        sourceModelId: d.sourceModelId,
+      });
   }
   return [...merged.values()];
 }
