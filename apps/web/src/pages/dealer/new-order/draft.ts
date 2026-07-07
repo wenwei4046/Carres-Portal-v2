@@ -1,6 +1,3 @@
-import type { ComboDto } from "@carres/shared";
-import { explodeCombo } from "@carres/shared";
-
 /**
  * Wizard draft state — local UI shape, not the DB row.
  *
@@ -35,60 +32,6 @@ export interface DraftLine {
    *  submit (DealerPos sends only sku/qty/attrs/unitPrice), so it never reaches
    *  the wire; the server is authoritative for the freed price (forces 0). */
   origUnitPrice?: number;
-}
-
-/**
- * Fresh local id for a staged line. Inlined here (NOT imported from
- * `configurators.tsx`) so this lower-level draft module never depends on a
- * React component file — same `crypto.randomUUID()`-with-JSDOM-guard pattern.
- */
-function newLocalId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-/**
- * Explode a fixed-set combo (套餐, migration 0177) into the component
- * `DraftLine`s the cart + submit pipeline already understand. PURE: no React,
- * no IO — delegates the price split to shared `explodeCombo` (integer-cents,
- * proportional to each component's selling price), then maps each exploded
- * line into a `DraftLine` carrying `attrs.combo_key` / `attrs.combo_label` so
- * the CartDrawer can group them under one "Remove combo".
- *
- * `lookup(sku)` supplies the SELLING price (for the split weight) + a human
- * label, both from the catalog index. A component SKU absent from the
- * (pos_active-filtered) catalog bundle returns `price: NaN`; `explodeCombo`
- * treats a non-finite price as 0 weight, so that component is priced 0 and the
- * remaining components absorb the combo price — the combo TOTAL still equals
- * `comboPrice`. Accepted v1 behaviour (the controller's carry-forward); we do
- * NOT try to fetch inactive sku prices here.
- *
- * `attrs` is EXACTLY `{ combo_key, combo_label }` — combo components are
- * concrete SKUs with no configurator options in v1.
- */
-export function comboToDraftLines(
-  combo: ComboDto,
-  lookup: (sku: string) => { price: number; label: string },
-): DraftLine[] {
-  const exploded = explodeCombo(
-    {
-      comboKey: combo.comboKey,
-      name: combo.name,
-      comboPrice: combo.comboPrice,
-      components: combo.components,
-    },
-    (sku) => lookup(sku).price,
-  );
-  return exploded.map((e) => ({
-    localId: newLocalId(),
-    sku: e.sku,
-    qty: e.qty,
-    attrs: { combo_key: e.comboKey, combo_label: e.comboLabel },
-    unitPrice: e.unitPrice,
-    label: lookup(e.sku).label || e.sku,
-  }));
 }
 
 /** Addon staged on the order. Persisted as order_addons rows on submit.
@@ -142,6 +85,12 @@ export interface DraftPayment {
 }
 
 export interface WizardDraft {
+  /** POS-parity (2990s) — an INTERNAL operator (principal) picks the dealer the
+   *  order belongs to in-flow at the CUSTOMER step. Dealer-side logins never
+   *  set these (their JWT dealer wins; the fields stay null). Optional so
+   *  drafts saved before this field existed restore cleanly. */
+  actingDealerId?: string | null;
+  actingDealerName?: string | null;
   outletId: string | null;
   salespersonId: string | null;
   customer: {
@@ -167,6 +116,12 @@ export interface WizardDraft {
     emergencyPhone: string;
     emergencyRelationship: string;
     emergencyRelationshipOther: string;
+    /** 0200 — POS-parity demographics (2990s customer step). POS-required
+     *  (step1 gate), server-lenient. Stored as strings; "" = not filled. */
+    email: string;
+    race: string;
+    gender: string;
+    birthday: string;
   };
   delivery: {
     date: string;
@@ -218,6 +173,8 @@ export const DRAFT_STORAGE_KEY = "carres-order-draft";
 
 export function emptyDraft(): WizardDraft {
   return {
+    actingDealerId: null,
+    actingDealerName: null,
     outletId: null,
     salespersonId: null,
     customer: {
@@ -236,6 +193,10 @@ export function emptyDraft(): WizardDraft {
       emergencyPhone: "",
       emergencyRelationship: "",
       emergencyRelationshipOther: "",
+      email: "",
+      race: "",
+      gender: "",
+      birthday: "",
     },
     delivery: { date: "", proceedDate: "", dateTbd: false, floor: 1, hasLift: false, stairItems: null, asap: false },
     lines: [],
@@ -350,6 +311,7 @@ export function clearDraft(): void {
  *   - outletId + salespersonId both set
  */
 const PHONE_RE = /^[0-9-+\s]{8,}/;
+const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
 export function step1Valid(d: WizardDraft): boolean {
   return step1FirstIssue(d) === null;
@@ -372,6 +334,11 @@ export function step1FirstIssue(d: WizardDraft): string | null {
   if (!d.salespersonId)   return "Sale info — pick a Salesperson";
   if (c.name.trim().length < 2)   return "Customer — full name (≥2 chars)";
   if (!PHONE_RE.test(c.phone))    return "Customer — phone (≥8 digits)";
+  // 0200 — POS-parity demographics (2990s: POS-required, server-lenient).
+  if (!EMAIL_RE.test(c.email.trim())) return "Customer — email";
+  if (!c.race)                    return "Customer — race";
+  if (!c.gender)                  return "Customer — gender";
+  if (!c.birthday)                return "Customer — birthday";
   if (c.emergencyName.trim().length < 2)   return "Emergency Contact — name";
   if (!PHONE_RE.test(c.emergencyPhone))    return "Emergency Contact — phone";
   if (!c.emergencyRelationship)            return "Emergency Contact — relationship";

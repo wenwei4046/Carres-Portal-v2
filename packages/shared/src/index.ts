@@ -49,6 +49,7 @@ export {
   ordersListResponseSchema,
   dealerSelfSchema,
   createOrderInputSchema,
+  rawCreateOrderInputSchema,
   topUpOrderInputSchema,
   setOrderAddressInputSchema,
   setOrderDateInputSchema,
@@ -63,6 +64,8 @@ export {
   type OrdersListResponse,
   type DealerSelf,
   type CreateOrderInput,
+  type RawCreateOrderInput,
+  type RawOrderLineInput,
   type OrderLineInput,
   type OrderAddonInput,
   type TopUpOrderInput,
@@ -121,11 +124,6 @@ export {
   fabricTierSchema,
   fabricTierConfigSchema,
   modelFabricTierOverrideSchema,
-  // 0177 — combo (套餐) schemas.
-  comboComponentSchema,
-  comboSchema,
-  comboCreateInput,
-  comboPatchInput,
   // 0178 — sofa compartment pool + per-model offered schemas.
   sofaCompartmentSchema,
   sofaCompartmentCreateInput,
@@ -169,11 +167,6 @@ export {
   type FabricTierValue,
   type FabricTierConfigDto,
   type ModelFabricTierOverrideDto,
-  // 0177 — combo (套餐) Dto types.
-  type ComboComponentDto,
-  type ComboDto,
-  type ComboCreateInput,
-  type ComboPatchInput,
   // 0178 — sofa compartment Dto + input types.
   type SofaCompartmentDto,
   type SofaCompartmentCreateInput,
@@ -206,6 +199,25 @@ export {
   type CatalogOptionPoolDto,
   type CatalogOptionPoolCreateInput,
   type CatalogOptionPoolPatchInput,
+  // 0201 — pool batch-save + config history schemas/Dto types.
+  catalogPoolEntryInput,
+  catalogPoolBatchSaveInput,
+  catalogPoolSnapshotEntrySchema,
+  catalogConfigHistorySchema,
+  type CatalogPoolEntryInput,
+  type CatalogPoolBatchSaveInput,
+  type CatalogPoolSnapshotEntryDto,
+  type CatalogConfigHistoryDto,
+  // 0202 — global fabric master schemas + input/Dto types.
+  fabricTierValueSchema,
+  catalogFabricSchema,
+  catalogFabricEntryInput,
+  catalogFabricsBatchSaveInput,
+  catalogFabricsHistorySchema,
+  type CatalogFabricDto,
+  type CatalogFabricEntryInput,
+  type CatalogFabricsBatchSaveInput,
+  type CatalogFabricsHistoryDto,
   // 0184 — delivery fee config + special rules + RuleTarget schemas/inputs.
   deliveryFeeConfigSchema,
   deliveryFeeConfigPatchInput,
@@ -555,29 +567,16 @@ export {
   type FabricTierGlobalConfig,
 } from "./fabric-tier";
 
-// Migration 0177 — combo (套餐) price-split helper + types. `explodeCombo` is
-// the pure split used by the POS (web Task 4) to fan a combo into N order lines.
-export {
-  explodeCombo,
-  type ExplodedComboLine,
-} from "./combo";
-
-// 0177 — combo domain types (camelCased). Top-level alias so consumers can
-// `import type { Combo } from "@carres/shared"` without dipping into Domain.*
-// (mirrors how CostSource is surfaced above). The zod schemas + Dto types live
-// in the schemas/catalog export block.
-export type { Combo, ComboComponent } from "./domain";
-
 // 0178 — sofa compartment domain types (camelCased). Top-level alias so the API
 // + web can `import type { SofaCompartment } from "@carres/shared"` without
-// dipping into Domain.* (mirrors the Combo alias above). The zod schemas + Dto
+// dipping into Domain.* (mirrors the CostSource alias above). The zod schemas + Dto
 // types live in the schemas/catalog export block; the adapters are reached via
-// Adapters.* like comboFromRow / fabricTierConfigFromRow.
+// Adapters.* like fabricTierConfigFromRow.
 export type { SofaCompartment, ModelSofaCompartment } from "./domain";
 
 // 0179 — sofa engine Phase 2: sofa combo domain type + the row→domain adapter +
 // the canonical seat-height axis. `sofaComboFromRow` is also reachable via
-// `Adapters.*` (like comboFromRow); the top-level alias mirrors the Combo/
+// `Adapters.*` (like fabricTierConfigFromRow); the top-level alias mirrors the
 // SofaCompartment surfacing above so the API + web can import it directly.
 export type { SofaCombo } from "./domain";
 export { sofaComboFromRow } from "./adapters";
@@ -598,9 +597,44 @@ export {
 } from "./special-addons";
 export type { SpecialAddon } from "./domain";
 // 0182 — global option pool domain type (the name union is re-exported from the
-// schemas/catalog block above as CatalogOptionPoolName).
-export type { CatalogOptionPool } from "./domain";
+// schemas/catalog block above as CatalogOptionPoolName). 0201 adds the
+// config-history domain type + its adapter.
+export type { CatalogOptionPool, CatalogConfigHistory } from "./domain";
+export { catalogConfigHistoryFromRow } from "./adapters";
+// 0202 — global fabric master domain type + adapters.
+export type { CatalogFabric, CatalogFabricsHistory } from "./domain";
+export { catalogFabricFromRow, catalogFabricsHistoryFromRow } from "./adapters";
 export { SOFA_HEIGHTS, type SofaHeight } from "./sofa-constants";
+
+// 0201/0202-wiring (2026-07-06) — Maintenance option pools → Modular per-model
+// gating → POS → Hono recompute. PURE: the POS preview and the server
+// option-picks recompute share `resolveOptionsTotal` (honest pricing, one
+// resolver both sides — the specials/sofa pattern).
+export {
+  poolTicksFor,
+  tickKeyFor,
+  allowedPoolValues,
+  allowedFabricsFor,
+  fabricTierFor,
+  activeSofaHeights,
+  activeSofaSizes,
+  gatedSofaHeights,
+  gatedSofaSizes,
+  resolveOptionsTotal,
+  inchesOf,
+  computedTotalHeight,
+  optionPickAttrSchema,
+  optionsAttrsSchema,
+  OPTION_PICK_KINDS,
+  type OptionPoolPickKind,
+  type OptionPickKind,
+  type OptionPickAttr,
+  type OptionsAttrs,
+  type OptionPick,
+  type OptionResolveContext,
+  type ResolvedOptionLine,
+  type OptionsTotalResult,
+} from "./option-picks";
 
 // 0184 — 2990s Products parity Phase 6: the unified RuleTarget matcher (PURE,
 // shared by the delivery-fee subsystem and any future rule consumer). Combo
@@ -635,7 +669,7 @@ export {
 // 0184 — the special-delivery-rule domain row type (camelCased). The config
 // domain type ships from the delivery-fee block above; the row→domain adapters
 // (deliveryFeeConfigFromRow / specialDeliveryFeeRuleFromRow) are reached via
-// `Adapters.*` like comboFromRow.
+// `Adapters.*` like sofaComboFromRow.
 export type { SpecialDeliveryFeeRule } from "./domain";
 
 // 0185 — 2990s Products parity Phase 7: Default Free Gifts + Free Item Campaigns
@@ -688,7 +722,7 @@ export type { PwpCode } from "./domain";
 // the legacy digits-only `phoneKey` (promoted from delivery-fee-recompute). The
 // stripped DISCOVERY adapter (`pwpDiscoverFromRow`) + its camelCase domain type —
 // the ONLY pwp_codes-derived shape a non-owner client receives (no PII).
-export { phoneKey, phoneKeyMy } from "./phone";
+export { phoneKey, phoneKeyMy, nameKey } from "./phone";
 export { pwpDiscoverFromRow } from "./adapters";
 export type { PwpDiscover } from "./domain";
 
@@ -697,6 +731,8 @@ export type { PwpDiscover } from "./domain";
 export {
   resolveCompartmentPrice,
   mirrorCode,
+  mirrorModules,
+  canMirror,
   canonicalizeSofaSlots,
   matchSofaCombo,
   pickSofaCombo,
@@ -705,11 +741,15 @@ export {
   explodeSofaBuildToOrderLines,
   sofaPriceWithinTolerance,
   SOFA_PRICE_DRIFT_TOLERANCE,
+  // 0186 — sofa-as-PWP-reward: the merged charged map + the snapshot swap.
+  comboChargedPrices,
+  pwpSwappedCombos,
   type SofaComboLike,
   type PickSofaComboArgs,
   type SofaComboPick,
   type SofaBuildCell,
   type SofaBuild,
+  type SofaLegHeightOption,
   type SofaPricingSnapshot,
   type SofaPriceBasis,
   type SofaPriceResult,
@@ -723,6 +763,16 @@ export {
 // `normalizeSkuKey` matches order_lines.sku ↔ ops_stock_items.sku across the
 // cosmetic case/separator drift (the catalog is empty) — the ops stock-reserve link.
 export { deriveSkuCode, normalizeSkuKey } from "./sku-code";
+
+// Canonical MY mattress/bedframe size table — the short code (SKU suffix) ↔ full
+// name (the SIZE shown). Size auto-generation resolves through this so the code
+// stays `-K` while the SIZE reads `King` (never the raw `K`).
+export {
+  CANONICAL_SIZES,
+  canonicalSize,
+  sizeName,
+  type CanonicalSize,
+} from "./mattress-sizes";
 
 // 2990s Products parity Phase 1 — SKU Import: the one record->row mapper + zod
 // shared by the staged-preview client and the import endpoint.
@@ -815,6 +865,7 @@ export {
   edgeContacts,
   groupSofas,
   orderSofaCellsLeftToRight,
+  reflowCellsForDepth,
   findSnap,
   hasArmConflict,
   analyzeSofa,

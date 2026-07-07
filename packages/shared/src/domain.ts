@@ -100,6 +100,11 @@ export interface ProductSku {
   // 0186 (PWP Phase 8a) — principal-only per-SKU PWP reward price (the price a
   // PWP-rule reward line is sold at). null = not set (mirrors cost). DORMANT.
   pwpPrice?: number | null;
+  // 0204 (per-size pricing, Loo 2026-07-06) — {size → RM} selling-price map,
+  // keys = the catalog_option_pools `sofa_size` values ("24"…"Flat"). Missing
+  // key / null map → the flat `price` applies. Principal-only. DORMANT until
+  // authored; only sofa compartment SKUs carry it today.
+  pricesBySize?: Record<string, number | null> | null;
 }
 
 export interface SofaFabric {
@@ -175,44 +180,89 @@ export interface SpecialAddon {
  * any order-side behaviour (sizes stay per-model in allowedOptions; supplier
  * scope stays in suppliers.cat_covered).
  */
-export type CatalogOptionPoolName = "supplier_category" | "bedframe_size" | "mattress_size";
+export type CatalogOptionPoolName =
+  | "supplier_category"
+  | "bedframe_size"
+  | "mattress_size"
+  | "divan_height"
+  | "total_height"
+  | "gap"
+  | "bedframe_leg_height"
+  | "sofa_size"
+  | "sofa_leg_height";
 export interface CatalogOptionPool {
   id: string;
   pool: CatalogOptionPoolName;
   value: string;
   label: string | null;
   dimensions: string | null;
+  /** 0201 — RM selling surcharge for priced pools; null renders as "—". */
+  surcharge: number | null;
   active: boolean;
   sortOrder: number;
 }
 
 /**
- * One component SKU inside a combo (migration 0177). `qty` = how many of this
- * SKU the bundle contains; `sortOrder` drives the deterministic explode order
- * (the last component absorbs the rounding residue in explodeCombo).
+ * 0202 — one global procurement fabric (2990s fabric_trackings port). Read-only
+ * reference list; no order-side consumer (the SELLING fabric path stays
+ * per-model sofaFabrics + the 0176 tier deltas). `series` is the free-text
+ * collection name the "+ Add series" chip edits.
  */
-export interface ComboComponent {
-  sku: string;
-  qty: number;
-  sortOrder: number;
-}
-
-/**
- * A fixed-set combo / bundle (套餐, migration 0177) sold at one `comboPrice`.
- * `comboFromRow` maps the `combos` row; `components` is attached by the caller
- * (the API assembles the nested `combo_components` rows, the same way other
- * nested domain objects are composed).
- */
-export interface Combo {
+export interface CatalogFabric {
   id: string;
-  comboKey: string;
-  name: string;
-  comboPrice: number;
-  // 0183 — principal-only cost benchmark companion to comboPrice; null = unset.
-  cost: number | null;
+  fabricCode: string;
+  series: string | null;
+  description: string | null;
+  supplierCode: string | null;
+  sofaTier: FabricTier;
+  bedframeTier: FabricTier;
   active: boolean;
+  sortOrder: number;
+}
+
+/**
+ * 0202 — one section='fabrics' catalog_config_history row: the snapshot a
+ * fabric-master Edit-save writes (fabric-shaped entries; same lightweight
+ * effective-from-save-date model as the pool history).
+ */
+export interface CatalogFabricsHistory {
+  id: string;
+  entries: {
+    fabricCode: string;
+    series: string | null;
+    description: string | null;
+    supplierCode: string | null;
+    sofaTier: FabricTier;
+    bedframeTier: FabricTier;
+    active: boolean;
+    sortOrder: number;
+  }[];
   effectiveFrom: string;
-  components: ComboComponent[];
+  notes: string | null;
+  createdAt: string;
+}
+
+/**
+ * 0201 — one catalog_config_history row: the lightweight append-only snapshot
+ * a pool Edit-save writes (effective_from = the save date; no future-dating).
+ */
+export interface CatalogConfigHistory {
+  id: string;
+  // 0202 widened the DB CHECK with 'fabrics' — the POOL history adapter can
+  // technically see it, though the fabrics log is read via its own endpoint
+  // + CatalogFabricsHistory shape.
+  section: CatalogOptionPoolName | "fabrics";
+  entries: {
+    value: string;
+    label: string | null;
+    dimensions: string | null;
+    surcharge: number | null;
+    active: boolean;
+    sortOrder: number;
+  }[];
+  effectiveFrom: string;
+  notes: string | null;
+  createdAt: string;
 }
 
 /**
@@ -230,18 +280,38 @@ export interface SofaCompartment {
   defaultPrice: number;
   sortOrder: number;
   active: boolean;
+  /** 0205 — per-compartment fabric-tier P2/P3 delta override. When a sofa build
+   *  uses this compartment, this REPLACES (overwrites) the per-model / global
+   *  fabric delta for the WHOLE sofa (highest wins across several). Absent /
+   *  `null` = no special (inherit). Optional: the adapter always emits it from
+   *  the pool row; only pre-0205 test fixtures omit it. */
+  specialTier2Delta?: number | null;
+  specialTier3Delta?: number | null;
 }
 
 /**
  * A per-model offered compartment (migration 0178). Row present = the model
- * offers this compartment. `priceOverride` NULL = use the pool's `defaultPrice`;
- * a value (>= 0) supersedes it for this model.
+ * offers this compartment.
+ *
+ * PRICE SOURCE (Loo, 2026-07-05): the authoritative à-la-carte price is the
+ * synced compartment SKU's `product_skus.price` (`{MODEL_KEY}-{code}`, set in
+ * SKU Master). `skuPrice` carries that price — joined in by the catalog bundle
+ * / server recompute, NOT a DB column on `model_sofa_compartments`. The legacy
+ * `priceOverride` → pool `defaultPrice` chain remains only as a fallback for
+ * rows whose synced SKU is missing (pre-cutover data).
  */
 export interface ModelSofaCompartment {
   modelId: string;
   compartmentId: string;
   priceOverride: number | null;
   sortOrder: number;
+  /** The synced `{MODEL_KEY}-{code}` SKU's price (SKU Master). Enriched by the
+   *  bundle/recompute; absent/null = no synced sku → legacy fallback. */
+  skuPrice?: number | null;
+  /** 0204 — the synced SKU's {size → RM} map. Enriched alongside `skuPrice`;
+   *  a chosen size hits this FIRST, then falls back to `skuPrice` when the
+   *  size key is absent/null (see resolveCompartmentPrice). */
+  skuPricesBySize?: Record<string, number | null> | null;
 }
 
 /**
@@ -267,6 +337,14 @@ export interface SofaCombo {
   effectiveFrom: string;
   active: boolean;
   discontinuedAt: string | null;
+  /** 0206 — true = a Quick Pick layout preset (shown in the POS Quick pick tab;
+   *  authored with no price → prices live when loaded). false = a pricing-only
+   *  matched combo (hidden from Quick pick). Optional: the adapter always emits
+   *  it (`?? false`); only pre-0206 test fixtures omit it. */
+  isQuickPick?: boolean;
+  /** 0179 audit timestamps — surfaced for the simple per-combo History view. */
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface FloorConfig {
@@ -410,6 +488,8 @@ export interface PwpDiscover {
   sourceOrderId: string | null;
   expiresAt: string | null;
   phoneMatches: boolean;
+  /** 0204 — the NAME half of the 2990s name+phone binding (server-computed). */
+  nameMatches: boolean;
 }
 
 export interface Warehouse {
@@ -519,6 +599,11 @@ export interface Order {
     billing: string | null;
     billingSame: boolean;
     emergency: string | null;
+    /** 0200 — POS-parity demographics (POS-required, server-lenient). */
+    email: string | null;
+    race: string | null;
+    gender: string | null;
+    birthday: string | null;
   };
 
   delivery: {
@@ -552,6 +637,8 @@ export interface Order {
     | "ready_to_dispatch" | "dispatched"
     | "waiting" | "delivered"
     | null;
+  // 0132 origin marker — 'autocount' for imported legacy rows (null = native).
+  sourceSystem: string | null;
   warehouseId: string | null;
   deliveryPartnerId: string | null;
   partnerStage: "assigned" | "picked_from_wh" | "en_route" | "delivered" | null;

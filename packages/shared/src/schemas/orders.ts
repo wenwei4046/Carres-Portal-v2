@@ -75,6 +75,12 @@ export const orderSchema = z.object({
     billing: z.string().nullable(),
     billingSame: z.boolean(),
     emergency: z.string().nullable(),
+    // 0200 — POS-parity demographics. `.optional()` keeps rows fetched before
+    // the migration parse-safe (adapter coalesces to null).
+    email: z.string().nullable().optional(),
+    race: z.string().nullable().optional(),
+    gender: z.string().nullable().optional(),
+    birthday: z.string().nullable().optional(),
   }),
   delivery: z.object({
     date: z.string().nullable(),
@@ -94,6 +100,9 @@ export const orderSchema = z.object({
   approvalCode: z.string().nullable(),
   installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
   operationStage: operationStageSchema.nullable(),
+  // Origin marker — 'autocount' for imported legacy rows (null = native).
+  // Optional so responses fetched before the field existed still parse.
+  sourceSystem: z.string().nullable().optional(),
   warehouseId: z.string().uuid().nullable(),
   deliveryPartnerId: z.string().uuid().nullable(),
   partnerStage: partnerStageSchema.nullable(),
@@ -172,6 +181,17 @@ export const createOrderInputSchema = z.object({
     billing: z.string().nullable(),
     billingSame: z.boolean(),
     emergency: z.string().min(1),
+    // 0200 — POS-parity demographics. The POS front-end gates requiredness;
+    // the server stays LENIENT (nullable/optional) so non-POS callers and
+    // in-flight drafts keep submitting (2990s precedent).
+    email: z.string().nullable().optional(),
+    race: z.string().nullable().optional(),
+    gender: z.string().nullable().optional(),
+    birthday: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable()
+      .optional(),
   }),
   delivery: z.object({
     date: z.string().nullable(),
@@ -266,6 +286,45 @@ export const createOrderInputSchema = z.object({
 export type CreateOrderInput = z.infer<typeof createOrderInputSchema>;
 export type OrderLineInput = z.infer<typeof orderLineInputSchema>;
 export type OrderAddonInput = z.infer<typeof orderAddonInputSchema>;
+
+/**
+ * POS-parity (MAINTAIN → New Order) — the RAW create input for INTERNAL roles
+ * (principal/operation). Mirrors the 2990s Backend "New Sales Order": no POS
+ * gates. Deliberately minimal vs `createOrderInputSchema`:
+ *   - no signature / terms / payment method / emergency contact / billing
+ *   - no lead-time floor — any (or no) delivery date; absent = TBD
+ *   - lines are free TEXT skus (catalog OR fully custom, `order_lines.sku` has
+ *     no FK) at operator-entered prices, persisted exactly as sent
+ * The create_order RPC still enforces: dealer required, ≥1 line, and the
+ * standing sofa ↔ mattress/bed-frame composition rule.
+ */
+const rawOrderLineInputSchema = z.object({
+  sku: z.string().trim().min(1),
+  qty: z.number().int().positive(),
+  unitPrice: z.number().nonnegative(),
+});
+
+export const rawCreateOrderInputSchema = z.object({
+  dealerId: z.string().uuid(),
+  outletId: z.string().uuid().nullable().optional(),
+  salespersonId: z.string().uuid().nullable().optional(),
+  customer: z.object({
+    name: z.string().trim().min(1),
+    phone: z.string().trim().nullable().optional(),
+    address: z.string().trim().nullable().optional(),
+  }),
+  /** ISO YYYY-MM-DD. Null / absent = delivery date TBD. */
+  deliveryDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
+  lines: z.array(rawOrderLineInputSchema).min(1),
+  paid: z.number().nonnegative().default(0),
+});
+/** z.input — `paid` stays optional for the POSTing client. */
+export type RawCreateOrderInput = z.input<typeof rawCreateOrderInputSchema>;
+export type RawOrderLineInput = z.infer<typeof rawOrderLineInputSchema>;
 
 /**
  * Phase 2C.1b — Blocker resolution mutation inputs. Each one targets a single

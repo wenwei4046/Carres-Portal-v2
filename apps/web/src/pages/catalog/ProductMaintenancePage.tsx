@@ -5,21 +5,26 @@ import { PillTabs, type PillTab } from "./components/PillTabs";
 import SkuMasterTab from "./tabs/SkuMasterTab";
 import ModularTab from "./modular/ModularTab";
 import MaintenanceTab from "./tabs/MaintenanceTab";
-import CombosTab from "./tabs/CombosTab";
+import SofaCombosTab from "./tabs/SofaCombosTab";
 import SpecialAddonsTab from "./tabs/SpecialAddonsTab";
+import FabricsTab from "./tabs/FabricsTab";
+import DeliveryTab from "./tabs/DeliveryTab";
 import PromoTab from "./tabs/PromoTab";
 
 /**
  * Product & Maintenance — the rebuilt Catalog page (0169-0173). Replaces the
- * old single-page `OperationCatalog`. Four tabs:
+ * old single-page `OperationCatalog`. Tabs:
  *
  *   • SKU Master  — flat product table (code · description · name · category ·
  *                   size · price · status), filter + search + Edit Prices.
  *   • Modular     — model cards grouped by category; photo, allowed-options,
  *                   per-size SKU ON/OFF (pos_active), Generate SKUs.
- *   • Maintenance — option pools + delivery-fee (floor_config) + add-ons.
- *   • Combos      — principal-only named SKU sets sold at one combo price; the
- *                   components split that price back out at checkout (0177).
+ *   • Delivery    — trip fee + special delivery rules + stair-carry fee (its
+ *                   own tab, split out of Maintenance — Loo 2026-07-06).
+ *   • Maintenance — option pools (sizes / compartments / supplier categories).
+ *   • Sofa Combos — principal-only matched-shape compartment bundles priced per
+ *                   seat height (0179). (The old fixed-set "Overall Combo" was
+ *                   removed 2026-07-06 — written in error, never used.)
  *
  * Mounts at the unchanged `'catalog'` routing key in BOTH OperationApp and
  * PrincipalApp. The single `useCatalog({ admin: true })` bundle is fetched
@@ -36,14 +41,24 @@ import PromoTab from "./tabs/PromoTab";
  * The prop is kept as an explicit override (tests / the legacy Principal mount).
  */
 
-type TabKey = "sku" | "modular" | "special" | "maintenance" | "combos" | "promo";
+type TabKey =
+  | "sku"
+  | "modular"
+  | "special"
+  | "fabrics"
+  | "delivery"
+  | "maintenance"
+  | "combos"
+  | "promo";
 
 const TABS: readonly PillTab<TabKey>[] = [
   { key: "sku", label: "SKU Master" },
   { key: "modular", label: "Modular" },
   { key: "special", label: "Special Add-ons" },
+  { key: "fabrics", label: "Fabrics" },
+  { key: "delivery", label: "Delivery" },
   { key: "maintenance", label: "Maintenance" },
-  { key: "combos", label: "Combos" },
+  { key: "combos", label: "Sofa Combos" },
   { key: "promo", label: "Promo / Free Gifts" },
 ];
 
@@ -89,11 +104,17 @@ export default function ProductMaintenancePage({
           {tab === "special" && (
             <SpecialAddonsTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
+          {tab === "fabrics" && (
+            <FabricsTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
+          )}
+          {tab === "delivery" && (
+            <DeliveryTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
+          )}
           {tab === "maintenance" && (
             <MaintenanceTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
           {tab === "combos" && (
-            <CombosTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
+            <SofaCombosTab catalog={catalogQ.data} isPrincipal={isPrincipal} />
           )}
           {tab === "promo" && (
             <PromoTab catalog={catalogQ.data} isPrincipal={isPrincipal} />

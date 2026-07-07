@@ -12,7 +12,7 @@
  *   · onAddBuild fires with the expected payload (cells + height + fabric + total)
  */
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import type {
   ProductModelDto,
   ProductSkuDto,
@@ -69,6 +69,9 @@ const FABRICS: SofaFabricDto[] = [
 
 function renderCanvas(props?: {
   combos?: SofaComboDto[];
+  offered?: ModelSofaCompartmentDto[];
+  heights?: string[];
+  compartmentPool?: SofaCompartmentDto[];
   onAddBuild?: (p: unknown) => void;
   onClose?: () => void;
 }) {
@@ -78,12 +81,13 @@ function renderCanvas(props?: {
     <SofaBuildCanvas
       model={MODEL}
       skus={SKUS}
-      compartmentPool={POOL}
-      modelCompartments={OFFERED}
+      compartmentPool={props?.compartmentPool ?? POOL}
+      modelCompartments={props?.offered ?? OFFERED}
       sofaCombos={props?.combos ?? []}
       fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
       fabricTierOverride={null}
       sofaFabrics={FABRICS}
+      heights={props?.heights}
       onAddBuild={onAddBuild}
       onClose={onClose}
     />,
@@ -93,6 +97,12 @@ function renderCanvas(props?: {
 
 function addModule(code: string) {
   fireEvent.click(screen.getByTestId(`module-palette-item-${code}`));
+}
+
+/** jsdom has no PointerEvent — dispatch a coordinate-carrying MouseEvent under
+ *  the pointer event's type (React's onPointer* handlers fire on the type). */
+function firePointer(el: Element, type: "pointerdown" | "pointermove" | "pointerup", x: number, y: number) {
+  fireEvent(el, new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }));
 }
 
 describe("SofaBuildCanvas", () => {
@@ -129,12 +139,273 @@ describe("SofaBuildCanvas", () => {
     renderCanvas();
     addModule("1S"); // 1500
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
-    // switch to PRICE_2 fabric → +300 global delta
-    fireEvent.change(screen.getByTestId("sofa-build-fabric"), { target: { value: "f-2" } });
+    // switch to PRICE_2 fabric → +300 global delta (select values are the
+    // unified selling-fabric KEYS: `sf:<sofa_fabrics id>` / `cf:<fabric code>`)
+    fireEvent.change(screen.getByTestId("sofa-build-fabric"), { target: { value: "sf:f-2" } });
     expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,800.00");
     // height picker present with the canonical heights
     const heightSel = screen.getByTestId("sofa-build-height") as HTMLSelectElement;
     expect(heightSel.value).toBe("24");
+  });
+
+  // 0204 — the size axis follows the sofa_size pool; per-size prices win.
+  it("heights drive the size picker (incl. non-numeric 'Flat'), default 24", () => {
+    renderCanvas({ heights: ["24", "32", "Flat"] });
+    const sel = screen.getByTestId("sofa-build-height") as HTMLSelectElement;
+    expect(sel.value).toBe("24");
+    expect(Array.from(sel.options).map((o) => o.value)).toEqual(["24", "32", "Flat"]);
+    // Non-numeric size renders WITHOUT the inch mark.
+    expect(Array.from(sel.options).map((o) => o.textContent)).toEqual(["24″", "32″", "Flat"]);
+  });
+
+  it("switching size re-prices the build + the palette via the per-size map", () => {
+    const offered: ModelSofaCompartmentDto[] = POOL.map((p, i) => ({
+      modelId: MODEL.id,
+      compartmentId: p.id,
+      priceOverride: null,
+      sortOrder: i,
+      skuPrice: p.defaultPrice,
+      // Only 1S is size-priced: RM 1,990 at 32; other sizes inherit the flat 1,500.
+      skuPricesBySize: p.code === "1S" ? { "32": 1990 } : null,
+    }));
+    renderCanvas({ offered, heights: ["24", "32", "Flat"] });
+    addModule("1S");
+    expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
+    fireEvent.change(screen.getByTestId("sofa-build-height"), { target: { value: "32" } });
+    expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,990.00");
+    // The palette card shows the sized price too.
+    expect(screen.getByTestId("module-palette-item-1S")).toHaveTextContent("1,990.00");
+    // A size with no entry falls back to the flat price.
+    fireEvent.change(screen.getByTestId("sofa-build-height"), { target: { value: "Flat" } });
+    expect(screen.getByTestId("sofa-build-total")).toHaveTextContent("RM 1,500.00");
+  });
+
+  it("Expand room grows the floor 1.5× (same ratio); Reset restores 600×480", () => {
+    renderCanvas();
+    const room = screen.getByTestId("sofa-build-room");
+    expect(room).toHaveStyle({ width: "600px", height: "480px" });
+    fireEvent.click(screen.getByTestId("sofa-room-expand"));
+    expect(room).toHaveStyle({ width: "900px", height: "720px" });
+    expect(screen.getByTestId("sofa-room-expand")).toHaveTextContent("Reset room");
+    fireEvent.click(screen.getByTestId("sofa-room-expand"));
+    expect(room).toHaveStyle({ width: "600px", height: "480px" });
+  });
+
+  it("controlled size: the redundant bottom size picker is hidden (the host owns it)", () => {
+    // When the size is controlled (heightValue provided), the host renders its
+    // own size chips, so the canvas footer's picker would be redundant and is
+    // omitted (Loo 2026-07-06).
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        heights={["24", "26", "Flat"]}
+        heightValue="26"
+        onHeightChange={vi.fn()}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("sofa-build-height")).toBeNull();
+  });
+
+  it("Create combo: no button without onCreateCombo (dealer flow)", () => {
+    renderCanvas();
+    addModule("1S");
+    expect(screen.queryByTestId("sofa-build-create-combo")).toBeNull();
+  });
+
+  it("Create combo: with onCreateCombo, a valid build hands up its module codes", () => {
+    const onCreateCombo = vi.fn();
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        onCreateCombo={onCreateCombo}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    addModule("1S");
+    const btn = screen.getByTestId("sofa-build-create-combo");
+    expect(btn).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(onCreateCombo).toHaveBeenCalledWith(["1S"]);
+  });
+
+  // 0206 — the parallel "Create quick pick" button.
+  it("Create quick pick: no button without onCreateQuickPick (dealer flow)", () => {
+    renderCanvas();
+    addModule("1S");
+    expect(screen.queryByTestId("sofa-build-create-quickpick")).toBeNull();
+  });
+
+  it("Create quick pick: with onCreateQuickPick, a valid build hands up its module codes", () => {
+    const onCreateQuickPick = vi.fn();
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        onCreateQuickPick={onCreateQuickPick}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    addModule("1S");
+    const btn = screen.getByTestId("sofa-build-create-quickpick");
+    expect(btn).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(onCreateQuickPick).toHaveBeenCalledWith(["1S"]);
+  });
+
+  /** A flush 1A(LHF)+1A(RHF) pair = ONE closed sofa, pre-placed. */
+  function renderClosedPair() {
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+        initialCells={[
+          { moduleCode: "1A(LHF)", x: 100, y: 100, rot: 0 },
+          { moduleCode: "1A(RHF)", x: 195, y: 100, rot: 0 }, // flush → ONE closed sofa
+        ]}
+      />,
+    );
+    return screen.getAllByTestId(/^sofa-cell-sc_/);
+  }
+
+  it("a CLOSED sofa drags as ONE piece — grabbing any cell moves the whole group", () => {
+    const [c1, c2] = renderClosedPair();
+    expect(c1).toHaveStyle({ left: "100px" });
+    expect(c2).toHaveStyle({ left: "195px" });
+    firePointer(c1!, "pointerdown", 0, 0);
+    firePointer(c1!, "pointermove", 60, 40);
+    firePointer(c1!, "pointerup", 60, 40);
+    // BOTH cells translate by the same delta (no snap targets, room clamp inert)
+    expect(c1).toHaveStyle({ left: "160px", top: "140px" });
+    expect(c2).toHaveStyle({ left: "255px", top: "140px" });
+  });
+
+  it("switching size re-abuts a linked sofa — it grows as ONE piece", () => {
+    const [c1, c2] = renderClosedPair(); // 1A pair flush at 24″ (95 wide each)
+    fireEvent.change(screen.getByTestId("sofa-build-height"), { target: { value: "28" } });
+    // 1A at 28″ is 105 wide → the right piece re-abuts instead of overlapping
+    expect(c1).toHaveStyle({ left: "100px", top: "100px" });
+    expect(c2).toHaveStyle({ left: "205px", top: "100px" });
+  });
+
+  it("clicking a complete sofa selects the WHOLE item — group toolbar, no per-cell pill", () => {
+    const [c1] = renderClosedPair();
+    firePointer(c1!, "pointerdown", 0, 0);
+    firePointer(c1!, "pointerup", 0, 0);
+    const tools = screen.getByTestId("sofa-group-tools");
+    expect(within(tools).getByTestId("sofa-group-rotate")).toBeInTheDocument();
+    expect(within(tools).getByTestId("sofa-group-edit")).toHaveTextContent("Edit modules");
+    expect(within(tools).getByTestId("sofa-group-delete")).toBeInTheDocument();
+    // the whole item is selected — no single-module rotate/delete pill
+    expect(screen.queryAllByTestId(/^sofa-cell-delete-/)).toHaveLength(0);
+  });
+
+  it("group rotate turns the whole sofa 90° about its centre", () => {
+    const [c1, c2] = renderClosedPair();
+    firePointer(c1!, "pointerdown", 0, 0);
+    firePointer(c1!, "pointerup", 0, 0);
+    fireEvent.click(screen.getByTestId("sofa-group-rotate"));
+    // 190×95 bbox centred at (195, 147.5) → a 95×190 vertical stack
+    expect(c1).toHaveStyle({ left: "147.5px", top: "52.5px" });
+    expect(c2).toHaveStyle({ left: "147.5px", top: "147.5px" });
+  });
+
+  it("Edit modules unlocks per-module editing — single select + single drag", () => {
+    const [c1, c2] = renderClosedPair();
+    firePointer(c1!, "pointerdown", 0, 0);
+    firePointer(c1!, "pointerup", 0, 0);
+    fireEvent.click(screen.getByTestId("sofa-group-edit"));
+    expect(screen.queryByTestId("sofa-group-tools")).not.toBeInTheDocument();
+    // dragging one module now moves ONLY that module (pull it out of the sofa)
+    firePointer(c2!, "pointerdown", 0, 0);
+    firePointer(c2!, "pointermove", 0, 150);
+    firePointer(c2!, "pointerup", 0, 150);
+    expect(c1).toHaveStyle({ left: "100px", top: "100px" });
+    expect(c2).toHaveStyle({ top: "250px" });
+    // and the single-module pill is reachable again
+    expect(screen.queryAllByTestId(/^sofa-cell-delete-/)).toHaveLength(1);
+  });
+
+  it("an UNCLOSED pair still drags per-cell (assembly mode)", () => {
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+        initialCells={[
+          // two LHF pieces — joined but right end open ⇒ NOT closed
+          { moduleCode: "1A(LHF)", x: 100, y: 100, rot: 0 },
+          { moduleCode: "1NA", x: 195, y: 100, rot: 0 },
+        ]}
+      />,
+    );
+    const [c1, c2] = screen.getAllByTestId(/^sofa-cell-sc_/);
+    firePointer(c2!, "pointerdown", 0, 0);
+    firePointer(c2!, "pointermove", 0, 200);
+    firePointer(c2!, "pointerup", 0, 200);
+    // only the grabbed piece moved
+    expect(c1).toHaveStyle({ left: "100px", top: "100px" });
+    expect(c2).toHaveStyle({ top: "300px" });
+  });
+
+  it("canvas cells draw the uploaded compartment art (flush) when the pool row has one", () => {
+    const pool = POOL.map((p) =>
+      p.code === "1S" ? { ...p, iconUrl: "https://cdn/1s.png" } : p,
+    );
+    renderCanvas({ compartmentPool: pool });
+    addModule("1S");
+    // the palette icon uses the same img testid — assert within the flush box
+    const box = screen.getByTestId("compartment-silhouette-img-flush");
+    const img = within(box).getByTestId("compartment-silhouette-img");
+    expect(img).toHaveAttribute("src", "https://cdn/1s.png");
+  });
+
+  it("clicking empty canvas deselects — the floating rotate/delete tools dismiss", () => {
+    renderCanvas();
+    addModule("1S"); // addModule auto-selects → tools visible
+    const cell = screen.getAllByTestId(/^sofa-cell-sc_/)[0]!;
+    const id = cell.getAttribute("data-testid")!.replace("sofa-cell-", "");
+    expect(screen.getByTestId(`sofa-cell-delete-${id}`)).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByTestId("sofa-build-room"));
+    expect(screen.queryByTestId(`sofa-cell-delete-${id}`)).not.toBeInTheDocument();
   });
 
   it("disables Add with a reason for a non-closed build (no-arms piece alone)", () => {
@@ -143,14 +414,18 @@ describe("SofaBuildCanvas", () => {
     const add = screen.getByTestId("sofa-build-add");
     expect(add).toBeDisabled();
     expect(add).toHaveTextContent(/Resolve/);
-    // the canvas shows a not-closed pill for the group
-    expect(screen.getByTestId("sofa-group-not-closed")).toBeInTheDocument();
+    // 2990s parity: the Add button is the ONLY closure messaging — an
+    // unclosed group gets no red outline and no per-group caption on canvas.
+    expect(screen.queryByTestId("sofa-group-not-closed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sofa-group-outline")).not.toBeInTheDocument();
   });
 
   it("enables Add for a self-closing single piece (1S = both arms) and emits the payload", () => {
     const onAddBuild = vi.fn();
     renderCanvas({ onAddBuild });
     addModule("1S");
+    // sole ("Other") series auto-collapses → pick the colour to lock a fabric
+    fireEvent.change(screen.getByTestId("sofa-build-fabric"), { target: { value: "sf:f-1" } });
     const add = screen.getByTestId("sofa-build-add");
     expect(add).not.toBeDisabled();
     expect(add).toHaveTextContent("Add to cart");
@@ -166,6 +441,50 @@ describe("SofaBuildCanvas", () => {
     expect(payload.fabricName).toBe("Linen Beige");
     expect(payload.total).toBe(1500);
     expect(payload.priceBasis).toBe("a_la_carte");
+    expect(payload.fabricDeferred).toBe(false);
+  });
+
+  it("colour KIV by default defers the fabric: null fabric + base tier + fabricDeferred", () => {
+    const onAddBuild = vi.fn();
+    renderCanvas({ onAddBuild });
+    addModule("1S");
+    // no colour picked → the fabric stays KIV
+    fireEvent.click(screen.getByTestId("sofa-build-add"));
+    const payload = onAddBuild.mock.calls[0]![0];
+    expect(payload.fabricDeferred).toBe(true);
+    expect(payload.fabricId).toBeNull();
+    expect(payload.fabricName).toBeNull();
+    expect(payload.fabricTier).toBe("PRICE_1"); // base tier when deferred
+  });
+
+  it("Fabric: multiple series → a series step appears; picking one reveals its colours + KIV", () => {
+    render(
+      <SofaBuildCanvas
+        model={MODEL}
+        skus={SKUS}
+        compartmentPool={POOL}
+        modelCompartments={OFFERED}
+        sofaCombos={[]}
+        fabricTierConfig={{ sofaTier2Delta: 300, sofaTier3Delta: 600 }}
+        fabricTierOverride={null}
+        sofaFabrics={FABRICS}
+        sellingFabrics={[
+          { key: "cf:EZ-001", name: "EZ-001 Pearl", tier: "PRICE_1", id: null, code: "EZ-001", swatch: null, series: "EZ" },
+          { key: "cf:BF-001", name: "BF-001 Coal", tier: "PRICE_2", id: null, code: "BF-001", swatch: null, series: "BF" },
+        ]}
+        onAddBuild={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    const series = screen.getByTestId("sofa-build-fabric-series") as HTMLSelectElement;
+    expect(series.value).toBe(""); // series-level KIV by default
+    expect(screen.queryByTestId("sofa-build-fabric")).toBeNull(); // colours hidden until a series
+    fireEvent.change(series, { target: { value: "EZ" } });
+    const colour = screen.getByTestId("sofa-build-fabric") as HTMLSelectElement;
+    expect(colour.value).toBe("__kiv__");
+    const labels = Array.from(colour.options).map((o) => o.textContent ?? "");
+    expect(labels.some((l) => /EZ-001/.test(l))).toBe(true);
+    expect(labels.some((l) => /BF-001/.test(l))).toBe(false); // only the EZ series
   });
 
   it("shows the matched-combo badge + savings when a combo applies", () => {
@@ -192,8 +511,8 @@ describe("SofaBuildCanvas", () => {
     const badge = screen.getByTestId("sofa-build-combo-badge");
     expect(badge).toHaveTextContent("Combo applied");
     expect(badge).toHaveTextContent("saves RM 500.00"); // 1500 subset − 1000 combo
-    // the matched cell carries a combo badge
-    expect(screen.getByTestId("sofa-cell-combo-badge")).toBeInTheDocument();
+    // the matched cell is highlighted (data-matched) but carries NO "Combo" logo
+    expect(screen.queryByTestId("sofa-cell-combo-badge")).toBeNull();
   });
 
   it("close button fires onClose", () => {

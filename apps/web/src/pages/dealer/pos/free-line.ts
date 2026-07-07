@@ -33,8 +33,12 @@ export interface GiftPreviewRow {
   giftSku: string;
   /** resolved qty for this (source model, gift) row. */
   qty: number;
-  /** display name: configured label, else the sku's description, else the code. */
+  /** display name: the sku's description → the accessory's model name → the
+   *  bare code. The configured campaign label is a REMARK (2990s campaignName),
+   *  never the product name. */
   name: string;
+  /** the optional campaign remark (e.g. "MING PAO CANADA") — muted suffix. */
+  campaign?: string;
   /** the product_models.id of the paid line that triggered this gift (rows are
    *  kept separate per source model — the same gift sku from two models = two
    *  rows = two appended server lines). */
@@ -72,9 +76,11 @@ export function toFreeGiftLineInput(
   const modelId = skuRow?.modelId ?? null;
   const category = modelId ? (categoryByModel(catalog).get(modelId) ?? "") : "";
   const qty = Number(line.qty ?? 1);
-  // One-way guard (F1): flag a line already FREE so the SHARED resolver skips it
-  // as a trigger — the single source of the guard lives in resolveDefaultFreeGifts.
-  const free = Boolean(attrs.free_item) || Boolean(attrs.free_gift);
+  // Only an APPENDED gift line (`attrs.free_gift`) is flagged so the SHARED
+  // resolver skips it (a gift never spawns another gift). A campaign-freed PAID
+  // item (`attrs.free_item`) STILL keeps its default gift — the GWP stays even
+  // after "Make free" (Loo 2026-07-06). Mirrors the server's deriveLineInput.
+  const free = Boolean(attrs.free_gift);
 
   // A sofa BUILD line (the SofaBuildCanvas single line) carries the full
   // geometry descriptor; its built compartments are the cell module codes.
@@ -145,18 +151,37 @@ export function previewDefaultGifts(
     return !!s && accessoryModelIds.has(s.modelId);
   };
 
-  // Friendly display name: configured label → sku description → bare code.
-  const descBySku = new Map(catalog.skus.map((s) => [s.sku, s.description ?? ""]));
+  // Friendly display name: sku description → the accessory's MODEL name (an
+  // accessory is one model = one product, e.g. "Pasir Wool Rug") → bare code.
+  // Never surface a raw SKU code when a human name exists (Loo 2026-07-06:
+  // "Free gift: ACC-601"). The configured label is the CAMPAIGN remark (2990s
+  // campaignName) — it rides along muted, it never replaces the product name.
+  const modelNameById = new Map(
+    catalog.models.map((m) => [m.id, (m.name || m.modelKey || "").trim()]),
+  );
+  const descBySku = new Map(
+    catalog.skus.map((s) => {
+      const desc = (s.description ?? "").trim();
+      return [s.sku, desc || modelNameById.get(s.modelId) || ""];
+    }),
+  );
   // F7b — one row per (source model, gift sku): do NOT merge the same gift sku
   // across source models (each model's gift is a distinct appended server line).
   const merged = new Map<string, GiftPreviewRow>();
   for (const d of desired) {
     if (!isAccessorySku(d.giftSku)) continue;
-    const name = d.label || descBySku.get(d.giftSku) || d.giftSku;
+    const name = descBySku.get(d.giftSku) || d.giftSku;
     const key = `${d.sourceModelId}__${d.giftSku}`;
     const cur = merged.get(key);
     if (cur) cur.qty += d.qty;
-    else merged.set(key, { giftSku: d.giftSku, qty: d.qty, name, sourceModelId: d.sourceModelId });
+    else
+      merged.set(key, {
+        giftSku: d.giftSku,
+        qty: d.qty,
+        name,
+        ...(d.label ? { campaign: d.label } : {}),
+        sourceModelId: d.sourceModelId,
+      });
   }
   return [...merged.values()];
 }

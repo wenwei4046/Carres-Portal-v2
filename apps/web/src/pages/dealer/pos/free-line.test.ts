@@ -44,7 +44,6 @@ function catalog(over?: Partial<CatalogResponse>): CatalogResponse {
     sofaFabrics: [],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
-    combos: [],
     sofaCombos: [],
     modelDefaultFreeGifts: [],
     freeItemCampaigns: [],
@@ -67,10 +66,18 @@ describe("previewDefaultGifts", () => {
     expect(rows).toEqual([{ giftSku: "PILLOW", qty: 1, name: "Memory Pillow", sourceModelId: MATT }]);
   });
 
-  it("a freed line never triggers a gift (one-way)", () => {
+  it("a campaign-freed item KEEPS its default gift ('Make free' must not strip the GWP)", () => {
     const cat = catalog({ modelDefaultFreeGifts: [{ modelId: MATT, gifts: [{ giftSku: "PILLOW", qty: 1 }] }] });
     const freed = line({ attrs: { free_item: { campaignId: "c1" } } });
-    expect(previewDefaultGifts([freed], cat)).toEqual([]);
+    expect(previewDefaultGifts([freed], cat)).toEqual([
+      { giftSku: "PILLOW", qty: 1, name: "Memory Pillow", sourceModelId: MATT },
+    ]);
+  });
+
+  it("an appended gift line never triggers another gift (no recursion)", () => {
+    const cat = catalog({ modelDefaultFreeGifts: [{ modelId: MATT, gifts: [{ giftSku: "PILLOW", qty: 1 }] }] });
+    const giftLine = line({ attrs: { free_gift: { giftSku: "PILLOW" } } });
+    expect(previewDefaultGifts([giftLine], cat)).toEqual([]);
   });
 
   it("non-sofa gift qty scales by line qty", () => {

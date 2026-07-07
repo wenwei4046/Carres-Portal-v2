@@ -1,6 +1,6 @@
 /**
  * ModulePaletteItem — Phase-3 Task-2 palette card tests.
- *  - shows the resolved price (priceOverride ?? pool defaultPrice)
+ *  - shows the resolved price (skuPrice ?? priceOverride ?? pool defaultPrice)
  *  - fires onAdd(code) on click
  */
 import { describe, it, expect, vi } from "vitest";
@@ -39,5 +39,17 @@ describe("ModulePaletteItem", () => {
     };
     render(<ModulePaletteItem compartment={POOL} offered={offered} onAdd={vi.fn()} />);
     expect(screen.getByText("RM 1,500.00")).toBeInTheDocument();
+  });
+
+  it("skuPrice (SKU Master) wins over override AND pool default", () => {
+    const offered: ModelSofaCompartmentDto = {
+      modelId: "22222222-2222-2222-2222-222222222222",
+      compartmentId: POOL.id,
+      priceOverride: 1500,
+      sortOrder: 0,
+      skuPrice: 1777,
+    };
+    render(<ModulePaletteItem compartment={POOL} offered={offered} onAdd={vi.fn()} />);
+    expect(screen.getByText("RM 1,777.00")).toBeInTheDocument();
   });
 });

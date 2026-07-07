@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import type {
+  CatalogOptionPoolDto,
+  CatalogOptionPoolName,
   CatalogResponse,
   ProductCategory,
   SpecialAddonDto,
@@ -15,14 +17,158 @@ import {
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
+import MaintenanceSidebar, {
+  type MaintenanceSidebarGroup,
+} from "../components/MaintenanceSidebar";
+import OrderAddonsSection from "./OrderAddonsSection";
+import PoolPanel from "./PoolPanel";
+import StairCarryFeeSection from "./StairCarryFeeSection";
 
 /**
- * Special Add-ons tab (0181) — principal-owned per-model SELLING surcharges with
- * one-level follow-up question groups (group → choices, each carrying an `extra`).
- * Surcharges may be negative (a deduction). Models opt in via the Modular drawer's
- * Special Add-ons panel (allowed_options.specials); at POS the picked surcharge
- * folds into the line price, server-recomputed on submit.
+ * Special Add-ons tab — 0201 reshaped to the 2990s reference layout (Loo
+ * 2026-07-05 screenshot): a grouped LEFT SIDEBAR + one panel at a time.
+ *
+ *   BEDFRAME  — Divan Heights (surcharge-priced) · Total Heights · Gaps ·
+ *               Leg Heights — 0201 option pools (PoolPanel: Edit-draft batch
+ *               save + Effective-from + History).
+ *   SOFA      — Sizes · Leg Heights — 0201 option pools.
+ *   PRODUCT ADD-ONS — the 0181 special_addons table (per-model SELLING
+ *               surcharges with one-level follow-up question groups; may be
+ *               negative). Unchanged editor, now hosted as a panel.
+ *   ORDER ADD-ONS — the order-level addons CRUD (disposal, lift…), moved here
+ *               from the Maintenance tab to mirror the 2990s sidebar. Also
+ *               hosts the stair-carry fee (an order-level charge — moved out
+ *               of the Delivery tab, Loo 2026-07-06).
  */
+
+// NOTE (Loo 2026-07-06): "total_height" is deliberately NOT a section — total
+// height is COMPUTED at POS (divan + leg), never authored/picked. The 0201
+// `total_height` pool rows stay dormant in the DB.
+type SpecialKey =
+  | "divan_height"
+  | "gap"
+  | "bedframe_leg_height"
+  | "sofa_size"
+  | "sofa_leg_height"
+  | "product"
+  | "order";
+
+export default function SpecialAddonsTab({
+  catalog,
+  isPrincipal = false,
+}: {
+  catalog: CatalogResponse;
+  isPrincipal?: boolean;
+}) {
+  const [active, setActive] = useState<SpecialKey>("divan_height");
+  const pools = catalog.optionPools ?? [];
+  const byPool = (p: CatalogOptionPoolName): CatalogOptionPoolDto[] =>
+    pools.filter((e) => e.pool === p);
+
+  const groups: MaintenanceSidebarGroup<SpecialKey>[] = [
+    {
+      title: "Bedframe",
+      items: [
+        { key: "divan_height", label: "Divan Heights", count: byPool("divan_height").length },
+        { key: "gap", label: "Gaps", count: byPool("gap").length },
+        {
+          key: "bedframe_leg_height",
+          label: "Leg Heights",
+          count: byPool("bedframe_leg_height").length,
+        },
+      ],
+    },
+    {
+      title: "Sofa",
+      items: [
+        { key: "sofa_size", label: "Sizes", count: byPool("sofa_size").length },
+        { key: "sofa_leg_height", label: "Leg Heights", count: byPool("sofa_leg_height").length },
+      ],
+    },
+    {
+      title: "Product Add-ons",
+      items: [
+        { key: "product", label: "Product Add-ons", count: (catalog.specialAddons ?? []).length },
+      ],
+    },
+    {
+      title: "Order Add-ons",
+      items: [{ key: "order", label: "Order Add-ons", count: catalog.addons.length }],
+    },
+  ];
+
+  return (
+    <div className="flex gap-5 items-start">
+      <MaintenanceSidebar groups={groups} active={active} onChange={setActive} />
+      <div className="flex-1 min-w-0 max-w-[860px]">
+        {active === "divan_height" && (
+          <PoolPanel
+            pool="divan_height"
+            variant="priced"
+            title="Divan Heights"
+            description="Bedframe divan height options with surcharge pricing."
+            entries={byPool("divan_height")}
+            isPrincipal={isPrincipal}
+          />
+        )}
+        {active === "gap" && (
+          <PoolPanel
+            pool="gap"
+            variant="plain"
+            title="Gaps"
+            description="Bedframe gap options (headboard-to-divan clearance)."
+            entries={byPool("gap")}
+            isPrincipal={isPrincipal}
+          />
+        )}
+        {active === "bedframe_leg_height" && (
+          <PoolPanel
+            pool="bedframe_leg_height"
+            variant="priced"
+            title="Leg Heights"
+            description="Bedframe leg height options with surcharge pricing."
+            entries={byPool("bedframe_leg_height")}
+            isPrincipal={isPrincipal}
+          />
+        )}
+        {active === "sofa_size" && (
+          <PoolPanel
+            pool="sofa_size"
+            variant="plain"
+            title="Sizes"
+            description="Sofa size options (seat depth, inches)."
+            entries={byPool("sofa_size")}
+            isPrincipal={isPrincipal}
+          />
+        )}
+        {active === "sofa_leg_height" && (
+          <PoolPanel
+            pool="sofa_leg_height"
+            variant="priced"
+            title="Leg Heights"
+            description="Sofa leg height options with surcharge pricing."
+            entries={byPool("sofa_leg_height")}
+            isPrincipal={isPrincipal}
+          />
+        )}
+        {active === "product" && (
+          <ProductAddonsPanel catalog={catalog} isPrincipal={isPrincipal} />
+        )}
+        {active === "order" && (
+          <div className="flex flex-col gap-8">
+            <OrderAddonsSection addons={catalog.addons} />
+            <StairCarryFeeSection catalog={catalog} isPrincipal={isPrincipal} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PRODUCT ADD-ONS panel — the 0181 special_addons editor (previously the whole
+// tab body; unchanged behaviour, now one sidebar panel).
+// ---------------------------------------------------------------------------
 
 function fmtRm(n: number): string {
   const sign = n < 0 ? "−" : "";
@@ -69,12 +215,12 @@ function toDraft(a?: SpecialAddonDto): Draft {
   };
 }
 
-export default function SpecialAddonsTab({
+function ProductAddonsPanel({
   catalog,
-  isPrincipal = false,
+  isPrincipal,
 }: {
   catalog: CatalogResponse;
-  isPrincipal?: boolean;
+  isPrincipal: boolean;
 }) {
   const rows = useMemo(
     () =>
@@ -86,17 +232,21 @@ export default function SpecialAddonsTab({
   const [editing, setEditing] = useState<Draft | null>(null);
 
   return (
-    <div>
-      <div className="flex justify-between items-center gap-3 mb-4 flex-wrap">
-        <p className="t-small text-base-600">
-          Per-model surcharges with optional follow-up questions. Attach them to a model in the
-          Modular tab. {!isPrincipal && <span className="text-base-400 italic"> · Master Admin only</span>}
-        </p>
+    <section data-testid="product-addons-panel">
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <div className="t-h4 font-display text-base-900">Product Add-ons</div>
+          <p className="t-tiny text-base-500 mt-0.5 max-w-[520px]">
+            Per-model surcharges with optional follow-up questions. Attach them to a
+            model in the Modular tab.
+            {!isPrincipal && " Master Admin only — read-only for your role."}
+          </p>
+        </div>
         {isPrincipal && (
           <button
             type="button"
             onClick={() => setEditing(toDraft())}
-            className="btn-hero text-[12px]"
+            className="btn-hero text-[12px] shrink-0"
             data-testid="special-new"
           >
             + New special add-on
@@ -162,7 +312,7 @@ export default function SpecialAddonsTab({
       {editing && isPrincipal && (
         <SpecialAddonEditor draft={editing} onClose={() => setEditing(null)} />
       )}
-    </div>
+    </section>
   );
 }
 

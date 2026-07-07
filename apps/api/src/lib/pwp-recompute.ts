@@ -4,6 +4,7 @@ import {
   DB,
   PWP_RULES,
   SOFA_COMBO_PRICING,
+  matchSofaCombo,
   resolvePwp,
   type PwpLineInput,
   type PwpRule as PwpRuleDomain,
@@ -59,7 +60,9 @@ import { resolveSkuInfo, type SkuInfo } from "./rule-line-input";
 
 /** Typed reject reasons. The route maps every `bad_request` to 409. */
 export type PwpRejectCode =
-  /** claim on an attrs.sofa_build line (Hard rule #1) */
+  /** a sofa-build claim that cannot be a combo reward (no combo targeting on
+   *  the rule / build matches none of the reward combos / no PWP price at the
+   *  build's seat height). Pre-0186-sofa-reward this covered EVERY build claim. */
   | "pwp_not_eligible_sofa_build"
   /** claim on a line that ALSO carries special add-ons (attrs.specials) — the
    *  PWP price is all-in; the downstream special-addon recompute would re-add the
@@ -71,10 +74,21 @@ export type PwpRejectCode =
   /** claimed but resolvePwp did not grant it (scope mismatch OR allowance
    *  exhausted OR a 'pwp' reward whose pwp_price is NULL OR granted by a rule
    *  other than the claimed one) */
-  | "pwp_not_eligible";
+  | "pwp_not_eligible"
+  /** a reward line must be quantity 1 (2990s parity — one voucher funds one
+   *  unit; qty>1 would milk a single grant for multiple units at PWP price) */
+  | "pwp_reward_qty_not_one";
 
 export type PwpRecomputeOutcome =
-  | { status: "ok"; lines: RecomputableLine[] }
+  | {
+      status: "ok";
+      lines: RecomputableLine[];
+      /** 0186 sofa-as-reward — per LINE INDEX, the granted reward combo ids
+       *  whose price maps the sofa recompute must swap for their PWP-merged
+       *  maps (`pwpSwappedCombos`). Empty when no sofa claim. The sofa stage
+       *  runs AFTER this stage on the SAME array, so indexes line up. */
+      sofaRewardCombosByIndex: Record<number, string[]>;
+    }
   | { status: "bad_request"; message: string; code: PwpRejectCode }
   | { status: "server_error"; message: string };
 
@@ -149,23 +163,42 @@ function deriveRuleLine(line: RecomputableLine, skuInfo: Map<string, SkuInfo>): 
 /* ─── combo→slots map (combo-scope trigger/reward refinements only) ──────────── */
 
 /** Load the combo id → ordered OR-set slots map for any combo-scope trigger or
- *  reward target, via RLS. Empty map when none referenced; null on a read error
- *  (fail-closed). Mirrors free-gift-resolve's loadComboSlots. */
+ *  reward target, via RLS — PLUS (0186 sofa-as-reward) each combo's
+ *  `pwp_prices_by_height` so a sofa claim can assert a PWP price exists at the
+ *  build's seat height BEFORE consuming the voucher. Empty maps when none
+ *  referenced; null on a read error (fail-closed). */
 async function loadComboSlots(
   sb: SupabaseClient,
   comboIds: Set<string>,
-): Promise<Map<string, string[][]> | null> {
-  const map = new Map<string, string[][]>();
-  if (comboIds.size === 0) return map;
+): Promise<{
+  slots: Map<string, string[][]>;
+  pwpByComboId: Map<string, Record<string, number | null> | null>;
+} | null> {
+  const slots = new Map<string, string[][]>();
+  const pwpByComboId = new Map<string, Record<string, number | null> | null>();
+  if (comboIds.size === 0) return { slots, pwpByComboId };
   const { data, error } = await sb
     .from(SOFA_COMBO_PRICING)
-    .select("id, slots")
+    .select("id, slots, pwp_prices_by_height")
     .in("id", Array.from(comboIds));
   if (error) return null;
-  for (const row of (data ?? []) as Array<{ id: string; slots: string[][] | null }>) {
-    map.set(row.id, row.slots ?? []);
+  for (const row of (data ?? []) as Array<{
+    id: string;
+    slots: string[][] | null;
+    pwp_prices_by_height: Record<string, number | string | null> | null;
+  }>) {
+    slots.set(row.id, row.slots ?? []);
+    if (row.pwp_prices_by_height == null) {
+      pwpByComboId.set(row.id, null);
+    } else {
+      const m: Record<string, number | null> = {};
+      for (const [h, v] of Object.entries(row.pwp_prices_by_height)) {
+        m[h] = v == null ? null : Number(v);
+      }
+      pwpByComboId.set(row.id, m);
+    }
   }
-  return map;
+  return { slots, pwpByComboId };
 }
 
 /** The pure engine subset (`PwpRuleEngine`) the matcher consumes. */
@@ -199,20 +232,41 @@ export async function recomputePwpLines(
   //    attrs — `stripClientPwp` deletes the whole `pwp` object including these
   //    two). They are re-emitted on the canonical marker at the rebuild below so
   //    Stage B (`claimPwpCodesForLines`) can read `attrs.pwp.code` after pricing.
-  const claims: Array<{ index: number; ruleId: string; code: string; claimGroup: string; crossOrder: boolean }> = [];
+  const claims: Array<{
+    index: number;
+    ruleId: string;
+    code: string;
+    claimGroup: string;
+    crossOrder: boolean;
+    /** 0186 sofa-as-reward — set when the claimed line is a sofa build: the
+     *  built module codes + the chosen seat height. Its price is NOT forced
+     *  here; instead the sofa recompute swaps the granted reward combos'
+     *  price maps (the 2990s pattern — keeps the drift gate honest). */
+    sofaBuild: { builtCodes: string[]; height: string } | null;
+  }> = [];
   for (let i = 0; i < lines.length; i++) {
     const attrs = lines[i]!.attrs as Record<string, unknown> | null;
     if (!hasPwp(attrs)) continue;
-    // Hard rule #1 — a free-hand sofa build line (attrs.sofa_build) is recomputed
-    // + exploded downstream under an ABSOLUTE drift gate; forcing its price to a
-    // PWP price would 422 sofa_price_drift. Reject the claim (mirrors P7's F2).
-    if (attrs && attrs.sofa_build) {
-      return {
-        status: "bad_request",
-        code: "pwp_not_eligible_sofa_build",
-        message:
-          "A custom-built sofa cannot be made a PWP/promo reward — PWP applies to flat products only.",
-      };
+    // 0186 sofa-as-reward — a build claim is allowed; capture its built codes +
+    // height for the combo-match/price checks below. (Pre-sofa-reward this was
+    // Hard rule #1's outright reject.)
+    let sofaBuild: { builtCodes: string[]; height: string } | null = null;
+    const rawBuild = attrs?.sofa_build as
+      | { cells?: Array<{ moduleCode?: unknown }>; height?: unknown }
+      | undefined;
+    if (rawBuild && Array.isArray(rawBuild.cells)) {
+      const builtCodes = rawBuild.cells
+        .map((c) => String(c?.moduleCode ?? "").trim())
+        .filter(Boolean);
+      const height = typeof rawBuild.height === "string" ? rawBuild.height : "";
+      if (builtCodes.length === 0 || !height) {
+        return {
+          status: "bad_request",
+          code: "pwp_not_eligible_sofa_build",
+          message: "This sofa build is malformed and cannot be a PWP/promo reward.",
+        };
+      }
+      sofaBuild = { builtCodes, height };
     }
     // A line carrying special add-ons cannot be a PWP/promo reward: the forced PWP
     // price is all-in, but the downstream special-addon recompute (which runs after
@@ -226,6 +280,16 @@ export async function recomputePwpLines(
         code: "pwp_not_eligible_specials",
         message:
           "A line with special add-ons cannot be made a PWP/promo reward — remove the add-ons first.",
+      };
+    }
+    // 2990s parity: a PWP/promo reward line must be quantity 1 — one voucher
+    // funds exactly one unit. Without this, a tampered qty=2 line gets two
+    // units at the PWP price off a single grant (2990s rejects at confirm).
+    if (Number(lines[i]!.qty ?? 1) !== 1) {
+      return {
+        status: "bad_request",
+        code: "pwp_reward_qty_not_one",
+        message: "A PWP/promo reward line must be quantity 1.",
       };
     }
     const pwp = (attrs as { pwp?: { ruleId?: unknown; code?: unknown; claimGroup?: unknown; crossOrder?: unknown } } | null)?.pwp;
@@ -242,13 +306,13 @@ export async function recomputePwpLines(
     const code = typeof pwp?.code === "string" ? pwp.code.trim() : "";
     const claimGroup = typeof pwp?.claimGroup === "string" ? pwp.claimGroup.trim() : "";
     const crossOrder = pwp?.crossOrder === true;
-    claims.push({ index: i, ruleId, code, claimGroup, crossOrder });
+    claims.push({ index: i, ruleId, code, claimGroup, crossOrder, sofaBuild });
   }
 
   // 1. Strip every client pwp marker first (re-derived below). Plain lines keep
   //    their identity (DORMANT byte-identical). NO DB read on the no-claim path.
   const stripped = lines.map(stripClientPwp);
-  if (claims.length === 0) return { status: "ok", lines: stripped };
+  if (claims.length === 0) return { status: "ok", lines: stripped, sofaRewardCombosByIndex: {} };
 
   const claimIndexSet = new Set(claims.map((c) => c.index));
 
@@ -278,10 +342,12 @@ export async function recomputePwpLines(
     for (const t of r.triggerTargets) if (t.scope === "combo") for (const id of t.comboIds ?? []) comboIds.add(id);
     for (const t of r.rewardTargets) if (t.scope === "combo") for (const id of t.comboIds ?? []) comboIds.add(id);
   }
-  const comboModulesById = await loadComboSlots(sb, comboIds);
-  if (comboModulesById === null) {
+  const comboData = await loadComboSlots(sb, comboIds);
+  if (comboData === null) {
     return { status: "server_error", message: "Failed to load sofa combos for PWP rule matching" };
   }
+  const comboModulesById = comboData.slots;
+  const pwpByComboId = comboData.pwpByComboId;
 
   // 6. Build the engine input. ONLY claimed lines request PWP; a line that is
   //    itself a reward (claimed, or already free via free_item/free_gift) is
@@ -313,8 +379,13 @@ export async function recomputePwpLines(
   //    else the forced PRICE could diverge from the POS preview (which resolves
   //    each rule in isolation). Not granted (ineligible / over-allowance) OR bound
   //    to a different rule → 409.
-  const claimSkus = claims.map((c) => lines[c.index]!.sku);
-  const priceR = await sb.from("product_skus").select("sku, pwp_price").in("sku", claimSkus);
+  // Sofa claims price via the combo swap (below) — only FLAT claims read the
+  // per-SKU pwp_price.
+  const claimSkus = claims.filter((c) => !c.sofaBuild).map((c) => lines[c.index]!.sku);
+  const priceR =
+    claimSkus.length === 0
+      ? { data: [], error: null }
+      : await sb.from("product_skus").select("sku, pwp_price").in("sku", claimSkus);
   if (priceR.error) return { status: "server_error", message: priceR.error.message };
   const pwpPriceBySku = new Map<string, number | null>();
   for (const row of (priceR.data ?? []) as Array<{ sku?: string; pwp_price?: number | string | null }>) {
@@ -323,6 +394,7 @@ export async function recomputePwpLines(
   }
 
   const out = [...stripped];
+  const sofaRewardCombosByIndex: Record<number, string[]> = {};
   for (const claim of claims) {
     const grant = grantByIdx.get(claim.index);
     if (!grant) {
@@ -354,46 +426,102 @@ export async function recomputePwpLines(
       };
     }
 
+    // The canonical marker every claimed line is rebuilt with (P8b/P8c/P8d).
+    const canonicalMarker = {
+      ruleId: rule.id,
+      type: rule.type,
+      triggerRef: grant.triggerRef ?? null,
+      // P8c carry-through (§3.4): re-emit the bound voucher code + per-submit
+      // claimGroup captured from the original line. OMIT a key when empty so a
+      // no-voucher (P8b-only) claim rebuilds a marker WITHOUT `code`/`claimGroup`
+      // — byte-identical to pre-P8c. Stage B reads `attrs.pwp.code` to claim.
+      ...(claim.code ? { code: claim.code } : {}),
+      ...(claim.claimGroup ? { claimGroup: claim.claimGroup } : {}),
+      // P8d (§4.2): re-emit `crossOrder` ONLY when true — a same-cart marker
+      // omits the key entirely (byte-identical to a P8c marker). Stage B reads
+      // this to route the claim to pwp_claim_available_code (phone-bound).
+      ...(claim.crossOrder ? { crossOrder: true } : {}),
+    };
+    const base = stripped[claim.index]!;
+
+    // 0186 sofa-as-reward — a build claim is NOT price-forced here (the sofa
+    // recompute's drift gate owns build pricing). Instead: the rule must target
+    // reward COMBOS, the build must match ≥1 of them, and at least one matched
+    // combo must carry a PWP price (> 0) at the build's seat height. The
+    // matched ids feed the sofa recompute's snapshot swap (2990s pattern).
+    if (claim.sofaBuild) {
+      const rewardComboIds = rule.rewardTargets.flatMap((t) =>
+        t.scope === "combo" ? (t.comboIds ?? []) : [],
+      );
+      if (rewardComboIds.length === 0) {
+        return {
+          status: "bad_request",
+          code: "pwp_not_eligible_sofa_build",
+          message:
+            "A sofa reward must be targeted by combo — this rule has no reward combos.",
+        };
+      }
+      const matched = rewardComboIds.filter((id) => {
+        const slots = comboModulesById.get(id);
+        return !!slots && matchSofaCombo(claim.sofaBuild!.builtCodes, slots) !== null;
+      });
+      if (matched.length === 0) {
+        return {
+          status: "bad_request",
+          code: "pwp_not_eligible_sofa_build",
+          message: "This sofa build doesn't match any of the offer's reward combos.",
+        };
+      }
+      const anyPriced = matched.some((id) => {
+        const p = pwpByComboId.get(id)?.[claim.sofaBuild!.height];
+        return typeof p === "number" && p > 0;
+      });
+      if (!anyPriced) {
+        return {
+          status: "bad_request",
+          code: "pwp_not_eligible_sofa_build",
+          message:
+            "No PWP price is configured for this sofa at the chosen seat height (set it on the combo).",
+        };
+      }
+      sofaRewardCombosByIndex[claim.index] = matched;
+      out[claim.index] = {
+        ...base,
+        attrs: {
+          ...((base.attrs as Record<string, unknown>) ?? {}),
+          pwp: canonicalMarker,
+        },
+      };
+      continue;
+    }
+
     // Force the price: pwp_price for 'pwp', 0 for 'promo'.
     let forced: number;
     if (rule.type === "promo") {
       forced = 0;
     } else {
       const p = pwpPriceBySku.get(lines[claim.index]!.sku);
-      if (p == null) {
+      // 2990s parity: pwp_price = 0 means "not set" for a 'pwp' rule (only a
+      // 'promo' may redeem free). Reject <= 0, not just NULL.
+      if (p == null || p <= 0) {
         return {
           status: "bad_request",
           code: "pwp_not_eligible",
-          message: "No PWP price is configured for this reward.",
+          message: "No PWP price is configured for this reward (set it in SKU Master).",
         };
       }
       forced = p;
     }
 
-    const base = stripped[claim.index]!;
     out[claim.index] = {
       ...base,
       unitPrice: round2(forced),
       attrs: {
         ...((base.attrs as Record<string, unknown>) ?? {}),
-        pwp: {
-          ruleId: rule.id,
-          type: rule.type,
-          triggerRef: grant.triggerRef ?? null,
-          // P8c carry-through (§3.4): re-emit the bound voucher code + per-submit
-          // claimGroup captured from the original line. OMIT a key when empty so a
-          // no-voucher (P8b-only) claim rebuilds a marker WITHOUT `code`/`claimGroup`
-          // — byte-identical to pre-P8c. Stage B reads `attrs.pwp.code` to claim.
-          ...(claim.code ? { code: claim.code } : {}),
-          ...(claim.claimGroup ? { claimGroup: claim.claimGroup } : {}),
-          // P8d (§4.2): re-emit `crossOrder` ONLY when true — a same-cart marker
-          // omits the key entirely (byte-identical to a P8c marker). Stage B reads
-          // this to route the claim to pwp_claim_available_code (phone-bound).
-          ...(claim.crossOrder ? { crossOrder: true } : {}),
-        },
+        pwp: canonicalMarker,
       },
     };
   }
 
-  return { status: "ok", lines: out };
+  return { status: "ok", lines: out, sofaRewardCombosByIndex };
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   catalogOptionPoolFromRow,
+  catalogFabricFromRow,
+  catalogFabricsHistoryFromRow,
   deliveryFeeConfigFromRow,
   freeItemCampaignFromRow,
   modelDefaultFreeGiftsFromRow,
@@ -17,6 +19,7 @@ import {
 } from "./adapters";
 import type {
   CatalogOptionPoolRow,
+  CatalogFabricRow,
   DeliveryFeeConfigRow,
   FreeItemCampaignRow,
   ModelDefaultFreeGiftsRow,
@@ -342,6 +345,9 @@ describe("sofaCompartmentFromRow", () => {
       default_price: "850.00" as unknown as number,
       sort_order: 3,
       active: true,
+      // 0205 — per-compartment fabric-tier deltas (default null = no special).
+      special_tier2_delta: null,
+      special_tier3_delta: null,
       created_at: "2026-06-21T08:00:00.000Z",
       updated_at: "2026-06-21T08:00:00.000Z",
       updated_by: null,
@@ -361,6 +367,23 @@ describe("sofaCompartmentFromRow", () => {
     expect(typeof out.defaultPrice).toBe("number");
     expect(out.sortOrder).toBe(3);
     expect(out.active).toBe(true);
+    // 0205 — specials default to null (no special) on a plain pool row.
+    expect(out.specialTier2Delta).toBeNull();
+    expect(out.specialTier3Delta).toBeNull();
+  });
+
+  it("0205 — coerces numeric special_tier2/3_delta; keeps null distinct", () => {
+    const out = sofaCompartmentFromRow(
+      baseRow({
+        special_tier2_delta: "500.00" as unknown as number,
+        special_tier3_delta: 800,
+      }),
+    );
+    expect(out.specialTier2Delta).toBe(500);
+    expect(typeof out.specialTier2Delta).toBe("number");
+    expect(out.specialTier3Delta).toBe(800);
+    // an unset special stays null (not 0)
+    expect(sofaCompartmentFromRow(baseRow()).specialTier3Delta).toBeNull();
   });
 
   it("preserves null seatCount/description/armConfig/iconUrl (not coerced to 0/empty)", () => {
@@ -415,6 +438,89 @@ describe("modelSofaCompartmentFromRow", () => {
   });
 });
 
+describe("catalogFabricFromRow (0202)", () => {
+  const row: CatalogFabricRow = {
+    id: "00000000-0000-0000-0000-0000000fab01",
+    fabric_code: "CG-001",
+    series: "KOONA VELVET H2O",
+    description: "CG-001 Pearl",
+    supplier_code: "KN390-1",
+    sofa_tier: "PRICE_2",
+    bedframe_tier: "PRICE_1",
+    active: true,
+    sort_order: "19" as unknown as number,
+    created_at: "2026-07-06T08:00:00.000Z",
+    updated_at: "2026-07-06T08:00:00.000Z",
+    updated_by: null,
+  };
+
+  it("snake->camel + coerces sort_order; keeps split tiers", () => {
+    const out = catalogFabricFromRow(row);
+    expect(out).toEqual({
+      id: "00000000-0000-0000-0000-0000000fab01",
+      fabricCode: "CG-001",
+      series: "KOONA VELVET H2O",
+      description: "CG-001 Pearl",
+      supplierCode: "KN390-1",
+      sofaTier: "PRICE_2",
+      bedframeTier: "PRICE_1",
+      active: true,
+      sortOrder: 19,
+    });
+  });
+
+  it("nulls stay null (series/description/supplier) — not coerced to empty", () => {
+    const out = catalogFabricFromRow({
+      ...row,
+      series: null,
+      description: null,
+      supplier_code: null,
+    });
+    expect(out.series).toBeNull();
+    expect(out.description).toBeNull();
+    expect(out.supplierCode).toBeNull();
+  });
+});
+
+describe("catalogFabricsHistoryFromRow (0202)", () => {
+  it("maps fabric-shaped snapshot entries; drops malformed; defaults bad tiers to PRICE_2", () => {
+    const out = catalogFabricsHistoryFromRow({
+      id: "00000000-0000-0000-0000-0000000fh001",
+      section: "fabrics",
+      snapshot: [
+        {
+          fabricCode: "BF-01",
+          series: null,
+          description: "BF-01",
+          supplierCode: "PC151-01",
+          sofaTier: "PRICE_1",
+          bedframeTier: "NOT_A_TIER",
+          active: false,
+          sortOrder: 1,
+        },
+        { value: "pool-shaped-entry-without-fabricCode" },
+        "garbage",
+      ],
+      effective_from: "2026-07-06",
+      notes: null,
+      created_at: "2026-07-06T08:00:00.000Z",
+      created_by: null,
+    });
+    expect(out.entries).toHaveLength(1);
+    expect(out.entries[0]).toEqual({
+      fabricCode: "BF-01",
+      series: null,
+      description: "BF-01",
+      supplierCode: "PC151-01",
+      sofaTier: "PRICE_1",
+      bedframeTier: "PRICE_2",
+      active: false,
+      sortOrder: 1,
+    });
+    expect(out.effectiveFrom).toBe("2026-07-06");
+  });
+});
+
 describe("catalogOptionPoolFromRow", () => {
   function baseRow(over: Partial<CatalogOptionPoolRow> = {}): CatalogOptionPoolRow {
     return {
@@ -423,6 +529,7 @@ describe("catalogOptionPoolFromRow", () => {
       value: "K",
       label: "6FT",
       dimensions: "183X190CM",
+      surcharge: null,
       // Postgres integer arrives fine, but exercise the Number() coercion anyway.
       sort_order: "3" as unknown as number,
       active: true,
@@ -440,6 +547,7 @@ describe("catalogOptionPoolFromRow", () => {
     expect(out.value).toBe("K");
     expect(out.label).toBe("6FT");
     expect(out.dimensions).toBe("183X190CM");
+    expect(out.surcharge).toBeNull();
     expect(out.sortOrder).toBe(3);
     expect(typeof out.sortOrder).toBe("number");
     expect(out.active).toBe(true);
@@ -453,6 +561,21 @@ describe("catalogOptionPoolFromRow", () => {
     expect(out.value).toBe("sofa");
     expect(out.label).toBeNull();
     expect(out.dimensions).toBeNull();
+  });
+
+  it("0201 — coerces Postgres numeric surcharge (string) via Number()", () => {
+    const out = catalogOptionPoolFromRow(
+      baseRow({
+        pool: "divan_height",
+        value: '10"',
+        label: null,
+        dimensions: null,
+        surcharge: "125.00" as unknown as number,
+      }),
+    );
+    expect(out.pool).toBe("divan_height");
+    expect(out.surcharge).toBe(125);
+    expect(typeof out.surcharge).toBe("number");
   });
 });
 
@@ -488,6 +611,8 @@ describe("sofaComboFromRow", () => {
       effective_from: "2026-06-21",
       active: true,
       discontinued_at: null,
+      // 0206 — Quick Pick preset flag (column NOT NULL default false).
+      is_quick_pick: false,
       created_at: "2026-06-21T08:00:00.000Z",
       updated_at: "2026-06-21T08:00:00.000Z",
       updated_by: null,
@@ -524,6 +649,12 @@ describe("sofaComboFromRow", () => {
     expect(out.effectiveFrom).toBe("2026-06-21");
     expect(out.active).toBe(true);
     expect(out.discontinuedAt).toBeNull();
+    // 0206 — Quick Pick preset flag maps through (default false here).
+    expect(out.isQuickPick).toBe(false);
+  });
+
+  it("0206 — maps is_quick_pick=true (a Quick Pick preset row)", () => {
+    expect(sofaComboFromRow(baseRow({ is_quick_pick: true })).isQuickPick).toBe(true);
   });
 
   it("defaults slots=[] and pricesByHeight={} when the DB sends null", () => {
@@ -568,6 +699,7 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
       description: null,
       compartment_id: "00000000-0000-0000-0000-0000000c0001",
       pwp_price: null,
+      prices_by_size: null,
       ...over,
     };
   }
@@ -587,6 +719,21 @@ describe("productSkuFromRow — 0178 compartmentId", () => {
     const out = productSkuFromRow(baseSkuRow({ pwp_price: "999.00" as unknown as number }));
     expect(out.pwpPrice).toBe(999);
     expect(typeof out.pwpPrice).toBe("number");
+  });
+
+  it("maps prices_by_size -> pricesBySize, coercing numerics + preserving nulls (0204)", () => {
+    expect(productSkuFromRow(baseSkuRow()).pricesBySize).toBeNull();
+    const out = productSkuFromRow(
+      baseSkuRow({
+        prices_by_size: {
+          "24": "900.00" as unknown as number, // PostgREST jsonb numeric-as-string
+          "32": 1200,
+          Flat: null, // defensive: null value = "not priced at this size"
+        },
+      }),
+    );
+    expect(out.pricesBySize).toEqual({ "24": 900, "32": 1200, Flat: null });
+    expect(typeof out.pricesBySize!["24"]).toBe("number");
   });
 });
 
@@ -928,6 +1075,7 @@ describe("pwpDiscoverFromRow (0188 — the stripped cross-order DISCOVERY projec
       source_order_id: "00000000-0000-0000-0000-0000000d0aa1",
       expires_at: null,
       phone_matches: true,
+      name_matches: true,
       ...over,
     };
   }
@@ -943,6 +1091,7 @@ describe("pwpDiscoverFromRow (0188 — the stripped cross-order DISCOVERY projec
       sourceOrderId: "00000000-0000-0000-0000-0000000d0aa1",
       expiresAt: null,
       phoneMatches: true,
+      nameMatches: true,
     });
   });
 

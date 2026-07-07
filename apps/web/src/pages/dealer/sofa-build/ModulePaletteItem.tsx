@@ -6,8 +6,9 @@ import CompartmentSilhouette from "./CompartmentSilhouette";
 /**
  * <ModulePaletteItem> — one card in the sofa builder's left module palette.
  * Shows the compartment's silhouette + code + its resolved à-la-carte price
- * (`resolveCompartmentPrice(offered, pool)` — the per-model `priceOverride`
- * falls back to the pool `defaultPrice`) + a `+` button that spawns the cell on
+ * (`resolveCompartmentPrice(offered, pool)` — the synced compartment SKU's
+ * price (SKU Master) is authoritative; the legacy `priceOverride` → pool
+ * `defaultPrice` chain is the fallback) + a `+` button that spawns the cell on
  * the canvas (`onAdd(code)`).
  *
  * Purely presentational + a single callback — the canvas owns placement.
@@ -21,15 +22,19 @@ function fmtRM(n: number): string {
 export default function ModulePaletteItem({
   compartment,
   offered,
+  size,
   onAdd,
 }: {
   /** The pool compartment (code / description / icon / default price). */
   compartment: SofaCompartmentDto;
   /** This model's offered row (drives the price override). Null = pool default. */
   offered: ModelSofaCompartmentDto | null;
+  /** 0204 — the canvas's selected size; the per-size price map wins when it
+   *  prices this size, else the flat SKU price (same chain as the engine). */
+  size?: string | null;
   onAdd: (code: string) => void;
 }) {
-  const price = resolveCompartmentPrice(offered, compartment);
+  const price = resolveCompartmentPrice(offered, compartment, size);
 
   return (
     <button

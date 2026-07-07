@@ -33,6 +33,7 @@ import {
   analyzeSofa,
   findSnap,
   orderSofaCellsLeftToRight,
+  reflowCellsForDepth,
   SNAP_CM,
   CONTACT_TOL,
   EDGE_W,
@@ -403,15 +404,54 @@ describe("analyzeSofa closure", () => {
     expect(r.reason).toBeNull();
   });
 
-  it("flags an L-shape with an exposed open cushion edge as NOT closed", () => {
+  it("accepts a horizontal L whose chaise FOOT is open (Loo 2026-07-07: open-foot chaises are a real product)", () => {
+    // Long top run (CNR + 2A) armed at BOTH main ends (CNR west arm + 2A east
+    // arm); a short chaise leg (1NA) drops below the corner with an OPEN foot.
+    // The foot is off the main (horizontal) axis → must NOT fail closure.
+    const group: GeoCell[] = [
+      { id: "cnr", moduleCode: "CNR", x: 0, y: 0, rot: 0 },
+      { id: "top", moduleCode: "2A(RHF)", x: 95, y: 0, rot: 0 },
+      { id: "foot", moduleCode: "1NA", x: 0, y: 95, rot: 270 },
+    ];
+    const r = analyzeSofa(group, "24");
+    expect(r.closed).toBe(true);
+    expect(r.reason).toBeNull();
+  });
+
+  it("an off-axis open end is fine when there are arms on two outer sides", () => {
+    // The main run CNR→2A is armed; the horizontal 2NA's far end is open but the
+    // build carries arms on 2+ distinct outer sides → complete (lenient rule).
     const group: GeoCell[] = [
       { id: "cnr", moduleCode: "CNR", x: 0, y: 0, rot: 0 },
       { id: "2na", moduleCode: "2NA", x: 95, y: 0, rot: 0 },
       { id: "2a", moduleCode: "2A(LHF)", x: 0, y: 95, rot: 270 },
     ];
     const r = analyzeSofa(group, "24");
-    expect(r.closed).toBe(false);
-    expect(r.reason).toBe("Right end has no arm");
+    expect(r.closed).toBe(true);
+  });
+
+  it("a vertical chaise pushed back-against the main run JOINS + closes (Loo 2026-07-07)", () => {
+    // 2A(LHF) main run [west arm] + a vertical 2A(RHF) chaise whose BACK abuts the
+    // run's open seat side. The lenient join links them into ONE sofa; arms on two
+    // outer sides (the run's west arm + the chaise's top arm) → complete. This was
+    // previously two disconnected groups → "Right end has no arm".
+    const cells: GeoCell[] = [
+      { id: "run", moduleCode: "2A(LHF)", x: 0, y: 0, rot: 0 },
+      { id: "chaise", moduleCode: "2A(RHF)", x: 158, y: 0, rot: 270 },
+    ];
+    const groups = groupSofas(cells, "24");
+    expect(groups).toHaveLength(1); // now ONE sofa (was two)
+    const r = analyzeSofa(groups[0]!, "24");
+    expect(r.closed).toBe(true);
+  });
+
+  it("fewer than two armed sides is NOT a complete sofa", () => {
+    // Two armless 1NAs → 0 arms; a lone 1A → 1 arm. Neither reaches two ends.
+    expect(analyzeSofa([
+      { id: "a", moduleCode: "1NA", x: 0, y: 0, rot: 0 },
+      { id: "b", moduleCode: "1NA", x: 75, y: 0, rot: 0 },
+    ], "24").closed).toBe(false);
+    expect(analyzeSofa([{ id: "a", moduleCode: "1A(LHF)", x: 0, y: 0, rot: 0 }], "24").closed).toBe(false);
   });
 
   it("accessory open edges do NOT fail closure", () => {
@@ -462,6 +502,72 @@ describe("findSnap threshold", () => {
     const s = findSnap(dragged, [above], "me", "24");
     // X overlap present (boxes overlap), so left-flush dx = 0 - 3 = -3 fires.
     expect(s.dx).toBe(-3);
+  });
+
+  // Magnet-parallel (Loo 2026-07-06): a side seam pulls the pieces FLUSH even
+  // when the perpendicular offset exceeds SNAP_CM — linked modules never step.
+  it("magnet-parallel: an abutting E/W seam aligns tops beyond SNAP_CM", () => {
+    // Dragged sits 29cm LOWER than the neighbour (beyond the 20cm snap radius)
+    // and 15cm short of abutting. X snaps the seam shut; the magnet then pulls
+    // the tops level.
+    const neighbour: GeoCell = { id: "n", moduleCode: "1A(LHF)", x: 110, y: 0, rot: 0 };
+    const dragged = cellBbox({ moduleCode: "1A(LHF)", x: 0, y: 29, rot: 0 }, "24")!;
+    const s = findSnap(dragged, [neighbour], "me", "24");
+    expect(s.dx).toBe(15); // abut: 110 - 95
+    expect(s.dy).toBe(-29); // magnet: tops level
+  });
+
+  it("magnet-parallel does NOT fire without a side contact", () => {
+    const farNeighbour: GeoCell = { id: "n", moduleCode: "1A(LHF)", x: 150, y: 0, rot: 0 };
+    const dragged = cellBbox({ moduleCode: "1A(LHF)", x: 0, y: 29, rot: 0 }, "24")!;
+    expect(findSnap(dragged, [farNeighbour], "me", "24")).toEqual({ dx: 0, dy: 0 });
+  });
+
+  it("magnet-parallel mirrors on an N/S seam (aligns lefts)", () => {
+    // Neighbour below; dragged 29cm to the right, 15cm above abutting.
+    const below: GeoCell = { id: "n", moduleCode: "1A(LHF)", x: 0, y: 110, rot: 0 };
+    const dragged = cellBbox({ moduleCode: "1A(LHF)", x: 29, y: 0, rot: 0 }, "24")!;
+    const s = findSnap(dragged, [below], "me", "24");
+    expect(s.dy).toBe(15); // abut: 110 - 95
+    expect(s.dx).toBe(-29); // magnet: lefts level
+  });
+});
+
+/* ─── reflowCellsForDepth ──────────────────────────────────────────────── */
+
+describe("reflowCellsForDepth (size change keeps sofas linked)", () => {
+  it("re-abuts a flush pair when the size grows — the sofa grows as one piece", () => {
+    const cells: GeoCell[] = [
+      { id: "a", moduleCode: "1B(LHF)", x: 0, y: 0, rot: 0 }, // 24″: 105 wide
+      { id: "b", moduleCode: "1B(RHF)", x: 105, y: 0, rot: 0 },
+    ];
+    const out = reflowCellsForDepth(cells, "24", "28"); // 28″: 115 wide
+    expect(out.find((c) => c.id === "a")).toMatchObject({ x: 0, y: 0 });
+    expect(out.find((c) => c.id === "b")).toMatchObject({ x: 115, y: 0 });
+  });
+
+  it("keeps a corner L linked across a size change (still ONE closed sofa)", () => {
+    // seedCornerL LHF shape at 24″: chaise under the corner, 2A east of it.
+    const cells: GeoCell[] = [
+      { id: "one", moduleCode: "1B(LHF)", x: 0, y: 95, rot: 270 },
+      { id: "cnr", moduleCode: "CNR", x: 0, y: 0, rot: 0 },
+      { id: "two", moduleCode: "2A(RHF)", x: 95, y: 0, rot: 0 },
+    ];
+    const out = reflowCellsForDepth(cells, "24", "28");
+    expect(out.find((c) => c.id === "one")).toMatchObject({ x: 0, y: 95 }); // anchor
+    expect(out.find((c) => c.id === "cnr")).toMatchObject({ x: 0, y: 0 });
+    expect(out.find((c) => c.id === "two")).toMatchObject({ x: 105, y: 0 }); // corner now 105 wide
+    const groups = groupSofas(out, "28");
+    expect(groups).toHaveLength(1); // still one connected sofa at the NEW size
+    expect(analyzeSofa(groups[0]!, "28").closed).toBe(true);
+  });
+
+  it("free-standing pieces keep their anchor; same depth is a no-op", () => {
+    const cells: GeoCell[] = [
+      { id: "solo", moduleCode: "1S", x: 300, y: 300, rot: 0 },
+    ];
+    expect(reflowCellsForDepth(cells, "24", "28")).toEqual(cells);
+    expect(reflowCellsForDepth(cells, "24", "24")).toBe(cells);
   });
 });
 

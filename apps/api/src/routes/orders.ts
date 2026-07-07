@@ -8,6 +8,7 @@ import {
   autocountImportResponseSchema,
   cancelOrderInputSchema,
   createOrderInputSchema,
+  rawCreateOrderInputSchema,
   isProceedBlockerCode,
   orderSchema,
   ordersListResponseSchema,
@@ -26,6 +27,7 @@ import {
   type LeadTimeViolation,
 } from "../lib/lead-time";
 import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
+import { recomputeOptionPickLines } from "../lib/option-picks-recompute";
 import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
 import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
@@ -177,6 +179,25 @@ ordersRouter.get("/inbox", async (c) => {
     .order("placed_at", { ascending: true });
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json({ orders: data ?? [], total: (data ?? []).length });
+});
+
+/**
+ * GET /api/orders/customer-type?phone= — POS-parity "CUSTOMER TYPE (AUTO)".
+ * Does any RLS-visible order already carry this phone? (Dealer sees own orders;
+ * internal roles see all — the answer is scoped accordingly, by design.)
+ * HEAD+count only — no rows, no PII, cheap on the customer_phone equality.
+ */
+ordersRouter.get("/customer-type", async (c) => {
+  const phone = (new URL(c.req.url).searchParams.get("phone") ?? "").trim();
+  if (phone.length < 8) return c.json({ existing: false, matches: 0 });
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { count, error } = await sb
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("customer_phone", phone);
+  if (error) throw new HTTPException(500, { message: error.message });
+  const matches = count ?? 0;
+  return c.json({ existing: matches > 0, matches });
 });
 
 /**
@@ -342,7 +363,13 @@ ordersRouter.post("/", async (c) => {
   // P8d (§4.2): pass the order's customer phone so a CROSS-order claim
   // (attrs.pwp.crossOrder=true) can assert the phone binding in the DEFINER RPC.
   // A same-cart claim ignores it (byte-identical to P8c).
-  const pwpClaim = await claimPwpCodesForLines(sb, { id: auth.id }, pwp.lines, parsed.data.customer.phone);
+  const pwpClaim = await claimPwpCodesForLines(
+    sb,
+    { id: auth.id },
+    pwp.lines,
+    parsed.data.customer.phone,
+    parsed.data.customer.name, // 0204 — the NAME half of the voucher identity
+  );
   if (pwpClaim.status === "server_error") {
     throw new HTTPException(500, { message: pwpClaim.message });
   }
@@ -381,9 +408,16 @@ ordersRouter.post("/", async (c) => {
   // total. Non-build lines pass through verbatim; `create_order` + `order_lines`
   // stay UNCHANGED — the RPC just inserts the (possibly expanded) line set.
   // NOTE: sofa recompute runs on `pwpClaim.lines` (=== pwp.lines — price + attrs
-  // untouched by Stage B). The P8c carry-through left `attrs.pwp.code`/`claimGroup`
-  // on coded lines, so they persist into create_order's payload.lines.
-  const recompute = await recomputeAndExplodeSofaBuildLines(sb, pwpClaim.lines);
+  // untouched by Stage B), so the PWP stage's per-INDEX sofa reward grants line
+  // up. A granted build prices against the PWP-swapped combo maps (0186
+  // sofa-as-reward) — the drift gate then checks the client preview against the
+  // SAME swapped figure.
+  const recompute = await recomputeAndExplodeSofaBuildLines(
+    sb,
+    pwpClaim.lines,
+    undefined,
+    pwp.sofaRewardCombosByIndex,
+  );
   if (recompute.status === "bad_request") {
     await rollbackPwpClaims(); // exit 1 (§4.5)
     throw new HTTPException(400, { message: recompute.message });
@@ -441,6 +475,40 @@ ordersRouter.post("/", async (c) => {
     );
   }
 
+  // 0201/0202-wiring (option picks) — honest-pricing trust gate for the
+  // Maintenance-pool options a configured line carries in `attrs.options[]`
+  // (divan_height / bedframe_leg_height / fabric). Same contract as the
+  // special-addon gate above: re-resolve against FRESH pool/fabric rows with
+  // the SAME pure resolver the POS previewed with; a retired value → 400, a
+  // >0.5% (min RM0.01) drift → 422, else unitPrice nudged + attrs canonicalised.
+  // Lines without options pass through verbatim (sofa-build leg heights ride
+  // the sofa recompute, not this array).
+  const optionsRecompute = await recomputeOptionPickLines(sb, specialRecompute.lines);
+  if (optionsRecompute.status === "bad_request") {
+    await rollbackPwpClaims(); // exit 6b (§4.5)
+    throw new HTTPException(400, { message: optionsRecompute.message });
+  }
+  if (optionsRecompute.status === "server_error") {
+    await rollbackPwpClaims(); // exit 6c (§4.5)
+    throw new HTTPException(500, { message: optionsRecompute.message });
+  }
+  if (optionsRecompute.status === "drift") {
+    await rollbackPwpClaims(); // exit 6d (§4.5)
+    return c.json(
+      {
+        error: "rule_violation",
+        code: "options_price_drift",
+        message:
+          `Option price mismatch on '${optionsRecompute.drift.lineSku}': client RM ` +
+          `${optionsRecompute.drift.clientTotal.toFixed(2)} vs server RM ` +
+          `${optionsRecompute.drift.serverTotal.toFixed(2)}. Please reconfigure and retry.`,
+        clientTotal: optionsRecompute.drift.clientTotal,
+        serverTotal: optionsRecompute.drift.serverTotal,
+      },
+      422,
+    );
+  }
+
   // 0185 (default free gifts) — DETERMINISTIC server-appended RM0 lines. Runs
   // AFTER the special-addon recompute (on the post-sofa-explode set) and BEFORE
   // the delivery recompute. The server runs the SAME pure resolver the POS preview
@@ -448,7 +516,7 @@ ordersRouter.post("/", async (c) => {
   // order_line per resolved gift (a real accessory sku, `attrs.free_gift`). A
   // misconfigured gift (giftSku not a real product_skus row) is fail-SOFT (logged
   // + omitted). DORMANT (no gift configured) → returns nothing → byte-identical.
-  const giftResult = await resolveDefaultFreeGiftLines(sb, specialRecompute.lines);
+  const giftResult = await resolveDefaultFreeGiftLines(sb, optionsRecompute.lines);
   if (giftResult.status === "server_error") {
     await rollbackPwpClaims(); // exit 7 (§4.5)
     throw new HTTPException(500, { message: giftResult.message });
@@ -456,7 +524,7 @@ ordersRouter.post("/", async (c) => {
   // The fully-verified line set fed to create_order: paid/freed lines + appended
   // RM0 gift lines. No-funding: gift + free-item lines are EXCLUDED from the
   // delivery charged-category set inside recomputeDeliveryFee.
-  const finalLines = [...specialRecompute.lines, ...giftResult.lines];
+  const finalLines = [...optionsRecompute.lines, ...giftResult.lines];
 
   // 0184 (delivery TRIP fee) — server-authoritative recompute. Re-runs the pure
   // `computeDeliveryFee` against FRESH delivery_fee_config + active
@@ -589,6 +657,7 @@ ordersRouter.post("/", async (c) => {
     ownerDealerId: effectiveDealerId,
     orderId: id,
     customerPhone: parsed.data.customer.phone,
+    customerName: parsed.data.customer.name, // 0204 — the NAME half of the identity
     finalLines,
     clientCartLineKeys: parsed.data.pwpCartLineKeys ?? [],
   });
@@ -629,6 +698,128 @@ ordersRouter.post("/", async (c) => {
   if (carryForwardWarning) {
     c.header("X-Pwp-Carry-Forward-Warning", encodeURIComponent(carryForwardWarning));
   }
+  return c.json(orderSchema.parse(order), 201);
+});
+
+// ---------------------------------------------------------------------------
+// RAW create door — POST /api/orders/raw (POS-parity, MAINTAIN → New Order)
+// The 2990s-Backend-style creation path for INTERNAL roles: no signature, no
+// terms, no payment method, no emergency contact, NO lead-time floor, and NONE
+// of the POS recompute engines (sofa/PWP/free-gift/special/delivery) — the
+// operator's line skus + prices are persisted exactly as entered; that is the
+// point of this path. Lines are stamped attrs=null so no downstream engine
+// ever recognises them as marker lines. The create_order RPC still enforces:
+// dealer required, ≥1 line, the sofa ↔ mattress/bed-frame composition rule,
+// and the internal-role gate (SECURITY DEFINER re-check).
+// ---------------------------------------------------------------------------
+
+const ORDER_RAW_CREATE_ROLES = new Set<string>(["principal", "operation"]);
+
+ordersRouter.post("/raw", async (c) => {
+  const auth = c.var.auth;
+  if (!ORDER_RAW_CREATE_ROLES.has(auth.role)) {
+    throw new HTTPException(403, { message: "Raw order creation is internal-only" });
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = rawCreateOrderInputSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: "Invalid order input: " + parsed.error.issues[0]?.message,
+    });
+  }
+  const input = parsed.data;
+
+  // deposit_pct only feeds the RPC's order_history line — derive it so the
+  // timeline text matches what the operator saw.
+  const total = input.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+  const depositPct =
+    total > 0 ? Math.min(100, Math.max(0, Math.round((input.paid / total) * 100))) : 0;
+
+  const payload: Record<string, unknown> = {
+    dealer_id: input.dealerId,
+    outlet_id: input.outletId ?? null,
+    salesperson_id: input.salespersonId ?? null,
+    customer_name: input.customer.name,
+    customer_phone: input.customer.phone ?? null,
+    customer_address: input.customer.address ?? null,
+    customer_address_unknown: !input.customer.address,
+    customer_billing: null,
+    customer_billing_same: true,
+    customer_emergency: null,
+    delivery_date: input.deliveryDate ?? null,
+    proceed_date: null,
+    delivery_date_tbd: !input.deliveryDate,
+    delivery_floor: 1,
+    delivery_has_lift: false,
+    delivery_stair_items: null,
+    paid: input.paid,
+    signature_url: null,
+    payment_slip_url: null,
+    terms_accepted: false,
+    payment_method: null,
+    approval_code: null,
+    installment_months: null,
+    lines: input.lines.map((l) => ({
+      sku: l.sku,
+      qty: l.qty,
+      attrs: null,
+      unit_price: l.unitPrice,
+    })),
+    addons: [],
+    deposit_pct: depositPct,
+  };
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data: created, error } = await sb.rpc("create_order", { payload });
+  if (error) {
+    if (error.code === "42501" || /forbidden/i.test(error.message ?? "")) {
+      throw new HTTPException(403, { message: "Forbidden" });
+    }
+    if (error.code === "22023") {
+      const detail = (error as { details?: string }).details;
+      if (detail === "mixed_category_lines") {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "mixed_category_lines",
+            message:
+              "Sofa cannot mix with mattress or bed frame in the same order. Please place them as separate Sales Orders.",
+          },
+          422,
+        );
+      }
+      throw new HTTPException(400, { message: error.message });
+    }
+    throw new HTTPException(500, { message: error.message });
+  }
+  const { id } = (created ?? {}) as { id?: string };
+  if (!id) throw new HTTPException(500, { message: "Order create returned no id" });
+
+  // Same response contract as POST / — the full order, so the client can show
+  // the SO number + land on the standard order shape without a second GET.
+  const { data: full, error: fetchErr } = await sb
+    .from("orders")
+    .select("*, order_lines(*), order_addons(*), order_history(*)")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchErr) throw new HTTPException(500, { message: fetchErr.message });
+  if (!full) throw new HTTPException(500, { message: "Order created but not readable" });
+  const row = full as DB.OrderRow & {
+    order_lines?: DB.OrderLineRow[];
+    order_addons?: DB.OrderAddonRow[];
+    order_history?: DB.OrderHistoryRow[];
+  };
+  const order = Adapters.orderFromRow(row, {
+    lines: row.order_lines ?? [],
+    addons: row.order_addons ?? [],
+    history: row.order_history ?? [],
+  });
   return c.json(orderSchema.parse(order), 201);
 });
 

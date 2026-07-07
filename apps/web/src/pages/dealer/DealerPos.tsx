@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Bookmark, ListOrdered, LogOut, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateOrderInput, Order, PwpDiscoverDto, PwpDiscoverResponse } from "@carres/shared";
 import { maxLeadDaysFor } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
-import CarresLockup from "@/components/CarresLockup";
 import { deliveryFeePreview } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import { useAuth } from "@/lib/auth";
@@ -15,6 +15,7 @@ import {
   useDealerSelf,
   useFreePwpCode,
   useOutlets,
+  usePrincipalDealers,
   useProceedOrder,
   usePwpAvailableForPhone,
   usePwpCodesMine,
@@ -30,17 +31,18 @@ import {
   emptyDraft,
   loadDraft,
   saveDraft,
-  step1FirstIssue,
   step1Valid,
   step3DateValid,
-  step3DateFirstIssue,
   step4Valid,
 } from "./new-order/draft";
 import Step3SignaturePayment from "./new-order/Step3SignaturePayment";
 import ThankYou from "./new-order/ThankYou";
 import CatalogStep from "./pos/CatalogStep";
 import CustomerStep from "./pos/CustomerStep";
-import PosStepper from "./pos/PosStepper";
+import OrderStatusPage from "./pos/OrderStatusPage";
+import OrderSummaryRail from "./pos/OrderSummaryRail";
+import QuotesDrawer from "./pos/QuotesDrawer";
+import { quoteToDraftLines, type SavedQuote } from "./pos/quotes";
 import { cartItemCount, cartTotalExStair } from "./pos/cart";
 
 /** True when a restored draft has real content worth resuming. */
@@ -121,6 +123,8 @@ export default function DealerPos({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [quotesOpen, setQuotesOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   const [showResume, setShowResume] = useState(() => {
     const d = loadDraft();
     return !!d && draftHasContent(d);
@@ -146,24 +150,72 @@ export default function DealerPos({
     return claimGroupRef.current;
   }, []);
 
-  const { effectiveDealerId, bodyDealerId } = resolveActingDealer(actingDealerId, dealerId);
-  // useDealerSelf 403s for a principal (no own dealer) — skip it when acting.
-  const dealerQ = useDealerSelf({ enabled: !actingDealerId });
+  // Trap the browser Back button inside the POS flow: on the Customer (2) or
+  // Confirm (3) step, Back returns to the Catalog (step 1) instead of leaving
+  // the POS entirely (Loo 2026-07-06 — it was jumping back to the portal). One
+  // guard history entry is armed the first time we leave step 1, so 2↔3 moves
+  // don't pollute history.
+  const posBackGuardRef = useRef(false);
+  useEffect(() => {
+    if (submitted || step === 1) {
+      posBackGuardRef.current = false;
+      return;
+    }
+    if (!posBackGuardRef.current) {
+      window.history.pushState(null, "");
+      posBackGuardRef.current = true;
+    }
+    const onPopState = () => {
+      posBackGuardRef.current = false;
+      setStep(1);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [step, submitted]);
+
+  // POS-parity (2990s) — an INTERNAL operator (principal, no JWT dealer) who
+  // wasn't handed an acting dealer by the caller picks the dealer IN-FLOW at
+  // the CUSTOMER step; the pick lives on the draft so it survives refresh.
+  // Dealer-side logins (JWT dealer present) never pick — their dealer wins.
+  const internalPicksDealer = !actingDealerId && !dealerId;
+  const effectiveActingId =
+    actingDealerId ?? (internalPicksDealer ? draft.actingDealerId ?? undefined : undefined);
+  const effectiveActingName =
+    actingDealerName ?? (internalPicksDealer ? draft.actingDealerName ?? undefined : undefined);
+
+  const { effectiveDealerId, bodyDealerId } = resolveActingDealer(effectiveActingId, dealerId);
+  // useDealerSelf 403s for a principal (no own dealer) — only dealer-side JWTs ask.
+  const dealerQ = useDealerSelf({ enabled: !!dealerId });
   const outletsQ = useOutlets();
   const salespersonsQ = useSalespersons();
   const catalogQ = useCatalog();
 
-  // When a principal places on behalf of a picked dealer, constrain the outlet +
-  // salesperson choices to THAT dealer (the lists are RLS-read-all for internal
-  // roles). A normal dealer already sees only their own, so this is a no-op there.
+  // The in-flow dealer choices (ACTIVE dealers only — matches the live status
+  // gate). Only fetched for an internal operator; dealers never hit this route.
+  const principalDealersQ = usePrincipalDealers({}, { enabled: internalPicksDealer });
+  const pickableDealers = useMemo(
+    () =>
+      (principalDealersQ.data?.dealers ?? [])
+        .filter((d) => d.status === "active")
+        .map((d) => ({ id: d.id, name: d.name })),
+    [principalDealersQ.data],
+  );
+
+  // When an internal operator places on behalf of a picked dealer, constrain the
+  // outlet + salesperson choices to THAT dealer (the lists are RLS-read-all for
+  // internal roles). A normal dealer already sees only their own, so this is a
+  // no-op there. Unpicked internal → empty lists (the CUSTOMER step blocks on
+  // the dealer card first).
   const outlets = useMemo(() => {
     const all = outletsQ.data?.outlets ?? [];
-    return actingDealerId ? all.filter((o) => o.dealerId === actingDealerId) : all;
-  }, [outletsQ.data, actingDealerId]);
+    if (!internalPicksDealer && !actingDealerId) return all;
+    return effectiveActingId ? all.filter((o) => o.dealerId === effectiveActingId) : [];
+  }, [outletsQ.data, internalPicksDealer, actingDealerId, effectiveActingId]);
   const salespersons = useMemo(() => {
     const all = salespersonsQ.data?.salespersons ?? [];
-    return actingDealerId ? all.filter((s) => s.dealerId === actingDealerId) : all;
-  }, [salespersonsQ.data, actingDealerId]);
+    if (!internalPicksDealer && !actingDealerId) return all;
+    return effectiveActingId ? all.filter((s) => s.dealerId === effectiveActingId) : [];
+  }, [salespersonsQ.data, internalPicksDealer, actingDealerId, effectiveActingId]);
 
   // Refetch catalog once on mount so the dealer's locked unit_price is fresh
   // against principal updates (the legacy wizard refetched on Step 2 entry).
@@ -192,8 +244,9 @@ export default function DealerPos({
   // makes ZERO discovery traffic. The stripped (no-PII) DTO; the server computes
   // the phone match. The cross-order claim is re-validated server-side at Confirm.
   const customerPhone = draft.customer.phone.trim();
+  const customerName = draft.customer.name.trim();
   const pwpAvailableQ = usePwpAvailableForPhone(
-    { phone: customerPhone },
+    { phone: customerPhone, name: customerName },
     { enabled: pwpActive && !submitted && customerPhone.length > 0 },
   );
 
@@ -208,12 +261,13 @@ export default function DealerPos({
       const params = new URLSearchParams();
       params.set("code", trimmed);
       if (customerPhone) params.set("phone", customerPhone);
+      if (customerName) params.set("name", customerName); // 0204 — name binding
       const res = await apiFetch<PwpDiscoverResponse>(
         `/api/pwp-codes/available?${params.toString()}`,
       );
       return res.vouchers.find((v) => v.code === trimmed) ?? null;
     },
-    [customerPhone],
+    [customerPhone, customerName],
   );
 
   // The trigger lines currently in the cart (keyed by localId). A trigger is a
@@ -229,7 +283,7 @@ export default function DealerPos({
   // qty-down to 0 → free. Single-flight per cartLineKey via an in-flight ref, so
   // reserves stay sequential (the §3.1 idempotency holds). Best-effort — a missed
   // reserve just shows fewer codes in the rail; never blocks submit. */
-  const lastReconciledRef = useRef<Map<string, number>>(new Map());
+  const lastReconciledRef = useRef<Map<string, string>>(new Map());
   const inFlightRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!pwpActive || submitted) return;
@@ -237,17 +291,27 @@ export default function DealerPos({
       const prev = lastReconciledRef.current;
       const next = new Map(triggerLines.map((t) => [t.cartLineKey, t]));
 
-      // Reserve new triggers + qty changes (sequential, single-flight per key).
+      // Reserve new triggers + qty/reward-flag changes (sequential, single-flight
+      // per key). The diff key includes `rewardLine` so marking a trigger line as
+      // a reward re-reconciles it (the server then trims its promo reservations).
       for (const t of triggerLines) {
         if (inFlightRef.current.has(t.cartLineKey)) continue;
-        if (prev.get(t.cartLineKey) === t.qty) continue; // unchanged → no-op
+        const diffKey = `${t.qty}:${t.rewardLine}`;
+        if (prev.get(t.cartLineKey) === diffKey) continue; // unchanged → no-op
         inFlightRef.current.add(t.cartLineKey);
         reservePwp.mutate(
-          { cartLineKey: t.cartLineKey, sku: t.sku, qty: t.qty },
+          {
+            cartLineKey: t.cartLineKey,
+            sku: t.sku,
+            qty: t.qty,
+            rewardLine: t.rewardLine,
+            // A sofa build's module codes — combo-scope trigger matching.
+            ...(t.builtCompartments?.length ? { builtCompartments: t.builtCompartments } : {}),
+          },
           {
             onSettled: () => {
               inFlightRef.current.delete(t.cartLineKey);
-              lastReconciledRef.current.set(t.cartLineKey, t.qty);
+              lastReconciledRef.current.set(t.cartLineKey, diffKey);
             },
           },
         );
@@ -304,9 +368,10 @@ export default function DealerPos({
 
   // CATALOG (step 1) advances via the cart drawer, which gates on step2Valid
   // itself; the shell only gates the CUSTOMER → CONFIRM → submit transitions.
+  // An internal operator must have picked the acting dealer before advancing.
   const customerReady = useMemo(
-    () => step1Valid(draft) && step3DateValid(draft, minLeadDays),
-    [draft, minLeadDays],
+    () => !!effectiveDealerId && step1Valid(draft) && step3DateValid(draft, minLeadDays),
+    [draft, minLeadDays, effectiveDealerId],
   );
   const confirmReady = useMemo(
     () => step4Valid(draft) && asapDepositOk,
@@ -392,6 +457,12 @@ export default function DealerPos({
           billing: draft.customer.billingSame ? null : draft.customer.billing,
           billingSame: draft.customer.billingSame,
           emergency: composeEmergency(draft.customer),
+          // 0200 — POS-parity demographics (POS-required via step1 gate;
+          // trimmed-empty → null keeps the wire shape lenient).
+          email: draft.customer.email.trim() || null,
+          race: draft.customer.race || null,
+          gender: draft.customer.gender || null,
+          birthday: draft.customer.birthday || null,
         },
         delivery: {
           date: draft.delivery.dateTbd ? null : draft.delivery.date,
@@ -493,6 +564,43 @@ export default function DealerPos({
     resetPwpReconciler();
   }
 
+  // Load a saved quote — REPLACES the cart (a quote is a snapshot). Keeps the
+  // typed customer unless the quote carries a real label/phone.
+  function handleLoadQuote(q: SavedQuote) {
+    if (
+      draftHasContent(draft) &&
+      !window.confirm("Replace the current cart with this quote? Unsaved cart lines are lost.")
+    ) {
+      return;
+    }
+    setDraft((d) => ({
+      ...d,
+      lines: quoteToDraftLines(q),
+      addons: q.addons,
+      customer: {
+        ...d.customer,
+        name: q.label && q.label !== "Unnamed quote" ? q.label : d.customer.name,
+        phone: q.phone || d.customer.phone,
+      },
+    }));
+    setQuotesOpen(false);
+    setShowResume(false);
+    setStep(1);
+    toast.success("Quote loaded to cart");
+  }
+
+  // In-flow dealer pick (internal operator only). Switching dealers resets the
+  // outlet + salesperson — those rows belong to the previous dealer.
+  function pickDealer(id: string, name: string) {
+    setDraft((d) => ({
+      ...d,
+      actingDealerId: id,
+      actingDealerName: name,
+      outletId: null,
+      salespersonId: null,
+    }));
+  }
+
   function handleExit() {
     if (!submitted && draftHasContent(draft)) {
       const leave = window.confirm(
@@ -506,59 +614,137 @@ export default function DealerPos({
   const outletName = draft.outletId
     ? outlets.find((o) => o.id === draft.outletId)?.name
     : undefined;
-  const contextLabel = outletName ?? actingDealerName ?? dealerQ.data?.name ?? "New sale";
+  const contextLabel = outletName ?? effectiveActingName ?? dealerQ.data?.name ?? "New sale";
   const itemCount = cartItemCount(draft.lines);
   const cartTotal = cartTotalExStair(draft.lines, draft.addons);
 
+  // Topbar staff chip (2990s parity: avatar + name + role) + My-orders target.
+  const displayName = dealerQ.data?.name ?? (userEmail ? userEmail.split("@")[0] : "Staff");
+  const initials = (dealerQ.data?.name || userEmail || "··").slice(0, 2).toUpperCase();
+  const roleLabel = (role ?? "dealer").replace(/_/g, " ");
+  const myOrdersHref = role === "principal" ? "/principal?tab=orders" : "/dealer/orders";
+
+  const STEPS: Array<{ n: 1 | 2 | 3; label: string }> = [
+    { n: 1, label: "Cart" },
+    { n: 2, label: "Customer" },
+    { n: 3, label: "Confirmed" },
+  ];
+
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-background text-foreground">
-      {/* Top bar — 56px fixed height, white over cream page, hairline bottom border. */}
-      <header className="shrink-0 h-14 border-b border-base-200 bg-white px-5 flex items-center gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <CarresLockup size={22} />
-          <div className="hidden sm:block border-l border-base-200 pl-3 min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-base-400">
-              POS · {(role ?? "dealer").toUpperCase()}
-            </p>
-            <p className="t-small font-semibold truncate max-w-[200px]">{contextLabel}</p>
-          </div>
+    <div
+      className="pos-proto fixed inset-0 z-40 flex flex-col"
+      style={{ background: "var(--pos-bg)" }}
+    >
+      {/* Top bar — prototype .pos-topbar (Loo's Claude Design 2026-07-04). */}
+      <header className="pos-topbar" style={{ height: 56, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+          <span className="pos-wordmark">CARRES</span>
+          <span
+            className="pos-topbar__crumb"
+            style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            POS · {contextLabel}
+          </span>
         </div>
 
-        {!submitted ? (
-          <div className="flex-1 flex justify-center">
-            <PosStepper step={step} onStepClick={(n) => setStep(n as 1 | 2 | 3)} />
-          </div>
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="pos-topbar__center">
+          {!submitted &&
+            STEPS.map((s, i) => {
+              const clickable = s.n < step;
+              return (
+                <button
+                  key={s.n}
+                  type="button"
+                  onClick={() => clickable && setStep(s.n)}
+                  disabled={!clickable && s.n !== step}
+                  aria-current={step === s.n ? "step" : undefined}
+                  data-testid={`pos-step-${s.n}`}
+                  className={`pos-topbar__step ${step === s.n ? "is-active" : ""}`}
+                  style={{ cursor: clickable ? "pointer" : "default" }}
+                >
+                  <span style={{ opacity: 0.55, marginRight: 6 }}>0{i + 1}</span>
+                  {s.label}
+                </button>
+              );
+            })}
+        </div>
 
-        <div className="flex items-center gap-2">
-          {!submitted && (
+        <div className="pos-topbar__right">
+          <button
+            type="button"
+            onClick={() => setQuotesOpen(true)}
+            className="topbar-pill"
+            aria-label="Saved quotes"
+            data-testid="pos-topbar-quotes"
+          >
+            <Bookmark size={13} strokeWidth={1.75} />
+            <span>Quotes</span>
+          </button>
+          {role === "principal" ? (
+            // Principal traces orders in the portal tab — keep the link.
+            <Link
+              to={myOrdersHref}
+              className="topbar-pill"
+              aria-label="My orders"
+              data-testid="pos-topbar-my-orders"
+              style={{ textDecoration: "none" }}
+            >
+              <ListOrdered size={13} strokeWidth={1.75} />
+              <span>My orders</span>
+            </Link>
+          ) : (
+            // Dealer/showroom get the in-POS Order Status board (PIN-gated).
+            <button
+              type="button"
+              onClick={() => setStatusOpen(true)}
+              className="topbar-pill"
+              aria-label="My orders"
+              data-testid="pos-topbar-my-orders"
+            >
+              <ListOrdered size={13} strokeWidth={1.75} />
+              <span>My orders</span>
+            </button>
+          )}
+          {!submitted && itemCount > 0 && (
             <button
               type="button"
               onClick={() => {
                 setStep(1);
                 setCartOpen(true);
               }}
-              className="flex items-center gap-2 rounded-full border border-base-300 bg-white px-3 py-1.5 hover:border-base-500 transition-colors"
+              className="pos-topbar__count"
               data-testid="pos-topbar-cart"
             >
-              <span className="grid place-items-center w-5 h-5 rounded-full bg-base-900 text-white font-mono text-[10px]">
-                {itemCount}
-              </span>
-              <span className="font-mono text-[12px] font-semibold">{rm(cartTotal)}</span>
+              <ShoppingBag size={13} strokeWidth={1.75} />
+              {itemCount} item{itemCount === 1 ? "" : "s"} · {rm(cartTotal)}
             </button>
           )}
-          <button onClick={handleExit} className="btn-ghost text-[12px]" data-testid="pos-exit">
-            Exit
-          </button>
           <Link
             to="/me"
             title="Profile · Sign out"
-            className="w-8 h-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-semibold"
+            data-testid="pos-topbar-staff"
+            style={{ textDecoration: "none", color: "inherit" }}
           >
-            {(dealerQ.data?.name || userEmail || "··").slice(0, 2).toUpperCase()}
+            <span className="pos-staff-chip">
+              <span className="pos-staff-chip__avatar">{initials}</span>
+              <span>
+                {displayName}
+                <span className="pos-staff-chip__role" style={{ display: "block" }}>
+                  {roleLabel}
+                </span>
+              </span>
+            </span>
           </Link>
+          <button
+            type="button"
+            onClick={handleExit}
+            className="icon-btn"
+            aria-label="Exit POS"
+            title="Exit POS"
+            data-testid="pos-exit"
+          >
+            <LogOut size={18} strokeWidth={1.75} />
+          </button>
         </div>
       </header>
 
@@ -582,17 +768,15 @@ export default function DealerPos({
       {/* Body */}
       <main className="flex-1 min-h-0 overflow-hidden">
         {submitted ? (
-          <div className="h-full overflow-auto">
-            <div className="mx-auto max-w-xl w-full">
-              <ThankYou
-                order={submitted}
-                onNewOrder={startAnotherOrder}
-                onClose={() => {
-                  clearDraft();
-                  (onExit ?? (() => navigate("/dealer/orders")))();
-                }}
-              />
-            </div>
+          <div className="page-shell h-full overflow-hidden">
+            <ThankYou
+              order={submitted}
+              onNewOrder={startAnotherOrder}
+              onClose={() => {
+                clearDraft();
+                (onExit ?? (() => navigate("/dealer/orders")))();
+              }}
+            />
           </div>
         ) : !catalogQ.data ? (
           <CenterMessage>
@@ -620,7 +804,7 @@ export default function DealerPos({
             />
           </div>
         ) : step === 2 ? (
-          <div key={2} className="animate-page-enter h-full overflow-auto">
+          <div key={2} className="page-shell h-full overflow-hidden">
             {outletsQ.data && salespersonsQ.data ? (
               <CustomerStep
                 draft={draft}
@@ -629,6 +813,18 @@ export default function DealerPos({
                 salespersons={salespersons}
                 catalog={catalogQ.data}
                 minLeadDays={minLeadDays}
+                onBackToCart={() => setStep(1)}
+                onProceed={() => customerReady && setStep(3)}
+                dealerPick={
+                  internalPicksDealer
+                    ? {
+                        dealers: pickableDealers,
+                        loading: principalDealersQ.isLoading,
+                        value: draft.actingDealerId ?? null,
+                        onPick: pickDealer,
+                      }
+                    : undefined
+                }
               />
             ) : (
               <CenterMessage>
@@ -641,61 +837,101 @@ export default function DealerPos({
             )}
           </div>
         ) : (
-          <div key={3} className="animate-page-enter h-full overflow-auto">
-            <div className="mx-auto max-w-3xl w-full px-6 py-8">
-              <Step3SignaturePayment draft={draft} onChange={setDraft} catalog={catalogQ.data} />
+          /* 03 — Confirm & pay, prototype .handover Phase 2 layout: left = phase
+             banner + the existing payment/signature form; right = summary rail. */
+          <div key={3} className="page-shell h-full overflow-hidden">
+            <div className="handover">
+              <div className="handover__left">
+                <div className="handover__title-row">
+                  <div>
+                    <span className="phase-banner">
+                      <span className="phase-banner__dot" />
+                      Phase 2 of 2 · Confirm &amp; pay
+                    </span>
+                    <h1 className="handover__title">Confirm &amp; payment</h1>
+                  </div>
+                </div>
+                <p className="handover__sub">
+                  Record payment, then capture the customer signature to complete the order.
+                </p>
+                <Step3SignaturePayment draft={draft} onChange={setDraft} catalog={catalogQ.data} />
+              </div>
+              <OrderSummaryRail draft={draft} catalog={catalogQ.data} />
             </div>
           </div>
         )}
       </main>
 
-      {/* Footer — steps 2 + 3 only (step 1 advances via the cart). */}
-      {!submitted && step !== 1 && (
-        <footer className="shrink-0 border-t border-base-200 bg-base-50 px-5 py-3 flex flex-col gap-2">
+      {quotesOpen && (
+        <QuotesDrawer
+          catalog={catalogQ.data}
+          onLoad={handleLoadQuote}
+          onClose={() => setQuotesOpen(false)}
+        />
+      )}
+
+      {statusOpen && <OrderStatusPage onClose={() => setStatusOpen(false)} />}
+
+      {/* Footer — step 3 only (step 1 advances via the cart; step 2's wizard
+          owns its own Back/Next). Prototype-styled bar: ghost Back · Total ·
+          primary Complete order. */}
+      {!submitted && step === 3 && (
+        <footer
+          className="shrink-0"
+          style={{
+            borderTop: "1px solid var(--line)",
+            background: "var(--pos-panel)",
+            padding: "12px 20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
           {submitError && (
-            <p className="text-xs text-destructive bg-destructive/5 border border-destructive/30 rounded px-3 py-1.5">
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--c-burnt)",
+                background: "color-mix(in oklab, var(--c-orange) 8%, transparent)",
+                border: "1px solid var(--line)",
+                borderRadius: 10,
+                padding: "6px 12px",
+              }}
+            >
               {submitError}
             </p>
           )}
-          <div className="flex items-center justify-between gap-4">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <button
-              onClick={() => setStep((step - 1) as 1 | 2 | 3)}
-              className="btn-ghost"
+              type="button"
+              onClick={() => setStep(2)}
+              className="btn btn--ghost"
               disabled={uploading || createOrder.isPending}
             >
               ← Back
             </button>
-            <div className="flex items-center gap-4">
-              <span className="text-[13px] text-base-700">
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
                 Total{" "}
-                <span className="font-mono font-semibold text-base-900">{rm(footerTotal)}</span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-mark)",
+                    fontWeight: 900,
+                    fontSize: 18,
+                    color: "var(--c-burnt)",
+                  }}
+                >
+                  {rm(footerTotal)}
+                </span>
               </span>
-              {step === 2 ? (
-                <div className="flex flex-col items-end gap-1">
-                  <button
-                    onClick={() => customerReady && setStep(3)}
-                    disabled={!customerReady}
-                    className="btn-primary"
-                  >
-                    Continue →
-                  </button>
-                  {!customerReady && (
-                    <span className="text-[11px] text-base-500 italic">
-                      {step1Valid(draft)
-                        ? step3DateFirstIssue(draft, minLeadDays)
-                        : `Missing: ${step1FirstIssue(draft)}`}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <button onClick={handleSubmit} disabled={submitDisabled} className="btn-hero">
-                  {uploading
-                    ? "Uploading…"
-                    : createOrder.isPending
-                      ? "Submitting…"
-                      : "Submit order"}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitDisabled}
+                className="btn btn--primary btn--lg"
+              >
+                {uploading ? "Uploading…" : createOrder.isPending ? "Submitting…" : "Complete order"}
+              </button>
             </div>
           </div>
         </footer>

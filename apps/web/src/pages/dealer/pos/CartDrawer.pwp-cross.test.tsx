@@ -55,7 +55,6 @@ function catalog(over?: Partial<CatalogResponse>): CatalogResponse {
     sofaFabrics: [],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
-    combos: [],
     sofaCombos: [],
     modelDefaultFreeGifts: [],
     freeItemCampaigns: [],
@@ -86,6 +85,7 @@ function voucher(over: Partial<PwpDiscoverDto> & { code: string }): PwpDiscoverD
     sourceOrderId: "99999999-9999-9999-9999-999999999999",
     expiresAt: null,
     phoneMatches: true,
+    nameMatches: true,
     ...over,
   };
 }

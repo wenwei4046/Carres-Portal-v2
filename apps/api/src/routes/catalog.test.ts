@@ -1202,8 +1202,8 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
             allowed_options: { sizes: ["Queen", "King"] },
           },
           suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
-          // Queen already exists → only King should be inserted.
-          product_skus__list: [{ sku: "CARRES-CLASSIC-Queen" }],
+          // Queen already exists (SHORT code suffix) → only King should insert.
+          product_skus__list: [{ sku: "CARRES-CLASSIC-Q" }],
         },
         inserted: [{ id: "00000000-0000-0000-0000-00000000bb30" }],
         records,
@@ -1222,9 +1222,51 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
     const body = (await res.json()) as { generated: number; skipped: number };
     expect(body).toMatchObject({ generated: 1, skipped: 1 });
     const insert = records.find((r) => r.op === "insert");
-    const rows = insert?.body as { sku: string }[];
+    const rows = insert?.body as { sku: string; variant: string }[];
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.sku).toBe("CARRES-CLASSIC-King");
+    // SHORT code suffix, FULL name variant — the SIZE reads "King", not "K".
+    expect(rows[0]?.sku).toBe("CARRES-CLASSIC-K");
+    expect(rows[0]?.variant).toBe("King");
+  });
+
+  it("expands raw bed-size codes to full-name variants (K→King, SS→Super Single)", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "lumi-classic",
+            allowed_options: {},
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+        },
+        inserted: [
+          { id: "00000000-0000-0000-0000-00000000bb31" },
+          { id: "00000000-0000-0000-0000-00000000bb32" },
+        ],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ variants: ["K", "SS"] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as {
+      sku: string;
+      variant: string;
+    }[];
+    expect(rows).toEqual([
+      expect.objectContaining({ sku: "LUMI-CLASSIC-K", variant: "King" }),
+      expect.objectContaining({ sku: "LUMI-CLASSIC-SS", variant: "Super Single" }),
+    ]);
   });
 });
 
@@ -1539,7 +1581,28 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
               discontinued_at: null,
             },
           ],
-          product_skus: [],
+          // The synced compartment sku: pos_active=false (never in the flat POS
+          // grid / non-admin `skus` output) but its PRICE must still enrich the
+          // offered row as `skuPrice` — the authoritative à-la-carte source.
+          product_skus: [
+            {
+              id: "00000000-0000-0000-0000-0000000d0001",
+              model_id: MODEL_ID_LIVE,
+              sku: "CLASSIC-1A(LHF)",
+              variant: "1A(LHF)",
+              variant_kind: "part",
+              price: 777,
+              cost: null,
+              supplier_id: null,
+              discontinued_at: null,
+              pos_active: false,
+              description: null,
+              compartment_id: COMP_ID,
+              // 0204 — per-size map; "900.00" exercises the PostgREST
+              // numeric-as-string coercion, null value preserved.
+              prices_by_size: { "24": "900.00", "32": 1200, Flat: null },
+            },
+          ],
           sofa_fabrics: [],
           addons: [],
           floor_config: [
@@ -1576,10 +1639,16 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       modelId: MODEL_ID_LIVE,
       compartmentId: COMP_ID,
       priceOverride: null,
+      // skuPrice = the synced compartment sku's price (SKU Master), even though
+      // the pos_active=false sku itself is excluded from the non-admin skus list.
+      skuPrice: 777,
+      // 0204 — the sku's per-size map rides along, numerics coerced, null kept.
+      skuPricesBySize: { "24": 900, "32": 1200, Flat: null },
     });
+    expect(body.skus).toHaveLength(0);
   });
 
-  it("POST /sofa-compartments — principal inserts → 201", async () => {
+  it("POST /sofa-compartments — principal inserts → 201 (NO price field — prices live in SKU Master)", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: COMP_ROW }));
     const jwt = await makeJwt("principal", null);
@@ -1587,7 +1656,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       new Request("http://t/api/catalog/sofa-compartments", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ code: "1A(LHF)", description: "1 seat, ONE arm (left)", seatCount: 1, defaultPrice: 250 }),
+        body: JSON.stringify({ code: "1A(LHF)", description: "1 seat, ONE arm (left)", seatCount: 1 }),
       }),
       env,
     );
@@ -1595,8 +1664,24 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     const ins = recorded.find((r) => r.op === "insert");
     expect(ins?.table).toBe("sofa_compartments");
     expect((ins?.payload as { code: string }).code).toBe("1A(LHF)");
-    const body = (await res.json()) as { compartment: { code: string; defaultPrice: number } };
-    expect(body.compartment).toMatchObject({ code: "1A(LHF)", defaultPrice: 250 });
+    // The pool carries no authored price — the insert never sets default_price
+    // (the column stays at its DB default, a dormant legacy fallback).
+    expect(ins?.payload as Record<string, unknown>).not.toHaveProperty("default_price");
+    const body = (await res.json()) as { compartment: { code: string } };
+    expect(body.compartment).toMatchObject({ code: "1A(LHF)" });
+  });
+
+  it("POST /sofa-compartments — defaultPrice is no longer accepted → 422 (strict schema)", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-compartments", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "1A(LHF)", defaultPrice: 250 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
   });
 
   it("POST /sofa-compartments — non-principal → 403", async () => {
@@ -1626,9 +1711,63 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     expect(res.status).toBe(422);
   });
 
-  it("PATCH /sofa-compartments/:id — principal updates default_price → 200", async () => {
+  it("PATCH /sofa-compartments/:id — principal updates iconUrl → 200", async () => {
     const recorded: AdminCall[] = [];
-    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { ...COMP_ROW, default_price: 300 } }));
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: { ...COMP_ROW, icon_url: "https://x/y.jpg" } }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ iconUrl: "https://x/y.jpg" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect((upd?.payload as { icon_url: string }).icon_url).toBe("https://x/y.jpg");
+  });
+
+  it("PATCH /sofa-compartments/:id — principal sets P2/P3 fabric-tier specials → 200 (0205)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: COMP_ROW }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ specialTier2Delta: 500, specialTier3Delta: 800 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload as Record<string, unknown>).toMatchObject({
+      special_tier2_delta: 500,
+      special_tier3_delta: 800,
+    });
+  });
+
+  it("PATCH /sofa-compartments/:id — explicit null clears a fabric-tier special (0205)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: COMP_ROW }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ specialTier2Delta: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    // `!== undefined` guard → an explicit null IS written (clears to inherit).
+    expect(Object.prototype.hasOwnProperty.call(upd?.payload, "special_tier2_delta")).toBe(true);
+    expect((upd?.payload as Record<string, unknown>).special_tier2_delta).toBeNull();
+  });
+
+  it("PATCH /sofa-compartments/:id — defaultPrice is no longer accepted → 422 (strict schema)", async () => {
     const jwt = await makeJwt("principal", null);
     const res = await app.fetch(
       new Request(`http://t/api/catalog/sofa-compartments/${COMP_ID}`, {
@@ -1638,9 +1777,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       }),
       env,
     );
-    expect(res.status).toBe(200);
-    const upd = recorded.find((r) => r.op === "update");
-    expect((upd?.payload as { default_price: number }).default_price).toBe(300);
+    expect(res.status).toBe(422);
   });
 
   it("DELETE /sofa-compartments/:id — soft-delete via active=false", async () => {
@@ -1667,7 +1804,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
         // Phase 5 — the auto-sync reads the model (sku prefix + category), the
         // pool compartment, and the model's own supplier before the upsert.
         reads: {
-          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa" }],
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
           sofa_compartments: [COMP_ROW],
           product_skus: [{ model_id: MODEL_ID_LIVE, supplier_id: "sup-ohana" }],
         },
@@ -1687,7 +1824,9 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
 
     // The synced compartment sku: real product_skus row, pos_active OFF (never in
     // the flat POS grid), variant_kind 'part', deterministic {MODEL_KEY}-{code}
-    // sku, inherited supplier, the override price, compartment_id linked.
+    // sku, inherited supplier, the override price, compartment_id linked, and
+    // the "Sofa {Model} {code}" description (Loo 2026-07-06 — names the
+    // model+compartment pair, NOT the pool compartment's own description).
     const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
     expect(skuUpsert?.payload).toMatchObject({
       sku: "OHANA-1A(LHF)",
@@ -1698,6 +1837,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       price: 280,
       supplier_id: "sup-ohana",
       pos_active: false,
+      description: "Sofa Ohana 1A(LHF)",
       discontinued_at: null,
     });
     // cost is OMITTED so a manually-set cost survives a re-sync.
@@ -1718,7 +1858,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       buildWriteSb({
         recorded,
         reads: {
-          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa" }],
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
           sofa_compartments: [COMP_ROW],
           product_skus: [], // model has no existing sku → no own supplier
           suppliers: [{ id: "sup-covers-sofa" }],
@@ -1766,7 +1906,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
       buildWriteSb({
         recorded,
         reads: {
-          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa" }],
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
           sofa_compartments: [COMP_ROW],
           // The model's own supplier read + the collision read both hit
           // product_skus. The colliding flat row has compartment_id NULL.
@@ -1877,898 +2017,6 @@ describe("0176 — PATCH /api/catalog/sofa-fabrics/:id persists tier", () => {
       env,
     );
     expect(res.status).toBe(422);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 0177 — Combos (套餐). GET bundles `combos` (each with `components`, sorted by
-// sortOrder, adminMode-filtered); principal-gated POST / PATCH / DELETE.
-// ---------------------------------------------------------------------------
-
-const COMBO_ID = "00000000-0000-0000-0000-00000000d101";
-const COMBO_ID_2 = "00000000-0000-0000-0000-00000000d102";
-
-/**
- * GET-bundle fixture builder including combos + combo_components, mirroring the
- * `bundle()` helper above (every parallel-query table must be present so the
- * route's Promise.all resolves).
- */
-function comboBundle(opts: {
-  combos: unknown[];
-  combo_components: unknown[];
-}) {
-  return {
-    product_models: [
-      {
-        id: MODEL_ID_LIVE,
-        category: "mattress",
-        model_key: "carres-classic",
-        name: "Classic",
-        blurb: null,
-        colors: null,
-        gaps: null,
-        sofa_mode: null,
-        discontinued_at: null,
-        photo_url: null,
-        allowed_options: {},
-      },
-    ],
-    product_skus: [],
-    sofa_fabrics: [],
-    addons: [],
-    floor_config: [{ id: 1, free_up_to_floor: 2, per_floor_per_item: 50 }],
-    fabric_tier_addon_config: [
-      { id: 1, sofa_tier2_delta: 0, sofa_tier3_delta: 0, updated_at: "2025-01-01T00:00:00Z", updated_by: null },
-    ],
-    model_fabric_tier_overrides: [],
-    combos: opts.combos,
-    combo_components: opts.combo_components,
-  };
-}
-
-type ComboBody = {
-  combos: { id: string; comboKey: string; name: string; comboPrice: number; active: boolean; effectiveFrom: string; components: { sku: string; qty: number; sortOrder: number }[] }[];
-};
-
-describe("0177 — GET /api/catalog includes combos with components", () => {
-  it("attaches each combo's components sorted by sortOrder; combo with none → []", async () => {
-    vi.mocked(userClient).mockReturnValue(
-      buildSb(
-        comboBundle({
-          combos: [
-            {
-              id: COMBO_ID,
-              combo_key: "bedroom-set",
-              name: "Bedroom Set",
-              combo_price: 3000,
-              active: true,
-              effective_from: "2026-06-20T00:00:00Z",
-              discontinued_at: null,
-            },
-            {
-              id: COMBO_ID_2,
-              combo_key: "empty-combo",
-              name: "Empty Combo",
-              combo_price: 100,
-              active: true,
-              effective_from: "2026-06-20T00:00:00Z",
-              discontinued_at: null,
-            },
-          ],
-          // Deliberately OUT of sort_order to prove the route sorts.
-          combo_components: [
-            { combo_id: COMBO_ID, sku: "MAT-QUEEN", qty: 1, sort_order: 2 },
-            { combo_id: COMBO_ID, sku: "FRAME-QUEEN", qty: 1, sort_order: 1 },
-          ],
-        }),
-      ),
-    );
-    const jwt = await makeJwt("dealer", DEALER_ID);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as ComboBody;
-    expect(body.combos).toHaveLength(2);
-
-    const withComps = body.combos.find((x) => x.id === COMBO_ID)!;
-    expect(withComps.comboKey).toBe("bedroom-set");
-    expect(withComps.comboPrice).toBe(3000);
-    // Sorted ascending by sortOrder (1 then 2).
-    expect(withComps.components.map((c) => c.sku)).toEqual(["FRAME-QUEEN", "MAT-QUEEN"]);
-    expect(withComps.components.map((c) => c.sortOrder)).toEqual([1, 2]);
-
-    const empty = body.combos.find((x) => x.id === COMBO_ID_2)!;
-    expect(empty.components).toEqual([]);
-  });
-
-  it("0183 — returns each combo's cost benchmark via comboFromRow (null when unset)", async () => {
-    vi.mocked(userClient).mockReturnValue(
-      buildSb(
-        comboBundle({
-          combos: [
-            {
-              id: COMBO_ID,
-              combo_key: "priced",
-              name: "Priced",
-              combo_price: 3000,
-              cost: 2100,
-              active: true,
-              effective_from: "2026-06-20T00:00:00Z",
-              discontinued_at: null,
-            },
-            {
-              id: COMBO_ID_2,
-              combo_key: "unset",
-              name: "Unset",
-              combo_price: 100,
-              cost: null,
-              active: true,
-              effective_from: "2026-06-20T00:00:00Z",
-              discontinued_at: null,
-            },
-          ],
-          combo_components: [],
-        }),
-      ),
-    );
-    const jwt = await makeJwt("dealer", DEALER_ID);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { combos: { id: string; cost: number | null }[] };
-    expect(body.combos.find((x) => x.id === COMBO_ID)!.cost).toBe(2100);
-    expect(body.combos.find((x) => x.id === COMBO_ID_2)!.cost).toBeNull();
-  });
-
-  it("two combos each get EXACTLY their own components (componentsByCombo keys on combo_id, no merge/cross-talk)", async () => {
-    vi.mocked(userClient).mockReturnValue(
-      buildSb(
-        comboBundle({
-          combos: [
-            {
-              id: COMBO_ID,
-              combo_key: "bedroom-set",
-              name: "Bedroom Set",
-              combo_price: 3000,
-              active: true,
-              effective_from: "2026-06-20T00:00:00Z",
-              discontinued_at: null,
-            },
-            {
-              id: COMBO_ID_2,
-              combo_key: "living-set",
-              name: "Living Set",
-              combo_price: 5000,
-              active: true,
-              effective_from: "2026-06-20T00:00:00Z",
-              discontinued_at: null,
-            },
-          ],
-          // Interleaved + out of order so a buggy non-keyed grouping (or a merge)
-          // would visibly leak one combo's components into the other.
-          combo_components: [
-            { combo_id: COMBO_ID_2, sku: "SOFA-3S", qty: 1, sort_order: 1 },
-            { combo_id: COMBO_ID, sku: "MAT-QUEEN", qty: 1, sort_order: 2 },
-            { combo_id: COMBO_ID_2, sku: "COFFEE-TABLE", qty: 1, sort_order: 2 },
-            { combo_id: COMBO_ID, sku: "FRAME-QUEEN", qty: 1, sort_order: 1 },
-          ],
-        }),
-      ),
-    );
-    const jwt = await makeJwt("dealer", DEALER_ID);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as ComboBody;
-    expect(body.combos).toHaveLength(2);
-
-    // Each combo carries ONLY its own two components, sorted ascending.
-    const bedroom = body.combos.find((x) => x.id === COMBO_ID)!;
-    expect(bedroom.components.map((c) => c.sku)).toEqual(["FRAME-QUEEN", "MAT-QUEEN"]);
-
-    const living = body.combos.find((x) => x.id === COMBO_ID_2)!;
-    expect(living.components.map((c) => c.sku)).toEqual(["SOFA-3S", "COFFEE-TABLE"]);
-
-    // Explicit no-cross-talk: neither combo contains the other's SKUs, and
-    // neither got the merged 4-item set.
-    expect(bedroom.components).toHaveLength(2);
-    expect(living.components).toHaveLength(2);
-    expect(bedroom.components.some((c) => c.sku === "SOFA-3S" || c.sku === "COFFEE-TABLE")).toBe(false);
-    expect(living.components.some((c) => c.sku === "FRAME-QUEEN" || c.sku === "MAT-QUEEN")).toBe(false);
-  });
-
-  it("non-admin excludes active:false / discontinued combos; ?admin=true includes them", async () => {
-    const combos = [
-      {
-        id: COMBO_ID,
-        combo_key: "live-combo",
-        name: "Live",
-        combo_price: 500,
-        active: true,
-        effective_from: "2026-06-20T00:00:00Z",
-        discontinued_at: null,
-      },
-      {
-        id: COMBO_ID_2,
-        combo_key: "off-combo",
-        name: "Off",
-        combo_price: 600,
-        active: false,
-        effective_from: "2026-06-20T00:00:00Z",
-        discontinued_at: null,
-      },
-    ];
-    // Non-admin: only the live combo.
-    vi.mocked(userClient).mockReturnValue(buildSb(comboBundle({ combos, combo_components: [] })));
-    const jwt = await makeJwt("dealer", DEALER_ID);
-    const resPos = await app.fetch(
-      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
-      env,
-    );
-    expect(resPos.status).toBe(200);
-    const posBody = (await resPos.json()) as ComboBody;
-    expect(posBody.combos.map((x) => x.id)).toEqual([COMBO_ID]);
-
-    // Admin: both.
-    vi.mocked(userClient).mockReturnValue(buildSb(comboBundle({ combos, combo_components: [] })));
-    const opJwt = await makeJwt("operation", null);
-    const resAdmin = await app.fetch(
-      new Request("http://t/api/catalog?admin=true", { headers: { Authorization: `Bearer ${opJwt}` } }),
-      env,
-    );
-    expect(resAdmin.status).toBe(200);
-    const adminBody = (await resAdmin.json()) as ComboBody;
-    expect(adminBody.combos.map((x) => x.id).sort()).toEqual([COMBO_ID, COMBO_ID_2].sort());
-  });
-});
-
-/**
- * comboWriteSb — write-aware mock for the combo CRUD routes. Records every
- * insert/update/delete per table, returns a scripted row from the combos write
- * chain's `.maybeSingle()`, and (optionally) makes the `combo_components`
- * insert error so the compensating-delete path can be asserted.
- */
-interface ComboCall {
-  table: string;
-  op: "insert" | "update" | "delete";
-  payload?: unknown;
-  eq?: { col: string; val: unknown }[];
-}
-function comboWriteSb(opts: {
-  comboReturn?: Record<string, unknown> | null;
-  /** When true, the combo_components insert resolves with an error. */
-  componentsInsertError?: boolean;
-  /**
-   * Rows the `combo_components` READ-back (select().eq() → then) resolves with.
-   * Used by the PATCH "components omitted" path, which re-reads the existing set
-   * so the response stays complete. Defaults to [] (the pre-existing behaviour).
-   */
-  componentReadReturn?: unknown[];
-  records?: ComboCall[];
-}): SbStub {
-  const records = opts.records ?? [];
-  const comboReturn = opts.comboReturn ?? null;
-  const componentsInsertError = opts.componentsInsertError ?? false;
-  const componentReadReturn = opts.componentReadReturn ?? [];
-
-  const mk = (table: string) => {
-    let op: "insert" | "update" | "delete" | null = null;
-    let payload: unknown = null;
-    const eqs: { col: string; val: unknown }[] = [];
-
-    const chain: Record<string, unknown> = {};
-    chain.select = () => chain;
-    chain.insert = (body: unknown) => {
-      op = "insert";
-      payload = body;
-      return chain;
-    };
-    chain.update = (body: unknown) => {
-      op = "update";
-      payload = body;
-      return chain;
-    };
-    chain.delete = () => {
-      op = "delete";
-      return chain;
-    };
-    chain.eq = (col: string, val: unknown) => {
-      eqs.push({ col, val });
-      return chain;
-    };
-    // Only WRITE ops are recorded; pure reads (select().eq().then) are not, so
-    // assertions like "no combo_components write happened" stay accurate.
-    const record = () => {
-      if (op !== null) records.push({ table, op, payload, eq: [...eqs] });
-    };
-    // combo_components insert is awaited directly (no .select) → thenable. The
-    // PATCH "no components" path also awaits a read here (select().eq() → then).
-    chain.then = (resolve: (v: { data: unknown; error: { code?: string; message?: string } | null }) => unknown) => {
-      record();
-      if (table === "combo_components" && op === "insert" && componentsInsertError) {
-        return resolve({ data: null, error: { code: "23503", message: "fk violation" } });
-      }
-      // A pure read on combo_components (no write op) → the PATCH "components
-      // omitted" read-back. Return the scripted existing set (default []).
-      if (table === "combo_components" && op === null) {
-        return resolve({ data: componentReadReturn, error: null });
-      }
-      return resolve({ data: [], error: null });
-    };
-    chain.maybeSingle = async () => {
-      record();
-      // combos insert/update returns the scripted row; delete returns {id}.
-      if (table === "combos") {
-        if (op === "delete") return { data: comboReturn ? { id: comboReturn.id } : null, error: null };
-        return { data: comboReturn, error: null };
-      }
-      return { data: comboReturn, error: null };
-    };
-    chain.single = chain.maybeSingle;
-    return chain;
-  };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { from: (table: string) => mk(table) } as any;
-}
-
-describe("0177 — POST /api/catalog/combos (principal only)", () => {
-  it("principal creates a combo + components → 201", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "bedroom-set",
-          name: "Bedroom Set",
-          combo_price: 3000,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/combos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Bedroom Set",
-          comboPrice: 3000,
-          components: [
-            { sku: "FRAME-QUEEN", qty: 1 },
-            { sku: "MAT-QUEEN", qty: 1 },
-          ],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(201);
-    const body = (await res.json()) as { combo: { id: string; comboKey: string; components: unknown[] } };
-    expect(body.combo.id).toBe(COMBO_ID);
-    // comboKey derived from the name (slugified) since none was supplied.
-    expect(body.combo.comboKey).toBe("bedroom-set");
-    expect(body.combo.components).toHaveLength(2);
-
-    const comboInsert = records.find((r) => r.table === "combos" && r.op === "insert");
-    expect(comboInsert?.payload).toMatchObject({ name: "Bedroom Set", combo_price: 3000, combo_key: "bedroom-set" });
-    const compInsert = records.find((r) => r.table === "combo_components" && r.op === "insert");
-    const compRows = compInsert?.payload as { combo_id: string; sku: string; sort_order: number }[];
-    expect(compRows).toHaveLength(2);
-    expect(compRows.every((r) => r.combo_id === COMBO_ID)).toBe(true);
-    // sort_order defaulted from array position.
-    expect(compRows.map((r) => r.sort_order)).toEqual([0, 1]);
-  });
-
-  it("0183 — persists the cost benchmark into the combos insert (camelCase cost → snake cost)", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "bedroom-set",
-          name: "Bedroom Set",
-          combo_price: 3000,
-          cost: 2100,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/combos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Bedroom Set",
-          comboPrice: 3000,
-          cost: 2100,
-          components: [{ sku: "FRAME-QUEEN", qty: 1 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(201);
-    const comboInsert = records.find((r) => r.table === "combos" && r.op === "insert");
-    expect((comboInsert?.payload as { cost: number }).cost).toBe(2100);
-    // Round-trips back through comboFromRow.
-    const body = (await res.json()) as { combo: { cost: number | null } };
-    expect(body.combo.cost).toBe(2100);
-  });
-
-  it("0183 — omitted cost → insert writes cost: null (unset, not absent)", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "bedroom-set",
-          name: "Bedroom Set",
-          combo_price: 3000,
-          cost: null,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/combos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Bedroom Set",
-          comboPrice: 3000,
-          components: [{ sku: "FRAME-QUEEN", qty: 1 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(201);
-    const comboInsert = records.find((r) => r.table === "combos" && r.op === "insert");
-    expect((comboInsert?.payload as { cost: number | null }).cost).toBeNull();
-    const body = (await res.json()) as { combo: { cost: number | null } };
-    expect(body.combo.cost).toBeNull();
-  });
-
-  it("non-principal → 403 (/Master Admin/i)", async () => {
-    const jwt = await makeJwt("operation", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/combos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Bedroom Set",
-          comboPrice: 3000,
-          components: [{ sku: "FRAME-QUEEN", qty: 1 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-    const body = (await res.json()) as { message?: string };
-    expect(body.message).toMatch(/Master Admin/i);
-  });
-
-  it("compensates (deletes the orphan combo) when the components insert errors", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        componentsInsertError: true,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "doomed",
-          name: "Doomed",
-          combo_price: 1000,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/combos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Doomed",
-          comboPrice: 1000,
-          components: [{ sku: "BAD-SKU", qty: 1 }],
-        }),
-      }),
-      env,
-    );
-    // Surfaces the components error (mapPgError default → 500 for 23503).
-    expect(res.status).toBe(500);
-    // The just-created combo row was compensated-deleted.
-    const del = records.find((r) => r.table === "combos" && r.op === "delete");
-    expect(del).toBeTruthy();
-    expect(del?.eq).toContainEqual({ col: "id", val: COMBO_ID });
-  });
-
-  it("derives a fallback combo_key for a name that slugifies to empty (Chinese)", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "combo-xxxxxxxx",
-          name: "卧室套餐",
-          combo_price: 2000,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/combos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "卧室套餐",
-          comboPrice: 2000,
-          components: [{ sku: "FRAME-QUEEN", qty: 1 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(201);
-    const comboInsert = records.find((r) => r.table === "combos" && r.op === "insert");
-    const key = (comboInsert?.payload as { combo_key: string }).combo_key;
-    // Fallback shape: combo-<hex>, never empty.
-    expect(key).toMatch(/^combo-[0-9a-f]+$/);
-  });
-
-  it("combo insert returning no row → 500 (and no components insert happens)", async () => {
-    const records: ComboCall[] = [];
-    // comboReturn:null → the combos insert .maybeSingle() yields {data:null},
-    // tripping the "combo insert returned no row" 500 branch BEFORE any
-    // combo_components write.
-    vi.mocked(userClient).mockReturnValue(comboWriteSb({ records, comboReturn: null }));
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/combos", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Ghost Set",
-          comboPrice: 999,
-          components: [{ sku: "FRAME-QUEEN", qty: 1 }],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(500);
-    const body = (await res.json()) as { message?: string };
-    expect(body.message).toMatch(/combo insert returned no row/i);
-    // The early-return means the components were never inserted.
-    expect(records.some((r) => r.table === "combo_components")).toBe(false);
-  });
-});
-
-describe("0177 — PATCH /api/catalog/combos/:id (principal only)", () => {
-  it("principal updates scalar fields (name + price)", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "bedroom-set",
-          name: "Bedroom Set Deluxe",
-          combo_price: 3500,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Bedroom Set Deluxe", comboPrice: 3500 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const upd = records.find((r) => r.table === "combos" && r.op === "update");
-    expect(upd?.payload).toMatchObject({ name: "Bedroom Set Deluxe", combo_price: 3500 });
-    // No components key sent → no combo_components writes.
-    expect(records.some((r) => r.table === "combo_components")).toBe(false);
-  });
-
-  it("components-replace path deletes the old set then re-inserts", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "bedroom-set",
-          name: "Bedroom Set",
-          combo_price: 3000,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          components: [
-            { sku: "FRAME-KING", qty: 1 },
-            { sku: "MAT-KING", qty: 1 },
-          ],
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const del = records.find((r) => r.table === "combo_components" && r.op === "delete");
-    expect(del?.eq).toContainEqual({ col: "combo_id", val: COMBO_ID });
-    const ins = records.find((r) => r.table === "combo_components" && r.op === "insert");
-    const rows = ins?.payload as { sku: string; combo_id: string }[];
-    expect(rows.map((r) => r.sku)).toEqual(["FRAME-KING", "MAT-KING"]);
-    expect(rows.every((r) => r.combo_id === COMBO_ID)).toBe(true);
-  });
-
-  it("components omitted → response reflects the read-back existing set (no component write)", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "bedroom-set",
-          name: "Bedroom Set Deluxe",
-          combo_price: 3500,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-        // The existing component set the read-back returns (out of sort_order to
-        // also prove the response is sorted ascending).
-        componentReadReturn: [
-          { combo_id: COMBO_ID, sku: "MAT-QUEEN", qty: 1, sort_order: 2 },
-          { combo_id: COMBO_ID, sku: "FRAME-QUEEN", qty: 1, sort_order: 1 },
-        ],
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        // Scalar-only patch (no `components` key) → existing set is preserved.
-        body: JSON.stringify({ name: "Bedroom Set Deluxe", comboPrice: 3500 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      combo: { components: { sku: string; sortOrder: number }[] };
-    };
-    // Response carries the READ-BACK existing set, sorted ascending by sortOrder.
-    expect(body.combo.components.map((c) => c.sku)).toEqual(["FRAME-QUEEN", "MAT-QUEEN"]);
-    expect(body.combo.components.map((c) => c.sortOrder)).toEqual([1, 2]);
-    // No component write of ANY kind happened (set untouched).
-    expect(records.some((r) => r.table === "combo_components")).toBe(false);
-  });
-
-  it("0183 — PATCH cost updates the benchmark (camelCase cost → snake cost)", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "bedroom-set",
-          name: "Bedroom Set",
-          combo_price: 3000,
-          cost: 2200,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ cost: 2200 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const upd = records.find((r) => r.table === "combos" && r.op === "update");
-    expect((upd?.payload as { cost: number }).cost).toBe(2200);
-    const body = (await res.json()) as { combo: { cost: number | null } };
-    expect(body.combo.cost).toBe(2200);
-  });
-
-  it("0183 — PATCH cost: null clears the benchmark (explicit null is written)", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "bedroom-set",
-          name: "Bedroom Set",
-          combo_price: 3000,
-          cost: null,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ cost: null }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const upd = records.find((r) => r.table === "combos" && r.op === "update");
-    // The cost key IS present with null (explicit clear back to "unset").
-    expect(upd?.payload).toHaveProperty("cost", null);
-  });
-
-  it("0183 — PATCH WITHOUT cost does NOT write cost (no clobber of the benchmark)", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({
-        records,
-        comboReturn: {
-          id: COMBO_ID,
-          combo_key: "bedroom-set",
-          name: "Renamed",
-          combo_price: 3000,
-          cost: 2100,
-          active: true,
-          effective_from: "2026-06-20T00:00:00Z",
-          discontinued_at: null,
-        },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Renamed" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const upd = records.find((r) => r.table === "combos" && r.op === "update");
-    // `cost` key absent from the update payload → the existing benchmark is untouched.
-    expect(upd?.payload).not.toHaveProperty("cost");
-  });
-
-  it("combo not found → 404", async () => {
-    // comboReturn:null → the combos update .maybeSingle() yields {data:null},
-    // tripping the "combo not found" 404 branch.
-    vi.mocked(userClient).mockReturnValue(comboWriteSb({ comboReturn: null }));
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Does Not Exist" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(404);
-    const body = (await res.json()) as { message?: string };
-    expect(body.message).toMatch(/combo not found/i);
-  });
-
-  it("non-principal → 403", async () => {
-    const jwt = await makeJwt("operation", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "x" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-  });
-
-  it("empty patch (no fields, no components) → 422", async () => {
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-});
-
-describe("0177 — DELETE /api/catalog/combos/:id (principal only)", () => {
-  it("principal soft-deletes (active=false + discontinued_at) → ok", async () => {
-    const records: ComboCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      comboWriteSb({ records, comboReturn: { id: COMBO_ID } }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { ok: boolean };
-    expect(body.ok).toBe(true);
-    const upd = records.find((r) => r.table === "combos" && r.op === "update");
-    expect(upd?.payload).toMatchObject({ active: false });
-    expect((upd?.payload as { discontinued_at: string }).discontinued_at).toBeTruthy();
-  });
-
-  it("combo not found → 404", async () => {
-    // comboReturn:null → the combos update .maybeSingle() yields {data:null},
-    // tripping the "combo not found" 404 branch.
-    vi.mocked(userClient).mockReturnValue(comboWriteSb({ comboReturn: null }));
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(404);
-    const body = (await res.json()) as { message?: string };
-    expect(body.message).toMatch(/combo not found/i);
-  });
-
-  it("non-principal → 403", async () => {
-    const jwt = await makeJwt("operation", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/combos/${COMBO_ID}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
   });
 });
 
@@ -2919,6 +2167,40 @@ describe("0179 — sofa combo pricing (GET bundle + principal-gated CRUD)", () =
     expect(payload.prices_by_height).toEqual({ "24": 2640, "28": 2750 });
     const body = (await res.json()) as { sofaCombo: { id: string; modelId: string } };
     expect(body.sofaCombo).toMatchObject({ id: SOFA_COMBO_ID, modelId: MODEL_ID_LIVE });
+  });
+
+  it("0206 — POST /sofa-combos threads is_quick_pick=true (Create quick pick)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId: MODEL_ID_LIVE, slots: [["1NA"]], isQuickPick: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect((ins?.payload as { is_quick_pick: boolean }).is_quick_pick).toBe(true);
+  });
+
+  it("0206 — POST /sofa-combos defaults is_quick_pick=false (Create combo)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: sofaComboRow() }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/sofa-combos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId: MODEL_ID_LIVE, slots: [["1NA"]], pricesByHeight: { "24": 1000 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const ins = recorded.find((r) => r.op === "insert");
+    expect((ins?.payload as { is_quick_pick: boolean }).is_quick_pick).toBe(false);
   });
 
   it("0183 — POST /sofa-combos persists cost_by_height (camelCase costByHeight → snake)", async () => {
@@ -4931,6 +4213,53 @@ describe("0186 — pwp_price + pwp_prices_by_height write paths", () => {
     expect(upd?.payload).not.toHaveProperty("pwp_price");
   });
 
+  // 0204 — per-size price map: same principal lock + full-map replace.
+  it("PATCH /skus/:id — principal sets pricesBySize → 200 (camelCase → prices_by_size, full map)", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({ recorded, writeReturn: skuRow({ prices_by_size: { "24": 900 } }) }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pricesBySize: { "24": 900, "32": 1200 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toEqual({ prices_by_size: { "24": 900, "32": 1200 } });
+  });
+
+  it("PATCH /skus/:id — pricesBySize by a non-principal → 403 (joins the 0175/0204 lock)", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pricesBySize: { "24": 900 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
+  });
+
+  it("PATCH /skus/:id — a negative per-size price → 422 (schema)", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pricesBySize: { "24": -5 } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
   it("POST /skus — a sku WITH pwpPrice by a non-principal → 403", async () => {
     const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
@@ -5079,5 +4408,411 @@ describe("0186 — pwp_price + pwp_prices_by_height write paths", () => {
     expect(res.status).toBe(200);
     const upd = recorded.find((r) => r.op === "update");
     expect(upd?.payload).not.toHaveProperty("pwp_prices_by_height");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0201 — option pool BATCH save (PUT /option-pools/:pool → catalog_pool_batch_
+// save RPC) + config-history read. The RPC replaces the pool's contents and
+// appends a catalog_config_history snapshot atomically; these tests assert the
+// route→RPC contract + gates, not the SQL.
+// ---------------------------------------------------------------------------
+
+describe("0201 — option pool batch save + config history", () => {
+  /** Minimal sb stub with a recording `.rpc()`. */
+  function buildRpcSb(opts?: {
+    rpcError?: { code?: string; message?: string } | null;
+    calls?: { fn: string; args: unknown }[];
+  }): SbStub {
+    const calls = opts?.calls ?? [];
+    return {
+      rpc: async (fn: string, args: unknown) => {
+        calls.push({ fn, args });
+        if (opts?.rpcError) return { data: null, error: opts.rpcError };
+        return { data: { ok: true, count: 2 }, error: null };
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+  }
+
+  it("PUT /option-pools/:pool — principal → RPC with p_pool/p_entries in array order", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools/divan_height", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { value: '4"' },
+            { value: '10"', surcharge: 125 },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].fn).toBe("catalog_pool_batch_save");
+    expect(calls[0].args).toEqual({
+      p_pool: "divan_height",
+      p_entries: [
+        { value: '4"', label: null, dimensions: null, surcharge: null, active: true },
+        { value: '10"', label: null, dimensions: null, surcharge: 125, active: true },
+      ],
+      p_notes: null,
+    });
+  });
+
+  it("PUT /option-pools/:pool — non-principal → 403, RPC never called", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools/divan_height", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ value: '4"' }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("PUT /option-pools/:pool — unknown pool → 404", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools/branding", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ value: "X" }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("PUT /option-pools/:pool — duplicate values in the body → 409, RPC never called", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/option-pools/gap", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ value: '4"' }, { value: '4"' }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_option_pool_value");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("GET /config-history?section= — internal read maps snapshot rows to camelCase", async () => {
+    const historyRow = {
+      id: "00000000-0000-0000-0000-0000000e0001",
+      section: "divan_height",
+      snapshot: [
+        { value: '10"', label: null, dimensions: null, surcharge: 125, active: true, sortOrder: 1 },
+      ],
+      effective_from: "2026-07-05",
+      notes: "Baseline — ported from 2990s Portal (0201)",
+      created_at: "2026-07-05T08:00:00.000Z",
+      created_by: null,
+    };
+    const eqCalls: { col: string; val: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue({
+      from: (table: string) => {
+        expect(table).toBe("catalog_config_history");
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = (col: string, val: unknown) => {
+          eqCalls.push({ col, val });
+          return chain;
+        };
+        chain.order = () => chain;
+        chain.limit = async () => ({ data: [historyRow], error: null });
+        return chain;
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/config-history?section=divan_height", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(eqCalls).toEqual([{ col: "section", val: "divan_height" }]);
+    const body = (await res.json()) as {
+      history: { section: string; effectiveFrom: string; entries: { surcharge: number }[] }[];
+    };
+    expect(body.history).toHaveLength(1);
+    expect(body.history[0]).toMatchObject({
+      section: "divan_height",
+      effectiveFrom: "2026-07-05",
+      notes: "Baseline — ported from 2990s Portal (0201)",
+    });
+    expect(body.history[0].entries[0].surcharge).toBe(125);
+  });
+
+  it("GET /config-history — unknown section → 422", async () => {
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/config-history?section=branding", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0202 — global fabric master (PUT /fabrics → catalog_fabrics_batch_save RPC)
+// + fabrics history read. Mirrors the 0201 batch-save contract tests above.
+// ---------------------------------------------------------------------------
+
+describe("0202 — fabric master batch save + history", () => {
+  it("GET /api/catalog returns fabrics (mapped camelCase, sorted by sort_order)", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildSb({
+        product_models: [],
+        product_skus: [],
+        sofa_fabrics: [],
+        addons: [],
+        floor_config: [
+          { id: 1, free_up_to_floor: 2, per_floor_per_item: 50, updated_at: "2025-01-01T00:00:00Z" },
+        ],
+        catalog_fabrics: [
+          {
+            id: "00000000-0000-4000-8000-0000000fab02",
+            fabric_code: "CG-001",
+            series: "KOONA VELVET H2O",
+            description: "CG-001 Pearl",
+            supplier_code: "KN390-1",
+            sofa_tier: "PRICE_2",
+            bedframe_tier: "PRICE_2",
+            active: true,
+            sort_order: 19,
+            created_at: "2026-07-06T00:00:00Z",
+            updated_at: "2026-07-06T00:00:00Z",
+            updated_by: null,
+          },
+          {
+            id: "00000000-0000-4000-8000-0000000fab01",
+            fabric_code: "BF-15",
+            series: null,
+            description: "BF-15",
+            supplier_code: "PC151-15",
+            sofa_tier: "PRICE_1",
+            bedframe_tier: "PRICE_2",
+            active: false,
+            sort_order: 15,
+            created_at: "2026-07-06T00:00:00Z",
+            updated_at: "2026-07-06T00:00:00Z",
+            updated_by: null,
+          },
+        ],
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      fabrics: {
+        fabricCode: string;
+        series: string | null;
+        supplierCode: string | null;
+        sofaTier: string;
+        bedframeTier: string;
+        active: boolean;
+      }[];
+    };
+    // sorted by sort_order: BF-15 (15) before CG-001 (19); inactive rows kept
+    expect(body.fabrics.map((f) => f.fabricCode)).toEqual(["BF-15", "CG-001"]);
+    expect(body.fabrics[0]).toMatchObject({
+      fabricCode: "BF-15",
+      supplierCode: "PC151-15",
+      sofaTier: "PRICE_1",
+      bedframeTier: "PRICE_2",
+      active: false,
+    });
+    expect(body.fabrics[1]).toMatchObject({
+      fabricCode: "CG-001",
+      series: "KOONA VELVET H2O",
+      sofaTier: "PRICE_2",
+    });
+  });
+
+  function buildRpcSb(opts?: {
+    rpcError?: { code?: string; message?: string } | null;
+    calls?: { fn: string; args: unknown }[];
+  }): SbStub {
+    const calls = opts?.calls ?? [];
+    return {
+      rpc: async (fn: string, args: unknown) => {
+        calls.push({ fn, args });
+        if (opts?.rpcError) return { data: null, error: opts.rpcError };
+        return { data: { ok: true, count: 2 }, error: null };
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+  }
+
+  it("PUT /fabrics — principal → RPC with camelCase p_entries in array order (tiers default PRICE_2)", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabrics", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { fabricCode: "BF-01", supplierCode: "PC151-01" },
+            { fabricCode: "BF-15", sofaTier: "PRICE_1", active: false },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].fn).toBe("catalog_fabrics_batch_save");
+    expect(calls[0].args).toEqual({
+      p_entries: [
+        {
+          fabricCode: "BF-01",
+          series: null,
+          description: null,
+          supplierCode: "PC151-01",
+          sofaTier: "PRICE_2",
+          bedframeTier: "PRICE_2",
+          active: true,
+        },
+        {
+          fabricCode: "BF-15",
+          series: null,
+          description: null,
+          supplierCode: null,
+          sofaTier: "PRICE_1",
+          bedframeTier: "PRICE_2",
+          active: false,
+        },
+      ],
+      p_notes: null,
+    });
+  });
+
+  it("PUT /fabrics — non-principal → 403, RPC never called", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabrics", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ fabricCode: "BF-01" }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("PUT /fabrics — duplicate codes in the body → 409, RPC never called", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabrics", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ fabricCode: "BF-01" }, { fabricCode: "BF-01" }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_fabric_code");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("PUT /fabrics — invalid tier value → 422", async () => {
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabrics", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ fabricCode: "BF-01", sofaTier: "PRICE_9" }] }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("GET /fabrics/history — internal read maps fabric-shaped snapshots", async () => {
+    const historyRow = {
+      id: "00000000-0000-0000-0000-0000000f0001",
+      section: "fabrics",
+      snapshot: [
+        {
+          fabricCode: "BF-01",
+          series: null,
+          description: "BF-01",
+          supplierCode: "PC151-01",
+          sofaTier: "PRICE_2",
+          bedframeTier: "PRICE_2",
+          active: true,
+          sortOrder: 1,
+        },
+      ],
+      effective_from: "2026-07-06",
+      notes: "Baseline — ported from the live 2990s fabric_trackings (0202)",
+      created_at: "2026-07-06T08:00:00.000Z",
+      created_by: null,
+    };
+    const eqCalls: { col: string; val: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue({
+      from: (table: string) => {
+        expect(table).toBe("catalog_config_history");
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = (col: string, val: unknown) => {
+          eqCalls.push({ col, val });
+          return chain;
+        };
+        chain.order = () => chain;
+        chain.limit = async () => ({ data: [historyRow], error: null });
+        return chain;
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/fabrics/history", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(eqCalls).toEqual([{ col: "section", val: "fabrics" }]);
+    const body = (await res.json()) as {
+      history: { effectiveFrom: string; entries: { fabricCode: string; sofaTier: string }[] }[];
+    };
+    expect(body.history).toHaveLength(1);
+    expect(body.history[0].effectiveFrom).toBe("2026-07-06");
+    expect(body.history[0].entries[0]).toMatchObject({
+      fabricCode: "BF-01",
+      supplierCode: "PC151-01",
+      sofaTier: "PRICE_2",
+    });
   });
 });

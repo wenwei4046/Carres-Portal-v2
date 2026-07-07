@@ -482,7 +482,19 @@ const hasConnectingContact = (a: GeoCell, b: GeoCell, depth: Depth): boolean => 
   const ea = cellEdges(a);
   const eb = cellEdges(b);
   const connectable = (t: EdgeType | undefined): boolean => t === "arm" || t === "open";
-  return contacts.some(({ edgeA, edgeB }) => connectable(ea[edgeA]) && connectable(eb[edgeB]));
+  // Two seat-connect/arm edges join (the original rule). ALSO join when one
+  // piece's BACK abuts the other's seat-connect/arm side — a chaise pushed
+  // back-against the main run is still ONE sofa (Loo 2026-07-07). A FRONT edge
+  // never joins: a piece facing away isn't part of the sofa (keeps genuinely
+  // separate back-to-back / face-to-open sofas apart).
+  return contacts.some(({ edgeA, edgeB }) => {
+    const ta = ea[edgeA];
+    const tb = eb[edgeB];
+    if (connectable(ta) && connectable(tb)) return true;
+    if (ta === "back" && connectable(tb)) return true;
+    if (tb === "back" && connectable(ta)) return true;
+    return false;
+  });
 };
 
 /** Union-find by edge contact. Returns an array of cell groups (each its own sofa). */
@@ -604,6 +616,94 @@ export const orderSofaCellsLeftToRight = (cells: GeoCell[], depth: Depth): GeoCe
     .flatMap(({ g }) => orderGroup(g));
 };
 
+/* ─── Depth-change reflow (keep sofas linked across seat sizes) ────────── */
+
+/** Perpendicular alignment across a seam after a size change: starts flush →
+ *  stay starts-flush; ends flush → stay ends-flush; a deliberate offset is
+ *  carried over as-is. */
+const alignPerp = (
+  aOldStart: number,
+  aOldLen: number,
+  bOldStart: number,
+  bOldLen: number,
+  aNewStart: number,
+  aNewLen: number,
+  bNewLen: number,
+): number => {
+  if (Math.abs(bOldStart - aOldStart) <= CONTACT_TOL) return aNewStart;
+  if (Math.abs(bOldStart + bOldLen - (aOldStart + aOldLen)) <= CONTACT_TOL)
+    return aNewStart + aNewLen - bNewLen;
+  return aNewStart + (bOldStart - aOldStart);
+};
+
+/**
+ * Re-abut every connected sofa after a seat-size change (Loo 2026-07-06):
+ * footprints widen along the seat axis, so cells that were flush at the old
+ * size would overlap (grow) or gap (shrink) at the new one — the assembled
+ * sofa broke and had to be re-linked by hand. Each connected group re-lays
+ * from its leftmost cell (walk order): every old contact re-abuts on the SAME
+ * side with the new footprints, preserving flush tops/bottoms (or a
+ * deliberate offset). Free-standing singles keep their anchor; positions of
+ * group starts are unchanged.
+ */
+export const reflowCellsForDepth = (
+  cells: GeoCell[],
+  oldDepth: Depth,
+  newDepth: Depth,
+): GeoCell[] => {
+  if (oldDepth === newDepth || cells.length < 2) return cells;
+  const newFp = (c: GeoCell) =>
+    moduleFootprint(findModule(c.moduleCode) ?? DEFAULT_FOOTPRINT, c.rot, newDepth);
+  const pos = new Map<GeoCell, { x: number; y: number }>();
+  for (const group of groupSofas(cells, oldDepth)) {
+    if (group.length <= 1) continue;
+    const ordered = orderSofaCellsLeftToRight(group, oldDepth);
+    const start = ordered[0]!;
+    pos.set(start, { x: start.x, y: start.y });
+    const placed = new Set<GeoCell>([start]);
+    const queue: GeoCell[] = [start];
+    while (queue.length > 0) {
+      const a = queue.shift()!;
+      const aOld = cellBbox(a, oldDepth);
+      if (!aOld) continue;
+      const aPos = pos.get(a)!;
+      const aNew = newFp(a);
+      for (const b of group) {
+        if (placed.has(b)) continue;
+        const contacts = edgeContacts(a, b, oldDepth);
+        if (contacts.length === 0) continue;
+        const bOld = cellBbox(b, oldDepth);
+        if (!bOld) continue;
+        const bNew = newFp(b);
+        const side = contacts[0]!.edgeA;
+        let nx: number;
+        let ny: number;
+        if (side === EDGE_E) {
+          nx = aPos.x + aNew.w;
+          ny = alignPerp(aOld.y, aOld.h, bOld.y, bOld.h, aPos.y, aNew.h, bNew.h);
+        } else if (side === EDGE_W) {
+          nx = aPos.x - bNew.w;
+          ny = alignPerp(aOld.y, aOld.h, bOld.y, bOld.h, aPos.y, aNew.h, bNew.h);
+        } else if (side === EDGE_S) {
+          ny = aPos.y + aNew.h;
+          nx = alignPerp(aOld.x, aOld.w, bOld.x, bOld.w, aPos.x, aNew.w, bNew.w);
+        } else {
+          ny = aPos.y - bNew.h;
+          nx = alignPerp(aOld.x, aOld.w, bOld.x, bOld.w, aPos.x, aNew.w, bNew.w);
+        }
+        pos.set(b, { x: nx, y: ny });
+        placed.add(b);
+        queue.push(b);
+      }
+    }
+  }
+  if (pos.size === 0) return cells;
+  return cells.map((c) => {
+    const p = pos.get(c);
+    return p && (p.x !== c.x || p.y !== c.y) ? { ...c, x: p.x, y: p.y } : c;
+  });
+};
+
 /* ─── Snap math (drag UI) ──────────────────────────────────────────────── */
 
 /** Threshold in cm — drag releases snap to a neighbour edge if within this. */
@@ -621,6 +721,13 @@ export interface SnapDelta {
  * when nothing is close enough. The X-axis snap only fires when the cells
  * overlap on Y (snapping a horizontal seam, not past a remote piece); mirrored
  * on Y. Four edge-alignment candidates per axis (abut + flush).
+ *
+ * Magnet-parallel pass (Loo 2026-07-06; v2 extension over the 2990s port):
+ * once the snapped drop ABUTS a neighbour on a side, the pieces must sit
+ * FLUSH — the perpendicular axis aligns to the neighbour's nearest edge even
+ * beyond SNAP_CM. Side-by-side modules bolt parallel; a stepped seam is never
+ * a valid assembly. The correction is bounded by the pieces' overlap, so it
+ * nudges into alignment — never flings the module.
  */
 export const findSnap = (
   draggedBbox: Bbox,
@@ -695,10 +802,51 @@ export const findSnap = (
     }
   }
 
-  return {
-    dx: bestX < SNAP_CM ? bestDx : 0,
-    dy: bestY < SNAP_CM ? bestDy : 0,
-  };
+  let dx = bestX < SNAP_CM ? bestDx : 0;
+  let dy = bestY < SNAP_CM ? bestDy : 0;
+
+  // Magnet-parallel: at the SNAPPED position, find side-abutting neighbours
+  // and align the perpendicular axis to the nearest edge (tops/bottoms for an
+  // E/W seam, lefts/rights for an N/S seam). Smallest correction wins per axis.
+  const nx1 = ax1 + dx,
+    nx2 = ax2 + dx;
+  const ny1 = ay1 + dy,
+    ny2 = ay2 + dy;
+  let alignX: number | null = null;
+  let alignY: number | null = null;
+  for (const c of otherCells) {
+    if (ignoreId !== undefined && c.id === ignoreId) continue;
+    const b = cellBbox(c, depth);
+    if (!b) continue;
+    const bx1 = b.x,
+      bx2 = b.x + b.w;
+    const by1 = b.y,
+      by2 = b.y + b.h;
+    const yOv = Math.min(ny2, by2) - Math.max(ny1, by1);
+    if (
+      (Math.abs(nx2 - bx1) <= CONTACT_TOL || Math.abs(nx1 - bx2) <= CONTACT_TOL) &&
+      yOv > CONTACT_TOL
+    ) {
+      const dTop = by1 - ny1;
+      const dBot = by2 - ny2;
+      const fix = Math.abs(dTop) <= Math.abs(dBot) ? dTop : dBot;
+      if (alignY === null || Math.abs(fix) < Math.abs(alignY)) alignY = fix;
+    }
+    const xOv = Math.min(nx2, bx2) - Math.max(nx1, bx1);
+    if (
+      (Math.abs(ny2 - by1) <= CONTACT_TOL || Math.abs(ny1 - by2) <= CONTACT_TOL) &&
+      xOv > CONTACT_TOL
+    ) {
+      const dLeft = bx1 - nx1;
+      const dRight = bx2 - nx2;
+      const fix = Math.abs(dLeft) <= Math.abs(dRight) ? dLeft : dRight;
+      if (alignX === null || Math.abs(fix) < Math.abs(alignX)) alignX = fix;
+    }
+  }
+  if (alignY !== null) dy += alignY;
+  if (alignX !== null) dx += alignX;
+
+  return { dx, dy };
 };
 
 /* ─── Sofa analysis (closure / arm violations) ─────────────────────────── */
@@ -846,10 +994,10 @@ export const analyzeSofa = (group: GeoCell[], depth: Depth): SofaAnalysis => {
     }
   }
 
+  const horizontalDominant = bbW >= bbH;
   let headArm = false;
   let tailArm = false;
   if (group.length > 0) {
-    const horizontalDominant = bbW >= bbH;
     if (horizontalDominant) {
       headArm = outwardArms.some((a) => a.edge === EDGE_W);
       tailArm = outwardArms.some((a) => a.edge === EDGE_E);
@@ -859,20 +1007,29 @@ export const analyzeSofa = (group: GeoCell[], depth: Depth): SofaAnalysis => {
     }
   }
 
-  const ends = headArm && tailArm;
-  const hasUnclosedOpen =
-    unclosedByDir[EDGE_W] || unclosedByDir[EDGE_N] || unclosedByDir[EDGE_E] || unclosedByDir[EDGE_S];
-  let closed = violations.length === 0 && ends && !hasUnclosedOpen;
+  // Lenient completeness (Loo 2026-07-07): a build is a complete sofa when it
+  // carries armrests on at least TWO distinct outer sides (its "two main ends")
+  // and no two arms collide. We no longer require the arms to sit on a specific
+  // axis, nor that every open cushion edge be capped — an L's chaise foot or any
+  // perpendicular leg may be open, and touching pieces that meet via a back/front
+  // edge still count. `unclosedByDir` (open cushion edges) is kept for reference
+  // but no longer gates closure. The salesperson vets the final shape.
+  const armDirections = new Set(outwardArms.map((a) => a.edge));
+  const hasTwoEnds = armDirections.size >= 2;
+  let closed = violations.length === 0 && hasTwoEnds;
   let reason: ClosureFailure | null = null;
   if (violations.length > 0) reason = "Arms colliding";
-  else if (!headArm && !tailArm) reason = "No arms on either end";
-  else if (!headArm) reason = bbW >= bbH ? "Left end has no arm" : "Top end has no arm";
-  else if (!tailArm) reason = bbW >= bbH ? "Right end has no arm" : "Bottom end has no arm";
-  else if (hasUnclosedOpen) {
-    if (unclosedByDir[EDGE_W]) reason = "Left end has no arm";
-    else if (unclosedByDir[EDGE_E]) reason = "Right end has no arm";
-    else if (unclosedByDir[EDGE_N]) reason = "Top end has no arm";
-    else if (unclosedByDir[EDGE_S]) reason = "Bottom end has no arm";
+  else if (armDirections.size === 0) reason = "No arms on either end";
+  else if (!hasTwoEnds) {
+    // Exactly one armed side → point at an unarmed extremity so the salesperson
+    // knows to cap the other end.
+    reason = !headArm
+      ? horizontalDominant
+        ? "Left end has no arm"
+        : "Top end has no arm"
+      : horizontalDominant
+        ? "Right end has no arm"
+        : "Bottom end has no arm";
   }
 
   const allAccessories = group.length > 0 && group.every((c) => isAccessoryModule(c.moduleCode));

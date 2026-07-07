@@ -1,44 +1,39 @@
-import { Search } from "lucide-react";
+import { Search, Sofa } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type {
   CatalogResponse,
-  ComboDto,
   ProductCategory,
+  ProductModelDto,
   PwpCodeDto,
   PwpDiscoverDto,
 } from "@carres/shared";
-import { CATEGORY_LABEL } from "@/pages/catalog/components/atoms";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { comboToDraftLines, type DraftLine, type WizardDraft } from "../new-order/draft";
-import { lockedCategoriesFor } from "../new-order/configurators";
+import { type DraftLine, type WizardDraft } from "../new-order/draft";
+import { lockedCategoriesFor, newLocalId } from "../new-order/configurators";
+import { offeredSpecialsFor } from "../new-order/special-addons-picker";
 import { buildCatalogIndex } from "./catalog-index";
 import { cartItemCount, cartTotalExStair, mergeLine } from "./cart";
-import CategoryRail, { type RailEntry, type RailKey } from "./CategoryRail";
+import PosSidebar, { type RailEntry, type RailKey } from "./PosSidebar";
 import ProductCard from "./ProductCard";
-import ComboCard from "./ComboCard";
 import ConfigureDrawer from "./ConfigureDrawer";
+import PosConfigurePage from "./PosConfigurePage";
+import SofaConfigurePage from "./SofaConfigurePage";
 import CartDrawer from "./CartDrawer";
 import AddonsPanel from "./AddonsPanel";
 import FloatingCartButton from "./FloatingCartButton";
 
-const RAIL_ICON: Record<RailKey, string> = {
-  all: "▦",
-  mattress: "▭",
-  bedframe: "▤",
-  sofa: "◳",
-  addons: "✦",
-};
-const CARD_ORDER: ProductCategory[] = ["mattress", "bedframe", "sofa"];
+const CARD_ORDER: ProductCategory[] = ["mattress", "bedframe", "sofa", "accessory"];
 
 /**
- * Step 01 — POS catalog. Left category rail + searchable, category-grouped
- * product card grid (+ an "Add-ons" panel), a configure drawer per model, a
- * cart drawer, and the floating cart CTA. Builds `DraftLine`/`DraftAddon`
- * objects identical to the legacy wizard so the submit pipeline is untouched.
+ * Step 01 — POS catalog. 2990s-parity layout: sectioned left sidebar
+ * (categories / quick / principal-only MAINTAIN / pricing footer), searchable
+ * card grid grouped under ONE brand-series header (Carres is a single brand —
+ * the 2990s multi-brand grouping collapses to one "CARRES" section), an
+ * "Add-ons" panel, a configure drawer per model, a cart drawer, and the
+ * floating cart CTA. Builds `DraftLine`/`DraftAddon` objects identical to the
+ * legacy wizard so the submit pipeline is untouched.
  *
- * Visual re-skin (2990s style): sticky pill-search toolbar, auto-fill card
- * grid (minmax 240px), flame rail, price-hero cards, ink-pill cart FAB.
  * All data-flow logic (mergeLine, mutex, toast): UNCHANGED.
  */
 export default function CatalogStep({
@@ -122,46 +117,58 @@ export default function CatalogStep({
   }, [draft.lines, index.skusByModel]);
 
   const railEntries: RailEntry[] = [
-    { key: "all", label: "All products", count: index.productModels.length, icon: RAIL_ICON.all },
+    { key: "all", label: "All open", count: index.productModels.length },
     {
       key: "mattress",
-      label: CATEGORY_LABEL.mattress,
+      label: "Mattresses",
       count: countByCat.get("mattress") ?? 0,
-      icon: RAIL_ICON.mattress,
       locked: lockedCats.has("mattress"),
     },
     {
       key: "bedframe",
-      label: "Bed Frame",
+      label: "Bed frames",
       count: countByCat.get("bedframe") ?? 0,
-      icon: RAIL_ICON.bedframe,
       locked: lockedCats.has("bedframe"),
     },
     {
       key: "sofa",
-      label: CATEGORY_LABEL.sofa,
+      label: "Sofas",
       count: countByCat.get("sofa") ?? 0,
-      icon: RAIL_ICON.sofa,
       locked: lockedCats.has("sofa"),
     },
-    { key: "addons", label: "Add-ons", count: activeAddons.length, icon: RAIL_ICON.addons },
+    // Accessories are cards too (2990s parity) — never mutex-locked.
+    {
+      key: "accessory",
+      label: "Accessories",
+      count: countByCat.get("accessory") ?? 0,
+    },
+    { key: "addons", label: "Add-ons", count: activeAddons.length },
   ];
 
-  // Which category sections to render, filtered by search.
+  // Models to render, filtered by rail + search, ordered category-first
+  // (mattress → bedframe → sofa) inside the single CARRES series group.
   const shownCats = activeRail === "all" ? CARD_ORDER : [activeRail as ProductCategory];
-  const sections = shownCats
-    .filter((cat) => cat === "mattress" || cat === "bedframe" || cat === "sofa")
-    .map((cat) => {
-      const models = index.productModels.filter((m) => {
+  const shownModels = shownCats
+    .filter((cat) => CARD_ORDER.includes(cat))
+    .flatMap((cat) =>
+      index.productModels.filter((m) => {
         if (m.category !== cat) return false;
         if (!search) return true;
         return index.meta.get(m.id)?.searchBlob.includes(search) ?? false;
-      });
-      return { cat, models };
-    })
-    .filter((s) => s.models.length > 0);
+      }),
+    );
 
-  const shownModelCount = sections.reduce((n, s) => n + s.models.length, 0);
+  const shownModelCount = shownModels.length;
+
+  // Sofa ↔ mattress/bedframe exclusivity, for the banner above the grid.
+  // Sofa in cart locks the mattress+bedframe rails; either of those locks sofa.
+  const cartHasSofa = lockedCats.has("mattress") || lockedCats.has("bedframe");
+  const cartHasMainNonSofa = lockedCats.has("sofa");
+
+  function resetFilters() {
+    setRawSearch("");
+    setActiveRail("all");
+  }
 
   function addLine(line: DraftLine) {
     onChange({ ...draft, lines: mergeLine(draft.lines, line) });
@@ -172,36 +179,26 @@ export default function CatalogStep({
     toast.success("Added to cart");
   }
 
-  // Explode a combo into its component DraftLines (split price) and fold ALL of
-  // them into the cart via mergeLine. attrs.combo_key keeps them grouped + lets
-  // CartDrawer offer one "Remove combo". Re-adding the same combo bumps qty via
-  // mergeLine (acceptable v1). The exploded lines carry the SELLING price from
-  // the catalog; a component SKU missing from the bundle is priced 0 by
-  // explodeCombo and the rest absorb the combo total (accepted v1 behaviour).
-  function addCombo(combo: ComboDto) {
-    const cls = comboToDraftLines(combo, (sku) => ({
-      price: index.skuPrice.get(sku) ?? NaN,
-      label: index.skuLabel.get(sku) ?? sku,
-    }));
-    let lines = draft.lines;
-    for (const l of cls) lines = mergeLine(lines, l);
-    onChange({ ...draft, lines });
-    setPulse(true);
-    window.setTimeout(() => setPulse(false), 220);
-    toast.success(`Added "${combo.name}" (${cls.length} item${cls.length === 1 ? "" : "s"})`);
+  // Card tap. Accessories / services have no options to pick — a single-sku,
+  // no-specials model adds STRAIGHT to the cart (Loo 2026-07-06: "can direct
+  // add to cart", no drawer). Anything with a real choice opens the configurator.
+  function handleConfigure(model: ProductModelDto) {
+    const modelSkus = index.skusByModel.get(model.id) ?? [];
+    const flat = model.category === "accessory" || model.category === "service";
+    if (flat && modelSkus.length === 1 && offeredSpecialsFor(model, catalog.specialAddons).length === 0) {
+      const s = modelSkus[0]!;
+      addLine({
+        localId: newLocalId(),
+        sku: s.sku,
+        qty: 1,
+        attrs: null,
+        unitPrice: s.price,
+        label: `${model.name} · ${s.variant}`,
+      });
+      return;
+    }
+    setConfigureModelId(model.id);
   }
-
-  // Combos shown only on the "All" rail (combos aren't a product category) and
-  // filtered by the same search box (match on name or comboKey).
-  const shownCombos =
-    activeRail === "all"
-      ? index.combos.filter(
-          (c) =>
-            !search ||
-            c.name.toLowerCase().includes(search) ||
-            c.comboKey.toLowerCase().includes(search),
-        )
-      : [];
 
   const configureModel = configureModelId
     ? index.productModels.find((m) => m.id === configureModelId) ?? null
@@ -211,108 +208,99 @@ export default function CatalogStep({
   const cartTotal = cartTotalExStair(draft.lines, draft.addons);
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* Left category rail */}
-      <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-base-100 bg-white overflow-auto px-2 py-4">
-        <CategoryRail entries={railEntries} active={activeRail} onSelect={setActiveRail} />
-        <div className="mt-auto pt-6 px-3">
-          <p className="label mb-1.5">Honest pricing</p>
-          <p className="t-tiny text-base-400 leading-relaxed">
-            Every model is priced on its own — no markups, no surprises. What you see is the floor
-            price.
-          </p>
-        </div>
-      </aside>
+    <div className="catalog">
+      {/* Left sidebar — categories / TBC / quick / MAINTAIN (principal) / footer */}
+      <PosSidebar
+        entries={railEntries}
+        active={activeRail}
+        onSelect={setActiveRail}
+        onResetFilters={resetFilters}
+      />
 
-      {/* Main: sticky toolbar + grid / add-ons */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* Sticky toolbar */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-base-100 bg-white/90 backdrop-blur sticky top-0 z-10">
-          {/* Pill search input with flame focus ring */}
-          <div className="relative flex-1 max-w-sm">
-            <Search
-              size={15}
-              strokeWidth={1.75}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base-400 pointer-events-none"
-            />
+      {/* Main: toolbar + grid / add-ons */}
+      <main className="cat-main">
+        <div className="cat-toolbar">
+          <div className="cat-search">
+            <Search size={16} strokeWidth={1.75} />
             <input
               type="search"
               value={rawSearch}
               onChange={(e) => setRawSearch(e.target.value)}
-              placeholder="Search by name, model, fabric…"
+              placeholder="Search by name, SKU, or detail…"
               aria-label="Search catalog"
-              className="w-full pl-9 pr-4 py-2 rounded-full border border-base-200 bg-base-50 t-small outline-none
-                         focus:border-primary focus:ring-2 focus:ring-primary/15 focus:bg-white transition-all"
             />
           </div>
-
-          {/* Section label + count */}
-          <span className="t-tiny text-base-400 whitespace-nowrap">
+          {/* One brand today — the series filter activates when series data exists. */}
+          <select className="cat-select" value="All series" onChange={() => {}}>
+            <option>All series</option>
+          </select>
+          <span className="cat-toolbar__count">
             {activeRail === "addons"
               ? `${activeAddons.length} add-on${activeAddons.length === 1 ? "" : "s"}`
-              : `${shownModelCount} item${shownModelCount === 1 ? "" : "s"}`}
+              : `${shownModelCount} piece${shownModelCount === 1 ? "" : "s"}`}
           </span>
         </div>
 
-        <div className="flex-1 overflow-auto px-5 py-5 pb-28">
+        <div className="cat-grid-wrap">
+          {/* Sofa-exclusivity notice — functional mutex feedback. */}
+          {activeRail !== "addons" && (cartHasSofa || cartHasMainNonSofa) && (
+            <div
+              className="fade-in"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 14px",
+                marginBottom: 16,
+                background: "var(--pos-panel)",
+                border: "1px solid var(--line-strong)",
+                borderRadius: 12,
+                fontSize: 12,
+                color: "var(--fg)",
+              }}
+            >
+              <Sofa size={16} strokeWidth={1.75} style={{ flexShrink: 0 }} />
+              <span>
+                {cartHasSofa
+                  ? "Sofa order — sofas don't share an order with mattresses or bed frames. Check out or clear the cart to switch categories."
+                  : "This order has a mattress or bed frame. Sofas are placed separately — check out or clear the cart to start a sofa order."}
+              </span>
+            </div>
+          )}
+
           {activeRail === "addons" ? (
             <AddonsPanel addons={activeAddons} draft={draft} onChange={onChange} />
-          ) : sections.length === 0 && shownCombos.length === 0 ? (
-            <p className="t-body text-base-500 text-center py-16">
-              {search ? `No products match "${rawSearch.trim()}".` : "No products in catalog."}
-            </p>
-          ) : (
-            <div className="flex flex-col gap-8">
-              {/* Combos (套餐) — featured bundle row, "All" rail only. */}
-              {shownCombos.length > 0 && (
-                <section data-testid="pos-combos-section">
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="pill pill-neutral">Combos</span>
-                    <span className="font-mono text-[11px] text-base-400">
-                      {shownCombos.length} bundle{shownCombos.length === 1 ? "" : "s"}
-                    </span>
-                  </div>
-                  <div
-                    className="grid gap-4"
-                    style={{ gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))" }}
-                  >
-                    {shownCombos.map((combo) => (
-                      <ComboCard key={combo.id} combo={combo} onAdd={() => addCombo(combo)} />
-                    ))}
-                  </div>
-                </section>
+          ) : shownModels.length === 0 ? (
+            <div className="cat-empty">
+              <h4>No pieces match.</h4>
+              <p>Try clearing the search or pick a different category.</p>
+              {search && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="btn btn--ghost btn--sm"
+                  style={{ marginTop: 14 }}
+                >
+                  Reset filters
+                </button>
               )}
-
-              {sections.map(({ cat, models }) => (
-                <section key={cat}>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="pill pill-neutral">{CATEGORY_LABEL[cat]}</span>
-                    <span className="font-mono text-[11px] text-base-400">
-                      {models.length} model{models.length === 1 ? "" : "s"}
-                    </span>
-                  </div>
-                  {/* Auto-fill grid: minmax(240px, 1fr) */}
-                  <div
-                    className="grid gap-4"
-                    style={{ gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))" }}
-                  >
-                    {models.map((model) => (
-                      <ProductCard
-                        key={model.id}
-                        model={model}
-                        meta={index.meta.get(model.id)!}
-                        locked={lockedCats.has(model.category)}
-                        inCart={modelIdsInCart.has(model.id)}
-                        onConfigure={() => setConfigureModelId(model.id)}
-                      />
-                    ))}
-                  </div>
-                </section>
+            </div>
+          ) : (
+            <div className="cat-grid">
+              {shownModels.map((model) => (
+                <ProductCard
+                  key={model.id}
+                  model={model}
+                  meta={index.meta.get(model.id)!}
+                  locked={lockedCats.has(model.category)}
+                  inCart={modelIdsInCart.has(model.id)}
+                  onConfigure={() => handleConfigure(model)}
+                />
               ))}
             </div>
           )}
         </div>
-      </div>
+      </main>
 
       <FloatingCartButton
         itemCount={itemCount}
@@ -321,22 +309,74 @@ export default function CatalogStep({
         onClick={() => onCartOpenChange(true)}
       />
 
-      {configureModel && (
-        <ConfigureDrawer
-          model={configureModel}
-          meta={index.meta.get(configureModel.id)}
-          skus={index.skusByModel.get(configureModel.id) ?? []}
-          fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
-          fabricTierConfig={catalog.fabricTierConfig}
-          modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-          sofaCompartments={catalog.sofaCompartments}
-          modelSofaCompartments={catalog.modelSofaCompartments}
-          sofaCombos={catalog.sofaCombos}
-          specialAddons={catalog.specialAddons}
-          onAdd={addLine}
-          onClose={() => setConfigureModelId(null)}
-        />
-      )}
+      {configureModel &&
+        (() => {
+          // POS-parity (Loo 2026-07-04) — a MODULAR sofa (offers compartments)
+          // jumps STRAIGHT into the full-page configurator (Quick pick +
+          // Customize tabs), no drawer hop. Every other model (mattress /
+          // bedframe / accessory / dropdown-sofa) keeps the drawer.
+          const offered = (catalog.modelSofaCompartments ?? []).filter(
+            (mc) => mc.modelId === configureModel.id,
+          );
+          // Mattress + bed frame ALSO go full page now (prototype's
+          // ConfiguratorScreen — plan-view canvas + live total), same
+          // straight-in convention. Accessory / pillow / dropdown-sofa /
+          // service keep the drawer.
+          if (
+            configureModel.category === "mattress" ||
+            configureModel.category === "bedframe"
+          ) {
+            return (
+              <PosConfigurePage
+                model={configureModel}
+                meta={index.meta.get(configureModel.id)}
+                skus={index.skusByModel.get(configureModel.id) ?? []}
+                specialAddons={catalog.specialAddons}
+                optionPools={catalog.optionPools}
+                fabrics={catalog.fabrics}
+                fabricTierConfig={catalog.fabricTierConfig}
+                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+                onAdd={addLine}
+                onClose={() => setConfigureModelId(null)}
+              />
+            );
+          }
+          if (configureModel.category === "sofa" && offered.length > 0) {
+            return (
+              <SofaConfigurePage
+                model={configureModel}
+                meta={index.meta.get(configureModel.id)}
+                skus={index.skusByModel.get(configureModel.id) ?? []}
+                fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
+                masterFabrics={catalog.fabrics}
+                optionPools={catalog.optionPools}
+                fabricTierConfig={catalog.fabricTierConfig}
+                modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+                sofaCompartments={catalog.sofaCompartments ?? []}
+                modelCompartments={offered}
+                sofaCombos={catalog.sofaCombos ?? []}
+                onAdd={addLine}
+                onClose={() => setConfigureModelId(null)}
+              />
+            );
+          }
+          return (
+            <ConfigureDrawer
+              model={configureModel}
+              meta={index.meta.get(configureModel.id)}
+              skus={index.skusByModel.get(configureModel.id) ?? []}
+              fabrics={index.fabricsByModel.get(configureModel.id) ?? []}
+              fabricTierConfig={catalog.fabricTierConfig}
+              modelFabricTierOverrides={catalog.modelFabricTierOverrides}
+              sofaCompartments={catalog.sofaCompartments}
+              modelSofaCompartments={catalog.modelSofaCompartments}
+              sofaCombos={catalog.sofaCombos}
+              specialAddons={catalog.specialAddons}
+              onAdd={addLine}
+              onClose={() => setConfigureModelId(null)}
+            />
+          );
+        })()}
 
       {cartOpen && (
         <CartDrawer

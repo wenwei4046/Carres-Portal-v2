@@ -37,3 +37,12 @@ export const phoneKeyMy = (p: string | null | undefined): string => {
   d = d.replace(/^0+/, ""); // drop leading 0s (domestic trunk)
   return d;
 };
+
+/** Canonical customer NAME for the voucher identity binding: lowercased +
+ *  trimmed (2990s parity — its `customers` unique key is
+ *  `(lower(trim(name)), phone)`: a shared phone with a DIFFERENT name is a
+ *  different customer, so a voucher never crosses). Empty result = "no usable
+ *  name". The SQL twin `public.pwp_name_key` (migration 0204) MUST produce
+ *  byte-identical output. */
+export const nameKey = (n: string | null | undefined): string =>
+  (n ?? "").trim().toLowerCase();

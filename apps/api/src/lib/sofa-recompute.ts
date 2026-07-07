@@ -1,5 +1,6 @@
 import {
   Adapters,
+  CATALOG_OPTION_POOLS,
   DB,
   FABRIC_TIER_ADDON_CONFIG,
   MODEL_FABRIC_TIER_OVERRIDES,
@@ -10,6 +11,7 @@ import {
   explodeSofaBuildToOrderLines,
   isSofaBuildLine,
   mirrorCode,
+  pwpSwappedCombos,
   resolveCompartmentPrice,
   sofaBuildLineAttrsSchema,
   sofaPriceWithinTolerance,
@@ -92,11 +94,17 @@ export async function recomputeAndExplodeSofaBuildLines(
   sb: SupabaseClient,
   lines: RecomputableLine[],
   asOf?: string,
+  /** 0186 sofa-as-reward — per LINE INDEX (in `lines`), the granted reward
+   *  combo ids from the PWP stage. That line prices against a snapshot whose
+   *  reward combos carry their PWP-merged maps (`pwpSwappedCombos`); the POS
+   *  preview applies the identical swap, so the drift gate stays honest. */
+  sofaRewardCombosByIndex?: Record<number, string[]>,
 ): Promise<SofaRecomputeOutcome> {
   const snapshotByModel = new Map<string, ModelSofaContext>();
   const out: RecomputableLine[] = [];
 
-  for (const line of lines) {
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx]!;
     if (!isSofaBuildLine(line.attrs)) {
       out.push(line);
       continue;
@@ -141,6 +149,20 @@ export async function recomputeAndExplodeSofaBuildLines(
       snapshotByModel.set(modelId, ctx);
     }
 
+    // 3b. 0204 — the build's size must be a LIVE `sofa_size` pool value when
+    //     the pool is configured (per-size prices key off those exact values;
+    //     a stale/spoofed size would silently price at the flat fallback). An
+    //     empty pool (unconfigured) skips the gate so legacy SOFA_HEIGHTS
+    //     builds keep working.
+    if (ctx.allowedSizes.length > 0 && !ctx.allowedSizes.includes(build.height)) {
+      return {
+        status: "bad_request",
+        message:
+          `Sofa build size '${build.height}' is not an active sofa size option. ` +
+          `Rebuild the sofa to pick a current size.`,
+      };
+    }
+
     // 4. Authoritative recompute with the SAME pure function the client previews.
     const sofaBuild: SofaBuild = {
       modelId,
@@ -152,13 +174,24 @@ export async function recomputeAndExplodeSofaBuildLines(
       })),
       fabricTier: parsed.data.fabric_tier ?? null,
       height: build.height,
+      // 0201-wiring — the chosen sofa_leg_height pool value. The engine prices
+      // an unknown/inactive value at 0, so a fudged claim drifts + rejects.
+      legHeight: parsed.data.leg_height ?? null,
       buildKey:
         typeof line.attrs?.sofa_build_key === "string"
           ? line.attrs.sofa_build_key
           : undefined,
       asOf,
     };
-    const serverTotal = round2(computeSofaPrice(sofaBuild, ctx.snapshot).total);
+    // 0186 sofa-as-reward — a PWP-granted build prices against the SWAPPED
+    // snapshot: its reward combos' price maps replaced by the PWP-merged maps.
+    const rewardIds = sofaRewardCombosByIndex?.[lineIdx];
+    const snapshot =
+      rewardIds && rewardIds.length > 0
+        ? { ...ctx.snapshot, sofaCombos: pwpSwappedCombos(ctx.snapshot.sofaCombos, new Set(rewardIds)) }
+        : ctx.snapshot;
+    const priceResult = computeSofaPrice(sofaBuild, snapshot);
+    const serverTotal = round2(priceResult.total);
 
     // 5. Drift gate.
     if (!sofaPriceWithinTolerance(line.unitPrice, serverTotal)) {
@@ -172,15 +205,19 @@ export async function recomputeAndExplodeSofaBuildLines(
     //    split weight mirrors computeSofaPrice's à-la-carte cell lookup (incl.
     //    mirror fallback) so the proportional split tracks the price basis.
     const { poolByCode, modelByCompId, codeToSku } = ctx;
+    // 0204 — the split weight prices each cell at the BUILD'S SIZE, mirroring
+    // computeSofaPrice's sized à-la-carte lookup (same fallback chain).
     const priceLookup = (code: string): number => {
       const comp = poolByCode.get(code) ?? poolByCode.get(mirrorCode(code));
       if (!comp) return 0;
-      return resolveCompartmentPrice(modelByCompId.get(comp.id), comp);
+      return resolveCompartmentPrice(modelByCompId.get(comp.id), comp, build.height);
     };
     // Fabric attrs ride on EVERY exploded line (each compartment is made in the
     // same fabric; the operation CreatePOModal cascade keys off them per line).
     // Read fabric_id/name/surcharge from the raw attrs (the schema .passthrough()s
     // them but doesn't type them); fabric_tier is the typed, validated field.
+    // Leg attrs ride the same way (whole-sofa; leg_surcharge = the SERVER-resolved
+    // pool surcharge, not the client claim).
     const exploded = explodeSofaBuildToOrderLines(sofaBuild, serverTotal, {
       priceLookup,
       codeToSku: (code) => codeToSku.get(code) ?? null,
@@ -189,6 +226,26 @@ export async function recomputeAndExplodeSofaBuildLines(
         fabric_name: line.attrs?.fabric_name ?? null,
         fabric_surcharge: line.attrs?.fabric_surcharge ?? 0,
         fabric_tier: parsed.data.fabric_tier ?? null,
+        // 0202 series survives the explode even when the colour is still KIV, so
+        // each per-compartment line/PO shows "EZ series · colour to confirm".
+        ...(typeof line.attrs?.fabric_series === "string"
+          ? { fabric_series: line.attrs.fabric_series }
+          : {}),
+        ...(parsed.data.leg_height
+          ? { leg_height: parsed.data.leg_height, leg_surcharge: priceResult.legDelta }
+          : {}),
+        // 0186 sofa-as-reward — a SLIM pwp marker rides every exploded line
+        // (ruleId + type only; the voucher code was already claimed pre-explode)
+        // so the carry-forward sweep's reward-line detection (promo one-way)
+        // still sees the exploded reward.
+        ...(rewardIds && rewardIds.length > 0 && (line.attrs as Record<string, unknown>)?.pwp
+          ? {
+              pwp: {
+                ruleId: ((line.attrs as Record<string, unknown>).pwp as { ruleId?: string }).ruleId ?? null,
+                type: ((line.attrs as Record<string, unknown>).pwp as { type?: string }).type ?? null,
+              },
+            }
+          : {}),
       },
     });
 
@@ -219,6 +276,8 @@ interface ModelSofaContext {
   modelByCompId: Map<string, ModelSofaCompartment>;
   /** Compartment code → the model's real `product_skus.sku` (5A auto-sync). */
   codeToSku: Map<string, string>;
+  /** 0204 — live `sofa_size` pool values; empty = pool unconfigured (gate off). */
+  allowedSizes: string[];
 }
 
 type FetchResult =
@@ -232,7 +291,7 @@ type FetchResult =
  * error fails CLOSED (`{ ok: false }`).
  */
 async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<FetchResult> {
-  const [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR] =
+  const [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR, sizesR, legPoolR] =
     await Promise.all([
       sb.from(SOFA_COMPARTMENTS).select("*"),
       sb.from(MODEL_SOFA_COMPARTMENTS).select("*").eq("model_id", modelId),
@@ -248,15 +307,28 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
       sb.from(MODEL_FABRIC_TIER_OVERRIDES).select("*").eq("model_id", modelId).maybeSingle(),
       // 5A — this model's real compartment skus (auto-synced on offer). Excludes
       // discontinued (un-offered) skus so an un-offered compartment can't be sold.
+      // `price` = the AUTHORITATIVE à-la-carte compartment price (SKU Master —
+      // Loo, 2026-07-05); enriched onto modelCompartments as `skuPrice`, and
+      // (0204) `prices_by_size` as `skuPricesBySize`.
       sb
         .from("product_skus")
-        .select("sku, compartment_id")
+        .select("sku, compartment_id, price, prices_by_size")
         .eq("model_id", modelId)
         .not("compartment_id", "is", null)
         .is("discontinued_at", null),
+      // 0204 — the live sofa-size axis (the per-size price keys + the builder's
+      // size options). Empty = pool unconfigured → the size gate is skipped.
+      sb
+        .from(CATALOG_OPTION_POOLS)
+        .select("value")
+        .eq("pool", "sofa_size")
+        .eq("active", true),
+      // 0201-wiring — the sofa_leg_height pool rows so a build's legHeight
+      // surcharge joins the drift-gated total (computeSofaPrice legDelta).
+      sb.from(CATALOG_OPTION_POOLS).select("*").eq("pool", "sofa_leg_height"),
     ]);
 
-  for (const r of [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR]) {
+  for (const r of [poolR, modelCompsR, combosR, tierConfigR, tierOverrideR, compSkusR, sizesR, legPoolR]) {
     if (r.error) return { ok: false, message: r.error.message };
   }
 
@@ -268,9 +340,41 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
   const compartmentPool = (poolR.data ?? []).map((r) =>
     Adapters.sofaCompartmentFromRow(r as DB.SofaCompartmentRow),
   );
-  const modelCompartments = (modelCompsR.data ?? []).map((r) =>
-    Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow),
+  // skuPrice enrichment — the synced compartment SKU's price is the
+  // authoritative à-la-carte source; resolveCompartmentPrice falls back to the
+  // legacy override→pool-default chain only when no synced sku exists.
+  const compSkuRows = (compSkusR.data ?? []) as Array<{
+    sku: string;
+    compartment_id: string;
+    price: number | string;
+    prices_by_size: Record<string, number | string | null> | null;
+  }>;
+  // Number.isFinite guard: a malformed/absent price must fall through to the
+  // legacy chain (null), never poison the drift gate with NaN (NaN survives ??).
+  const priceByCompId = new Map(
+    compSkuRows
+      .filter((r) => Number.isFinite(Number(r.price)))
+      .map((r) => [r.compartment_id, Number(r.price)]),
   );
+  // 0204 — per-size map, same NaN discipline per entry (malformed → null so the
+  // chain falls through to the flat price instead of poisoning the drift gate).
+  const sizesByCompId = new Map<string, Record<string, number | null>>();
+  for (const r of compSkuRows) {
+    if (r.prices_by_size == null) continue;
+    const m: Record<string, number | null> = {};
+    for (const [k, v] of Object.entries(r.prices_by_size)) {
+      m[k] = v == null || !Number.isFinite(Number(v)) ? null : Number(v);
+    }
+    sizesByCompId.set(r.compartment_id, m);
+  }
+  const modelCompartments = (modelCompsR.data ?? []).map((r) => {
+    const mc = Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow);
+    return {
+      ...mc,
+      skuPrice: priceByCompId.get(mc.compartmentId) ?? null,
+      skuPricesBySize: sizesByCompId.get(mc.compartmentId) ?? null,
+    };
+  });
 
   const snapshot: SofaPricingSnapshot = {
     compartmentPool,
@@ -286,6 +390,11 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
           tierOverrideR.data as DB.ModelFabricTierOverrideRow,
         )
       : null,
+    // 0201-wiring — the leg-height pool (structural subset: value/surcharge/
+    // active are all the engine reads).
+    legHeightPool: (legPoolR.data ?? []).map((r) =>
+      Adapters.catalogOptionPoolFromRow(r as DB.CatalogOptionPoolRow),
+    ),
   };
 
   // Compartment code → real sku, via the pool (sku rows carry compartment_id).
@@ -303,6 +412,7 @@ async function fetchSofaContext(sb: SupabaseClient, modelId: string): Promise<Fe
       poolByCode: new Map(compartmentPool.map((c) => [c.code, c])),
       modelByCompId: new Map(modelCompartments.map((m) => [m.compartmentId, m])),
       codeToSku,
+      allowedSizes: ((sizesR.data ?? []) as Array<{ value: string }>).map((r) => r.value),
     },
   };
 }

@@ -58,6 +58,23 @@ describe("CompartmentSilhouette", () => {
     expect(screen.queryByTestId("compartment-silhouette")).not.toBeInTheDocument();
   });
 
+  it("flush + iconUrl: bbox-fitted art in an overflow-hidden box (build canvas)", () => {
+    render(<CompartmentSilhouette code="1A(LHF)" iconUrl="https://cdn/x.png" flush />);
+    const box = screen.getByTestId("compartment-silhouette-img-flush");
+    expect(box.className).toContain("overflow-hidden");
+    const img = screen.getByTestId("compartment-silhouette-img");
+    expect(img).toHaveAttribute("src", "https://cdn/x.png");
+    expect(img).toHaveAttribute("draggable", "false");
+    // unmeasured (jsdom never loads) → fallback stretch fills the cell exactly
+    expect(img).toHaveStyle({ width: "100%", height: "100%" });
+  });
+
+  it("flush SVG: no viewBox inset — joined modules tile with no seam", () => {
+    render(<CompartmentSilhouette code="1NA" flush />);
+    // 1NA at 24″ is 75×95cm; flush viewBox = the exact footprint (no +8 pad)
+    expect(screen.getByTestId("compartment-silhouette")).toHaveAttribute("viewBox", "0 0 75 95");
+  });
+
   it("applies a flame ring when selected and a red outline on violation", () => {
     const { rerender } = render(<CompartmentSilhouette code="1NA" selected />);
     expect(screen.getByTestId("compartment-silhouette")).toHaveStyle({

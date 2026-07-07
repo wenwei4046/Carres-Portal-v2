@@ -1,6 +1,5 @@
 import type {
   CatalogResponse,
-  ComboDto,
   FabricTierGlobalConfig,
   ModelFabricTierOverrideDto,
   ProductCategory,
@@ -15,13 +14,19 @@ import { resolveFabricDelta } from "@carres/shared";
  * sku/fabric indexes, the sku→category map (for the sofa mutex), and per-model
  * from-price / option-count / search blob. Pure so it unit-tests cleanly.
  *
- * Only mattress/bedframe/sofa models with ≥1 sellable sku become product
- * cards — accessory/service models carry no variant axis and are surfaced
- * elsewhere (service backs the add-ons list).
+ * Mattress/bedframe/sofa/accessory models with ≥1 sellable sku become product
+ * cards (accessories get the generic pick-option configurator — 2990s shows
+ * them as cards too); service models carry no card (service backs the
+ * add-ons list).
  */
 
-/** Categories that render as configurable product cards in the POS grid. */
-export const POS_CARD_CATEGORIES: ProductCategory[] = ["mattress", "bedframe", "sofa"];
+/** Categories that render as product cards in the POS grid. */
+export const POS_CARD_CATEGORIES: ProductCategory[] = [
+  "mattress",
+  "bedframe",
+  "sofa",
+  "accessory",
+];
 
 export interface ModelMeta {
   fromPrice: number;
@@ -39,16 +44,6 @@ export interface CatalogIndex {
   /** Sellable product-card models in catalog order. */
   productModels: ProductModelDto[];
   meta: Map<string, ModelMeta>;
-  /** Flat sku → SELLING price (the combo explode weight source). Built from
-   *  every sku in the (already pos_active-filtered) bundle. */
-  skuPrice: Map<string, number>;
-  /** Flat sku → human label (description || "model · variant" || sku code).
-   *  Used to name the exploded combo component lines in the cart. */
-  skuLabel: Map<string, string>;
-  /** Active fixed-set combos (套餐) to render as POS combo cards. Empty array
-   *  when the bundle carries no combos (pre-0177 / no combos defined) → the
-   *  Combos section is simply not rendered. */
-  combos: ComboDto[];
 }
 
 export function buildCatalogIndex(
@@ -72,25 +67,10 @@ export function buildCatalogIndex(
 
   const modelById = new Map(catalog.models.map((m) => [m.id, m]));
   const skuToCategory = new Map<string, ProductCategory>();
-  // Flat sku → selling price + human label, used by the combo explode helper.
-  // Label mirrors how product cards name a variant: description, else
-  // "model name · variant", else the bare sku code.
-  const skuPrice = new Map<string, number>();
-  const skuLabel = new Map<string, string>();
   for (const s of catalog.skus) {
     const model = modelById.get(s.modelId);
     if (model) skuToCategory.set(s.sku, model.category);
-    skuPrice.set(s.sku, s.price);
-    const label =
-      (s.description && s.description.trim()) ||
-      (model ? `${model.name} · ${s.variant}` : s.variant) ||
-      s.sku;
-    skuLabel.set(s.sku, label);
   }
-
-  // Active combos only (the GET already filters non-admin to active; filter
-  // defensively here too). Empty/absent → no Combos section in the grid.
-  const combos = (catalog.combos ?? []).filter((c) => c.active);
 
   const productModels: ProductModelDto[] = [];
   const meta = new Map<string, ModelMeta>();
@@ -118,7 +98,7 @@ export function buildCatalogIndex(
       m.category === "sofa"
         ? skus.filter((s) => s.variantKind === "preset").length || skus.length
         : skus.filter((s) => s.variantKind === "size").length || skus.length;
-    const optionNoun = m.category === "sofa" ? "option" : "size";
+    const optionNoun = m.category === "sofa" || m.category === "accessory" ? "option" : "size";
 
     const searchBlob = [
       m.name,
@@ -139,8 +119,5 @@ export function buildCatalogIndex(
     skuToCategory,
     productModels,
     meta,
-    skuPrice,
-    skuLabel,
-    combos,
   };
 }

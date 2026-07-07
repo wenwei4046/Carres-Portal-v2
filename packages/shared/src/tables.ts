@@ -44,12 +44,6 @@ export const SPECIAL_DELIVERY_FEE_RULES = "special_delivery_fee_rules" as const;
 export const FABRIC_TIER_ADDON_CONFIG    = "fabric_tier_addon_config" as const;
 export const MODEL_FABRIC_TIER_OVERRIDES = "model_fabric_tier_overrides" as const;
 
-// 0177 — fixed-set combos (套餐): a named bundle sold at one combo_price, with
-// its component SKUs in combo_components. explodeCombo() splits the price back
-// across the components at submit time.
-export const COMBOS           = "combos" as const;
-export const COMBO_COMPONENTS = "combo_components" as const;
-
 // 0178 — sofa engine Phase 1: principal-owned compartment pool + per-model
 // offered (which compartments a sofa model offers, with optional price override).
 export const SOFA_COMPARTMENTS       = "sofa_compartments" as const;
@@ -66,6 +60,16 @@ export const SPECIAL_ADDONS          = "special_addons" as const;
 // order-side consumer (sizes stay per-model in allowed_options; supplier scope
 // stays in suppliers.cat_covered).
 export const CATALOG_OPTION_POOLS    = "catalog_option_pools" as const;
+
+// 0201 — lightweight append-only snapshot log for the option pools (one row
+// per pool Edit-save; "Effective from" + History in the catalog admin UI).
+// 0202 widens `section` with 'fabrics' (fabric-master Edit-saves log here too).
+export const CATALOG_CONFIG_HISTORY  = "catalog_config_history" as const;
+
+// 0202 — global procurement fabric master (2990s fabric_trackings port): code ·
+// series · description · supplier code · sofa/bedframe tier · active. Read-only
+// reference — the SELLING fabric path stays per-model sofa_fabrics + 0176 deltas.
+export const CATALOG_FABRICS         = "catalog_fabrics" as const;
 
 // 0185 — 2990s Products parity Phase 7: principal-owned Default Free Gifts (per
 // model) + Free Item Campaigns (GWP). Free lines book as RM0 order_lines with

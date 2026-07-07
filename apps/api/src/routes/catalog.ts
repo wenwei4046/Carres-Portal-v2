@@ -13,8 +13,6 @@ import {
   sofaFabricPatchInput,
   fabricTierConfigSchema,
   modelFabricTierOverrideSchema,
-  comboCreateInput,
-  comboPatchInput,
   sizesActiveInput,
   generateSkusInput,
   floorConfigPatchInput,
@@ -23,8 +21,6 @@ import {
   PRODUCT_MODEL_PHOTOS_BUCKET,
   FABRIC_TIER_ADDON_CONFIG,
   MODEL_FABRIC_TIER_OVERRIDES,
-  COMBOS,
-  COMBO_COMPONENTS,
   sofaCompartmentCreateInput,
   sofaCompartmentPatchInput,
   modelSofaCompartmentInput,
@@ -39,7 +35,12 @@ import {
   SPECIAL_ADDONS,
   catalogOptionPoolCreateInput,
   catalogOptionPoolPatchInput,
+  catalogOptionPoolNameSchema,
+  catalogPoolBatchSaveInput,
   CATALOG_OPTION_POOLS,
+  CATALOG_CONFIG_HISTORY,
+  CATALOG_FABRICS,
+  catalogFabricsBatchSaveInput,
   deliveryFeeConfigPatchInput,
   specialDeliveryFeeRuleInput,
   DELIVERY_FEE_CONFIG,
@@ -51,6 +52,7 @@ import {
   pwpRuleInput,
   PWP_RULES,
   deriveSkuCode,
+  canonicalSize,
   skuImportInput,
   hasPricingIntent,
   type SkuImportRow,
@@ -130,10 +132,21 @@ function gateSkuCreatePriceCost(
 // pwp_price key at all (presence = intent to change; a `null` clearing counts).
 function gateSkuPatchPriceCost(
   c: { var: { auth: { role: string } } },
-  data: { price?: number; cost?: number | null; pwpPrice?: number | null },
+  data: {
+    price?: number;
+    cost?: number | null;
+    pwpPrice?: number | null;
+    // 0204 — per-size price map; presence = intent to change, same lock.
+    pricesBySize?: Record<string, number> | null;
+  },
 ) {
   if (c.var.auth.role === "principal") return;
-  if (data.price !== undefined || data.cost !== undefined || data.pwpPrice !== undefined) {
+  if (
+    data.price !== undefined ||
+    data.cost !== undefined ||
+    data.pwpPrice !== undefined ||
+    data.pricesBySize !== undefined
+  ) {
     throw new HTTPException(403, { message: SKU_PRICE_COST_ERROR });
   }
 }
@@ -183,7 +196,7 @@ catalogRouter.get("/", async (c) => {
   // catalog table, all RLS-public-read. No auth-scoped filtering needed.
   // 0176 — also fetch the fabric tier config singleton + per-model overrides.
   const modelsQ = sb.from("product_models").select("*");
-  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, combosR, comboComponentsR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR] = await Promise.all([
+  const [modelsR, allSkus, fabricsR, addonsR, floorR, tierConfigR, tierOverridesR, sofaCompsR, modelSofaCompsR, sofaCombosR, specialAddonsR, optionPoolsR, deliveryFeeR, specialDeliveryRulesR, modelFreeGiftsR, freeItemCampaignsR, pwpRulesR, fabricMasterR] = await Promise.all([
     adminMode ? modelsQ : modelsQ.is("discontinued_at", null),
     fetchAllSkus(sb), // paged — never capped at 1000
     sb.from("sofa_fabrics").select("*"),
@@ -194,13 +207,6 @@ catalogRouter.get("/", async (c) => {
     sb.from(FABRIC_TIER_ADDON_CONFIG).select("*").eq("id", 1).maybeSingle(),
     // 0176 — all override rows (sparse table; most models have no row).
     sb.from(MODEL_FABRIC_TIER_OVERRIDES).select("*"),
-    // 0177 — combos + their components. Fetched unfiltered; the active /
-    // discontinued_at filter is applied client-side below (like the skus
-    // pos_active filter), since each combo also needs its components joined in
-    // JS anyway. A combo is "effective immediately" — `effective_from` is
-    // stored but NOT gated in v1.
-    sb.from(COMBOS).select("*"),
-    sb.from(COMBO_COMPONENTS).select("*"),
     // 0178 — sofa compartment pool + per-model offered rows (additive). The
     // maintenance UI is the only consumer in Phase 1; returned unfiltered.
     sb.from(SOFA_COMPARTMENTS).select("*"),
@@ -240,6 +246,11 @@ catalogRouter.get("/", async (c) => {
     // `active` itself. Additive — pre-0186 clients ignore the key, and with NONE
     // authored / `active` default false it's dormant (zero behaviour change).
     sb.from(PWP_RULES).select("*"),
+    // 0202 — global procurement fabric master (2990s fabric_trackings port).
+    // Fetched UNFILTERED (active AND inactive — each row carries `active`; the
+    // Fabrics tab editor must see OFF rows). Read-only reference — NOT a source
+    // of truth for any order-side consumer (selling fabrics stay sofa_fabrics).
+    sb.from(CATALOG_FABRICS).select("*"),
   ]);
 
   for (const r of [modelsR, fabricsR, addonsR, floorR]) {
@@ -247,8 +258,6 @@ catalogRouter.get("/", async (c) => {
   }
   if (tierConfigR.error) throw new HTTPException(500, { message: tierConfigR.error.message });
   if (tierOverridesR.error) throw new HTTPException(500, { message: tierOverridesR.error.message });
-  if (combosR.error) throw new HTTPException(500, { message: combosR.error.message });
-  if (comboComponentsR.error) throw new HTTPException(500, { message: comboComponentsR.error.message });
   if (sofaCompsR.error) throw new HTTPException(500, { message: sofaCompsR.error.message });
   if (modelSofaCompsR.error) throw new HTTPException(500, { message: modelSofaCompsR.error.message });
   if (sofaCombosR.error) throw new HTTPException(500, { message: sofaCombosR.error.message });
@@ -259,6 +268,7 @@ catalogRouter.get("/", async (c) => {
   if (modelFreeGiftsR.error) throw new HTTPException(500, { message: modelFreeGiftsR.error.message });
   if (freeItemCampaignsR.error) throw new HTTPException(500, { message: freeItemCampaignsR.error.message });
   if (pwpRulesR.error) throw new HTTPException(500, { message: pwpRulesR.error.message });
+  if (fabricMasterR.error) throw new HTTPException(500, { message: fabricMasterR.error.message });
   if (!floorR.data) {
     // floor_config row 1 should always exist post-migration; if it's missing
     // we surface as 500 rather than silently shipping a broken bundle.
@@ -288,31 +298,6 @@ catalogRouter.get("/", async (c) => {
     ? Adapters.fabricTierConfigFromRow(tierConfigR.data as DB.FabricTierAddonConfigRow)
     : { sofaTier2Delta: 0, sofaTier3Delta: 0 };
 
-  // 0177 — assemble each combo with its components (sorted by sort_order asc;
-  // the last component absorbs the rounding residue in explodeCombo). Non-admin
-  // consumers (POS) only see live combos (active && not discontinued); admin
-  // (maintenance tab) sees ALL combos so it can re-activate / restore them.
-  const comboRows = (combosR.data ?? []).filter((row) => {
-    if (adminMode) return true;
-    const r = row as DB.ComboRow;
-    return r.active === true && r.discontinued_at == null;
-  });
-  const componentsByCombo = new Map<string, DB.ComboComponentRow[]>();
-  for (const row of comboComponentsR.data ?? []) {
-    const cc = row as DB.ComboComponentRow;
-    const list = componentsByCombo.get(cc.combo_id) ?? [];
-    list.push(cc);
-    componentsByCombo.set(cc.combo_id, list);
-  }
-  const combos = comboRows.map((row) => {
-    const r = row as DB.ComboRow;
-    const components = (componentsByCombo.get(r.id) ?? [])
-      .slice()
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((cc) => Adapters.comboComponentFromRow(cc));
-    return { ...Adapters.comboFromRow(r), components };
-  });
-
   // 0184 — delivery fee config. The singleton (id=1) is seeded by the migration,
   // but fall back to the dormant defaults (all fees 0) when the row is absent so a
   // fresh/empty DB never ships a broken bundle (mirrors the fabric-tier fallback).
@@ -337,15 +322,46 @@ catalogRouter.get("/", async (c) => {
     modelFabricTierOverrides: (tierOverridesR.data ?? []).map(
       (r) => Adapters.modelFabricTierOverrideFromRow(r as DB.ModelFabricTierOverrideRow),
     ),
-    // 0177 — fixed-set combos (additive; pre-0177 clients ignore this key).
-    combos,
     // 0178 — sofa compartment pool + per-model offered (additive; optional).
     sofaCompartments: (sofaCompsR.data ?? []).map(
       (r) => Adapters.sofaCompartmentFromRow(r as DB.SofaCompartmentRow),
     ),
-    modelSofaCompartments: (modelSofaCompsR.data ?? []).map(
-      (r) => Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow),
-    ),
+    // Each offered row is enriched with `skuPrice` — the synced
+    // `{MODEL_KEY}-{code}` compartment SKU's price (SKU Master), which is the
+    // authoritative à-la-carte price source (Loo, 2026-07-05). Joined from
+    // `allSkus` (pre-pos_active-filter — compartment skus are pos_active=false
+    // by design and must still price the builder in the non-admin POS bundle).
+    modelSofaCompartments: (() => {
+      const compSkuPrice = new Map<string, number>();
+      // 0204 — the synced SKU's {size → RM} map, enriched alongside skuPrice so
+      // the builder + POS price à-la-carte per the chosen size.
+      const compSkuSizes = new Map<string, Record<string, number | null>>();
+      for (const s of allSkus) {
+        const row = s as DB.ProductSkuRow;
+        if (row.compartment_id == null || row.discontinued_at != null) continue;
+        if (row.prices_by_size != null) {
+          const m: Record<string, number | null> = {};
+          for (const [k, v] of Object.entries(row.prices_by_size)) {
+            // NaN guard per entry: malformed → null (falls to the flat price).
+            m[k] = v == null || !Number.isFinite(Number(v)) ? null : Number(v);
+          }
+          compSkuSizes.set(`${row.model_id}|${row.compartment_id}`, m);
+        }
+        const p = Number(row.price);
+        // NaN guard: a malformed price falls through to the legacy chain (null)
+        // instead of poisoning resolveCompartmentPrice (NaN survives ??).
+        if (!Number.isFinite(p)) continue;
+        compSkuPrice.set(`${row.model_id}|${row.compartment_id}`, p);
+      }
+      return (modelSofaCompsR.data ?? []).map((r) => {
+        const mc = Adapters.modelSofaCompartmentFromRow(r as DB.ModelSofaCompartmentRow);
+        return {
+          ...mc,
+          skuPrice: compSkuPrice.get(`${mc.modelId}|${mc.compartmentId}`) ?? null,
+          skuPricesBySize: compSkuSizes.get(`${mc.modelId}|${mc.compartmentId}`) ?? null,
+        };
+      });
+    })(),
     // 0179 — sofa combo pricing (additive; optional). Non-admin consumers
     // (POS / the future builder) only see live combos (active && not
     // discontinued); admin (maintenance tab) sees ALL so it can restore them —
@@ -420,6 +436,16 @@ catalogRouter.get("/", async (c) => {
           : String(ra.created_at).localeCompare(String(rb.created_at));
       })
       .map((r) => Adapters.pwpRuleFromRow(r as DB.PwpRuleRow)),
+    // 0202 — global procurement fabric master (additive, OPTIONAL). Sorted in
+    // JS by (sort_order, fabric_code) to mirror the plain `.select("*")` fetch
+    // and stay mock-friendly, the way the 0182 option-pools branch sorts.
+    fabrics: (fabricMasterR.data ?? [])
+      .map((r) => Adapters.catalogFabricFromRow(r as DB.CatalogFabricRow))
+      .sort((a, b) =>
+        a.sortOrder !== b.sortOrder
+          ? a.sortOrder - b.sortOrder
+          : a.fabricCode.localeCompare(b.fabricCode),
+      ),
   });
   // EXPOSURE NOTE (0186): unlike `cost`, the PWP discounted reward price
   // (product_skus.pwp_price → sku.pwpPrice / sofa_combo_pricing.pwp_prices_by_height
@@ -569,7 +595,16 @@ catalogRouter.post("/skus", async (c) => {
   if (!modelRow) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
-  const skuCode = deriveSkuCode(modelRow.model_key, parsed.data.variant);
+  // Mattress/bedframe sizes resolve through the canonical table so the SKU code
+  // stays SHORT (`-K`) while the stored variant (the SIZE shown) is the FULL
+  // name (`King`). Non-size variants (sofa presets, accessories) pass through.
+  const isBedSize =
+    parsed.data.variantKind === "size" &&
+    (modelRow.category === "mattress" || modelRow.category === "bedframe");
+  const resolvedVariant = isBedSize
+    ? canonicalSize(parsed.data.variant)
+    : { code: parsed.data.variant, name: parsed.data.variant };
+  const skuCode = deriveSkuCode(modelRow.model_key, resolvedVariant.code);
   const supplierless = SUPPLIERLESS_CATEGORIES.has(modelRow.category);
 
   // 0074 bugfix (Loo 2026-05-09): product_skus.supplier_id was NOT NULL on
@@ -607,7 +642,7 @@ catalogRouter.post("/skus", async (c) => {
     .insert({
       model_id: parsed.data.modelId,
       sku: skuCode,
-      variant: parsed.data.variant,
+      variant: resolvedVariant.name,
       variant_kind: parsed.data.variantKind,
       price: parsed.data.price,
       cost: parsed.data.cost ?? null,
@@ -644,6 +679,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   // 0186 — only write pwp_price when present so an unrelated patch doesn't clobber
   // the benchmark; an explicit null clears it (back to "unset").
   if (parsed.data.pwpPrice !== undefined) patch.pwp_price = parsed.data.pwpPrice;
+  // 0204 — full-map replace: the UI sends the whole {size → RM} map on each
+  // commit (unpriced sizes OMITTED); explicit null clears the map entirely.
+  if (parsed.data.pricesBySize !== undefined) patch.prices_by_size = parsed.data.pricesBySize;
   if (parsed.data.supplierId !== undefined) patch.supplier_id = parsed.data.supplierId;
   // 0075 — restore toggle (Loo 2026-05-09).
   if (parsed.data.discontinuedAt !== undefined)
@@ -1144,7 +1182,13 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
     supplierId = supRow.id as string;
   }
 
-  const codeFor = (v: string) => deriveSkuCode(modelRow.model_key, v);
+  // Mattress/bedframe sizes resolve through the canonical table so the SKU
+  // code stays SHORT (`-K`) while the stored variant (the SIZE shown) is the
+  // FULL name (`King`) — never the raw pool code. Other categories pass through
+  // unchanged (canonicalSize is a no-op for non-bed tokens anyway).
+  const isBedCategory = modelRow.category === "mattress" || modelRow.category === "bedframe";
+  const resolve = (v: string) => (isBedCategory ? canonicalSize(v) : { code: v, name: v });
+  const codeFor = (v: string) => deriveSkuCode(modelRow.model_key, resolve(v).code);
   const wantCodes = variants.map(codeFor);
   const { data: existingRows, error: exErr } = await sb
     .from("product_skus")
@@ -1158,7 +1202,7 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
     .map((v) => ({
       model_id: id,
       sku: codeFor(v),
-      variant: v,
+      variant: resolve(v).name,
       variant_kind: "size" as const,
       price: parsed.data.price ?? 0,
       cost: null,
@@ -1222,7 +1266,7 @@ catalogRouter.patch("/models/:id/photo", async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_input", code: "invalid_param", message: "path required" }, 422);
   }
-  if (!parsed.data.path.startsWith(`${id}/`)) {
+  if (!parsed.data.path.startsWith(`${id}/`) || parsed.data.path.includes("..")) {
     return c.json({ error: "invalid_input", code: "path_mismatch", message: "path does not belong to this model" }, 422);
   }
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -1516,211 +1560,6 @@ catalogRouter.put("/model-fabric-tier-override/:modelId", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// 0177 — Combos (套餐). Fixed-set bundles sold at one combo_price; component
-// SKUs split the price back via explodeCombo() at submit time. All writes are
-// principal-only ("Master Admin"), mirroring the 0176 fabric-tier write gate:
-// early friendly 403 here, with RLS (combos_write_principal /
-// combo_components_write_principal) as the real boundary — we forward the USER
-// JWT (userClient) so RLS runs.
-// ---------------------------------------------------------------------------
-
-const COMBO_PRINCIPAL_MSG = "Only the principal (Master Admin) can manage combos";
-
-// kebab-case slug from the combo name: lowercase, spaces → dash, strip anything
-// outside [a-z0-9-]. A name that slugifies to empty (e.g. Chinese-only) yields
-// "" → the caller falls back to a random `combo-<hex>` key.
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-// POST /combos — create a combo + its components (principal-only).
-// Atomicity (no new RPC in v1): supabase-js can't wrap two statements in a
-// single txn without an RPC, so if the components insert fails we COMPENSATE by
-// deleting the just-created combo row — no orphan combo is left behind.
-catalogRouter.post("/combos", async (c) => {
-  principalOnly(c, COMBO_PRINCIPAL_MSG);
-  const parsed = await parseJsonBody(c, comboCreateInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-
-  const comboKey =
-    parsed.data.comboKey?.trim() ||
-    slugify(parsed.data.name) ||
-    `combo-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
-
-  const { data: comboRow, error: comboErr } = await sb
-    .from(COMBOS)
-    .insert({
-      combo_key: comboKey,
-      name: parsed.data.name,
-      combo_price: parsed.data.comboPrice,
-      // 0183 — principal-only cost benchmark (companion to combo_price). null =
-      // unset; never feeds order/finance/PO — selling stays the only price driver.
-      cost: parsed.data.cost ?? null,
-      active: parsed.data.active ?? true,
-      updated_at: new Date().toISOString(),
-      updated_by: c.var.auth.id,
-    })
-    .select("*")
-    .maybeSingle();
-  if (comboErr) {
-    const m = mapPgError(comboErr);
-    return c.json(m.body, m.status);
-  }
-  if (!comboRow) {
-    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "combo insert returned no row" }, 500);
-  }
-  const newId = (comboRow as DB.ComboRow).id;
-
-  const componentRows = parsed.data.components.map((comp, i) => ({
-    combo_id: newId,
-    sku: comp.sku,
-    qty: comp.qty,
-    sort_order: comp.sortOrder ?? i,
-  }));
-  const { error: compErr } = await sb.from(COMBO_COMPONENTS).insert(componentRows);
-  if (compErr) {
-    // Compensating delete — remove the orphan combo so a half-created bundle
-    // doesn't linger. (Best-effort: if the delete itself fails the original
-    // error still wins; v1-acceptable per the brief.)
-    await sb.from(COMBOS).delete().eq("id", newId);
-    const m = mapPgError(compErr);
-    return c.json(m.body, m.status);
-  }
-
-  const combo = {
-    ...Adapters.comboFromRow(comboRow as DB.ComboRow),
-    components: [...componentRows]
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((r) => Adapters.comboComponentFromRow(r as DB.ComboComponentRow)),
-  };
-  return c.json({ combo }, 201);
-});
-
-// PATCH /combos/:id — update scalar fields and/or REPLACE the component set
-// (principal-only). Components-replace = delete-then-insert; if the re-insert
-// fails after the delete there is a small window with no components for the
-// combo (v1-acceptable: no multi-statement txn without an RPC).
-catalogRouter.patch("/combos/:id", async (c) => {
-  principalOnly(c, COMBO_PRINCIPAL_MSG);
-  const id = c.req.param("id");
-  const parsed = await parseJsonBody(c, comboPatchInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-
-  const patch: Record<string, unknown> = {};
-  if (parsed.data.name !== undefined) patch.name = parsed.data.name;
-  if (parsed.data.comboPrice !== undefined) patch.combo_price = parsed.data.comboPrice;
-  // 0183 — only write cost when the key is present so an unrelated patch doesn't
-  // clobber the benchmark; an explicit null clears it (back to "unset").
-  if (parsed.data.cost !== undefined) patch.cost = parsed.data.cost;
-  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
-  if (parsed.data.comboKey !== undefined) patch.combo_key = parsed.data.comboKey;
-
-  const hasComponents = parsed.data.components !== undefined;
-  if (Object.keys(patch).length === 0 && !hasComponents) {
-    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
-  }
-
-  const sb = userClient(c.env, c.var.auth.jwt);
-
-  // Always stamp updated_at / updated_by when there's at least one scalar field;
-  // if ONLY components change we still touch the combo row so updated_* reflects
-  // the edit.
-  patch.updated_at = new Date().toISOString();
-  patch.updated_by = c.var.auth.id;
-
-  const { data: comboRow, error: comboErr } = await sb
-    .from(COMBOS)
-    .update(patch)
-    .eq("id", id)
-    .select("*")
-    .maybeSingle();
-  if (comboErr) {
-    const m = mapPgError(comboErr);
-    return c.json(m.body, m.status);
-  }
-  if (!comboRow) {
-    return c.json({ error: "not_found", code: "not_found", message: "combo not found" }, 404);
-  }
-
-  let componentRows: { combo_id: string; sku: string; qty: number; sort_order: number }[] = [];
-  if (hasComponents) {
-    componentRows = (parsed.data.components ?? []).map((comp, i) => ({
-      combo_id: id,
-      sku: comp.sku,
-      qty: comp.qty,
-      sort_order: comp.sortOrder ?? i,
-    }));
-    // Replace the set: delete the old components, then insert the new ones.
-    const { error: delErr } = await sb.from(COMBO_COMPONENTS).delete().eq("combo_id", id);
-    if (delErr) {
-      const m = mapPgError(delErr);
-      return c.json(m.body, m.status);
-    }
-    if (componentRows.length > 0) {
-      const { error: insErr } = await sb.from(COMBO_COMPONENTS).insert(componentRows);
-      if (insErr) {
-        const m = mapPgError(insErr);
-        return c.json(m.body, m.status);
-      }
-    }
-  } else {
-    // Components untouched → read the existing set so the response is complete.
-    const { data: existing, error: readErr } = await sb
-      .from(COMBO_COMPONENTS)
-      .select("*")
-      .eq("combo_id", id);
-    if (readErr) {
-      const m = mapPgError(readErr);
-      return c.json(m.body, m.status);
-    }
-    componentRows = (existing ?? []) as { combo_id: string; sku: string; qty: number; sort_order: number }[];
-  }
-
-  const combo = {
-    ...Adapters.comboFromRow(comboRow as DB.ComboRow),
-    components: [...componentRows]
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((r) => Adapters.comboComponentFromRow(r as DB.ComboComponentRow)),
-  };
-  return c.json({ combo });
-});
-
-// DELETE /combos/:id — soft-delete (principal-only), mirroring DELETE /models
-// and /skus: stamp discontinued_at and flip active=false so GET / hides it
-// from POS while the maintenance tab (admin=true) can still restore it.
-catalogRouter.delete("/combos/:id", async (c) => {
-  principalOnly(c, COMBO_PRINCIPAL_MSG);
-  const id = c.req.param("id");
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from(COMBOS)
-    .update({
-      active: false,
-      discontinued_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      updated_by: c.var.auth.id,
-    })
-    .eq("id", id)
-    .select("id")
-    .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  if (!data) {
-    return c.json({ error: "not_found", code: "not_found", message: "combo not found" }, 404);
-  }
-  return c.json({ ok: true });
-});
-
-// ---------------------------------------------------------------------------
 // 0178 — Sofa compartments (the "Base" pool) + per-model offered set. All
 // writes are principal-only ("Master Admin"), mirroring the 0176/0177 gate:
 // early friendly 403 here, with RLS (sofa_compartments_write_principal /
@@ -1745,9 +1584,14 @@ catalogRouter.post("/sofa-compartments", async (c) => {
       seat_count: parsed.data.seatCount ?? null,
       arm_config: parsed.data.armConfig ?? null,
       icon_url: parsed.data.iconUrl ?? null,
-      default_price: parsed.data.defaultPrice ?? 0,
+      // NO default_price (Loo, 2026-07-05): the pool is a foundation catalog;
+      // prices live on the synced per-model SKUs (SKU Master). Column stays at
+      // its DB default (0) as a dormant legacy fallback.
       sort_order: parsed.data.sortOrder ?? 0,
       active: parsed.data.active ?? true,
+      // 0205 — per-compartment fabric-tier delta override (null = inherit).
+      special_tier2_delta: parsed.data.specialTier2Delta ?? null,
+      special_tier3_delta: parsed.data.specialTier3Delta ?? null,
       updated_at: new Date().toISOString(),
       updated_by: c.var.auth.id,
     })
@@ -1773,9 +1617,12 @@ catalogRouter.patch("/sofa-compartments/:id", async (c) => {
   if (parsed.data.seatCount !== undefined) patch.seat_count = parsed.data.seatCount;
   if (parsed.data.armConfig !== undefined) patch.arm_config = parsed.data.armConfig;
   if (parsed.data.iconUrl !== undefined) patch.icon_url = parsed.data.iconUrl;
-  if (parsed.data.defaultPrice !== undefined) patch.default_price = parsed.data.defaultPrice;
   if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  // 0205 — per-compartment fabric-tier deltas. `!== undefined` (not `??`) so an
+  // explicit null clears the override back to "inherit per-model / global".
+  if (parsed.data.specialTier2Delta !== undefined) patch.special_tier2_delta = parsed.data.specialTier2Delta;
+  if (parsed.data.specialTier3Delta !== undefined) patch.special_tier3_delta = parsed.data.specialTier3Delta;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
@@ -1813,6 +1660,83 @@ catalogRouter.delete("/sofa-compartments/:id", async (c) => {
     return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
   }
   return c.json({ ok: true });
+});
+
+// ----- Compartment photo (signed-upload pattern, mirrors /models/:id/photo) -----
+// Reuses the PUBLIC product-model-photos bucket (0173 — internal-write, no path
+// scoping) under the reserved `compartments/{id}/…` prefix (model photo paths
+// start with a model uuid, so the prefixes can never collide). The photo lands
+// in `sofa_compartments.icon_url` (0178) — CompartmentSilhouette prefers it
+// over the SVG in the builder / POS configurator cell boxes.
+
+// POST /sofa-compartments/:id/photo/sign-upload — principal-only.
+catalogRouter.post("/sofa-compartments/:id/photo/sign-upload", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = photoSignSchema.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: issue?.message ?? "invalid input", field: issue?.path.join(".") ?? "unknown" },
+      422,
+    );
+  }
+  const ext =
+    parsed.data.mimeType === "image/jpeg" ? "jpg" : parsed.data.mimeType === "image/png" ? "png" : "webp";
+  const path = `compartments/${id}/${crypto.randomUUID()}.${ext}`;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.storage
+    .from(PRODUCT_MODEL_PHOTOS_BUCKET)
+    .createSignedUploadUrl(path);
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ token: data.token, path: data.path });
+});
+
+// PATCH /sofa-compartments/:id/photo — store the uploaded file's public URL in
+// icon_url. The path must belong to this compartment (anti-spoof).
+catalogRouter.patch("/sofa-compartments/:id/photo", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = photoStoreSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: "path required" }, 422);
+  }
+  if (!parsed.data.path.startsWith(`compartments/${id}/`) || parsed.data.path.includes("..")) {
+    return c.json({ error: "invalid_input", code: "path_mismatch", message: "path does not belong to this compartment" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const pub = sb.storage.from(PRODUCT_MODEL_PHOTOS_BUCKET).getPublicUrl(parsed.data.path);
+  const { data, error } = await sb
+    .from(SOFA_COMPARTMENTS)
+    .update({ icon_url: pub.data.publicUrl, updated_at: new Date().toISOString(), updated_by: c.var.auth.id })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
+  }
+  return c.json({ compartment: Adapters.sofaCompartmentFromRow(data as DB.SofaCompartmentRow) });
+});
+
+// DELETE /sofa-compartments/:id/photo — clear icon_url (falls back to the SVG).
+catalogRouter.delete("/sofa-compartments/:id/photo", async (c) => {
+  principalOnly(c, SOFA_COMPARTMENT_MSG);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(SOFA_COMPARTMENTS)
+    .update({ icon_url: null, updated_at: new Date().toISOString(), updated_by: c.var.auth.id })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
+  }
+  return c.json({ compartment: Adapters.sofaCompartmentFromRow(data as DB.SofaCompartmentRow) });
 });
 
 // PUT /models/:modelId/compartments/:compartmentId — upsert the per-model
@@ -1916,6 +1840,8 @@ catalogRouter.post("/sofa-combos", async (c) => {
     pwp_prices_by_height: parsed.data.pwpPricesByHeight ?? null,
     label: parsed.data.label ?? null,
     active: parsed.data.active ?? true,
+    // 0206 — Quick Pick preset flag (default false = a pricing-only combo).
+    is_quick_pick: parsed.data.isQuickPick ?? false,
     updated_at: new Date().toISOString(),
     updated_by: c.var.auth.id,
   };
@@ -1956,6 +1882,8 @@ catalogRouter.patch("/sofa-combos/:id", async (c) => {
   if (parsed.data.label !== undefined) patch.label = parsed.data.label;
   if (parsed.data.effectiveFrom !== undefined) patch.effective_from = parsed.data.effectiveFrom;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
+  // 0206 — Quick Pick preset flag (promote/demote a combo to/from Quick pick).
+  if (parsed.data.isQuickPick !== undefined) patch.is_quick_pick = parsed.data.isQuickPick;
 
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
@@ -2043,6 +1971,7 @@ catalogRouter.post("/option-pools", async (c) => {
       value: parsed.data.value,
       label: parsed.data.label ?? null,
       dimensions: parsed.data.dimensions ?? null,
+      surcharge: parsed.data.surcharge ?? null,
       active: parsed.data.active ?? true,
       sort_order: parsed.data.sortOrder ?? 0,
       updated_at: new Date().toISOString(),
@@ -2075,6 +2004,7 @@ catalogRouter.patch("/option-pools/:id", async (c) => {
   if (parsed.data.value !== undefined) patch.value = parsed.data.value;
   if (parsed.data.label !== undefined) patch.label = parsed.data.label;
   if (parsed.data.dimensions !== undefined) patch.dimensions = parsed.data.dimensions;
+  if (parsed.data.surcharge !== undefined) patch.surcharge = parsed.data.surcharge;
   if (parsed.data.active !== undefined) patch.active = parsed.data.active;
   if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
   if (Object.keys(patch).length === 0) {
@@ -2117,6 +2047,154 @@ catalogRouter.delete("/option-pools/:id", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ ok: true });
+});
+
+// PUT /option-pools/:pool — 0201 batch save (principal-only). REPLACE semantics:
+// the body's `entries` become the pool's full new contents (array order =
+// display order) and the catalog_pool_batch_save RPC appends a
+// catalog_config_history snapshot in the SAME transaction — that atomicity is
+// exactly why this is an RPC and not delete+insert round-trips. SECURITY
+// INVOKER: the user JWT is forwarded, so RLS
+// (catalog_option_pools_write_principal + catalog_config_history_write_principal)
+// stays the real boundary.
+catalogRouter.put("/option-pools/:pool", async (c) => {
+  principalOnly(c, OPTION_POOL_MSG);
+  const poolParam = catalogOptionPoolNameSchema.safeParse(c.req.param("pool"));
+  if (!poolParam.success) {
+    return c.json({ error: "not_found", code: "not_found", message: "unknown option pool" }, 404);
+  }
+  const parsed = await parseJsonBody(c, catalogPoolBatchSaveInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // Friendly 409 before the round-trip: duplicate values would trip
+  // UNIQUE(pool,value) mid-RPC and roll the whole save back anyway.
+  const values = parsed.data.entries.map((e) => e.value);
+  if (new Set(values).size !== values.length) {
+    return c.json(optionPoolDuplicate(undefined, poolParam.data), 409);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("catalog_pool_batch_save", {
+    p_pool: poolParam.data,
+    p_entries: parsed.data.entries.map((e) => ({
+      value: e.value,
+      label: e.label ?? null,
+      dimensions: e.dimensions ?? null,
+      surcharge: e.surcharge ?? null,
+      active: e.active ?? true,
+    })),
+    p_notes: parsed.data.notes ?? null,
+  });
+  if (error) {
+    if (error.code === "23505") {
+      return c.json(optionPoolDuplicate(undefined, poolParam.data), 409);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, result: data ?? null });
+});
+
+// GET /config-history?section= — 0201 snapshot log for one pool, newest first
+// (internal read; the History dialog is operation+principal facing).
+catalogRouter.get("/config-history", async (c) => {
+  internalOnly(c);
+  const sectionParam = catalogOptionPoolNameSchema.safeParse(c.req.query("section"));
+  if (!sectionParam.success) {
+    return c.json(
+      { error: "validation", code: "validation", message: "unknown config-history section" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(CATALOG_CONFIG_HISTORY)
+    .select("*")
+    .eq("section", sectionParam.data)
+    .order("effective_from", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({
+    history: (data ?? []).map((r) =>
+      Adapters.catalogConfigHistoryFromRow(r as DB.CatalogConfigHistoryRow),
+    ),
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0202 — Global procurement fabric master (2990s fabric_trackings port). The
+// Fabrics tab edits the WHOLE list as one draft, so the write is a single
+// atomic batch save (replace contents + append a section='fabrics'
+// catalog_config_history snapshot via catalog_fabrics_batch_save — 0201
+// pattern). Principal-only write; RLS (catalog_fabrics_write_principal) is the
+// real boundary — userClient, never service_role.
+// ---------------------------------------------------------------------------
+
+const FABRIC_MSG = "Only the principal (Master Admin) can manage fabrics";
+
+// PUT /fabrics — batch save (principal-only). REPLACE semantics.
+catalogRouter.put("/fabrics", async (c) => {
+  principalOnly(c, FABRIC_MSG);
+  const parsed = await parseJsonBody(c, catalogFabricsBatchSaveInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  // Friendly 409 before the round-trip: duplicate codes would trip
+  // UNIQUE(fabric_code) mid-RPC and roll the whole save back anyway.
+  const codes = parsed.data.entries.map((e) => e.fabricCode);
+  if (new Set(codes).size !== codes.length) {
+    return c.json(fabricDuplicate(), 409);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("catalog_fabrics_batch_save", {
+    p_entries: parsed.data.entries.map((e) => ({
+      fabricCode: e.fabricCode,
+      series: e.series ?? null,
+      description: e.description ?? null,
+      supplierCode: e.supplierCode ?? null,
+      sofaTier: e.sofaTier ?? "PRICE_2",
+      bedframeTier: e.bedframeTier ?? "PRICE_2",
+      active: e.active ?? true,
+    })),
+    p_notes: parsed.data.notes ?? null,
+  });
+  if (error) {
+    if (error.code === "23505") return c.json(fabricDuplicate(), 409);
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, result: data ?? null });
+});
+
+function fabricDuplicate() {
+  return {
+    error: "conflict",
+    code: "duplicate_fabric_code",
+    message: "Duplicate fabric codes — each fabric code must be unique.",
+  } as const;
+}
+
+// GET /fabrics/history — the section='fabrics' snapshot log, newest first
+// (internal read; the History dialog is operation+principal facing).
+catalogRouter.get("/fabrics/history", async (c) => {
+  internalOnly(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from(CATALOG_CONFIG_HISTORY)
+    .select("*")
+    .eq("section", "fabrics")
+    .order("effective_from", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({
+    history: (data ?? []).map((r) =>
+      Adapters.catalogFabricsHistoryFromRow(r as DB.CatalogConfigHistoryRow),
+    ),
+  });
 });
 
 // ---------------------------------------------------------------------------

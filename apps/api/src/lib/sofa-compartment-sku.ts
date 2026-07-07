@@ -17,9 +17,10 @@ import { mapPgError } from "./route-helpers";
  * Principal-owned + contract-safe: this runs only inside the principal-gated
  * `model_sofa_compartments` route on the principal's USER JWT (never
  * service_role), so the 0175 price-lock trigger allows the price write. The sku
- * is `pos_active = false` — it NEVER appears as a standalone product in the flat
- * POS grid (that is how the builder coexists with the 628 legacy flat sofa SKUs);
- * it is reachable only via the builder + the exploded order lines.
+ * is minted `pos_active = false` (not a standalone flat-grid product); the
+ * Modular tab owns the toggle from then on — a RE-offer preserves it (like
+ * price/cost), because a compartment-only sofa model needs ≥1 POS-visible sku
+ * for the builder's representative cart line (Loo 2026-07-06).
  */
 
 // Sofa is NOT supplierless; service/accessory are (mirror catalog.ts).
@@ -50,29 +51,32 @@ export async function syncCompartmentSku(
   sb: SupabaseClient,
   args: { modelId: string; compartmentId: string; priceOverride: number | null },
 ): Promise<CompartmentSkuResult> {
-  // 1. The model gives the sku prefix (model_key) + the category (supplier +
-  //    mutex soundness derive from it).
+  // 1. The model gives the sku prefix (model_key), the category (supplier +
+  //    mutex soundness derive from it) and the name (description prefix).
   const { data: model, error: mErr } = await sb
     .from("product_models")
-    .select("model_key, category")
+    .select("model_key, category, name")
     .eq("id", args.modelId)
     .maybeSingle();
   if (mErr) return { ok: false, ...mapPgError(mErr) };
   if (!model || !model.model_key) return notFound("model");
 
-  // 2. The compartment pool row gives the code (sku suffix + variant),
-  //    description, and the fallback price.
+  // 2. The compartment pool row gives the code (sku suffix + variant + the
+  //    description suffix) and the fallback price.
   const { data: comp, error: cErr } = await sb
     .from("sofa_compartments")
-    .select("code, description, default_price")
+    .select("code, default_price")
     .eq("id", args.compartmentId)
     .maybeSingle();
   if (cErr) return { ok: false, ...mapPgError(cErr) };
   if (!comp) return notFound("compartment");
 
-  // 3. Per-model price: override wins (incl. an explicit 0), else the pool
-  //    default (mirrors resolveCompartmentPrice's `??` discipline).
-  const price = args.priceOverride ?? (comp.default_price as number | null) ?? 0;
+  // 3. SEED price for a first-time offer only: override wins (incl. an explicit
+  //    0), else the legacy pool default. The synced SKU's price is the
+  //    AUTHORITATIVE à-la-carte source (SKU Master — Loo, 2026-07-05), so on a
+  //    RE-offer the existing row's price is preserved (like `cost`) — a
+  //    principal's SKU-Master edit must survive un-offer → re-offer.
+  const seedPrice = args.priceOverride ?? (comp.default_price as number | null) ?? 0;
 
   // 4. Supplier: inherit THIS model's own supplier (each sofa model has exactly
   //    one across its flat SKUs) so PO-by-sku routes the compartment to the
@@ -127,8 +131,16 @@ export async function syncCompartmentSku(
     };
   }
 
-  // Upsert on the UNIQUE sku (idempotent re-offer). pos_active=false keeps it
-  // out of the flat POS grid; compartment_id (0178) links it back to its type.
+  // Upsert on the UNIQUE sku (idempotent re-offer); compartment_id (0178)
+  // links it back to its type. `price` AND `pos_active` are included ONLY on
+  // first insert — a re-offer preserves the SKU-Master-authored price (like
+  // `cost`) and the Modular-authored ON/OFF. pos_active matters: a sofa model
+  // with ONLY compartment skus needs ≥1 of them POS-visible or the builder
+  // has no representative sku to hang the cart line on (buildToDraftLine);
+  // the old always-false re-assert kept silently switching rows OFF
+  // (Loo 2026-07-06 — the 1A(LHF) mystery). First insert still defaults OFF;
+  // the principal turns rows ON in the Modular tab.
+  const isReoffer = clash != null;
   const { error: upErr } = await sb.from("product_skus").upsert(
     {
       sku,
@@ -136,10 +148,12 @@ export async function syncCompartmentSku(
       compartment_id: args.compartmentId,
       variant: comp.code,
       variant_kind: "part",
-      price,
+      ...(isReoffer ? {} : { price: seedPrice, pos_active: false }),
       supplier_id: supplierId,
-      pos_active: false,
-      description: comp.description ?? null,
+      // "Sofa {Model} {code}" (Loo 2026-07-06) — the SKU Master row names the
+      // model+compartment pair, NOT the pool compartment's own description
+      // (e.g. "Sofa Angsa 1A(LHF)", not "Left hand facing").
+      description: `Sofa ${model.name} ${comp.code}`,
       discontinued_at: null,
     },
     { onConflict: "sku" },

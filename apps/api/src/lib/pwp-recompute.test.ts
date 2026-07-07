@@ -345,22 +345,85 @@ describe("recomputePwpLines", () => {
     expect(r.code).toBe("pwp_unknown_rule");
   });
 
-  it("a sofa-build PWP claim → bad_request pwp_not_eligible_sofa_build (rejected before any DB read)", async () => {
-    const sb = mockSb({ rules: [ruleRow()] });
-    const fromSpy = vi.spyOn(sb, "from");
-    const lines = [
-      line({
-        sku: "SOFA-REP",
-        attrs: { pwp: { ruleId: "rule-1" }, sofa_build: { cells: [{ moduleCode: "2A" }], height: "28" } },
+  // ── 0186 sofa-as-reward — a build claim is validated (not auto-rejected):
+  //    the rule must target reward COMBOS, the build must match one, and a
+  //    matched combo must carry a PWP price > 0 at the build's seat height.
+  //    The price is NOT forced here — the sofa recompute swaps the granted
+  //    combos' price maps instead (sofaRewardCombosByIndex).
+  const SOFA_MODEL = "00000000-0000-0000-0000-0000000sofa0";
+  const sofaRewardFixtures = (over: {
+    slots?: string[][];
+    pwp?: Record<string, number | null> | null;
+    ruleOver?: Record<string, unknown>;
+  } = {}) => ({
+    productSkus: [
+      skuRow("MATT-1"),
+      skuRow("SOFA-REP", { model_id: SOFA_MODEL, product_models: { category: "sofa" } }),
+    ],
+    rules: [
+      ruleRow({
+        reward_category: "sofa",
+        reward_targets: [{ scope: "combo", modelId: SOFA_MODEL, comboIds: ["combo-1"] }],
+        ...over.ruleOver,
       }),
-    ];
-    const r = await recomputePwpLines(sb, lines);
+    ],
+    combos: [
+      {
+        id: "combo-1",
+        slots: over.slots ?? [["2A"]],
+        pwp_prices_by_height: over.pwp === undefined ? { "28": 1990 } : over.pwp,
+      },
+    ],
+  });
+  const sofaClaimLines = () => [
+    line({ sku: "MATT-1", qty: 1, unitPrice: 1500 }),
+    line({
+      sku: "SOFA-REP",
+      qty: 1,
+      unitPrice: 2500,
+      attrs: { pwp: { ruleId: "rule-1" }, sofa_build: { cells: [{ moduleCode: "2A" }], height: "28" } },
+    }),
+  ];
+
+  it("sofa reward: a granted build claim keeps its price + records the swap ids", async () => {
+    const sb = mockSb(sofaRewardFixtures());
+    const r = await recomputePwpLines(sb, sofaClaimLines());
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    // Price NOT forced — the sofa recompute owns build pricing (swap pattern).
+    expect(r.lines[1]!.unitPrice).toBe(2500);
+    expect(r.sofaRewardCombosByIndex).toEqual({ 1: ["combo-1"] });
+    const marker = (r.lines[1]!.attrs as { pwp: { ruleId: string; type: string } }).pwp;
+    expect(marker.ruleId).toBe("rule-1");
+    expect(marker.type).toBe("pwp");
+  });
+
+  it("sofa reward: a rule with no combo targeting → 409 pwp_not_eligible_sofa_build", async () => {
+    const sb = mockSb(sofaRewardFixtures({ ruleOver: { reward_targets: [] } }));
+    const r = await recomputePwpLines(sb, sofaClaimLines());
     expect(r.status).toBe("bad_request");
     if (r.status !== "bad_request") return;
     expect(r.code).toBe("pwp_not_eligible_sofa_build");
-    expect(r.message.toLowerCase()).toContain("sofa");
-    // Rejected outright — no rules / catalog read.
-    expect(fromSpy).not.toHaveBeenCalled();
+    expect(r.message.toLowerCase()).toContain("combo");
+  });
+
+  it("sofa reward: build matches none of the reward combos → 409 pwp_not_eligible_sofa_build", async () => {
+    const sb = mockSb(sofaRewardFixtures({ slots: [["L(LHF)"]] }));
+    const r = await recomputePwpLines(sb, sofaClaimLines());
+    expect(r.status).toBe("bad_request");
+    if (r.status !== "bad_request") return;
+    // Un-granted (reward scope doesn't cover the build) OR granted-but-unmatched —
+    // both are 409s; the sofa-specific code fires when the grant succeeded.
+    expect(["pwp_not_eligible", "pwp_not_eligible_sofa_build"]).toContain(r.code);
+  });
+
+  it("sofa reward: no PWP price at the build's seat height → 409 pwp_not_eligible_sofa_build", async () => {
+    const sb = mockSb(sofaRewardFixtures({ pwp: { "32": 1990 } }));
+    const r = await recomputePwpLines(sb, sofaClaimLines());
+    expect(r.status).toBe("bad_request");
+    if (r.status !== "bad_request") return;
+    expect(r.code).toBe("pwp_not_eligible_sofa_build");
+    expect(r.message.toLowerCase()).toContain("seat height");
   });
 
   it("a PWP claim on a line carrying special add-ons → bad_request pwp_not_eligible_specials (before any DB read)", async () => {

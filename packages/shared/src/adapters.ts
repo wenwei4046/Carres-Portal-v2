@@ -75,6 +75,9 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   // 0186 — principal-only PWP reward price; null stays null (not coerced to 0)
   // so "unset" is distinct from "zero PWP price".
   pwpPrice: r.pwp_price == null ? null : Number(r.pwp_price),
+  // 0204 — per-size price map; null column stays null ("nothing authored"),
+  // present maps get their numeric values coerced (PostgREST jsonb strings).
+  pricesBySize: r.prices_by_size == null ? null : coerceHeightMap(r.prices_by_size),
 });
 
 export const sofaFabricFromRow = (r: DB.SofaFabricRow): D.SofaFabric => ({
@@ -181,45 +184,96 @@ export const specialDeliveryFeeRuleFromRow = (
 });
 
 // 0182 — global option pool entry (supplier_category / bedframe_size /
-// mattress_size). `label` + `dimensions` are nullable (size pools only) and
-// stay null; `sort_order` is Postgres integer normalised via Number().
+// mattress_size + the 0201 pools). `label` + `dimensions` are nullable (size
+// pools only) and stay null; `surcharge` (0201) is Postgres numeric → Number();
+// `sort_order` is Postgres integer normalised via Number().
 export const catalogOptionPoolFromRow = (r: DB.CatalogOptionPoolRow): D.CatalogOptionPool => ({
   id: r.id,
   pool: r.pool,
   value: r.value,
   label: r.label ?? null,
   dimensions: r.dimensions ?? null,
+  surcharge: r.surcharge == null ? null : Number(r.surcharge),
   active: r.active,
   sortOrder: Number(r.sort_order),
 });
 
-/**
- * Maps a `combo_components` row to the camelCase domain shape (migration 0177).
- */
-export const comboComponentFromRow = (r: DB.ComboComponentRow): D.ComboComponent => ({
-  sku: r.sku,
-  qty: Number(r.qty),
-  sortOrder: Number(r.sort_order),
-});
-
-/**
- * Maps a `combos` row to the camelCase domain shape (migration 0177).
- * `combo_price` is Postgres numeric — `Number()` normalises the string|number
- * PostgREST surfaces it as. `components` is NOT on the row; the caller attaches
- * the mapped `combo_components` (via comboComponentFromRow) after fetch, so this
- * adapter defaults it to an empty array.
- */
-export const comboFromRow = (r: DB.ComboRow): D.Combo => ({
+/** 0201 — catalog_config_history row → domain. `snapshot` entries are stored
+ *  camelCase by the RPC/migration; malformed entries are dropped (defensive —
+ *  the write path always produces the full shape). */
+export const catalogConfigHistoryFromRow = (
+  r: DB.CatalogConfigHistoryRow,
+): D.CatalogConfigHistory => ({
   id: r.id,
-  comboKey: r.combo_key,
-  name: r.name,
-  comboPrice: Number(r.combo_price),
-  // 0183 — cost benchmark; null stays null (not coerced to 0) so "unset" is
-  // distinct from "zero cost".
-  cost: r.cost == null ? null : Number(r.cost),
-  active: r.active,
+  section: r.section,
+  entries: (Array.isArray(r.snapshot) ? r.snapshot : []).flatMap((e) => {
+    if (typeof e !== "object" || e === null) return [];
+    const o = e as Record<string, unknown>;
+    if (typeof o.value !== "string") return [];
+    return [
+      {
+        value: o.value,
+        label: typeof o.label === "string" ? o.label : null,
+        dimensions: typeof o.dimensions === "string" ? o.dimensions : null,
+        surcharge: typeof o.surcharge === "number" ? o.surcharge : null,
+        active: typeof o.active === "boolean" ? o.active : true,
+        sortOrder: typeof o.sortOrder === "number" ? o.sortOrder : 0,
+      },
+    ];
+  }),
   effectiveFrom: r.effective_from,
-  components: [],
+  notes: r.notes ?? null,
+  createdAt: r.created_at,
+});
+
+// 0202 — global procurement fabric master row → domain (2990s fabric_trackings
+// port). Tiers default PRICE_2 defensively (matches the DB column default).
+export const catalogFabricFromRow = (r: DB.CatalogFabricRow): D.CatalogFabric => ({
+  id: r.id,
+  fabricCode: r.fabric_code,
+  series: r.series ?? null,
+  description: r.description ?? null,
+  supplierCode: r.supplier_code ?? null,
+  sofaTier: (r.sofa_tier ?? "PRICE_2") as D.FabricTier,
+  bedframeTier: (r.bedframe_tier ?? "PRICE_2") as D.FabricTier,
+  active: r.active,
+  sortOrder: Number(r.sort_order),
+});
+
+const FABRIC_TIERS: readonly D.FabricTier[] = ["PRICE_1", "PRICE_2", "PRICE_3"];
+
+/** 0202 — a section='fabrics' catalog_config_history row → domain. The
+ *  snapshot entries are fabric-shaped (camelCase, written by
+ *  catalog_fabrics_batch_save); malformed entries are dropped (defensive —
+ *  the write path always produces the full shape). */
+export const catalogFabricsHistoryFromRow = (
+  r: DB.CatalogConfigHistoryRow,
+): D.CatalogFabricsHistory => ({
+  id: r.id,
+  entries: (Array.isArray(r.snapshot) ? r.snapshot : []).flatMap((e) => {
+    if (typeof e !== "object" || e === null) return [];
+    const o = e as Record<string, unknown>;
+    if (typeof o.fabricCode !== "string") return [];
+    return [
+      {
+        fabricCode: o.fabricCode,
+        series: typeof o.series === "string" ? o.series : null,
+        description: typeof o.description === "string" ? o.description : null,
+        supplierCode: typeof o.supplierCode === "string" ? o.supplierCode : null,
+        sofaTier: FABRIC_TIERS.includes(o.sofaTier as D.FabricTier)
+          ? (o.sofaTier as D.FabricTier)
+          : "PRICE_2",
+        bedframeTier: FABRIC_TIERS.includes(o.bedframeTier as D.FabricTier)
+          ? (o.bedframeTier as D.FabricTier)
+          : "PRICE_2",
+        active: typeof o.active === "boolean" ? o.active : true,
+        sortOrder: typeof o.sortOrder === "number" ? o.sortOrder : 0,
+      },
+    ];
+  }),
+  effectiveFrom: r.effective_from,
+  notes: r.notes ?? null,
+  createdAt: r.created_at,
 });
 
 /**
@@ -238,6 +292,10 @@ export const sofaCompartmentFromRow = (r: DB.SofaCompartmentRow): D.SofaCompartm
   defaultPrice: Number(r.default_price),
   sortOrder: Number(r.sort_order),
   active: r.active,
+  // 0205 — nullable per-compartment fabric-tier deltas. null stays null so
+  // "no special" is distinct from "special of 0" (mirrors priceOverride below).
+  specialTier2Delta: r.special_tier2_delta == null ? null : Number(r.special_tier2_delta),
+  specialTier3Delta: r.special_tier3_delta == null ? null : Number(r.special_tier3_delta),
 });
 
 /**
@@ -287,6 +345,11 @@ export const sofaComboFromRow = (r: DB.SofaComboPricingRow): D.SofaCombo => {
     effectiveFrom: r.effective_from,
     active: r.active,
     discontinuedAt: r.discontinued_at ?? null,
+    // 0206 — Quick Pick preset flag; column is NOT NULL default false.
+    isQuickPick: r.is_quick_pick ?? false,
+    // 0179 audit timestamps — feed the simple per-combo History view.
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
   };
 };
 
@@ -389,6 +452,8 @@ export const pwpDiscoverFromRow = (r: DB.PwpDiscoverRow): D.PwpDiscover => ({
   sourceOrderId: r.source_order_id,
   expiresAt: r.expires_at,
   phoneMatches: r.phone_matches,
+  // 0204 — legacy rows (pre-name-binding RPC) default to true (phone-only).
+  nameMatches: r.name_matches ?? true,
 });
 
 export const warehouseFromRow = (r: DB.WarehouseRow): D.Warehouse => ({
@@ -497,6 +562,11 @@ export const orderFromRow = (
     billing: r.customer_billing,
     billingSame: r.customer_billing_same,
     emergency: r.customer_emergency,
+    // 0200 — `?? null` so pre-migration rows surface as null.
+    email: r.customer_email ?? null,
+    race: r.customer_race ?? null,
+    gender: r.customer_gender ?? null,
+    birthday: r.customer_birthday ?? null,
   },
   delivery: {
     date: r.delivery_date,
@@ -521,6 +591,8 @@ export const orderFromRow = (
   approvalCode: r.approval_code ?? null,
   installmentMonths: r.installment_months ?? null,
   operationStage: r.operation_stage,
+  // 0132 import marker. `?? null` keeps pre-0132 rows adapting cleanly.
+  sourceSystem: r.source_system ?? null,
   warehouseId: r.warehouse_id,
   deliveryPartnerId: r.delivery_partner_id,
   partnerStage: r.partner_stage,
@@ -696,6 +768,11 @@ export const orderInputToRpcPayload = (
   customer_billing: input.customer.billingSame ? null : input.customer.billing,
   customer_billing_same: input.customer.billingSame,
   customer_emergency: input.customer.emergency,
+  // 0200 — POS-parity demographics (RPC nullifs '' → null).
+  customer_email: input.customer.email ?? null,
+  customer_race: input.customer.race ?? null,
+  customer_gender: input.customer.gender ?? null,
+  customer_birthday: input.customer.birthday ?? null,
   delivery_date: input.delivery.dateTbd ? null : input.delivery.date,
   // Phase 11.1 — proceed date pairs with delivery date; both nulled when TBD.
   proceed_date: input.delivery.dateTbd ? null : input.delivery.proceedDate,

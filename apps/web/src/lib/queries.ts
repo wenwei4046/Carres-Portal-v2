@@ -32,14 +32,13 @@ import {
   type SpecialAddonDto,
   type SpecialAddonCreateInput,
   type SpecialAddonPatchInput,
-  type CatalogOptionPoolDto,
-  type CatalogOptionPoolCreateInput,
-  type CatalogOptionPoolPatchInput,
+  type CatalogOptionPoolName,
+  type CatalogPoolBatchSaveInput,
+  type CatalogConfigHistoryDto,
+  type CatalogFabricsBatchSaveInput,
+  type CatalogFabricsHistoryDto,
   type SofaFabricCreateInput,
   type SofaFabricPatchInput,
-  type ComboDto,
-  type ComboCreateInput,
-  type ComboPatchInput,
   type SofaComboDto,
   type SofaComboCreateInput,
   type SofaComboPatchInput,
@@ -78,6 +77,7 @@ import {
   type LpRejectOrderInput,
   type ReselectPartnerInput,
   type CreateOrderInput,
+  type RawCreateOrderInput,
   type CreatePoInput,
   type CreatePosBatchInput,
   type CreatePosBatchResponse,
@@ -133,7 +133,7 @@ import {
   type ModelFabricTierOverrideDto,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
-import { uploadModelPhoto } from "./photo-upload";
+import { uploadCompartmentPhoto, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
   dealers:      () => ["dealers"] as const,
@@ -141,6 +141,9 @@ export const qk = {
   orders:       (filters?: OrderFilters) => ["orders", filters ?? {}] as const,
   order:        (id: string) => ["orders", id] as const,
   catalog:      () => ["catalog"] as const,
+  /** 0201 — per-pool config-history snapshots. Nested under 'catalog' so every
+   *  catalog mutation's ["catalog"] prefix-invalidation refreshes it too. */
+  catalogConfigHistory: (section: string) => ["catalog", "config-history", section] as const,
   outlets:      () => ["outlets"] as const,
   salespersons: (outletId?: string) => ["salespersons", outletId ?? null] as const,
   /** 0187 (Phase 8c) — the caller's RESERVED pwp_codes (GET /api/pwp-codes/mine),
@@ -152,8 +155,9 @@ export const qk = {
    *  auto-suggest + manual-entry affordance cache distinctly per lookup. The
    *  stripped (no-PII) DTO. Only enabled when a selector is present + PWP is
    *  active (DORMANT carts make zero discovery traffic). */
-  pwpAvailable: (sel: { phone?: string | null; code?: string | null }) =>
-    ["pwp-codes", "available", sel.phone ?? null, sel.code ?? null] as const,
+  pwpAvailable: (sel: { phone?: string | null; code?: string | null; name?: string | null }) =>
+    ["pwp-codes", "available", sel.phone ?? null, sel.code ?? null, sel.name ?? null] as const,
+  pwpByOrder: (orderId: string) => ["pwp-codes", "by-order", orderId] as const,
   // Phase 3 — Principal admin namespace. Keys are nested under 'principal' so
   // we can selectively invalidate the whole sub-tree (e.g. after a decision
   // ripples to dealers + dashboard) without touching dealer/order caches.
@@ -662,6 +666,72 @@ export function useCreateOrder(
 }
 
 /**
+ * useSalesAnalytics — GET /api/analytics/sales?months=N (POS-parity,
+ * MAINTAIN → Sales analysis; principal only). Flattened order + line rows;
+ * the page aggregates via lib/sales-analysis.
+ */
+export function useSalesAnalytics(
+  months: number,
+  opts?: Partial<UseQueryOptions<import("./sales-analysis").SalesAnalyticsResponse>>,
+) {
+  return useQuery<import("./sales-analysis").SalesAnalyticsResponse>({
+    queryKey: ["analytics", "sales", months],
+    queryFn: () =>
+      apiFetch<import("./sales-analysis").SalesAnalyticsResponse>(
+        `/api/analytics/sales?months=${months}`,
+      ),
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+/**
+ * useCustomerTypeProbe — GET /api/orders/customer-type?phone= (POS-parity
+ * "CUSTOMER TYPE (AUTO)"). Answers whether any RLS-visible order already
+ * carries this phone. Disabled until the phone looks dial-able.
+ */
+export function useCustomerTypeProbe(
+  phone: string,
+  opts?: Partial<UseQueryOptions<{ existing: boolean; matches: number }>>,
+) {
+  const trimmed = phone.trim();
+  return useQuery<{ existing: boolean; matches: number }>({
+    queryKey: ["orders", "customer-type", trimmed],
+    queryFn: () =>
+      apiFetch<{ existing: boolean; matches: number }>(
+        `/api/orders/customer-type?phone=${encodeURIComponent(trimmed)}`,
+      ),
+    enabled: trimmed.length >= 8,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/**
+ * useRawCreateOrder — POST /api/orders/raw (POS-parity, MAINTAIN → New Order).
+ * Internal-only raw creation: free-form line skus + prices, no POS gates.
+ * Same Order response contract as useCreateOrder.
+ */
+export function useRawCreateOrder(
+  opts?: Partial<UseMutationOptions<Order, Error, RawCreateOrderInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<Order, Error, RawCreateOrderInput>({
+    mutationFn: (input) =>
+      apiFetch<Order>("/api/orders/raw", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (...args) => {
+      const [order] = args;
+      qc.setQueryData(qk.order(order.id), order);
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
  * useProceedOrder — POST /api/orders/:id/proceed. Atomically transitions a
  * Place order to Proceed (sent to operation). On success, primes both the
  * detail cache and invalidates the list cache so kanban + tabs reflect the
@@ -1036,17 +1106,21 @@ export function useFreePwpCode(
  * freshly-redeemed voucher drops out of the suggestion promptly on re-fetch.
  */
 export function usePwpAvailableForPhone(
-  selector: { phone?: string | null; code?: string | null },
+  selector: { phone?: string | null; code?: string | null; name?: string | null },
   opts?: Partial<UseQueryOptions<PwpDiscoverResponse>>,
 ) {
   const phone = (selector.phone ?? "").trim();
   const code = (selector.code ?? "").trim();
+  // 0204 — the customer NAME rides along so the server can compute nameMatches
+  // (the 2990s name+phone identity). Never a selector on its own.
+  const name = (selector.name ?? "").trim();
   return useQuery({
-    queryKey: qk.pwpAvailable({ phone: phone || null, code: code || null }),
+    queryKey: qk.pwpAvailable({ phone: phone || null, code: code || null, name: name || null }),
     queryFn: () => {
       const params = new URLSearchParams();
       if (phone) params.set("phone", phone);
       if (code) params.set("code", code);
+      if (name) params.set("name", name);
       return apiFetch<PwpDiscoverResponse>(
         `/api/pwp-codes/available${params.toString() ? `?${params.toString()}` : ""}`,
       );
@@ -1054,6 +1128,26 @@ export function usePwpAvailableForPhone(
     // Default off unless a selector exists; the caller AND-gates with PWP-active.
     enabled: Boolean(phone || code),
     staleTime: 10_000,
+    ...opts,
+  });
+}
+
+/**
+ * usePwpCodesByOrder — GET /api/pwp-codes/by-order/:orderId. The vouchers EARNED
+ * on one order (carry-forward `source_order_id` = this order) — the 2990s
+ * "codes printed on the SO" surface (Loo 2026-07-06): the POS ThankYou screen
+ * lists them so the customer walks away with the code. Owner/dealer-scoped via
+ * RLS; an order with no carried vouchers returns `{ codes: [] }`.
+ */
+export function usePwpCodesByOrder(
+  orderId: string | null,
+  opts?: Partial<UseQueryOptions<PwpCodesResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.pwpByOrder(orderId ?? ""),
+    queryFn: () => apiFetch<PwpCodesResponse>(`/api/pwp-codes/by-order/${orderId}`),
+    enabled: Boolean(orderId),
+    staleTime: 30_000,
     ...opts,
   });
 }
@@ -4963,38 +5057,59 @@ export function useDeleteSpecialAddon() {
   });
 }
 
-// 0182 — Global option pools (2990s Products parity Phase 4). Three curated
-// READ-ONLY reference lists (supplier_category / bedframe_size / mattress_size).
-// Not a source of truth for any order-side consumer — sizes only SUGGEST in the
-// per-model size picker; product_models.allowed_options.sizes stays authoritative.
-// CRUD mirrors the special-addon hooks; all invalidate ['catalog'] so the
-// Maintenance tab + per-model size picker refresh (pools ride in the catalog
-// bundle — no dedicated query key needed). Principal-only at the API/RLS layer;
-// the UI gate in OptionPoolEditor is a friendly read-only veneer.
-export function useCreateOptionPoolEntry() {
+// 0182→0201 — Global option pools. Curated reference lists (sizes / heights /
+// gaps / supplier categories) rendered by the Maintenance + Special Add-ons
+// sidebar panels. Not a source of truth for any order-side consumer — sizes
+// only SUGGEST in the per-model size picker; product_models.allowed_options
+// stays authoritative. 0201 replaced the per-row CRUD hooks with ONE batch
+// save (Edit-mode draft → PUT replaces the pool + appends a history snapshot
+// atomically via the catalog_pool_batch_save RPC). Principal-only at the
+// API/RLS layer; the UI gate in PoolPanel is a friendly read-only veneer.
+export function useBatchSaveOptionPool() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CatalogOptionPoolCreateInput) =>
-      apiFetch<{ optionPool: CatalogOptionPoolDto }>("/api/catalog/option-pools", catalogJson("POST", input)),
+    mutationFn: ({ pool, input }: { pool: CatalogOptionPoolName; input: CatalogPoolBatchSaveInput }) =>
+      apiFetch<{ ok: true }>(`/api/catalog/option-pools/${pool}`, catalogJson("PUT", input)),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }
 
-export function usePatchOptionPoolEntry() {
+/** 0201 — the History dialog's snapshot log for one pool (newest first). Only
+ *  fetched while the dialog is open (`enabled`); rides the ["catalog"] prefix
+ *  so every pool save refreshes it. */
+export function useCatalogConfigHistory(section: CatalogOptionPoolName, enabled: boolean) {
+  return useQuery({
+    queryKey: qk.catalogConfigHistory(section),
+    queryFn: () =>
+      apiFetch<{ history: CatalogConfigHistoryDto[] }>(
+        `/api/catalog/config-history?section=${section}`,
+      ),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** 0202 — atomic replace-all save of the global fabric master (the Fabrics tab
+ *  Edit draft). Appends a section='fabrics' history snapshot server-side
+ *  (catalog_fabrics_batch_save RPC). Principal-only at the API/RLS layer. */
+export function useBatchSaveCatalogFabrics() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: CatalogOptionPoolPatchInput }) =>
-      apiFetch<{ optionPool: CatalogOptionPoolDto }>(`/api/catalog/option-pools/${id}`, catalogJson("PATCH", patch)),
+    mutationFn: (input: CatalogFabricsBatchSaveInput) =>
+      apiFetch<{ ok: true }>("/api/catalog/fabrics", catalogJson("PUT", input)),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }
 
-export function useDeleteOptionPoolEntry() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) =>
-      apiFetch<{ ok: true }>(`/api/catalog/option-pools/${id}`, catalogJson("DELETE")),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+/** 0202 — the Fabrics History dialog's snapshot log (newest first). Rides the
+ *  ["catalog"] prefix so every fabric save refreshes it. */
+export function useCatalogFabricsHistory(enabled: boolean) {
+  return useQuery({
+    queryKey: qk.catalogConfigHistory("fabrics"),
+    queryFn: () =>
+      apiFetch<{ history: CatalogFabricsHistoryDto[] }>("/api/catalog/fabrics/history"),
+    enabled,
+    staleTime: 60_000,
   });
 }
 
@@ -5028,43 +5143,6 @@ export function useDeleteSofaFabric() {
 // 0176 — Alias so callers can use the Task-5 brief's naming convention.
 // Both names are exported; the underlying hook is the same.
 export { usePatchSofaFabric as useUpdateSofaFabric };
-
-// ---------------------------------------------------------------------------
-// 0177 — fixed-set combos (套餐). Three CRUD mutations mirroring the sofa-fabric
-// hooks: POST creates a combo + its components, PATCH replaces the scalar fields
-// and/or the full component set, DELETE soft-deletes (active=false). All three
-// are principal-only at the API/RLS layer (combos_write_principal); the UI gate
-// in CombosTab is just a friendly read-only veneer. Each invalidates the whole
-// `['catalog']` tree so the admin bundle re-fetches (combos ride in the bundle —
-// no dedicated query key needed).
-// ---------------------------------------------------------------------------
-
-export function useCreateCombo() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: ComboCreateInput) =>
-      apiFetch<{ combo: ComboDto }>("/api/catalog/combos", catalogJson("POST", input)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
-  });
-}
-
-export function useUpdateCombo() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: ComboPatchInput }) =>
-      apiFetch<{ combo: ComboDto }>(`/api/catalog/combos/${id}`, catalogJson("PATCH", patch)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
-  });
-}
-
-export function useDeleteCombo() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) =>
-      apiFetch<{ ok: true }>(`/api/catalog/combos/${id}`, catalogJson("DELETE")),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
-  });
-}
 
 // ---------------------------------------------------------------------------
 // 0179 — sofa combos (sofa engine Phase 2). Slots = ordered OR-sets of
@@ -5155,12 +5233,71 @@ export function useUpsertModelSofaCompartment() {
   });
 }
 
+/** Offer MANY compartments on a model in one go (the New-SKU sofa flow — Loo
+ *  2026-07-06). Each offer is the same idempotent principal-only PUT the drawer
+ *  uses (the server auto-syncs the `{MODEL_KEY}-{code}` SKU per offer). One
+ *  failing compartment does NOT abort the rest — failures are collected and
+ *  returned so the caller can retry just those — and the catalog invalidates
+ *  ONCE at the end instead of once per compartment. */
+export function useOfferModelCompartments() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      modelId,
+      compartmentIds,
+    }: {
+      modelId: string;
+      compartmentIds: string[];
+    }) => {
+      const failed: { compartmentId: string; message: string }[] = [];
+      for (const compartmentId of compartmentIds) {
+        try {
+          await apiFetch<{ modelSofaCompartment: ModelSofaCompartmentDto }>(
+            `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
+            catalogJson("PUT", {}),
+          );
+        } catch (e) {
+          failed.push({
+            compartmentId,
+            message: e instanceof ApiError ? e.message : "offer failed",
+          });
+        }
+      }
+      return { offered: compartmentIds.length - failed.length, failed };
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
 export function useDeleteModelSofaCompartment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ modelId, compartmentId }: { modelId: string; compartmentId: string }) =>
       apiFetch<{ ok: true }>(
         `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
+        catalogJson("DELETE"),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+/** Compartment photo (signed-upload flow in photo-upload.ts — principal-only).
+ *  Lands in `sofa_compartments.icon_url`; the builder silhouettes prefer it. */
+export function useSetCompartmentPhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ compartmentId, file }: { compartmentId: string; file: Blob }) =>
+      uploadCompartmentPhoto(compartmentId, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
+  });
+}
+
+export function useDeleteCompartmentPhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (compartmentId: string) =>
+      apiFetch<{ compartment: SofaCompartmentDto }>(
+        `/api/catalog/sofa-compartments/${compartmentId}/photo`,
         catalogJson("DELETE"),
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),

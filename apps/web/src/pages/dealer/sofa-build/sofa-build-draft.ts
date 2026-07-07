@@ -46,6 +46,21 @@ export function buildToDraftLine(
     fabric_name: payload.fabricName,
     fabric_surcharge: payload.fabricSurcharge,
     fabric_tier: payload.fabricTier,
+    // 0202-wiring — the master Fabrics-tab code when the pick came from the
+    // master list (fabric_id stays null for those).
+    ...(payload.fabricCode ? { fabric_code: payload.fabricCode } : {}),
+    // 0202 series — recorded even when the colour is still KIV (series known,
+    // colour pending), so the order/PO shows "EZ series · colour to confirm".
+    ...(payload.fabricSeries ? { fabric_series: payload.fabricSeries } : {}),
+    // KIV — fabric colour deferred to the customer; downstream shows a "to
+    // confirm" chip instead of a fabric name. True whenever no concrete colour
+    // is locked (series KIV, or series chosen + colour KIV).
+    fabric_deferred: payload.fabricDeferred,
+    // 0201-wiring — leg height; the server recompute re-prices it from the
+    // sofa_leg_height pool inside the drift-gated computeSofaPrice total.
+    ...(payload.legHeight
+      ? { leg_height: payload.legHeight, leg_surcharge: payload.legSurcharge }
+      : {}),
     // Full build geometry descriptor (cells + height) — Phase 4 reads this to
     // server-recompute + explode into per-compartment lines.
     sofa_build: { cells: payload.cells, height: payload.height },
@@ -78,9 +93,14 @@ function cellsSummary(payload: SofaBuildAddPayload): string {
   return payload.cells.map((c) => c.moduleCode).join(" + ");
 }
 
-/** "Ohana · 2A + L + 1A · 28″ · Velvet Teal" style label. */
+/** "Ohana · 2A + L + 1A · 28″ · Velvet Teal · leg 4″" style label. */
 function buildLabel(payload: SofaBuildAddPayload, model: ProductModelDto): string {
   const parts = [model.name, cellsSummary(payload), `${payload.height}″`];
   if (payload.fabricName) parts.push(payload.fabricName);
+  // KIV: series known but colour pending → "EZ · colour KIV"; nothing chosen →
+  // "Fabric KIV".
+  else if (payload.fabricSeries) parts.push(`${payload.fabricSeries} · colour KIV`);
+  else if (payload.fabricDeferred) parts.push("Fabric KIV");
+  if (payload.legHeight) parts.push(`leg ${payload.legHeight}`);
   return parts.join(" · ");
 }

@@ -5,6 +5,7 @@ import {
   DB,
   PWP_CODES,
   PWP_RULES,
+  SOFA_COMBO_PRICING,
   lineMatchesTargets,
   pwpReserveInputSchema,
   pwpCodesResponseSchema,
@@ -96,14 +97,20 @@ pwpCodesRouter.post("/reserve", async (c) => {
       message: "Invalid reserve input: " + parsed.error.issues[0]?.message,
     });
   }
-  const { cartLineKey, sku, qty } = parsed.data;
+  const { cartLineKey, sku, qty, rewardLine, builtCompartments } = parsed.data;
   const sb = userClient(c.env, auth.jwt);
 
-  // 1. Resolve the trigger sku → { category, modelId, variant }.
+  // 1. Resolve the trigger sku → { category, modelId, variant }. A sofa BUILD
+  //    trigger additionally carries its built module codes (client-sent, but
+  //    harmless to trust here: a fudged list only mints RESERVED codes that the
+  //    order-path grant re-validates against the REAL build before any claim).
   const skuRes = await resolveSkuInfo(sb, [sku]);
   if (!skuRes.ok) throw new HTTPException(500, { message: skuRes.message });
   const info = skuRes.skuInfo.get(sku) ?? null;
-  const triggerLine = deriveRuleLine(info);
+  const triggerLine: RuleLineInput = {
+    ...deriveRuleLine(info),
+    builtCompartments: (builtCompartments ?? []).map((m) => m.trim()).filter(Boolean),
+  };
 
   // 2. ACTIVE pwp_rules (RLS). The adapter parses RuleTargets.
   const rulesR = await sb.from(PWP_RULES).select("*").eq("active", true);
@@ -116,11 +123,41 @@ pwpCodesRouter.post("/reserve", async (c) => {
   //    each a flat trigger; an empty comboMap means a combo target never matches
   //    here, which is correct for the flat-line reserve.) Builds a per-rule target
   //    count = qtyPerTrigger × qty.
-  const emptyCombos = new Map<string, string[][]>();
+  // COMBO-scope trigger targets need each combo's slots to match a BUILD
+  // trigger. Load them only when a build is in play AND some rule references a
+  // combo trigger (flat-line reserves keep the zero-read path).
+  let comboModulesById = new Map<string, string[][]>();
+  const triggerComboIds = new Set<string>();
+  if (triggerLine.builtCompartments.length > 0) {
+    for (const rule of rules) {
+      for (const t of rule.triggerTargets) {
+        if (t.scope === "combo") for (const id of t.comboIds ?? []) triggerComboIds.add(id);
+      }
+    }
+  }
+  if (triggerComboIds.size > 0) {
+    const { data, error } = await sb
+      .from(SOFA_COMBO_PRICING)
+      .select("id, slots")
+      .in("id", Array.from(triggerComboIds));
+    if (error) throw new HTTPException(500, { message: error.message });
+    comboModulesById = new Map(
+      ((data ?? []) as Array<{ id: string; slots: string[][] | null }>).map((r) => [
+        r.id,
+        r.slots ?? [],
+      ]),
+    );
+  }
+
   const matched: Array<{ rule: PwpRule; target: number }> = [];
   for (const rule of rules) {
+    // 2990s one-way parity: a trigger line that is ITSELF a reward never mints
+    // PROMO vouchers (a free reward funding the next free reward). PWP rules
+    // still reserve — chaining is intentional. Unmatched promo reservations for
+    // this line are trimmed as strays below.
+    if (rewardLine && rule.type === "promo") continue;
     if (upper(triggerLine.category) !== upper(rule.triggerCategory)) continue;
-    if (!lineMatchesTargets(triggerLine, rule.triggerTargets, emptyCombos)) continue;
+    if (!lineMatchesTargets(triggerLine, rule.triggerTargets, comboModulesById)) continue;
     const qpt = Math.max(1, Math.floor(Number(rule.qtyPerTrigger) || 1));
     matched.push({ rule, target: qpt * qty });
   }
@@ -248,6 +285,7 @@ pwpCodesRouter.get("/available", async (c) => {
   const url = new URL(c.req.url);
   const phone = url.searchParams.get("phone"); // raw; canonicalized in the RPC
   const code = url.searchParams.get("code");
+  const name = url.searchParams.get("name"); // 0204 — drives name_matches (raw)
   // No selector → no discovery (the RPC also short-circuits, but skip the call).
   if (!phone && !code) {
     return c.json(pwpDiscoverResponseSchema.parse({ vouchers: [] }));
@@ -256,12 +294,36 @@ pwpCodesRouter.get("/available", async (c) => {
   const { data, error } = await sb.rpc("pwp_discover_available", {
     p_phone: phone ?? null,
     p_code: code ?? null,
+    p_name: name ?? null,
   });
   if (error) throw new HTTPException(500, { message: error.message });
   // The RPC already returns the STRIPPED shape — map snake→camel into the discover
   // DTO (no PII can reach the client by construction).
   const vouchers = ((data ?? []) as DB.PwpDiscoverRow[]).map((r) => Adapters.pwpDiscoverFromRow(r));
   return c.json(pwpDiscoverResponseSchema.parse({ vouchers }));
+});
+
+/* ─── GET /by-order/:orderId — the vouchers EARNED on one order (0204) ──────── */
+
+// 2990s parity (Loo 2026-07-06): the reference prints a customer's earned
+// voucher codes on the SO so they physically carry them. This is the v2
+// surface: the POS ThankYou screen (and any reprint) lists the codes whose
+// carry-forward `source_order_id` is this order. Owner/dealer-scoped via the
+// pwp_codes RLS (the creating salesperson owns the codes they just minted) —
+// plain table read under the user JWT, no DEFINER needed, never service_role.
+// DORMANT: an order with no carried vouchers returns `{ codes: [] }`.
+pwpCodesRouter.get("/by-order/:orderId", async (c) => {
+  const auth = c.var.auth;
+  const orderId = c.req.param("orderId");
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from(PWP_CODES)
+    .select("*")
+    .eq("source_order_id", orderId)
+    .in("status", ["AVAILABLE", "USED"]);
+  if (error) throw new HTTPException(500, { message: error.message });
+  const codes = ((data ?? []) as DB.PwpCodeRow[]).map((r) => Adapters.pwpCodeFromRow(r));
+  return c.json(pwpCodesResponseSchema.parse({ codes }));
 });
 
 /* ─── GET /mine — the reconciler's read (+ owner-scoped self-heal) ──────────── */

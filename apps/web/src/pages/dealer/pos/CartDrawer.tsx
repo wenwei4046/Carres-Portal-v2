@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { X, Trash2, Minus, Plus, Package, Gift, Ticket } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowRight, BookmarkPlus, X, Trash2, Minus, Plus, Gift, Ticket, UserRound } from "lucide-react";
 import type { CatalogResponse, PwpCodeDto, PwpDiscoverDto, PwpRuleDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
@@ -9,6 +10,7 @@ import {
   type WizardDraft,
 } from "../new-order/draft";
 import { cartAddonSubtotal, cartItemCount, cartLineSubtotal } from "./cart";
+import { saveQuote } from "./quotes";
 import { SpecialsSummary } from "../new-order/special-addons-picker";
 import {
   coveringCampaignsForLine,
@@ -30,19 +32,6 @@ import {
   pwpRewardPrice,
   unmarkLinePwp,
 } from "./pwp-line";
-
-/** The combo key a line belongs to (set by `comboToDraftLines`), or null for a
- *  standalone (non-combo) line. */
-function lineComboKey(l: DraftLine): string | null {
-  const k = (l.attrs as Record<string, unknown> | null)?.combo_key;
-  return typeof k === "string" ? k : null;
-}
-
-/** The display label for a combo group (the combo name, stamped on every line). */
-function lineComboLabel(l: DraftLine): string {
-  const v = (l.attrs as Record<string, unknown> | null)?.combo_label;
-  return typeof v === "string" ? v : "Combo";
-}
 
 /** 0186 — true when the line is claimed under a 'promo' PWP rule (price forced to
  *  0). A 'pwp' claim (discounted, > 0) shows its discounted price, not FREE. We
@@ -128,12 +117,14 @@ export default function CartDrawer({
   function removeAddon(key: string) {
     onChange({ ...draft, addons: draft.addons.filter((a) => a.key !== key) });
   }
-  // Drop every line belonging to a combo (its exploded component lines share
-  // one combo_key). Standalone lines + add-ons are untouched.
-  function removeCombo(comboKey: string) {
-    onChange({
-      ...draft,
-      lines: draft.lines.filter((l) => lineComboKey(l) !== comboKey),
+  // Empty every item from the cart (lines + add-ons) in one tap. Customer /
+  // delivery details are kept — this clears the ITEMS only. One click, but an
+  // Undo toast makes an accidental clear recoverable.
+  function clearCart() {
+    const prev = draft;
+    onChange({ ...draft, lines: [], addons: [] });
+    toast.success("Cart cleared", {
+      action: { label: "Undo", onClick: () => onChange(prev) },
     });
   }
   // 0185 / 0186 — replace a standalone line with a re-priced copy. Used by both
@@ -148,22 +139,6 @@ export default function CartDrawer({
   // 0185 — deterministic default-gift preview (display-only; the server appends
   // the real RM0 gift lines). Empty when nothing is configured (DORMANT).
   const giftPreview = catalog ? previewDefaultGifts(draft.lines, catalog) : [];
-
-  // Partition lines into standalone (render with steppers, as today) and combo
-  // groups (header + read-only component lines + one "Remove combo"). Groups are
-  // ordered by first appearance to keep the cart stable across re-renders.
-  const standaloneLines = draft.lines.filter((l) => lineComboKey(l) === null);
-  const comboOrder: string[] = [];
-  const comboGroups = new Map<string, { label: string; lines: DraftLine[] }>();
-  for (const l of draft.lines) {
-    const key = lineComboKey(l);
-    if (key === null) continue;
-    if (!comboGroups.has(key)) {
-      comboGroups.set(key, { label: lineComboLabel(l), lines: [] });
-      comboOrder.push(key);
-    }
-    comboGroups.get(key)!.lines.push(l);
-  }
 
   // 0187 — voucher codes already bound to a reward line in THIS cart. A RESERVED
   // code already on one reward line must not be offered to another (one code = one
@@ -184,46 +159,39 @@ export default function CartDrawer({
 
   return (
     <>
-      {/* Ink-wash + blur scrim */}
-      <div
-        onClick={onClose}
-        role="presentation"
-        className="pos-drawer-scrim"
-        aria-hidden="true"
-      />
-
-      {/* White slide-in panel */}
-      <div
-        className="fixed inset-y-0 right-0 z-[60] flex flex-col bg-white animate-drawer-slide-in"
-        style={{
-          width: 460,
-          maxWidth: "100vw",
-          boxShadow: "-4px 0 32px rgba(17,24,39,0.12)",
-        }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Cart"
-        data-testid="pos-cart-drawer"
-      >
-        {/* Header */}
-        <header
-          className="px-6 pt-5 pb-4 flex items-center justify-between gap-4 shrink-0"
-          style={{ borderBottom: "1px solid hsl(var(--base-200))" }}
+      {/* Prototype cart popup (Loo's Claude Design 2026-07-04): bottom-right
+          card over a dim backdrop. Internal line logic: UNCHANGED. */}
+      <div className="cart-pop-backdrop" onClick={onClose} role="presentation">
+        <aside
+          className="cart cart--pop"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Cart"
+          data-testid="pos-cart-drawer"
         >
-          <div>
-            <p className="kicker mb-0.5">Customer order</p>
-            <h2 className="t-h3">
-              {items} item{items === 1 ? "" : "s"}
-            </h2>
+          {/* Header */}
+          <div className="cart__head shrink-0">
+            <div className="cart__title-row">
+              <span className="cart__title">Customer order</span>
+              <span className="cart__count">
+                {items} {items === 1 ? "piece" : "pieces"}
+              </span>
+              <button className="cart__close" onClick={onClose} aria-label="Close cart">
+                <X size={16} strokeWidth={1.75} />
+              </button>
+            </div>
+            <div className="cart__customer">
+              <UserRound size={13} strokeWidth={1.75} />
+              {draft.customer.name ? (
+                <span>{draft.customer.name}</span>
+              ) : (
+                <span style={{ fontStyle: "italic" }}>
+                  Walk-in customer · details captured at the customer step
+                </span>
+              )}
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close cart"
-            className="btn-ghost p-2 shrink-0"
-          >
-            <X size={18} strokeWidth={1.75} />
-          </button>
-        </header>
 
         {/* Scrollable line list */}
         <div className="flex-1 overflow-auto px-6 py-4">
@@ -233,7 +201,7 @@ export default function CartDrawer({
             </p>
           ) : (
             <div className="flex flex-col gap-4">
-              {standaloneLines.map((l) => (
+              {draft.lines.map((l) => (
                 <div key={l.localId} className="pos-card p-3 flex items-start gap-3">
                   {/* Product photo placeholder */}
                   <div
@@ -327,82 +295,6 @@ export default function CartDrawer({
                 </div>
               ))}
 
-              {/* Combo groups (套餐) — header + read-only component lines + one
-                  "Remove combo". No per-line stepper: an independent qty would
-                  break the fixed combo ratio. */}
-              {comboOrder.map((comboKey) => {
-                const group = comboGroups.get(comboKey)!;
-                const groupTotal = group.lines.reduce(
-                  (s, l) => s + l.unitPrice * l.qty,
-                  0,
-                );
-                return (
-                  <div
-                    key={comboKey}
-                    className="pos-card p-3 flex flex-col gap-3"
-                    data-testid={`pos-cart-combo-${comboKey}`}
-                  >
-                    {/* Combo header: label + group total */}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="shrink-0 w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                          <Package size={15} strokeWidth={1.75} />
-                        </span>
-                        <div className="min-w-0">
-                          <span className="kicker">Combo</span>
-                          <div className="t-small font-medium text-base-900 truncate">
-                            {group.label}
-                          </div>
-                        </div>
-                      </div>
-                      <span className="pos-price text-[16px] shrink-0">
-                        <span className="pos-price-rm">RM</span>
-                        {groupTotal.toLocaleString()}
-                      </span>
-                    </div>
-
-                    {/* Read-only component lines */}
-                    <div
-                      className="flex flex-col gap-1.5 pl-9"
-                      style={{ borderTop: "1px solid hsl(var(--base-100))", paddingTop: 10 }}
-                    >
-                      {group.lines.map((l) => (
-                        <div
-                          key={l.localId}
-                          className="flex items-baseline justify-between gap-3 text-base-600"
-                        >
-                          <div className="min-w-0">
-                            <span className="t-small">
-                              {l.label}
-                              {l.qty > 1 && (
-                                <span className="text-base-500"> ×{l.qty}</span>
-                              )}
-                            </span>
-                            <span className="font-mono text-[11px] text-base-400 block">
-                              {l.sku}
-                            </span>
-                          </div>
-                          <span className="font-mono text-[12px] text-base-500 shrink-0">
-                            {(l.unitPrice * l.qty).toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* One "Remove combo" for the whole group */}
-                    <button
-                      type="button"
-                      onClick={() => removeCombo(comboKey)}
-                      aria-label={`Remove combo ${group.label}`}
-                      className="self-start inline-flex items-center gap-1.5 text-[11px] text-base-500 hover:text-destructive transition-colors"
-                    >
-                      <Trash2 size={13} strokeWidth={1.75} />
-                      Remove combo
-                    </button>
-                  </div>
-                );
-              })}
-
               {/* 0185 — default free-gift preview (display-only). The server
                   appends the real RM0 gift lines authoritatively; the client
                   NEVER sends a gift line. */}
@@ -425,6 +317,9 @@ export default function CartDrawer({
                         <span className="t-small text-base-700 truncate">
                           Free gift: {g.name}
                           {g.qty > 1 && <span className="text-base-500"> ×{g.qty}</span>}
+                          {g.campaign && (
+                            <span className="text-base-400"> · {g.campaign}</span>
+                          )}
                         </span>
                       </div>
                       <span className="pill pill-confirmed shrink-0">FREE</span>
@@ -474,51 +369,74 @@ export default function CartDrawer({
           )}
         </div>
 
-        {/* Footer — subtotal + total + proceed */}
-        <footer
-          className="px-6 py-5 shrink-0 bg-white"
-          style={{ borderTop: "1px solid hsl(var(--base-200))" }}
-        >
-          <div className="flex justify-between items-center text-base-600 t-small">
-            <span>Items subtotal</span>
-            <span className="font-mono">{rm(lineSub)}</span>
+        {/* Footer — prototype .cart__foot: lines + total + CTA row. */}
+        <div className="cart__foot shrink-0">
+          <div className="cart__line">
+            <span>Subtotal</span>
+            <span>{rm(lineSub)}</span>
           </div>
           {addonSub > 0 && (
-            <div className="flex justify-between items-center text-base-600 t-small mt-1.5">
+            <div className="cart__line">
               <span>Add-ons</span>
-              <span className="font-mono">{rm(addonSub)}</span>
+              <span>{rm(addonSub)}</span>
             </div>
           )}
-
-          {/* Total row */}
-          <div
-            className="flex justify-between items-baseline mt-3 pt-3"
-            style={{ borderTop: "1px solid hsl(var(--base-200))" }}
-          >
-            <span className="t-h4 text-base-900">Total</span>
-            <span className="pos-price text-[26px]">
-              <span className="pos-price-rm">RM</span>
-              {total.toLocaleString()}
+          <div className="cart__line">
+            <span>Delivery</span>
+            <span>Set at the customer step</span>
+          </div>
+          <div className="cart__line cart__line--total">
+            <span>Total</span>
+            <span className="cart__total-num">
+              <sup>RM</sup>
+              {total.toLocaleString("en-MY")}
             </span>
           </div>
 
-          <p className="t-tiny text-base-500 mt-1.5">
-            Stair carry (if any) is added at the next step.
-          </p>
-
-          {/* Proceed — BLACK btn-primary (flame belongs to the FAB) */}
-          <button
-            type="button"
-            onClick={onProceed}
-            disabled={!ready}
-            className="btn-primary w-full mt-4"
-          >
-            Proceed to Customer →
-          </button>
+          <div className="cart__cta">
+            {/* Clear cart — empties every item in one tap (Undo toast recovers
+                it). Kept away from the primary CTA to avoid a misclick. */}
+            <button
+              type="button"
+              disabled={draft.lines.length === 0 && draft.addons.length === 0}
+              onClick={clearCart}
+              className="btn btn--ghost"
+              style={{ color: "var(--c-burnt)" }}
+              data-testid="pos-clear-cart"
+            >
+              <Trash2 size={16} strokeWidth={1.75} />
+              Clear cart
+            </button>
+            {/* Save Quote — parks a sanitized snapshot on this device (POS
+                topbar → Quotes lists + loads them back). */}
+            <button
+              type="button"
+              disabled={draft.lines.length === 0}
+              onClick={() => {
+                const q = saveQuote({
+                  label: draft.customer.name,
+                  phone: draft.customer.phone,
+                  lines: draft.lines,
+                  addons: draft.addons,
+                });
+                toast.success(`Quote saved — "${q.label}"`);
+              }}
+              className="btn btn--ghost"
+              data-testid="pos-save-quote"
+            >
+              <BookmarkPlus size={16} strokeWidth={1.75} />
+              Save Quote
+            </button>
+            <button type="button" onClick={onProceed} disabled={!ready} className="btn btn--primary">
+              Convert to Sales Order
+              <ArrowRight size={16} strokeWidth={1.75} />
+            </button>
+          </div>
           {!ready && blockReason && (
-            <p className="t-tiny text-warning text-center mt-2">{blockReason}</p>
+            <p style={{ fontSize: 11, color: "var(--c-burnt)", textAlign: "center" }}>{blockReason}</p>
           )}
-        </footer>
+        </div>
+        </aside>
       </div>
     </>
   );
@@ -802,10 +720,11 @@ function PwpCrossOrderRow({
     return { rule, price: pwpRewardPrice(line, catalog, rule) ?? 0 };
   }
 
-  // Auto-suggest: phone-matched AVAILABLE vouchers whose rule covers this line +
-  // not already bound to another reward line in this cart.
+  // Auto-suggest: identity-matched (phone AND name — the 2990s name+phone
+  // binding, 0204) AVAILABLE vouchers whose rule covers this line + not already
+  // bound to another reward line in this cart.
   const suggestions = availableVouchers.filter(
-    (v) => v.phoneMatches && !consumedCodes.has(v.code) && ruleForVoucher(v) !== null,
+    (v) => v.phoneMatches && v.nameMatches && !consumedCodes.has(v.code) && ruleForVoucher(v) !== null,
   );
 
   function bind(v: PwpDiscoverDto) {
@@ -829,7 +748,7 @@ function PwpCrossOrderRow({
         setManualError("This voucher is already applied to a line in this cart.");
         return;
       }
-      if (!v.phoneMatches) {
+      if (!v.phoneMatches || !v.nameMatches) {
         setManualError("This voucher belongs to a different customer.");
         return;
       }

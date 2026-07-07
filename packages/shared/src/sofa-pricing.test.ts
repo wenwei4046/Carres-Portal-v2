@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
+  comboChargedPrices,
+  pwpSwappedCombos,
   resolveCompartmentPrice,
   mirrorCode,
+  mirrorModules,
+  canMirror,
   canonicalizeSofaSlots,
   matchSofaCombo,
   pickSofaCombo,
@@ -80,6 +84,7 @@ function snapshotFrom(
     overrides?: Record<string, number | null>;
     fabricTierConfig?: { sofaTier2Delta: number; sofaTier3Delta: number };
     fabricTierOverride?: { tier2Delta: number | null; tier3Delta: number | null };
+    legHeightPool?: Array<{ value: string; surcharge: number | null; active: boolean }>;
   } = {},
 ): SofaPricingSnapshot {
   const compartmentPool: SofaCompartment[] = [];
@@ -96,6 +101,7 @@ function snapshotFrom(
     sofaCombos: opts.combos ?? [],
     fabricTierConfig: opts.fabricTierConfig ?? null,
     fabricTierOverride: opts.fabricTierOverride ?? null,
+    legHeightPool: opts.legHeightPool ?? null,
   };
 }
 
@@ -114,7 +120,25 @@ const ASOF = "2026-05-28";
 /* ─── resolveCompartmentPrice ──────────────────────────────────────────── */
 
 describe("resolveCompartmentPrice", () => {
-  it("uses the model override when present", () => {
+  it("skuPrice (SKU Master) is authoritative — beats override AND pool default", () => {
+    expect(
+      resolveCompartmentPrice({ ...modelComp("c", 500), skuPrice: 777 }, pool("X", 300)),
+    ).toBe(777);
+  });
+
+  it("skuPrice of 0 wins (explicitly free — ?? not ||)", () => {
+    expect(
+      resolveCompartmentPrice({ ...modelComp("c", 500), skuPrice: 0 }, pool("X", 300)),
+    ).toBe(0);
+  });
+
+  it("skuPrice null falls through to the legacy override chain", () => {
+    expect(
+      resolveCompartmentPrice({ ...modelComp("c", 500), skuPrice: null }, pool("X", 300)),
+    ).toBe(500);
+  });
+
+  it("uses the model override when present (no synced sku)", () => {
     expect(resolveCompartmentPrice(modelComp("c", 500), pool("X", 300))).toBe(500);
   });
 
@@ -133,6 +157,47 @@ describe("resolveCompartmentPrice", () => {
   it("falls back to pool default when model-comp is missing", () => {
     expect(resolveCompartmentPrice(undefined, pool("X", 420))).toBe(420);
   });
+
+  /* 0204 — per-size head of the chain (Loo 2026-07-06). */
+
+  it("per-size price wins over skuPrice when the size is priced (0204)", () => {
+    const mc = {
+      ...modelComp("c", 500),
+      skuPrice: 777,
+      skuPricesBySize: { "24": 900, "32": 1200 },
+    };
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "32")).toBe(1200);
+  });
+
+  it("per-size explicit 0 wins (explicitly free at that size — ?? not ||)", () => {
+    const mc = { ...modelComp("c", 500), skuPrice: 777, skuPricesBySize: { "24": 0 } };
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "24")).toBe(0);
+  });
+
+  it("size key absent from the map → falls back to the flat skuPrice", () => {
+    const mc = { ...modelComp("c", 500), skuPrice: 777, skuPricesBySize: { "24": 900 } };
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "Flat")).toBe(777);
+  });
+
+  it("size entry null (defensive) → falls back to the flat skuPrice", () => {
+    const mc = {
+      ...modelComp("c", 500),
+      skuPrice: 777,
+      skuPricesBySize: { "24": null as number | null },
+    };
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "24")).toBe(777);
+  });
+
+  it("no size argument → flat behaviour unchanged (map ignored)", () => {
+    const mc = { ...modelComp("c", 500), skuPrice: 777, skuPricesBySize: { "24": 900 } };
+    expect(resolveCompartmentPrice(mc, pool("X", 300))).toBe(777);
+  });
+
+  it("per-size map present but no skuPrice → unsized falls to the legacy chain", () => {
+    const mc = { ...modelComp("c", 500), skuPrice: null, skuPricesBySize: { "24": 900 } };
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "24")).toBe(900);
+    expect(resolveCompartmentPrice(mc, pool("X", 300), "28")).toBe(500);
+  });
 });
 
 /* ─── mirrorCode ───────────────────────────────────────────────────────── */
@@ -147,6 +212,47 @@ describe("mirrorCode", () => {
   it("passes orientation-free codes through unchanged", () => {
     expect(mirrorCode("1NA")).toBe("1NA");
     expect(mirrorCode("Console")).toBe("Console");
+  });
+});
+
+/* ─── mirrorModules ────────────────────────────────────────────────────── */
+
+describe("mirrorModules", () => {
+  it("reverses slot order and swaps each handed code L↔R", () => {
+    expect(mirrorModules([["1A(LHF)"], ["2A(RHF)"]])).toEqual([
+      ["2A(LHF)"],
+      ["1A(RHF)"],
+    ]);
+  });
+  it("mirrors an L-shape (corner + tail) end to end", () => {
+    expect(mirrorModules([["1A(LHF)"], ["CNR"], ["2A(RHF)"]])).toEqual([
+      ["2A(LHF)"],
+      ["CNR"],
+      ["1A(RHF)"],
+    ]);
+  });
+  it("mirrors every code inside a multi-code OR-set slot", () => {
+    expect(mirrorModules([["1A(LHF)", "1B(LHF)"]])).toEqual([
+      ["1A(RHF)", "1B(RHF)"],
+    ]);
+  });
+});
+
+/* ─── canMirror ────────────────────────────────────────────────────────── */
+
+describe("canMirror", () => {
+  it("is true when the representative sequence changes", () => {
+    expect(canMirror([["1A(LHF)"], ["2A(RHF)"]])).toBe(true);
+  });
+  it("is false for an orientation-free palindrome (nothing to flip)", () => {
+    expect(canMirror([["1NA"]])).toBe(false);
+    expect(canMirror([["Console"], ["Console"]])).toBe(false);
+  });
+  it("is false for a single symmetric handed seat (mirror = self via reverse)", () => {
+    // one slot: reverse is a no-op, and canMirror compares first-code sequence
+    // only, so a lone handed code still flips its rep → true. A genuinely
+    // symmetric layout (same rep after mirror) is the palindrome case above.
+    expect(canMirror([["1A(LHF)"]])).toBe(true);
   });
 });
 
@@ -559,6 +665,94 @@ describe("computeSofaPrice — fabric tier delta", () => {
   });
 });
 
+describe("computeSofaPrice — per-compartment fabric special (0205)", () => {
+  // Snapshot with global config (+ optional per-model override), then set the
+  // per-compartment specials directly on the pool rows.
+  function withSpecials(
+    specials: Record<string, { t2?: number | null; t3?: number | null }>,
+    opts: { fabricTierOverride?: { tier2Delta: number | null; tier3Delta: number | null } } = {},
+  ): SofaPricingSnapshot {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      {
+        fabricTierConfig: { sofaTier2Delta: 200, sofaTier3Delta: 400 },
+        fabricTierOverride: opts.fabricTierOverride,
+      },
+    );
+    for (const c of snap.compartmentPool) {
+      const s = specials[c.code];
+      if (s) {
+        c.specialTier2Delta = s.t2 ?? null;
+        c.specialTier3Delta = s.t3 ?? null;
+      }
+    }
+    return snap;
+  }
+
+  it("a used compartment's P2 special OVERWRITES the global + per-model delta", () => {
+    const snap = withSpecials(
+      { "2A(LHF)": { t2: 500 } },
+      { fabricTierOverride: { tier2Delta: 50, tier3Delta: null } },
+    );
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_2" }), snap);
+    expect(r.fabricDelta).toBe(500); // special > per-model 50 > global 200
+    expect(r.total).toBe(2300); // 1800 à-la-carte + 500
+  });
+
+  it("PRICE_1 build never gets a delta, even if the compartment has a special", () => {
+    const snap = withSpecials({ "2A(LHF)": { t2: 500, t3: 900 } });
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_1" }), snap);
+    expect(r.fabricDelta).toBe(0);
+    expect(r.total).toBe(1800);
+  });
+
+  it("no used compartment has a special → delta unchanged (dormant guarantee)", () => {
+    const snap = withSpecials({});
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_2" }), snap);
+    expect(r.fabricDelta).toBe(200); // falls through to global config
+  });
+
+  it("highest special wins when a build spans several special compartments", () => {
+    const snap = withSpecials({ "2A(LHF)": { t2: 300 }, "L(RHF)": { t2: 650 } });
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_2" }), snap);
+    expect(r.fabricDelta).toBe(650);
+  });
+
+  it("a special of 0 explicitly zeroes the fabric premium (?? not ||)", () => {
+    const snap = withSpecials(
+      { "2A(LHF)": { t2: 0 } },
+      { fabricTierOverride: { tier2Delta: 50, tier3Delta: null } },
+    );
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_2" }), snap);
+    expect(r.fabricDelta).toBe(0);
+    expect(r.total).toBe(1800);
+  });
+
+  it("special stacks on a COMBO price the same way the tier delta does", () => {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      {
+        combos: [combo({ tier: null, pricesByHeight: { "28": 2750 } })],
+        fabricTierConfig: { sofaTier2Delta: 200, sofaTier3Delta: 400 },
+      },
+    );
+    snap.compartmentPool.find((c) => c.code === "2A(LHF)")!.specialTier3Delta = 999;
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_3" }), snap);
+    expect(r.basis).toBe("combo");
+    expect(r.fabricDelta).toBe(999); // special > global 400
+    expect(r.total).toBe(3749); // 2750 combo + 999
+  });
+
+  it("special applies via the mirror-code fallback (same lookup as pricing)", () => {
+    // Build uses L(RHF); pool prices L under L(LHF) with the special → the mirror
+    // fallback in the special collection still finds it (the C1 lookup parity).
+    const snap = snapshotFrom({ "2A(LHF)": 1000, "L(LHF)": 800 });
+    snap.compartmentPool.find((c) => c.code === "L(LHF)")!.specialTier2Delta = 700;
+    const r = computeSofaPrice(build({ fabricTier: "PRICE_2" }), snap);
+    expect(r.fabricDelta).toBe(700);
+  });
+});
+
 describe("computeSofaPrice — recliner stub", () => {
   it("reclinerExtra is always 0 in Phase 2 (interface-complete stub)", () => {
     const snap = snapshotFrom({ "2A(LHF)": 1000, "L(RHF)": 800 });
@@ -573,6 +767,67 @@ describe("computeSofaPrice — cents-exact rounding", () => {
     const r = computeSofaPrice(build(), snap);
     expect(r.aLaCarteSum).toBe(1800.3);
     expect(r.total).toBe(1800.3);
+  });
+});
+
+/* ─── computeSofaPrice — per-size à-la-carte (0204) ────────────────────── */
+
+describe("computeSofaPrice — per-size à-la-carte (0204)", () => {
+  /** Two offered compartments whose synced SKUs price per size:
+   *  2A(LHF): flat 1000, {"24": 900, "32": 1200}
+   *  L(RHF):  flat 800,  {"32": 950}  (no 24 entry → flat fallback at 24) */
+  function sizedSnapshot(combos: SofaComboLike[] = []): SofaPricingSnapshot {
+    const c1 = pool("2A(LHF)", 111); // pool defaults are decoys — skuPrice wins
+    const c2 = pool("L(RHF)", 222);
+    return {
+      compartmentPool: [c1, c2],
+      modelCompartments: [
+        {
+          ...modelComp(c1.id, null),
+          skuPrice: 1000,
+          skuPricesBySize: { "24": 900, "32": 1200 },
+        },
+        { ...modelComp(c2.id, null), skuPrice: 800, skuPricesBySize: { "32": 950 } },
+      ],
+      sofaCombos: combos,
+      fabricTierConfig: null,
+      fabricTierOverride: null,
+    };
+  }
+
+  it("prices the à-la-carte sum at the build's size; unmapped size falls to flat", () => {
+    const snap = sizedSnapshot();
+    // 24: 900 (sized) + 800 (L has no 24 → flat) = 1700
+    expect(computeSofaPrice(build({ height: "24", asOf: ASOF }), snap).total).toBe(1700);
+    // 32: 1200 + 950 = 2150
+    expect(computeSofaPrice(build({ height: "32", asOf: ASOF }), snap).total).toBe(2150);
+    // Pool-only size with no entries anywhere (e.g. "Flat") → all flat: 1800
+    expect(computeSofaPrice(build({ height: "Flat", asOf: ASOF }), snap).total).toBe(1800);
+  });
+
+  it("a combo unpriced at a pool-only size → à-la-carte basis at that size", () => {
+    // The combo prices only 24/28 — at "32" it must NOT apply.
+    const snap = sizedSnapshot([combo()]);
+    const at32 = computeSofaPrice(build({ height: "32", asOf: ASOF }), snap);
+    expect(at32.basis).toBe("a_la_carte");
+    expect(at32.total).toBe(2150);
+    // At 24 the combo (2640) covers both slots — combo basis, sized subset math.
+    const at24 = computeSofaPrice(build({ height: "24", asOf: ASOF }), snap);
+    expect(at24.basis).toBe("combo");
+    expect(at24.total).toBe(2640);
+  });
+
+  it("C1 invariant holds per size: mirrored matched cell prices identically in subset + à-la-carte", () => {
+    // Build uses L(LHF) — only L(RHF) exists in the pool (mirror fallback).
+    // Subset sum must use the SAME sized lookup, so extras stay 0.
+    const snap = sizedSnapshot([combo()]);
+    const res = computeSofaPrice(
+      build({ cells: [{ moduleCode: "2A(LHF)" }, { moduleCode: "L(LHF)" }], height: "24", asOf: ASOF }),
+      snap,
+    );
+    expect(res.basis).toBe("combo");
+    expect(res.comboExtras).toBe(0);
+    expect(res.total).toBe(2640);
   });
 });
 
@@ -791,5 +1046,118 @@ describe("sofaPriceWithinTolerance", () => {
     expect(sofaPriceWithinTolerance(NaN, 5000)).toBe(false);
     expect(sofaPriceWithinTolerance(5000, NaN)).toBe(false);
     expect(sofaPriceWithinTolerance(5000, -5000)).toBe(false);
+  });
+});
+
+/* ─── legDelta (0201-wiring — sofa_leg_height pool surcharge) ──────────── */
+
+describe("computeSofaPrice — leg-height surcharge (0201-wiring)", () => {
+  const LEG_POOL = [
+    { value: "No Leg", surcharge: null, active: true },
+    { value: '4"', surcharge: 80, active: true },
+    { value: '6"', surcharge: 120, active: true },
+    { value: '2"', surcharge: 40, active: false },
+  ];
+
+  it("adds the chosen leg value's surcharge on top of the base", () => {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      { legHeightPool: LEG_POOL },
+    );
+    const r = computeSofaPrice(build({ legHeight: '4"' }), snap);
+    expect(r.legDelta).toBe(80);
+    expect(r.total).toBe(1880);
+  });
+
+  it("no legHeight (unset/null) → legDelta 0", () => {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      { legHeightPool: LEG_POOL },
+    );
+    expect(computeSofaPrice(build(), snap).legDelta).toBe(0);
+    expect(computeSofaPrice(build({ legHeight: null }), snap).legDelta).toBe(0);
+  });
+
+  it("a null-surcharge pool value (No Leg) prices 0", () => {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      { legHeightPool: LEG_POOL },
+    );
+    const r = computeSofaPrice(build({ legHeight: "No Leg" }), snap);
+    expect(r.legDelta).toBe(0);
+    expect(r.total).toBe(1800);
+  });
+
+  it("unknown or INACTIVE value prices 0 (a client-claimed surcharge drifts)", () => {
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      { legHeightPool: LEG_POOL },
+    );
+    expect(computeSofaPrice(build({ legHeight: "Iron" }), snap).legDelta).toBe(0);
+    // '2"' exists but active=false → never priced.
+    expect(computeSofaPrice(build({ legHeight: '2"' }), snap).legDelta).toBe(0);
+  });
+
+  it("absent legHeightPool in the snapshot → 0 (dormant)", () => {
+    const snap = snapshotFrom({ "2A(LHF)": 1000, "L(RHF)": 800 });
+    expect(computeSofaPrice(build({ legHeight: '4"' }), snap).legDelta).toBe(0);
+  });
+
+  it("stacks with combo price AND fabric delta (whole-sofa modifiers)", () => {
+    // combo @28 = 2750; fabric P2 delta = 200; leg 6" = 120 → 3070.
+    const snap = snapshotFrom(
+      { "2A(LHF)": 1000, "L(RHF)": 800 },
+      {
+        combos: [combo({ tier: null })],
+        fabricTierConfig: { sofaTier2Delta: 200, sofaTier3Delta: 400 },
+        legHeightPool: LEG_POOL,
+      },
+    );
+    const r = computeSofaPrice(
+      build({ fabricTier: "PRICE_2", legHeight: '6"', asOf: ASOF }),
+      snap,
+    );
+    expect(r.basis).toBe("combo");
+    expect(r.comboPrice).toBe(2750);
+    expect(r.fabricDelta).toBe(200);
+    expect(r.legDelta).toBe(120);
+    expect(r.total).toBe(3070);
+  });
+});
+
+/* ─── 0186 sofa-as-reward — comboChargedPrices + pwpSwappedCombos ────────── */
+
+describe("comboChargedPrices + pwpSwappedCombos (0186 sofa-as-reward)", () => {
+  it("merges per height: an authored PWP entry wins; unset heights keep the normal price", () => {
+    const merged = comboChargedPrices({ "28": 1990, "24": null }, { "24": 2640, "28": 2750 });
+    expect(merged).toEqual({ "24": 2640, "28": 1990 });
+  });
+
+  it("null / absent PWP map keeps the normal map byte-identical", () => {
+    expect(comboChargedPrices(null, { "28": 2750 })).toEqual({ "28": 2750 });
+    expect(comboChargedPrices(undefined, { "28": 2750 })).toEqual({ "28": 2750 });
+  });
+
+  it("pwpSwappedCombos swaps only the reward ids; computeSofaPrice then charges the PWP price", () => {
+    const c = { ...combo(), pwpPricesByHeight: { "28": 1990 } };
+    const other = { ...combo({ id: "r2" }), pwpPricesByHeight: { "28": 1111 } };
+    const swapped = pwpSwappedCombos([c, other], new Set(["r1"]));
+    // r1 swapped to the PWP price at 28; r2 untouched.
+    expect(swapped[0]!.pricesByHeight["28"]).toBe(1990);
+    expect(swapped[1]!.pricesByHeight["28"]).toBe(2750);
+
+    const snapNormal = snapshotFrom(
+      { "2A(LHF)": 1500, "L(RHF)": 1400 },
+      { combos: [c] },
+    );
+    const snapSwapped: SofaPricingSnapshot = {
+      ...snapNormal,
+      sofaCombos: pwpSwappedCombos(snapNormal.sofaCombos, new Set(["r1"])),
+    };
+    const b = build({ asOf: ASOF });
+    expect(computeSofaPrice(b, snapNormal).total).toBe(2750); // normal combo price
+    const rewarded = computeSofaPrice(b, snapSwapped);
+    expect(rewarded.basis).toBe("combo");
+    expect(rewarded.total).toBe(1990); // the PWP price at height 28
   });
 });

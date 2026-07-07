@@ -7,6 +7,67 @@
 
 ---
 
+## 2026-07-05 — POS prototype program: configurator + Order Status (PRs #51-#54)
+
+Three slices, merged + deployed (web Pages `caefea95`, bundle `index-BF-4hRJF.js`;
+NO api change, NO migration):
+
+1. **PR #51** — mattress/bedframe now jump into a FULL-PAGE configurator
+   (`pos/PosConfigurePage.tsx`, design `prototype/pos-configurator.jsx`): plan-view
+   canvas + cfg-* controls + live-total header. **The drawer stays** for
+   accessory/pillow/dropdown-sofa/service. DraftLine emit byte-identical.
+   ⚠ The `.pos-proto` button/input CSS reset is now `:where()`-wrapped (element-level
+   specificity) — do NOT re-raise it; single-class prototype rules must win.
+2. **PR #52** — `SofaConfigurePage` + `SofaBuildCanvas` re-skinned (`sof-qp` rail+hero
+   quick pick, `sof-cv` room/grid/dim-callouts/tool-pill). Geometry/pricing untouched.
+3. **PR #53** — **Order Status** board behind the POS "My orders" pill
+   (`pos/OrderStatusPage.tsx`): PIN gate (**227737** = CARRES on the keypad),
+   revenue summary, 3 lanes, card → the existing `DealerOrderDetail` overlay.
+   Principal's pill still links to the portal orders tab.
+
+4. **PR #54** — accessory POS cards (rail row + generic Option configurator) ·
+   corner-combo quick-pick seeds as a self-validated L (analyzeSofa-searched
+   rotations) · `orders.sourceSystem` surfaced (shared schema/adapter/domain) so
+   AutoCount rows sit in the Order Status Proceed lane. Shared adapter changed
+   → API redeployed (`f3f741e7`); web `a78e33b8`. Prod catalog gained the 2990s
+   pilot trio: Cloud Series Mattress · Kayu Platform Bed · Pasir Wool Rug.
+
+If your branch touches `CatalogStep` / `SofaConfigurePage` / `SofaBuildCanvas` /
+`DealerPos` / `pos-prototype.css`: rebase and take these shapes.
+
+— from the POS-prototype session (Loo's machine)
+
+## 2026-07-03 — POS 2990s-parity program (branch `feat/pos-2990s-parity`, PR #47)
+
+Five slices, one branch. **⚠ migration 0200 must be applied BEFORE this deploys**
+(orders += customer_email/race/gender/birthday + create_order re-issue).
+
+1. **POS shell**: `PosSidebar` (sectioned: Categories/Quick/**MAINTAIN
+   principal-only**/pricing footer) replaced `CategoryRail` (deleted); single
+   "CARRES" series group in the grid; topbar = 01 CART/02 CUSTOMER/03 CONFIRMED
+   + Quotes + My orders + cart chip + staff chip. **`PrincipalPos` (dealer
+   pre-pick page) is DELETED** — principal `?tab=pos` mounts `DealerPos`
+   directly; the dealer is picked IN-FLOW at the CUSTOMER step
+   (`draft.actingDealerId`).
+2. **MAINTAIN → New Order**: `POST /api/orders/raw` (principal/operation; same
+   create_order RPC, NO POS gates/recomputes) + `PrincipalNewOrder`
+   (`?tab=new-order`).
+3. **CUSTOMER step (Image-#4 parity)**: **`Step1Customer` is DELETED** —
+   absorbed into the rebuilt `CustomerStep` (4 section chips + sticky
+   `OrderSummaryRail`); EMAIL/RACE/GENDER/BIRTHDAY now **POS-required**
+   (step1 gate — dealers included), server stays lenient. New
+   `GET /api/orders/customer-type?phone=` probe.
+4. **Sales analysis**: `GET /api/analytics/sales` + `lib/sales-analysis.ts`
+   summarizers + `PrincipalSalesAnalysis` (`?tab=sales-analysis`).
+5. **Quotes**: device-local saved quotes (`pos/quotes.ts`, sanitized lines) +
+   `QuotesDrawer` + CartDrawer "Save as quote".
+
+If your branch touches `DealerPos` / `CatalogStep` / `CustomerStep` /
+`PrincipalApp` / `portal-nav`: rebase and take this branch's shapes; don't
+re-introduce `CategoryRail` / `Step1Customer` / `PrincipalPos`.
+
+— from the POS-parity session
+
 ## 2026-06-30 — unified internal portal (Operation + Principal + Finance)
 
 The three internal portals merged into ONE role-aware portal. **The three

@@ -1,16 +1,18 @@
 import { useMemo, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X, Edit3, History } from "lucide-react";
 import { toast } from "sonner";
 import type {
+  CatalogOptionPoolDto,
   SofaCompartmentDto,
   ModelSofaCompartmentDto,
   SofaComboDto,
+  SofaHeight,
   FabricTierValue,
 } from "@carres/shared";
 import {
+  activeSofaHeights,
   sofaComboCreateInput,
   sofaComboPatchInput,
-  SOFA_HEIGHTS,
   resolveCompartmentPrice,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
@@ -19,10 +21,10 @@ import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
 import { skuMargin } from "../margin";
 
 /**
- * Sofa Combos panel (migration 0179, sofa engine Phase 2) — lives INSIDE
- * ProductModelDrawer for SOFA models only, beside the P1 offered-compartments
- * panel + the fabric-tier override card (a sofa combo is model-scoped via
- * `modelId`, so a per-model panel is the natural home).
+ * Sofa Combos panel (migration 0179, sofa engine Phase 2) — hosted in the
+ * COMBO PRICING tab's "Sofa combos" section (model picker there supplies
+ * `modelId`; moved out of Modular per Loo 2026-07-06 — combo authoring is
+ * pricing work, and Modular is ON/OFF · name · description · photo only).
  *
  * A sofa combo = an ordered list of SLOTS (each slot an OR-set of compartment
  * `code` strings drawn from THIS model's offered set) priced per seat HEIGHT in
@@ -46,40 +48,65 @@ function fmtRM(n: number): string {
   return n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** ISO date (YYYY-MM-DD…) → DD/MM/YYYY for display. */
+function fmtDate(iso: string): string {
+  const p = iso.slice(0, 10).split("-");
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+}
+
+/** ISO timestamp → "DD/MM/YYYY HH:MM" (falls back to the date alone). */
+function fmtDateTime(iso: string): string {
+  const [date, rest] = iso.split("T");
+  const d = fmtDate(date);
+  const time = rest ? rest.slice(0, 5) : "";
+  return time ? `${d} ${time}` : d;
+}
+
 /** A short human summary of a combo's slots, e.g. "2A(LHF)|2A(RHF) + L(LHF)". */
 function slotsSummary(slots: string[][]): string {
   if (slots.length === 0) return "—";
   return slots.map((s) => s.join("|")).join(" + ");
 }
 
-/** A short summary of which heights carry a price, e.g. "24, 28, 32". */
-function pricedHeights(pricesByHeight: Record<string, number | null>): string {
-  const set = SOFA_HEIGHTS.filter((h) => typeof pricesByHeight[h] === "number");
-  return set.length === 0 ? "none" : set.join(", ");
-}
 
 export default function SofaCombosPanel({
   modelId,
+  modelName,
   offered,
   pool,
   combos,
+  optionPools,
   isPrincipal,
 }: {
   modelId: string;
+  /** The base model's display name (group heading + card badge). */
+  modelName: string;
   /** This model's offered compartments (drives the slot code picker). */
   offered: ModelSofaCompartmentDto[];
   /** The global compartment pool (code/description/default price lookup). */
   pool: SofaCompartmentDto[];
   /** All sofa combos in the bundle (we filter to this model). */
   combos: SofaComboDto[];
+  /** 0201-wiring — the Maintenance option pools; the ACTIVE `sofa_size` values
+   *  drive which seat-height columns the price grid offers. */
+  optionPools?: CatalogOptionPoolDto[] | null;
   isPrincipal: boolean;
 }) {
+  // The seat-height axis = the ACTIVE Maintenance sofa sizes (falls back to
+  // the full canonical axis when the pool is empty/absent).
+  const heights = useMemo(() => activeSofaHeights(optionPools), [optionPools]);
   const del = useDeleteSofaCombo();
   // null = closed · "new" = create · a SofaComboDto = edit that combo
   const [editing, setEditing] = useState<SofaComboDto | "new" | null>(null);
+  // The combo whose History dialog is open (null = closed).
+  const [history, setHistory] = useState<SofaComboDto | null>(null);
 
+  // The pricing panel shows ONLY pricing combos (is_quick_pick = false). Quick
+  // Pick presets (created via "Create quick pick" on the sofa canvas) belong to
+  // the POS Quick pick tab, NOT here — filtering them out stops a quick pick
+  // from leaking in as a combo (Loo 2026-07-07 bug).
   const mine = useMemo(
-    () => combos.filter((c) => c.modelId === modelId),
+    () => combos.filter((c) => c.modelId === modelId && !c.isQuickPick),
     [combos, modelId],
   );
 
@@ -119,9 +146,15 @@ export default function SofaCombosPanel({
   }
 
   return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-1">
-        <div className="label">Sofa combos</div>
+    <div className="mb-8" data-testid={`sofa-combos-model-${modelId}`}>
+      {/* Model heading + pricing-combo count + New button. */}
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div className="t-h4 font-display">
+          {modelName}{" "}
+          <span className="t-small text-base-400 font-sans font-normal">
+            ({mine.length} combo{mine.length === 1 ? "" : "s"})
+          </span>
+        </div>
         {isPrincipal && (
           <button
             type="button"
@@ -129,90 +162,257 @@ export default function SofaCombosPanel({
             className="btn-ghost text-[11px] inline-flex items-center gap-1"
             data-testid="sofa-combo-add"
           >
-            <Plus size={13} strokeWidth={2.4} /> New sofa combo
+            <Plus size={13} strokeWidth={2.4} /> New combo
           </button>
         )}
       </div>
-      <p className="t-tiny text-base-500 mb-3">
-        Matched-shape bundles priced per seat height. When a build matches a combo&apos;s slots,
-        the combo price for the chosen height wins over à-la-carte. Pricing is principal-only.
-        {!isPrincipal && " Read-only for your role."}
-      </p>
 
-      <div className="border border-base-200 rounded-[4px] overflow-hidden">
-        <div
-          className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
-          style={{ gridTemplateColumns: "minmax(140px,1.4fr) minmax(90px,1fr) 70px 96px" }}
-        >
-          <div className="label">Slots</div>
-          <div className="label">Priced heights</div>
-          <div className="label">Tier</div>
-          <div className="label text-right">{isPrincipal ? "Actions" : "Status"}</div>
+      {/* One card per combo, auto-fit to FILL the row. Each card shows the FULL
+          seat-height price grid (RM or —) + any PWP reward prices + the effective
+          date, with Edit / History / delete affordances. */}
+      {mine.length === 0 ? (
+        <div className="t-small text-base-500 border border-base-200 rounded-[6px] px-3 py-6 text-center">
+          No combos yet for {modelName}.
         </div>
-        {mine.length === 0 && (
-          <div className="t-small text-base-500 px-3 py-3">
-            No sofa combos yet for this model.
-          </div>
-        )}
-        {mine.map((combo) => (
-          <div
-            key={combo.id}
-            className={`grid items-center gap-3 px-3 py-2 border-b border-base-100 last:border-b-0 ${
-              combo.active ? "" : "opacity-50"
-            }`}
-            style={{ gridTemplateColumns: "minmax(140px,1.4fr) minmax(90px,1fr) 70px 96px" }}
-            data-testid={`sofa-combo-row-${combo.id}`}
-          >
-            <div className="min-w-0">
-              <div className="t-small font-semibold text-base-900 truncate">
-                {combo.label ?? slotsSummary(combo.slots)}
-              </div>
-              {combo.label && (
-                <div className="t-tiny text-base-400 truncate">{slotsSummary(combo.slots)}</div>
-              )}
-            </div>
-            <div className="t-tiny text-base-600 font-mono">{pricedHeights(combo.pricesByHeight)}</div>
-            <div className="t-tiny text-base-600">{combo.tier ? combo.tier.replace("PRICE_", "P") : "Any"}</div>
-            <div className="text-right flex justify-end items-center gap-3">
-              {isPrincipal ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(combo)}
-                    className="t-tiny font-semibold text-base-700 hover:text-base-900 underline"
-                    data-testid={`sofa-combo-edit-${combo.id}`}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeCombo(combo)}
-                    disabled={del.isPending}
-                    className="btn-danger text-[11px]"
-                    data-testid={`sofa-combo-delete-${combo.id}`}
-                  >
-                    Disable
-                  </button>
-                </>
-              ) : combo.active ? (
-                <span className="pill pill-confirmed">Active</span>
-              ) : (
-                <span className="pill pill-neutral">Inactive</span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      ) : (
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))" }}
+          data-testid="sofa-combos-grid"
+        >
+          {mine.map((combo) => (
+            <SofaComboCard
+              key={combo.id}
+              combo={combo}
+              modelName={modelName}
+              heights={heights}
+              isPrincipal={isPrincipal}
+              deleting={del.isPending}
+              onEdit={() => setEditing(combo)}
+              onDelete={() => removeCombo(combo)}
+              onHistory={() => setHistory(combo)}
+            />
+          ))}
+        </div>
+      )}
 
       {isPrincipal && editing !== null && (
         <SofaComboEditor
           modelId={modelId}
           offeredCodes={offeredCodes}
+          heights={heights}
           combo={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
         />
       )}
+      {history && (
+        <SofaComboHistoryModal
+          combo={history}
+          modelName={modelName}
+          onClose={() => setHistory(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Card — one combo: model badge + slots, the full seat-height price grid
+// (RM or —), any PWP reward prices, and an effective-date / Edit / History
+// footer. Delete lives as a trash icon top-right (principal only).
+// ---------------------------------------------------------------------------
+
+function SofaComboCard({
+  combo,
+  modelName,
+  heights,
+  isPrincipal,
+  deleting,
+  onEdit,
+  onDelete,
+  onHistory,
+}: {
+  combo: SofaComboDto;
+  modelName: string;
+  heights: readonly SofaHeight[];
+  isPrincipal: boolean;
+  deleting: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onHistory: () => void;
+}) {
+  const pwp = combo.pwpPricesByHeight;
+  const anyPwp = heights.some((h) => typeof pwp?.[h] === "number");
+  // The combo seat-height axis never includes "Flat" (SofaHeight excludes it);
+  // every height renders as `<n>″`.
+  const heightLabel = (h: SofaHeight) => `${h}″`;
+  return (
+    <div
+      className={`bg-white border border-base-200 rounded-[8px] p-3.5 flex flex-col gap-3 ${
+        combo.active ? "" : "opacity-60"
+      }`}
+      data-testid={`sofa-combo-row-${combo.id}`}
+    >
+      {/* Header: model badge + slots + delete */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className="shrink-0 t-tiny font-semibold px-2 py-0.5 rounded-[4px] border border-base-300 bg-base-50 text-base-700">
+            {modelName}
+          </span>
+          <span
+            className="t-small font-semibold text-base-900 font-mono truncate"
+            title={slotsSummary(combo.slots)}
+          >
+            {combo.label ?? slotsSummary(combo.slots)}
+          </span>
+        </div>
+        {isPrincipal && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={deleting}
+            aria-label="Delete combo"
+            data-testid={`sofa-combo-delete-${combo.id}`}
+            className="shrink-0 text-base-400 hover:text-danger disabled:opacity-40"
+          >
+            <Trash2 size={15} strokeWidth={1.9} />
+          </button>
+        )}
+      </div>
+
+      {/* Full seat-height price grid — every active height, RM price or —. */}
+      <div
+        className="grid rounded-[6px] border border-base-100 overflow-hidden"
+        style={{ gridTemplateColumns: `repeat(${heights.length}, minmax(0, 1fr))` }}
+      >
+        {heights.map((h, i) => {
+          const price = combo.pricesByHeight[h];
+          const has = typeof price === "number";
+          return (
+            <div
+              key={h}
+              className={`flex flex-col items-center gap-0.5 px-1 py-1.5 text-center ${
+                i > 0 ? "border-l border-base-100" : ""
+              }`}
+              data-testid={`sofa-combo-cell-${combo.id}-${h}`}
+            >
+              <span className="t-micro text-base-400">{heightLabel(h)}</span>
+              {has ? (
+                <span
+                  className="t-tiny t-num font-semibold text-base-900 leading-tight"
+                  data-testid={`sofa-combo-price-${combo.id}-${h}`}
+                >
+                  {fmtRM(price as number)}
+                </span>
+              ) : (
+                <span className="t-tiny text-base-300">—</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* PWP reward prices (0186) — flame; only the heights that carry one. */}
+      {anyPwp && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="t-micro text-primary font-semibold">PWP</span>
+          {heights
+            .filter((h) => typeof pwp?.[h] === "number")
+            .map((h) => (
+              <span
+                key={h}
+                className="inline-flex items-baseline gap-1 rounded-[4px] border border-primary/30 bg-primary/10 px-2 py-0.5"
+                data-testid={`sofa-combo-pwp-${combo.id}-${h}`}
+              >
+                <span className="t-tiny text-base-500">{heightLabel(h)}</span>
+                <span className="t-tiny t-num font-semibold text-primary">
+                  RM {fmtRM(pwp![h] as number)}
+                </span>
+              </span>
+            ))}
+        </div>
+      )}
+
+      {/* Footer: effective date · tier · status · Edit · History */}
+      <div className="flex items-center justify-between gap-2 flex-wrap mt-auto pt-2 border-t border-base-100">
+        <div className="flex items-center gap-2 t-tiny text-base-500">
+          <span>Effective {fmtDate(combo.effectiveFrom)}</span>
+          <span className="text-base-300">·</span>
+          <span>Tier {combo.tier ? combo.tier.replace("PRICE_", "P") : "Any"}</span>
+        </div>
+        <div className="flex items-center gap-2.5">
+          {combo.active ? (
+            <span className="pill pill-confirmed">Active</span>
+          ) : (
+            <span className="pill pill-neutral">Inactive</span>
+          )}
+          {isPrincipal && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="t-tiny font-semibold text-base-700 hover:text-base-900 inline-flex items-center gap-1"
+              data-testid={`sofa-combo-edit-${combo.id}`}
+            >
+              <Edit3 size={12} strokeWidth={2} /> Edit
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onHistory}
+            className="t-tiny font-semibold text-base-600 hover:text-base-900 inline-flex items-center gap-1"
+            data-testid={`sofa-combo-history-${combo.id}`}
+          >
+            <History size={12} strokeWidth={2} /> History
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// History — a simple per-combo dialog (Created / Effective / Last updated).
+// A full price-change audit trail isn't tracked yet (Loo 2026-07-07 chose the
+// lightweight version); this surfaces the current version's key dates.
+// ---------------------------------------------------------------------------
+
+function SofaComboHistoryModal({
+  combo,
+  modelName,
+  onClose,
+}: {
+  combo: SofaComboDto;
+  modelName: string;
+  onClose: () => void;
+}) {
+  const rows: { label: string; value: string }[] = [
+    { label: "Created", value: combo.createdAt ? fmtDateTime(combo.createdAt) : "—" },
+    { label: "Effective from", value: fmtDate(combo.effectiveFrom) },
+    { label: "Last updated", value: combo.updatedAt ? fmtDateTime(combo.updatedAt) : "—" },
+    { label: "Status", value: combo.active ? "Active" : "Inactive" },
+  ];
+  return (
+    <Modal title="History" onClose={onClose}>
+      <div className="flex flex-col gap-3" data-testid={`sofa-combo-history-modal-${combo.id}`}>
+        <div className="t-small text-base-700">
+          <span className="font-semibold">{modelName}</span>
+          <span className="text-base-400"> · </span>
+          <span className="font-mono">{combo.label ?? slotsSummary(combo.slots)}</span>
+        </div>
+        <div className="flex flex-col divide-y divide-base-100 border border-base-200 rounded-[6px]">
+          {rows.map((r) => (
+            <div key={r.label} className="flex items-center justify-between gap-4 px-3 py-2">
+              <span className="t-tiny text-base-500">{r.label}</span>
+              <span className="t-small t-num text-base-900">{r.value}</span>
+            </div>
+          ))}
+        </div>
+        <p className="t-tiny text-base-400">
+          A full price-change log (every edit versioned) isn&apos;t tracked yet — this shows the
+          current version&apos;s key dates.
+        </p>
+      </div>
+    </Modal>
   );
 }
 
@@ -229,11 +429,14 @@ interface OfferedCode {
 function SofaComboEditor({
   modelId,
   offeredCodes,
+  heights,
   combo,
   onClose,
 }: {
   modelId: string;
   offeredCodes: OfferedCode[];
+  /** The seat-height columns to offer (ACTIVE Maintenance sofa sizes). */
+  heights: readonly SofaHeight[];
   combo: SofaComboDto | null;
   onClose: () => void;
 }) {
@@ -246,10 +449,10 @@ function SofaComboEditor({
   const [slots, setSlots] = useState<string[][]>(
     combo ? combo.slots.map((s) => [...s]) : [[]],
   );
-  // prices-by-height: a string per SOFA_HEIGHTS ("" = null = n/a at that height).
+  // prices-by-height: a string per offered height ("" = null = n/a at that height).
   const [prices, setPrices] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
-    for (const h of SOFA_HEIGHTS) {
+    for (const h of heights) {
       const v = combo?.pricesByHeight?.[h];
       init[h] = typeof v === "number" ? String(v) : "";
     }
@@ -261,8 +464,19 @@ function SofaComboEditor({
   // cost never feeds checkout / order / finance pricing.
   const [costs, setCosts] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
-    for (const h of SOFA_HEIGHTS) {
+    for (const h of heights) {
       const v = combo?.costByHeight?.[h];
+      init[h] = typeof v === "number" ? String(v) : "";
+    }
+    return init;
+  });
+  // 0186 — PWP reward price per height: what THIS combo sells for when it is
+  // redeemed as a PWP reward. "" = no PWP price at that height (not redeemable
+  // there); the whole map collapses to null when every height is blank.
+  const [pwpPrices, setPwpPrices] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const h of heights) {
+      const v = combo?.pwpPricesByHeight?.[h];
       init[h] = typeof v === "number" ? String(v) : "";
     }
     return init;
@@ -294,7 +508,7 @@ function SofaComboEditor({
 
   const pricesByHeight = useMemo(() => {
     const out: Record<string, number | null> = {};
-    for (const h of SOFA_HEIGHTS) {
+    for (const h of heights) {
       const raw = prices[h]?.trim() ?? "";
       out[h] = raw === "" ? null : Number(raw);
     }
@@ -306,7 +520,7 @@ function SofaComboEditor({
   const costByHeight = useMemo<Record<string, number | null> | null>(() => {
     const out: Record<string, number | null> = {};
     let anyCost = false;
-    for (const h of SOFA_HEIGHTS) {
+    for (const h of heights) {
       const raw = costs[h]?.trim() ?? "";
       if (raw === "") {
         out[h] = null;
@@ -317,6 +531,22 @@ function SofaComboEditor({
     }
     return anyCost ? out : null;
   }, [costs]);
+
+  // 0186 — PWP reward price map; same null-collapse semantics as costByHeight.
+  const pwpPricesByHeight = useMemo<Record<string, number | null> | null>(() => {
+    const out: Record<string, number | null> = {};
+    let anyPwp = false;
+    for (const h of heights) {
+      const raw = pwpPrices[h]?.trim() ?? "";
+      if (raw === "") {
+        out[h] = null;
+      } else {
+        out[h] = Number(raw);
+        anyPwp = true;
+      }
+    }
+    return anyPwp ? out : null;
+  }, [pwpPrices]);
 
   // --- per-height implied-discount baseline ------------------------------
   // À-la-carte baseline = Σ over slots of the FIRST code's resolved price
@@ -336,6 +566,7 @@ function SofaComboEditor({
     tier: tier === "" ? null : tier,
     pricesByHeight,
     costByHeight,
+    pwpPricesByHeight,
     label: label.trim() === "" ? null : label.trim(),
     effectiveFrom,
     active,
@@ -362,8 +593,9 @@ function SofaComboEditor({
       tier: tier === "" ? null : (tier as FabricTierValue),
       pricesByHeight,
       // Always send costByHeight (null when no height carries a cost) so clearing
-      // every cost on edit clears the DB benchmark.
+      // every cost on edit clears the DB benchmark. Same for pwpPricesByHeight.
       costByHeight,
+      pwpPricesByHeight,
       label: label.trim() === "" ? null : label.trim(),
       effectiveFrom,
       active,
@@ -458,7 +690,7 @@ function SofaComboEditor({
                 className="flex items-start gap-2 bg-base-50 border border-base-200 rounded-[4px] px-2.5 py-2"
                 data-testid={`sofa-combo-slot-${i}`}
               >
-                <span className="t-tiny text-base-400 font-mono mt-2 w-5 shrink-0">{i + 1}</span>
+                <span className="t-tiny text-base-400 t-num mt-2 w-5 shrink-0">{i + 1}</span>
                 <SlotCodePicker
                   selected={slot}
                   options={offeredCodes}
@@ -487,8 +719,8 @@ function SofaComboEditor({
         {/* Prices-by-height grid */}
         <div>
           <span className="label block mb-1.5">Combo price by seat height (RM)</span>
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${SOFA_HEIGHTS.length}, minmax(0,1fr))` }}>
-            {SOFA_HEIGHTS.map((h) => {
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${heights.length}, minmax(0,1fr))` }}>
+            {heights.map((h) => {
               const raw = prices[h]?.trim() ?? "";
               const priceNum = raw === "" ? null : Number(raw);
               const saves =
@@ -503,13 +735,13 @@ function SofaComboEditor({
                     value={prices[h] ?? ""}
                     onChange={(e) => setPrices((p) => ({ ...p, [h]: e.target.value }))}
                     placeholder="n/a"
-                    className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+                    className={`${INPUT_CLS} text-right t-num text-[12px]`}
                     data-testid={`sofa-combo-price-${h}`}
                     aria-label={`combo price at height ${h}`}
                   />
                   {saves !== null && (
                     <span
-                      className={`block t-tiny mt-0.5 text-right font-mono ${
+                      className={`block t-tiny mt-0.5 text-right t-num ${
                         saves >= 0 ? "text-base-500" : "text-danger"
                       }`}
                       data-testid={`sofa-combo-implied-${h}`}
@@ -524,16 +756,65 @@ function SofaComboEditor({
           <p className="t-tiny text-base-400 mt-1.5">
             Blank = the combo does not apply at that height. À-la-carte baseline (sum of each
             slot&apos;s first code):{" "}
-            <b className="font-mono text-base-600">RM {fmtRM(baseline)}</b>. The figure under each
+            <b className="t-num text-base-600">RM {fmtRM(baseline)}</b>. The figure under each
             price is the implied discount (or markup) vs that baseline.
+          </p>
+        </div>
+
+        {/* PWP-price-by-height grid (0186) — the price this combo sells at when
+            redeemed as a PWP reward. Blank = not redeemable at that height. */}
+        <div>
+          <span className="label block mb-1.5">PWP reward price by seat height (RM)</span>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${heights.length}, minmax(0,1fr))` }}>
+            {heights.map((h) => {
+              const priceRaw = prices[h]?.trim() ?? "";
+              const priceNum = priceRaw === "" ? null : Number(priceRaw);
+              const pwpRaw = pwpPrices[h]?.trim() ?? "";
+              const pwpNum = pwpRaw === "" ? null : Number(pwpRaw);
+              const saves =
+                priceNum !== null && pwpNum !== null && Number.isFinite(priceNum) && Number.isFinite(pwpNum)
+                  ? priceNum - pwpNum
+                  : null;
+              return (
+                <label key={h} className="block">
+                  <span className="t-tiny text-base-500 block mb-0.5">{h}&Prime;</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={pwpPrices[h] ?? ""}
+                    onChange={(e) => setPwpPrices((p) => ({ ...p, [h]: e.target.value }))}
+                    placeholder="n/a"
+                    className={`${INPUT_CLS} text-right t-num text-[12px]`}
+                    data-testid={`sofa-combo-pwp-${h}`}
+                    aria-label={`combo PWP price at height ${h}`}
+                  />
+                  {saves !== null && (
+                    <span
+                      className={`block t-tiny mt-0.5 text-right t-num ${
+                        saves >= 0 ? "text-base-500" : "text-danger"
+                      }`}
+                      data-testid={`sofa-combo-pwp-saves-${h}`}
+                    >
+                      {saves >= 0 ? `−RM ${fmtRM(saves)}` : `+RM ${fmtRM(-saves)}`}
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+          <p className="t-tiny text-base-400 mt-1.5">
+            The price a customer pays for THIS combo when redeeming it as a PWP reward. Blank =
+            the combo cannot be a PWP reward at that height. The figure under each price is the
+            saving vs that height&apos;s normal combo price.
           </p>
         </div>
 
         {/* Cost-by-height grid (0183, principal-only benchmark, display-only) */}
         <div>
           <span className="label block mb-1.5">Cost benchmark by seat height (RM)</span>
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${SOFA_HEIGHTS.length}, minmax(0,1fr))` }}>
-            {SOFA_HEIGHTS.map((h) => {
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${heights.length}, minmax(0,1fr))` }}>
+            {heights.map((h) => {
               const priceRaw = prices[h]?.trim() ?? "";
               const priceNum = priceRaw === "" ? null : Number(priceRaw);
               const costRaw = costs[h]?.trim() ?? "";
@@ -554,12 +835,12 @@ function SofaComboEditor({
                     value={costs[h] ?? ""}
                     onChange={(e) => setCosts((c) => ({ ...c, [h]: e.target.value }))}
                     placeholder="n/a"
-                    className={`${INPUT_CLS} text-right font-mono text-[12px]`}
+                    className={`${INPUT_CLS} text-right t-num text-[12px]`}
                     data-testid={`sofa-combo-cost-${h}`}
                     aria-label={`combo cost at height ${h}`}
                   />
                   <span
-                    className={`block t-tiny mt-0.5 text-right font-mono ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-500"}`}
+                    className={`block t-tiny mt-0.5 text-right t-num ${margin != null && margin.amount < 0 ? "text-danger" : "text-base-500"}`}
                     data-testid={`sofa-combo-margin-${h}`}
                   >
                     {margin != null ? `${(margin.pct * 100).toFixed(1)}%` : "—"}

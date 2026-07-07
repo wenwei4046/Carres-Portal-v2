@@ -26,8 +26,22 @@
 // a claim with 409 `pwp_not_eligible_sofa_build`. `coveringPwpForLine` returns []
 // for a build line.
 // ----------------------------------------------------------------------------
-import type { CatalogResponse, PwpRuleDto, PwpRuleEngine, PwpLineInput } from "@carres/shared";
-import { lineMatchesTargets, resolvePwp } from "@carres/shared";
+import type {
+  CatalogResponse,
+  FabricTier,
+  PwpRuleDto,
+  PwpRuleEngine,
+  PwpLineInput,
+  SofaBuild,
+  SofaPricingSnapshot,
+} from "@carres/shared";
+import {
+  computeSofaPrice,
+  lineMatchesTargets,
+  matchSofaCombo,
+  pwpSwappedCombos,
+  resolvePwp,
+} from "@carres/shared";
 import type { DraftLine } from "../new-order/draft";
 import { toFreeGiftLineInput } from "./free-line";
 
@@ -101,10 +115,11 @@ export function coveringPwpForLine(
   allLines: DraftLine[],
   catalog: CatalogResponse,
 ): PwpRuleDto[] {
-  // Hard rule #1 — PWP applies to FLAT lines only; never offer on a sofa-build
-  // line (the server rejects such a claim with 409 pwp_not_eligible_sofa_build).
   const lineAttrs = line.attrs as Record<string, unknown> | null;
-  if (lineAttrs?.sofa_build) return [];
+  // 0186 sofa-as-reward — a build line IS offerable, priced via the reward
+  // combo's pwpPricesByHeight swap (sofaPwpRewardPrice); the old Hard rule #1
+  // outright-reject is gone.
+  const isBuild = Boolean(lineAttrs?.sofa_build);
   // A line carrying special add-ons can't be a PWP reward — the PWP price is
   // all-in and the server's special-addon recompute would re-add the surcharge.
   // Never offer the toggle (the server 409s pwp_not_eligible_specials).
@@ -127,8 +142,10 @@ export function coveringPwpForLine(
   // cart label each offering rule on the toggle.
   for (const rule of rules) {
     // A 'pwp' rule with no usable reward price for this sku is not offerable (the
-    // server would 409 it). 'promo' is always free (0), no price needed.
-    if (rule.type === "pwp" && pwpRewardPrice(line, catalog, rule) == null) continue;
+    // server would 409 it). 'promo' is always free (0), no price needed — EXCEPT
+    // a sofa build, whose reward price ALWAYS comes from the combo PWP map (both
+    // kinds): no matched-and-priced combo → not offerable.
+    if ((rule.type === "pwp" || isBuild) && pwpRewardPrice(line, catalog, rule) == null) continue;
 
     const inputs: PwpLineInput[] = allLines.map((l, i) =>
       toPwpLineInput(l, catalog, i, i === targetIdx || isLinePwp(l)),
@@ -142,19 +159,105 @@ export function coveringPwpForLine(
 
 /**
  * The previewed reward price for `line` under `rule`: the sku's `pwpPrice` for a
- * 'pwp' rule, 0 for a 'promo' rule. Returns `null` for a 'pwp' rule whose sku has
- * no `pwpPrice` set (not offerable). This is the IDENTICAL figure the server
- * forces, because both read `catalog.skus[].pwpPrice` / 0 — honest-pricing.
+ * 'pwp' rule, 0 for a 'promo' rule — and for a SOFA BUILD line (0186), the
+ * build's total recomputed against the PWP-swapped combo maps (both kinds).
+ * Returns `null` when not offerable ('pwp' sku with no pwpPrice; a build that
+ * matches no reward combo / has no PWP price at its seat height). This is the
+ * IDENTICAL figure the server produces — honest-pricing.
  */
 export function pwpRewardPrice(
   line: DraftLine,
   catalog: CatalogResponse,
   rule: PwpRuleDto,
 ): number | null {
+  if ((line.attrs as Record<string, unknown> | null)?.sofa_build) {
+    return sofaPwpRewardPrice(line, catalog, rule);
+  }
   if (rule.type === "promo") return 0;
   const skuRow = catalog.skus.find((s) => s.sku === line.sku) ?? null;
   const p = skuRow?.pwpPrice;
   return typeof p === "number" ? p : null;
+}
+
+/** Reconstruct the pure `SofaBuild` a build line carries (null = not a build /
+ *  malformed / unknown rep sku). Mirrors the server's re-parse. */
+function sofaBuildFromLine(line: DraftLine, catalog: CatalogResponse): SofaBuild | null {
+  const attrs = line.attrs as Record<string, unknown> | null;
+  const sb = attrs?.sofa_build as
+    | { cells?: Array<{ moduleCode?: unknown; x?: number | null; y?: number | null; rot?: number | null }>; height?: unknown }
+    | undefined;
+  if (!sb || !Array.isArray(sb.cells) || sb.cells.length === 0 || typeof sb.height !== "string") {
+    return null;
+  }
+  const skuRow = catalog.skus.find((s) => s.sku === line.sku);
+  if (!skuRow) return null;
+  return {
+    modelId: skuRow.modelId,
+    cells: sb.cells.map((c) => ({
+      moduleCode: String(c?.moduleCode ?? "").trim(),
+      x: c?.x ?? null,
+      y: c?.y ?? null,
+      rot: c?.rot ?? null,
+    })),
+    fabricTier: (attrs?.fabric_tier as FabricTier | null | undefined) ?? null,
+    height: sb.height,
+    legHeight: (attrs?.leg_height as string | null | undefined) ?? null,
+  };
+}
+
+/** The pricing snapshot for one model, assembled from the catalog bundle — the
+ *  SAME sources SofaBuildCanvas previews with, so this figure re-derives the
+ *  line's original total when no swap applies. */
+function sofaSnapshotFromCatalog(catalog: CatalogResponse, modelId: string): SofaPricingSnapshot {
+  return {
+    compartmentPool: catalog.sofaCompartments ?? [],
+    modelCompartments: (catalog.modelSofaCompartments ?? []).filter((mc) => mc.modelId === modelId),
+    sofaCombos: (catalog.sofaCombos ?? []).filter((c) => c.modelId === modelId),
+    fabricTierOverride:
+      (catalog.modelFabricTierOverrides ?? []).find((o) => o.modelId === modelId) ?? null,
+    fabricTierConfig: catalog.fabricTierConfig ?? null,
+    legHeightPool: (catalog.optionPools ?? [])
+      .filter((p) => p.pool === "sofa_leg_height")
+      .map((p) => ({ value: p.value, surcharge: p.surcharge, active: p.active })),
+  };
+}
+
+/**
+ * 0186 sofa-as-reward — the previewed reward TOTAL for a sofa build line under
+ * `rule`: eligibility mirrors the server (rule targets reward COMBOS; the build
+ * matches ≥1; a matched combo carries a PWP price > 0 at the build's height),
+ * then the SAME `computeSofaPrice` runs over the PWP-swapped snapshot. `null`
+ * = not offerable (the server would 409 pwp_not_eligible_sofa_build).
+ */
+export function sofaPwpRewardPrice(
+  line: DraftLine,
+  catalog: CatalogResponse,
+  rule: PwpRuleDto,
+): number | null {
+  const build = sofaBuildFromLine(line, catalog);
+  if (!build) return null;
+  const rewardComboIds = rule.rewardTargets.flatMap((t) =>
+    t.scope === "combo" ? (t.comboIds ?? []) : [],
+  );
+  if (rewardComboIds.length === 0) return null;
+  const combosById = new Map((catalog.sofaCombos ?? []).map((c) => [c.id, c] as const));
+  const builtCodes = build.cells.map((c) => c.moduleCode);
+  const matched = rewardComboIds.filter((id) => {
+    const c = combosById.get(id);
+    return !!c && matchSofaCombo(builtCodes, c.slots ?? []) !== null;
+  });
+  if (matched.length === 0) return null;
+  const anyPriced = matched.some((id) => {
+    const p = combosById.get(id)?.pwpPricesByHeight?.[build.height];
+    return typeof p === "number" && p > 0;
+  });
+  if (!anyPriced) return null;
+  const snapshot = sofaSnapshotFromCatalog(catalog, build.modelId);
+  const swapped: SofaPricingSnapshot = {
+    ...snapshot,
+    sofaCombos: pwpSwappedCombos(snapshot.sofaCombos, new Set(matched)),
+  };
+  return computeSofaPrice(build, swapped).total;
 }
 
 /** The rule id a line is claimed PWP under, or null. */
@@ -227,6 +330,12 @@ export interface PwpTriggerLine {
   cartLineKey: string;
   sku: string;
   qty: number;
+  /** True when the line is itself a reward (attrs.pwp / free_item / free_gift).
+   *  The reserve route skips PROMO rules for such a line (2990s one-way parity);
+   *  PWP rules still reserve — chaining is intentional. */
+  rewardLine: boolean;
+  /** A sofa build's module codes (combo-scope trigger matching); absent for flat lines. */
+  builtCompartments?: string[];
 }
 
 /**
@@ -235,11 +344,11 @@ export interface PwpTriggerLine {
  * over the rule's `triggerTargets`). Mirrors the server reserve route's matcher
  * (`apps/api/src/routes/pwp-codes.ts` step 3) so the POS reconciler and the
  * server agree on which lines own a reservation. Returns `[]` when nothing is
- * configured (DORMANT) — the reconciler then never calls reserve. A free /
- * combo-component / sofa-build line is still scanned (the matcher decides) but a
- * line carrying `attrs.free_item`/`free_gift` (already a reward) is never a
- * trigger (it would self-fund — the shared resolver guards this; here a free
- * line simply won't be RE-reserved for, which is harmless).
+ * configured (DORMANT) — the reconciler then never calls reserve. A line that is
+ * itself a reward (attrs.pwp / free_item / free_gift) is still a PWP trigger
+ * (chainable) but is flagged `rewardLine` so the reserve route skips PROMO rules
+ * for it — the 2990s one-way rule (a free reward must never mint a promo voucher
+ * that funds the next free reward).
  */
 export function triggerLinesInCart(
   lines: DraftLine[],
@@ -263,7 +372,16 @@ export function triggerLinesInCart(
         lineMatchesTargets(ruleLine, r.triggerTargets, comboModulesById),
     );
     if (isTrigger) {
-      out.push({ cartLineKey: line.localId, sku: line.sku, qty: Number(line.qty ?? 1) });
+      const attrs = (line.attrs ?? {}) as Record<string, unknown>;
+      out.push({
+        cartLineKey: line.localId,
+        sku: line.sku,
+        qty: Number(line.qty ?? 1),
+        rewardLine: Boolean(attrs.pwp || attrs.free_item || attrs.free_gift),
+        // A sofa build's module codes ride along so the server reserve can
+        // match COMBO-scope triggers (a flat sku alone can't).
+        ...(li.builtCompartments.length > 0 ? { builtCompartments: li.builtCompartments } : {}),
+      });
     }
   }
   return out;

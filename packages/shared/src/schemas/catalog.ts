@@ -37,6 +37,14 @@ export const allowedOptionsSchema = z
     gaps: z.array(z.string()).optional(),
     // 0181 — special add-on codes this model offers (per-model attach).
     specials: z.array(z.string()).optional(),
+    // 0201-wiring (2026-07-06, 2990s parity) — per-model POS gating of the
+    // Maintenance option pools. divan/leg ticks: EMPTY/ABSENT = no restriction
+    // (every active pool option shows at POS); a non-empty list narrows.
+    divan_heights: z.array(z.string()).optional(),
+    leg_heights: z.array(z.string()).optional(),
+    // 0202 — fabric CODES this model offers (catalog_fabrics.fabric_code).
+    // OPT-IN: empty/absent = the model shows no fabric choice at POS.
+    fabrics: z.array(z.string()).optional(),
   })
   .passthrough();
 export type AllowedOptions = z.infer<typeof allowedOptionsSchema>;
@@ -90,6 +98,11 @@ export const productSkuSchema = z.object({
   // (null = no PWP price set). Additive/optional so pre-0186 serialized SKUs
   // stay valid. DORMANT — no order consumer yet.
   pwpPrice: z.number().nullable().optional(),
+  // 0204 (per-size pricing, Loo 2026-07-06) — {size → RM} map keyed by the
+  // `sofa_size` pool values. Values nullable defensively: a null value reads
+  // as "not priced at this size" and falls through to the flat price.
+  // Additive/optional so pre-0204 serialized SKUs stay valid.
+  pricesBySize: z.record(z.number().nullable()).nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
 
@@ -165,27 +178,155 @@ export type SpecialAddonDto = z.infer<typeof specialAddonSchema>;
 // these and the Maintenance UI reuses the exact same shapes.
 // ---------------------------------------------------------------------------
 
-/** The three curated pools (branding dropped — every Carres product is one brand). */
+/** The curated pools (branding stays dropped — every Carres product is one
+ *  brand). 0201 widens the original three with the six 2990s-ported pools that
+ *  back the Maintenance + Special Add-ons sidebar sections. */
 export const CATALOG_OPTION_POOL_NAMES = [
   "supplier_category",
   "bedframe_size",
   "mattress_size",
+  "divan_height",
+  "total_height",
+  "gap",
+  "bedframe_leg_height",
+  "sofa_size",
+  "sofa_leg_height",
 ] as const;
 export const catalogOptionPoolNameSchema = z.enum(CATALOG_OPTION_POOL_NAMES);
 export type CatalogOptionPoolName = z.infer<typeof catalogOptionPoolNameSchema>;
 
 /** One pool entry (mirrors the domain `CatalogOptionPool` / a row, camelCased).
- *  `label` + `dimensions` are populated for size pools only (null otherwise). */
+ *  `label` + `dimensions` are populated for size pools only (null otherwise);
+ *  `surcharge` (0201) is the RM selling surcharge for priced pools (divan /
+ *  total / leg heights) — null renders as "—". */
 export const catalogOptionPoolSchema = z.object({
   id: z.string().uuid(),
   pool: catalogOptionPoolNameSchema,
   value: z.string(),
   label: z.string().nullable(),
   dimensions: z.string().nullable(),
+  surcharge: z.number().nullable(),
   active: z.boolean(),
   sortOrder: z.number().int(),
 });
 export type CatalogOptionPoolDto = z.infer<typeof catalogOptionPoolSchema>;
+
+/** 0201 — one entry inside a pool batch-save. Same shape as a pool row minus
+ *  `id`/`pool`/`sortOrder` (the RPC re-mints rows; array order = display
+ *  order, so sortOrder is server-assigned from ordinality). */
+export const catalogPoolEntryInput = z
+  .object({
+    value: z.string().trim().min(1).max(60),
+    label: z.string().trim().max(60).nullable().optional(),
+    dimensions: z.string().trim().max(60).nullable().optional(),
+    surcharge: z.number().nullable().optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+export type CatalogPoolEntryInput = z.infer<typeof catalogPoolEntryInput>;
+
+/** 0201 — PUT /option-pools/:pool body: the pool's FULL new contents (replace
+ *  semantics; the catalog_pool_batch_save RPC appends a catalog_config_history
+ *  snapshot in the same transaction). */
+export const catalogPoolBatchSaveInput = z
+  .object({
+    entries: z.array(catalogPoolEntryInput).max(200),
+    notes: z.string().trim().max(500).optional(),
+  })
+  .strict();
+export type CatalogPoolBatchSaveInput = z.infer<typeof catalogPoolBatchSaveInput>;
+
+/** 0201 — one snapshot entry as stored in catalog_config_history.snapshot. */
+export const catalogPoolSnapshotEntrySchema = z.object({
+  value: z.string(),
+  label: z.string().nullable(),
+  dimensions: z.string().nullable(),
+  surcharge: z.number().nullable(),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type CatalogPoolSnapshotEntryDto = z.infer<typeof catalogPoolSnapshotEntrySchema>;
+
+/** 0201 — one catalog_config_history row (lightweight append-only history:
+ *  effective_from = the save date; no future-dating engine). */
+export const catalogConfigHistorySchema = z.object({
+  id: z.string().uuid(),
+  section: catalogOptionPoolNameSchema,
+  entries: z.array(catalogPoolSnapshotEntrySchema),
+  effectiveFrom: z.string(),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type CatalogConfigHistoryDto = z.infer<typeof catalogConfigHistorySchema>;
+
+// ---------------------------------------------------------------------------
+// 0202 — global procurement fabric master (2990s fabric_trackings port). One
+// schema, two consumers (§9.5): the API bundle + PUT /fabrics batch save and
+// the web Fabrics tab reuse these exact shapes.
+// ---------------------------------------------------------------------------
+
+export const fabricTierValueSchema = z.enum(["PRICE_1", "PRICE_2", "PRICE_3"]);
+
+/** One fabric row (bundle DTO, camelCased). */
+export const catalogFabricSchema = z.object({
+  id: z.string().uuid(),
+  fabricCode: z.string(),
+  series: z.string().nullable(),
+  description: z.string().nullable(),
+  supplierCode: z.string().nullable(),
+  sofaTier: fabricTierValueSchema,
+  bedframeTier: fabricTierValueSchema,
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type CatalogFabricDto = z.infer<typeof catalogFabricSchema>;
+
+/** 0202 — one entry inside a fabric batch-save (rows re-minted by the RPC;
+ *  array order = display order, sortOrder server-assigned from ordinality). */
+export const catalogFabricEntryInput = z
+  .object({
+    fabricCode: z.string().trim().min(1).max(80),
+    series: z.string().trim().max(120).nullable().optional(),
+    description: z.string().trim().max(200).nullable().optional(),
+    supplierCode: z.string().trim().max(120).nullable().optional(),
+    sofaTier: fabricTierValueSchema.optional(),
+    bedframeTier: fabricTierValueSchema.optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+export type CatalogFabricEntryInput = z.infer<typeof catalogFabricEntryInput>;
+
+/** 0202 — PUT /fabrics body: the fabric master's FULL new contents (replace
+ *  semantics; catalog_fabrics_batch_save appends a section='fabrics'
+ *  catalog_config_history snapshot in the same transaction). */
+export const catalogFabricsBatchSaveInput = z
+  .object({
+    entries: z.array(catalogFabricEntryInput).max(500),
+    notes: z.string().trim().max(500).optional(),
+  })
+  .strict();
+export type CatalogFabricsBatchSaveInput = z.infer<typeof catalogFabricsBatchSaveInput>;
+
+/** 0202 — one section='fabrics' history row (fabric-shaped snapshot entries). */
+export const catalogFabricsHistorySchema = z.object({
+  id: z.string().uuid(),
+  entries: z.array(
+    z.object({
+      fabricCode: z.string(),
+      series: z.string().nullable(),
+      description: z.string().nullable(),
+      supplierCode: z.string().nullable(),
+      sofaTier: fabricTierValueSchema,
+      bedframeTier: fabricTierValueSchema,
+      active: z.boolean(),
+      sortOrder: z.number().int(),
+    }),
+  ),
+  effectiveFrom: z.string(),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type CatalogFabricsHistoryDto = z.infer<typeof catalogFabricsHistorySchema>;
 
 export const floorConfigSchema = z.object({
   id: z.number().int(),
@@ -218,71 +359,6 @@ export const modelFabricTierOverrideSchema = z.object({
 export type ModelFabricTierOverrideDto = z.infer<typeof modelFabricTierOverrideSchema>;
 
 // ---------------------------------------------------------------------------
-// 0177 — fixed-set combos (套餐). A named bundle sold at one combo_price; its
-// component SKUs split the price back out via explodeCombo() at submit time.
-// One schema, two consumers (§9.5): the API validates these and the web form
-// reuses the exact same shapes.
-// ---------------------------------------------------------------------------
-
-/** One component SKU of a combo (mirrors a `combo_components` row, camelCased). */
-export const comboComponentSchema = z.object({
-  sku: z.string(),
-  qty: z.number().int().positive(),
-  sortOrder: z.number().int(),
-});
-export type ComboComponentDto = z.infer<typeof comboComponentSchema>;
-
-/** A combo plus its components (mirrors the `Combo` domain type). */
-export const comboSchema = z.object({
-  id: z.string().uuid(),
-  comboKey: z.string(),
-  name: z.string(),
-  comboPrice: z.number(),
-  // 0183 — principal-only cost benchmark companion to comboPrice; null = unset.
-  cost: z.number().nullable(),
-  active: z.boolean(),
-  effectiveFrom: z.string(),
-  components: z.array(comboComponentSchema),
-});
-export type ComboDto = z.infer<typeof comboSchema>;
-
-/**
- * Create a combo. `comboKey` is optional — the server may derive it from the
- * name. At least one component is required. `sortOrder` is optional per
- * component (the server defaults it from array position).
- */
-export const comboCreateInput = z
-  .object({
-    name: z.string().trim().min(2).max(80),
-    comboPrice: z.number().nonnegative(),
-    // 0183 — optional cost benchmark (principal-only). null/omit = unset.
-    cost: z.number().nonnegative().nullable().optional(),
-    comboKey: z
-      .string()
-      .trim()
-      .min(2)
-      .max(60)
-      .regex(/^[a-z0-9-]+$/, "comboKey must be kebab-case (a-z, 0-9, dash)")
-      .optional(),
-    active: z.boolean().optional(),
-    components: z
-      .array(
-        z.object({
-          sku: z.string().trim().min(1),
-          qty: z.number().int().positive(),
-          sortOrder: z.number().int().optional(),
-        }),
-      )
-      .min(1),
-  })
-  .strict();
-export type ComboCreateInput = z.infer<typeof comboCreateInput>;
-
-/** Patch a combo — every field of create is optional. */
-export const comboPatchInput = comboCreateInput.partial().strict();
-export type ComboPatchInput = z.infer<typeof comboPatchInput>;
-
-// ---------------------------------------------------------------------------
 // 0178 — sofa compartment pool + per-model offered (sofa engine Phase 1).
 // Principal-owned. One schema, two consumers (§9.5): the API validates these
 // and the Maintenance UI reuses the exact same shapes.
@@ -300,23 +376,33 @@ export const sofaCompartmentSchema = z.object({
   defaultPrice: z.number(),
   sortOrder: z.number().int(),
   active: z.boolean(),
+  // 0205 — per-compartment fabric-tier P2/P3 delta override (RM, null = inherit).
+  // Optional so pre-0205 fixtures still parse; the API adapter always emits both.
+  specialTier2Delta: z.number().nullable().optional(),
+  specialTier3Delta: z.number().nullable().optional(),
 });
 export type SofaCompartmentDto = z.infer<typeof sofaCompartmentSchema>;
 
 /** One per-model offered compartment (mirrors `ModelSofaCompartment` /
- *  a `model_sofa_compartments` row). `priceOverride` NULL = inherit the pool's
- *  `defaultPrice`. */
+ *  a `model_sofa_compartments` row). `skuPrice` = the synced
+ *  `{MODEL_KEY}-{code}` SKU's price (SKU Master — the authoritative à-la-carte
+ *  price source), joined in by the bundle; `priceOverride` → pool
+ *  `defaultPrice` is the legacy fallback when no synced sku exists. */
 export const modelSofaCompartmentSchema = z.object({
   modelId: z.string().uuid(),
   compartmentId: z.string().uuid(),
   priceOverride: z.number().nullable(),
   sortOrder: z.number().int(),
+  skuPrice: z.number().nullable().optional(),
+  // 0204 — the synced SKU's {size → RM} map, enriched alongside `skuPrice`.
+  skuPricesBySize: z.record(z.number().nullable()).nullable().optional(),
 });
 export type ModelSofaCompartmentDto = z.infer<typeof modelSofaCompartmentSchema>;
 
 /**
- * Create a compartment in the pool. `code` is required + unique-by-convention;
- * `defaultPrice` defaults to 0 server-side and must be >= 0 when given.
+ * Create a compartment in the pool. `code` is required + unique-by-convention.
+ * NO price field (Loo, 2026-07-05): the pool is a foundation catalog only —
+ * compartment prices live on the synced per-model SKUs in SKU Master.
  */
 export const sofaCompartmentCreateInput = z
   .object({
@@ -330,9 +416,13 @@ export const sofaCompartmentCreateInput = z
     seatCount: z.number().int().nonnegative().nullable().optional(),
     armConfig: z.string().trim().max(60).nullable().optional(),
     iconUrl: z.string().trim().max(500).nullable().optional(),
-    defaultPrice: z.number().nonnegative().optional(),
     sortOrder: z.number().int().optional(),
     active: z.boolean().optional(),
+    // 0205 — per-compartment fabric-tier P2/P3 delta override (RM, >= 0, null =
+    // inherit). Tunes the whole-sofa FABRIC premium, not the compartment module
+    // price. Reachable on PATCH too via sofaCompartmentPatchInput (create.partial).
+    specialTier2Delta: z.number().nonnegative().nullable().optional(),
+    specialTier3Delta: z.number().nonnegative().nullable().optional(),
   })
   .strict();
 export type SofaCompartmentCreateInput = z.infer<typeof sofaCompartmentCreateInput>;
@@ -392,6 +482,13 @@ export const sofaComboSchema = z.object({
   effectiveFrom: z.string(),
   active: z.boolean(),
   discontinuedAt: z.string().nullable(),
+  // 0206 — Quick Pick preset flag. Optional so pre-0206 fixtures still parse;
+  // the API adapter always emits it (?? false).
+  isQuickPick: z.boolean().optional(),
+  // 0179 audit timestamps — surfaced (additive, optional) for the simple
+  // per-combo History view. The API adapter emits them; older fixtures omit them.
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 export type SofaComboDto = z.infer<typeof sofaComboSchema>;
 
@@ -415,6 +512,9 @@ export const sofaComboCreateInput = z
     label: z.string().trim().max(200).nullable().optional(),
     effectiveFrom: z.string().optional(),
     active: z.boolean().optional(),
+    // 0206 — true = author a Quick Pick preset (shown in POS Quick pick, no
+    // price); false/omit = a pricing-only combo. Defaults false at the DB.
+    isQuickPick: z.boolean().optional(),
   })
   .strict();
 export type SofaComboCreateInput = z.infer<typeof sofaComboCreateInput>;
@@ -693,6 +793,9 @@ export const pwpDiscoverDtoSchema = z.object({
   sourceOrderId: z.string().uuid().nullable(),
   expiresAt: z.string().nullable(),
   phoneMatches: z.boolean(),
+  /** 0204 — the NAME half of the 2990s name+phone binding (server-computed;
+   *  defaults true for pre-0204 API responses). */
+  nameMatches: z.boolean().default(true),
 });
 export type PwpDiscoverDto = z.infer<typeof pwpDiscoverDtoSchema>;
 
@@ -710,6 +813,15 @@ export const pwpReserveInputSchema = z
     cartLineKey: z.string().min(1),
     sku: z.string().min(1),
     qty: z.number().int().positive(),
+    /** True when the trigger line is ITSELF a reward (claimed PWP/promo, free
+     *  item, or appended free gift). The reserve route then skips PROMO rules —
+     *  a free reward must never mint a promo voucher that funds the next free
+     *  reward (2990s one-way parity). PWP rules still reserve (chainable). */
+    rewardLine: z.boolean().optional(),
+    /** The trigger line's built module codes when it is a SOFA BUILD — lets the
+     *  reserve route match COMBO-scope trigger targets (a flat sku carries no
+     *  build, so combo triggers otherwise never mint). Absent for flat lines. */
+    builtCompartments: z.array(z.string()).max(60).optional(),
   })
   .strict();
 export type PwpReserveInput = z.infer<typeof pwpReserveInputSchema>;
@@ -753,9 +865,6 @@ export const catalogResponseSchema = z.object({
   // The API endpoint adds these; pre-0176 clients that don't read them are unaffected.
   fabricTierConfig: fabricTierConfigSchema.optional(),
   modelFabricTierOverrides: z.array(modelFabricTierOverrideSchema).optional(),
-  // 0177 — fixed-set combos (additive, backward-compatible / OPTIONAL).
-  // Pre-0177 clients that don't read `combos` are wholly unaffected.
-  combos: z.array(comboSchema).optional(),
   // 0178 — sofa compartment pool + per-model offered (additive, OPTIONAL).
   // Pre-0178 clients that don't read these are wholly unaffected.
   sofaCompartments: z.array(sofaCompartmentSchema).optional(),
@@ -776,6 +885,9 @@ export const catalogResponseSchema = z.object({
   freeItemCampaigns: z.array(freeItemCampaignSchema).optional(),
   // 0186 — PWP & Promo rules (additive, OPTIONAL). Pre-0186 clients unaffected.
   pwpRules: z.array(pwpRuleSchema).optional(),
+  // 0202 — global procurement fabric master (additive, OPTIONAL). Pre-0202
+  // clients that don't read this are wholly unaffected.
+  fabrics: z.array(catalogFabricSchema).optional(),
 });
 export type CatalogResponse = z.infer<typeof catalogResponseSchema>;
 
@@ -894,6 +1006,14 @@ export const productSkuPatchInput = z
     // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (mirrors `cost`).
     // Presence = intent to change → gated to principal in the route.
     pwpPrice: z.number().nonnegative().nullable().optional(),
+    // 0204 (per-size pricing) — REPLACES the whole {size → RM} map (the UI
+    // sends the full map on each commit; a size with no price is OMITTED, not
+    // nulled). `null` clears the map entirely. Presence = intent to change →
+    // gated to principal in the route (mirrors price/cost/pwpPrice).
+    pricesBySize: z
+      .record(z.string().trim().min(1).max(24), z.number().nonnegative())
+      .nullable()
+      .optional(),
   })
   .strict();
 export type ProductSkuPatchInput = z.infer<typeof productSkuPatchInput>;
@@ -1050,6 +1170,7 @@ export const catalogOptionPoolCreateInput = z
     value: z.string().trim().min(1).max(60),
     label: z.string().trim().max(60).nullable().optional(),
     dimensions: z.string().trim().max(60).nullable().optional(),
+    surcharge: z.number().nullable().optional(),
     active: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   })
@@ -1064,6 +1185,7 @@ export const catalogOptionPoolPatchInput = z
     value: z.string().trim().min(1).max(60).optional(),
     label: z.string().trim().max(60).nullable().optional(),
     dimensions: z.string().trim().max(60).nullable().optional(),
+    surcharge: z.number().nullable().optional(),
     active: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   })

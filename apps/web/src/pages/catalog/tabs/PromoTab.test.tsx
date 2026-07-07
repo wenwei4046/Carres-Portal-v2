@@ -70,7 +70,6 @@ function makeCatalog(overrides?: Partial<CatalogResponse>): CatalogResponse {
     sofaFabrics: [],
     addons: [],
     floorConfig: { id: 1, freeUpToFloor: 1, perFloorPerItem: 50 },
-    combos: [],
     sofaCombos: [],
     sofaCompartments: [],
     modelSofaCompartments: [],
@@ -99,11 +98,15 @@ beforeEach(() => {
 // Principal-gating
 // ---------------------------------------------------------------------------
 describe("PromoTab — gating", () => {
-  it("principal: shows the gift model picker + the New campaign control + the New rule control", () => {
+  it("principal: shows the four header entry buttons (PWP / Promo / Free Gift / Free Item)", () => {
     render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
-    expect(screen.getByTestId("promo-gift-model-select")).toBeInTheDocument();
-    expect(screen.getByTestId("campaign-add")).toBeInTheDocument();
     expect(screen.getByTestId("pwp-add")).toBeInTheDocument();
+    expect(screen.getByTestId("promo-add")).toBeInTheDocument();
+    expect(screen.getByTestId("gwp-add")).toBeInTheDocument(); // "+ New Free Gift"
+    expect(screen.getByTestId("campaign-add")).toBeInTheDocument(); // "+ New Free Item"
+    // the old inline "Add gifts to a model" picker is gone — every add lives in
+    // the header row now.
+    expect(screen.queryByTestId("promo-gift-model-select")).not.toBeInTheDocument();
   });
 
   it("non-principal: no gift picker, no campaign add, no rule add; existing config read-only", () => {
@@ -137,6 +140,8 @@ describe("PromoTab — gating", () => {
     expect(screen.queryByTestId("promo-gift-model-select")).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaign-add")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pwp-add")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("promo-add")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("gwp-add")).not.toBeInTheDocument();
     // Lists still render
     expect(screen.getByTestId(`gift-model-card-${MATTRESS_MODEL}`)).toBeInTheDocument();
     expect(screen.getByText("Pillow promo")).toBeInTheDocument();
@@ -152,15 +157,23 @@ describe("PromoTab — gating", () => {
 // Default free gifts
 // ---------------------------------------------------------------------------
 describe("PromoTab — default free gifts", () => {
-  it("add a gift to a model → Save calls useUpsertModelFreeGifts with the payload", async () => {
-    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+  it("Edit a model's gifts → Save calls useUpsertModelFreeGifts with the payload", async () => {
+    // Adding a gift to a NEW model is done from the header "+ New Free Gift"
+    // modal (covered below); the per-model editor is reached via each card's
+    // Edit. Seed one config, Edit it, tweak the row, Save.
+    render(
+      wrap(
+        <PromoTab
+          catalog={makeCatalog({
+            modelDefaultFreeGifts: [{ modelId: MATTRESS_MODEL, gifts: [{ giftSku: "PILLOW", qty: 1 }] }],
+          })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId(`gift-edit-${MATTRESS_MODEL}`));
 
-    // pick the mattress model + Configure
-    fireEvent.change(screen.getByTestId("promo-gift-model-select"), { target: { value: MATTRESS_MODEL } });
-    fireEvent.click(screen.getByTestId("promo-gift-add"));
-
-    // pick the accessory gift + qty 2 + label
-    fireEvent.change(screen.getByTestId("gift-row-sku-0"), { target: { value: "PILLOW" } });
+    // editor pre-fills row 0 = PILLOW; bump qty to 2 + add a label
     fireEvent.change(screen.getByTestId("gift-row-qty-0"), { target: { value: "2" } });
     fireEvent.change(screen.getByTestId("gift-row-label-0"), { target: { value: "Free pillow" } });
 
@@ -172,10 +185,20 @@ describe("PromoTab — default free gifts", () => {
     expect(arg.input.gifts).toEqual([{ giftSku: "PILLOW", qty: 2, label: "Free pillow" }]);
   });
 
-  it("Save is disabled until at least one row has a gift SKU", () => {
-    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
-    fireEvent.change(screen.getByTestId("promo-gift-model-select"), { target: { value: MATTRESS_MODEL } });
-    fireEvent.click(screen.getByTestId("promo-gift-add"));
+  it("Save is disabled when a gift row has no SKU", () => {
+    render(
+      wrap(
+        <PromoTab
+          catalog={makeCatalog({
+            modelDefaultFreeGifts: [{ modelId: MATTRESS_MODEL, gifts: [{ giftSku: "PILLOW", qty: 1 }] }],
+          })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId(`gift-edit-${MATTRESS_MODEL}`));
+    // clear the only row's SKU → nothing valid to save
+    fireEvent.change(screen.getByTestId("gift-row-sku-0"), { target: { value: "" } });
     expect(screen.getByTestId("gift-save")).toBeDisabled();
   });
 
@@ -197,16 +220,42 @@ describe("PromoTab — default free gifts", () => {
     expect((screen.getByTestId("gift-row-sku-0") as HTMLSelectElement).value).toBe("PILLOW");
   });
 
+  it("size chips fall back to SKU-derived variants when allowed_options.sizes is empty", async () => {
+    // Loo 2026-07-06: Cloud Series Mattress had allowed_options.sizes = null but
+    // real King/Queen SKUs — the "Only for specific sizes" tick showed nothing.
+    // makeCatalog's mattress model has NO allowedOptions; its MATT-A sku carries
+    // variant "S" (variantKind "size") → the chip must still render.
+    render(
+      wrap(
+        <PromoTab
+          catalog={makeCatalog({
+            modelDefaultFreeGifts: [{ modelId: MATTRESS_MODEL, gifts: [{ giftSku: "PILLOW", qty: 1 }] }],
+          })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId(`gift-edit-${MATTRESS_MODEL}`));
+    fireEvent.click(screen.getByTestId("gift-row-cond-toggle-0"));
+
+    // The SKU-derived size chip "S" renders and ticks into the payload.
+    fireEvent.click(screen.getByRole("button", { name: "S" }));
+    fireEvent.click(screen.getByTestId("gift-save"));
+    await waitFor(() => expect(mockUpsertGifts).toHaveBeenCalledOnce());
+    const gifts = mockUpsertGifts.mock.calls[0][0].input.gifts;
+    expect(gifts[0].condition).toEqual({ scope: "variant", sizeCodes: ["S"] });
+  });
+
   it("a size condition rides into the saved payload", async () => {
     // give the model an offered size so the variant refinement renders chips
-    const catalog = makeCatalog();
+    const catalog = makeCatalog({
+      modelDefaultFreeGifts: [{ modelId: MATTRESS_MODEL, gifts: [{ giftSku: "PILLOW", qty: 1 }] }],
+    });
     catalog.models = catalog.models.map((m) =>
       m.id === MATTRESS_MODEL ? { ...m, allowedOptions: { sizes: ["King", "Queen"] } } : m,
     );
     render(wrap(<PromoTab catalog={catalog} isPrincipal={true} />));
-    fireEvent.change(screen.getByTestId("promo-gift-model-select"), { target: { value: MATTRESS_MODEL } });
-    fireEvent.click(screen.getByTestId("promo-gift-add"));
-    fireEvent.change(screen.getByTestId("gift-row-sku-0"), { target: { value: "PILLOW" } });
+    fireEvent.click(screen.getByTestId(`gift-edit-${MATTRESS_MODEL}`));
 
     // turn on the condition + tick King
     fireEvent.click(screen.getByTestId("gift-row-cond-toggle-0"));
@@ -303,13 +352,16 @@ describe("PromoTab — free item campaigns", () => {
 // PWP / Promo rules (0186, Phase 8a)
 // ---------------------------------------------------------------------------
 describe("PromoTab — PWP / promo rules", () => {
-  it("create: kind + categories + tick a trigger model → Save calls useCreatePwpRule", async () => {
+  it("create: + New PWP presets kind=pwp, active defaults ON (2990s) → Save calls useCreatePwpRule", async () => {
     render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
     fireEvent.click(screen.getByTestId("pwp-add"));
 
-    // default kind=pwp, trigger=mattress, reward=accessory. Bump qty to 2.
+    // kind chips preset to pwp; active defaults true (2990s parity)
+    expect(screen.getByTestId("pwp-kind-pwp")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("pwp-active")).toBeChecked();
+
+    // trigger=mattress, reward=accessory. Bump qty to 2.
     fireEvent.change(screen.getByTestId("pwp-qty"), { target: { value: "2" } });
-    fireEvent.click(screen.getByTestId("pwp-active"));
 
     // tick the mattress model in the TRIGGER picker (the first RuleTargetPicker)
     const triggerRow = screen.getByTestId(`rtp-model-${MATTRESS_MODEL}`);
@@ -327,6 +379,15 @@ describe("PromoTab — PWP / promo rules", () => {
     expect(arg.triggerTargets).toEqual([{ modelId: MATTRESS_MODEL, scope: "model" }]);
     // empty reward targeting = whole category (allowed)
     expect(arg.rewardTargets).toEqual([]);
+  });
+
+  it("+ New Promo presets kind=promo", async () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("promo-add"));
+    expect(screen.getByTestId("pwp-kind-promo")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("pwp-save"));
+    await waitFor(() => expect(mockCreatePwp).toHaveBeenCalledOnce());
+    expect(mockCreatePwp.mock.calls[0][0].type).toBe("promo");
   });
 
   it("create with empty trigger targeting = whole category is still valid", async () => {
@@ -383,7 +444,7 @@ describe("PromoTab — PWP / promo rules", () => {
       ),
     );
     fireEvent.click(screen.getByTestId("pwp-edit-pwp-1"));
-    expect((screen.getByTestId("pwp-kind") as HTMLSelectElement).value).toBe("pwp");
+    expect(screen.getByTestId("pwp-kind-pwp")).toHaveAttribute("aria-pressed", "true");
     expect((screen.getByTestId("pwp-qty") as HTMLInputElement).value).toBe("1");
     fireEvent.click(screen.getByTestId("pwp-active")); // flip ON
     fireEvent.click(screen.getByTestId("pwp-save"));
@@ -393,6 +454,13 @@ describe("PromoTab — PWP / promo rules", () => {
     expect(arg.id).toBe("pwp-1");
     expect(arg.patch.active).toBe(true);
     expect(arg.patch.triggerTargets).toEqual([{ modelId: MATTRESS_MODEL, scope: "model" }]);
+  });
+
+  it("a sofa trigger with no explicit selection disables Save (2990s parity)", () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("pwp-add"));
+    fireEvent.change(screen.getByTestId("pwp-trigger-category"), { target: { value: "sofa" } });
+    expect(screen.getByTestId("pwp-save")).toBeDisabled();
   });
 
   it("Delete confirms then calls useDeletePwpRule", () => {
@@ -413,5 +481,78 @@ describe("PromoTab — PWP / promo rules", () => {
     expect(confirmSpy).toHaveBeenCalled();
     expect(mockDeletePwp).toHaveBeenCalledWith("pwp-1", expect.anything());
     confirmSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// New GWP — bulk gift modal (2990s parity)
+// ---------------------------------------------------------------------------
+describe("PromoTab — New GWP bulk modal", () => {
+  it("tick a model + pick an accessory → Add calls useUpsertModelFreeGifts per model", async () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("gwp-add"));
+
+    fireEvent.click(screen.getByTestId(`gwp-model-${MATTRESS_MODEL}`));
+    fireEvent.change(screen.getByTestId("gwp-row-sku-0"), { target: { value: "PILLOW" } });
+    fireEvent.change(screen.getByTestId("gwp-row-qty-0"), { target: { value: "2" } });
+    fireEvent.change(screen.getByTestId("gwp-row-label-0"), { target: { value: "MING PAO CANADA" } });
+
+    fireEvent.click(screen.getByTestId("gwp-apply"));
+
+    await waitFor(() => expect(mockUpsertGifts).toHaveBeenCalledOnce());
+    const arg = mockUpsertGifts.mock.calls[0][0];
+    expect(arg.modelId).toBe(MATTRESS_MODEL);
+    expect(arg.input.gifts).toEqual([{ giftSku: "PILLOW", qty: 2, label: "MING PAO CANADA" }]);
+  });
+
+  it("appends to a model's existing gifts (merge, not replace)", async () => {
+    render(
+      wrap(
+        <PromoTab
+          catalog={makeCatalog({
+            modelDefaultFreeGifts: [
+              { modelId: MATTRESS_MODEL, gifts: [{ giftSku: "PILLOW", qty: 1, label: "Old promo" }] },
+            ],
+          })}
+          isPrincipal={true}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByTestId("gwp-add"));
+    fireEvent.click(screen.getByTestId(`gwp-model-${MATTRESS_MODEL}`));
+    fireEvent.change(screen.getByTestId("gwp-row-sku-0"), { target: { value: "PILLOW" } });
+    fireEvent.change(screen.getByTestId("gwp-row-label-0"), { target: { value: "New promo" } });
+    fireEvent.click(screen.getByTestId("gwp-apply"));
+
+    await waitFor(() => expect(mockUpsertGifts).toHaveBeenCalledOnce());
+    const gifts = mockUpsertGifts.mock.calls[0][0].input.gifts;
+    // different label = different entry — the old one survives
+    expect(gifts).toEqual([
+      { giftSku: "PILLOW", qty: 1, label: "Old promo" },
+      { giftSku: "PILLOW", qty: 1, label: "New promo" },
+    ]);
+  });
+
+  it("a size tick attaches a variant condition to mattress/bedframe gifts", async () => {
+    const catalog = makeCatalog();
+    catalog.models = catalog.models.map((m) =>
+      m.id === MATTRESS_MODEL ? { ...m, allowedOptions: { sizes: ["King", "Queen"] } } : m,
+    );
+    render(wrap(<PromoTab catalog={catalog} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("gwp-add"));
+    fireEvent.click(screen.getByTestId(`gwp-model-${MATTRESS_MODEL}`));
+    fireEvent.change(screen.getByTestId("gwp-row-sku-0"), { target: { value: "PILLOW" } });
+    fireEvent.click(screen.getByTestId("gwp-size-KING"));
+    fireEvent.click(screen.getByTestId("gwp-apply"));
+
+    await waitFor(() => expect(mockUpsertGifts).toHaveBeenCalledOnce());
+    const gifts = mockUpsertGifts.mock.calls[0][0].input.gifts;
+    expect(gifts[0].condition).toEqual({ scope: "variant", sizeCodes: ["KING"] });
+  });
+
+  it("Apply is disabled until at least one model is selected", () => {
+    render(wrap(<PromoTab catalog={makeCatalog()} isPrincipal={true} />));
+    fireEvent.click(screen.getByTestId("gwp-add"));
+    expect(screen.getByTestId("gwp-apply")).toBeDisabled();
   });
 });

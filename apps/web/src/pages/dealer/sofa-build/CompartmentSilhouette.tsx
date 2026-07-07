@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   parseCompartmentStructure,
   findModule,
@@ -11,6 +11,7 @@ import {
   DEFAULT_FOOTPRINT,
 } from "@carres/shared";
 import type { EdgeType } from "@carres/shared";
+import { ART_BBOX_FALLBACK, getCachedArtBbox, measureArtBbox } from "./sofa-art";
 
 /**
  * <CompartmentSilhouette> — a top-down plan-view SVG of one sofa compartment,
@@ -36,11 +37,23 @@ import type { EdgeType } from "@carres/shared";
  *   · `violation` → red outline (the builder's arm-cap / arm-collision warning).
  */
 
-const STROKE = "hsl(var(--base-400))";
-const BODY_FILL = "hsl(var(--base-100))";
-const BACK_FILL = "hsl(var(--base-200))";
-const ARM_FILL = "hsl(var(--base-300))";
-const SEAM = "hsl(var(--base-400))";
+// Plan-view furniture palette — WARM, matching the CARRES prototype art:
+// a cream seat cushion inside a tan arm/backrest frame with a dark outline, so
+// each compartment reads with front/back depth (not a flat gray box).
+const STROKE = "#2B2521"; // dark warm charcoal — the sofa outline
+const BODY_FILL = "#EFE7D6"; // cream / oat seat cushion (the light base)
+const BACK_FILL = "#CBAA7C"; // warm tan backrest band
+const ARM_FILL = "#BE9A64"; // deeper tan arms (reads as the frame)
+const SEAM = "#A98C5E"; // muted tan cushion seam
+
+/** The warm plan-view palette, shared with <SofaPlanView> (the joined view). */
+export const PLAN_PALETTE = {
+  stroke: STROKE,
+  body: BODY_FILL,
+  back: BACK_FILL,
+  arm: ARM_FILL,
+  seam: SEAM,
+} as const;
 
 /** A short mechanism label drawn in the body centre when a compartment has a
  *  power / recliner / power-leg mechanism. NOT an emoji (CLAUDE.md §10). */
@@ -56,6 +69,7 @@ export default function CompartmentSilhouette({
   iconUrl,
   selected = false,
   violation = false,
+  flush = false,
   className,
 }: {
   /** Compartment code, e.g. '1A(LHF)', '2NA', 'CNR', 'L(RHF)'. */
@@ -66,6 +80,12 @@ export default function CompartmentSilhouette({
   iconUrl?: string | null;
   selected?: boolean;
   violation?: boolean;
+  /** Build-canvas mode (Loo 2026-07-06 — joined modules must tile with NO
+   *  seams): the art bleeds edge-to-edge. iconUrl art is alpha-bbox-fitted
+   *  (2990s technique) so its padded margins are cropped away; the SVG
+   *  fallback drops its viewBox inset + corner radius. Default (palette /
+   *  standalone) keeps the breathing room. */
+  flush?: boolean;
   className?: string;
 }) {
   const geom = useMemo(() => {
@@ -91,11 +111,56 @@ export default function CompartmentSilhouette({
     };
   }, [code, depth]);
 
+  // Flush art path — re-render once the alpha bbox has been measured so the
+  // first paint (fallback stretch) snaps to the cropped fit.
+  const [, bumpArt] = useState(0);
+  useEffect(() => {
+    if (!iconUrl || !flush) return;
+    let live = true;
+    void measureArtBbox(iconUrl).then(() => {
+      if (live) bumpArt((n) => n + 1);
+    });
+    return () => {
+      live = false;
+    };
+  }, [iconUrl, flush]);
+
   const ringStyle = violation
     ? { boxShadow: "0 0 0 2px hsl(var(--danger))" }
     : selected
       ? { boxShadow: "0 0 0 3px hsl(var(--primary) / 0.4)" }
       : undefined;
+
+  // Flush photoreal path (build canvas): scale/offset the img so the measured
+  // silhouette bbox fills the cell exactly — cropped margins ⇒ joined modules
+  // tile without gaps (2990s SofaCellsPreview technique).
+  if (iconUrl && flush) {
+    const bbox = getCachedArtBbox(iconUrl) ?? ART_BBOX_FALLBACK;
+    const bw = Math.max(bbox.r - bbox.l, 0.01);
+    const bh = Math.max(bbox.b - bbox.t, 0.01);
+    return (
+      <div
+        className={`relative overflow-hidden ${className ?? ""}`}
+        style={ringStyle}
+        data-testid="compartment-silhouette-img-flush"
+        data-code={code}
+      >
+        <img
+          src={iconUrl}
+          alt={code}
+          draggable={false}
+          className="absolute max-w-none select-none"
+          style={{
+            width: `${100 / bw}%`,
+            height: `${100 / bh}%`,
+            left: `${(-bbox.l / bw) * 100}%`,
+            top: `${(-bbox.t / bh) * 100}%`,
+          }}
+          data-testid="compartment-silhouette-img"
+        />
+      </div>
+    );
+  }
 
   // Photoreal path: a 0178 icon_url wins. Keep the same box / ring chrome.
   if (iconUrl) {
@@ -111,7 +176,9 @@ export default function CompartmentSilhouette({
   }
 
   // SVG geometry. viewBox = the footprint aspect (cm), small inset for stroke.
-  const PAD = 4;
+  // Flush (build canvas): NO inset — cells abut in cm space, so any padding
+  // here reads as a visible gap between joined modules.
+  const PAD = flush ? 0 : 4;
   const vbW = geom.w + PAD * 2;
   const vbH = geom.h + PAD * 2;
   const ARM = Math.min(14, geom.w * 0.16, geom.h * 0.16); // arm strip thickness
@@ -133,38 +200,38 @@ export default function CompartmentSilhouette({
         y={PAD}
         width={geom.w}
         height={geom.h}
-        rx={3}
+        rx={flush ? 0 : 3}
         fill={BODY_FILL}
         stroke={violation ? "hsl(var(--danger))" : STROKE}
-        strokeWidth={1.4}
+        strokeWidth={2}
       />
 
       {/* backrest strip (on the back edge) */}
       {geom.backN && (
-        <rect x={PAD} y={PAD} width={geom.w} height={BACK} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-back" />
+        <rect x={PAD} y={PAD} width={geom.w} height={BACK} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-back" />
       )}
       {geom.backS && (
-        <rect x={PAD} y={PAD + geom.h - BACK} width={geom.w} height={BACK} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-back" />
+        <rect x={PAD} y={PAD + geom.h - BACK} width={geom.w} height={BACK} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-back" />
       )}
       {geom.backW && (
-        <rect x={PAD} y={PAD} width={BACK} height={geom.h} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-back" />
+        <rect x={PAD} y={PAD} width={BACK} height={geom.h} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-back" />
       )}
       {geom.backE && (
-        <rect x={PAD + geom.w - BACK} y={PAD} width={BACK} height={geom.h} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-back" />
+        <rect x={PAD + geom.w - BACK} y={PAD} width={BACK} height={geom.h} fill={BACK_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-back" />
       )}
 
       {/* arm rects */}
       {geom.armW && (
-        <rect x={PAD} y={PAD} width={ARM} height={geom.h} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-arm-left" />
+        <rect x={PAD} y={PAD} width={ARM} height={geom.h} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-arm-left" />
       )}
       {geom.armE && (
-        <rect x={PAD + geom.w - ARM} y={PAD} width={ARM} height={geom.h} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-arm-right" />
+        <rect x={PAD + geom.w - ARM} y={PAD} width={ARM} height={geom.h} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-arm-right" />
       )}
       {geom.armN && (
-        <rect x={PAD} y={PAD} width={geom.w} height={ARM} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-arm-top" />
+        <rect x={PAD} y={PAD} width={geom.w} height={ARM} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-arm-top" />
       )}
       {geom.armS && (
-        <rect x={PAD} y={PAD + geom.h - ARM} width={geom.w} height={ARM} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.6} data-testid="silhouette-arm-bottom" />
+        <rect x={PAD} y={PAD + geom.h - ARM} width={geom.w} height={ARM} fill={ARM_FILL} stroke={STROKE} strokeWidth={0.9} data-testid="silhouette-arm-bottom" />
       )}
 
       {/* per-cushion seams (vertical dashed dividers along the seat length) */}
@@ -179,7 +246,7 @@ export default function CompartmentSilhouette({
               x2={x}
               y2={PAD + geom.h}
               stroke={SEAM}
-              strokeWidth={0.6}
+              strokeWidth={0.9}
               strokeDasharray="3,3"
               data-testid="silhouette-seam"
             />
@@ -195,7 +262,7 @@ export default function CompartmentSilhouette({
           dominantBaseline="central"
           fontSize={Math.min(geom.w, geom.h) * 0.28}
           fontWeight={700}
-          fill="hsl(var(--base-500))"
+          fill={STROKE}
           data-testid="silhouette-mechanism"
         >
           {MECH_LABEL[geom.mechanism]}

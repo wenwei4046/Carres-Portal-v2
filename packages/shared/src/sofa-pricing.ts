@@ -40,6 +40,7 @@ import type {
 import type { FabricTier } from "./fabric-tier";
 import {
   resolveFabricDelta,
+  pickCompartmentSpecial,
   type FabricTierOverride,
   type FabricTierGlobalConfig,
 } from "./fabric-tier";
@@ -65,18 +66,53 @@ export function mirrorCode(code: string): string {
 }
 
 /**
+ * Mirror a Quick Pick's OR-set slot layout left↔right: reverse the slot order
+ * and swap each handed code's LHF↔RHF. Pure; identical result on POS + server.
+ * Faithful port of 2990s `mirrorModules` (sofa-build.ts:376-378).
+ */
+export function mirrorModules(slots: string[][]): string[][] {
+  return slots
+    .slice()
+    .reverse()
+    .map((slot) => slot.map(mirrorCode));
+}
+
+/**
+ * True when mirroring actually changes the layout. Symmetric palindromes
+ * (1-seater, 2-seater) mirror to themselves → false, so the POS hides the flip
+ * control for them. Compares the representative-code sequence (first code per
+ * slot) — that's what the preview + cart build consume.
+ * Faithful port of 2990s `canMirror` (sofa-build.ts:383-386).
+ */
+export function canMirror(slots: string[][]): boolean {
+  const rep = (m: string[][]): string => m.map((s) => s[0] ?? "").join("+");
+  return rep(slots) !== rep(mirrorModules(slots));
+}
+
+/**
  * Resolve the à-la-carte RM price for a per-model compartment.
- *   `modelComp.priceOverride ?? pool.defaultPrice`
- * Mirrors `resolveFabricDelta`'s `??` discipline: an override of `0` WINS
- * (explicitly free for this model); `null` INHERITS the pool default. When
- * neither is available (compartment not in the pool / not offered), returns 0
- * — the caller's mirror fallback gets a chance before this 0 lands.
+ *   `skuPricesBySize[size] ?? modelComp.skuPrice ?? modelComp.priceOverride
+ *    ?? pool.defaultPrice`
+ *
+ * PRICE SOURCE (Loo, 2026-07-05): the synced `{MODEL_KEY}-{code}` SKU's price
+ * (SKU Master) is authoritative — `skuPrice` is joined onto the offered row by
+ * the catalog bundle / server recompute. 0204 (Loo 2026-07-06) puts the SKU's
+ * per-SIZE map in FRONT of it: when a `size` is given and the map prices that
+ * size, that price wins; an absent/null size entry falls through to the flat
+ * `skuPrice`. The legacy override→pool-default chain survives only as a
+ * fallback for offered rows whose synced SKU is missing (pre-cutover data).
+ * `??` discipline throughout: an explicit `0` at any level WINS (explicitly
+ * free); `null`/absent falls through. When nothing is available (compartment
+ * not in the pool / not offered), returns 0 — the caller's mirror fallback
+ * gets a chance before this 0 lands.
  */
 export function resolveCompartmentPrice(
   modelComp: ModelSofaCompartment | null | undefined,
   pool: SofaCompartment | null | undefined,
+  size?: string | null,
 ): number {
-  return modelComp?.priceOverride ?? pool?.defaultPrice ?? 0;
+  const bySize = size == null ? undefined : modelComp?.skuPricesBySize?.[size];
+  return bySize ?? modelComp?.skuPrice ?? modelComp?.priceOverride ?? pool?.defaultPrice ?? 0;
 }
 
 /* ─── canonicalizeSofaSlots ────────────────────────────────────────────── */
@@ -286,6 +322,44 @@ export function pickSofaCombo(
   return { combo: winner.combo, priceMyr: winner.price, matchedIndices: winner.subset };
 }
 
+/* ─── PWP sofa reward (0186) ───────────────────────────────────────────── */
+
+/**
+ * The charged per-height price map for a combo redeemed as a PWP/promo REWARD:
+ * per height, the authored `pwpPricesByHeight` entry wins; a height with no PWP
+ * price falls back to the normal combo price (2990s `comboChargedPrices`).
+ */
+export function comboChargedPrices(
+  pwp: Record<string, number | null> | null | undefined,
+  normal: Record<string, number | null>,
+): Record<string, number | null> {
+  const out: Record<string, number | null> = { ...normal };
+  for (const [h, v] of Object.entries(pwp ?? {})) {
+    if (v !== null && v !== undefined) out[h] = v;
+  }
+  return out;
+}
+
+/**
+ * Swap the granted reward combos' price maps for their PWP-merged maps, leaving
+ * every other combo untouched. The normal `computeSofaPrice` engine then runs
+ * UNCHANGED over the swapped snapshot — the reward build re-prices to the
+ * combo's PWP price at its height, and the drift gate stays honest because the
+ * POS preview applies the IDENTICAL swap (the 2990s `pwpSofaComboIds` pattern).
+ */
+export function pwpSwappedCombos(
+  combos: readonly (SofaComboLike & {
+    pwpPricesByHeight?: Record<string, number | null> | null;
+  })[],
+  rewardComboIds: ReadonlySet<string>,
+): SofaComboLike[] {
+  return combos.map((c) =>
+    rewardComboIds.has(c.id)
+      ? { ...c, pricesByHeight: comboChargedPrices(c.pwpPricesByHeight, c.pricesByHeight) }
+      : c,
+  );
+}
+
 /* ─── computeSofaPrice ─────────────────────────────────────────────────── */
 
 /** One assembled-sofa cell (Phase 2: just the compartment code + optional
@@ -305,9 +379,21 @@ export interface SofaBuild {
   fabricTier?: FabricTier | null;
   /** Chosen seat-height key (combo lookup axis). */
   height: string;
+  /** 0201-wiring — the chosen leg-height pool VALUE (`sofa_leg_height`).
+   *  `null`/unset → no leg surcharge. An unknown/inactive value also prices 0,
+   *  so a client-claimed surcharge on a bad value fails the drift gate. */
+  legHeight?: string | null;
   /** Optional group key carried into the explode (regroup the visual sofa). */
   buildKey?: string;
   asOf?: string;
+}
+
+/** One `sofa_leg_height` pool row as the engine consumes it (a structural
+ *  subset of `CatalogOptionPool` so DTO rows pass straight through). */
+export interface SofaLegHeightOption {
+  value: string;
+  surcharge: number | null;
+  active: boolean;
 }
 
 /** The catalog snapshot the engine prices against (all numeric MYR at rest). */
@@ -322,6 +408,9 @@ export interface SofaPricingSnapshot {
   fabricTierOverride?: FabricTierOverride | null;
   /** Global fabric-tier delta config singleton (0176). */
   fabricTierConfig?: FabricTierGlobalConfig | null;
+  /** 0201-wiring — the `sofa_leg_height` pool rows (Maintenance Special
+   *  Add-ons › Sofa › Leg Heights). Absent/empty → leg picks price 0. */
+  legHeightPool?: SofaLegHeightOption[] | null;
 }
 
 export type SofaPriceBasis = "combo" | "a_la_carte";
@@ -340,6 +429,8 @@ export interface SofaPriceResult {
   reclinerExtra: number;
   /** Fabric-tier P2/P3 delta (RM). */
   fabricDelta: number;
+  /** Leg-height surcharge (RM) from the `sofa_leg_height` pool (0201-wiring). */
+  legDelta: number;
   /** Final RM price, rounded to 2dp once. */
   total: number;
   /** The build-cell indices the combo consumed (when basis === 'combo'). */
@@ -352,17 +443,20 @@ export interface SofaPriceResult {
  * flipped Quick Pick) so a one-hand-priced module never prices to RM 0. This is
  * the SINGLE lookup used by BOTH the à-la-carte loop and the combo-subset loop
  * (the C1 invariant — both must agree, or extras double-charge a mirrored cell).
+ * 0204: `size` (= build.height) threads through so the per-size price map wins
+ * when authored — identically in both loops, preserving C1.
  */
 function cellPriceCents(
   code: string,
   poolByCode: Map<string, SofaCompartment>,
   modelByCompId: Map<string, ModelSofaCompartment>,
+  size?: string | null,
 ): number {
   const direct = poolByCode.get(code);
   const comp = direct ?? poolByCode.get(mirrorCode(code));
   if (!comp) return 0;
   const mc = modelByCompId.get(comp.id);
-  return toCents(resolveCompartmentPrice(mc, comp));
+  return toCents(resolveCompartmentPrice(mc, comp, size));
 }
 
 /**
@@ -381,10 +475,11 @@ export function computeSofaPrice(
     snapshot.modelCompartments.map((m) => [m.compartmentId, m]),
   );
 
-  // À-la-carte total (cents) — sum every cell with mirror fallback.
+  // À-la-carte total (cents) — sum every cell with mirror fallback, priced at
+  // the build's chosen size (0204: per-size map wins, flat price fallback).
   let aLaCarteCents = 0;
   for (const cell of build.cells) {
-    aLaCarteCents += cellPriceCents(cell.moduleCode, poolByCode, modelByCompId);
+    aLaCarteCents += cellPriceCents(cell.moduleCode, poolByCode, modelByCompId, build.height);
   }
 
   // Combo override. Default lookup tier when fabricTier is unset = PRICE_1
@@ -426,6 +521,7 @@ export function computeSofaPrice(
         build.cells[i]!.moduleCode,
         poolByCode,
         modelByCompId,
+        build.height,
       );
     }
     const extrasCents = Math.max(0, aLaCarteCents - subsetCents);
@@ -441,15 +537,42 @@ export function computeSofaPrice(
   // Recliner extra — Phase-3 stub (interface present, no data → 0).
   const reclinerCents = 0;
 
-  // Fabric-tier P2/P3 delta (RM → cents).
+  // Per-compartment fabric-tier special (0205): the highest-precedence delta
+  // layer. Collect the special of every compartment this build uses (mirror
+  // fallback — the SAME pool lookup as cellPriceCents), highest-wins per tier →
+  // one whole-sofa delta that REPLACES the per-model / global delta below.
+  const compartmentSpecial = pickCompartmentSpecial(
+    build.cells.flatMap((cell) => {
+      const comp =
+        poolByCode.get(cell.moduleCode) ?? poolByCode.get(mirrorCode(cell.moduleCode));
+      return comp
+        ? [{ tier2Delta: comp.specialTier2Delta ?? null, tier3Delta: comp.specialTier3Delta ?? null }]
+        : [];
+    }),
+  );
+
+  // Fabric-tier P2/P3 delta (RM → cents). Precedence: per-compartment special >
+  // per-model override > global config (resolveFabricDelta owns the ?? chain).
   const fabricDeltaMyr = resolveFabricDelta(
     lookupTier,
     snapshot.fabricTierOverride,
     snapshot.fabricTierConfig,
+    compartmentSpecial,
   );
   const fabricDeltaCents = toCents(fabricDeltaMyr);
 
-  const totalCents = baseCents + reclinerCents + fabricDeltaCents;
+  // Leg-height surcharge (0201-wiring) — the chosen `sofa_leg_height` pool
+  // value's surcharge, whole-sofa (like the fabric delta). Unknown / inactive
+  // value → 0, so a client-claimed surcharge on a bad value drifts + rejects.
+  let legDeltaCents = 0;
+  if (build.legHeight) {
+    const leg = (snapshot.legHeightPool ?? []).find(
+      (o) => o.active && o.value === build.legHeight,
+    );
+    legDeltaCents = toCents(leg?.surcharge ?? 0);
+  }
+
+  const totalCents = baseCents + reclinerCents + fabricDeltaCents + legDeltaCents;
 
   return {
     aLaCarteSum: toMyr(aLaCarteCents),
@@ -460,6 +583,7 @@ export function computeSofaPrice(
     comboExtras,
     reclinerExtra: toMyr(reclinerCents),
     fabricDelta: toMyr(fabricDeltaCents),
+    legDelta: toMyr(legDeltaCents),
     total: toMyr(totalCents),
     matchedCellIndices,
   };
