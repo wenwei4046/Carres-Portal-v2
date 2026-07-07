@@ -542,6 +542,17 @@ export {
   type StorageExtensionReason,
   type RecordStorageExtensionInput,
 } from "./schemas/ops-order-control";
+
+export {
+  loanSofaInput,
+  returnLoanInput,
+  sofaLoanSchema,
+  sofaLoansResponseSchema,
+  type LoanSofaInput,
+  type ReturnLoanInput,
+  type SofaLoanDto,
+  type SofaLoansResponse,
+} from "./schemas/sofa-loan";
 export * from "./schemas/ops-cockpit";
 // Sofa engine Phase 4 — build-line attrs schema + guard (server-recompute trust
 // gate re-parses the build out of order_lines.attrs free jsonb before pricing).

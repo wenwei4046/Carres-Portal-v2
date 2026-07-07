@@ -73,6 +73,9 @@ interface Props {
   isSofa: boolean;
   /** Called after a successful reserve so the parent can invalidate. */
   onReserved: () => void;
+  /** When provided, the loan view's action LOANS the picked sofa (issue a DO +
+   *  on-loan tracking) via the parent instead of a plain reserve (migration 0209). */
+  onLoan?: (itemId: string, itemSku: string) => void;
 }
 
 // ☐ · Date in · Category · Item · Size · PO · Old ref · Condition
@@ -98,7 +101,7 @@ const COLS: {
   { key: "cond", label: "Cond", kind: "select", optKey: "cond" },
 ];
 
-export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved }: Props) {
+export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onReserved, onLoan }: Props) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [f, setF] = useState<Record<string, string>>({});
@@ -144,7 +147,17 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           score,
         };
       })
-      .sort((a, b) => b.score - a.score || a.sku.localeCompare(b.sku));
+      .sort((a, b) => {
+        // Loan view (Jess): prefer Exhibition, then Old, then New — spare the new
+        // stock; a loaner is temporary.
+        if (loanMode) {
+          const rank = (cond: string) =>
+            cond === "exhibition" ? 0 : cond === "old" ? 1 : 2;
+          const r = rank(a.condition) - rank(b.condition);
+          if (r !== 0) return r;
+        }
+        return b.score - a.score || a.sku.localeCompare(b.sku);
+      });
   }, [units, sku, matchKey, loanMode]);
 
   const opts = useMemo(() => {
@@ -178,6 +191,16 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
       return next;
     });
   }
+
+  // Loan the FIRST picked sofa (a loan is one unit + one DO) — the parent opens
+  // the DO prompt + issues the loan (migration 0209).
+  function loanOne() {
+    const firstId = [...checked][0];
+    if (!firstId || !onLoan) return;
+    const row = rows.find((r) => r.id === firstId);
+    onLoan(firstId, row?.sku ?? sku);
+  }
+  const loaning = loanMode && !!onLoan;
 
   async function reserve() {
     const ids = [...checked];
@@ -370,18 +393,30 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
         <span className="t-tiny text-base-500 mr-auto">
           need {need} · {checked.size} picked
         </span>
-        <button
-          type="button"
-          onClick={reserve}
-          disabled={submitting || checked.size === 0}
-          className="btn-primary t-tiny py-1.5 px-4"
-        >
-          {submitting
-            ? loanMode
-              ? "Loaning…"
-              : "Reserving…"
-            : `${loanMode ? "Loan" : "Reserve"} ${checked.size} to ${soRef}`}
-        </button>
+        {loaning ? (
+          <button
+            type="button"
+            onClick={loanOne}
+            disabled={checked.size === 0}
+            title="Issue a loan DO + mark this sofa on-loan to the order"
+            className="btn-primary t-tiny py-1.5 px-4"
+          >
+            Loan to {soRef}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={reserve}
+            disabled={submitting || checked.size === 0}
+            className="btn-primary t-tiny py-1.5 px-4"
+          >
+            {submitting
+              ? loanMode
+                ? "Loaning…"
+                : "Reserving…"
+              : `${loanMode ? "Loan" : "Reserve"} ${checked.size} to ${soRef}`}
+          </button>
+        )}
       </div>
 
       {/* Funnel filter menu (fixed-positioned so the grid's scroll never clips it) */}

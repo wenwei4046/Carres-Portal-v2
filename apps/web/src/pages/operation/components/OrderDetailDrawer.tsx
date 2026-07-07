@@ -29,6 +29,9 @@ import {
   useOperationOrder,
   useRecheckStockMutation,
   useReceiveLine,
+  useOrderLoans,
+  useLoanSofa,
+  useReturnLoan,
   useUpdateOrder,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
@@ -557,6 +560,10 @@ function DrawerBody({
     qty: number;
     received: number;
   } | null>(null);
+  // Sofa loan (migration 0209) — the pending "loan this sofa" DO prompt target.
+  const [loanTarget, setLoanTarget] = useState<{ itemId: string; sku: string } | null>(
+    null,
+  );
   // Group free units by the stock MATCH key (same model + canonical size), the
   // exact rule the Warehouse-stock panel filters by — so the readiness count the
   // badge shows can never disagree with the units the panel lists.
@@ -600,6 +607,12 @@ function DrawerBody({
   const loc = locationForAddress(order.customer_address ?? null);
 
   const form = useOrderControlForm(order.id);
+  // Sofa loans (migration 0209) — active loaners against this order.
+  const loansQuery = useOrderLoans(order.id);
+  const activeLoans = (loansQuery.data?.loans ?? []).filter(
+    (l) => l.status === "on_loan",
+  );
+  const returnLoan = useReturnLoan(order.id);
   // Combine duplicate-SKU lines into ONE row (Jess: don't repeat the same item),
   // then list mattress → bedframe → sofa → pillow → M.P → service.
   const orderedLines = Object.values(
@@ -775,6 +788,15 @@ function DrawerBody({
           lineQty={receiveLine.qty}
           alreadyReceived={receiveLine.received}
           onClose={() => setReceiveLine(null)}
+        />
+      )}
+      {loanTarget && (
+        <LoanSofaModal
+          orderId={order.id}
+          soRef={soRef}
+          itemId={loanTarget.itemId}
+          itemSku={loanTarget.sku}
+          onClose={() => setLoanTarget(null)}
         />
       )}
       {/* No separate top bar — the ⋮ actions menu + close moved into the Order
@@ -1133,6 +1155,9 @@ function DrawerBody({
                   void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
                   void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
                 }}
+                onLoan={(itemId, itemSku) =>
+                  setLoanTarget({ itemId, sku: itemSku })
+                }
               />
             </div>
           ) : (
@@ -1244,6 +1269,57 @@ function DrawerBody({
                     customerPhone: order.customer_phone ?? "",
                   }}
                 />
+              </div>
+            </Panel>
+          )}
+
+          {/* On loan (migration 0209) — active loaner sofas out against this order;
+              collected back (swap) at the real delivery. Only when a loan is live. */}
+          {activeLoans.length > 0 && (
+            <Panel
+              title="On loan"
+              summary={<MiniBadge tone="waiting">{activeLoans.length} out</MiniBadge>}
+            >
+              <div className="p-3 space-y-2">
+                {activeLoans.map((loan) => (
+                  <div
+                    key={loan.id}
+                    className="flex items-center justify-between gap-2 rounded-md border border-base-100 bg-base-50 px-2 py-1.5"
+                  >
+                    <div className="min-w-0">
+                      <div
+                        className="text-[12px] font-medium truncate"
+                        title={loan.item_sku ?? ""}
+                      >
+                        {loan.item_sku ?? "Sofa"}
+                      </div>
+                      <div className="text-[10px] text-base-500">
+                        {loan.item_condition ?? "—"}
+                        {loan.do_number ? ` · DO ${loan.do_number}` : ""} · loaned{" "}
+                        {fmtDate(loan.loaned_at.slice(0, 10))}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        returnLoan.mutate(
+                          { loanId: loan.id },
+                          {
+                            onSuccess: () =>
+                              toast.success("Loaner collected — back in stock"),
+                            onError: (e) =>
+                              toast.error(`Couldn't return — ${e.message}`),
+                          },
+                        )
+                      }
+                      disabled={returnLoan.isPending}
+                      title="Collect the loaner at delivery — it returns to free stock"
+                      className="btn-secondary text-[11px] whitespace-nowrap shrink-0"
+                    >
+                      Collect (swap)
+                    </button>
+                  </div>
+                ))}
               </div>
             </Panel>
           )}
@@ -1498,6 +1574,98 @@ function ReceiveLineModal({
             className="btn-primary text-[12px] disabled:opacity-40"
           >
             {receive.isPending ? "Booking…" : "Book in"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Loan-a-sofa DO prompt (migration 0209) — issue the loan DO + mark the picked
+ *  free sofa on-loan to the order. The real sofa line stays Waiting. */
+function LoanSofaModal({
+  orderId,
+  soRef,
+  itemId,
+  itemSku,
+  onClose,
+}: {
+  orderId: string;
+  soRef: string;
+  itemId: string;
+  itemSku: string;
+  onClose: () => void;
+}) {
+  const [doNumber, setDoNumber] = useState("");
+  const [notes, setNotes] = useState("");
+  const loan = useLoanSofa(orderId);
+  const field =
+    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-primary";
+
+  function submit() {
+    loan.mutate(
+      {
+        itemId,
+        doNumber: doNumber.trim() || undefined,
+        notes: notes.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success(
+            `Loaned to ${soRef}${doNumber.trim() ? ` · DO ${doNumber.trim()}` : ""}`,
+          );
+          onClose();
+        },
+        onError: (e) => toast.error(`Couldn't loan — ${e.message}`),
+      },
+    );
+  }
+
+  return (
+    <Modal title="Loan this sofa" onClose={onClose}>
+      <div className="space-y-3">
+        <div className="text-[12px] text-base-600">
+          <span className="font-mono text-[11px]">{itemSku}</span>
+          <span className="ml-2 text-base-400">→ {soRef} · FREE loaner</span>
+        </div>
+        <p className="t-tiny text-base-500">
+          The sofa is marked on-loan; the real sofa line stays Waiting. Collect it
+          back (swap) at the real delivery.
+        </p>
+        <label className="block">
+          <span className="t-tiny text-base-500">Loan DO # (optional)</span>
+          <input
+            value={doNumber}
+            onChange={(e) => setDoNumber(e.target.value)}
+            placeholder="e.g. DO-5321"
+            className={field}
+          />
+        </label>
+        <label className="block">
+          <span className="t-tiny text-base-500">Note (optional)</span>
+          <input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. customer moving in this week"
+            className={field}
+          />
+        </label>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loan.isPending}
+            className="btn-ghost text-[12px]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={loan.isPending}
+            className="btn-primary text-[12px] disabled:opacity-40"
+          >
+            {loan.isPending ? "Loaning…" : "Loan sofa"}
           </button>
         </div>
       </div>

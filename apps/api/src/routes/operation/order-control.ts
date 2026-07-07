@@ -7,9 +7,12 @@ import {
   matchStockRows,
   aggregateStorageFeesByRef,
   receiveLineInput,
+  loanSofaInput,
+  returnLoanInput,
   type OrderLineRef,
   type StockEtaImportResult,
   type ReceiveLineResult,
+  type SofaLoanDto,
 } from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -483,6 +486,205 @@ orderControlRouter.post("/:id/receive-line", async (c) => {
 
   const result: ReceiveLineResult = { received: qty, lineReceived, lineQty, ready };
   return c.json({ result });
+});
+
+// ── Sofa loan flow (migration 0209) ──────────────────────────────────────────
+// GET /:id/loans — the order's loans (joined with the loaned unit's sku + cond).
+orderControlRouter.get("/:id/loans", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("ops_sofa_loans")
+    .select(
+      "id, order_id, item_id, do_number, status, loaned_at, returned_at, notes, ops_stock_items(sku, condition)",
+    )
+    .eq("order_id", idCheck.data)
+    .order("loaned_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const loans: SofaLoanDto[] = (data ?? []).map((r) => {
+    const row = r as Record<string, unknown> & {
+      ops_stock_items?: { sku?: string | null; condition?: string | null } | null;
+    };
+    return {
+      id: row.id as string,
+      order_id: row.order_id as string,
+      item_id: row.item_id as string,
+      item_sku: row.ops_stock_items?.sku ?? null,
+      item_condition: row.ops_stock_items?.condition ?? null,
+      do_number: (row.do_number as string | null) ?? null,
+      status: row.status as "on_loan" | "returned",
+      loaned_at: row.loaned_at as string,
+      returned_at: (row.returned_at as string | null) ?? null,
+      notes: (row.notes as string | null) ?? null,
+    };
+  });
+  return c.json({ loans });
+});
+
+// POST /:id/loan-sofa — lend a free sofa to the order: claim the unit (free →
+// reserved with a "LOAN SO-{n}" marker, atomic on status='free') + record the
+// loan. The real sofa line is untouched (stays Waiting).
+orderControlRouter.post("/:id/loan-sofa", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const orderId = idCheck.data;
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = loanSofaInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const path = issue && issue.path.length > 0 ? issue.path.join(".") : "<root>";
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: `Invalid loan input at ${path}: ${issue?.message ?? "validation failed"}` },
+      422,
+    );
+  }
+  const { itemId, doNumber, notes } = parsed.data;
+  const sb = userClient(c.env, auth.jwt);
+
+  const { data: order, error: ordErr } = await sb
+    .from("orders")
+    .select("id, so")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (ordErr) {
+    const m = mapPgError(ordErr);
+    return c.json(m.body, m.status);
+  }
+  if (!order) throw new HTTPException(404, { message: "Order not found" });
+
+  // Claim the free unit (atomic on status='free' — 409 if someone grabbed it).
+  const now = new Date().toISOString();
+  const { data: claimed, error: claimErr } = await sb
+    .from("ops_stock_items")
+    .update({ status: "reserved", reserved_ref: `LOAN SO-${order.so}`, updated_at: now })
+    .eq("id", itemId)
+    .eq("status", "free")
+    .select("id, sku, condition")
+    .maybeSingle();
+  if (claimErr) {
+    const m = mapPgError(claimErr);
+    return c.json(m.body, m.status);
+  }
+  if (!claimed) {
+    return c.json(
+      { error: "not_free", code: "conflict", message: "That sofa is no longer free" },
+      409,
+    );
+  }
+
+  const { data: loan, error: loanErr } = await sb
+    .from("ops_sofa_loans")
+    .insert({
+      order_id: orderId,
+      item_id: itemId,
+      do_number: doNumber ?? null,
+      status: "on_loan",
+      loaned_by: auth.id,
+      notes: notes ?? null,
+    })
+    .select("id, order_id, item_id, do_number, status, loaned_at, returned_at, notes")
+    .single();
+  if (loanErr) {
+    // Best-effort rollback of the claim so the unit isn't stranded reserved.
+    await sb
+      .from("ops_stock_items")
+      .update({ status: "free", reserved_ref: null, updated_at: new Date().toISOString() })
+      .eq("id", itemId);
+    const m = mapPgError(loanErr);
+    return c.json(m.body, m.status);
+  }
+  const dto: SofaLoanDto = {
+    id: loan.id as string,
+    order_id: loan.order_id as string,
+    item_id: loan.item_id as string,
+    item_sku: (claimed.sku as string | null) ?? null,
+    item_condition: (claimed.condition as string | null) ?? null,
+    do_number: (loan.do_number as string | null) ?? null,
+    status: loan.status as "on_loan" | "returned",
+    loaned_at: loan.loaned_at as string,
+    returned_at: (loan.returned_at as string | null) ?? null,
+    notes: (loan.notes as string | null) ?? null,
+  };
+  return c.json({ loan: dto });
+});
+
+// POST /:id/loan-return — the swap at final delivery: mark the loan returned +
+// free the loaned unit back to stock.
+orderControlRouter.post("/:id/loan-return", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const orderId = idCheck.data;
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = returnLoanInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "loanId must be a uuid" },
+      422,
+    );
+  }
+  const { loanId } = parsed.data;
+  const sb = userClient(c.env, auth.jwt);
+
+  const { data: loan, error: loanErr } = await sb
+    .from("ops_sofa_loans")
+    .select("id, item_id, status")
+    .eq("id", loanId)
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (loanErr) {
+    const m = mapPgError(loanErr);
+    return c.json(m.body, m.status);
+  }
+  if (!loan) throw new HTTPException(404, { message: "Loan not found" });
+  if (loan.status !== "on_loan") {
+    return c.json(
+      { error: "already_returned", code: "conflict", message: "That loan is already returned" },
+      409,
+    );
+  }
+
+  const now = new Date().toISOString();
+  const { error: upErr } = await sb
+    .from("ops_sofa_loans")
+    .update({ status: "returned", returned_at: now, updated_at: now })
+    .eq("id", loanId)
+    .eq("status", "on_loan");
+  if (upErr) {
+    const m = mapPgError(upErr);
+    return c.json(m.body, m.status);
+  }
+  const { error: freeErr } = await sb
+    .from("ops_stock_items")
+    .update({ status: "free", reserved_ref: null, updated_at: now })
+    .eq("id", loan.item_id as string);
+  if (freeErr) {
+    const m = mapPgError(freeErr);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true });
 });
 
 export default orderControlRouter;

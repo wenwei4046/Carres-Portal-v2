@@ -277,10 +277,11 @@ describe("PUT /api/operation/orders/:id/control", () => {
 /** Per-table mock: routes each `.from(table)` to its own result, is thenable so
  *  `await select().eq()` resolves, and captures insert/upsert rows. */
 function tableSb(tables: Record<string, { data?: unknown; error?: unknown }>) {
-  const captured: { inserts: { table: string; rows: unknown }[]; upserts: { table: string; rows: unknown }[] } = {
-    inserts: [],
-    upserts: [],
-  };
+  const captured: {
+    inserts: { table: string; rows: unknown }[];
+    upserts: { table: string; rows: unknown }[];
+    updates: { table: string; patch: unknown }[];
+  } = { inserts: [], upserts: [], updates: [] };
   const from = vi.fn((table: string) => {
     const res = { data: null, error: null, ...(tables[table] ?? {}) };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -291,9 +292,14 @@ function tableSb(tables: Record<string, { data?: unknown; error?: unknown }>) {
       not: vi.fn(() => builder),
       maybeSingle: vi.fn().mockResolvedValue(res),
       single: vi.fn().mockResolvedValue(res),
+      // insert / update are chainable (…​.select().single()) AND awaitable (via then).
       insert: vi.fn((rows: unknown) => {
         captured.inserts.push({ table, rows });
-        return Promise.resolve({ error: res.error ?? null });
+        return builder;
+      }),
+      update: vi.fn((patch: unknown) => {
+        captured.updates.push({ table, patch });
+        return builder;
       }),
       upsert: vi.fn((rows: unknown) => {
         captured.upserts.push({ table, rows });
@@ -421,5 +427,158 @@ describe("POST /api/operation/orders/:id/receive-line", () => {
     expect(body.result).toMatchObject({ ready: false, lineReceived: 1 });
     const up = sb.captured.upserts.find((u) => u.table === "ops_order_control");
     expect((up!.rows as Record<string, unknown>).line_stock_status).toBeUndefined();
+  });
+});
+
+// =====================================================================
+// Sofa loan flow (migration 0209)
+// =====================================================================
+describe("POST /api/operation/orders/:id/loan-sofa", () => {
+  const URL = `http://t/api/operation/orders/${ORDER_ID}/loan-sofa`;
+  const ITEM = "00000000-0000-0000-0000-0000000000f1";
+
+  it("403 for dealer role", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: ITEM }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("422 on an invalid body (itemId not a uuid)", async () => {
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: "nope" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("200 — claims the free unit (LOAN marker) + records the loan", async () => {
+    const sb = tableSb({
+      orders: { data: { id: ORDER_ID, so: 1146 } },
+      ops_stock_items: { data: { id: ITEM, sku: "Sofa L 3-Seater", condition: "exhibition" } },
+      ops_sofa_loans: {
+        data: {
+          id: "loan1",
+          order_id: ORDER_ID,
+          item_id: ITEM,
+          do_number: "DO-5321",
+          status: "on_loan",
+          loaned_at: "2026-07-07T00:00:00.000Z",
+          returned_at: null,
+          notes: null,
+        },
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: ITEM, doNumber: "DO-5321" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { loan: { status: string; item_sku: string } };
+    expect(body.loan.status).toBe("on_loan");
+    expect(body.loan.item_sku).toBe("Sofa L 3-Seater");
+    // The unit was claimed with a LOAN reserved_ref marker.
+    const claim = sb.captured.updates.find((u) => u.table === "ops_stock_items");
+    expect((claim!.patch as Record<string, unknown>).reserved_ref).toBe("LOAN SO-1146");
+  });
+
+  it("409 when the sofa is no longer free", async () => {
+    const sb = tableSb({
+      orders: { data: { id: ORDER_ID, so: 1146 } },
+      ops_stock_items: { data: null }, // the conditional update matched nothing
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: ITEM }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+  });
+});
+
+describe("POST /api/operation/orders/:id/loan-return", () => {
+  const URL = `http://t/api/operation/orders/${ORDER_ID}/loan-return`;
+  const LOAN = "00000000-0000-0000-0000-0000000000f2";
+
+  it("200 — marks the loan returned + frees the unit", async () => {
+    const sb = tableSb({
+      ops_sofa_loans: { data: { id: LOAN, item_id: "unit1", status: "on_loan" } },
+      ops_stock_items: {},
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ loanId: LOAN }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // loan → returned, unit → free.
+    const loanUpd = sb.captured.updates.find((u) => u.table === "ops_sofa_loans");
+    expect((loanUpd!.patch as Record<string, unknown>).status).toBe("returned");
+    const freeUpd = sb.captured.updates.find((u) => u.table === "ops_stock_items");
+    expect((freeUpd!.patch as Record<string, unknown>).status).toBe("free");
+  });
+
+  it("404 when the loan isn't found on the order", async () => {
+    const sb = tableSb({ ops_sofa_loans: { data: null } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ loanId: LOAN }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("409 when the loan is already returned", async () => {
+    const sb = tableSb({
+      ops_sofa_loans: { data: { id: LOAN, item_id: "unit1", status: "returned" } },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ loanId: LOAN }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
   });
 });

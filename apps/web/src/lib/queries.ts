@@ -29,6 +29,10 @@ import {
   type StockEtaImportResult,
   type ReceiveLineInput,
   type ReceiveLineResult,
+  type LoanSofaInput,
+  type ReturnLoanInput,
+  type SofaLoanDto,
+  type SofaLoansResponse,
   type AutocountImportInput,
   type AutocountImportResponse,
   type SpecialAddonDto,
@@ -5047,6 +5051,55 @@ export function useReceiveLine(orderId: string) {
         queryKey: qk.operation.orderControl(orderId),
         exact: true,
       });
+      void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+    },
+  });
+}
+
+// ── Sofa loan flow (migration 0209) ──────────────────────────────────────────
+const loansKey = (orderId: string | null) =>
+  ["operation", "orders", orderId ?? "null", "loans"] as const;
+
+/** The order's sofa loans (active + returned). */
+export function useOrderLoans(orderId: string | null) {
+  return useQuery({
+    queryKey: loansKey(orderId),
+    queryFn: () =>
+      apiFetch<SofaLoansResponse>(`/api/operation/orders/${orderId}/loans`),
+    enabled: !!orderId,
+    staleTime: 10_000,
+  });
+}
+
+/** Lend a free sofa to the order (issue a loan DO + on-loan tracking). */
+export function useLoanSofa(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: LoanSofaInput) =>
+      apiFetch<{ loan: SofaLoanDto }>(
+        `/api/operation/orders/${orderId}/loan-sofa`,
+        catalogJson("POST", input),
+      ).then((r) => r.loan),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: loansKey(orderId) });
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
+    },
+  });
+}
+
+/** Return a loaned sofa (the swap at final delivery) — frees the unit again. */
+export function useReturnLoan(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReturnLoanInput) =>
+      apiFetch<{ ok: true }>(
+        `/api/operation/orders/${orderId}/loan-return`,
+        catalogJson("POST", input),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: loansKey(orderId) });
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
     },
   });
