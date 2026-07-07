@@ -6,6 +6,7 @@ import {
   stockEtaImportInput,
   matchStockRows,
   aggregateStorageFeesByRef,
+  aggregateBalancesByRef,
   receiveLineInput,
   loanSofaInput,
   returnLoanInput,
@@ -13,6 +14,7 @@ import {
   type StockEtaImportResult,
   type ReceiveLineResult,
   type SofaLoanDto,
+  type BalancePayStatus,
 } from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -162,7 +164,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
       422,
     );
   }
-  const { rows, storageFees, dryRun = false } = parsed.data;
+  const { rows, storageFees, balances, dryRun = false } = parsed.data;
 
   const sb = userClient(c.env, auth.jwt);
 
@@ -207,9 +209,17 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
   // can be written to ops_order_control.storage_fee_msbf / _sof. Aggregated
   // server-side too (defence — a Master repeats an order's fee across its lines).
   const storageAgg = aggregateStorageFeesByRef(storageFees ?? []);
+  const balanceAgg = aggregateBalancesByRef(balances ?? []);
   const feeByOrder = new Map<string, { msbf?: number; sof?: number }>();
+  const balanceByOrder = new Map<
+    string,
+    { owing?: number; payStatus?: BalancePayStatus }
+  >();
   let storageUnmatched = 0;
-  if (storageAgg.length > 0) {
+  let balanceUnmatched = 0;
+  // Storage fees + balance/payment-status both join by Ref (per-order) — resolve
+  // the ref→order map ONCE and drive both (orders.source_ref is a text[]).
+  if (storageAgg.length > 0 || balanceAgg.length > 0) {
     const { data: orderData, error: ordErr } = await sb
       .from("orders")
       .select("id, source_ref");
@@ -234,6 +244,17 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
       if (f.sof !== undefined) cur.sof = f.sof;
       feeByOrder.set(orderId, cur);
     }
+    for (const b of balanceAgg) {
+      const orderId = orderByRef.get(b.ref.trim().toUpperCase());
+      if (!orderId) {
+        balanceUnmatched += 1;
+        continue;
+      }
+      const cur = balanceByOrder.get(orderId) ?? {};
+      if (b.owing !== undefined) cur.owing = b.owing;
+      if (b.payStatus) cur.payStatus = b.payStatus;
+      balanceByOrder.set(orderId, cur);
+    }
   }
 
   const result: StockEtaImportResult = {
@@ -244,11 +265,17 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     storageOrders: feeByOrder.size,
     storageWritten: 0,
     storageUnmatched,
+    balanceOrders: balanceByOrder.size,
+    balanceWritten: 0,
+    balanceUnmatched,
     sampleUnmatched: unmatched.slice(0, 20),
     dryRun,
   };
 
-  if (dryRun || (touchedOrders.size === 0 && feeByOrder.size === 0)) {
+  if (
+    dryRun ||
+    (touchedOrders.size === 0 && feeByOrder.size === 0 && balanceByOrder.size === 0)
+  ) {
     return c.json({ result });
   }
 
@@ -327,6 +354,30 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
       return c.json(m.body, m.status);
     }
     result.storageWritten = feeByOrder.size;
+  }
+
+  // Write the per-order balance (owing) + payment status from the Master's
+  // "Balance" + "Payment Status" columns. No migration — both columns exist.
+  if (balanceByOrder.size > 0) {
+    const balRows = [...balanceByOrder.entries()].map(([orderId, b]) => {
+      const row: {
+        order_id: string;
+        updated_by: string;
+        balance?: number;
+        payment_status?: string;
+      } = { order_id: orderId, updated_by: auth.id };
+      if (b.owing !== undefined) row.balance = b.owing;
+      if (b.payStatus) row.payment_status = b.payStatus;
+      return row;
+    });
+    const { error: balErr } = await sb
+      .from("ops_order_control")
+      .upsert(balRows, { onConflict: "order_id" });
+    if (balErr) {
+      const m = mapPgError(balErr);
+      return c.json(m.body, m.status);
+    }
+    result.balanceWritten = balanceByOrder.size;
   }
 
   return c.json({ result });
