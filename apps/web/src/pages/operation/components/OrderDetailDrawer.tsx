@@ -978,8 +978,11 @@ function DrawerBody({
                     <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-24 border-r border-base-600">
                       PO
                     </th>
-                    <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-32">
-                      Location
+                    <th
+                      className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-32"
+                      title="Where this item's stock is received / consolidated before delivery"
+                    >
+                      Receive at
                     </th>
                   </tr>
                 </thead>
