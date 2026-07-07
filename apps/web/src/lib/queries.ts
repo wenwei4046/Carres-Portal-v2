@@ -27,6 +27,8 @@ import {
   type StockEtaImportRow,
   type StorageFeeImportRow,
   type StockEtaImportResult,
+  type ReceiveLineInput,
+  type ReceiveLineResult,
   type AutocountImportInput,
   type AutocountImportResponse,
   type SpecialAddonDto,
@@ -5024,6 +5026,28 @@ export function useImportStockEta() {
       ).then((r) => r.result),
     onSuccess: (_res, vars) => {
       if (!vars.dryRun) void qc.invalidateQueries({ queryKey: ["operation"] });
+    },
+  });
+}
+
+/** GRN per-line receive (migration 0208) — book n units of one order line into
+ *  stock (reserved to the SO). Refreshes the order detail + control overlay +
+ *  the ops-stock listing so the Recv X/N + readiness update. */
+export function useReceiveLine(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReceiveLineInput) =>
+      apiFetch<{ result: ReceiveLineResult }>(
+        `/api/operation/orders/${orderId}/receive-line`,
+        catalogJson("POST", input),
+      ).then((r) => r.result),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      void qc.invalidateQueries({
+        queryKey: qk.operation.orderControl(orderId),
+        exact: true,
+      });
+      void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
     },
   });
 }

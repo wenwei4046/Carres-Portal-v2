@@ -7,6 +7,7 @@ import {
   FileText,
   Flag,
   MoreVertical,
+  PackagePlus,
   Pencil,
   Phone,
   RotateCcw,
@@ -27,6 +28,7 @@ import {
   qk,
   useOperationOrder,
   useRecheckStockMutation,
+  useReceiveLine,
   useUpdateOrder,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
@@ -44,6 +46,7 @@ import {
   stockMatchKey,
 } from "@/lib/line-category";
 import { useAuth } from "@/lib/auth";
+import { Modal } from "./Modal";
 import DeliveryChain from "./DeliveryChain";
 import {
   useOrderControlForm,
@@ -548,6 +551,12 @@ function DrawerBody({
   const [pickerSku, setPickerSku] = useState<string | null>(null);
   // GRN — receive an open linked PO right here (Jess: receive in the order).
   const [receivePo, setReceivePo] = useState<operationOrderDetailPo | null>(null);
+  // GRN per-line partial receive (migration 0208) — the "Book in" stepper target.
+  const [receiveLine, setReceiveLine] = useState<{
+    sku: string;
+    qty: number;
+    received: number;
+  } | null>(null);
   // Group free units by the stock MATCH key (same model + canonical size), the
   // exact rule the Warehouse-stock panel filters by — so the readiness count the
   // badge shows can never disagree with the units the panel lists.
@@ -693,6 +702,9 @@ function DrawerBody({
   // the sheet, not the portal, so the derived value alone never shows Ready.
   const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" =>
     form.draft.line_stock_status[sku] ?? derivedReadiness(sku, qty);
+  // GRN received-so-far per line (migration 0208) — drives the Recv X/N column.
+  const lineReceivedOf = (sku: string): number =>
+    Number(form.control?.line_received?.[sku] ?? 0);
   const readyN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "ready").length;
   const waitingN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "waiting").length;
   const nopoN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "nopo").length;
@@ -754,6 +766,15 @@ function DrawerBody({
           supplier={undefined}
           warehouse={warehouse ?? undefined}
           onClose={() => setReceivePo(null)}
+        />
+      )}
+      {receiveLine && (
+        <ReceiveLineModal
+          orderId={order.id}
+          sku={receiveLine.sku}
+          lineQty={receiveLine.qty}
+          alreadyReceived={receiveLine.received}
+          onClose={() => setReceiveLine(null)}
         />
       )}
       {/* No separate top bar — the ⋮ actions menu + close moved into the Order
@@ -910,6 +931,12 @@ function DrawerBody({
                     <th className="text-right text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-10 border-r border-base-600">
                       Qty
                     </th>
+                    <th
+                      className="text-center text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 w-16 border-r border-base-600"
+                      title="Received / ordered — click to book in received units (GRN)"
+                    >
+                      Recv
+                    </th>
                     <th className="text-left text-[10px] uppercase tracking-[0.04em] font-semibold px-2 py-1.5 border-r border-base-600">
                       Model
                     </th>
@@ -989,6 +1016,36 @@ function DrawerBody({
                         <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
                           {l.qty}
                         </td>
+                        {isService ? (
+                          <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 text-center align-top">
+                            —
+                          </td>
+                        ) : (
+                          <td className="border border-base-200 px-1 py-1 text-center align-middle">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReceiveLine({
+                                  sku: l.sku,
+                                  qty: l.qty,
+                                  received: lineReceivedOf(l.sku),
+                                });
+                              }}
+                              title="Book in received units (GRN)"
+                              className={`inline-flex items-center gap-0.5 text-[11px] tabular-nums px-1.5 py-0.5 rounded ${
+                                lineReceivedOf(l.sku) >= l.qty
+                                  ? "text-success font-semibold"
+                                  : "text-primary hover:bg-primary/10"
+                              }`}
+                            >
+                              {lineReceivedOf(l.sku)}/{l.qty}
+                              {lineReceivedOf(l.sku) < l.qty && (
+                                <PackagePlus size={11} strokeWidth={2} />
+                              )}
+                            </button>
+                          </td>
+                        )}
                         <td className="border border-base-200 px-2 py-1 align-top">
                           <div
                             className="font-mono text-[10px] leading-tight break-words"
@@ -1318,6 +1375,133 @@ function addonsSum(
   return (addons ?? []).reduce(
     (s, a) => s + Number(a.unit_price || 0) * Number(a.qty || 0),
     0,
+  );
+}
+
+/** GRN "Book in" stepper (migration 0208) — receive n units of one order line
+ *  into stock (reserved to the SO), WITHOUT a portal PO. Fully-received lines
+ *  auto-flip to Ready. */
+function ReceiveLineModal({
+  orderId,
+  sku,
+  lineQty,
+  alreadyReceived,
+  onClose,
+}: {
+  orderId: string;
+  sku: string;
+  lineQty: number;
+  alreadyReceived: number;
+  onClose: () => void;
+}) {
+  const remaining = Math.max(0, lineQty - alreadyReceived);
+  const [qty, setQty] = useState(String(remaining || 1));
+  const [condition, setCondition] = useState<"new" | "exhibition" | "old">("new");
+  const [location, setLocation] = useState("");
+  const [doNumber, setDoNumber] = useState("");
+  const receive = useReceiveLine(orderId);
+  const n = Number(qty);
+  const valid = Number.isFinite(n) && n >= 1 && n <= 999;
+  const field =
+    "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-primary";
+
+  function submit() {
+    if (!valid) return;
+    receive.mutate(
+      {
+        sku,
+        qty: n,
+        condition,
+        location: location.trim() || undefined,
+        doNumber: doNumber.trim() || undefined,
+      },
+      {
+        onSuccess: (r) => {
+          toast.success(
+            `Booked ${r.received} unit(s) — ${r.lineReceived}/${r.lineQty}${r.ready ? " · Ready" : ""}`,
+          );
+          onClose();
+        },
+        onError: (e) => toast.error(`Couldn't book — ${e.message}`),
+      },
+    );
+  }
+
+  return (
+    <Modal title="Book in received stock" onClose={onClose}>
+      <div className="space-y-3">
+        <div className="text-[12px] text-base-600">
+          <span className="font-mono text-[11px]">{sku}</span>
+          <span className="ml-2 text-base-400">
+            received {alreadyReceived}/{lineQty}
+          </span>
+        </div>
+        <label className="block">
+          <span className="t-tiny text-base-500">Arrived now (units)</span>
+          <input
+            type="number"
+            min={1}
+            max={remaining || 999}
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            className={field}
+          />
+          {remaining > 0 && (
+            <span className="t-tiny text-base-400">remaining {remaining}</span>
+          )}
+        </label>
+        <label className="block">
+          <span className="t-tiny text-base-500">Condition</span>
+          <select
+            value={condition}
+            onChange={(e) =>
+              setCondition(e.target.value as "new" | "exhibition" | "old")
+            }
+            className={field}
+          >
+            <option value="new">New</option>
+            <option value="exhibition">Exhibition</option>
+            <option value="old">Old</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="t-tiny text-base-500">Location (optional)</span>
+          <input
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g. Carres Klang"
+            className={field}
+          />
+        </label>
+        <label className="block">
+          <span className="t-tiny text-base-500">DO / receipt # (optional)</span>
+          <input
+            value={doNumber}
+            onChange={(e) => setDoNumber(e.target.value)}
+            placeholder="e.g. RF2607"
+            className={field}
+          />
+        </label>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={receive.isPending}
+            className="btn-ghost text-[12px]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!valid || receive.isPending}
+            className="btn-primary text-[12px] disabled:opacity-40"
+          >
+            {receive.isPending ? "Booking…" : "Book in"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

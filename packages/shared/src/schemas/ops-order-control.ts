@@ -115,6 +115,12 @@ export const opsOrderControlSchema = z.object({
   line_stock_status: z
     .record(z.string(), z.enum(["ready", "waiting", "nopo"]))
     .nullable(),
+  /** Per-line GRN received qty { <sku>: number } — how many units have been
+   *  booked into ops_stock_items (reserved to this SO) for the line. Drives the
+   *  Recv X/N column; when it reaches the line qty the line auto-flips to Ready
+   *  (via line_stock_status). READ-only on the overlay — written by the dedicated
+   *  /receive-line endpoint, never the generic control PUT (migration 0208). */
+  line_received: z.record(z.string(), z.number()).nullable().default(null),
   called_customer: z.boolean().default(false),
   /** Balance job (migration 0184) — when the customer's balance is due. Key-in;
    *  the Payments panel + drawer flag overdue (due < today AND outstanding > 0).
@@ -326,6 +332,32 @@ export const opsOrderControlResponseSchema = z.object({
 export type OpsOrderControlResponse = z.infer<
   typeof opsOrderControlResponseSchema
 >;
+
+// ── GRN per-line receive (migration 0208) ────────────────────────────────────
+/** Book n units of ONE order line into ops_stock_items, reserved to the SO. The
+ *  condition mirrors ops_stock_items ('new' | 'exhibition' | 'old'); location +
+ *  a receipt/DO number are optional stamps. */
+export const receiveLineInput = z
+  .object({
+    sku: z.string().trim().min(1).max(200),
+    qty: z.number().int().min(1).max(999),
+    condition: z.enum(["new", "exhibition", "old"]).default("new"),
+    location: z.string().trim().max(120).optional(),
+    doNumber: z.string().trim().max(60).optional(),
+  })
+  .strict();
+export type ReceiveLineInput = z.infer<typeof receiveLineInput>;
+
+export interface ReceiveLineResult {
+  /** Units booked in this call. */
+  received: number;
+  /** Line's cumulative received qty after this call. */
+  lineReceived: number;
+  /** The line's ordered qty (received == ordered ⇒ the line flips to Ready). */
+  lineQty: number;
+  /** True when the line is now fully received (auto-set to Ready). */
+  ready: boolean;
+}
 
 // ── Storage scope + collect-before-delivery gate ─────────────────────────────
 /** Storage-fee scope of a SKU: mattress/bed frame bills at the MS/BF rate, sofa
