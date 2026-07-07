@@ -32,6 +32,7 @@ import {
   useOrderLoans,
   useLoanSofa,
   useReturnLoan,
+  useDeliveryPartners,
   useUpdateOrder,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
@@ -607,6 +608,13 @@ function DrawerBody({
   const loc = locationForAddress(order.customer_address ?? null);
 
   const form = useOrderControlForm(order.id);
+  // The order's assigned logistic NAME (ops_assigned_logistic is a partner id) —
+  // drives the default stock Location (final consolidation point, not supplier).
+  const { data: partnersData } = useDeliveryPartners();
+  const assignedLogisticName =
+    (partnersData?.partners ?? []).find(
+      (p) => p.id === order.ops_assigned_logistic,
+    )?.name ?? null;
   // Sofa loans (migration 0209) — active loaners against this order.
   const loansQuery = useOrderLoans(order.id);
   const activeLoans = (loansQuery.data?.loans ?? []).filter(
@@ -713,8 +721,13 @@ function DrawerBody({
   // Per-line override (Master-sheet import or keyed in the Stock cell) wins over
   // the derived free-stock value (migration 0199) — AutoCount receipts live in
   // the sheet, not the portal, so the derived value alone never shows Ready.
-  const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" =>
-    form.draft.line_stock_status[sku] ?? derivedReadiness(sku, qty);
+  const readinessOf = (sku: string, qty: number): "ready" | "waiting" | "nopo" => {
+    // Accessories (pillow / M.P / protector) are ALWAYS ready warehouse stock
+    // (Jess 2026-07-07) — they don't go through a PO / receive; they're deducted
+    // from the Klang warehouse. Only core items run the PO/stock readiness.
+    if (lineKind(sku) === "acc") return "ready";
+    return form.draft.line_stock_status[sku] ?? derivedReadiness(sku, qty);
+  };
   // GRN received-so-far per line (migration 0208) — drives the Recv X/N column.
   const lineReceivedOf = (sku: string): number =>
     Number(form.control?.line_received?.[sku] ?? 0);
@@ -973,6 +986,9 @@ function DrawerBody({
                 <tbody>
                   {orderedLines.map((l) => {
                     const isService = lineKind(l.sku) === "service";
+                    // Accessories (pillow / M.P / protector) come from the Klang
+                    // warehouse — no PO, no Stock ETA, no receive step (Jess).
+                    const isAcc = lineKind(l.sku) === "acc";
                     // Per-item Stock Status (Jess sheet col Z): Received (stock in) ·
                     // Pending (PO placed, waiting — show Stock ETA) · No PO (nothing
                     // raised). Derived from same-model+size free stock + PO existence.
@@ -996,7 +1012,7 @@ function DrawerBody({
                     const locValue =
                       savedLoc !== undefined
                         ? (savedLoc[0] ?? "")
-                        : (defaultLineLocation(l.sku) ?? "");
+                        : (defaultLineLocation(l.sku, assignedLogisticName) ?? "");
                     // Per-item Stock ETA (migration 0170) — when the item's stock
                     // arrives; defaults to the linked PO's date, overridable.
                     const etaValue =
@@ -1011,6 +1027,13 @@ function DrawerBody({
                         <td className="border border-base-200 px-1.5 py-1 align-top">
                           {isService || !rd ? (
                             <span className="text-base-300 text-[11px]">—</span>
+                          ) : isAcc ? (
+                            <span
+                              title="Accessory — always in the Klang warehouse; deducted from ready stock"
+                              className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] whitespace-nowrap"
+                            >
+                              Ready · stock
+                            </span>
                           ) : (
                             <StockStatusCell
                               sku={l.sku}
@@ -1021,9 +1044,9 @@ function DrawerBody({
                             />
                           )}
                         </td>
-                        {isService ? (
+                        {isService || isAcc ? (
                           <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 align-top">
-                            N/A
+                            {isAcc ? "from stock" : "N/A"}
                           </td>
                         ) : (
                           <td className="border border-base-200 px-1 py-0.5 align-top">
@@ -1038,9 +1061,9 @@ function DrawerBody({
                         <td className="border border-base-200 px-2 py-1 text-right text-[12px] tabular-nums align-top">
                           {l.qty}
                         </td>
-                        {isService ? (
-                          <td className="border border-base-200 px-2 py-1 text-[11px] text-base-400 text-center align-top">
-                            —
+                        {isService || isAcc ? (
+                          <td className="border border-base-200 px-2 py-1 text-[10px] text-base-400 text-center align-middle">
+                            {isAcc ? "from stock" : "—"}
                           </td>
                         ) : (
                           <td className="border border-base-200 px-1 py-1 text-center align-middle">
