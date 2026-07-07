@@ -1,4 +1,4 @@
--- 0200_master_storage_fees
+-- 0207_master_storage_fees
 --
 -- 2990s-style Master import → per-order storage fees (Jess 2026-07-06). Jess
 -- hand-computes each order's storage fee in the Master's "MS/BF Storage Fees"
@@ -16,6 +16,6 @@ alter table ops_order_control
   add column if not exists storage_fee_sof  numeric(12,2);
 
 comment on column ops_order_control.storage_fee_msbf is
-  'MS/BF storage fee imported from the Master "MS/BF Storage Fees" column (RM); null = not imported (migration 0200).';
+  'MS/BF storage fee imported from the Master "MS/BF Storage Fees" column (RM); null = not imported (migration 0207).';
 comment on column ops_order_control.storage_fee_sof is
-  'Sofa storage fee imported from the Master "SOF Storage Fees" column (RM); null = not imported (migration 0200).';
+  'Sofa storage fee imported from the Master "SOF Storage Fees" column (RM); null = not imported (migration 0207).';

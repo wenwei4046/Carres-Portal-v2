@@ -242,7 +242,7 @@ export function masterRecordToOrderRow(
 // Storage fee — the per-ORDER fee Jess hand-computes in the Master's
 // "MS/BF Storage Fees" / "SOF Storage Fees" columns (col AN / AO). Keyed by Ref
 // (order identity), NOT PO (which is per-line). Imported into
-// ops_order_control.storage_fee_msbf / _sof (migration 0200).
+// ops_order_control.storage_fee_msbf / _sof (migration 0207).
 // ---------------------------------------------------------------------------
 
 export interface StorageFeeImportRow {
@@ -436,7 +436,7 @@ export const stockEtaImportInput = z
   .object({
     rows: z.array(stockEtaImportRowSchema).min(1).max(2000),
     /** Per-order storage fees from the Master's MS/BF / SOF Storage-Fees columns
-     *  (migration 0200) — keyed by Ref, written to ops_order_control. Optional so
+     *  (migration 0207) — keyed by Ref, written to ops_order_control. Optional so
      *  a Master without those columns still imports stock ETA/status. */
     storageFees: z.array(storageFeeImportRowSchema).max(2000).optional(),
     /** Preview only — compute + return counts, write nothing. */

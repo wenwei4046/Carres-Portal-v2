@@ -714,7 +714,7 @@ function DrawerBody({
   const pastLastCall = daysToDelivery !== null && daysToDelivery <= 1;
   const balanceOwing = hasTotal && outstanding > 0;
   // Storage is "incurred" when the operator set a From date, OR the Master import
-  // carried a fee (migration 0200, Jess: a Master fee auto-marks incurred → it
+  // carried a fee (migration 0207, Jess: a Master fee auto-marks incurred → it
   // enters the collect-before-delivery gate).
   const storageIncurred =
     !!(form.control?.storage_from ?? "").trim() ||

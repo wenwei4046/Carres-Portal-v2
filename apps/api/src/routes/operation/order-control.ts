@@ -197,7 +197,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     }
   }
 
-  // Storage fees (per-ORDER, by Ref) — migration 0200. Resolve each Master
+  // Storage fees (per-ORDER, by Ref) — migration 0207. Resolve each Master
   // storage-fee row's Ref to an order id (orders.source_ref is a text[]), so it
   // can be written to ops_order_control.storage_fee_msbf / _sof. Aggregated
   // server-side too (defence — a Master repeats an order's fee across its lines).
