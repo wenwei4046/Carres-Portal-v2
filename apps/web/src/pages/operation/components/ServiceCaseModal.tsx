@@ -256,7 +256,9 @@ export default function ServiceCaseModal({
           </div>
 
           {saveMut.isError && (
-            <p className="text-xs text-error-700">Save failed. Check the fields and retry.</p>
+            <p className="text-xs text-error-700 break-words">
+              Save failed: {(saveMut.error as Error)?.message ?? "unknown error"}
+            </p>
           )}
         </div>
 
