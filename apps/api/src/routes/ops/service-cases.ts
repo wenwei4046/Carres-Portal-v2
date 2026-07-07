@@ -76,7 +76,13 @@ scRouter.get("/lookup", requireOperationOrPrincipal, async (c) => {
     if (error) throw new HTTPException(500, { message: error.message });
     rows = (data ?? []) as OrderRow[];
   } else if (ref) {
-    const { data, error } = await sb.from("orders").select(cols).contains("source_ref", [ref]);
+    // AutoCount Refs are stored uppercase in source_ref (e.g. TCF0497); the
+    // array-containment match is exact, so upper-case the term to tolerate a
+    // lower-case typed input.
+    const { data, error } = await sb
+      .from("orders")
+      .select(cols)
+      .contains("source_ref", [ref.toUpperCase()]);
     if (error) throw new HTTPException(500, { message: error.message });
     rows = (data ?? []) as OrderRow[];
   } else {
