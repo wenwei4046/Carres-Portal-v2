@@ -23,6 +23,7 @@ import { z } from "zod";
 export const STOCK_LOCATIONS = [
   "Carres Klang",
   "Houzs Balakong",
+  "AL",
   "Nice Future",
   "Ohana",
   "at-supplier",

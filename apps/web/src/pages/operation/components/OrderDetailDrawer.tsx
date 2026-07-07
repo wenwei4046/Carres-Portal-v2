@@ -32,6 +32,7 @@ import {
   useOrderLoans,
   useLoanSofa,
   useReturnLoan,
+  useDeliveryPartners,
   useUpdateOrder,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
@@ -607,6 +608,13 @@ function DrawerBody({
   const loc = locationForAddress(order.customer_address ?? null);
 
   const form = useOrderControlForm(order.id);
+  // The order's assigned logistic NAME (ops_assigned_logistic is a partner id) —
+  // drives the default stock Location (final consolidation point, not supplier).
+  const { data: partnersData } = useDeliveryPartners();
+  const assignedLogisticName =
+    (partnersData?.partners ?? []).find(
+      (p) => p.id === order.ops_assigned_logistic,
+    )?.name ?? null;
   // Sofa loans (migration 0209) — active loaners against this order.
   const loansQuery = useOrderLoans(order.id);
   const activeLoans = (loansQuery.data?.loans ?? []).filter(
@@ -996,7 +1004,7 @@ function DrawerBody({
                     const locValue =
                       savedLoc !== undefined
                         ? (savedLoc[0] ?? "")
-                        : (defaultLineLocation(l.sku) ?? "");
+                        : (defaultLineLocation(l.sku, assignedLogisticName) ?? "");
                     // Per-item Stock ETA (migration 0170) — when the item's stock
                     // arrives; defaults to the linked PO's date, overridable.
                     const etaValue =

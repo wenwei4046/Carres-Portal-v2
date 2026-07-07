@@ -148,13 +148,22 @@ export function lineSortRank(sku: string): number {
  *     as ready warehouse stock.
  *   • service charges (No Lift / Disposal / floor) → null — no physical location.
  * It's only a DEFAULT — the drawer dropdown lets the operator override per line.
+ *
+ * The default is the FINAL consolidation point (Jess 2026-07-07), driven by the
+ * order's assigned LOGISTIC — NOT the supplier: HOUZS → Houzs Balakong · AL → AL ·
+ * everything else (incl. NETS + not-yet-assigned) → the own Carres Klang
+ * warehouse. Received stock is booked in at where it's consolidated for delivery,
+ * so a mattress lands at the Klang warehouse by default, not at its supplier.
  */
-export function defaultLineLocation(sku: string): string | null {
-  const cat = lineCategory(sku);
-  if (cat === "mattress") return "Nice Future";
-  if (cat === "bedframe" || cat === "sofa") return "Ohana";
-  if (lineKind(sku) === "service") return null;
-  return "Carres Klang"; // accessories
+export function defaultLineLocation(
+  sku: string,
+  logisticName?: string | null,
+): string | null {
+  if (lineKind(sku) === "service") return null; // no physical location
+  const l = (logisticName ?? "").trim().toLowerCase();
+  if (l.includes("houzs")) return "Houzs Balakong";
+  if (l === "al") return "AL";
+  return "Carres Klang"; // own warehouse — the default consolidation point
 }
 
 /** The location options the drawer offers (the shared known set). */
