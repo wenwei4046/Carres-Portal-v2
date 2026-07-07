@@ -26,6 +26,7 @@ import {
   type SkuImportResult,
   type StockEtaImportRow,
   type StorageFeeImportRow,
+  type BalanceImportRow,
   type StockEtaImportResult,
   type ReceiveLineInput,
   type ReceiveLineResult,
@@ -5022,6 +5023,7 @@ export function useImportStockEta() {
     mutationFn: (input: {
       rows: StockEtaImportRow[];
       storageFees?: StorageFeeImportRow[];
+      balances?: BalanceImportRow[];
       dryRun?: boolean;
     }) =>
       apiFetch<{ result: StockEtaImportResult }>(

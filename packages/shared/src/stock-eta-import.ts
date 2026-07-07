@@ -316,6 +316,95 @@ export function aggregateStorageFeesByRef(
 }
 
 // ---------------------------------------------------------------------------
+// Balance — the per-ORDER payment status + outstanding Jess keeps in the Master
+// "Payment Status" (Paid / Follow Up Balance) + "Balance" columns. Keyed by Ref.
+// Imported into ops_order_control.payment_status + .balance (no migration — both
+// columns already exist).
+// ---------------------------------------------------------------------------
+
+export type BalancePayStatus = "Paid" | "Partial" | "Follow Up" | "Unpaid";
+
+export interface BalanceImportRow {
+  /** orders.source_ref to join on (the Master "Ref"). */
+  ref: string;
+  /** Outstanding owed (RM). 0 = settled. Omitted when unknown. */
+  owing?: number;
+  /** Payment status mapped to the panel's PAYMENT_STATUSES. */
+  payStatus?: BalancePayStatus;
+}
+
+export type BalanceRowResult =
+  | { ok: true; row: BalanceImportRow }
+  | { ok: false; reason: string };
+
+/** Extract the first RM/number from a loose money cell — "RM2248" → 2248,
+ *  "RM3322 Paid @ 23 Apr 26" → 3322, 3746 → 3746, blank → null. */
+export function parseMoneyLoose(
+  raw: string | number | undefined | null,
+): number | null {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw === "number") return Number.isFinite(raw) && raw >= 0 ? raw : null;
+  const m = raw.replace(/,/g, "").match(/\d+(\.\d+)?/);
+  if (!m) return null;
+  const n = Number(m[0]);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** Map ONE raw Master "Ops" record to a per-order balance row. "Payment Status"
+ *  drives it: Paid → settled (owing 0); Follow Up Balance → the "Balance" column
+ *  is the outstanding to chase; Partial/Unpaid likewise carry the Balance amount.
+ *  A row with no Ref, or no status + no balance, is skipped. */
+export function masterRecordToBalance(
+  rec: Record<string, string | number>,
+): BalanceRowResult {
+  const norm: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(rec)) norm[k.trim().toLowerCase()] = v;
+  const ref = String(norm["ref"] ?? "").trim();
+  if (!ref) return { ok: false, reason: "missing Ref" };
+
+  const rawStatus = String(norm["payment status"] ?? "").trim();
+  const rawBal = norm["balance"];
+  let payStatus: BalancePayStatus | undefined;
+  let owing: number | undefined;
+  if (/follow\s*up/i.test(rawStatus)) {
+    payStatus = "Follow Up";
+    owing = parseMoneyLoose(rawBal) ?? undefined;
+  } else if (/partial/i.test(rawStatus)) {
+    payStatus = "Partial";
+    owing = parseMoneyLoose(rawBal) ?? undefined;
+  } else if (/unpaid/i.test(rawStatus)) {
+    payStatus = "Unpaid";
+    owing = parseMoneyLoose(rawBal) ?? undefined;
+  } else if (/paid/i.test(rawStatus)) {
+    payStatus = "Paid";
+    owing = 0; // settled — the Master "Balance" note is the already-paid amount
+  }
+  if (!payStatus && owing === undefined) {
+    return { ok: false, reason: "no payment status or balance" };
+  }
+  const row: BalanceImportRow = { ref };
+  if (payStatus) row.payStatus = payStatus;
+  if (owing !== undefined) row.owing = owing;
+  return { ok: true, row };
+}
+
+/** Aggregate per-order balance rows by Ref (the Master repeats an order's balance
+ *  across its lines) — last non-empty wins per field. */
+export function aggregateBalancesByRef(
+  rows: BalanceImportRow[],
+): BalanceImportRow[] {
+  const byRef = new Map<string, BalanceImportRow>();
+  for (const r of rows) {
+    const key = r.ref.trim().toUpperCase();
+    const cur = byRef.get(key) ?? { ref: r.ref };
+    if (r.payStatus) cur.payStatus = r.payStatus;
+    if (r.owing !== undefined) cur.owing = r.owing;
+    byRef.set(key, cur);
+  }
+  return [...byRef.values()];
+}
+
+// ---------------------------------------------------------------------------
 // Pure matcher — join import rows to portal order lines by PO + token overlap
 // ---------------------------------------------------------------------------
 
@@ -432,6 +521,15 @@ export const storageFeeImportRowSchema = z
   .strict();
 export type StorageFeeImportRowParsed = z.infer<typeof storageFeeImportRowSchema>;
 
+export const balanceImportRowSchema = z
+  .object({
+    ref: z.string().trim().min(1).max(60),
+    owing: z.number().min(0).max(99_999_999).optional(),
+    payStatus: z.enum(["Paid", "Partial", "Follow Up", "Unpaid"]).optional(),
+  })
+  .strict();
+export type BalanceImportRowParsed = z.infer<typeof balanceImportRowSchema>;
+
 export const stockEtaImportInput = z
   .object({
     rows: z.array(stockEtaImportRowSchema).min(1).max(2000),
@@ -439,6 +537,10 @@ export const stockEtaImportInput = z
      *  (migration 0207) — keyed by Ref, written to ops_order_control. Optional so
      *  a Master without those columns still imports stock ETA/status. */
     storageFees: z.array(storageFeeImportRowSchema).max(2000).optional(),
+    /** Per-order payment status + outstanding from the Master's "Payment Status"
+     *  + "Balance" columns — keyed by Ref, written to ops_order_control (no
+     *  migration; the columns exist). Optional. */
+    balances: z.array(balanceImportRowSchema).max(2000).optional(),
     /** Preview only — compute + return counts, write nothing. */
     dryRun: z.boolean().optional(),
   })
@@ -460,6 +562,12 @@ export interface StockEtaImportResult {
   storageWritten: number;
   /** Storage-fee rows whose Ref matched no order (with a short why). */
   storageUnmatched: number;
+  /** Orders whose balance/payment-status was matched by Ref. */
+  balanceOrders: number;
+  /** Orders whose balance was actually written (0 on a dry run). */
+  balanceWritten: number;
+  /** Balance rows whose Ref matched no order. */
+  balanceUnmatched: number;
   /** A short sample of unmatched rows, to spot a bad PO/name in the sheet. */
   sampleUnmatched: { po: string; sku: string; reason: string }[];
   dryRun: boolean;

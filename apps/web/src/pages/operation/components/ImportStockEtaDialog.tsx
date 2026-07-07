@@ -5,8 +5,11 @@ import {
   masterRecordToOrderRow,
   masterRecordToStorageFee,
   aggregateStorageFeesByRef,
+  masterRecordToBalance,
+  aggregateBalancesByRef,
   type StockEtaImportRow,
   type StorageFeeImportRow,
+  type BalanceImportRow,
   type StockEtaImportResult,
   type AutocountImportRow,
   type AutocountImportResponse,
@@ -31,6 +34,7 @@ interface Parsed {
   orderRows: AutocountImportRow[];
   stockRows: StockEtaImportRow[];
   storageFees: StorageFeeImportRow[];
+  balances: BalanceImportRow[];
 }
 
 async function readMaster(file: File): Promise<Parsed> {
@@ -38,7 +42,7 @@ async function readMaster(file: File): Promise<Parsed> {
   const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
   const name = wb.SheetNames.find((n) => /ops/i.test(n)) ?? wb.SheetNames[0];
   const sheet = name ? wb.Sheets[name] : undefined;
-  if (!sheet) return { orderRows: [], stockRows: [], storageFees: [] };
+  if (!sheet) return { orderRows: [], stockRows: [], storageFees: [], balances: [] };
   // raw:true keeps date cells as Excel serials (the shared parsers convert them).
   const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
     header: 1,
@@ -49,6 +53,7 @@ async function readMaster(file: File): Promise<Parsed> {
   const orderRows: AutocountImportRow[] = [];
   const stockRows: StockEtaImportRow[] = [];
   const feeRows: StorageFeeImportRow[] = [];
+  const balRows: BalanceImportRow[] = [];
   for (let r = 1; r < aoa.length; r++) {
     const cells = aoa[r];
     if (!Array.isArray(cells)) continue;
@@ -65,10 +70,17 @@ async function readMaster(file: File): Promise<Parsed> {
     if (stk.ok) stockRows.push(stk.row);
     const fee = masterRecordToStorageFee(rec);
     if (fee.ok) feeRows.push(fee.row);
+    const bal = masterRecordToBalance(rec);
+    if (bal.ok) balRows.push(bal.row);
   }
-  // The Master lists one row per line → an order's storage fee repeats; collapse
-  // to one fee per Ref (max non-zero per category).
-  return { orderRows, stockRows, storageFees: aggregateStorageFeesByRef(feeRows) };
+  // The Master lists one row per line → an order's storage fee + balance repeat;
+  // collapse each to one per Ref.
+  return {
+    orderRows,
+    stockRows,
+    storageFees: aggregateStorageFeesByRef(feeRows),
+    balances: aggregateBalancesByRef(balRows),
+  };
 }
 
 export default function ImportStockEtaDialog({ onClose }: { onClose: () => void }) {
@@ -82,6 +94,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
     orderRows: [],
     stockRows: [],
     storageFees: [],
+    balances: [],
   });
   const [preview, setPreview] = useState<StockEtaImportResult | null>(null);
   const [ordersResult, setOrdersResult] = useState<AutocountImportResponse | null>(null);
@@ -105,6 +118,7 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
       const dry = await importEta.mutateAsync({
         rows: p.stockRows,
         storageFees: p.storageFees,
+        balances: p.balances,
         dryRun: true,
       });
       setPreview(dry);
@@ -129,17 +143,19 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
         ? await importOrders.mutateAsync({ sourceSystem: "autocount", rows: parsed.orderRows })
         : null;
       setOrdersResult(ord);
-      // 2) Now set stock ETA + status + storage fees — matches climb after the create.
+      // 2) Now set stock ETA + status + storage fees + balances — matches climb
+      //    after the create.
       const stk = await importEta.mutateAsync({
         rows: parsed.stockRows,
         storageFees: parsed.storageFees,
+        balances: parsed.balances,
       });
       setStockResult(stk);
       setStage("result");
       toast.success(
         `${ord ? `${ord.created} order(s) created · ` : ""}${stk.written} stock line(s) set${
           stk.storageWritten > 0 ? ` · ${stk.storageWritten} storage fee(s)` : ""
-        }`,
+        }${stk.balanceWritten > 0 ? ` · ${stk.balanceWritten} balance(s)` : ""}`,
       );
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Import failed");
@@ -205,6 +221,13 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
                 storage fees
               </>
             )}
+            {parsed.balances.length > 0 && (
+              <>
+                {" "}·{" "}
+                <span className="font-semibold text-base-900">{parsed.balances.length}</span>{" "}
+                balances
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-2">
@@ -234,6 +257,18 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
                 {preview.storageOrders === 1 ? "" : "s"} now
                 {preview.storageUnmatched > 0 && (
                   <> · {preview.storageUnmatched} by Ref not found (climbs after create)</>
+                )}
+                .
+              </>
+            )}
+            {parsed.balances.length > 0 && (
+              <>
+                {" "}
+                Balance + payment status match{" "}
+                <span className="font-semibold text-base-900">{preview.balanceOrders}</span>{" "}
+                order{preview.balanceOrders === 1 ? "" : "s"} now
+                {preview.balanceUnmatched > 0 && (
+                  <> · {preview.balanceUnmatched} by Ref not found (climbs after create)</>
                 )}
                 .
               </>
@@ -284,6 +319,20 @@ export default function ImportStockEtaDialog({ onClose }: { onClose: () => void 
                 {stockResult.storageUnmatched > 0 && (
                   <>
                     {" "}· <span className="text-amber-600">{stockResult.storageUnmatched} Ref
+                    unmatched</span>
+                  </>
+                )}
+              </div>
+            )}
+            {stockResult.balanceWritten > 0 && (
+              <div className="t-small text-base-700 mt-1 pt-1 border-t border-base-200">
+                <span className="font-semibold text-green-700">
+                  {stockResult.balanceWritten}
+                </span>{" "}
+                balance + payment status set from the Master
+                {stockResult.balanceUnmatched > 0 && (
+                  <>
+                    {" "}· <span className="text-amber-600">{stockResult.balanceUnmatched} Ref
                     unmatched</span>
                   </>
                 )}

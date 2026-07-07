@@ -10,10 +10,14 @@ import {
   masterRecordToOrderRow,
   masterRecordToStorageFee,
   aggregateStorageFeesByRef,
+  parseMoneyLoose,
+  masterRecordToBalance,
+  aggregateBalancesByRef,
   matchStockRows,
   type OrderLineRef,
   type StockEtaImportRow,
   type StorageFeeImportRow,
+  type BalanceImportRow,
 } from "./stock-eta-import";
 
 describe("excelSerialToISO", () => {
@@ -257,6 +261,68 @@ describe("masterRecordToStorageFee", () => {
       "SOF Storage Fees": "",
     });
     expect(out.ok).toBe(false);
+  });
+});
+
+describe("parseMoneyLoose", () => {
+  it("extracts the first number from a loose money cell", () => {
+    expect(parseMoneyLoose("RM2248")).toBe(2248);
+    expect(parseMoneyLoose("RM3322 Paid @ 23 Apr 26")).toBe(3322);
+    expect(parseMoneyLoose(3746)).toBe(3746);
+    expect(parseMoneyLoose("RM1,120")).toBe(1120);
+  });
+  it("is null for blank / no-number", () => {
+    expect(parseMoneyLoose("")).toBeNull();
+    expect(parseMoneyLoose(null)).toBeNull();
+    expect(parseMoneyLoose("paid")).toBeNull();
+  });
+});
+
+describe("masterRecordToBalance", () => {
+  it("Follow Up Balance → Follow Up + the Balance amount as owing", () => {
+    const out = masterRecordToBalance({
+      Ref: "CR1123",
+      Balance: "RM2248",
+      "Payment Status": "Follow Up Balance, Delay delivery date",
+    });
+    expect(out).toEqual({ ok: true, row: { ref: "CR1123", owing: 2248, payStatus: "Follow Up" } });
+  });
+  it("Paid → Paid + owing 0 (the Balance note is the already-paid amount)", () => {
+    const out = masterRecordToBalance({
+      Ref: "CR0418",
+      Balance: "RM3322 Paid @ 23 Apr 26",
+      "Payment Status": "Paid",
+    });
+    expect(out).toEqual({ ok: true, row: { ref: "CR0418", owing: 0, payStatus: "Paid" } });
+  });
+  it("reads a numeric Balance cell", () => {
+    const out = masterRecordToBalance({
+      Ref: "CR0629",
+      Balance: 3746,
+      "Payment Status": "Follow Up Balance",
+    });
+    expect(out).toEqual({ ok: true, row: { ref: "CR0629", owing: 3746, payStatus: "Follow Up" } });
+  });
+  it("skips a row with no Ref or no status/balance", () => {
+    expect(masterRecordToBalance({ Balance: "RM100" }).ok).toBe(false);
+    expect(masterRecordToBalance({ Ref: "X", "Payment Status": "", Balance: "" }).ok).toBe(false);
+  });
+});
+
+describe("aggregateBalancesByRef", () => {
+  it("collapses an order's repeated rows to one balance", () => {
+    const rows: BalanceImportRow[] = [
+      { ref: "CR1123", owing: 2248, payStatus: "Follow Up" },
+      { ref: "cr1123", owing: 2248, payStatus: "Follow Up" },
+      { ref: "CR0418", owing: 0, payStatus: "Paid" },
+    ];
+    const out = aggregateBalancesByRef(rows);
+    expect(out).toHaveLength(2);
+    expect(out.find((r) => r.ref.toUpperCase() === "CR1123")).toEqual({
+      ref: "CR1123",
+      owing: 2248,
+      payStatus: "Follow Up",
+    });
   });
 });
 
