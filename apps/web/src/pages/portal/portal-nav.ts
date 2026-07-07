@@ -122,7 +122,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "suppliers", label: "Suppliers", icon: Truck },
       {
         key: "service-notes",
-        label: "Service Notes",
+        label: "Service Cases",
         icon: LifeBuoy,
         badge: "service-notes",
       },

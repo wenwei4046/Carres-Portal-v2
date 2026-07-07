@@ -41,7 +41,7 @@ import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import OperationStockOnHand from "./OperationStockOnHand";
 // Migration 0140 — Service Notes / Issue Tracker.
-import OperationServiceNotes from "./OperationServiceNotes";
+import OperationServiceCases from "./OperationServiceCases";
 // Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
 import OperationRightRail from "./components/OperationRightRail";
 import type { MovementsFilters } from "@/lib/queries";
@@ -286,7 +286,7 @@ export default function OperationApp() {
             {tab === "ops-repair" && <OperationOpsRepair />}
             {tab === "ops-inventory" && <OperationOpsInventory />}
             {/* Migration 0140 — Service Notes / Issue Tracker */}
-            {tab === "service-notes" && <OperationServiceNotes />}
+            {tab === "service-notes" && <OperationServiceCases />}
           </>
         )}
       </main>

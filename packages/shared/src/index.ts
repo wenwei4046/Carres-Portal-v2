@@ -497,6 +497,29 @@ export {
   type UpdateServiceNoteInput,
 } from "./schemas/service-notes";
 
+// Migration 0210 — Service Cases (case parent layer + config-driven type/status).
+export {
+  caseTypeSchema,
+  caseStatusSchema,
+  serviceCaseConfigSchema,
+  serviceCaseSchema,
+  serviceCaseListResponseSchema,
+  createServiceCaseInputSchema,
+  updateServiceCaseInputSchema,
+  caseLookupLineSchema,
+  caseLookupOrderSchema,
+  caseLookupResponseSchema,
+  type CaseType,
+  type CaseStatus,
+  type ServiceCaseConfig,
+  type ServiceCase,
+  type ServiceCaseListResponse,
+  type CreateServiceCaseInput,
+  type UpdateServiceCaseInput,
+  type CaseLookupOrder,
+  type CaseLookupResponse,
+} from "./schemas/service-cases";
+
 // Migration 0156 — multi-leg delivery chain (γ architecture).
 export {
   deliveryStopStatusSchema,

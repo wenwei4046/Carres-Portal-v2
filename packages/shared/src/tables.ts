@@ -127,6 +127,11 @@ export const INQUIRIES     = "inquiries" as const;
 export const SERVICE_NOTES = "service_notes" as const;
 export const SOPS          = "sops" as const;
 
+// Migration 0210 — Service Cases (case parent layer + config tables).
+export const SERVICE_CASES         = "service_cases" as const;
+export const SERVICE_CASE_TYPES    = "service_case_types" as const;
+export const SERVICE_CASE_STATUSES = "service_case_statuses" as const;
+
 // Migration 0159 — ops order control overlay.
 export const OPS_ORDER_CONTROL = "ops_order_control" as const;
 
