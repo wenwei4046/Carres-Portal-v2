@@ -676,8 +676,9 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // Count over the full set (the default Open tab hides the completed 1007).
     fireEvent.click(statusGroup().getByRole("button", { name: /All\s*7/ }));
     // 7 orders; D has a carrier via the partner map (NETS), E has TEOW joined →
-    // the other 5 have no carrier.
-    const chip = within(screen.getByTestId("filter-needs action")).getByRole(
+    // the other 5 have no carrier. The Unassigned chip lives in the Logistic
+    // group (Jess 2026-07-07: removed the duplicate from Needs action).
+    const chip = within(screen.getByTestId("filter-logistic")).getByRole(
       "button",
       { name: /Unassigned/ },
     );

@@ -791,10 +791,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const flaggedCount = useMemo(() => tabFiltered.filter(hasOpenTask).length, [tabFiltered, tasksByOrder]);
   const escalateCount = useMemo(() => tabFiltered.filter(hasEscalatedTask).length, [tabFiltered, tasksByOrder]);
   const etaCount = useMemo(() => tabFiltered.filter(needsEta).length, [tabFiltered]);
-  const noCarrierCount = useMemo(
-    () => tabFiltered.filter((o) => logisticOf(o, partnerName) === null).length,
-    [tabFiltered, partnerName],
-  );
   const dueEntries = useMemo(() => {
     const m = new Map<DueBucket, number>();
     for (const o of tabFiltered) {
@@ -1194,6 +1190,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
               onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
             />
           ))}
+          {/* No-ETA lives with the logistic chips (Jess 2026-07-07: it's a logistic
+              chase, not a separate needs-action lane). */}
+          <QuickView
+            icon={CalendarClock}
+            label="No ETA"
+            count={etaCount}
+            tone="warning"
+            active={etaOnly}
+            title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
+            onClick={() => setEtaOnly((v) => !v)}
+          />
         </FilterGroup>
         {/* Needs action — the two action lanes (Follow-up · For Jess) + the two
             logistic-chase alerts (Unassigned carrier · No ETA), same boxed
@@ -1216,26 +1223,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
             active={escalateOnly}
             title="Escalated to Jess — orders needing the boss's action"
             onClick={() => setEscalateOnly((v) => !v)}
-          />
-          <QuickView
-            icon={Truck}
-            label="Unassigned"
-            count={noCarrierCount}
-            tone="danger"
-            active={logisticFilter === NO_CARRIER}
-            title="No logistic partner assigned yet — operation to assign a carrier"
-            onClick={() =>
-              setLogisticFilter((r) => (r === NO_CARRIER ? null : NO_CARRIER))
-            }
-          />
-          <QuickView
-            icon={CalendarClock}
-            label="No ETA"
-            count={etaCount}
-            tone="warning"
-            active={etaOnly}
-            title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
-            onClick={() => setEtaOnly((v) => !v)}
           />
         </FilterGroup>
       </div>
