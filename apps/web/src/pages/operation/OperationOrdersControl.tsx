@@ -1244,9 +1244,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       >
         <table
           ref={listTableRef}
-          className={`w-full border-collapse text-[13px] table-fixed ${
-            compact ? "[&_td]:py-0.5 [&_th]:py-1" : ""
-          }`}
+          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[44px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden"
           style={{ minWidth: 900 }}
         >
           {/* Widths L→R: checkbox · ⚑ · Ref · Customer · Region · Deadline ·
@@ -1702,7 +1700,7 @@ function OrderRow({
   return (
     <tr
       onClick={onOpen}
-      className={`border-t border-base-200 hover:bg-info-soft/50 cursor-pointer align-top ${
+      className={`border-t border-[rgba(17,24,39,0.06)] hover:bg-info-soft/50 cursor-pointer align-middle ${
         selected
           ? "bg-primary/15 shadow-[inset_3px_0_0_#C44D2B]"
           : idx % 2
@@ -1727,23 +1725,18 @@ function OrderRow({
           a faint secondary line below. Phone stays in the cell tooltip. */}
       <td className="px-3 py-2" title={o.customer_phone ?? undefined}>
         {ref.length > 0 ? (
-          <div
-            className="font-mono leading-[1.3]"
-            style={{ ...clamp3, fontSize: "13px", fontWeight: 600, color: "#111827" }}
-            title={ref.join("\n")}
-          >
-            {ref.map((r, i) => (
-              <div key={i} className="truncate">
-                {r}
-              </div>
-            ))}
+          <div className="font-mono truncate" style={{ lineHeight: "16px" }} title={ref.join("\n")}>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}>{ref[0]}</span>
+            {ref.length > 1 && (
+              <span style={{ fontSize: "11px", fontWeight: 400, color: "#9CA3AF" }}> +{ref.length - 1}</span>
+            )}
           </div>
         ) : (
           <span className="text-base-300">—</span>
         )}
         <div
           className="font-mono"
-          style={{ fontSize: "10px", fontWeight: 400, color: "#9CA3AF" }}
+          style={{ fontSize: "10px", fontWeight: 400, color: "#9CA3AF", lineHeight: "12px" }}
         >
           SO-{o.so}
         </div>
@@ -1752,8 +1745,8 @@ function OrderRow({
       <td className="px-3 py-2">
         {o.customer_name ? (
           <span
-            className={`${cjkClassName(o.customer_name)} text-[11px] text-base-800 leading-[1.3]`}
-            style={clamp3}
+            className={`${cjkClassName(o.customer_name)} text-[12.5px] text-base-800 leading-[1.3]`}
+            style={{ color: "#1F2937", ...clamp3 }}
             title={o.customer_name}
           >
             {o.customer_name}
@@ -1767,10 +1760,10 @@ function OrderRow({
       <td className="px-3 py-2">
         {loc.label ? (
           <span
-            className={`text-[11px] font-medium leading-[1.3] ${
+            className={`text-[12px] leading-[1.3] ${
               loc.area === "Outstation" ? "text-warning" : "text-base-600"
             }`}
-            style={clamp3}
+            style={{ color: loc.area === "Outstation" ? undefined : "#4B5563", ...clamp3 }}
             title={
               loc.area === "Outstation"
                 ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
@@ -1805,7 +1798,7 @@ function OrderRow({
               <div className="flex items-center gap-1.5">
                 <span
                   className="tabular-nums"
-                  style={{ fontSize: "11px", fontWeight: 600, color: hot ? "#DC2626" : "#111827" }}
+                  style={{ fontSize: "12.5px", fontWeight: 600, color: hot ? "#DC2626" : "#111827" }}
                 >
                   {datePart}
                 </span>
@@ -1844,7 +1837,7 @@ function OrderRow({
       {/* Logistic — the carrier name (neutral grey). */}
       <td className="px-3 py-2 whitespace-nowrap">
         {logistic ? (
-          <span className="text-[12px] text-base-500">{logistic}</span>
+          <span className="text-[12px]" style={{ color: "#4B5563" }}>{logistic}</span>
         ) : (
           <span className="text-base-300">—</span>
         )}
@@ -1866,7 +1859,7 @@ function CatCountCell({ testid, qty }: { testid: string; qty: number }) {
           {qty}
         </span>
       ) : (
-        <span style={{ color: "#9CA3AF" }}>·</span>
+        <span style={{ color: "#E5E1D8" }}>·</span>
       )}
     </td>
   );
@@ -1973,11 +1966,11 @@ function StockDot({ info, qtyTotal }: { info: StockInfo; qtyTotal: number }) {
       data-stock-state={info.state}
     >
       <span
-        className="inline-block w-2 h-2 rounded-full shrink-0"
+        className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
         style={{ backgroundColor: color }}
         aria-hidden="true"
       />
-      <span style={{ fontSize: "12px", fontWeight: 600, color }}>{word}</span>
+      <span style={{ fontSize: "12px", fontWeight: 500, color }}>{word}</span>
     </span>
   );
 }
