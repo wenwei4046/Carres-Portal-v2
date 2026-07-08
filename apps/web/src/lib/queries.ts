@@ -2006,14 +2006,28 @@ export interface operationOrderListRow {
   ops_order_control?: opsRemarkEmbed | opsRemarkEmbed[] | null;
 }
 export interface opsRemarkEmbed {
-  customer_request: string | null;
-  action_for_logistic: string | null;
-  carres_remark: string | null;
-  warehouse_remark: string | null;
+  // Optional (C2): the list no longer renders these remark fields in-row, and
+  // test fixtures build partial overlays (e.g. just `balance`), so they're not
+  // required on the embed type. Still selected by the query when present.
+  customer_request?: string | null;
+  action_for_logistic?: string | null;
+  carres_remark?: string | null;
+  warehouse_remark?: string | null;
   /** The logistic's committed delivery date (migration 0180) — distinct from the
    *  customer's `delivery_date` deadline. Surfaced into the Orders list ETA
    *  column (Jess 2026-06-25); operation fills it from the drawer or the cell. */
   logistic_eta?: string | null;
+  /** Payment + storage overlay (C2 Next-action, 2026-07-08) — the Orders list now
+   *  also reads these so the "Collect $" payment-hold + "Call customer" lamps can
+   *  compute. All optional so pre-C2 fixtures keep typechecking. */
+  balance?: number | string | null;
+  payment_status?: string | null;
+  storage_fee_msbf?: number | string | null;
+  storage_fee_sof?: number | string | null;
+  storage_paid?: boolean | null;
+  storage_collected_at?: string | null;
+  storage_waiver_status?: string | null;
+  called_customer?: boolean | null;
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];

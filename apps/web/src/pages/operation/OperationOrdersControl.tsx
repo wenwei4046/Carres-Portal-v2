@@ -40,6 +40,7 @@ import {
   Flag,
   ChevronsUp,
   CalendarClock,
+  Lock,
   Printer,
   type LucideIcon,
 } from "lucide-react";
@@ -312,6 +313,80 @@ function needsEta(o: operationOrderListRow): boolean {
   if (logisticEtaOf(o)) return false;
   const diff = daysToDue(o);
   return diff !== null && diff <= 7;
+}
+
+// ─── Next action (C2, 2026-07-08) ────────────────────────────────────────────
+// The single most-urgent NEXT step per order — one lamp per row. PURE: reads
+// only existing signals (stock readiness, controlTabOf stage, the control
+// overlay). Never mutates readinessOf / stageOf / counts.
+type NextTone = "danger" | "warning" | "info" | "success" | "neutral";
+export interface NextAction {
+  label: string;
+  tone: NextTone;
+  /** Delivery is HELD on an owing balance/storage (🔒). */
+  locked?: boolean;
+}
+// Reuse the locked v17 pills (no new colours): red / amber / blue / green / grey.
+const NEXT_TONE_PILL: Record<NextTone, string> = {
+  danger: "pill-overdue",
+  warning: "pill-warning",
+  info: "pill-sent",
+  success: "pill-confirmed",
+  neutral: "pill-neutral",
+};
+
+function ovlOf(o: operationOrderListRow) {
+  const raw = o.ops_order_control;
+  return Array.isArray(raw) ? raw[0] : raw;
+}
+
+/** The one action the operator should take next on an order. Priority (Jess
+ *  2026-07-08): money is only chased once stock is READY and we're arranging
+ *  delivery — an owing balance/storage then suppresses the green action and
+ *  HOLDS dispatch (🔒). While stock isn't ready the order leads with its
+ *  supplier / PO step (you don't chase payment before the goods even exist).
+ *  ETA wording is logistic-only; the supplier line uses overdue / waiting /
+ *  no-PO. "Supplier overdue" fires once we're inside the stock-arrival window
+ *  and it still hasn't landed: MS/BF = deadline−7d, Sofa = deadline−5d. */
+export function nextActionOf(
+  o: operationOrderListRow,
+  stock: StockInfo,
+  lines: { sku: string; qty: number }[],
+): NextAction {
+  if (controlTabOf(o) === "completed") return { label: "Done", tone: "neutral" };
+
+  const ready = stock.state === "ready" || stock.state === "in_stock";
+
+  // Stock not secured yet → the supplier / PO step leads.
+  if (!ready) {
+    if (stock.state === "unknown") return { label: "No PO · order it", tone: "danger" };
+    const dd = daysToDue(o);
+    const hasMsbf = lines.some((l) => {
+      const c = lineCategory(l.sku);
+      return c === "mattress" || c === "bedframe";
+    });
+    const hasSofa = lines.some((l) => lineCategory(l.sku) === "sofa");
+    const lead = hasMsbf ? 7 : hasSofa ? 5 : 7;
+    if (dd !== null && dd < lead) return { label: "Supplier overdue", tone: "danger" };
+    return { label: "Waiting stock", tone: "warning" };
+  }
+
+  // Stock READY → delivery stage. Payment hold: owing balance/storage holds it.
+  const ovl = ovlOf(o);
+  const owingBalance = Number(ovl?.balance ?? 0) > 0;
+  const storageFee =
+    (Number(ovl?.storage_fee_msbf) || 0) + (Number(ovl?.storage_fee_sof) || 0);
+  const owingStorage =
+    storageFee > 0 && !ovl?.storage_collected_at && ovl?.storage_waiver_status !== "approved";
+  if (owingBalance) return { label: "Collect $ · balance", tone: "danger", locked: true };
+  if (owingStorage) return { label: "Collect $ · storage", tone: "danger", locked: true };
+
+  // Paid → arrange the delivery (assign → chase ETA → confirm customer → go).
+  const hasLogistic = !!(o.delivery_partners?.name || o.ops_assigned_logistic);
+  if (!hasLogistic) return { label: "Assign logistic", tone: "info" };
+  if (!logisticEtaOf(o)) return { label: "Logistic · no ETA", tone: "info" };
+  if (!ovl?.called_customer) return { label: "Call customer", tone: "info" };
+  return { label: "Schedule delivery", tone: "success" };
 }
 
 /** Default sort — deadline ASCENDING (Jess P3): overdue/earliest first so the
@@ -1245,7 +1320,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
         <table
           ref={listTableRef}
           className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[44px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden"
-          style={{ minWidth: 900 }}
+          style={{ minWidth: 1060 }}
         >
           {/* Widths L→R: checkbox · ⚑ · Ref · Customer · Region · Deadline ·
               MS · BF · Sofa · Stock · Logistic */}
@@ -1261,6 +1336,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 52 }} />
             <col style={{ width: 96 }} />
             <col style={{ width: 80 }} />
+            <col style={{ width: 160 }} />
           </colgroup>
           {/* ONE dark header band (#221F20) with a flame underline so it reads
               clearly AS the header (C1 redesign). */}
@@ -1290,13 +1366,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th center>Sofa</Th>
               <Th>Stock</Th>
               <Th>Logistic</Th>
+              <Th>Next action</Th>
             </tr>
           </thead>
           <tbody>
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={12}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1841,6 +1918,21 @@ function OrderRow({
         ) : (
           <span className="text-base-300">—</span>
         )}
+      </td>
+      {/* Next action — the single most-urgent next step (C2); one pill per row. */}
+      <td className="px-3 py-2 whitespace-nowrap">
+        {(() => {
+          const na = nextActionOf(o, stock, lines);
+          return (
+            <span
+              className={`pill ${NEXT_TONE_PILL[na.tone]} inline-flex items-center gap-1 align-middle`}
+              data-next-action={na.label}
+            >
+              {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
+              {na.label}
+            </span>
+          );
+        })()}
       </td>
     </tr>
   );

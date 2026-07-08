@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import OperationOrdersControl, {
   buildOrdersCsv,
   buildOrdersPrintHtml,
+  nextActionOf,
 } from "./OperationOrdersControl";
 import type {
   operationOrdersListResponse,
@@ -516,9 +517,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       source_ref: ["TCF2024/06-461"],
     });
     wrap(<OperationOrdersControl />);
-    // ONE header row (C1 redesign — 11 columns). The follow-up flag is the 2nd
+    // ONE header row (C1/C2 redesign — 12 columns). The follow-up flag is the 2nd
     // column (icon-only header). Status / ETA / Items / Remark columns are gone;
-    // the MS / BF / Sofa per-category count columns replace the Items summary.
+    // the MS / BF / Sofa per-category count columns replace the Items summary, and
+    // C2 adds the "Next action" lamp as the final column.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
@@ -532,6 +534,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Sofa",
       "Stock",
       "Logistic",
+      "Next action",
     ]);
     // The Ref column merges the day-to-day reference with the system SO number;
     // the phone stays in that cell's tooltip.
@@ -761,5 +764,131 @@ describe("orders export", () => {
     expect(fakeWin.document.write.mock.calls[0][0]).toContain("SO-");
 
     open.mockRestore();
+  });
+});
+
+// ── C2 · nextActionOf — the single most-urgent next step per order ────────────
+describe("nextActionOf (C2)", () => {
+  // Local-midnight date N days from today → daysToDue returns exactly N.
+  const inDays = (n: number) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  };
+  const MS = [{ sku: "mattress:MAT-1", qty: 1 }];
+  const SOFA = [{ sku: "sofa:SOF-1", qty: 1 }];
+
+  it("completed order → Done (grey)", () => {
+    const o = makeRow({ id: "x", so: 1, status: "delivered", operation_stage: "delivered" });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({ label: "Done", tone: "neutral" });
+  });
+
+  it("no PO (unknown stock) → No PO · order it (red)", () => {
+    const o = makeRow({ id: "x", so: 1 });
+    expect(nextActionOf(o, { state: "unknown" }, [])).toMatchObject({
+      label: "No PO · order it",
+      tone: "danger",
+    });
+  });
+
+  it("PO open + inside the MS/BF window (deadline−7d) → Supplier overdue (red)", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: inDays(5) });
+    expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
+      label: "Supplier overdue",
+      tone: "danger",
+    });
+  });
+
+  it("PO open + still outside the window → Waiting stock (amber)", () => {
+    const o = makeRow({ id: "x", so: 1, delivery_date: inDays(10) });
+    expect(nextActionOf(o, { state: "awaiting" }, MS)).toMatchObject({
+      label: "Waiting stock",
+      tone: "warning",
+    });
+  });
+
+  it("Sofa uses a 5-day window, not 7 (deadline−6d = still Waiting, −3d = overdue)", () => {
+    expect(
+      nextActionOf(makeRow({ id: "x", so: 1, delivery_date: inDays(6) }), { state: "awaiting" }, SOFA).label,
+    ).toBe("Waiting stock");
+    expect(
+      nextActionOf(makeRow({ id: "y", so: 2, delivery_date: inDays(3) }), { state: "awaiting" }, SOFA).label,
+    ).toBe("Supplier overdue");
+  });
+
+  it("ready + owing balance → Collect $ · balance, held (🔒) — payment hold", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { balance: 2248 },
+    });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Collect $ · balance",
+      tone: "danger",
+      locked: true,
+    });
+  });
+
+  it("ready + owing storage (no balance) → Collect $ · storage, held", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { storage_fee_msbf: 150 },
+    });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Collect $ · storage",
+      locked: true,
+    });
+  });
+
+  it("ready + storage waived → NOT held (no Collect $)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { storage_fee_msbf: 150, storage_waiver_status: "approved" },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).label).not.toContain("Collect");
+  });
+
+  it("ready + paid + no carrier → Assign logistic (blue)", () => {
+    const o = makeRow({ id: "x", so: 1 });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Assign logistic",
+      tone: "info",
+    });
+  });
+
+  it("ready + paid + carrier + no ETA → Logistic · no ETA", () => {
+    const o = makeRow({ id: "x", so: 1, ops_assigned_logistic: "p1" });
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Logistic · no ETA");
+  });
+
+  it("ready + carrier + ETA + customer not called → Call customer", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { logistic_eta: "2026-08-01" },
+    });
+    expect(nextActionOf(o, { state: "ready" }, []).label).toBe("Call customer");
+  });
+
+  it("ready + carrier + ETA + called → Schedule delivery (green)", () => {
+    const o = makeRow({
+      id: "x",
+      so: 1,
+      ops_assigned_logistic: "p1",
+      ops_order_control: { logistic_eta: "2026-08-01", called_customer: true },
+    });
+    expect(nextActionOf(o, { state: "ready" }, [])).toMatchObject({
+      label: "Schedule delivery",
+      tone: "success",
+    });
   });
 });
