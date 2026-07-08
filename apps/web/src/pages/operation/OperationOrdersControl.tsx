@@ -6,7 +6,6 @@ import {
   useOperationOrders,
   useOperationStock,
   useDeliveryPartners,
-  useSaveOrderControl,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { useActiveOrder } from "@/lib/active-order";
@@ -29,7 +28,6 @@ import { TASKS_KEY } from "./components/rail/TasksPanel";
 import type { OpsTask, OpsTasksListResponse } from "@carres/shared";
 import type { OperationStage } from "./components/StageChip";
 import {
-  AlertTriangle,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
@@ -105,19 +103,6 @@ const STATUS_META_DESC: Partial<Record<ControlTab, string>> = {
 };
 
 type SettledTab = Exclude<ControlTab, "all">;
-
-/** Status pill per control tab (Jess 2026-06-24 Q1: colour confined to the
- *  Status "lane" — like his CRM reference — so a coloured Status column is fine
- *  now that Location + Stock read neutral). Active states carry a hue; Completed
- *  stays neutral grey because it's ~78% of orders, so a green-for-done pill would
- *  re-flood the table with colour. Tune in the live preview. */
-const TAB_PILL: Record<SettledTab, string> = {
-  placed: "pill-sent", // blue — new, needs triage
-  proceed: "pill-draft", // purple — being arranged
-  pending: "pill-warning", // amber — waiting on stock
-  scheduled: "pill-collected", // indigo — LP assigned / en route
-  completed: "pill-neutral", // grey — done (kept calm; the majority state)
-};
 
 const TAB_LABEL: Record<SettledTab, string> = {
   placed: "Placed",
@@ -241,21 +226,6 @@ function stockBucketOf(
   if (s === "ready" || s === "in_stock") return "Ready";
   if (s === "need_po" || s === "awaiting") return "Waiting";
   return "No PO";
-}
-
-/** Left-edge urgency accent per row (Jess 2026-06-24, his CRM-sample "priority
- *  lane"): red overdue/today/tomorrow · amber the 2–7-day prep window · none
- *  otherwise. Completed / TBD / undated rows get no bar. */
-function urgencyColor(o: operationOrderListRow, ct: SettledTab): string | null {
-  if (ct === "completed" || o.delivery_date_tbd || !o.delivery_date) return null;
-  const d = new Date(`${o.delivery_date}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
-  if (diff <= 1) return "#DC2626"; // overdue / today / tomorrow
-  if (diff <= 7) return "#D97706"; // prep window
-  return null;
 }
 
 /** A follow-up IS an ops_task linked to the order (#2, Jess 2026-06-26). The
@@ -503,10 +473,14 @@ function itemRollup(lines: { sku: string; qty: number }[]): string {
   return itemTags(lines).map(tagLabel).join(" · ") || "—";
 }
 
-/** Full item breakdown for the items-cell tooltip — answers "what are the +N
- *  accessories" on hover without cluttering the row. */
-function itemBreakdown(lines: { sku: string; qty: number }[]): string {
-  return lines.map((l) => `${l.sku} ×${l.qty}`).join("\n");
+/** Units of ONE core category (Mattress / Bedframe / Sofa) on an order — the
+ *  per-category count the MS / BF / Sofa columns show. Sums each line's qty
+ *  whose `lineCategory` matches; accessories / services never count. */
+function catQty(lines: { sku: string; qty: number }[], cat: CoreCat): number {
+  let t = 0;
+  for (const l of lines)
+    if (lineCategory(l.sku) === cat) t += Number(l.qty || 0);
+  return t;
 }
 
 /** Old kanban stage slug (still produced by hand-typed `/operation/orders/:stage`
@@ -662,9 +636,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
     so: number | null;
     refNo: string | null;
   } | null>(null);
-  // Fixed at 15 rows (Jess 2026-06-25: stick to 15, no selector). The listing is
-  // a fixed box that auto-scales (CSS zoom) so the 15 rows always fit, no scroll.
-  const [pageSize] = useState<number | "all">(15);
+  // Fixed at 20 rows/page (C1 redesign): ≥20 auto-enables the dense `compact`
+  // layout. The listing is a fixed box that auto-scales (CSS zoom) so the rows
+  // always fit, no scroll.
+  const [pageSize] = useState<number | "all">(20);
   const [page, setPage] = useState(0);
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -1272,28 +1247,31 @@ export default function OperationOrdersControl({ onImport }: Props) {
           className={`w-full border-collapse text-[13px] table-fixed ${
             compact ? "[&_td]:py-0.5 [&_th]:py-1" : ""
           }`}
-          style={{ minWidth: 1260 }}
+          style={{ minWidth: 900 }}
         >
+          {/* Widths L→R: checkbox · ⚑ · Ref · Customer · Region · Deadline ·
+              MS · BF · Sofa · Stock · Logistic */}
           <colgroup>
             <col style={{ width: 34 }} />
             <col style={{ width: 40 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 70 }} />
-            <col style={{ width: 80 }} />
+            <col style={{ width: 118 }} />
             <col style={{ width: 132 }} />
-            <col style={{ width: 130 }} />
-            <col style={{ width: 88 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 64 }} />
-            <col style={{ width: 70 }} />
+            <col style={{ width: 92 }} />
             <col style={{ width: 150 }} />
-            <col style={{ width: 168 }} />
+            <col style={{ width: 44 }} />
+            <col style={{ width: 44 }} />
+            <col style={{ width: 52 }} />
+            <col style={{ width: 96 }} />
+            <col style={{ width: 80 }} />
           </colgroup>
-          {/* ONE thin, darker header band so it reads clearly AS the header
-              (Jess 2026-06-24: header darker, no column shade, less thick). */}
+          {/* ONE dark header band (#221F20) with a flame underline so it reads
+              clearly AS the header (C1 redesign). */}
           <thead>
-            <tr className="bg-base-700 border-b-2 border-primary">
-              <th className="px-3 py-1.5 border-r border-base-600">
+            <tr
+              className="border-b-2 border-primary"
+              style={{ backgroundColor: "#221F20" }}
+            >
+              <th className="px-3 py-1.5">
                 <input
                   type="checkbox"
                   checked={allPagedSelected}
@@ -1302,30 +1280,25 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   className="cursor-pointer accent-base-900 align-middle"
                 />
               </th>
-              <th
-                className="px-1 py-1.5 text-center border-r border-base-600"
-                title="Follow-up"
-              >
+              <th className="px-1 py-1.5 text-center" title="Follow-up">
                 <Flag size={13} strokeWidth={2} className="inline text-white" aria-label="Follow-up" />
               </th>
-              <Th>Status</Th>
-              <Th noBorder>Order ID</Th>
-              <Th noBorder>Ref No</Th>
+              <Th>Ref</Th>
               <Th>Customer</Th>
+              <Th>Region</Th>
               <Th>Deadline</Th>
-              <Th>ETA</Th>
-              <Th>Location</Th>
-              <Th>Logistic</Th>
+              <Th center>MS</Th>
+              <Th center>BF</Th>
+              <Th center>Sofa</Th>
               <Th>Stock</Th>
-              <Th>Items</Th>
-              <Th>Remark</Th>
+              <Th>Logistic</Th>
             </tr>
           </thead>
           <tbody>
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={13}
+                  colSpan={11}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1673,195 +1646,6 @@ function QuickView({
   );
 }
 
-/** Inline remark editor (Jess 2026-06-24: edit the 4 operator remarks straight
- *  from the list, no need to open the full order drawer). Saves via the
- *  order-control overlay PUT, which also refreshes the orders list. */
-/** Remark cell — shows the 4 operator remarks (Carres / Action / WH / Cust) IN
- *  the cell and edits them IN PLACE on click (Jess 2026-06-24: no popup modal).
- *  Saves via the order-control overlay PUT, which also refreshes the list. */
-// Carres-remark dropped from the list (Jess 2026-06-29): it overlapped the
-// Follow-up column (internal ops note) + the Payment panel. The 3 party remarks
-// stay; "Action" → "Logistic" so the wording aligns with the Logistic column.
-const REMARK_FIELDS = [
-  { key: "action_for_logistic", label: "Logistic", tone: "info" },
-  { key: "warehouse_remark", label: "WH", tone: "warning" },
-  { key: "customer_request", label: "Cust", tone: "success" },
-] as const;
-
-// Small colour-coded pill per remark party so the 3 lines read at a glance
-// (Jess 2026-06-29): Logistic = blue · WH = amber · Cust = green.
-const REMARK_TONE: Record<string, string> = {
-  info: "bg-info/10 text-info",
-  warning: "bg-warning/10 text-warning",
-  success: "bg-success/10 text-success",
-};
-function RemarkCell({ order }: { order: operationOrderListRow }) {
-  const ovlRaw = order.ops_order_control;
-  const ovl = Array.isArray(ovlRaw) ? ovlRaw[0] : ovlRaw;
-  const [editing, setEditing] = useState(false);
-  const [vals, setVals] = useState({
-    action_for_logistic: ovl?.action_for_logistic ?? "",
-    warehouse_remark: ovl?.warehouse_remark ?? "",
-    customer_request: ovl?.customer_request ?? "",
-  });
-  const save = useSaveOrderControl(order.id, {
-    onSuccess: () => {
-      toast.success("Remark saved");
-      setEditing(false);
-    },
-    onError: (e) => toast.error(`Couldn't save — ${e.message}`),
-  });
-
-  if (editing) {
-    return (
-      <td className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
-        <div className="space-y-1">
-          {REMARK_FIELDS.map((f) => (
-            <div key={f.key} className="flex items-center gap-1">
-              <span className="text-[9px] font-semibold uppercase text-base-400 w-9 shrink-0">
-                {f.label}
-              </span>
-              <input
-                value={vals[f.key]}
-                onChange={(e) => setVals((v) => ({ ...v, [f.key]: e.target.value }))}
-                className="flex-1 min-w-0 px-1.5 py-0.5 border border-base-200 rounded text-[11px] bg-white outline-none focus:border-base-700"
-              />
-            </div>
-          ))}
-          <div className="flex justify-end gap-2 pt-0.5">
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="text-[10px] text-base-500 hover:text-base-900"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={save.isPending}
-              onClick={() =>
-                save.mutate({
-                  action_for_logistic: vals.action_for_logistic.trim() || null,
-                  warehouse_remark: vals.warehouse_remark.trim() || null,
-                  customer_request: vals.customer_request.trim() || null,
-                })
-              }
-              className="text-[10px] font-semibold text-primary hover:underline disabled:opacity-50"
-            >
-              {save.isPending ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </div>
-      </td>
-    );
-  }
-
-  const filled = REMARK_FIELDS.filter((f) => vals[f.key].trim());
-  return (
-    <td
-      className="px-3 py-2 align-top cursor-text hover:bg-base-50"
-      onClick={(e) => {
-        e.stopPropagation();
-        setEditing(true);
-      }}
-      title="Click to edit remarks"
-    >
-      {filled.length === 0 ? (
-        <span className="text-[10px] text-base-300">+ add remark</span>
-      ) : (
-        <div className="leading-[1.3]">
-          {filled.map((f) => (
-            <div key={f.key} className="truncate text-[10px]">
-              <span
-                className={`inline-block text-[8px] font-bold uppercase tracking-wide px-1 py-px rounded mr-1 align-middle ${REMARK_TONE[f.tone]}`}
-              >
-                {f.label}
-              </span>
-              <span className="text-base-700 align-middle">{vals[f.key]}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </td>
-  );
-}
-
-/** ETA cell — the logistic's committed delivery date (Jess 2026-06-25), edited
- *  IN PLACE from the list (click → date) via the same order-control overlay PUT
- *  the drawer uses. Shows a red "No ETA" alert when missing + the deadline is
- *  near (≤7d); else the date, or a faint "+ set". Distinct from the Deadline. */
-function EtaCell({ order, ct }: { order: operationOrderListRow; ct: SettledTab }) {
-  const eta = logisticEtaOf(order);
-  const alert = needsEta(order);
-  const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(eta ?? "");
-  const save = useSaveOrderControl(order.id, {
-    onSuccess: () => {
-      toast.success("ETA saved");
-      setEditing(false);
-    },
-    onError: (e) => toast.error(`Couldn't save — ${e.message}`),
-  });
-  if (editing) {
-    return (
-      <td className="px-2 py-2 align-top" onClick={(e) => e.stopPropagation()}>
-        <div className="flex flex-col gap-1">
-          <input
-            type="date"
-            value={val}
-            onChange={(e) => setVal(e.target.value)}
-            className="w-full px-1 py-0.5 border border-base-200 rounded text-[10px] bg-white outline-none focus:border-base-700"
-          />
-          <div className="flex justify-end gap-1.5">
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="text-[9px] text-base-500 hover:text-base-900"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={save.isPending}
-              onClick={() => save.mutate({ logistic_eta: val.trim() || null })}
-              className="text-[9px] font-semibold text-primary hover:underline disabled:opacity-50"
-            >
-              {save.isPending ? "…" : "Save"}
-            </button>
-          </div>
-        </div>
-      </td>
-    );
-  }
-  return (
-    <td
-      className="px-3 py-2 border-r border-base-100 whitespace-nowrap cursor-text hover:bg-base-50"
-      onClick={(e) => {
-        e.stopPropagation();
-        setEditing(true);
-      }}
-      title="Logistic's committed delivery ETA — click to set"
-    >
-      {eta ? (
-        <span className="text-[11px] text-base-700 tabular-nums">
-          {fmtDate(eta).split(", ")[0]}
-        </span>
-      ) : ct === "completed" ? (
-        <span className="text-base-300">—</span>
-      ) : alert ? (
-        <span
-          className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-destructive"
-          title="No logistic ETA + deadline near — chase the logistic to confirm"
-        >
-          <AlertTriangle size={11} strokeWidth={2.5} /> No ETA
-        </span>
-      ) : (
-        <span className="text-[10px] text-base-300">+ set</span>
-      )}
-    </td>
-  );
-}
-
 function OrderRow({
   o,
   idx,
@@ -1889,14 +1673,14 @@ function OrderRow({
   /** Open the side follow-up form for this order (#2). */
   onFlag: (o: operationOrderListRow) => void;
 }) {
-  const ct = controlTabOf(o);
-  const urg = urgencyColor(o, ct);
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
   const qtyTotal = unitTotal(lines);
-  const tags = itemTags(lines);
   const stock = stockReadiness(o, availableBySku);
   const loc = locationForAddress(o.customer_address ?? null);
+  const msQty = catQty(lines, "mattress");
+  const bfQty = catQty(lines, "bedframe");
+  const sofaQty = catQty(lines, "sofa");
 
   // Logistic: prefer the formal LP (joined name), fall back to the Inbox-triage
   // assignment resolved via the partners map.
@@ -1906,8 +1690,8 @@ function OrderRow({
       ? partnerName.get(o.ops_assigned_logistic) ?? "…"
       : null);
 
-  // ≤3-line clamp shared by the wrapping cells (Ref / Customer / Location) —
-  // fixed width, never taller than 3 lines (Jess 2026-06-24).
+  // ≤3-line clamp shared by the wrapping cells (Ref / Customer / Region) —
+  // fixed width, never taller than 3 lines.
   const clamp3 = {
     display: "-webkit-box",
     WebkitBoxOrient: "vertical" as const,
@@ -1927,11 +1711,7 @@ function OrderRow({
       }`}
       data-testid="order-row"
     >
-      <td
-        className="px-3 py-2 border-r border-base-100"
-        style={{ borderLeft: `3px solid ${urg ?? "transparent"}` }}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={selected}
@@ -1943,27 +1723,13 @@ function OrderRow({
       {/* Follow-up — the order's STATUS flag (#2), 2nd column (Jess: left, not a
           separate empty column). Click opens the side form. */}
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
-      {/* Status — Q1 (Jess 2026-06-24): a soft coloured pill, colour confined to
-          THIS column (his CRM-ref pattern). Completed stays neutral grey. */}
-      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
-        <span title={TAB_DESC[ct]} className={`pill ${TAB_PILL[ct]}`}>
-          {TAB_LABEL[ct]}
-        </span>
-      </td>
-      {/* Order ID — the SO number (phone in tooltip) */}
-      <td
-        className="px-3 py-2 whitespace-nowrap font-mono font-semibold text-[12px] text-base-900"
-        title={o.customer_phone ?? undefined}
-      >
-        SO-{o.so}
-      </td>
-      {/* Ref No — each ref on its OWN line, ≤3 lines. Part of the customer-detail
-          group (Order ID · Ref · Customer) → no inner divider, darker text. */}
-      <td className="px-3 py-2">
+      {/* Ref — the day-to-day reference (mono, bold) with the system SO number as
+          a faint secondary line below. Phone stays in the cell tooltip. */}
+      <td className="px-3 py-2" title={o.customer_phone ?? undefined}>
         {ref.length > 0 ? (
           <div
-            className="font-mono text-[10px] font-medium text-base-900 leading-[1.3]"
-            style={clamp3}
+            className="font-mono leading-[1.3]"
+            style={{ ...clamp3, fontSize: "13px", fontWeight: 600, color: "#111827" }}
             title={ref.join("\n")}
           >
             {ref.map((r, i) => (
@@ -1975,9 +1741,15 @@ function OrderRow({
         ) : (
           <span className="text-base-300">—</span>
         )}
+        <div
+          className="font-mono"
+          style={{ fontSize: "10px", fontWeight: 400, color: "#9CA3AF" }}
+        >
+          SO-{o.so}
+        </div>
       </td>
-      {/* Customer — fixed width, wraps to ≤3 lines (Jess 2026-06-24). */}
-      <td className="px-3 py-2 border-r border-base-100">
+      {/* Customer — fixed width, wraps to ≤3 lines. */}
+      <td className="px-3 py-2">
         {o.customer_name ? (
           <span
             className={`${cjkClassName(o.customer_name)} text-[11px] text-base-800 leading-[1.3]`}
@@ -1990,64 +1762,9 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Deadline — merged Due + Deadline (Jess 2026-06-25): date on top, weekday +
-          days-left below. ALWAYS shows the date (incl. completed — Jess: don't
-          hide it); the countdown only on still-open orders. */}
-      <td
-        className="px-3 py-2 border-r border-base-100 leading-[1.2] whitespace-nowrap"
-        title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
-      >
-        {o.delivery_date_tbd ? (
-          <span className="text-[11px] font-medium text-warning">TBD</span>
-        ) : o.delivery_date ? (
-          (() => {
-            const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
-            // Short due-day colour badge before the date (Jess 2026-06-26):
-            // just the day count -2d / today / 2d, coloured by the SAME DUE bucket
-            // as the top filter header (reuses dueBucketOf + DUE_TONE → they can
-            // never drift into two systems). Badge sits LEFT; the date + weekday
-            // stack as a column to its right, so the weekday lines up under the
-            // date (not under the badge — Jess 2026-06-29). Hidden on completed /
-            // TBD / undated.
-            const dueBucket = dueBucketOf(o);
-            const dd = daysToDue(o);
-            const tone = dueBucket ? DUE_TONE[dueBucket] : null;
-            const dueShort =
-              dd == null ? null : dd < 0 ? `-${-dd}d` : dd === 0 ? "today" : `${dd}d`;
-            return (
-              <div className="flex items-start gap-1.5">
-                {tone && dueShort ? (
-                  <span
-                    className="min-w-[44px] text-center text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums shrink-0"
-                    style={{ background: tone.bg, color: tone.text, border: `0.5px solid ${tone.border}` }}
-                  >
-                    {dueShort}
-                  </span>
-                ) : (
-                  // No bucket (completed / undated): reserve the same-width slot so
-                  // every date in the column lines up, badge or not.
-                  <span className="min-w-[44px] shrink-0" aria-hidden="true" />
-                )}
-                <div className="leading-none">
-                  <div className="text-[11px] font-medium text-base-900 tabular-nums">{datePart}</div>
-                  {dayPart && <div className="text-[10px] tabular-nums text-base-400 mt-0.5">{dayPart}</div>}
-                </div>
-              </div>
-            );
-          })()
-        ) : (
-          <span className="text-base-300">—</span>
-        )}
-      </td>
-      {/* ETA — the logistic's committed delivery date (Jess 2026-06-25, distinct
-          from the customer Deadline). Inline-editable; a red "No ETA" alert when
-          missing + the deadline is near (≤7d) → chase the logistic. */}
-      <EtaCell order={o} ct={ct} />
-      {/* Location — delivery city/state. Q1 colour restraint (Jess 2026-06-24):
-          KV (the majority) is now NEUTRAL grey so the green leaves the table;
-          only Outstation keeps a quiet amber (no warehouse buffer = special
-          handling). The "Call before PO" action moved INTO the drawer. */}
-      <td className="px-3 py-2 border-r border-base-100">
+      {/* Region — delivery city/state (was "Location"). KV reads neutral grey;
+          only Outstation keeps a quiet amber (no warehouse buffer). */}
+      <td className="px-3 py-2">
         {loc.label ? (
           <span
             className={`text-[11px] font-medium leading-[1.3] ${
@@ -2066,54 +1783,92 @@ function OrderRow({
           <span className="text-base-400">—</span>
         )}
       </td>
-      {/* Carrier (was Logistic) */}
-      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
+      {/* Deadline — three distinct segments: date (bold, red when hot) · weekday
+          (grey) · a faint days-left pill (-Nd / today / Nd / over). */}
+      <td
+        className="px-3 py-2 leading-[1.2] whitespace-nowrap"
+        title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
+      >
+        {o.delivery_date_tbd ? (
+          <span className="text-[11px] font-medium text-warning">TBD</span>
+        ) : o.delivery_date ? (
+          (() => {
+            const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
+            // Reuse the SAME DUE bucket as the top filter header so they can never
+            // drift: the date turns red on the two hottest tiers (Overdue / Urgent).
+            const bucket = dueBucketOf(o);
+            const dd = daysToDue(o);
+            const hot = bucket === "Overdue" || bucket === "Urgent";
+            const pillText =
+              dd == null ? null : dd < 0 ? "over" : dd === 0 ? "today" : `${dd}d`;
+            return (
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="tabular-nums"
+                  style={{ fontSize: "11px", fontWeight: 600, color: hot ? "#DC2626" : "#111827" }}
+                >
+                  {datePart}
+                </span>
+                {dayPart && (
+                  <span style={{ fontSize: "10px", color: "#9CA3AF" }}>{dayPart}</span>
+                )}
+                {pillText && (
+                  <span
+                    className="tabular-nums shrink-0"
+                    style={{
+                      fontSize: "10px",
+                      color: "#9CA3AF",
+                      background: "rgba(156,163,175,0.15)",
+                      padding: "0 5px",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    {pillText}
+                  </span>
+                )}
+              </div>
+            );
+          })()
+        ) : (
+          <span className="text-base-300">—</span>
+        )}
+      </td>
+      {/* MS / BF / Sofa — per-category unit counts; 0 shows a faint dot. */}
+      <CatCountCell testid="cat-ms" qty={msQty} />
+      <CatCountCell testid="cat-bf" qty={bfQty} />
+      <CatCountCell testid="cat-sofa" qty={sofaQty} />
+      {/* Stock — a colour dot + word (No PO / Waiting / Partial / Ready), no qty. */}
+      <td className="px-3 py-2 whitespace-nowrap">
+        <StockDot info={stock} qtyTotal={qtyTotal} />
+      </td>
+      {/* Logistic — the carrier name (neutral grey). */}
+      <td className="px-3 py-2 whitespace-nowrap">
         {logistic ? (
           <span className="text-[12px] text-base-500">{logistic}</span>
         ) : (
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Stock · qty — merged (Jess 2026-06-24): one button carries readiness +
-          the goods-unit count, sitting next to Items. */}
-      <td className="px-3 py-2 whitespace-nowrap border-r border-base-100">
-        <StockCell info={stock} qty={qtyTotal} />
-      </td>
-      {/* Items — 2-line summary (Jess): core goods (dark) on top, accessories
-          (dim) below; the size is kept in every tag (e.g. "1× MS(K)"). */}
-      <td className="px-3 py-2 border-r border-base-100" title={itemBreakdown(lines)}>
-        {tags.length === 0 ? (
-          <span className="text-base-300">—</span>
-        ) : (
-          <div className="leading-tight space-y-0.5">
-            {tags.filter((t) => t.kind === "core").length > 0 && (
-              <div className="truncate text-[11px] font-medium text-base-800">
-                {tags
-                  .filter((t) => t.kind === "core")
-                  .map((t, i) => (
-                    <span key={i} className="mr-3">
-                      {tagLabel(t)}
-                    </span>
-                  ))}
-              </div>
-            )}
-            {tags.filter((t) => t.kind !== "core").length > 0 && (
-              <div className="truncate text-[11px] text-base-400">
-                {tags
-                  .filter((t) => t.kind !== "core")
-                  .map((t, i) => (
-                    <span key={i} className="mr-3">
-                      {tagLabel(t)}
-                    </span>
-                  ))}
-              </div>
-            )}
-          </div>
-        )}
-      </td>
-      {/* Remark — the 4 operator remarks shown in-cell; click to edit in place. */}
-      <RemarkCell order={o} />
     </tr>
+  );
+}
+
+/** Per-category unit-count cell (MS / BF / Sofa) — the integer, or a faint dot
+ *  when the order has none of that category. */
+function CatCountCell({ testid, qty }: { testid: string; qty: number }) {
+  return (
+    <td data-testid={testid} className="px-2 py-2 text-center">
+      {qty > 0 ? (
+        <span
+          className="tabular-nums"
+          style={{ fontSize: "12.5px", fontWeight: 600, color: "#111827" }}
+        >
+          {qty}
+        </span>
+      ) : (
+        <span style={{ color: "#9CA3AF" }}>·</span>
+      )}
+    </td>
   );
 }
 
@@ -2163,36 +1918,31 @@ function ActionCell({
   );
 }
 
-/** Stock · qty cell — a colour-coded WORD badge that tallies with the top Stock
- *  legend (Jess 2026-06-24): green "Ready N" · amber "Waiting N/M" · RED "Not set
- *  N" (alert — go set it). The number is the goods-unit count (have/need where a
- *  short is known). A traffic-light read: green ok · amber on its way · red act. */
-function StockCell({ info, qty }: { info: StockInfo; qty: number }) {
-  const n = qty > 0 ? ` ${qty}` : "";
-  let label: string;
-  let pill: string;
+/** Stock dot — a colour ● + one WORD (No PO / Waiting / Partial / Ready), NO qty
+ *  number (C1 redesign). Four states mapped from the readiness `info.state`:
+ *    unknown → "No PO" (red) · awaiting → "Waiting" (amber) · need_po → "Partial"
+ *    (grey, when some but not all units are on hand) else "Waiting" (amber) ·
+ *    ready / in_stock → "Ready" (green). `data-stock-state` stays for tests. */
+function StockDot({ info, qtyTotal }: { info: StockInfo; qtyTotal: number }) {
+  let word: string;
+  let color: string;
   let title: string;
   switch (info.state) {
     case "unknown":
-      label = `No PO${n}`;
-      pill = "bg-[#DC2626] text-white"; // vivid red — no PO raised, operation must act
+      word = "No PO";
+      color = "#991B1B";
       title = "No PO raised yet — open the order to reserve stock or raise a PO";
       break;
-    case "ready":
-      label = `Ready${n}`;
-      pill = "pill-confirmed"; // green — secured / reserved
-      title = "Stock secured / reserved for this order";
-      break;
-    case "in_stock":
-      label = `Ready ${info.have ?? qty}`;
-      pill = "pill-confirmed";
-      title = "Free warehouse stock covers every line";
-      break;
     case "need_po": {
-      const need = info.need ?? qty;
+      const need = info.need ?? qtyTotal;
       const have = info.have ?? 0;
-      label = `Waiting ${have}/${need}`;
-      pill = "pill-warning"; // amber — short, raise a PO
+      if (have > 0 && have < need) {
+        word = "Partial";
+        color = "#374151";
+      } else {
+        word = "Waiting";
+        color = "#92400E";
+      }
       title =
         "Short — raise a PO" +
         (info.short && info.short.length > 0
@@ -2200,19 +1950,34 @@ function StockCell({ info, qty }: { info: StockInfo; qty: number }) {
           : "");
       break;
     }
+    case "ready":
+      word = "Ready";
+      color = "#166534";
+      title = "Stock secured / reserved for this order";
+      break;
+    case "in_stock":
+      word = "Ready";
+      color = "#166534";
+      title = "Free warehouse stock covers every line";
+      break;
     default: // awaiting
-      label = `Waiting${n}`;
-      pill = "pill-warning";
+      word = "Waiting";
+      color = "#92400E";
       title = "PO open — stock on the way";
       break;
   }
   return (
     <span
-      className={`pill ${pill} whitespace-nowrap tabular-nums`}
+      className="inline-flex items-center gap-1.5 whitespace-nowrap"
       title={title}
       data-stock-state={info.state}
     >
-      {label}
+      <span
+        className="inline-block w-2 h-2 rounded-full shrink-0"
+        style={{ backgroundColor: color }}
+        aria-hidden="true"
+      />
+      <span style={{ fontSize: "12px", fontWeight: 600, color }}>{word}</span>
     </span>
   );
 }
@@ -2225,18 +1990,16 @@ function shortSku(sku: string): string {
 
 function Th({
   children,
-  noBorder,
+  center,
 }: {
   children: React.ReactNode;
-  /** Drop the right divider so adjacent columns read as ONE category group
-   *  (e.g. Order ID · Ref · Customer = customer detail). */
-  noBorder?: boolean;
+  /** Center-align the header (the narrow MS / BF / Sofa count columns). */
+  center?: boolean;
 }) {
   return (
     <th
-      className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.02em] text-white text-left ${
-        noBorder ? "" : "border-r border-base-600"
-      }`}
+      className={`px-3 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
+      style={{ color: "#C9C5BB", fontSize: "9.5px", letterSpacing: "0.05em" }}
     >
       {children}
     </th>

@@ -248,9 +248,12 @@ describe("OperationOrdersControl", () => {
     const row = screen
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1002"))!;
-    // 2 + 1 = 3 goods units → red "Not set 3" (AutoCount free-text SKU).
-    expect(within(row).getByText("No PO 3")).toBeInTheDocument();
-    // the CR/TCF ref now has its OWN column (Jess: Order split into 3).
+    // AutoCount free-text SKUs → red "No PO" dot (no qty on the stock cell now).
+    expect(within(row).getByText("No PO")).toBeInTheDocument();
+    // Per-category counts: 2 mattress + 1 bedframe, no sofa.
+    expect(within(row).getByTestId("cat-ms")).toHaveTextContent("2");
+    expect(within(row).getByTestId("cat-bf")).toHaveTextContent("1");
+    // the CR/TCF ref shows in the merged Ref column.
     expect(row).toHaveTextContent("CR0418");
   });
 
@@ -324,7 +327,7 @@ describe("OperationOrdersControl · Stock column", () => {
     listHookState.data = { orders: [makeRow(partial)] };
   }
 
-  it("shows In stock + coverage when free balance covers every line (native, early stage)", () => {
+  it("shows a green Ready dot when free balance covers every line (native, early stage)", () => {
     oneRow({
       id: "ns",
       so: 2001,
@@ -342,11 +345,12 @@ describe("OperationOrdersControl · Stock column", () => {
     ]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // have = min(5,2)+min(3,1) = 3 → "Ready 3" (covered; tallies with the legend)
-    expect(within(row).getByText("Ready 3")).toBeInTheDocument();
+    // every line covered (in_stock) → "Ready" dot (no qty on the cell now).
+    expect(within(row).getByText("Ready")).toBeInTheDocument();
+    expect(row.querySelector('[data-stock-state="in_stock"]')).toBeTruthy();
   });
 
-  it("shows Make to order + partial coverage when a line is short", () => {
+  it("shows a Partial dot when some — but not all — units are on hand", () => {
     oneRow({
       id: "sh",
       so: 2002,
@@ -363,11 +367,12 @@ describe("OperationOrdersControl · Stock column", () => {
     ]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // have = 3 ; need = 5 → amber "Waiting 3/5"
-    expect(within(row).getByText("Waiting 3/5")).toBeInTheDocument();
+    // have = 3 ; need = 5 → 0 < have < need → grey "Partial" dot.
+    expect(within(row).getByText("Partial")).toBeInTheDocument();
+    expect(row.querySelector('[data-stock-state="need_po"]')).toBeTruthy();
   });
 
-  it("falls back to a muted Not set for AutoCount free-text SKUs absent from the catalog", () => {
+  it("falls back to a red No PO dot for AutoCount free-text SKUs absent from the catalog", () => {
     oneRow({
       id: "ac",
       so: 2003,
@@ -379,10 +384,11 @@ describe("OperationOrdersControl · Stock column", () => {
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
     expect(row.querySelector('[data-stock-state="unknown"]')).toBeTruthy();
-    // free-text SKU → red "Not set 1" (alert: a human must set readiness).
-    expect(within(row).getByText("No PO 1")).toBeInTheDocument();
+    // free-text SKU → red "No PO" (alert: a human must set readiness).
+    expect(within(row).getByText("No PO")).toBeInTheDocument();
     expect(within(row).queryByText(/^Ready/)).not.toBeInTheDocument();
     expect(within(row).queryByText(/^Waiting/)).not.toBeInTheDocument();
+    expect(within(row).queryByText(/^Partial/)).not.toBeInTheDocument();
   });
 
   it("keeps Ready (stage-derived) for ready_to_dispatch even when free balance is 0", () => {
@@ -398,12 +404,12 @@ describe("OperationOrdersControl · Stock column", () => {
     stockHookState.data = stockResponse([{ sku: "SOFA-1", available: 0 }]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // secured stage → "Ready 99" (word + qty, green pill).
-    expect(within(row).getByText("Ready 99")).toBeInTheDocument();
+    // secured stage → green "Ready" dot (no qty).
+    expect(within(row).getByText("Ready")).toBeInTheDocument();
     expect(row.querySelector('[data-stock-state="ready"]')).toBeTruthy();
   });
 
-  it("shows amber Waiting for awaiting_operation_action (PO already open)", () => {
+  it("shows an amber Waiting dot for awaiting_operation_action (PO already open)", () => {
     oneRow({
       id: "aw",
       so: 2005,
@@ -413,7 +419,7 @@ describe("OperationOrdersControl · Stock column", () => {
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
     expect(within(row).getByText("Waiting")).toBeInTheDocument();
-    expect(row.querySelector('[data-stock-state="awaiting"]')?.className).toContain("pill-warning");
+    expect(row.querySelector('[data-stock-state="awaiting"]')).toBeTruthy();
   });
 
   it("falls back to — for an early native order while the stock snapshot is still loading", () => {
@@ -436,40 +442,29 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     listHookState.data = { orders: [makeRow(partial)] };
   }
 
-  it("rolls items up into a 2-line tier-coloured summary, services not counted (A1)", () => {
+  it("counts MS / BF / Sofa units per category, services not counted (A1)", () => {
     oneRow({
       id: "r1",
       so: 3001,
       order_lines: [
         { sku: "MS01-L1201S-Q", qty: 2 }, // Mattress, Queen → core
         { sku: "BF02-1013", qty: 1 }, // Bedframe, no size → core
-        { sku: "Pillow", qty: 3 }, // accessory
+        { sku: "Pillow", qty: 3 }, // accessory — not a core category
         { sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }, // → M.P, accessory
         { sku: "Sofa Disposal", qty: 1 }, // → Disposal, SERVICE
       ],
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Goods-unit total 2+1+3+1 = 7 (Disposal service NOT counted) → "Not set 7".
-    expect(within(row).getByText("No PO 7")).toBeInTheDocument();
-    // Master-Sheet short codes (MS/BF/SOF) as a 2-line summary; MONOCHROME tiers
-    // by LINE: core goods dark (text-base-800), accessories/services dim
-    // (text-base-400). The colour sits on the line, not the individual tag.
-    expect(within(row).getByText("2× MS(Q)").parentElement?.className).toContain("text-base-800");
-    expect(within(row).getByText("1× BF").parentElement?.className).toContain("text-base-800");
-    expect(within(row).getByText("3× Pillow").parentElement?.className).toContain("text-base-400");
-    expect(within(row).getByText("1× M.P").parentElement?.className).toContain("text-base-400");
-    expect(within(row).getByText("1× Disposal").parentElement?.className).toContain("text-base-400");
-    // Two-line layout: core tags sit in a different flex row from acc/service.
-    const coreRow = within(row).getByText("2× MS(Q)").parentElement;
-    expect(coreRow).toBe(within(row).getByText("1× BF").parentElement);
-    expect(coreRow).not.toBe(within(row).getByText("3× Pillow").parentElement);
-    expect(within(row).getByText("3× Pillow").parentElement).toBe(
-      within(row).getByText("1× Disposal").parentElement,
-    );
+    // Per-category count cells: 2 mattress + 1 bedframe + 0 sofa (accessories +
+    // service never count towards a core category).
+    expect(within(row).getByTestId("cat-ms")).toHaveTextContent("2");
+    expect(within(row).getByTestId("cat-bf")).toHaveTextContent("1");
+    // Sofa count is 0 → a faint dot placeholder, not a number.
+    expect(within(row).getByTestId("cat-sofa")).toHaveTextContent("·");
   });
 
-  it("classifies real AutoCount free-text SKUs into MS/BF/SOF — even with COL: colour codes and non-MS/BF/SF model families (P1 classifier fix)", () => {
+  it("classifies real AutoCount free-text SKUs into MS/BF/Sofa counts — even with COL: colour codes and non-MS/BF/SF model families (P1 classifier fix)", () => {
     oneRow({
       id: "ac1",
       so: 3099,
@@ -489,62 +484,30 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Master-Sheet codes, NOT the raw model name; each size shows its own qty
-    // (Jess: "1× MS(K)" + "2× MS(Q)", never a lazy "3× MS(K,Q)").
-    expect(within(row).getByText("1× MS(K)")).toBeInTheDocument();
-    expect(within(row).getByText("2× MS(Q)")).toBeInTheDocument();
-    expect(within(row).getByText("1× BF(K)")).toBeInTheDocument();
-    expect(within(row).getByText("2× BF(Q)")).toBeInTheDocument();
-    expect(within(row).getByText("2× SOF")).toBeInTheDocument();
-    // The raw model names no longer leak into the row as accessory tags.
+    // Category counts aggregate across sizes: MS = 1+2 = 3, BF = 1+2 = 3,
+    // Sofa = 1+1 = 2 (the classifier resolves each free-text SKU correctly).
+    expect(within(row).getByTestId("cat-ms")).toHaveTextContent("3");
+    expect(within(row).getByTestId("cat-bf")).toHaveTextContent("3");
+    expect(within(row).getByTestId("cat-sofa")).toHaveTextContent("2");
+    // The raw model names never leak into the row.
     expect(within(row).queryByText(/jager|hk55|glano|breeze|lumi/i)).toBeNull();
   });
 
-  it("names a Carress Footrest line by its TYPE (Footrest), not the brand first-word (P7)", () => {
-    oneRow({
-      id: "fr1",
-      so: 3100,
-      order_lines: [
-        { sku: "Carress Footrest-K", qty: 6 },
-        { sku: "Carress Footrest-Q", qty: 4 },
-      ],
-    });
-    wrap(<OperationOrdersControl />);
-    const row = screen.getByTestId("order-row");
-    // Both sizes roll up by TYPE → "10× Footrest"; the brand never shows.
-    expect(within(row).getByText("10× Footrest")).toBeInTheDocument();
-    expect(within(row).queryByText(/carress/i)).toBeNull();
-  });
-
-  it("always shows qty on accessory/service tags — even a lone qty-1 accessory (P1)", () => {
-    oneRow({
-      id: "p1",
-      so: 3011,
-      order_lines: [{ sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }],
-    });
-    wrap(<OperationOrdersControl />);
-    const row = screen.getByTestId("order-row");
-    // No qty-1 exemption: "1× M.P", never a bare "M.P" (only core keeps the
-    // single-category de-dup).
-    expect(within(row).getByText("1× M.P")).toBeInTheDocument();
-    expect(within(row).queryByText("M.P")).not.toBeInTheDocument();
-  });
-
-  it("merged Stock · qty button carries the goods-unit total; the Items tag keeps its own qty + size", () => {
+  it("the Stock cell shows a state dot with no qty; the category counts carry the qty", () => {
     oneRow({
       id: "r1b",
       so: 3010,
-      order_lines: [{ sku: "SF03-HK5535", qty: 2 }], // sofa only
+      order_lines: [{ sku: "SF03-HK5535", qty: 2 }], // sofa only, free-text SKU
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Qty total (2) now in the Stock · qty badge ("Not set 2" — free-text SKU);
-    // the Items tag still carries its own qty + size ("2× SOF").
-    expect(within(row).getByText("No PO 2")).toBeInTheDocument();
-    expect(within(row).getByText("2× SOF")).toBeInTheDocument();
+    // Free-text SKU → red "No PO" dot (no qty on the stock cell);
+    // the Sofa count cell carries the 2 units.
+    expect(within(row).getByText("No PO")).toBeInTheDocument();
+    expect(within(row).getByTestId("cat-sofa")).toHaveTextContent("2");
   });
 
-  it("orders columns: select · Follow-up · Status · Order ID · Ref No · Customer · Deadline · ETA · Location · Carrier · Stock · Items · Remark", () => {
+  it("orders columns: select · Follow-up · Ref · Customer · Region · Deadline · MS · BF · Sofa · Stock · Logistic", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -553,33 +516,31 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       source_ref: ["TCF2024/06-461"],
     });
     wrap(<OperationOrdersControl />);
-    // ONE header row. The follow-up flag = the order's STATUS, in the 2nd column
-    // (Jess 2026-06-26: left, not a separate empty column). The old far-right
-    // Action column is gone — the status flag replaced it.
+    // ONE header row (C1 redesign — 11 columns). The follow-up flag is the 2nd
+    // column (icon-only header). Status / ETA / Items / Remark columns are gone;
+    // the MS / BF / Sofa per-category count columns replace the Items summary.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
-      "", // follow-up flag — icon-only header now (Jess 2026-06-29)
-      "Status",
-      "Order ID",
-      "Ref No",
+      "", // follow-up flag — icon-only header
+      "Ref",
       "Customer",
+      "Region",
       "Deadline",
-      "ETA",
-      "Location",
-      "Logistic", // was "Carrier" — wording aligned to the Logistic filter
+      "MS",
+      "BF",
+      "Sofa",
       "Stock",
-      "Items",
-      "Remark",
+      "Logistic",
     ]);
-    // Order is split into THREE columns now (Jess): SO# · ref · customer, each
-    // its own cell. Phone stays in the Order ID cell tooltip.
+    // The Ref column merges the day-to-day reference with the system SO number;
+    // the phone stays in that cell's tooltip.
     const row = screen.getByTestId("order-row");
     expect(within(row).getByText("SO-3012")).toBeInTheDocument();
     expect(within(row).getByText("Tan Ah Kow")).toBeInTheDocument();
     expect(within(row).getByText("TCF2024/06-461")).toBeInTheDocument();
-    const idCell = within(row).getByText("SO-3012").closest("td")!;
-    expect(idCell).toHaveAttribute("title", "012-3456789");
+    const refCell = within(row).getByText("SO-3012").closest("td")!;
+    expect(refCell).toHaveAttribute("title", "012-3456789");
   });
 
   it("sorts by deadline ascending — overdue/earliest first, TBD + undated last (P3)", () => {
@@ -650,25 +611,25 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header present
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // Merged Deadline cell = date (black) on top, weekday (grey) below, no
-    // countdown (Jess 2026-06-25). The dated cell must render something, not "—".
+    // Deadline is the 6th cell (index 5: select · flag · Ref · Customer · Region
+    // · Deadline). It shows date + weekday + days-left; must not be the "—" dash.
     const cells = within(screen.getByTestId("order-row")).getAllByRole("cell");
-    expect(cells[6].textContent).not.toBe("—");
-    expect(cells[6].textContent).toMatch(/\d/);
+    expect(cells[5].textContent).not.toBe("—");
+    expect(cells[5].textContent).toMatch(/\d/);
   });
 
-  it("paginates — 15/page by default (fixed listing box), Next works", () => {
+  it("paginates — 20/page by default (fixed listing box), Next works", () => {
     listHookState.data = {
       orders: Array.from({ length: 120 }, (_, i) =>
         makeRow({ id: `p${i}`, so: 4000 + i }),
       ),
     };
     wrap(<OperationOrdersControl />);
-    expect(screen.getByText(/1.15 of 120/)).toBeInTheDocument();
-    expect(screen.getAllByTestId("order-row")).toHaveLength(15);
+    expect(screen.getByText(/1.20 of 120/)).toBeInTheDocument();
+    expect(screen.getAllByTestId("order-row")).toHaveLength(20);
 
     fireEvent.click(screen.getByRole("button", { name: /Next/ }));
-    expect(screen.getByText(/16.30 of 120/)).toBeInTheDocument();
+    expect(screen.getByText(/21.40 of 120/)).toBeInTheDocument();
   });
 
   it("surfaces an Unassigned-carrier alert (no-carrier count) and filters on click", () => {
