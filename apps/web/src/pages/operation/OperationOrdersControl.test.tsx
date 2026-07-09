@@ -461,8 +461,8 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // service never count towards a core category).
     expect(within(row).getByTestId("cat-ms")).toHaveTextContent("2");
     expect(within(row).getByTestId("cat-bf")).toHaveTextContent("1");
-    // Sofa count is 0 → a faint dot placeholder, not a number.
-    expect(within(row).getByTestId("cat-sofa")).toHaveTextContent("·");
+    // Sofa count is 0 → a faint dash placeholder, not a number.
+    expect(within(row).getByTestId("cat-sofa")).toHaveTextContent("–");
   });
 
   it("classifies real AutoCount free-text SKUs into MS/BF/Sofa counts — even with COL: colour codes and non-MS/BF/SF model families (P1 classifier fix)", () => {

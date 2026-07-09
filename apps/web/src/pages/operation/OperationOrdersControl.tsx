@@ -1327,23 +1327,26 @@ export default function OperationOrdersControl({ onImport }: Props) {
         <table
           ref={listTableRef}
           className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[44px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden"
-          style={{ minWidth: 1060 }}
+          style={{ minWidth: 1000, maxWidth: 1120 }}
         >
           {/* Widths L→R: checkbox · ⚑ · Ref · Customer · Region · Deadline ·
               MS · BF · Sofa · Stock · Logistic */}
+          {/* Narrowed count group (MS/BF/SOF) → width given back to Customer +
+              Next action; capped total keeps the table from sprawling on wide
+              screens (Loo readability round 2026-07-09). */}
           <colgroup>
             <col style={{ width: 34 }} />
+            <col style={{ width: 36 }} />
+            <col style={{ width: 124 }} />
+            <col style={{ width: 168 }} />
+            <col style={{ width: 104 }} />
+            <col style={{ width: 148 }} />
+            <col style={{ width: 34 }} />
+            <col style={{ width: 34 }} />
             <col style={{ width: 40 }} />
-            <col style={{ width: 118 }} />
-            <col style={{ width: 132 }} />
-            <col style={{ width: 92 }} />
-            <col style={{ width: 150 }} />
-            <col style={{ width: 44 }} />
-            <col style={{ width: 44 }} />
-            <col style={{ width: 52 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 80 }} />
-            <col style={{ width: 160 }} />
+            <col style={{ width: 100 }} />
+            <col style={{ width: 90 }} />
+            <col style={{ width: 184 }} />
           </colgroup>
           {/* Dark ink header band (#221F20) — kept per Loo; the flame underline
               stays DROPPED (flame never enters the table), replaced by a faint
@@ -1811,12 +1814,12 @@ function OrderRow({
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* Ref — the day-to-day reference (mono, bold) with the system SO number as
           a faint secondary line below. Phone stays in the cell tooltip. */}
-      <td className="px-3 py-2" title={o.customer_phone ?? undefined}>
+      <td className="px-3 py-1" title={o.customer_phone ?? undefined}>
         {ref.length > 0 ? (
-          <div className="font-mono truncate" style={{ lineHeight: "16px" }} title={ref.join("\n")}>
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}>{ref[0]}</span>
+          <div className="font-mono truncate" style={{ lineHeight: "18px" }} title={ref.join("\n")}>
+            <span style={{ fontSize: "16px", fontWeight: 700, color: "#221F20" }}>{ref[0]}</span>
             {ref.length > 1 && (
-              <span style={{ fontSize: "11px", fontWeight: 400, color: "#9CA3AF" }}> +{ref.length - 1}</span>
+              <span style={{ fontSize: "12px", fontWeight: 400, color: "#9B9389" }}> +{ref.length - 1}</span>
             )}
           </div>
         ) : (
@@ -1824,7 +1827,7 @@ function OrderRow({
         )}
         <div
           className="font-mono"
-          style={{ fontSize: "10px", fontWeight: 400, color: "#9CA3AF", lineHeight: "12px" }}
+          style={{ fontSize: "12px", fontWeight: 400, color: "#6F6960", lineHeight: "13px" }}
         >
           SO-{o.so}
         </div>
@@ -1833,7 +1836,7 @@ function OrderRow({
       <td className="px-3 py-2">
         {o.customer_name ? (
           <span
-            className={`${cjkClassName(o.customer_name)} text-[12.5px] text-base-800 leading-[1.3]`}
+            className={`${cjkClassName(o.customer_name)} text-[13px] text-base-800 leading-[1.3]`}
             style={{ color: "#1F2937", ...clamp3 }}
             title={o.customer_name}
           >
@@ -1848,7 +1851,7 @@ function OrderRow({
       <td className="px-3 py-2">
         {loc.label ? (
           <span
-            className="text-[12px] leading-[1.3]"
+            className="text-[13px] leading-[1.3]"
             style={{ color: loc.area === "Outstation" ? "#9A7B3F" : "#4B5563", ...clamp3 }}
             title={
               loc.area === "Outstation"
@@ -1884,7 +1887,7 @@ function OrderRow({
               <div className="flex items-center gap-1.5">
                 <span
                   className="tabular-nums"
-                  style={{ fontSize: "12.5px", fontWeight: 600, color: hot ? "#DC2626" : "#111827" }}
+                  style={{ fontSize: "13px", fontWeight: 600, color: hot ? "#DC2626" : "#111827" }}
                 >
                   {datePart}
                 </span>
@@ -1923,7 +1926,7 @@ function OrderRow({
       {/* Logistic — the carrier name (neutral grey). */}
       <td className="px-3 py-2 whitespace-nowrap">
         {logistic ? (
-          <span className="text-[12px]" style={{ color: "#4B5563" }}>{logistic}</span>
+          <span className="text-[13px]" style={{ color: "#4B5563" }}>{logistic}</span>
         ) : (
           <span className="text-base-300">—</span>
         )}
@@ -1960,16 +1963,16 @@ function OrderRow({
  *  when the order has none of that category. */
 function CatCountCell({ testid, qty }: { testid: string; qty: number }) {
   return (
-    <td data-testid={testid} className="px-2 py-2 text-center">
+    <td data-testid={testid} className="px-1 py-2 text-center">
       {qty > 0 ? (
         <span
           className="tabular-nums"
-          style={{ fontSize: "12.5px", fontWeight: 600, color: "#111827" }}
+          style={{ fontSize: "13px", fontWeight: 700, color: "#221F20" }}
         >
           {qty}
         </span>
       ) : (
-        <span style={{ color: "#E5E1D8" }}>·</span>
+        <span style={{ color: "#C9C5BB", fontSize: "13px" }}>–</span>
       )}
     </td>
   );
@@ -2080,7 +2083,7 @@ function StockDot({ info, qtyTotal }: { info: StockInfo; qtyTotal: number }) {
         style={{ backgroundColor: color }}
         aria-hidden="true"
       />
-      <span style={{ fontSize: "12px", fontWeight: 500, color }}>{word}</span>
+      <span style={{ fontSize: "13px", fontWeight: 500, color }}>{word}</span>
     </span>
   );
 }
@@ -2102,7 +2105,7 @@ function Th({
   return (
     <th
       className={`px-3 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      style={{ color: "#C9C5BB", fontSize: "10px", letterSpacing: "0.10em" }}
+      style={{ color: "#C9C5BB", fontSize: "11px", letterSpacing: "0.04em" }}
     >
       {children}
     </th>
