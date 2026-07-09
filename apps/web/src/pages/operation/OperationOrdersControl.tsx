@@ -326,13 +326,17 @@ export interface NextAction {
   /** Delivery is HELD on an owing balance/storage (🔒). */
   locked?: boolean;
 }
-// Reuse the locked v17 pills (no new colours): red / amber / blue / green / grey.
-const NEXT_TONE_PILL: Record<NextTone, string> = {
-  danger: "pill-overdue",
-  warning: "pill-warning",
-  info: "pill-sent",
-  success: "pill-confirmed",
-  neutral: "pill-neutral",
+// POS re-skin (Loo 2026-07-09): the Next-action column is the ONE place colour
+// lives in the row, and even here it's LOW-SATURATION (flame never enters the
+// table; a saturated red is reserved for the genuinely-urgent danger tone).
+// Soft tinted pill = the POS badge look (`.prod-card__badge`) — rounded, faint
+// fill, coloured ink — carried inline so the shared global `.pill` stays put.
+const NEXT_TONE_STYLE: Record<NextTone, { text: string; bg: string }> = {
+  danger: { text: "#B03A2E", bg: "rgba(176,58,46,0.10)" }, // real red — "会出事"
+  warning: { text: "#8A6D2F", bg: "rgba(138,109,47,0.12)" }, // low-sat amber
+  info: { text: "#3E6187", bg: "rgba(62,97,135,0.11)" }, // low-sat blue
+  success: { text: "#4B7A5A", bg: "rgba(75,122,90,0.12)" }, // low-sat green
+  neutral: { text: "#6F6960", bg: "rgba(34,31,32,0.06)" }, // grey
 };
 
 function ovlOf(o: operationOrderListRow) {
@@ -1112,7 +1116,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   return (
     <div
-      className="h-full flex flex-col px-6 pt-6 pb-5 bg-base-200"
+      className="h-full flex flex-col px-6 pt-6 pb-5 bg-[#F5F1EA]"
       data-testid="operation-orders-control"
     >
       {/* Header — title + count + search + import (fixed; does not scroll) */}
@@ -1148,7 +1152,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <button
               type="button"
               onClick={onImport}
-              className="btn-primary text-[12px] whitespace-nowrap"
+              className="btn-hero text-[12px] whitespace-nowrap"
             >
               + Import from AutoCount
             </button>
@@ -1315,7 +1319,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           their width; long Ref/Customer/Location/Remark wrap to ≤3 lines. */}
       <div
         ref={listBoxRef}
-        className="flex-1 min-h-0 bg-white border border-base-200 rounded-lg shadow-md overflow-auto"
+        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-lg shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
       >
         <table
           ref={listTableRef}
@@ -1338,12 +1342,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 80 }} />
             <col style={{ width: 160 }} />
           </colgroup>
-          {/* ONE dark header band (#221F20) with a flame underline so it reads
-              clearly AS the header (C1 redesign). */}
+          {/* Light POS-style header band (Loo 2026-07-09 re-skin): a soft paper
+              fill + a solid hairline underline (flame underline dropped — flame
+              never enters the table), grey micro uppercase labels. */}
           <thead>
             <tr
-              className="border-b-2 border-primary"
-              style={{ backgroundColor: "#221F20" }}
+              className="border-b"
+              style={{ backgroundColor: "#EFEAE1", borderBottomColor: "rgba(34,31,32,0.14)" }}
             >
               <th className="px-3 py-1.5">
                 <input
@@ -1355,7 +1360,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 />
               </th>
               <th className="px-1 py-1.5 text-center" title="Follow-up">
-                <Flag size={13} strokeWidth={2} className="inline text-white" aria-label="Follow-up" />
+                <Flag size={13} strokeWidth={2} className="inline text-[#6F6960]" aria-label="Follow-up" />
               </th>
               <Th>Ref</Th>
               <Th>Customer</Th>
@@ -1777,11 +1782,11 @@ function OrderRow({
   return (
     <tr
       onClick={onOpen}
-      className={`border-t border-[rgba(17,24,39,0.06)] hover:bg-info-soft/50 cursor-pointer align-middle ${
+      className={`border-t border-[rgba(34,31,32,0.06)] hover:bg-[#F5F1EA] cursor-pointer align-middle ${
         selected
-          ? "bg-primary/15 shadow-[inset_3px_0_0_#C44D2B]"
+          ? "bg-[#EFE9DF] shadow-[inset_3px_0_0_#221F20]"
           : idx % 2
-            ? "bg-base-100/70"
+            ? "bg-[#FBF9F5]"
             : "bg-white"
       }`}
       data-testid="order-row"
@@ -1837,10 +1842,8 @@ function OrderRow({
       <td className="px-3 py-2">
         {loc.label ? (
           <span
-            className={`text-[12px] leading-[1.3] ${
-              loc.area === "Outstation" ? "text-warning" : "text-base-600"
-            }`}
-            style={{ color: loc.area === "Outstation" ? undefined : "#4B5563", ...clamp3 }}
+            className="text-[12px] leading-[1.3]"
+            style={{ color: loc.area === "Outstation" ? "#9A7B3F" : "#4B5563", ...clamp3 }}
             title={
               loc.area === "Outstation"
                 ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
@@ -1860,7 +1863,7 @@ function OrderRow({
         title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
         {o.delivery_date_tbd ? (
-          <span className="text-[11px] font-medium text-warning">TBD</span>
+          <span className="text-[11px] font-medium" style={{ color: "#9A7B3F" }}>TBD</span>
         ) : o.delivery_date ? (
           (() => {
             const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
@@ -1923,9 +1926,18 @@ function OrderRow({
       <td className="px-3 py-2 whitespace-nowrap">
         {(() => {
           const na = nextActionOf(o, stock, lines);
+          const st = NEXT_TONE_STYLE[na.tone];
           return (
             <span
-              className={`pill ${NEXT_TONE_PILL[na.tone]} inline-flex items-center gap-1 align-middle`}
+              className="inline-flex items-center gap-1 rounded-full align-middle whitespace-nowrap"
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                letterSpacing: "0.01em",
+                padding: "2px 9px",
+                color: st.text,
+                background: st.bg,
+              }}
               data-next-action={na.label}
             >
               {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
@@ -1992,11 +2004,11 @@ function ActionCell({
         className="inline-flex"
       >
         {!lead ? (
-          <Flag size={15} strokeWidth={2} className="text-base-300 hover:text-warning" />
+          <Flag size={15} strokeWidth={2} className="text-base-300 hover:text-[#9A7B3F]" />
         ) : u === "overdue" ? (
           <Flag size={15} strokeWidth={2.5} className="fill-current text-danger" />
         ) : (
-          <Flag size={15} strokeWidth={2} className="fill-current text-warning" />
+          <Flag size={15} strokeWidth={2} className="fill-current" style={{ color: "#9A7B3F" }} />
         )}
       </button>
     </td>
@@ -2015,7 +2027,7 @@ function StockDot({ info, qtyTotal }: { info: StockInfo; qtyTotal: number }) {
   switch (info.state) {
     case "unknown":
       word = "No PO";
-      color = "#991B1B";
+      color = "#A85C46";
       title = "No PO raised yet — open the order to reserve stock or raise a PO";
       break;
     case "need_po": {
@@ -2023,10 +2035,10 @@ function StockDot({ info, qtyTotal }: { info: StockInfo; qtyTotal: number }) {
       const have = info.have ?? 0;
       if (have > 0 && have < need) {
         word = "Partial";
-        color = "#374151";
+        color = "#726C64";
       } else {
         word = "Waiting";
-        color = "#92400E";
+        color = "#9A7B3F";
       }
       title =
         "Short — raise a PO" +
@@ -2037,17 +2049,17 @@ function StockDot({ info, qtyTotal }: { info: StockInfo; qtyTotal: number }) {
     }
     case "ready":
       word = "Ready";
-      color = "#166534";
+      color = "#5B7F63";
       title = "Stock secured / reserved for this order";
       break;
     case "in_stock":
       word = "Ready";
-      color = "#166534";
+      color = "#5B7F63";
       title = "Free warehouse stock covers every line";
       break;
     default: // awaiting
       word = "Waiting";
-      color = "#92400E";
+      color = "#9A7B3F";
       title = "PO open — stock on the way";
       break;
   }
@@ -2084,7 +2096,7 @@ function Th({
   return (
     <th
       className={`px-3 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      style={{ color: "#C9C5BB", fontSize: "9.5px", letterSpacing: "0.05em" }}
+      style={{ color: "#6F6960", fontSize: "10px", letterSpacing: "0.12em" }}
     >
       {children}
     </th>
