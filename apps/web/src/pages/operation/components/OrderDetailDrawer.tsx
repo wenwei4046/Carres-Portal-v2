@@ -22,7 +22,7 @@ import {
   type LineStockStatus,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
-import { renderDoPdf } from "@/lib/pdf/render";
+import { renderDoPdf, renderReceiptPdf } from "@/lib/pdf/render";
 import type { DoTemplateData } from "@/lib/pdf/types";
 import {
   qk,
@@ -34,6 +34,10 @@ import {
   useReturnLoan,
   useDeliveryPartners,
   useUpdateOrder,
+  useOrderPayments,
+  useRecordPayment,
+  useVoidPayment,
+  type OrderPaymentRow,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
   type operationOrderDetailStockBalance,
@@ -57,7 +61,6 @@ import {
   RoutingFields,
   DeliveryTimeSlotField,
   LogisticEtaField,
-  PaymentControlFields,
   StorageControlFields,
   RemarkControlField,
   OrderControlSaveBar,
@@ -660,15 +663,19 @@ function DrawerBody({
     return "in_production";
   })();
   const shortages = calcShortages(lines, stockBalances);
-  // Outstanding = order grand total − paid. AutoCount-imported orders often
-  // carry no line prices (total 0) → we can't compute a real balance, so the
-  // header pill hides rather than lie. Mirrors OrderControlPanel's PaymentSummary.
+  // Line-sum of the order (native/priced orders). AutoCount imports carry no line
+  // prices → grandTotal is 0 and Total falls back to the keyed balance (see the
+  // Money block below). hasLineTotal drives whether Total is auto (read-only) or
+  // staff-keyed.
   const grandTotal = total + addonsSum(addons);
-  const outstanding = Math.max(0, grandTotal - Number(order.paid || 0));
-  const hasTotal = grandTotal > 0;
+  const hasLineTotal = grandTotal > 0;
   const loc = locationForAddress(order.customer_address ?? null);
 
   const form = useOrderControlForm(order.id);
+  // Payment ledger (order_payments, migration 0184) — the source of truth for
+  // Collected. Fetched at the drawer level so the header sticker + status strip +
+  // Money card all read ONE Outstanding.
+  const paymentsQuery = useOrderPayments(order.id);
   // The order's assigned logistic NAME (ops_assigned_logistic is a partner id) —
   // drives the default stock Location (final consolidation point, not supplier).
   const { data: partnersData } = useDeliveryPartners();
@@ -739,11 +746,6 @@ function DrawerBody({
     deliveryMs !== null
       ? fmtDate(new Date(deliveryMs - 1 * 86_400_000).toISOString().slice(0, 10))
       : null;
-  // Header summary = the OWING amount (Jess: operation tracks outstanding, not a
-  // bill). Prefer the operator/import-keyed control balance; else the derived
-  // outstanding; never show "RM 0 paid" (that read as settled when it wasn't).
-  const controlOwing = form.draft.balance.trim() ? Number(form.draft.balance) : 0;
-
   // Readiness per goods line (locked vocab): Ready (free stock ≥ qty) → Waiting
   // (a PO is raised for the sku) → No PO (nothing yet). Service lines carry no
   // stock, so they're excluded from the count. The panel header badge tallies
@@ -836,7 +838,24 @@ function DrawerBody({
         )
       : null;
   const pastLastCall = daysToDelivery !== null && daysToDelivery <= 1;
-  const balanceOwing = hasTotal && outstanding > 0;
+  // ── Money (batch 2, Jess 2026-07-09) — ledger-based Total / Collected /
+  //    Outstanding. Path 1 (no migration): Total = the order's to-collect figure —
+  //    the line-sum when priced (native), else the keyed ops_order_control.balance
+  //    (AutoCount has no line prices → staff keys it once). Collected = Σ goods
+  //    payments (payment+deposit) from the order_payments ledger. Outstanding =
+  //    Total − Collected. The whole system already nets balance − ledger
+  //    (OperationPayments), so this stays consistent. Total-not-set ⇒ don't block.
+  const ledger = paymentsQuery.data?.payments ?? [];
+  const collected = ledger
+    .filter((p) => p.kind === "payment" || p.kind === "deposit")
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+  const keyedTotal = form.draft.balance.trim()
+    ? Number(form.draft.balance)
+    : Number(form.control?.balance ?? 0);
+  const orderTotal = hasLineTotal ? grandTotal : keyedTotal;
+  const totalSet = orderTotal > 0;
+  const moneyOutstanding = totalSet ? Math.max(0, orderTotal - collected) : 0;
+  const balanceOwing = totalSet && moneyOutstanding > 0;
   // Storage is "incurred" when the operator set a From date, OR the Master import
   // carried a fee (migration 0207, Jess: a Master fee auto-marks incurred → it
   // enters the collect-before-delivery gate).
@@ -855,11 +874,10 @@ function DrawerBody({
   // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
   const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
   const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
-  // Balance panel STATUS pill (Jess 2026-07-08: panel = status, show the amount
-  // as a pill — no explanatory sentence). owing = import-keyed control balance
-  // wins, else the derived outstanding.
-  const isOwing = balanceOwing || controlOwing > 0;
-  const owingAmt = controlOwing > 0 ? controlOwing : outstanding;
+  // Balance panel STATUS pill + status-strip Money cell (batch 2): the ledger
+  // Outstanding drives them all, so pill / strip / header sticker never disagree.
+  const isOwing = balanceOwing;
+  const owingAmt = moneyOutstanding;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -949,6 +967,17 @@ function DrawerBody({
                 className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-warning/15 text-warning shrink-0 max-w-[170px] truncate"
               >
                 <AlertCircle size={10} strokeWidth={2.5} /> Action needed
+              </span>
+            )}
+            {/* Outstanding · hold sticker (batch 2) — money owed HOLDS delivery
+                until Outstanding = RM0 (hard rule, Jess). Red, always visible when
+                a balance is due. */}
+            {balanceOwing && (
+              <span
+                title="Delivery is held until the balance is fully collected"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FEE2E2] text-[#991B1B] shrink-0"
+              >
+                <AlertCircle size={10} strokeWidth={2.5} /> Outstanding · hold
               </span>
             )}
             {/* Deadline countdown — completed NEVER shows red (batch-1 reuses the
@@ -1374,7 +1403,7 @@ function DrawerBody({
                   )}
                   {RM(owingAmt)} owing
                 </span>
-              ) : hasTotal ? (
+              ) : totalSet ? (
                 <MiniBadge tone="ready">Settled</MiniBadge>
               ) : (
                 <MiniBadge tone="muted">No balance</MiniBadge>
@@ -1398,11 +1427,15 @@ function DrawerBody({
                   </span>
                 </div>
               )}
-              <PaymentControlFields
-                form={form}
-                paid={Number(order.paid || 0)}
-                total={grandTotal}
+              <MoneyCard
                 orderId={order.id}
+                form={form}
+                hasLineTotal={hasLineTotal}
+                orderTotal={orderTotal}
+                totalSet={totalSet}
+                collected={collected}
+                outstanding={moneyOutstanding}
+                ledger={ledger}
                 receiptMeta={{
                   orderCode: `SO-${order.so}`,
                   customerName: order.customer_name ?? "",
@@ -1447,7 +1480,20 @@ function DrawerBody({
                 )
               }
             >
-              <div className="p-3">
+              <div className="p-3 space-y-2">
+                {/* Per-day rate FRAME (batch 2 placeholder, Jess 2026-07-09): the
+                    new by-day rates. The actual per-day accrual (delivery window +
+                    public-holiday aware) is deferred — this only states the rates
+                    so the block reads right; the fee below still uses the existing
+                    calc until the by-day logic lands. */}
+                <div className="rounded-[8px] border border-base-200/70 bg-base-50 px-2.5 py-1.5 text-[11px] text-base-500 flex items-center justify-between gap-2">
+                  <span>
+                    Rate · mattress{" "}
+                    <span className="font-mono text-base-700">RM5</span>/day · sofa{" "}
+                    <span className="font-mono text-base-700">RM14.30</span>/day
+                  </span>
+                  <span className="text-base-400 italic">by-day calc coming</span>
+                </div>
                 <StorageControlFields
                   form={form}
                   hasMsbf={hasMsbf}
@@ -2058,6 +2104,274 @@ function downloadOrderCsv(
   a.download = `SO-${order.so}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ─── Money card (batch 2, Jess 2026-07-09) ───────────────────────────────────
+// The clean replacement for the old 5-field Balance mess. Three locked rows
+// (Total / Collected / Outstanding), a per-payment history list, and a 3-field
+// Record-payment form — all wired to the existing order_payments ledger + hooks
+// (useOrderPayments/useRecordPayment/useVoidPayment) and the existing receipt PDF
+// (renderReceiptPdf). Lining-box; colour only for Outstanding (red) / Collected
+// (green). Total store = ops_order_control.balance (path 1, no migration).
+
+/** Render + open a receipt PDF for one ledger entry (reuses the shared
+ *  renderReceiptPdf; receipt_no format R{so}-{n} until the PAY-/RCP- renumber). */
+async function openReceipt(
+  row: OrderPaymentRow,
+  meta: { orderCode: string; customerName: string },
+) {
+  try {
+    const blob = await renderReceiptPdf({
+      receipt_no: row.receipt_no ?? row.id.slice(0, 8),
+      issue_date: row.paid_on,
+      order_code: meta.orderCode,
+      customer: { name: meta.customerName },
+      amount: Number(row.amount),
+      method: row.method,
+      kind: row.kind,
+      reference: row.reference,
+      note: row.note,
+      currency: "MYR",
+    });
+    window.open(URL.createObjectURL(blob), "_blank");
+  } catch (e) {
+    toast.error(`Couldn't open receipt — ${(e as Error).message}`);
+  }
+}
+
+/** One row of the Total / Collected / Outstanding stack. */
+function MoneyRow({
+  label,
+  children,
+  strong,
+}: {
+  label: string;
+  children: ReactNode;
+  strong?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-2 px-3 ${strong ? "py-2" : "py-1.5"}`}
+    >
+      <span className="t-micro text-base-400">{label}</span>
+      <span className="text-right">{children}</span>
+    </div>
+  );
+}
+
+/** The 3-field Record-payment form (amount + date + note only, Jess: the whole
+ *  point — split the free-text mess into clean typed inputs). method='cash' /
+ *  kind='payment' are applied by the caller. */
+function RecordPaymentForm({
+  pending,
+  onCancel,
+  onSubmit,
+}: {
+  pending: boolean;
+  onCancel: () => void;
+  onSubmit: (input: { amount: number; paidOn: string; note: string | null }) => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState("");
+  const amt = Number(amount);
+  const valid = amount.trim() !== "" && Number.isFinite(amt) && amt > 0 && !pending;
+  const cell =
+    "w-full px-2 py-1.5 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700";
+  return (
+    <div className="rounded-[8px] border border-base-200/70 bg-base-50 p-2 space-y-1.5">
+      <div className="grid grid-cols-2 gap-1.5">
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="Amount (RM)"
+          aria-label="Payment amount"
+          className={cell}
+        />
+        <input
+          type="date"
+          value={paidOn}
+          onChange={(e) => setPaidOn(e.target.value)}
+          aria-label="Payment date"
+          className={cell}
+        />
+      </div>
+      <input
+        type="text"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Note (e.g. Deposit · 2nd payment · final)"
+        aria-label="Payment note"
+        className={cell}
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!valid}
+          onClick={() =>
+            onSubmit({ amount: amt, paidOn, note: note.trim() || null })
+          }
+          className="btn-hero text-[12px] disabled:opacity-50"
+        >
+          {pending ? "Recording…" : "Record payment"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-[12px] text-base-500 hover:text-base-700"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MoneyCard({
+  orderId,
+  form,
+  hasLineTotal,
+  orderTotal,
+  totalSet,
+  collected,
+  outstanding,
+  ledger,
+  receiptMeta,
+}: {
+  orderId: string;
+  form: ReturnType<typeof useOrderControlForm>;
+  hasLineTotal: boolean;
+  orderTotal: number;
+  totalSet: boolean;
+  collected: number;
+  outstanding: number;
+  ledger: OrderPaymentRow[];
+  receiptMeta: { orderCode: string; customerName: string };
+}) {
+  const role = useAuth((s) => s.role);
+  const isPrincipal = role === "principal";
+  const [adding, setAdding] = useState(false);
+  const record = useRecordPayment(orderId, {
+    onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
+  });
+  const voidPay = useVoidPayment(orderId, {
+    onError: (e) => toast.error(`Couldn't void — ${e.message}`),
+  });
+
+  return (
+    <div className="space-y-2.5">
+      {/* Three locked rows — Total / Collected / Outstanding. */}
+      <div className="rounded-[8px] border border-base-200/70 bg-white divide-y divide-base-100">
+        <MoneyRow label="Total">
+          {hasLineTotal ? (
+            <span
+              className="font-mono text-[13px] text-base-800"
+              title="Summed from the order items"
+            >
+              {RM(orderTotal)}
+            </span>
+          ) : (
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.draft.balance}
+              onChange={(e) => form.set("balance", e.target.value)}
+              placeholder="Set total (RM)"
+              aria-label="Order total"
+              className="w-32 text-right font-mono text-[13px] px-1.5 py-0.5 border border-base-200 rounded bg-white outline-none focus:border-base-700"
+            />
+          )}
+        </MoneyRow>
+        <MoneyRow label="Collected">
+          <span className="font-mono text-[13px] font-semibold text-success">
+            {RM(collected)}
+          </span>
+        </MoneyRow>
+        <MoneyRow label="Outstanding" strong>
+          {totalSet ? (
+            <span
+              className={`font-mono text-[17px] font-bold leading-none ${
+                outstanding > 0 ? "text-[#991B1B]" : "text-success"
+              }`}
+            >
+              {outstanding > 0 ? RM(outstanding) : "Settled"}
+            </span>
+          ) : (
+            <span className="text-[11px] text-base-400">Total not set</span>
+          )}
+        </MoneyRow>
+      </div>
+
+      {/* Payment history — one line per payment: label · date · amount · receipt. */}
+      {ledger.length === 0 ? (
+        <div className="text-[11px] text-base-400">No payments recorded yet.</div>
+      ) : (
+        <div className="space-y-1">
+          {ledger.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center justify-between gap-2 text-[12px] border-b border-base-100 pb-1 last:border-b-0"
+            >
+              <span className="min-w-0 truncate">
+                <span className="font-medium text-base-800">
+                  {p.note?.trim() || (p.kind === "deposit" ? "Deposit" : "Payment")}
+                </span>
+                <span className="text-base-400"> · {fmtDate(p.paid_on)}</span>
+              </span>
+              <span className="flex items-center gap-2 shrink-0">
+                <span className="font-mono font-semibold text-success">
+                  {RM(Number(p.amount))}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void openReceipt(p, receiptMeta)}
+                  title={`Receipt ${p.receipt_no ?? ""}`}
+                  aria-label={`Receipt ${p.receipt_no ?? p.id}`}
+                  className="text-base-400 hover:text-primary"
+                >
+                  <FileText size={13} />
+                </button>
+                {isPrincipal && (
+                  <button
+                    type="button"
+                    onClick={() => voidPay.mutate(p.id)}
+                    disabled={voidPay.isPending}
+                    title="Void this payment"
+                    aria-label={`Void payment ${p.receipt_no ?? p.id}`}
+                    className="text-[10px] text-base-300 hover:text-destructive"
+                  >
+                    void
+                  </button>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Record payment — the ONE flame CTA (Jess). Opens the 3-field form. */}
+      {adding ? (
+        <RecordPaymentForm
+          pending={record.isPending}
+          onCancel={() => setAdding(false)}
+          onSubmit={(input) =>
+            record.mutate(
+              { ...input, method: "cash", kind: "payment" },
+              { onSuccess: () => setAdding(false) },
+            )
+          }
+        />
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} className="btn-hero text-[12px]">
+          Record payment
+        </button>
+      )}
+    </div>
+  );
 }
 
 function MenuItem({
