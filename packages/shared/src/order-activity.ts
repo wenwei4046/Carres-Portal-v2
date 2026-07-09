@@ -164,3 +164,27 @@ export function filterEventsForViewer<T extends { eventType: string }>(
     (e) => isOrderEventType(e.eventType) && visibleTo(e.eventType, viewer),
   );
 }
+
+/**
+ * The action strings today's `ops_activity_log` already writes, mapped onto the
+ * taxonomy. Lets the existing per-order timeline render human, categorised
+ * labels (via `orderEventMeta`) with NO database change — a pure display upgrade.
+ * (0138/0139: inbox_assign · autocount_import · stock_* · annotation_added.)
+ */
+export const LEGACY_ACTIVITY_ACTION_TO_EVENT_TYPE: Record<string, OrderEventType> = {
+  annotation_added: "note.added",
+  inbox_assign: "partner.assigned",
+  autocount_import: "order.imported",
+  stock_reserve: "stock.reserved",
+  stock_release: "stock.released",
+  stock_reassign: "stock.reassigned",
+  stock_takeout: "stock.takeout",
+  stock_flag_repair: "stock.flag_repair",
+};
+
+export function eventTypeForLegacyAction(
+  action: string | null | undefined,
+): OrderEventType | null {
+  if (!action) return null;
+  return LEGACY_ACTIVITY_ACTION_TO_EVENT_TYPE[action] ?? null;
+}

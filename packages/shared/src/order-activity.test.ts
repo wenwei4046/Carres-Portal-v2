@@ -9,6 +9,8 @@ import {
   isImmutableEvent,
   visibleTo,
   filterEventsForViewer,
+  eventTypeForLegacyAction,
+  LEGACY_ACTIVITY_ACTION_TO_EVENT_TYPE,
 } from "./order-activity";
 
 const ALL_TYPES = Object.keys(ORDER_EVENT_TYPES) as OrderEventType[];
@@ -111,6 +113,30 @@ describe("filterEventsForViewer", () => {
     const withJunk = [...events, { eventType: "totally.unknown", id: 99 }];
     expect(filterEventsForViewer(withJunk, "customer").some((e) => e.id === 99)).toBe(false);
     expect(filterEventsForViewer(withJunk, "management").some((e) => e.id === 99)).toBe(false);
+  });
+});
+
+describe("legacy activity-action mapping (pure display upgrade, no DB change)", () => {
+  it("maps every known ops_activity_log action to a real taxonomy type", () => {
+    for (const [action, type] of Object.entries(LEGACY_ACTIVITY_ACTION_TO_EVENT_TYPE)) {
+      expect(isOrderEventType(type)).toBe(true);
+      expect(eventTypeForLegacyAction(action)).toBe(type);
+    }
+  });
+
+  it("gives the noisy legacy actions a human title + category", () => {
+    const imported = orderEventMeta(eventTypeForLegacyAction("autocount_import")!);
+    expect(imported.defaultTitle).toBe("Imported from AutoCount");
+    expect(imported.category).toBe("system");
+    expect(orderEventCategory(eventTypeForLegacyAction("stock_reserve")!)).toBe("stock");
+    expect(orderEventCategory(eventTypeForLegacyAction("inbox_assign")!)).toBe("system");
+  });
+
+  it("returns null for unknown / empty actions (falls back to raw label)", () => {
+    expect(eventTypeForLegacyAction("something_new")).toBeNull();
+    expect(eventTypeForLegacyAction(null)).toBeNull();
+    expect(eventTypeForLegacyAction(undefined)).toBeNull();
+    expect(eventTypeForLegacyAction("")).toBeNull();
   });
 });
 
