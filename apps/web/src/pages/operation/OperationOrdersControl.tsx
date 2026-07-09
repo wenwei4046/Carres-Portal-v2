@@ -723,8 +723,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
   // P1 (Loo 2026-07-09) — the left filter KANBAN open/collapsed toggle.
   const [kanbanOpen, setKanbanOpen] = useState(true);
-  // P2 G — CATEGORY tucked under a "More" toggle (the other groups show in full).
-  const [moreOpen, setMoreOpen] = useState(false);
+  // GMAIL_FINAL C3 — per-group collapse; CATEGORY starts collapsed at the bottom.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () => new Set(["CATEGORY"]),
+  );
+  const toggleGroup = (k: string) =>
+    setCollapsedGroups((prev) => {
+      const n = new Set(prev);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
   // Two action lanes (Jess 2026-06-25): 🚩 Follow-up = team handoff (follow_up
   // annotations) · ⏫ For Jess = escalations needing the boss (escalate). Each is
   // a derived open-annotation state with its own quick-view filter; the per-row
@@ -1110,7 +1119,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
   return (
     <div
-      className="h-full flex flex-col px-6 pt-6 pb-5 bg-[#F5F1EA]"
+      className="h-full flex flex-col px-6 pt-6 pb-5 bg-[#ECE8E0]"
       data-testid="operation-orders-control"
     >
       {/* Header — title + count + search + import (fixed; does not scroll) */}
@@ -1225,14 +1234,23 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 </button>
               </div>
 
-              {/* CHASE NOW — the triage lane. No ETA + No PO reuse the logistic /
-                  stock filters, Urgent the Due filter, Follow-up + For Jess the
-                  task lanes. */}
-              <KanbanGroup title="CHASE NOW" danger>
+              {/* CHASE NOW — the triage lane (title reads dark red). */}
+              <KanbanGroup
+                title="CHASE NOW"
+                danger
+                total={
+                  etaCount +
+                  (stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0) +
+                  (dueEntries.find((e) => e.bucket === "Urgent")?.count ?? 0) +
+                  flaggedCount +
+                  escalateCount
+                }
+                collapsed={collapsedGroups.has("CHASE NOW")}
+                onToggle={() => toggleGroup("CHASE NOW")}
+              >
                 <KanbanRow
                   label="No ETA"
                   count={etaCount}
-                  tone="danger"
                   active={etaOnly}
                   title="Logistic hasn't given an ETA + deadline near (≤7d) — chase them"
                   onClick={() => setEtaOnly((v) => !v)}
@@ -1240,14 +1258,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 <KanbanRow
                   label="No PO"
                   count={stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0}
-                  tone="danger"
                   active={stockFilter === "No PO"}
                   onClick={() => setStockFilter((r) => (r === "No PO" ? null : "No PO"))}
                 />
                 <KanbanRow
                   label="Urgent"
                   count={dueEntries.find((e) => e.bucket === "Urgent")?.count ?? 0}
-                  tone="warning"
                   active={dueFilter === "Urgent"}
                   title={DUE_DESC.Urgent}
                   onClick={() => setDueFilter((r) => (r === "Urgent" ? null : "Urgent"))}
@@ -1255,7 +1271,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 <KanbanRow
                   label="Follow-up"
                   count={flaggedCount}
-                  tone="warning"
                   active={flaggedOnly}
                   title="Orders with an open follow-up note for the next operator"
                   onClick={() => setFlaggedOnly((v) => !v)}
@@ -1263,27 +1278,36 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 <KanbanRow
                   label="For Jess"
                   count={escalateCount}
-                  tone="danger"
                   active={escalateOnly}
                   title="Escalated to Jess — orders needing the boss's action"
                   onClick={() => setEscalateOnly((v) => !v)}
                 />
               </KanbanGroup>
 
-              <KanbanGroup title="STOCK">
+              <KanbanGroup
+                title="STOCK"
+                total={stockEntries.reduce((s, e) => s + e.count, 0)}
+                collapsed={collapsedGroups.has("STOCK")}
+                onToggle={() => toggleGroup("STOCK")}
+              >
                 {stockEntries.map((e) => (
                   <KanbanRow
                     key={e.bucket}
                     label={e.bucket}
                     count={e.count}
-                    dot={e.bucket === "Ready" ? "#5B7F63" : e.bucket === "Waiting" ? "#9A7B3F" : "#8C3F36"}
                     active={stockFilter === e.bucket}
                     onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
                   />
                 ))}
               </KanbanGroup>
 
-              <KanbanGroup title="LOGISTIC" testid="filter-logistic">
+              <KanbanGroup
+                title="LOGISTIC"
+                testid="filter-logistic"
+                total={logisticEntries.reduce((s, e) => s + e.count, 0)}
+                collapsed={collapsedGroups.has("LOGISTIC")}
+                onToggle={() => toggleGroup("LOGISTIC")}
+              >
                 {logisticEntries.map((e) => (
                   <KanbanRow
                     key={e.carrier}
@@ -1296,7 +1320,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 ))}
               </KanbanGroup>
 
-              <KanbanGroup title="REGION">
+              <KanbanGroup
+                title="REGION"
+                total={regionEntries.reduce((s, e) => s + e.count, 0)}
+                collapsed={collapsedGroups.has("REGION")}
+                onToggle={() => toggleGroup("REGION")}
+              >
                 {regionEntries.map((e) => (
                   <KanbanRow
                     key={e.region}
@@ -1308,35 +1337,30 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 ))}
               </KanbanGroup>
 
-              {/* Category tucked under a More toggle (the others show in full). */}
-              <button
-                type="button"
-                onClick={() => setMoreOpen((v) => !v)}
-                className="w-full flex items-center gap-1 px-2 pt-2 pb-1 text-[11px] font-medium text-base-500 hover:text-base-800"
+              {/* CATEGORY — its own group at the bottom, collapsed by default. */}
+              <KanbanGroup
+                title="CATEGORY"
+                total={categoryEntries.reduce((s, e) => s + e.count, 0)}
+                collapsed={collapsedGroups.has("CATEGORY")}
+                onToggle={() => toggleGroup("CATEGORY")}
               >
-                {moreOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                {moreOpen ? "Less" : "More"}
-              </button>
-              {moreOpen && (
-                <KanbanGroup title="CATEGORY">
-                  {categoryEntries.map((e) => (
-                    <KanbanRow
-                      key={e.key}
-                      label={e.label}
-                      count={e.count}
-                      active={categoryFilter.has(e.key)}
-                      onClick={() =>
-                        setCategoryFilter((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(e.key)) next.delete(e.key);
-                          else next.add(e.key);
-                          return next;
-                        })
-                      }
-                    />
-                  ))}
-                </KanbanGroup>
-              )}
+                {categoryEntries.map((e) => (
+                  <KanbanRow
+                    key={e.key}
+                    label={e.label}
+                    count={e.count}
+                    active={categoryFilter.has(e.key)}
+                    onClick={() =>
+                      setCategoryFilter((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(e.key)) next.delete(e.key);
+                        else next.add(e.key);
+                        return next;
+                      })
+                    }
+                  />
+                ))}
+              </KanbanGroup>
             </div>
           </aside>
         ) : (
@@ -1642,62 +1666,43 @@ function BulkMenuItem({
   );
 }
 
-/** Gmail-nav-style filter ROW (P2 G) — full-width, name LEFT / count RIGHT, no
- *  box border; hover + selected get a tinted fill. Selected reuses the table's
- *  row blue (#E6EDF9 / #1E40AF) so selection is ONE colour across the page.
- *  `tone` colours only the COUNT on the CHASE NOW rows (danger red / warning
- *  amber); other rows keep a grey count. `dot` prefixes a stock-state dot. */
+/** Gmail-minimal filter ROW (Loo GMAIL_FINAL) — pure text: name LEFT / count
+ *  RIGHT, no icon / dot / pill / box. Normal = grey-black; SELECTED = a light
+ *  blue pill (#D3E3FD) with black-bold text (name + count); hover = a faint
+ *  grey. The kanban's ONLY colour is this selection blue. */
 function KanbanRow({
   label,
   count,
   active,
   onClick,
-  tone,
-  dot,
   title,
 }: {
   label: string;
   count: number;
   active: boolean;
   onClick: () => void;
-  tone?: "danger" | "warning";
-  dot?: string;
   title?: string;
 }) {
-  const countColor = active
-    ? "#1E40AF"
-    : tone === "danger"
-      ? "#991B1B"
-      : tone === "warning"
-        ? "#B45309"
-        : "#6F6960";
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`w-full flex items-center gap-1.5 rounded-lg text-left transition-colors ${
-        active ? "" : "hover:bg-[#F5F1EA]"
+      className={`w-full flex items-center gap-1.5 rounded-full text-left transition-colors ${
+        active ? "" : "hover:bg-[#F5F4F1]"
       }`}
-      style={{ padding: "7px 8px", backgroundColor: active ? "#E6EDF9" : undefined }}
+      style={{ padding: "6px 10px", backgroundColor: active ? "#D3E3FD" : undefined }}
     >
-      {dot && (
-        <span
-          className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-          style={{ backgroundColor: dot }}
-          aria-hidden="true"
-        />
-      )}
       <span
         className="flex-1 min-w-0 truncate text-[13px]"
-        style={{ color: active ? "#1E40AF" : "#221F20", fontWeight: active ? 600 : 400 }}
+        style={{ color: active ? "#0B0B0B" : "#3C4043", fontWeight: active ? 700 : 400 }}
       >
         {label}
       </span>
       <span
         className="text-[13px] tabular-nums shrink-0"
-        style={{ color: countColor, fontWeight: active ? 700 : 500 }}
+        style={{ color: active ? "#0B0B0B" : "#5F6368", fontWeight: active ? 700 : 400 }}
       >
         {count}
       </span>
@@ -1705,33 +1710,59 @@ function KanbanRow({
   );
 }
 
-/** Gmail-nav-style filter GROUP (P2 G) — a small uppercase title + its rows.
- *  `testid` keeps `filter-logistic` addressable for the tests. */
+/** Gmail-minimal filter GROUP (Loo GMAIL_FINAL, C3) — a light-grey TITLE BAR
+ *  (#F1EFE8, radius 6) with the group total on the right + a collapse toggle
+ *  (▾ open / ▸ collapsed). CHASE NOW's title reads dark red; all other titles
+ *  are black. `testid` keeps `filter-logistic` addressable for the tests. */
 function KanbanGroup({
   title,
   danger,
+  total,
+  collapsed,
+  onToggle,
   testid,
   children,
 }: {
   title: string;
   danger?: boolean;
+  total: number;
+  collapsed: boolean;
+  onToggle: () => void;
   testid?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div data-testid={testid}>
-      <div
-        className="uppercase px-2 pt-2 pb-0.5"
-        style={{
-          fontSize: "10px",
-          fontWeight: 700,
-          letterSpacing: "0.06em",
-          color: danger ? "#991B1B" : "#6F6960",
-        }}
+    <div data-testid={testid} className="mb-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center gap-1 rounded-md px-2 py-1.5 hover:brightness-[0.97]"
+        style={{ background: "#F1EFE8" }}
       >
-        {title}
-      </div>
-      <div className="flex flex-col gap-0.5">{children}</div>
+        {collapsed ? (
+          <ChevronRight size={12} className="shrink-0 text-base-500" />
+        ) : (
+          <ChevronDown size={12} className="shrink-0 text-base-500" />
+        )}
+        <span
+          className="uppercase flex-1 text-left"
+          style={{
+            fontSize: "11px",
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            color: danger ? "#991B1B" : "#221F20",
+          }}
+        >
+          {title}
+        </span>
+        <span
+          className="tabular-nums shrink-0"
+          style={{ fontSize: "11px", fontWeight: 600, color: "#6F6960" }}
+        >
+          {total}
+        </span>
+      </button>
+      {!collapsed && <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>}
     </div>
   );
 }
@@ -1828,12 +1859,8 @@ function OrderRow({
   return (
     <tr
       onClick={onOpen}
-      className={`group border-t border-[rgba(34,31,32,0.06)] hover:bg-[#F5F1EA] cursor-pointer align-middle ${
-        selected
-          ? "bg-[#E6EDF9] shadow-[inset_3px_0_0_#1E40AF]"
-          : idx % 2
-            ? "bg-[#FBF9F5]"
-            : "bg-white"
+      className={`group border-t border-[rgba(34,31,32,0.06)] cursor-pointer align-middle ${
+        selected ? "bg-[#D3E3FD]" : "bg-white hover:bg-[#F5F4F1]"
       }`}
       data-testid="order-row"
     >
