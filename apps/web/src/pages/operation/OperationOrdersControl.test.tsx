@@ -508,7 +508,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByTestId("cat-sofa")).toHaveTextContent("2");
   });
 
-  it("orders columns: select · Follow-up · Ref · Customer · Region · Deadline · MS · BF · Sofa · Stock · Logistic", () => {
+  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Deadline · MS · BF · Sofa · Stock · Logistic", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -517,15 +517,16 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       source_ref: ["TCF2024/06-461"],
     });
     wrap(<OperationOrdersControl />);
-    // ONE header row (C1/C2 redesign — 12 columns). The follow-up flag is the 2nd
-    // column (icon-only header). Status / ETA / Items / Remark columns are gone;
+    // ONE header row (13 columns). The follow-up flag is the 2nd column (icon-only
+    // header). Ref is split into Order ID (SO) + Ref No (the day-to-day reference);
     // the MS / BF / Sofa per-category count columns replace the Items summary, and
     // C2 adds the "Next action" lamp as the final column.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
       "", // follow-up flag — icon-only header
-      "Ref",
+      "Order ID",
+      "Ref No",
       "Customer",
       "Region",
       "Deadline",
@@ -536,8 +537,8 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Logistic",
       "Next action",
     ]);
-    // The Ref column merges the day-to-day reference with the system SO number;
-    // the phone stays in that cell's tooltip.
+    // Order ID (SO) + Ref No are now separate columns; the phone tooltip stays on
+    // the Order ID cell.
     const row = screen.getByTestId("order-row");
     expect(within(row).getByText("SO-3012")).toBeInTheDocument();
     expect(within(row).getByText("Tan Ah Kow")).toBeInTheDocument();
@@ -614,25 +615,25 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header present
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // Deadline is the 6th cell (index 5: select · flag · Ref · Customer · Region
-    // · Deadline). It shows date + weekday + days-left; must not be the "—" dash.
+    // Deadline is the 7th cell (index 6: select · flag · Order ID · Ref No ·
+    // Customer · Region · Deadline). Shows date + weekday + days-left; not "—".
     const cells = within(screen.getByTestId("order-row")).getAllByRole("cell");
-    expect(cells[5].textContent).not.toBe("—");
-    expect(cells[5].textContent).toMatch(/\d/);
+    expect(cells[6].textContent).not.toBe("—");
+    expect(cells[6].textContent).toMatch(/\d/);
   });
 
-  it("paginates — 20/page by default (fixed listing box), Next works", () => {
+  it("paginates — 15/page by default (fixed listing box), Next works", () => {
     listHookState.data = {
       orders: Array.from({ length: 120 }, (_, i) =>
         makeRow({ id: `p${i}`, so: 4000 + i }),
       ),
     };
     wrap(<OperationOrdersControl />);
-    expect(screen.getByText(/1.20 of 120/)).toBeInTheDocument();
-    expect(screen.getAllByTestId("order-row")).toHaveLength(20);
+    expect(screen.getByText(/1.15 of 120/)).toBeInTheDocument();
+    expect(screen.getAllByTestId("order-row")).toHaveLength(15);
 
     fireEvent.click(screen.getByRole("button", { name: /Next/ }));
-    expect(screen.getByText(/21.40 of 120/)).toBeInTheDocument();
+    expect(screen.getByText(/16.30 of 120/)).toBeInTheDocument();
   });
 
   it("surfaces an Unassigned-carrier alert (no-carrier count) and filters on click", () => {

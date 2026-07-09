@@ -721,7 +721,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Fixed at 20 rows/page (C1 redesign): ≥20 auto-enables the dense `compact`
   // layout. The listing is a fixed box that auto-scales (CSS zoom) so the rows
   // always fit, no scroll.
-  const [pageSize] = useState<number | "all">(20);
+  const [pageSize] = useState<number | "all">(15);
   const [page, setPage] = useState(0);
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -1141,12 +1141,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="SO number or customer…"
-            className="w-[230px] px-2 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+            className="w-[230px] px-4 py-2 border border-base-200 rounded-full text-[13px] bg-white outline-none focus:border-base-700"
           />
           <button
             type="button"
             onClick={() => setEtaImportOpen(true)}
-            className="btn-secondary text-[12px] whitespace-nowrap"
+            className="btn-secondary text-[12px] whitespace-nowrap rounded-xl"
             title="Fill each order line's Stock ETA + status from your Master sheet"
           >
             Import from Master
@@ -1155,7 +1155,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <button
               type="button"
               onClick={onImport}
-              className="btn-hero text-[12px] whitespace-nowrap"
+              className="btn-hero text-[12px] whitespace-nowrap rounded-xl"
             >
               + Import from AutoCount
             </button>
@@ -1202,7 +1202,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               label={e.bucket}
               count={e.count}
               active={stockFilter === e.bucket}
-              dot={e.bucket === "Ready" ? "#5B7F63" : e.bucket === "Waiting" ? "#9A7B3F" : "#A85C46"}
+              dot={e.bucket === "Ready" ? "#5B7F63" : e.bucket === "Waiting" ? "#9A7B3F" : "#8C3F36"}
               onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
             />
           ))}
@@ -1253,7 +1253,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             icon={CalendarClock}
             label="No ETA"
             count={etaCount}
-            tone="warning"
+            tone="danger"
             active={etaOnly}
             title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
             onClick={() => setEtaOnly((v) => !v)}
@@ -1322,7 +1322,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           their width; long Ref/Customer/Location/Remark wrap to ≤3 lines. */}
       <div
         ref={listBoxRef}
-        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-lg shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
+        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-2xl shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
       >
         <table
           ref={listTableRef}
@@ -1333,20 +1333,22 @@ export default function OperationOrdersControl({ onImport }: Props) {
               MS · BF · Sofa · Stock · Logistic */}
           {/* Fill the FULL width (no cap); the data columns stay tight and the
               two forgiving text columns — Customer + Next action — carry the
-              slack so nothing sprawls (Loo readability round 2 2026-07-09). */}
+              slack so nothing sprawls. Order ID + Ref No are a tight pair
+              (Loo final 2026-07-09). */}
           <colgroup>
             <col style={{ width: 34 }} />
             <col style={{ width: 34 }} />
-            <col style={{ width: 130 }} />
-            <col style={{ width: 250 }} />
-            <col style={{ width: 118 }} />
-            <col style={{ width: 156 }} />
+            <col style={{ width: 92 }} />
+            <col style={{ width: 124 }} />
+            <col style={{ width: 240 }} />
+            <col style={{ width: 112 }} />
+            <col style={{ width: 150 }} />
             <col style={{ width: 38 }} />
             <col style={{ width: 38 }} />
             <col style={{ width: 44 }} />
-            <col style={{ width: 112 }} />
-            <col style={{ width: 116 }} />
-            <col style={{ width: 230 }} />
+            <col style={{ width: 108 }} />
+            <col style={{ width: 110 }} />
+            <col style={{ width: 220 }} />
           </colgroup>
           {/* Dark ink header band (#221F20) — kept per Loo; the flame underline
               stays DROPPED (flame never enters the table), replaced by a faint
@@ -1368,7 +1370,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <th className="px-1 py-1.5 text-center" title="Follow-up">
                 <Flag size={13} strokeWidth={2} className="inline text-[#C9C5BB]" aria-label="Follow-up" />
               </th>
-              <Th>Ref</Th>
+              <Th>Order ID</Th>
+              <Th>Ref No</Th>
               <Th>Customer</Th>
               <Th>Region</Th>
               <Th>Deadline</Th>
@@ -1384,7 +1387,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={13}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1812,32 +1815,46 @@ function OrderRow({
       {/* Follow-up — the order's STATUS flag (#2), 2nd column (Jess: left, not a
           separate empty column). Click opens the side form. */}
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
-      {/* Ref — the day-to-day reference (mono, bold) with the system SO number as
-          a faint secondary line below. Phone stays in the cell tooltip. */}
-      <td className="px-2 py-1.5" title={o.customer_phone ?? undefined}>
-        {ref.length > 0 ? (
-          <div className="font-mono truncate" style={{ lineHeight: "20px" }} title={ref.join("\n")}>
-            <span style={{ fontSize: "17px", fontWeight: 700, color: "#221F20" }}>{ref[0]}</span>
-            {ref.length > 1 && (
-              <span style={{ fontSize: "13px", fontWeight: 400, color: "#9B9389" }}> +{ref.length - 1}</span>
-            )}
-          </div>
-        ) : (
-          <span className="text-base-300">—</span>
-        )}
-        <div
-          className="font-mono"
-          style={{ fontSize: "13px", fontWeight: 400, color: "#6F6960", lineHeight: "15px" }}
+      {/* Order ID — the system SO number (13px ink, tabular). Phone tooltip lives
+          here; paired tight with the Ref No column to its right. */}
+      <td className="pl-2 pr-1 py-1.5" title={o.customer_phone ?? undefined}>
+        <span
+          className="font-mono tabular-nums"
+          style={{ fontSize: "13px", fontWeight: 500, color: "#221F20" }}
         >
           SO-{o.so}
-        </div>
+        </span>
+      </td>
+      {/* Ref No — the day-to-day reference(s), the PRIMARY identifier (17px/700).
+          All refs stack vertically; only >3 fold to "+N". */}
+      <td className="pl-1 pr-2 py-1.5">
+        {ref.length === 0 ? (
+          <span className="text-base-300">—</span>
+        ) : (
+          <div className="font-mono" style={{ lineHeight: "20px" }} title={ref.join("\n")}>
+            {ref.slice(0, 3).map((r, i) => (
+              <div
+                key={i}
+                className="truncate tabular-nums"
+                style={{ fontSize: "17px", fontWeight: 700, color: "#221F20" }}
+              >
+                {r}
+              </div>
+            ))}
+            {ref.length > 3 && (
+              <div style={{ fontSize: "12px", fontWeight: 400, color: "#9B9389" }}>
+                +{ref.length - 3} more
+              </div>
+            )}
+          </div>
+        )}
       </td>
       {/* Customer — fixed width, wraps to ≤3 lines. */}
       <td className="px-2 py-2">
         {o.customer_name ? (
           <span
             className={`${cjkClassName(o.customer_name)} text-[14px] text-base-800 leading-[1.35]`}
-            style={{ color: "#1F2937", ...clamp3 }}
+            style={{ color: "#221F20", ...clamp3 }}
             title={o.customer_name}
           >
             {o.customer_name}
@@ -1852,7 +1869,7 @@ function OrderRow({
         {loc.label ? (
           <span
             className="text-[14px] leading-[1.35]"
-            style={{ color: loc.area === "Outstation" ? "#9A7B3F" : "#4B5563", ...clamp3 }}
+            style={{ color: loc.area === "Outstation" ? "#9A7B3F" : "#6F6960", ...clamp3 }}
             title={
               loc.area === "Outstation"
                 ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
@@ -1887,22 +1904,22 @@ function OrderRow({
               <div className="flex items-center gap-1.5">
                 <span
                   className="tabular-nums"
-                  style={{ fontSize: "14px", fontWeight: 600, color: hot ? "#8C3F36" : "#111827" }}
+                  style={{ fontSize: "14px", fontWeight: 600, color: hot ? "#8C3F36" : "#221F20" }}
                 >
                   {datePart}
                 </span>
                 {dayPart && (
-                  <span style={{ fontSize: "10px", color: "#9CA3AF" }}>{dayPart}</span>
+                  <span style={{ fontSize: "11.5px", color: "#9CA3AF" }}>{dayPart}</span>
                 )}
                 {pillText && (
                   <span
                     className="tabular-nums shrink-0"
                     style={{
-                      fontSize: "10px",
+                      fontSize: "11.5px",
                       color: "#9CA3AF",
                       background: "rgba(156,163,175,0.15)",
-                      padding: "0 5px",
-                      borderRadius: "8px",
+                      padding: "0 6px",
+                      borderRadius: "999px",
                     }}
                   >
                     {pillText}
@@ -1926,7 +1943,7 @@ function OrderRow({
       {/* Logistic — the carrier name (neutral grey). */}
       <td className="px-2 py-2 whitespace-nowrap">
         {logistic ? (
-          <span className="text-[14px]" style={{ color: "#4B5563" }}>{logistic}</span>
+          <span className="text-[14px]" style={{ color: "#6F6960" }}>{logistic}</span>
         ) : (
           <span className="text-base-300">—</span>
         )}
@@ -2036,7 +2053,7 @@ function StockDot({ info, qtyTotal }: { info: StockInfo; qtyTotal: number }) {
   switch (info.state) {
     case "unknown":
       word = "No PO";
-      color = "#A85C46";
+      color = "#8C3F36";
       title = "No PO raised yet — open the order to reserve stock or raise a PO";
       break;
     case "need_po": {
@@ -2105,7 +2122,7 @@ function Th({
   return (
     <th
       className={`px-2 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      style={{ color: "#C9C5BB", fontSize: "11.5px", letterSpacing: "0.04em" }}
+      style={{ color: "#C9C5BB", fontSize: "11px", letterSpacing: "0.04em" }}
     >
       {children}
     </th>
