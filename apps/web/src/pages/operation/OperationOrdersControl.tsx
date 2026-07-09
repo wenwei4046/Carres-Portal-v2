@@ -1402,30 +1402,27 @@ export default function OperationOrdersControl({ onImport }: Props) {
       >
         <table
           ref={listTableRef}
-          className="w-full border-separate [border-spacing:0] text-[13px] table-fixed [&_td]:h-[50px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:border-t [&_td]:border-[rgba(34,31,32,0.06)]"
-          style={{ minWidth: 880 }}
+          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[50px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden"
         >
-          {/* Widths L→R: checkbox · ⚑ · Ref · Customer · Region · Deadline ·
-              MS · BF · Sofa · Stock · Logistic */}
-          {/* Fill the FULL width (no cap); Customer + Next action carry the slack.
-              MS/BF/SOF dropped (Loo 2026-07-09 — the STOCK core ratio covers the
-              core total). Logistic moved next to Region; a Logistic-ETA column
-              sits beside Deadline for a deadline-vs-ETA compare. */}
-          {/* P2 (Loo 2026-07-09) — tightened so the table fits the list column
-              with the kanban OPEN (no horizontal scroll). Customer + Next action
-              narrowed the most (they drove the overflow) → ellipsis-truncated. */}
+          {/* PERCENTAGE colgroup (Loo 2026-07-09) — table-fixed + w-full + % widths
+              so the table is ALWAYS exactly the container width → it NEVER
+              horizontally scrolls on any screen; long content ellipsis-truncates.
+              Data columns take a small share (tight groups); Manage takes the
+              largest (its future multi-line message). Order: ☐ · ⚑ · Order ID ·
+              Ref No · Customer · Region · Logistic · ETA · Deadline · Stock ·
+              Manage. */}
           <colgroup>
-            <col style={{ width: 30 }} />
-            <col style={{ width: 26 }} />
-            <col style={{ width: 74 }} />
-            <col style={{ width: 88 }} />
-            <col style={{ width: 112 }} />
-            <col style={{ width: 80 }} />
-            <col style={{ width: 70 }} />
-            <col style={{ width: 80 }} />
-            <col style={{ width: 118 }} />
-            <col style={{ width: 104 }} />
-            <col style={{ width: 160 }} />
+            <col style={{ width: "3%" }} />
+            <col style={{ width: "3%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "14%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "6.5%" }} />
+            <col style={{ width: "6.5%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "23%" }} />
           </colgroup>
           {/* Dark ink header band (#221F20) — kept per Loo; the flame underline
               stays DROPPED (flame never enters the table), replaced by a faint
@@ -1703,10 +1700,10 @@ function KanbanRow({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`w-full flex items-center gap-1.5 rounded-full text-left transition-shadow ${
-        active ? "" : "hover:shadow-[0_1px_4px_rgba(34,31,32,0.14)]"
+      className={`w-full flex items-center gap-1.5 rounded-full text-left transition-colors ${
+        active ? "" : "hover:bg-[#E9ECEF]"
       }`}
-      style={{ padding: "6px 10px", backgroundColor: active ? "#D3E3FD" : undefined }}
+      style={{ padding: "6px 10px", backgroundColor: active ? "#C2E7FF" : undefined }}
     >
       <span
         className="flex-1 min-w-0 truncate text-[13px]"
@@ -1878,10 +1875,8 @@ function OrderRow({
   return (
     <tr
       onClick={onOpen}
-      className={`group cursor-pointer align-middle ${
-        selected
-          ? "bg-[#D3E3FD]"
-          : "bg-white hover:relative hover:z-[1] hover:shadow-[0_3px_10px_rgba(34,31,32,0.18)]"
+      className={`group border-t border-[rgba(34,31,32,0.06)] cursor-pointer align-middle ${
+        selected ? "bg-[#C2E7FF]" : "bg-white hover:bg-[#E9ECEF]"
       }`}
       data-testid="order-row"
     >
@@ -1967,7 +1962,7 @@ function OrderRow({
           where). Neutral grey. */}
       <td className="pl-4 pr-1 py-2 whitespace-nowrap">
         {logistic ? (
-          <span className="text-[14px]" style={{ color: "#4B5563" }}>{logistic}</span>
+          <span className="text-[14px] block truncate" style={{ color: "#4B5563" }}>{logistic}</span>
         ) : (
           <span className="text-base-300">—</span>
         )}
