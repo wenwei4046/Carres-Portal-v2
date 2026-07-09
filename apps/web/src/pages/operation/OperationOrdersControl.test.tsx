@@ -491,7 +491,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("0/2")).toBeInTheDocument();
   });
 
-  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Logistic · Deadline · Logistic ETA · Stock · Next action", () => {
+  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Logistic · Logistic ETA · Deadline · Stock · Next action", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -513,8 +513,8 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Customer",
       "Region",
       "Logistic",
-      "Deadline",
       "Logistic ETA",
+      "Deadline",
       "Stock",
       "Next action",
     ]);
@@ -596,11 +596,11 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header present
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // Deadline is the 8th cell (index 7: select · flag · Order ID · Ref No ·
-    // Customer · Region · Logistic · Deadline). Shows date + weekday + days-left.
+    // Deadline is the 9th cell (index 8: select · flag · Order ID · Ref No ·
+    // Customer · Region · Logistic · Logistic ETA · Deadline). date + weekday.
     const cells = within(screen.getByTestId("order-row")).getAllByRole("cell");
-    expect(cells[7].textContent).not.toBe("—");
-    expect(cells[7].textContent).toMatch(/\d/);
+    expect(cells[8].textContent).not.toBe("—");
+    expect(cells[8].textContent).toMatch(/\d/);
   });
 
   it("paginates — 15/page by default (fixed listing box), Next works", () => {

@@ -1342,8 +1342,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 240 }} />
             <col style={{ width: 112 }} />
             <col style={{ width: 110 }} />
-            <col style={{ width: 150 }} />
             <col style={{ width: 120 }} />
+            <col style={{ width: 150 }} />
             <col style={{ width: 130 }} />
             <col style={{ width: 220 }} />
           </colgroup>
@@ -1372,8 +1372,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Customer</Th>
               <Th>Region</Th>
               <Th>Logistic</Th>
-              <Th>Deadline</Th>
               <Th>Logistic ETA</Th>
+              <Th>Deadline</Th>
               <Th>Stock</Th>
               <Th>Next action</Th>
             </tr>
@@ -1825,12 +1825,12 @@ function OrderRow({
         {ref.length === 0 ? (
           <span className="text-base-300">—</span>
         ) : (
-          <div className="font-mono" style={{ lineHeight: "20px" }} title={ref.join("\n")}>
+          <div className="font-mono" style={{ lineHeight: "16px" }} title={ref.join("\n")}>
             {ref.slice(0, 3).map((r, i) => (
               <div
                 key={i}
                 className="truncate tabular-nums"
-                style={{ fontSize: "17px", fontWeight: 700, color: "#111827" }}
+                style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}
               >
                 {r}
               </div>
@@ -1884,6 +1884,33 @@ function OrderRow({
         ) : (
           <span className="text-base-300">—</span>
         )}
+      </td>
+      {/* Logistic ETA — the logistic's committed delivery date
+          (ops_order_control.logistic_eta), just before the customer Deadline for
+          a quick compare. "No ETA" (red) when it's overdue for chasing. */}
+      <td className="px-2 py-2 whitespace-nowrap">
+        {(() => {
+          const eta = logisticEtaOf(o);
+          if (eta) {
+            const [d, wd] = fmtDate(eta).split(", ");
+            return (
+              <span className="inline-flex items-baseline gap-1.5">
+                <span
+                  className="tabular-nums"
+                  style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}
+                >
+                  {d}
+                </span>
+                {wd && <span style={{ fontSize: "11.5px", color: "#9CA3AF" }}>{wd}</span>}
+              </span>
+            );
+          }
+          return needsEta(o) ? (
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "#991B1B" }}>No ETA</span>
+          ) : (
+            <span className="text-base-300">—</span>
+          );
+        })()}
       </td>
       {/* Deadline — three distinct segments: date (bold, red when hot) · weekday
           (grey) · a faint days-left pill (-Nd / today / Nd / over). */}
@@ -1943,33 +1970,6 @@ function OrderRow({
         ) : (
           <span className="text-base-300">—</span>
         )}
-      </td>
-      {/* Logistic ETA — the logistic's committed delivery date
-          (ops_order_control.logistic_eta), beside the customer Deadline for a
-          quick compare. "No ETA" (red) when it's overdue for chasing. */}
-      <td className="px-2 py-2 whitespace-nowrap">
-        {(() => {
-          const eta = logisticEtaOf(o);
-          if (eta) {
-            const [d, wd] = fmtDate(eta).split(", ");
-            return (
-              <span className="inline-flex items-baseline gap-1.5">
-                <span
-                  className="tabular-nums"
-                  style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}
-                >
-                  {d}
-                </span>
-                {wd && <span style={{ fontSize: "11.5px", color: "#9CA3AF" }}>{wd}</span>}
-              </span>
-            );
-          }
-          return needsEta(o) ? (
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "#991B1B" }}>No ETA</span>
-          ) : (
-            <span className="text-base-300">—</span>
-          );
-        })()}
       </td>
       {/* Stock — one pill: status (Ready / Waiting / No PO) + core arrival ratio. */}
       <td className="px-2 py-2 whitespace-nowrap">
