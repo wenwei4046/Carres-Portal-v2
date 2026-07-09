@@ -1995,8 +1995,15 @@ function OrderRow({
             // Reuse the SAME DUE bucket as the top filter header so they can never
             // drift: the date turns red on the two hottest tiers (Overdue / Urgent).
             const dd = daysToDue(o);
-            const pillText =
-              dd == null ? null : dd < 0 ? "over" : dd === 0 ? "today" : `${dd}d`;
+            // BUG 1 (Loo 2026-07-09): a COMPLETED (delivered) order's deadline is
+            // HISTORY — never colour it red/hot. Otherwise a delivered order whose
+            // delivery_date is in the past shows a red "over" pill and reads as
+            // overdue. Mirrors dueBucketOf/needsEta, which already null-out for
+            // completed. Drop the days-left pill + grey the date to read as settled.
+            const done = controlTabOf(o) === "completed";
+            const pillText = done
+              ? null
+              : dd == null ? null : dd < 0 ? "over" : dd === 0 ? "today" : `${dd}d`;
             // Countdown heat (Loo 2026-07-09): a 4-level ramp by days-left so 2–6d
             // read as orange / yellow urgency; only 7d+ goes grey. The DATE text
             // stays clear black — only this pill carries the heat.
@@ -2030,7 +2037,11 @@ function OrderRow({
                 )}
                 <span
                   className="tabular-nums"
-                  style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: done ? "#9CA3AF" : "#111827", // completed = greyed history
+                  }}
                 >
                   {datePart}
                 </span>
