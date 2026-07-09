@@ -274,7 +274,7 @@ type DueBucket = (typeof DUE_BUCKETS)[number];
 // restraint. Overdue keeps the ONE reserved real red (genuine danger); Urgent →
 // muted clay, Attention → low-sat amber, Upcoming → low-sat blue, Later → grey.
 const DUE_TONE: Record<DueBucket, { bg: string; text: string; border: string }> = {
-  Overdue: { bg: "rgba(176,58,46,0.09)", text: "#B03A2E", border: "rgba(176,58,46,0.28)" },
+  Overdue: { bg: "rgba(140,63,54,0.09)", text: "#8C3F36", border: "rgba(140,63,54,0.26)" },
   Urgent: { bg: "rgba(154,90,58,0.10)", text: "#9A5A3A", border: "rgba(154,90,58,0.26)" },
   Attention: { bg: "rgba(138,109,47,0.11)", text: "#8A6D2F", border: "rgba(138,109,47,0.26)" },
   Upcoming: { bg: "rgba(62,97,135,0.10)", text: "#3E6187", border: "rgba(62,97,135,0.26)" },
@@ -335,7 +335,7 @@ export interface NextAction {
 // Soft tinted pill = the POS badge look (`.prod-card__badge`) — rounded, faint
 // fill, coloured ink — carried inline so the shared global `.pill` stays put.
 const NEXT_TONE_STYLE: Record<NextTone, { text: string; bg: string }> = {
-  danger: { text: "#B03A2E", bg: "rgba(176,58,46,0.10)" }, // real red — "会出事"
+  danger: { text: "#8C3F36", bg: "rgba(140,63,54,0.10)" }, // low-sat dark red — "会出事", not a bright flood
   warning: { text: "#8A6D2F", bg: "rgba(138,109,47,0.12)" }, // low-sat amber
   info: { text: "#3E6187", bg: "rgba(62,97,135,0.11)" }, // low-sat blue
   success: { text: "#4B7A5A", bg: "rgba(75,122,90,0.12)" }, // low-sat green
@@ -1141,7 +1141,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="SO number or customer…"
-            className="w-[230px] px-3 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
+            className="w-[230px] px-2 py-2 border border-base-200 rounded text-[13px] bg-white outline-none focus:border-base-700"
           />
           <button
             type="button"
@@ -1326,27 +1326,27 @@ export default function OperationOrdersControl({ onImport }: Props) {
       >
         <table
           ref={listTableRef}
-          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[44px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden"
-          style={{ minWidth: 1000, maxWidth: 1120 }}
+          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[50px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden"
+          style={{ minWidth: 1040 }}
         >
           {/* Widths L→R: checkbox · ⚑ · Ref · Customer · Region · Deadline ·
               MS · BF · Sofa · Stock · Logistic */}
-          {/* Narrowed count group (MS/BF/SOF) → width given back to Customer +
-              Next action; capped total keeps the table from sprawling on wide
-              screens (Loo readability round 2026-07-09). */}
+          {/* Fill the FULL width (no cap); the data columns stay tight and the
+              two forgiving text columns — Customer + Next action — carry the
+              slack so nothing sprawls (Loo readability round 2 2026-07-09). */}
           <colgroup>
             <col style={{ width: 34 }} />
-            <col style={{ width: 36 }} />
-            <col style={{ width: 124 }} />
-            <col style={{ width: 168 }} />
-            <col style={{ width: 104 }} />
-            <col style={{ width: 148 }} />
             <col style={{ width: 34 }} />
-            <col style={{ width: 34 }} />
-            <col style={{ width: 40 }} />
-            <col style={{ width: 100 }} />
-            <col style={{ width: 90 }} />
-            <col style={{ width: 184 }} />
+            <col style={{ width: 130 }} />
+            <col style={{ width: 250 }} />
+            <col style={{ width: 118 }} />
+            <col style={{ width: 156 }} />
+            <col style={{ width: 38 }} />
+            <col style={{ width: 38 }} />
+            <col style={{ width: 44 }} />
+            <col style={{ width: 112 }} />
+            <col style={{ width: 116 }} />
+            <col style={{ width: 230 }} />
           </colgroup>
           {/* Dark ink header band (#221F20) — kept per Loo; the flame underline
               stays DROPPED (flame never enters the table), replaced by a faint
@@ -1356,7 +1356,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               className="border-b"
               style={{ backgroundColor: "#221F20", borderBottomColor: "rgba(201,197,187,0.22)" }}
             >
-              <th className="px-3 py-1.5">
+              <th className="px-2 py-1.5">
                 <input
                   type="checkbox"
                   checked={allPagedSelected}
@@ -1514,7 +1514,7 @@ function BulkBar({
   busy: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 mb-2.5 px-3 py-2 rounded bg-base-900 text-white">
+    <div className="flex items-center gap-2 mb-2.5 px-2 py-2 rounded bg-base-900 text-white">
       <span className="text-[12px] font-semibold tabular-nums">
         {count} selected
       </span>
@@ -1539,18 +1539,18 @@ function BulkBar({
               </>
             ) : (
               <>
-                <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
+                <div className="px-2 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
                   Assign to…
                 </div>
                 {partners.length === 0 && (
-                  <div className="px-3 py-1.5 text-[12px] text-base-400">No partners.</div>
+                  <div className="px-2 py-1.5 text-[12px] text-base-400">No partners.</div>
                 )}
                 {partners.map((p) => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => onAssign(p.id)}
-                    className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-base-100"
+                    className="w-full text-left px-2 py-1.5 text-[12px] hover:bg-base-100"
                   >
                     {p.name}
                   </button>
@@ -1558,7 +1558,7 @@ function BulkBar({
                 <button
                   type="button"
                   onClick={() => setMenu("menu")}
-                  className="w-full text-left px-3 py-1.5 text-[11px] text-base-500 hover:bg-base-100 border-t border-base-100 mt-1"
+                  className="w-full text-left px-2 py-1.5 text-[11px] text-base-500 hover:bg-base-100 border-t border-base-100 mt-1"
                 >
                   ← Back
                 </button>
@@ -1591,7 +1591,7 @@ function BulkMenuItem({
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-2 px-3 py-2 text-[12px] hover:bg-base-100"
+      className="w-full flex items-center gap-2 px-2 py-2 text-[12px] hover:bg-base-100"
     >
       <Icon size={14} className="text-base-500" /> {label}
     </button>
@@ -1712,7 +1712,7 @@ function QuickView({
   // Low-saturation tones (Loo 2026-07-09) — the band matches the table: danger =
   // the reserved muted red, warning = low-sat amber. Filled when active, quiet
   // ghost at 0 so "For Jess 0" / "No ETA 0" don't cry wolf.
-  const c = tone === "danger" ? "#B03A2E" : "#8A6D2F";
+  const c = tone === "danger" ? "#8C3F36" : "#8A6D2F";
   const style = quiet
     ? undefined
     : active
@@ -1800,7 +1800,7 @@ function OrderRow({
       }`}
       data-testid="order-row"
     >
-      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+      <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={selected}
@@ -1814,12 +1814,12 @@ function OrderRow({
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* Ref — the day-to-day reference (mono, bold) with the system SO number as
           a faint secondary line below. Phone stays in the cell tooltip. */}
-      <td className="px-3 py-1" title={o.customer_phone ?? undefined}>
+      <td className="px-2 py-1.5" title={o.customer_phone ?? undefined}>
         {ref.length > 0 ? (
-          <div className="font-mono truncate" style={{ lineHeight: "18px" }} title={ref.join("\n")}>
-            <span style={{ fontSize: "16px", fontWeight: 700, color: "#221F20" }}>{ref[0]}</span>
+          <div className="font-mono truncate" style={{ lineHeight: "20px" }} title={ref.join("\n")}>
+            <span style={{ fontSize: "17px", fontWeight: 700, color: "#221F20" }}>{ref[0]}</span>
             {ref.length > 1 && (
-              <span style={{ fontSize: "12px", fontWeight: 400, color: "#9B9389" }}> +{ref.length - 1}</span>
+              <span style={{ fontSize: "13px", fontWeight: 400, color: "#9B9389" }}> +{ref.length - 1}</span>
             )}
           </div>
         ) : (
@@ -1827,16 +1827,16 @@ function OrderRow({
         )}
         <div
           className="font-mono"
-          style={{ fontSize: "12px", fontWeight: 400, color: "#6F6960", lineHeight: "13px" }}
+          style={{ fontSize: "13px", fontWeight: 400, color: "#6F6960", lineHeight: "15px" }}
         >
           SO-{o.so}
         </div>
       </td>
       {/* Customer — fixed width, wraps to ≤3 lines. */}
-      <td className="px-3 py-2">
+      <td className="px-2 py-2">
         {o.customer_name ? (
           <span
-            className={`${cjkClassName(o.customer_name)} text-[13px] text-base-800 leading-[1.3]`}
+            className={`${cjkClassName(o.customer_name)} text-[14px] text-base-800 leading-[1.35]`}
             style={{ color: "#1F2937", ...clamp3 }}
             title={o.customer_name}
           >
@@ -1848,10 +1848,10 @@ function OrderRow({
       </td>
       {/* Region — delivery city/state (was "Location"). KV reads neutral grey;
           only Outstation keeps a quiet amber (no warehouse buffer). */}
-      <td className="px-3 py-2">
+      <td className="px-2 py-2">
         {loc.label ? (
           <span
-            className="text-[13px] leading-[1.3]"
+            className="text-[14px] leading-[1.35]"
             style={{ color: loc.area === "Outstation" ? "#9A7B3F" : "#4B5563", ...clamp3 }}
             title={
               loc.area === "Outstation"
@@ -1868,7 +1868,7 @@ function OrderRow({
       {/* Deadline — three distinct segments: date (bold, red when hot) · weekday
           (grey) · a faint days-left pill (-Nd / today / Nd / over). */}
       <td
-        className="px-3 py-2 leading-[1.2] whitespace-nowrap"
+        className="px-2 py-2 leading-[1.2] whitespace-nowrap"
         title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
         {o.delivery_date_tbd ? (
@@ -1887,7 +1887,7 @@ function OrderRow({
               <div className="flex items-center gap-1.5">
                 <span
                   className="tabular-nums"
-                  style={{ fontSize: "13px", fontWeight: 600, color: hot ? "#DC2626" : "#111827" }}
+                  style={{ fontSize: "14px", fontWeight: 600, color: hot ? "#8C3F36" : "#111827" }}
                 >
                   {datePart}
                 </span>
@@ -1920,19 +1920,19 @@ function OrderRow({
       <CatCountCell testid="cat-bf" qty={bfQty} />
       <CatCountCell testid="cat-sofa" qty={sofaQty} />
       {/* Stock — a colour dot + word (No PO / Waiting / Partial / Ready), no qty. */}
-      <td className="px-3 py-2 whitespace-nowrap">
+      <td className="px-2 py-2 whitespace-nowrap">
         <StockDot info={stock} qtyTotal={qtyTotal} />
       </td>
       {/* Logistic — the carrier name (neutral grey). */}
-      <td className="px-3 py-2 whitespace-nowrap">
+      <td className="px-2 py-2 whitespace-nowrap">
         {logistic ? (
-          <span className="text-[13px]" style={{ color: "#4B5563" }}>{logistic}</span>
+          <span className="text-[14px]" style={{ color: "#4B5563" }}>{logistic}</span>
         ) : (
           <span className="text-base-300">—</span>
         )}
       </td>
       {/* Next action — the single most-urgent next step (C2); one pill per row. */}
-      <td className="px-3 py-2 whitespace-nowrap">
+      <td className="px-2 py-2 whitespace-nowrap">
         {(() => {
           const na = nextActionOf(o, stock, lines);
           const st = NEXT_TONE_STYLE[na.tone];
@@ -1967,12 +1967,12 @@ function CatCountCell({ testid, qty }: { testid: string; qty: number }) {
       {qty > 0 ? (
         <span
           className="tabular-nums"
-          style={{ fontSize: "13px", fontWeight: 700, color: "#221F20" }}
+          style={{ fontSize: "14px", fontWeight: 700, color: "#221F20" }}
         >
           {qty}
         </span>
       ) : (
-        <span style={{ color: "#C9C5BB", fontSize: "13px" }}>–</span>
+        <span style={{ color: "#C9C5BB", fontSize: "14px" }}>–</span>
       )}
     </td>
   );
@@ -2083,7 +2083,7 @@ function StockDot({ info, qtyTotal }: { info: StockInfo; qtyTotal: number }) {
         style={{ backgroundColor: color }}
         aria-hidden="true"
       />
-      <span style={{ fontSize: "13px", fontWeight: 500, color }}>{word}</span>
+      <span style={{ fontSize: "14px", fontWeight: 500, color }}>{word}</span>
     </span>
   );
 }
@@ -2104,8 +2104,8 @@ function Th({
 }) {
   return (
     <th
-      className={`px-3 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      style={{ color: "#C9C5BB", fontSize: "11px", letterSpacing: "0.04em" }}
+      className={`px-2 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
+      style={{ color: "#C9C5BB", fontSize: "11.5px", letterSpacing: "0.04em" }}
     >
       {children}
     </th>
