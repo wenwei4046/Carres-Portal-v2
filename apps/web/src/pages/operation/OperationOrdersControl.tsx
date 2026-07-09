@@ -33,7 +33,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-  Filter,
   MoreVertical,
   Truck,
   Download,
@@ -1119,19 +1118,37 @@ export default function OperationOrdersControl({ onImport }: Props) {
       className="h-full flex flex-col px-6 pt-6 pb-5 bg-[#ECE8E0]"
       data-testid="operation-orders-control"
     >
-      {/* Header — title + count + search + import (fixed; does not scroll) */}
-      <div className="flex items-center justify-between gap-4 mb-3 flex-wrap shrink-0">
-        <div className="flex items-baseline gap-2.5 flex-wrap">
-          <h1 className="t-h1 font-display">Orders</h1>
-          <span className="text-[14px] font-medium text-base-500 tabular-nums">
-            {orders.length} orders
-          </span>
-          {latestIn && (
-            <span className="text-[12px] text-base-400" title="Most recent order / import">
-              · last in {fmtDateShort(latestIn)}
-            </span>
-          )}
+      {/* Breadcrumb row — static location label (left) + the data-freshness
+          stamp paired with refresh (right). "Last import" lives here, out of the
+          way of the Import CTAs, and shares this line so it adds no extra height. */}
+      <div className="flex items-center justify-between gap-3 mb-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 text-[12px] text-base-400">
+          <span>Operations</span>
+          <ChevronRight size={12} className="text-base-300" />
+          <span className="text-base-600">Orders</span>
         </div>
+        {latestIn && (
+          <div className="flex items-center gap-1 text-[12px] text-base-400">
+            <span className="tabular-nums" title="Most recent order / import">
+              Synced {fmtDateShort(latestIn)}
+            </span>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              title="Refresh"
+              aria-label="Refresh orders"
+              className="p-1 rounded hover:text-base-900 hover:bg-base-100 transition-colors"
+            >
+              <RefreshCw size={14} strokeWidth={2} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Header — title + search + import (fixed; does not scroll). The order
+          count moved out — the "All" tab already carries the total. */}
+      <div className="flex items-center justify-between gap-4 mb-3 flex-wrap shrink-0">
+        <h1 className="t-h1 font-display">Orders</h1>
         <div className="flex items-center gap-2.5">
           <input
             type="search"
@@ -1179,20 +1196,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
             onSelect={setTab}
           />
           {total > 0 && (
-            <div className="flex items-center gap-2 text-[12px] text-base-500">
-              <span className="tabular-nums" title="Rows loaded / total in this tab">
-                {Math.min(shown.length, total)} of {total}
-              </span>
-              <button
-                type="button"
-                onClick={() => void refetch()}
-                title="Refresh"
-                aria-label="Refresh orders"
-                className="p-1.5 rounded text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
-              >
-                <RefreshCw size={15} strokeWidth={2} />
-              </button>
-            </div>
+            <span
+              className="text-[12px] text-base-500 tabular-nums"
+              title="Rows loaded / total in this tab"
+            >
+              {Math.min(shown.length, total)} of {total}
+            </span>
           )}
         </div>
       </div>
@@ -1202,8 +1211,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
           here verbatim from the old top band; only the container changes (a
           vertical stack, chips wrap within 240). Regroup (CHASE NOW…) + the
           vertical-row chip restyle are P2 (deferred). */}
-      <div className="flex-1 flex gap-4 min-h-0">
-        {kanbanOpen ? (
+      <div className="flex-1 flex gap-2 min-h-0">
+        {kanbanOpen && (
           <aside
             className="w-[240px] shrink-0 flex flex-col gap-2 overflow-y-auto no-scrollbar pb-2"
             data-testid="orders-filter-kanban"
@@ -1214,21 +1223,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 : undefined,
             }}
           >
-            {/* One white card (P2 G) — Gmail-nav rows. No "Filters" label; the
-                collapse chevron sits top-right. */}
+            {/* One white card (P2 G) — Gmail-nav rows. Collapse now lives on the
+                edge rail between this panel and the table (no in-card row). */}
             <div className="bg-white border rounded-[12px] p-1.5" style={{ borderColor: "#E5E1D8" }}>
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setKanbanOpen(false)}
-                  title="Collapse filters"
-                  aria-label="Collapse filters"
-                  className="p-1 rounded text-base-500 hover:bg-base-100"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-              </div>
-
               {/* CHASE NOW — the triage lane (title reads dark red). */}
               <KanbanGroup
                 title="CHASE NOW"
@@ -1358,19 +1355,20 @@ export default function OperationOrdersControl({ onImport }: Props) {
               </KanbanGroup>
             </div>
           </aside>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setKanbanOpen(true)}
-            title="Show filters"
-            aria-label="Show filters"
-            data-testid="orders-filter-rail"
-            className="w-[28px] shrink-0 self-start flex flex-col items-center gap-2 pt-1.5 pb-2 rounded-md border border-base-200 bg-white text-base-500 hover:text-base-800 hover:bg-base-100"
-          >
-            <Filter size={14} />
-            <ChevronRight size={14} />
-          </button>
         )}
+        {/* Edge rail (Option A) — a thin full-height divider toggle between the
+            filter panel and the table. Collapse/expand with 0 row cost (no
+            dedicated row or 28px card). */}
+        <button
+          type="button"
+          onClick={() => setKanbanOpen((v) => !v)}
+          title={kanbanOpen ? "Collapse filters" : "Show filters"}
+          aria-label={kanbanOpen ? "Collapse filters" : "Show filters"}
+          data-testid="orders-filter-rail"
+          className="w-[18px] shrink-0 self-stretch flex items-center justify-center rounded text-base-400 hover:text-base-800 hover:bg-base-100 transition-colors"
+        >
+          {kanbanOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+        </button>
 
         {/* List column — the scrolling listing (the toolbar moved full-width
             above the split so the kanban + table header line up, P2 D). */}
@@ -1432,7 +1430,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             ) : (
               <tr
                 className="border-b"
-                style={{ backgroundColor: "#F3EFE8", borderBottomColor: "rgba(34,31,32,0.12)" }}
+                style={{ backgroundColor: "#F8F6F1", borderBottomColor: "rgba(34,31,32,0.14)" }}
               >
                 <th className="px-2 py-1.5">
                   <input
@@ -1627,7 +1625,7 @@ function BulkHeadRow({
             disabled={busy}
             className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded hover:bg-black/5 disabled:opacity-50"
           >
-            <CheckCircle2 size={14} /> {busy ? "Working…" : "Mark completed"}
+            <CheckCircle2 size={14} /> {busy ? "Working…" : "Mark delivered"}
           </button>
           {/* Occasional actions — folded under ⋮. */}
           <div className="relative">
@@ -1811,20 +1809,21 @@ function StatusTabs({
             title={t.title}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors"
             style={{
-              // Wireframe (P11): the active tab is a quiet warm-fill + darker
-              // hairline + bold dark text — no black pill. Colour is reserved
-              // for alerts, not chrome.
+              // The active tab is a solid ink fill (2990s-style) — a control
+              // needs clear contrast to read as "selected"; a tab pill is a
+              // point of emphasis, not the heavy header band we removed. Inactive
+              // stays white + hairline. Colour is still reserved for alerts.
               fontSize: "13px",
               fontWeight: on ? 600 : 500,
-              color: on ? "#221F20" : "#4B5563",
-              background: on ? "#EDE7DB" : "#FFFFFF",
-              border: on ? "1px solid #B8AF9C" : "1px solid #DDD8CE",
+              color: on ? "#FFFFFF" : "#4B5563",
+              background: on ? "#221F20" : "#FFFFFF",
+              border: on ? "1px solid #221F20" : "1px solid #DDD8CE",
             }}
           >
             {t.label}
             <span
               className="tabular-nums"
-              style={{ color: on ? "#6B7280" : "#9CA3AF", fontSize: "12px" }}
+              style={{ color: on ? "rgba(255,255,255,0.7)" : "#9CA3AF", fontSize: "12px" }}
             >
               {t.count}
             </span>
