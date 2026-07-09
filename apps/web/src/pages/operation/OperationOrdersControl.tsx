@@ -270,12 +270,15 @@ type DueBucket = (typeof DUE_BUCKETS)[number];
 /** Soft colour per bucket — a red→grey heat ramp (matches the agreed mock): the
  *  hotter the deadline, the warmer the chip. Applied as the chip's resting tint;
  *  the selected chip still flips to the shared black active state. */
+// Low-saturation hot→cool ramp (Loo 2026-07-09): the band matches the table's
+// restraint. Overdue keeps the ONE reserved real red (genuine danger); Urgent →
+// muted clay, Attention → low-sat amber, Upcoming → low-sat blue, Later → grey.
 const DUE_TONE: Record<DueBucket, { bg: string; text: string; border: string }> = {
-  Overdue: { bg: "#FCEBEB", text: "#A32D2D", border: "#F0959566" },
-  Urgent: { bg: "#FAECE7", text: "#993C1D", border: "#F0997B66" },
-  Attention: { bg: "#FAEEDA", text: "#854F0B", border: "#EF9F2766" },
-  Upcoming: { bg: "#E6F1FB", text: "#185FA5", border: "#85B7EB66" },
-  Later: { bg: "#F1EFE8", text: "#5F5E5A", border: "#D3D1C766" },
+  Overdue: { bg: "rgba(176,58,46,0.09)", text: "#B03A2E", border: "rgba(176,58,46,0.28)" },
+  Urgent: { bg: "rgba(154,90,58,0.10)", text: "#9A5A3A", border: "rgba(154,90,58,0.26)" },
+  Attention: { bg: "rgba(138,109,47,0.11)", text: "#8A6D2F", border: "rgba(138,109,47,0.26)" },
+  Upcoming: { bg: "rgba(62,97,135,0.10)", text: "#3E6187", border: "rgba(62,97,135,0.26)" },
+  Later: { bg: "rgba(34,31,32,0.05)", text: "#6F6960", border: "rgba(34,31,32,0.14)" },
 };
 const DUE_DESC: Record<DueBucket, string> = {
   Overdue: "Past the delivery date",
@@ -1199,7 +1202,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               label={e.bucket}
               count={e.count}
               active={stockFilter === e.bucket}
-              dot={e.bucket === "Ready" ? "#16A34A" : e.bucket === "Waiting" ? "#D97706" : "#DC2626"}
+              dot={e.bucket === "Ready" ? "#5B7F63" : e.bucket === "Waiting" ? "#9A7B3F" : "#A85C46"}
               onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
             />
           ))}
@@ -1342,13 +1345,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 80 }} />
             <col style={{ width: 160 }} />
           </colgroup>
-          {/* Light POS-style header band (Loo 2026-07-09 re-skin): a soft paper
-              fill + a solid hairline underline (flame underline dropped — flame
-              never enters the table), grey micro uppercase labels. */}
+          {/* Dark ink header band (#221F20) — kept per Loo; the flame underline
+              stays DROPPED (flame never enters the table), replaced by a faint
+              light hairline. Light micro uppercase labels on the dark band. */}
           <thead>
             <tr
               className="border-b"
-              style={{ backgroundColor: "#EFEAE1", borderBottomColor: "rgba(34,31,32,0.14)" }}
+              style={{ backgroundColor: "#221F20", borderBottomColor: "rgba(201,197,187,0.22)" }}
             >
               <th className="px-3 py-1.5">
                 <input
@@ -1360,7 +1363,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 />
               </th>
               <th className="px-1 py-1.5 text-center" title="Follow-up">
-                <Flag size={13} strokeWidth={2} className="inline text-[#6F6960]" aria-label="Follow-up" />
+                <Flag size={13} strokeWidth={2} className="inline text-[#C9C5BB]" aria-label="Follow-up" />
               </th>
               <Th>Ref</Th>
               <Th>Customer</Th>
@@ -1703,22 +1706,25 @@ function QuickView({
   // border) so "For Jess 0" / "Unassigned 0" don't cry wolf; the alert styling
   // only kicks in once there's actually something to act on (Jess 2026-06-29).
   const quiet = count === 0 && !active;
-  const cls = quiet
-    ? "text-base-400 hover:bg-base-100"
-    : tone === "danger"
-      ? active
-        ? "bg-destructive text-white"
-        : "border border-destructive/40 text-destructive hover:bg-destructive/5"
-      : active
-        ? "bg-warning text-white"
-        : "border border-warning/40 text-warning hover:bg-warning/5";
+  // Low-saturation tones (Loo 2026-07-09) — the band matches the table: danger =
+  // the reserved muted red, warning = low-sat amber. Filled when active, quiet
+  // ghost at 0 so "For Jess 0" / "No ETA 0" don't cry wolf.
+  const c = tone === "danger" ? "#B03A2E" : "#8A6D2F";
+  const style = quiet
+    ? undefined
+    : active
+      ? { backgroundColor: c, color: "#fff", border: `0.5px solid ${c}` }
+      : { color: c, border: `0.5px solid ${c}59`, backgroundColor: "transparent" };
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors ${cls}`}
+      style={style}
+      className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors ${
+        quiet ? "text-base-400 hover:bg-base-100" : "hover:brightness-95"
+      }`}
     >
       <Icon size={11} strokeWidth={2.5} /> {label}
       <span className="tabular-nums opacity-80">{count}</span>
@@ -2096,7 +2102,7 @@ function Th({
   return (
     <th
       className={`px-3 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      style={{ color: "#6F6960", fontSize: "10px", letterSpacing: "0.12em" }}
+      style={{ color: "#C9C5BB", fontSize: "10px", letterSpacing: "0.10em" }}
     >
       {children}
     </th>
