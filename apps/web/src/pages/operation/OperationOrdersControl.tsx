@@ -29,8 +29,8 @@ import type { OpsTask, OpsTasksListResponse } from "@carres/shared";
 import type { OperationStage } from "./components/StageChip";
 import {
   RefreshCw,
+  PanelLeft,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   ExternalLink,
   MoreVertical,
@@ -1184,17 +1184,36 @@ export default function OperationOrdersControl({ onImport }: Props) {
             bulk actions fill the table-header row instead (see thead below), so
             nothing shifts when rows are picked. */}
         <div className="flex items-center justify-between gap-3">
-          {/* H — STATUS pipeline as top horizontal tabs (Gmail Primary/Social). */}
-          <StatusTabs
-            tabs={TABS.map((t) => ({
-              key: t.key,
-              label: t.label,
-              count: counts[t.key],
-              title: STATUS_META_DESC[t.key] ?? TAB_DESC[t.key as SettledTab],
-            }))}
-            active={tab}
-            onSelect={setTab}
-          />
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Filter-panel toggle — lives in the toolbar (above the panel), so
+                it adds no body width and leaves no dead rail column. */}
+            <button
+              type="button"
+              onClick={() => setKanbanOpen((v) => !v)}
+              title={kanbanOpen ? "Hide filters" : "Show filters"}
+              aria-label={kanbanOpen ? "Hide filters" : "Show filters"}
+              data-testid="orders-filter-rail"
+              className="shrink-0 p-1.5 rounded-lg border transition-colors"
+              style={{
+                borderColor: kanbanOpen ? "#221F20" : "#DDD8CE",
+                color: kanbanOpen ? "#221F20" : "#6B7280",
+                background: "#FFFFFF",
+              }}
+            >
+              <PanelLeft size={15} />
+            </button>
+            {/* H — STATUS pipeline as top horizontal tabs (Gmail Primary/Social). */}
+            <StatusTabs
+              tabs={TABS.map((t) => ({
+                key: t.key,
+                label: t.label,
+                count: counts[t.key],
+                title: STATUS_META_DESC[t.key] ?? TAB_DESC[t.key as SettledTab],
+              }))}
+              active={tab}
+              onSelect={setTab}
+            />
+          </div>
           {total > 0 && (
             <span
               className="text-[12px] text-base-500 tabular-nums"
@@ -1211,7 +1230,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           here verbatim from the old top band; only the container changes (a
           vertical stack, chips wrap within 240). Regroup (CHASE NOW…) + the
           vertical-row chip restyle are P2 (deferred). */}
-      <div className="flex-1 flex gap-2 min-h-0">
+      <div className="flex-1 flex gap-4 min-h-0">
         {kanbanOpen && (
           <aside
             className="w-[240px] shrink-0 flex flex-col gap-2 overflow-y-auto no-scrollbar pb-2"
@@ -1356,19 +1375,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
             </div>
           </aside>
         )}
-        {/* Edge rail (Option A) — a thin full-height divider toggle between the
-            filter panel and the table. Collapse/expand with 0 row cost (no
-            dedicated row or 28px card). */}
-        <button
-          type="button"
-          onClick={() => setKanbanOpen((v) => !v)}
-          title={kanbanOpen ? "Collapse filters" : "Show filters"}
-          aria-label={kanbanOpen ? "Collapse filters" : "Show filters"}
-          data-testid="orders-filter-rail"
-          className="w-[18px] shrink-0 self-stretch flex items-center justify-center rounded text-base-400 hover:text-base-800 hover:bg-base-100 transition-colors"
-        >
-          {kanbanOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
-        </button>
 
         {/* List column — the scrolling listing (the toolbar moved full-width
             above the split so the kanban + table header line up, P2 D). */}
