@@ -787,6 +787,11 @@ function DrawerBody({
   const readyN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "ready").length;
   const waitingN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "waiting").length;
   const nopoN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "nopo").length;
+  // Every goods line reads "ready" (Master override + accessories-always-ready +
+  // free stock — see readinessOf). Hoisted so the header status strip + ActionBar
+  // (batch 1) share the SAME readiness the pill uses — no "Ready pill / waiting
+  // buttons" disagreement. Empty goods list (service-only) is NOT "all received".
+  const allReceived = goodsLines.length > 0 && readyN === goodsLines.length;
 
   // Header pipeline status (BUG 2) — derived from the order's real work signals,
   // each criterion reading ONE clear source (Loo 2026-07-09: annotate every one).
@@ -802,7 +807,7 @@ function DrawerBody({
     //   the Master `ops_order_control.line_stock_status` override + accessories-
     //   always-ready + live free stock. Ready criterion = readyN === goodsLines.length
     //   (Loo: match the Items-panel badge; not strict GRN line_received).
-    allReceived: goodsLines.length > 0 && readyN === goodsLines.length,
+    allReceived,
     // etaFilled — a linked portal PO carries a delivery date (`purchase_orders.eta_date`,
     //   collected into `poEtaBySku`). AutoCount inline POs carry no ETA, so they never trip this.
     etaFilled: poEtaBySku.size > 0,
@@ -903,52 +908,19 @@ function DrawerBody({
       {/* No separate top bar — the ⋮ actions menu + close moved into the Order
           section header next to the status chip (Jess: save a row). Backdrop
           click still closes the drawer. */}
-      {/* Option-1 full-page grid (Jess 2026-06-30): Order/customer full-width on
-          top · Delivery | Payment as two columns · Items & stock the full-width
-          work area (only it scrolls) · Activity at the bottom. */}
-      <div
-        className="flex-1 min-h-0 overflow-hidden px-5 py-3 grid gap-2.5 items-stretch"
-        style={{
-          // Locked one-screen layout (Jess 2026-07-01): LEFT (~1.05fr) = two
-          // listing panels (Items ordered · Warehouse stock); RIGHT (~0.95fr) =
-          // stacked cards (Customer|Balance · Delivery). align-items:stretch →
-          // both columns EQUAL height, bottoms line up (no 高高低低).
-          gridTemplateColumns: "1.05fr 0.95fr",
-          gridTemplateRows: "auto auto auto minmax(0,1fr)",
-          gridTemplateAreas:
-            '"banner banner" "header header" "actions actions" "main side"',
-        }}
-      >
-        {/* Operator's own free-text note (not a system status — that lives as a
-            pill on each panel header). Surfaced at the top so a hand-written
-            "call customer before delivery" can't be missed. */}
-        {form.draft.action_for_logistic.trim() && (
-          <div
-            style={{ gridArea: "banner" }}
-            className="flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]"
-          >
-            <AlertCircle
-              className="w-4 h-4 shrink-0 mt-0.5 text-warning"
-              aria-hidden="true"
-            />
-            <span className="text-base-900">
-              <span className="block text-[10px] font-semibold uppercase tracking-[0.06em] text-warning">
-                Action needed
-              </span>
-              {form.draft.action_for_logistic}
-            </span>
-          </div>
-        )}
-        {/* Header bar — status FIRST · Order # · customer name on the left;
-            flag / actions / close on the right. Full width above the 3 meta
-            columns (Jess Option 1). */}
-        <div
-          style={{ gridArea: "header" }}
-          className="flex items-center justify-between gap-3 min-w-0"
-        >
-          {/* Status · boxed order # · grey Ref — NO customer name (it lives in
-              the Customer card; Jess: don't repeat it here). */}
-          <div className="flex items-center gap-2.5 min-w-0">
+      {/* ═══ STICKY HEADER BAND (batch 1 #2) ═══ A shrink-0 lining-box that never
+          scrolls — breadcrumb · pill · #id · sticker · deadline · 3-cell status
+          strip · 1–2 stage actions. The body below is the single scroll region.
+          Flex SIBLINGS (not position:sticky — sticky breaks inside nested overflow
+          parents). Lining-box style: pale surface + hairline border, colour only
+          for alerts. */}
+      <header className="shrink-0 bg-base-50/80 border-b border-base-200/70 px-5 pt-3 pb-2.5 flex flex-col gap-2.5">
+        {/* Row 1 — identity (breadcrumb · pill · #id · items · ref · sticker ·
+            deadline) on the left; flag / ⋯ / close on the right. */}
+        <div className="flex items-center justify-between gap-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="t-tiny text-base-400 shrink-0">Orders&nbsp;/</span>
+            {/* Stage pill — deriveOrderStage (batch BUG-2). */}
             <span
               className={`pill ${PIPELINE_PILL[pipelineStatus]}`}
               title={PIPELINE_HINT[pipelineStatus]}
@@ -958,8 +930,7 @@ function DrawerBody({
             <span className="font-mono font-semibold text-base-900 border border-base-300 rounded-md px-2 py-0.5 bg-white shrink-0">
               #{order.so}
             </span>
-            {/* One order, many items → summarise as a count + region, NOT a single
-                model name (Jess). */}
+            {/* One order, many items → a count + region, NOT one model name (Jess). */}
             <span className="t-small text-base-500 shrink-0 whitespace-nowrap">
               {orderedLines.length} item{orderedLines.length === 1 ? "" : "s"}
               {loc.label ? ` · ${loc.label}` : ""}
@@ -969,8 +940,25 @@ function DrawerBody({
                 Ref {order.source_ref[0]}
               </span>
             )}
-            {/* HOLD DELIVERY moved to the top instruction line (banner) — removed
-                here so the block is never stated twice (revised plan 2(b)). */}
+            {/* Special sticker — the operator's own "action needed" note as a
+                compact amber chip (full text stays in the body banner). This is
+                the only real "sticker" signal today; not invented. */}
+            {form.draft.action_for_logistic.trim() && (
+              <span
+                title={form.draft.action_for_logistic}
+                className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-warning/15 text-warning shrink-0 max-w-[170px] truncate"
+              >
+                <AlertCircle size={10} strokeWidth={2.5} /> Action needed
+              </span>
+            )}
+            {/* Deadline countdown — completed NEVER shows red (batch-1 reuses the
+                BUG-1 rule: a delivered order's past deadline reads as settled). */}
+            <DeadlineCountdown
+              deliveryDate={order.delivery_date}
+              tbd={order.delivery_date_tbd}
+              daysLeft={daysToDelivery}
+              completed={pipelineStatus === "completed"}
+            />
           </div>
           <span className="flex items-center gap-1 shrink-0">
             <button
@@ -986,7 +974,13 @@ function DrawerBody({
               order={order}
               lines={lines}
               stage={stage}
+              orderId={order.id}
+              pipelineStatus={pipelineStatus}
               onServiceNoteClick={onServiceNoteClick}
+              onTransferReadyClick={onTransferReadyClick}
+              onConfirmProceedClick={onConfirmProceedClick}
+              onTopUpClick={onTopUpClick}
+              onAbandonClick={onAbandonClick}
             />
             <button
               type="button"
@@ -999,32 +993,61 @@ function DrawerBody({
           </span>
         </div>
 
-        {/* Action strip — the stage actions live at the TOP now (Jess 2026-07-02:
-            "bottom shouldn't be there, put top"), right under the header where the
-            operator lands, not buried at the drawer bottom. */}
-        <div
-          style={{ gridArea: "actions" }}
-          className="flex items-center justify-between gap-3 rounded-[8px] bg-base-50 border border-base-100 px-3 py-2 min-w-0"
-        >
+        {/* Row 2 — 3-cell status strip (batch 1 #3): Stock · Logistic · Money. */}
+        <StatusStrip
+          readyN={readyN}
+          goodsTotal={goodsLines.length}
+          allReceived={allReceived}
+          logisticEta={form.control?.logistic_eta ?? form.draft.logistic_eta ?? null}
+          logisticName={assignedLogisticName}
+          isOwing={isOwing}
+          owingAmt={owingAmt}
+          balanceGate={balanceGate}
+        />
+
+        {/* Row 3 — converged stage action (batch 1 #1) + the control save bar. */}
+        <div className="flex items-center justify-between gap-3 min-w-0">
           <ActionBar
-            stage={stage}
-            orderId={order.id}
-            so={order.so}
+            pipelineStatus={pipelineStatus}
+            allReceived={allReceived}
             warehouseName={warehouse?.name ?? null}
-            shortageCount={shortages.length}
-            partnerAssigned={anyThreadPartnerAssigned}
-            doNumber={order.do_number}
             onDispatchClick={onDispatchClick}
             onDOClick={onDOClick}
             onIssuePOsClick={onIssuePOsClick}
-            onAbandonClick={onAbandonClick}
-            onConfirmProceedClick={onConfirmProceedClick}
-            onTransferReadyClick={onTransferReadyClick}
-            onTopUpClick={onTopUpClick}
+            onChaseClick={onFollowUpClick}
             proceedBlocked={loc.area === "Outstation" && !form.draft.called_customer}
           />
           <OrderControlSaveBar form={form} />
         </div>
+      </header>
+
+      {/* ═══ SCROLL BODY (batch 1 #2) ═══ The single scroll region. Panels flow in
+          at natural height; their internal content is UNTOUCHED (batch 2/3). */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-3 flex flex-col gap-2.5">
+        {/* Operator's own free-text note — full text (the header only chips it). */}
+        {form.draft.action_for_logistic.trim() && (
+          <div className="flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]">
+            <AlertCircle
+              className="w-4 h-4 shrink-0 mt-0.5 text-warning"
+              aria-hidden="true"
+            />
+            <span className="text-base-900">
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.06em] text-warning">
+                Action needed
+              </span>
+              {form.draft.action_for_logistic}
+            </span>
+          </div>
+        )}
+        {/* main | side — the two locked columns (content untouched this batch);
+            items-start so they take natural height and the BODY scrolls as one. */}
+        <div
+          className="grid gap-2.5 items-start"
+          style={{
+            gridTemplateColumns: "1.05fr 0.95fr",
+            gridTemplateAreas: '"main side"',
+          }}
+        >
 
         {/* LEFT column — the two locked listing panels: Items ordered (fixed
             scroll table, ≤8 rows) on top · Warehouse stock (the reserve grid,
@@ -1606,8 +1629,8 @@ function DrawerBody({
             </div>
           </Panel>
         </div>{/* /right column */}
-
-      </div>
+        </div>{/* /main|side grid */}
+      </div>{/* /scroll body */}
     </div>
   );
 }
@@ -2043,12 +2066,14 @@ function MenuItem({
   onClick,
   disabled,
   title,
+  danger,
 }: {
   icon: ReactNode;
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   title?: string;
+  danger?: boolean;
 }) {
   return (
     <button
@@ -2056,9 +2081,15 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 ${disabled ? "opacity-40 cursor-not-allowed" : "text-base-900"}`}
+      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-base-50 ${
+        disabled
+          ? "opacity-40 cursor-not-allowed"
+          : danger
+            ? "text-destructive"
+            : "text-base-900"
+      }`}
     >
-      <span className="text-base-500 shrink-0">{icon}</span>
+      <span className={`shrink-0 ${danger ? "text-destructive" : "text-base-500"}`}>{icon}</span>
       {label}
     </button>
   );
@@ -2070,12 +2101,24 @@ function ActionsMenu({
   order,
   lines,
   stage,
+  orderId,
+  pipelineStatus,
   onServiceNoteClick,
+  onTransferReadyClick,
+  onConfirmProceedClick,
+  onTopUpClick,
+  onAbandonClick,
 }: {
   order: DrawerBodyProps["data"]["order"];
   lines: operationOrderDetailLine[];
   stage: OperationStage;
+  orderId: string;
+  pipelineStatus: PipelineStatus;
   onServiceNoteClick: () => void;
+  onTransferReadyClick: () => void;
+  onConfirmProceedClick: () => void;
+  onTopUpClick: () => void;
+  onAbandonClick: () => void;
 }) {
   const role = useAuth((s) => s.role);
   const [open, setOpen] = useState(false);
@@ -2084,6 +2127,13 @@ function ActionsMenu({
     setOpen(false);
     setDlOpen(false);
   };
+  // Rare / secondary stage actions moved off the ActionBar (batch 1 #1). These
+  // still run the existing modals/mutations — the manual "Transfer to ready"
+  // bridge lives here so a Ready-by-override order can still be advanced through
+  // the functional stage machine (see "NEW/OLD STAGE NOT BRIDGED").
+  const recheck = useRecheckStockMutation(orderId);
+  const active = pipelineStatus !== "completed";
+  const preProcure = pipelineStatus === "needs_setup" || pipelineStatus === "proceed";
   return (
     <div className="relative shrink-0">
       <button
@@ -2101,6 +2151,52 @@ function ActionsMenu({
         <>
           <div className="fixed inset-0 z-10" onClick={close} />
           <div className="absolute right-0 mt-1 w-52 z-20 bg-white border border-base-200 rounded-[6px] shadow-lg">
+            {/* Stage actions moved off the ActionBar (batch 1 #1). */}
+            {active && (
+              <>
+                <MenuItem
+                  icon={<RotateCcw className="w-4 h-4" />}
+                  label={recheck.isPending ? "Checking…" : "Re-check stock"}
+                  disabled={recheck.isPending}
+                  onClick={async () => {
+                    try {
+                      await recheck.mutateAsync();
+                      toast.info("Stock re-checked");
+                    } catch (e) {
+                      toast.error(e instanceof ApiError ? e.message : "Re-check failed");
+                    }
+                  }}
+                />
+                {preProcure && (
+                  <MenuItem
+                    icon={<ChevronRight className="w-4 h-4" />}
+                    label="Confirm proceed"
+                    onClick={() => {
+                      close();
+                      onConfirmProceedClick();
+                    }}
+                  />
+                )}
+                <MenuItem
+                  icon={<PackagePlus className="w-4 h-4" />}
+                  label="Transfer to ready"
+                  title="Mark stock on-hand → ready (manual bridge)"
+                  onClick={() => {
+                    close();
+                    onTransferReadyClick();
+                  }}
+                />
+                <MenuItem
+                  icon={<Pencil className="w-4 h-4" />}
+                  label="Record top-up"
+                  onClick={() => {
+                    close();
+                    onTopUpClick();
+                  }}
+                />
+                <div className="border-t border-base-100 my-0.5" />
+              </>
+            )}
             <MenuItem
               icon={<FileText className="w-4 h-4" />}
               label="Service note"
@@ -2183,6 +2279,20 @@ function ActionsMenu({
                 </div>
               )}
             </div>
+            {active && (
+              <>
+                <div className="border-t border-base-100 my-0.5" />
+                <MenuItem
+                  icon={<AlertCircle className="w-4 h-4" />}
+                  label="Abandon order"
+                  danger
+                  onClick={() => {
+                    close();
+                    onAbandonClick();
+                  }}
+                />
+              </>
+            )}
           </div>
         </>
       )}
@@ -2190,207 +2300,250 @@ function ActionsMenu({
   );
 }
 
+/** Deadline countdown chip (batch 1 #2 · header). Completed NEVER shows red —
+ *  a delivered order's past deadline is settled history (batch-1 BUG-1 rule),
+ *  so it renders the date in grey with no "over" heat. */
+function DeadlineCountdown({
+  deliveryDate,
+  tbd,
+  daysLeft,
+  completed,
+}: {
+  deliveryDate: string | null;
+  tbd: boolean | null;
+  daysLeft: number | null;
+  completed: boolean;
+}) {
+  if (tbd) return <span className="t-tiny text-base-400 shrink-0">Deadline TBD</span>;
+  if (!deliveryDate || daysLeft == null) return null;
+  if (completed)
+    return (
+      <span
+        title={`Delivered — deadline was ${fmtDate(deliveryDate)}`}
+        className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-base-100 text-base-500 shrink-0 tabular-nums"
+      >
+        {fmtDate(deliveryDate)}
+      </span>
+    );
+  const label =
+    daysLeft < 0 ? `${Math.abs(daysLeft)}d over` : daysLeft === 0 ? "today" : `${daysLeft}d left`;
+  // Heat only on the two hottest tiers; otherwise neutral (lining-box: colour = alert only).
+  const tone =
+    daysLeft <= 1
+      ? "bg-[#FCE4E4] text-[#991B1B]"
+      : daysLeft <= 3
+        ? "bg-[#FDEBD8] text-[#B45309]"
+        : "bg-base-100 text-base-500";
+  return (
+    <span
+      title={`Customer deadline ${fmtDate(deliveryDate)}`}
+      className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 tabular-nums ${tone}`}
+    >
+      {label} · {fmtDate(deliveryDate)}
+    </span>
+  );
+}
+
+/** One cell of the 3-cell status strip — a label + a right-aligned value. */
+function StripCell({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-3 py-1.5 min-w-0">
+      <span className="t-micro text-base-400 shrink-0">{label}</span>
+      <span className="truncate text-right">{children}</span>
+    </div>
+  );
+}
+
+/** 3-cell status strip (batch 1 #3) — Stock · Logistic · Money, a thin lining-box
+ *  row with hairline dividers. Colour only for alerts (green = all in, amber =
+ *  waiting/owing, red = HOLD owing); everything else stays neutral grey.
+ *  All three values are existing signals (no new data). */
+function StatusStrip({
+  readyN,
+  goodsTotal,
+  allReceived,
+  logisticEta,
+  logisticName,
+  isOwing,
+  owingAmt,
+  balanceGate,
+}: {
+  readyN: number;
+  goodsTotal: number;
+  allReceived: boolean;
+  logisticEta: string | null;
+  logisticName: string | null;
+  isOwing: boolean;
+  owingAmt: number;
+  balanceGate: "hold" | "warn" | null;
+}) {
+  return (
+    <div className="grid grid-cols-3 rounded-[8px] border border-base-200/70 bg-white overflow-hidden divide-x divide-base-200/70 text-[11px]">
+      {/* Stock — goods readiness (readyN / goodsTotal). */}
+      <StripCell label="Stock">
+        {goodsTotal === 0 ? (
+          <span className="text-base-400">no goods</span>
+        ) : allReceived ? (
+          <span className="text-success font-semibold">all in {readyN}/{goodsTotal}</span>
+        ) : (
+          <span className="text-warning font-semibold">{readyN}/{goodsTotal} waiting</span>
+        )}
+      </StripCell>
+      {/* Logistic — scheduled if a logistic ETA is set; greyed until stock is in. */}
+      <StripCell label="Logistic">
+        {logisticEta ? (
+          <span className="text-base-700 font-medium">
+            {logisticName ? `${logisticName} · ` : ""}
+            {fmtDate(logisticEta)}
+          </span>
+        ) : allReceived ? (
+          <span className="text-base-500">to schedule</span>
+        ) : (
+          <span className="text-base-300">—</span>
+        )}
+      </StripCell>
+      {/* Money — owing amount (existing balance signal; real Total/Paid/Owing card
+          is batch 2). Red on a HOLD gate, amber otherwise; grey when clear. */}
+      <StripCell label="Money">
+        {isOwing ? (
+          <span
+            className={
+              balanceGate === "hold"
+                ? "text-[#991B1B] font-semibold"
+                : "text-warning font-semibold"
+            }
+          >
+            Owing {RM(owingAmt)}
+          </span>
+        ) : (
+          <span className="text-base-400">clear</span>
+        )}
+      </StripCell>
+    </div>
+  );
+}
+
+/** One situational line + at most one primary CTA (batch 1 #1). */
+function ActionRow({
+  line,
+  button,
+}: {
+  line: string;
+  button?: { label: string; onClick: () => void; disabled?: boolean; title?: string };
+}) {
+  return (
+    <div className="flex items-center gap-3 min-w-0">
+      <span className="text-[12px] text-base-600 font-body truncate">{line}</span>
+      {button && (
+        <button
+          type="button"
+          onClick={button.onClick}
+          disabled={button.disabled}
+          title={button.title}
+          className="btn-primary text-[12px] shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {button.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface ActionBarProps {
-  stage: OperationStage;
-  orderId: string;
-  so: number;
+  pipelineStatus: PipelineStatus;
+  allReceived: boolean;
   warehouseName: string | null;
-  shortageCount: number;
-  partnerAssigned: boolean;
-  doNumber: string | null;
   onDispatchClick: () => void;
   onDOClick: () => void;
   onIssuePOsClick: () => void;
-  onAbandonClick: () => void;
-  onConfirmProceedClick: () => void;
-  onTransferReadyClick: () => void;
-  onTopUpClick: () => void;
+  onChaseClick: () => void;
   proceedBlocked?: boolean;
 }
 
+/**
+ * ActionBar (batch 1 #1) — ONE stage-appropriate primary button, driven by the
+ * SAME `pipelineStatus` the header pill shows, so pill + button never disagree.
+ * (The old bar keyed on the functional `stage`, which for AutoCount imports is
+ * stuck at in_production → it shouted "Waiting on stock" even on a Ready order.)
+ * Rare actions — Re-check stock · Transfer to ready · Record top-up · Confirm
+ * proceed · Abandon — live in the ⋯ ActionsMenu.
+ *
+ * ⚠️ NEW/OLD STAGE NOT BRIDGED (batch B marker) — the pill + this button now read
+ * `pipelineStatus` (deriveOrderStage), but the underlying functional `stage` and
+ * the backend transition RPCs are UNCHANGED. Where pipelineStatus runs ahead of
+ * the functional stage (e.g. Master-override readiness on an AutoCount order whose
+ * `operation_stage` is still null → functional in_production, pipelineStatus=ready),
+ * we surface the pipelineStatus-appropriate CTA ("Assign logistic") and keep the
+ * manual bridge (Transfer to ready) in the ⋯ menu so nothing is lost. Teaching the
+ * functional stage machine to recognise override-readiness so these CTAs drive
+ * real end-to-end transitions is BATCH B — grep "NEW/OLD STAGE NOT BRIDGED".
+ */
 function ActionBar({
-  stage,
-  orderId,
+  pipelineStatus,
+  allReceived: _allReceived, // gated via pipelineStatus (=ready ⇒ never "waiting")
   warehouseName,
-  shortageCount,
-  doNumber,
   onDispatchClick,
   onDOClick,
   onIssuePOsClick,
-  onAbandonClick,
-  onConfirmProceedClick,
-  onTransferReadyClick,
-  onTopUpClick,
+  onChaseClick,
   proceedBlocked,
 }: ActionBarProps) {
-  const recheck = useRecheckStockMutation(orderId);
-
-  if (stage === "placed") {
-    return (
-      <div>
-        <div className="text-[12px] text-base-700 mb-2 font-body">
-          Order placed by dealer. Waiting for them to push it to operation — no
-          action available yet.
-        </div>
-      </div>
-    );
+  void _allReceived;
+  switch (pipelineStatus) {
+    case "needs_setup":
+      return (
+        <ActionRow
+          line="No PO raised yet — issue a PO to start procurement."
+          button={{ label: "Issue PO", onClick: onIssuePOsClick }}
+        />
+      );
+    case "proceed":
+      return (
+        <ActionRow
+          line={
+            proceedBlocked
+              ? "Outstation — call the customer to confirm the ETA first, then issue."
+              : "Confirmed — issue the PO to procure the goods."
+          }
+          button={{
+            label: "Issue PO",
+            onClick: onIssuePOsClick,
+            disabled: proceedBlocked,
+            title: proceedBlocked ? "Call the customer first (outstation)" : undefined,
+          }}
+        />
+      );
+    case "pending":
+      return (
+        <ActionRow
+          line="Waiting on stock — chase the PO / update the ETA below."
+          button={{ label: "Chase / update ETA", onClick: onChaseClick }}
+        />
+      );
+    case "in_production":
+      return (
+        <ActionRow
+          line="In production — chase the PO / update the ETA below."
+          button={{ label: "Chase / update ETA", onClick: onChaseClick }}
+        />
+      );
+    case "ready":
+      return (
+        <ActionRow
+          line={`All goods in${warehouseName ? ` at ${warehouseName}` : ""} — assign a delivery partner.`}
+          button={{ label: "Assign logistic", onClick: onDispatchClick }}
+        />
+      );
+    case "scheduled":
+      return (
+        <ActionRow
+          line="Out for delivery — confirm the signed DO to close the loop."
+          button={{ label: "Confirm delivery", onClick: onDOClick }}
+        />
+      );
+    case "completed":
+      return <ActionRow line="Delivered and closed." />;
   }
-  if (stage === "confirmed") {
-    return (
-      <div>
-        <div className="text-[12px] text-base-700 mb-2 font-body">
-          Dealer pushed this order. Confirm to triage — system will reserve
-          stock or queue a PO based on availability.
-        </div>
-        {proceedBlocked && (
-          <div className="text-[11px] text-warning mb-2 font-medium">
-            Outstation: call the customer to confirm the final ETA before
-            ordering stock, then tick "Call before PO" first.
-          </div>
-        )}
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn-primary text-[12px] disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={onConfirmProceedClick}
-            disabled={proceedBlocked}
-            title={
-              proceedBlocked ? "Call the customer first (outstation)" : undefined
-            }
-          >
-            Confirm proceed
-          </button>
-          <button
-            type="button"
-            className="btn-ghost text-[12px] text-destructive"
-            onClick={onAbandonClick}
-          >
-            Abandon
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (stage === "in_production") {
-    return (
-      <div>
-        {shortageCount > 0 ? (
-          <div className="text-[12px] text-warning mb-2 font-body">
-            Waiting on stock for {shortageCount} line{shortageCount === 1 ? "" : "s"}.
-            When the supplier DO arrives, mark the PO as received in <strong>Procurement</strong>{" "}
-            — or transfer manually if stock is already on-hand.
-          </div>
-        ) : (
-          <div className="text-[12px] text-base-700 mb-2 font-body">
-            Proceeded — stock is on-hand. Transfer to ready, then dispatch.
-          </div>
-        )}
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn-secondary text-[12px]"
-            onClick={async () => {
-              try {
-                await recheck.mutateAsync();
-                toast.info("Stock re-checked");
-              } catch (e) {
-                toast.error(e instanceof ApiError ? e.message : "Re-check failed");
-              }
-            }}
-            disabled={recheck.isPending}
-          >
-            {recheck.isPending ? "Checking…" : "↻ Re-check stock"}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary text-[12px]"
-            onClick={onTransferReadyClick}
-          >
-            Transfer to ready (stock on-hand)
-          </button>
-          {shortageCount > 0 && (
-            <button
-              type="button"
-              className="btn-primary text-[12px]"
-              onClick={onIssuePOsClick}
-            >
-              + Issue POs
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn-ghost text-[12px] text-destructive"
-            onClick={onAbandonClick}
-          >
-            Abandon
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (stage === "ready_to_dispatch") {
-    return (
-      <div>
-        <div className="text-[12px] text-base-700 mb-2 font-body">
-          Stock secured at <strong>{warehouseName ?? "—"}</strong>. Pick a delivery partner.
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn-primary text-[12px]"
-            onClick={onDispatchClick}
-          >
-            Assign delivery partner
-          </button>
-          <button
-            type="button"
-            className="btn-secondary text-[12px]"
-            onClick={onTopUpClick}
-          >
-            Record top-up
-          </button>
-          <button
-            type="button"
-            className="btn-ghost text-[12px] text-destructive"
-            onClick={onAbandonClick}
-          >
-            Abandon
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (stage === "dispatched") {
-    return (
-      <div>
-        <div className="text-[12px] text-base-700 mb-2 font-body">
-          Out for delivery. When the DO comes back signed, attach it to close the loop.
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn-primary text-[12px]"
-            onClick={onDOClick}
-          >
-            Attach DO &amp; mark delivered
-          </button>
-          <button
-            type="button"
-            className="btn-secondary text-[12px]"
-            onClick={onTopUpClick}
-          >
-            Record top-up
-          </button>
-        </div>
-      </div>
-    );
-  }
-  // delivered
-  return (
-    <div className="text-[12px] text-success font-body">
-      Delivered. {doNumber && <>DO <strong>{doNumber}</strong> on file.</>}
-    </div>
-  );
 }
 
 function PoRow({
