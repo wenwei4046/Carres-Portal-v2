@@ -66,7 +66,7 @@ import {
 import ServiceNoteModal from "./ServiceNoteModal";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
-import StageChip, { type OperationStage } from "./StageChip";
+import { type OperationStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
 import AbandonOrderModal from "./AbandonOrderModal";
@@ -104,6 +104,86 @@ interface Props {
   orderId: string;
   onClose: () => void;
 }
+
+/**
+ * Header pipeline status (BUG 2, Loo 2026-07-09) — derived from the order's ACTUAL
+ * work signals (PO? ETA? goods in? confirmed?), NOT a status-string guess. The old
+ * header fell through to "In Production" for any AutoCount import that carried no
+ * operation_stage — inventing a stage that wasn't real. `deriveOrderStage` instead
+ * reads the real signals and, when NONE are present, says "Needs setup".
+ *
+ * Ladder — first match wins, most-advanced first:
+ *   completed     ← delivered
+ *   ready         ← every goods line in stock  (beats scheduled — Loo: 货齐 > 排物流)
+ *   scheduled     ← LP leg live (dispatched / ready_to_dispatch)
+ *   in_production ← a linked PO carries an ETA date
+ *   pending       ← a PO exists but no ETA yet
+ *   proceed       ← order confirmed, nothing procured yet
+ *   needs_setup   ← none of the above (fresh import: no PO / ETA / stock)
+ *
+ * ⚠️ Drawer-only richer vocab. The Orders LIST keeps its coarser 5-tab bucketing
+ * (`controlTabOf`) for now — aligning the list to this ladder is a SEPARATE task
+ * (Loo). Display-only: the functional `stage: OperationStage` that drives the
+ * ActionBar / StockPickerGrid is UNCHANGED.
+ */
+type PipelineStatus =
+  | "needs_setup"
+  | "proceed"
+  | "pending"
+  | "in_production"
+  | "ready"
+  | "scheduled"
+  | "completed";
+
+function deriveOrderStage(sig: {
+  delivered: boolean;
+  scheduled: boolean;
+  allReceived: boolean;
+  etaFilled: boolean;
+  hasPo: boolean;
+  confirmed: boolean;
+}): PipelineStatus {
+  if (sig.delivered) return "completed";
+  if (sig.allReceived) return "ready"; // Loo: goods-ready outranks scheduled
+  if (sig.scheduled) return "scheduled";
+  if (sig.etaFilled) return "in_production";
+  if (sig.hasPo) return "pending";
+  if (sig.confirmed) return "proceed";
+  return "needs_setup";
+}
+
+const PIPELINE_LABEL: Record<PipelineStatus, string> = {
+  needs_setup: "Needs setup",
+  proceed: "Proceed",
+  pending: "Pending",
+  in_production: "In Production",
+  ready: "Ready",
+  scheduled: "Scheduled",
+  completed: "Completed",
+};
+
+/** Pill class per status — grey (no work) → purple → amber → blue → green →
+ *  indigo → grey (done). */
+const PIPELINE_PILL: Record<PipelineStatus, string> = {
+  needs_setup: "pill-neutral", // grey — no work started yet
+  proceed: "pill-draft", // purple — confirmed, being arranged
+  pending: "pill-warning", // amber — PO raised, waiting on stock
+  in_production: "pill-sent", // blue — factory has an ETA
+  ready: "pill-confirmed", // green — all goods in
+  scheduled: "pill-collected", // indigo — LP assigned / en route
+  completed: "pill-neutral", // grey — done
+};
+
+/** Hover copy per status — one plain-English line explaining what it means. */
+const PIPELINE_HINT: Record<PipelineStatus, string> = {
+  needs_setup: "No PO, ETA, or stock yet — this order hasn't been set up",
+  proceed: "Confirmed — being arranged",
+  pending: "PO raised — waiting for stock at the warehouse",
+  in_production: "Supplier has given an ETA — in production",
+  ready: "All goods are in stock — ready to schedule delivery",
+  scheduled: "Delivery partner assigned / out for delivery",
+  completed: "Delivered and closed",
+};
 
 function calcShortages(
   lines: operationOrderDetailLine[],
@@ -230,7 +310,7 @@ export default function OrderDetailDrawer({ orderId, onClose }: Props) {
     <div
       role="region"
       aria-label="Order detail"
-      className="bg-card text-card-foreground flex flex-col h-full w-full min-w-0"
+      className="bg-background text-card-foreground flex flex-col h-full w-full min-w-0"
       data-testid="order-detail-drawer"
     >
         {isLoading && <DrawerSkeleton onClose={onClose} />}
@@ -436,7 +516,7 @@ function Panel({
 }) {
   return (
     <section
-      className={`border border-base-200 rounded-[12px] bg-white overflow-hidden flex flex-col min-h-0 ${grow ? "flex-1" : ""} ${className ?? ""}`}
+      className={`bg-white rounded-2xl overflow-hidden flex flex-col min-h-0 border-[1.5px] border-[rgba(17,24,39,0.06)] shadow-[0_1px_2px_rgba(17,24,39,0.05),0_1px_1px_rgba(17,24,39,0.03)] ${grow ? "flex-1" : ""} ${className ?? ""}`}
     >
       <header className="flex items-center justify-between gap-3 px-3 py-2 border-b border-base-100 shrink-0">
         <span className="t-h4 text-base-900 truncate">{title}</span>
@@ -475,25 +555,6 @@ function MiniBadge({
       {children}
     </span>
   );
-}
-
-/** The collect-before-delivery gate badge (Jess 2026-07-02): amber "Collect
- *  before delivery" (warning, ETA still >1 day off) → red "Hold delivery" (block,
- *  from ETA−1 if uncollected). Renders on the Bill + Storage panel headers. */
-function GateBadge({ gate }: { gate: "hold" | "warn" | null }) {
-  if (gate === "hold")
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEE2E2] text-[#991B1B] whitespace-nowrap">
-        <AlertCircle size={10} strokeWidth={2.5} /> Hold delivery
-      </span>
-    );
-  if (gate === "warn")
-    return (
-      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] whitespace-nowrap">
-        Collect before delivery
-      </span>
-    );
-  return null;
 }
 
 /** Items-ordered header readiness — shows only the states present (No PO grey →
@@ -682,14 +743,6 @@ function DrawerBody({
   // bill). Prefer the operator/import-keyed control balance; else the derived
   // outstanding; never show "RM 0 paid" (that read as settled when it wasn't).
   const controlOwing = form.draft.balance.trim() ? Number(form.draft.balance) : 0;
-  const paymentSummary =
-    controlOwing > 0
-      ? `${RM(controlOwing)} owing`
-      : hasTotal
-        ? outstanding <= 0
-          ? "Settled"
-          : `${RM(outstanding)} owing`
-        : "No balance";
 
   // Readiness per goods line (locked vocab): Ready (free stock ≥ qty) → Waiting
   // (a PO is raised for the sku) → No PO (nothing yet). Service lines carry no
@@ -735,6 +788,34 @@ function DrawerBody({
   const waitingN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "waiting").length;
   const nopoN = goodsLines.filter((l) => readinessOf(l.sku, l.qty) === "nopo").length;
 
+  // Header pipeline status (BUG 2) — derived from the order's real work signals,
+  // each criterion reading ONE clear source (Loo 2026-07-09: annotate every one).
+  // Display-only; the functional `stage` above still drives the ActionBar.
+  const pipelineStatus = deriveOrderStage({
+    // delivered — the collapsed operation_stage enum (`orders.operation_stage`),
+    //   or `orders.status === "delivered"`, both folded into `stage` above.
+    delivered: stage === "delivered",
+    // scheduled — an LP leg is live: `orders.operation_stage` is dispatched /
+    //   ready_to_dispatch (via `stage`).
+    scheduled: stage === "dispatched" || stage === "ready_to_dispatch",
+    // allReceived — every goods line reads "ready". `readinessOf` already folds in
+    //   the Master `ops_order_control.line_stock_status` override + accessories-
+    //   always-ready + live free stock. Ready criterion = readyN === goodsLines.length
+    //   (Loo: match the Items-panel badge; not strict GRN line_received).
+    allReceived: goodsLines.length > 0 && readyN === goodsLines.length,
+    // etaFilled — a linked portal PO carries a delivery date (`purchase_orders.eta_date`,
+    //   collected into `poEtaBySku`). AutoCount inline POs carry no ETA, so they never trip this.
+    etaFilled: poEtaBySku.size > 0,
+    // hasPo — a portal `purchase_orders` line (`poSkus`) OR an AutoCount inline PO
+    //   (`order_lines.source_po` → `soPoBySku`) exists for any sku.
+    hasPo: poSkus.size > 0 || soPoBySku.size > 0,
+    // confirmed — the order has moved past raw entry: `orders.operation_stage` is set,
+    //   or `orders.status` is neither "place" nor "cancelled".
+    confirmed:
+      order.operation_stage != null ||
+      (order.status !== "place" && order.status !== "cancelled"),
+  });
+
   // Collect-before-delivery gate (Jess 2026-07-02), keyed to the Logistic ETA
   // (delivery date). Two stages: amber "Collect before delivery" while the ETA
   // is still >1 day away; red "Hold Delivery" from ETA−1 if still uncollected.
@@ -763,10 +844,17 @@ function DrawerBody({
     !!form.control?.storage_collected_at ||
     form.control?.storage_waiver_status === "approved";
   const storageOwing = storageIncurred && !storageCleared;
+  const storageFee =
+    Number(form.control?.storage_fee_msbf ?? 0) +
+    Number(form.control?.storage_fee_sof ?? 0);
   // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
   const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
   const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
-  const holdCount = (balanceGate === "hold" ? 1 : 0) + (storageGate === "hold" ? 1 : 0);
+  // Balance panel STATUS pill (Jess 2026-07-08: panel = status, show the amount
+  // as a pill — no explanatory sentence). owing = import-keyed control balance
+  // wins, else the derived outstanding.
+  const isOwing = balanceOwing || controlOwing > 0;
+  const owingAmt = controlOwing > 0 ? controlOwing : outstanding;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -831,10 +919,14 @@ function DrawerBody({
             '"banner banner" "header header" "actions actions" "main side"',
         }}
       >
-        {/* Needs-action banner — the "action for logistic" note surfaced at the
-            top so it can't be missed (Jess). */}
+        {/* Operator's own free-text note (not a system status — that lives as a
+            pill on each panel header). Surfaced at the top so a hand-written
+            "call customer before delivery" can't be missed. */}
         {form.draft.action_for_logistic.trim() && (
-          <div className="flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]" style={{ gridArea: "banner" }}>
+          <div
+            style={{ gridArea: "banner" }}
+            className="flex items-start gap-2 rounded-[4px] border border-warning/50 bg-warning/10 px-3 py-2 text-[12px]"
+          >
             <AlertCircle
               className="w-4 h-4 shrink-0 mt-0.5 text-warning"
               aria-hidden="true"
@@ -857,23 +949,28 @@ function DrawerBody({
           {/* Status · boxed order # · grey Ref — NO customer name (it lives in
               the Customer card; Jess: don't repeat it here). */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <StageChip stage={stage} />
+            <span
+              className={`pill ${PIPELINE_PILL[pipelineStatus]}`}
+              title={PIPELINE_HINT[pipelineStatus]}
+            >
+              {PIPELINE_LABEL[pipelineStatus]}
+            </span>
             <span className="font-mono font-semibold text-base-900 border border-base-300 rounded-md px-2 py-0.5 bg-white shrink-0">
               #{order.so}
+            </span>
+            {/* One order, many items → summarise as a count + region, NOT a single
+                model name (Jess). */}
+            <span className="t-small text-base-500 shrink-0 whitespace-nowrap">
+              {orderedLines.length} item{orderedLines.length === 1 ? "" : "s"}
+              {loc.label ? ` · ${loc.label}` : ""}
             </span>
             {order.source_ref?.[0] && (
               <span className="t-small text-base-400 font-mono shrink-0 uppercase">
                 Ref {order.source_ref[0]}
               </span>
             )}
-            {holdCount > 0 && (
-              <span
-                title="Delivery is blocked — clear the reasons in the Bill / Storage panels below"
-                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#FEE2E2] text-[#991B1B] shrink-0"
-              >
-                <AlertCircle size={12} strokeWidth={2.5} /> HOLD DELIVERY ({holdCount})
-              </span>
-            )}
+            {/* HOLD DELIVERY moved to the top instruction line (banner) — removed
+                here so the block is never stated twice (revised plan 2(b)). */}
           </div>
           <span className="flex items-center gap-1 shrink-0">
             <button
@@ -1224,17 +1321,40 @@ function DrawerBody({
             </div>
           </Panel>
 
-          {/* 2. Balance — its OWN card (Jess: split from Storage). Header summary =
-              the gate (Collect before delivery / Hold delivery) or the owing amount.
-              Collect-by (ETA−7d) / last-call (ETA−1d) readout escalates with the
-              gate colour. Operation shows only the OUTSTANDING owed (no Bill/Total). */}
+          {/* 2. Balance — its OWN card (Jess: split from Storage). Header summary is
+              a STATUS PILL, not a sentence (Jess 2026-07-08): the owing AMOUNT when
+              money is due — red if the delivery gate is HOLD, amber if it's a WARN,
+              neutral otherwise — else Settled / No balance. Operation shows only the
+              OUTSTANDING owed (no Bill/Total). */}
           <Panel
             title="Balance"
             summary={
-              balanceGate ? (
-                <GateBadge gate={balanceGate} />
+              isOwing ? (
+                <span
+                  title={
+                    balanceGate === "hold"
+                      ? "Delivery on hold — collect before dispatch"
+                      : balanceGate === "warn"
+                        ? "Collect before delivery"
+                        : "Outstanding balance"
+                  }
+                  className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                    balanceGate === "hold"
+                      ? "bg-[#FEE2E2] text-[#991B1B]"
+                      : balanceGate === "warn"
+                        ? "bg-[#FEF3C7] text-[#92400E]"
+                        : "bg-base-100 text-base-700"
+                  }`}
+                >
+                  {balanceGate === "hold" && (
+                    <AlertCircle size={10} strokeWidth={2.5} />
+                  )}
+                  {RM(owingAmt)} owing
+                </span>
+              ) : hasTotal ? (
+                <MiniBadge tone="ready">Settled</MiniBadge>
               ) : (
-                <MiniBadge tone="muted">{paymentSummary}</MiniBadge>
+                <MiniBadge tone="muted">No balance</MiniBadge>
               )
             }
           >
@@ -1268,16 +1388,37 @@ function DrawerBody({
             </div>
           </Panel>
 
-          {/* 3. Storage — its OWN card (Jess: split from Balance). Header summary =
-              the storage gate or "fee if held". StorageControlFields lays the two
-              category fees (MS/BF · Sofa) 2-col; fee auto-computes today (Master
-              import is P2). Only shows when a storable category is on the order. */}
+          {/* 3. Storage — its OWN card (Jess: split from Balance). Header summary is
+              a STATUS PILL, not a sentence (Jess 2026-07-08): the fee amount when a
+              fee is running (red if the delivery gate is HOLD, amber if WARN, neutral
+              otherwise) — else "fee if held". Only shows when a storable category is
+              on the order. */}
           {(hasMsbf || hasSof) && (
             <Panel
               title="Storage"
               summary={
-                storageGate ? (
-                  <GateBadge gate={storageGate} />
+                storageOwing ? (
+                  <span
+                    title={
+                      storageGate === "hold"
+                        ? "Delivery on hold — clear storage before dispatch"
+                        : storageGate === "warn"
+                          ? "Collect storage before delivery"
+                          : "Storage fee running"
+                    }
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                      storageGate === "hold"
+                        ? "bg-[#FEE2E2] text-[#991B1B]"
+                        : storageGate === "warn"
+                          ? "bg-[#FEF3C7] text-[#92400E]"
+                          : "bg-base-100 text-base-700"
+                    }`}
+                  >
+                    {storageGate === "hold" && (
+                      <AlertCircle size={10} strokeWidth={2.5} />
+                    )}
+                    {storageFee > 0 ? `${RM(storageFee)} fee` : "fee due"}
+                  </span>
                 ) : (
                   <MiniBadge tone="muted">fee if held</MiniBadge>
                 )
