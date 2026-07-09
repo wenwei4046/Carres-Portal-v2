@@ -1337,10 +1337,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 ))}
               </KanbanGroup>
 
-              {/* CATEGORY — its own group at the bottom, collapsed by default. */}
+              {/* CATEGORY — its own group at the bottom, collapsed by default.
+                  No total (category matches overlap → the sum misleads). */}
               <KanbanGroup
                 title="CATEGORY"
-                total={categoryEntries.reduce((s, e) => s + e.count, 0)}
                 collapsed={collapsedGroups.has("CATEGORY")}
                 onToggle={() => toggleGroup("CATEGORY")}
               >
@@ -1725,7 +1725,9 @@ function KanbanGroup({
 }: {
   title: string;
   danger?: boolean;
-  total: number;
+  /** Group total shown on the right of the title bar; omit to hide it (CATEGORY
+   *  overlaps across orders, so its sum would exceed the order count → hidden). */
+  total?: number;
   collapsed: boolean;
   onToggle: () => void;
   testid?: string;
@@ -1755,12 +1757,14 @@ function KanbanGroup({
         >
           {title}
         </span>
-        <span
-          className="tabular-nums shrink-0"
-          style={{ fontSize: "11px", fontWeight: 600, color: "#6F6960" }}
-        >
-          {total}
-        </span>
+        {total !== undefined && (
+          <span
+            className="tabular-nums shrink-0"
+            style={{ fontSize: "11px", fontWeight: 600, color: "#6F6960" }}
+          >
+            {total}
+          </span>
+        )}
       </button>
       {!collapsed && <div className="flex flex-col gap-0.5 mt-0.5">{children}</div>}
     </div>
