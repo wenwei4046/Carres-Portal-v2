@@ -329,17 +329,16 @@ export interface NextAction {
   /** Delivery is HELD on an owing balance/storage (🔒). */
   locked?: boolean;
 }
-// POS re-skin (Loo 2026-07-09): the Next-action column is the ONE place colour
-// lives in the row, and even here it's LOW-SATURATION (flame never enters the
-// table; a saturated red is reserved for the genuinely-urgent danger tone).
-// Soft tinted pill = the POS badge look (`.prod-card__badge`) — rounded, faint
-// fill, coloured ink — carried inline so the shared global `.pill` stays put.
-const NEXT_TONE_STYLE: Record<NextTone, { text: string; bg: string }> = {
-  danger: { text: "#8C3F36", bg: "rgba(140,63,54,0.10)" }, // low-sat dark red — "会出事", not a bright flood
-  warning: { text: "#8A6D2F", bg: "rgba(138,109,47,0.12)" }, // low-sat amber
-  info: { text: "#3E6187", bg: "rgba(62,97,135,0.11)" }, // low-sat blue
-  success: { text: "#4B7A5A", bg: "rgba(75,122,90,0.12)" }, // low-sat green
-  neutral: { text: "#6F6960", bg: "rgba(34,31,32,0.06)" }, // grey
+// Next-action pill colours — restored to Jess's original proposal
+// (carres_full_page_final_dateformat.html) so the five action tones read as
+// five DISTINCT colours, not one washed-out red. Each = soft fill + strong
+// ink + a matching border; carried inline so the shared global `.pill` stays put.
+const NEXT_TONE_STYLE: Record<NextTone, { text: string; bg: string; border: string }> = {
+  danger: { text: "#991B1B", bg: "#FCE4E4", border: "#F3B4B4" }, // chase / overdue — red
+  warning: { text: "#92400E", bg: "#FBE8C6", border: "#F0D08A" }, // waiting stock — amber
+  info: { text: "#1E40AF", bg: "#D3E4FB", border: "#A9C8F2" }, // call / assign — blue
+  success: { text: "#166534", bg: "#D6EFD9", border: "#A9D8B0" }, // schedule delivery — green
+  neutral: { text: "#4B5563", bg: "#EAE7DF", border: "#D6D2C6" }, // done — grey
 };
 
 function ovlOf(o: operationOrderListRow) {
@@ -1820,7 +1819,7 @@ function OrderRow({
       <td className="pl-2 pr-1 py-1.5" title={o.customer_phone ?? undefined}>
         <span
           className="font-mono tabular-nums"
-          style={{ fontSize: "13px", fontWeight: 500, color: "#221F20" }}
+          style={{ fontSize: "13px", fontWeight: 500, color: "#1F2937" }}
         >
           SO-{o.so}
         </span>
@@ -1836,7 +1835,7 @@ function OrderRow({
               <div
                 key={i}
                 className="truncate tabular-nums"
-                style={{ fontSize: "17px", fontWeight: 700, color: "#221F20" }}
+                style={{ fontSize: "17px", fontWeight: 700, color: "#111827" }}
               >
                 {r}
               </div>
@@ -1854,7 +1853,7 @@ function OrderRow({
         {o.customer_name ? (
           <span
             className={`${cjkClassName(o.customer_name)} text-[14px] text-base-800 leading-[1.35]`}
-            style={{ color: "#221F20", ...clamp3 }}
+            style={{ color: "#1F2937", ...clamp3 }}
             title={o.customer_name}
           >
             {o.customer_name}
@@ -1869,7 +1868,7 @@ function OrderRow({
         {loc.label ? (
           <span
             className="text-[14px] leading-[1.35]"
-            style={{ color: loc.area === "Outstation" ? "#9A7B3F" : "#6F6960", ...clamp3 }}
+            style={{ color: loc.area === "Outstation" ? "#9A7B3F" : "#4B5563", ...clamp3 }}
             title={
               loc.area === "Outstation"
                 ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
@@ -1904,7 +1903,7 @@ function OrderRow({
               <div className="flex items-center gap-1.5">
                 <span
                   className="tabular-nums"
-                  style={{ fontSize: "14px", fontWeight: 600, color: hot ? "#8C3F36" : "#221F20" }}
+                  style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}
                 >
                   {datePart}
                 </span>
@@ -1916,8 +1915,8 @@ function OrderRow({
                     className="tabular-nums shrink-0"
                     style={{
                       fontSize: "11.5px",
-                      color: "#9CA3AF",
-                      background: "rgba(156,163,175,0.15)",
+                      color: hot ? "#991B1B" : "#4B5563",
+                      background: hot ? "#FCE4E4" : "#EAE7DF",
                       padding: "0 6px",
                       borderRadius: "999px",
                     }}
@@ -1943,7 +1942,7 @@ function OrderRow({
       {/* Logistic — the carrier name (neutral grey). */}
       <td className="px-2 py-2 whitespace-nowrap">
         {logistic ? (
-          <span className="text-[14px]" style={{ color: "#6F6960" }}>{logistic}</span>
+          <span className="text-[14px]" style={{ color: "#4B5563" }}>{logistic}</span>
         ) : (
           <span className="text-base-300">—</span>
         )}
@@ -1963,6 +1962,7 @@ function OrderRow({
                 padding: "2px 9px",
                 color: st.text,
                 background: st.bg,
+                border: `1px solid ${st.border}`,
               }}
               data-next-action={na.label}
             >
@@ -1984,7 +1984,7 @@ function CatCountCell({ testid, qty }: { testid: string; qty: number }) {
       {qty > 0 ? (
         <span
           className="tabular-nums"
-          style={{ fontSize: "14px", fontWeight: 700, color: "#221F20" }}
+          style={{ fontSize: "14px", fontWeight: 700, color: "#111827" }}
         >
           {qty}
         </span>
