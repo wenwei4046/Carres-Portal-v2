@@ -208,13 +208,13 @@ describe("OperationOrdersControl", () => {
     wrap(<OperationOrdersControl />);
     const g = statusGroup();
     expect(g.getAllByRole("button")).toHaveLength(6);
-    // counts: All 7, Placed 1, Proceed 2, Pending 1, Scheduled 2, Completed 1.
+    // counts: All 7, Placed 1, Proceed 2, Pending 1, Scheduled 2, Delivered 1.
     expect(g.getByRole("button", { name: /All\s*7/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Placed\s*1/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Proceed\s*2/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Pending\s*1/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Scheduled\s*2/ })).toBeInTheDocument();
-    expect(g.getByRole("button", { name: /Completed\s*1/ })).toBeInTheDocument();
+    expect(g.getByRole("button", { name: /Delivered\s*1/ })).toBeInTheDocument();
   });
 
   it("defaults to All and shows every order (completed 1007 sorts to the bottom)", () => {
@@ -603,18 +603,20 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(cells[8].textContent).toMatch(/\d/);
   });
 
-  it("paginates — 15/page by default (fixed listing box), Next works", () => {
+  it("windows to the first 30 rows + shows the load-more sentinel (infinite scroll)", () => {
     listHookState.data = {
       orders: Array.from({ length: 120 }, (_, i) =>
         makeRow({ id: `p${i}`, so: 4000 + i }),
       ),
     };
     wrap(<OperationOrdersControl />);
-    expect(screen.getByText(/1.15 of 120/)).toBeInTheDocument();
-    expect(screen.getAllByTestId("order-row")).toHaveLength(15);
-
-    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
-    expect(screen.getByText(/16.30 of 120/)).toBeInTheDocument();
+    // P11: render only the first batch (30) into the DOM; the rest lazy-load as
+    // the bottom sentinel scrolls into view (IntersectionObserver — not firable
+    // in jsdom, so only the initial window is asserted here).
+    expect(screen.getAllByTestId("order-row")).toHaveLength(30);
+    expect(screen.getByText("30 of 120")).toBeInTheDocument();
+    // The sentinel row advertises what's left to load.
+    expect(screen.getByText(/Loading more/)).toBeInTheDocument();
   });
 
   it("surfaces an Unassigned-carrier alert (no-carrier count) and filters on click", () => {
@@ -641,6 +643,29 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "title",
       expect.stringContaining("Confirmed"),
     );
+  });
+
+  // P11 (Gmail-style bulk header) — a partial tick offers "Select all N in
+  // <tab>"; clicking it selects the whole filtered tab; the in-bar checkbox
+  // stays put and unticks everything in place.
+  it("offers cross-tab select-all + unticks in place from the bulk header", () => {
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(screen.getByLabelText("Select SO-1001"));
+    fireEvent.click(screen.getByLabelText("Select SO-1002"));
+    fireEvent.click(screen.getByLabelText("Select SO-1003"));
+    expect(screen.getByText("3 selected")).toBeInTheDocument();
+
+    // "Select all 7 in All" — the whole tab, not just the ticked rows.
+    fireEvent.click(screen.getByRole("button", { name: /Select all 7 in All/ }));
+    expect(screen.getByText("7 selected")).toBeInTheDocument();
+    // Banner disappears once everything is already selected.
+    expect(
+      screen.queryByRole("button", { name: /Select all 7/ }),
+    ).not.toBeInTheDocument();
+
+    // The header checkbox is still there (not hidden) and clears in place.
+    fireEvent.click(screen.getByLabelText("Deselect all"));
+    expect(screen.queryByText(/\d+ selected/)).not.toBeInTheDocument();
   });
 });
 
@@ -691,7 +716,7 @@ describe("orders export", () => {
     // Export/print live behind the row checkboxes + ⋮ — NOT a top-bar button
     // (Jess 2026-06-26: tick one customer → ⋮ → Print prints just that order).
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: /Actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
     expect(screen.getByRole("button", { name: /Export CSV/ })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Print \/ Save as PDF/ }),
@@ -714,7 +739,7 @@ describe("orders export", () => {
 
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: /Actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
     fireEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
@@ -737,7 +762,7 @@ describe("orders export", () => {
 
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: /Actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
     fireEvent.click(screen.getByRole("button", { name: /Print \/ Save as PDF/ }));
 
     expect(open).toHaveBeenCalledTimes(1);

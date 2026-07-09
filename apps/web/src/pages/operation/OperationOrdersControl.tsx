@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useParams } from "react-router-dom";
@@ -29,11 +29,10 @@ import type { OpsTask, OpsTasksListResponse } from "@carres/shared";
 import type { OperationStage } from "./components/StageChip";
 import {
   RefreshCw,
+  PanelLeft,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   ExternalLink,
-  Filter,
   MoreVertical,
   Truck,
   Download,
@@ -95,7 +94,7 @@ const TABS: { key: ControlTab; label: string }[] = [
   { key: "proceed", label: "Proceed" },
   { key: "pending", label: "Pending" },
   { key: "scheduled", label: "Scheduled" },
-  { key: "completed", label: "Completed" },
+  { key: "completed", label: "Delivered" },
 ];
 
 /** Tooltip for the "All" meta tab — the five pipeline stages get theirs from
@@ -111,7 +110,7 @@ const TAB_LABEL: Record<SettledTab, string> = {
   proceed: "Proceed",
   pending: "Pending",
   scheduled: "Scheduled",
-  completed: "Completed",
+  completed: "Delivered",
 };
 
 /** Plain-English meaning of each pipeline status — surfaced as a hover tooltip
@@ -705,11 +704,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
     so: number | null;
     refNo: string | null;
   } | null>(null);
-  // Fixed at 20 rows/page (C1 redesign): ≥20 auto-enables the dense `compact`
-  // layout. The listing is a fixed box that auto-scales (CSS zoom) so the rows
-  // always fit, no scroll.
-  const [pageSize] = useState<number | "all">(15);
-  const [page, setPage] = useState(0);
+  // Infinite scroll (P11, Loo 2026-07-09): render 30 rows, append 30 more each
+  // time the bottom sentinel scrolls into view. Replaces the old fixed-box +
+  // CSS-zoom + N/page pager — a lazy-loading scroll list scales past 500 orders
+  // (only ~30 <tr> in the DOM until the user scrolls).
+  const ROWS_PER_BATCH = 30;
+  const [renderCount, setRenderCount] = useState(ROWS_PER_BATCH);
   // Bulk select (Gmail-style): selected order ids + the ⋮ menu mode.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMenu, setBulkMenu] = useState<null | "menu" | "assign">(null);
@@ -939,54 +939,42 @@ export default function OperationOrdersControl({ onImport }: Props) {
     return mx;
   }, [orders]);
 
-  // Reset to the first page whenever the filtered set changes.
+  // Reset the render window to the first batch whenever the filtered set changes.
   useEffect(
-    () => setPage(0),
-    [tab, search, pageSize, dueFilter, flaggedOnly, escalateOnly, etaOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
+    () => setRenderCount(ROWS_PER_BATCH),
+    [tab, search, dueFilter, flaggedOnly, escalateOnly, etaOnly, regionFilter, stockFilter, logisticFilter, categoryFilter],
   );
 
   const total = visible.length;
-  const pageCount =
-    pageSize === "all" ? 1 : Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(page, pageCount - 1);
-  const paged = useMemo(() => {
-    if (pageSize === "all") return visible;
-    const start = safePage * pageSize;
-    return visible.slice(start, start + pageSize);
-  }, [visible, pageSize, safePage]);
-  const rangeStart = total === 0 ? 0 : safePage * (pageSize === "all" ? total : pageSize) + 1;
-  const rangeEnd = pageSize === "all" ? total : Math.min(total, (safePage + 1) * pageSize);
+  const shown = useMemo(() => visible.slice(0, renderCount), [visible, renderCount]);
 
-  // Fixed listing — scale the whole table (CSS zoom) so every row of the page
-  // fits the box with NO vertical scroll (Jess 2026-06-24: "fix listing, not
-  // scroll; 15/30/45/60 → show smaller"). zoom reflows (font + row height shrink
-  // together) and is set imperatively so it can't trigger a re-render loop.
+  // The list is the only scroll area. An IntersectionObserver sentinel at the
+  // bottom appends the next batch as it scrolls into view (guarded for jsdom).
   const listBoxRef = useRef<HTMLDivElement>(null);
-  const listTableRef = useRef<HTMLTableElement>(null);
-  useLayoutEffect(() => {
-    const box = listBoxRef.current;
-    const table = listTableRef.current;
-    if (!box || !table) return;
-    const fit = () => {
-      table.style.zoom = "1";
-      const natural = table.scrollHeight;
-      const avail = box.clientHeight - 2; // small margin so a fit doesn't leave a 1px scrollbar
-      // Scale down to fit, but never below a readable floor — past that (45/60
-      // rows on a short screen) the box scrolls rather than hiding rows.
-      table.style.zoom =
-        avail > 0 && natural > avail ? String(Math.max(0.5, avail / natural)) : "1";
-    };
-    fit();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(fit);
-    ro.observe(box);
-    return () => ro.disconnect();
-  }, [pageSize, safePage, paged]);
+  const sentinelRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const el = sentinelRef.current;
+    const root = listBoxRef.current;
+    if (!el || !root) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting)
+          setRenderCount((c) => Math.min(visible.length, c + ROWS_PER_BATCH));
+      },
+      { root, rootMargin: "240px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visible.length]);
 
   // ── Bulk select (Gmail-style) ──────────────────────────────────────────────
-  const pagedIds = useMemo(() => paged.map((o) => o.id), [paged]);
+  const pagedIds = useMemo(() => shown.map((o) => o.id), [shown]);
   const allPagedSelected =
     pagedIds.length > 0 && pagedIds.every((id) => selected.has(id));
+  // Partial tick → the header checkbox shows an indeterminate dash (Gmail).
+  const somePagedSelected =
+    !allPagedSelected && pagedIds.some((id) => selected.has(id));
   function toggleOne(id: string) {
     setSelected((s) => {
       const n = new Set(s);
@@ -1006,6 +994,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
   function clearSel() {
     setSelected(new Set());
     setBulkMenu(null);
+  }
+  // Gmail "Select all N in <tab>" — the whole filtered tab is already in memory
+  // (visible), windowing only limits what's RENDERED, so this needs no API call.
+  function selectAllInTab() {
+    setSelected(new Set(visible.map((o) => o.id)));
   }
   const selectedOrders = orders.filter((o) => selected.has(o.id));
 
@@ -1125,19 +1118,37 @@ export default function OperationOrdersControl({ onImport }: Props) {
       className="h-full flex flex-col px-6 pt-6 pb-5 bg-[#ECE8E0]"
       data-testid="operation-orders-control"
     >
-      {/* Header — title + count + search + import (fixed; does not scroll) */}
-      <div className="flex items-center justify-between gap-4 mb-3 flex-wrap shrink-0">
-        <div className="flex items-baseline gap-2.5 flex-wrap">
-          <h1 className="t-h1 font-display">Orders</h1>
-          <span className="text-[14px] font-medium text-base-500 tabular-nums">
-            {orders.length} orders
-          </span>
-          {latestIn && (
-            <span className="text-[12px] text-base-400" title="Most recent order / import">
-              · last in {fmtDateShort(latestIn)}
-            </span>
-          )}
+      {/* Breadcrumb row — static location label (left) + the data-freshness
+          stamp paired with refresh (right). "Last import" lives here, out of the
+          way of the Import CTAs, and shares this line so it adds no extra height. */}
+      <div className="flex items-center justify-between gap-3 mb-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 text-[12px] text-base-400">
+          <span>Operations</span>
+          <ChevronRight size={12} className="text-base-300" />
+          <span className="text-base-600">Orders</span>
         </div>
+        {latestIn && (
+          <div className="flex items-center gap-1 text-[12px] text-base-400">
+            <span className="tabular-nums" title="Most recent order / import">
+              Synced {fmtDateShort(latestIn)}
+            </span>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              title="Refresh"
+              aria-label="Refresh orders"
+              className="p-1 rounded hover:text-base-900 hover:bg-base-100 transition-colors"
+            >
+              <RefreshCw size={14} strokeWidth={2} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Header — title + search + import (fixed; does not scroll). The order
+          count moved out — the "All" tab already carries the total. */}
+      <div className="flex items-center justify-between gap-4 mb-3 flex-wrap shrink-0">
+        <h1 className="t-h1 font-display">Orders</h1>
         <div className="flex items-center gap-2.5">
           <input
             type="search"
@@ -1169,22 +1180,28 @@ export default function OperationOrdersControl({ onImport }: Props) {
       {/* Toolbar — result count + bulk actions, full-width above the split (P2 D:
           keeps the kanban + table header on one line). */}
       <div className="shrink-0 mb-2">
-        {selected.size > 0 ? (
-          <BulkBar
-            count={selected.size}
-            menu={bulkMenu}
-            setMenu={setBulkMenu}
-            partners={partnersQ.data?.partners ?? []}
-            onAssign={bulkAssignLogistic}
-            onExport={exportSelectedCsv}
-            onPrint={printSelected}
-            onTasks={bulkCreateTasks}
-            onComplete={bulkMarkCompleted}
-            onClear={clearSel}
-            busy={assignMut.isPending || taskMut.isPending || completeMut.isPending}
-          />
-        ) : (
-          <div className="flex items-center justify-between gap-3">
+        {/* Tabs ALWAYS stay put — selection no longer swaps them for a bar; the
+            bulk actions fill the table-header row instead (see thead below), so
+            nothing shifts when rows are picked. */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Filter-panel toggle — lives in the toolbar (above the panel), so
+                it adds no body width and leaves no dead rail column. */}
+            <button
+              type="button"
+              onClick={() => setKanbanOpen((v) => !v)}
+              title={kanbanOpen ? "Hide filters" : "Show filters"}
+              aria-label={kanbanOpen ? "Hide filters" : "Show filters"}
+              data-testid="orders-filter-rail"
+              className="shrink-0 p-1.5 rounded-lg border transition-colors"
+              style={{
+                borderColor: kanbanOpen ? "#221F20" : "#DDD8CE",
+                color: kanbanOpen ? "#221F20" : "#6B7280",
+                background: "#FFFFFF",
+              }}
+            >
+              <PanelLeft size={15} />
+            </button>
             {/* H — STATUS pipeline as top horizontal tabs (Gmail Primary/Social). */}
             <StatusTabs
               tabs={TABS.map((t) => ({
@@ -1196,19 +1213,16 @@ export default function OperationOrdersControl({ onImport }: Props) {
               active={tab}
               onSelect={setTab}
             />
-            {total > 0 && (
-              <Pager
-                safePage={safePage}
-                onPage={setPage}
-                total={total}
-                rangeStart={rangeStart}
-                rangeEnd={rangeEnd}
-                pageCount={pageCount}
-                onRefresh={() => void refetch()}
-              />
-            )}
           </div>
-        )}
+          {total > 0 && (
+            <span
+              className="text-[12px] text-base-500 tabular-nums"
+              title="Rows loaded / total in this tab"
+            >
+              {Math.min(shown.length, total)} of {total}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Body split (Loo 2026-07-09, P1) — a left FILTER KANBAN (240px, collapsible
@@ -1217,7 +1231,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
           vertical stack, chips wrap within 240). Regroup (CHASE NOW…) + the
           vertical-row chip restyle are P2 (deferred). */}
       <div className="flex-1 flex gap-4 min-h-0">
-        {kanbanOpen ? (
+        {kanbanOpen && (
           <aside
             className="w-[240px] shrink-0 flex flex-col gap-2 overflow-y-auto no-scrollbar pb-2"
             data-testid="orders-filter-kanban"
@@ -1228,21 +1242,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 : undefined,
             }}
           >
-            {/* One white card (P2 G) — Gmail-nav rows. No "Filters" label; the
-                collapse chevron sits top-right. */}
+            {/* One white card (P2 G) — Gmail-nav rows. Collapse now lives on the
+                edge rail between this panel and the table (no in-card row). */}
             <div className="bg-white border rounded-[12px] p-1.5" style={{ borderColor: "#E5E1D8" }}>
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setKanbanOpen(false)}
-                  title="Collapse filters"
-                  aria-label="Collapse filters"
-                  className="p-1 rounded text-base-500 hover:bg-base-100"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-              </div>
-
               {/* CHASE NOW — the triage lane (title reads dark red). */}
               <KanbanGroup
                 title="CHASE NOW"
@@ -1372,18 +1374,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
               </KanbanGroup>
             </div>
           </aside>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setKanbanOpen(true)}
-            title="Show filters"
-            aria-label="Show filters"
-            data-testid="orders-filter-rail"
-            className="w-[28px] shrink-0 self-start flex flex-col items-center gap-2 pt-1.5 pb-2 rounded-md border border-base-200 bg-white text-base-500 hover:text-base-800 hover:bg-base-100"
-          >
-            <Filter size={14} />
-            <ChevronRight size={14} />
-          </button>
         )}
 
         {/* List column — the scrolling listing (the toolbar moved full-width
@@ -1393,10 +1383,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
               scroll). table-fixed + a colgroup → columns keep their width. */}
       <div
         ref={listBoxRef}
-        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto no-scrollbar"
+        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
       >
         <table
-          ref={listTableRef}
           className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[50px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden"
         >
           {/* PERCENTAGE colgroup (Loo 2026-07-09) — table-fixed + w-full + % widths
@@ -1419,36 +1408,59 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: "9%" }} />
             <col style={{ width: "23%" }} />
           </colgroup>
-          {/* Dark ink header band (#221F20) — kept per Loo; the flame underline
-              stays DROPPED (flame never enters the table), replaced by a faint
-              light hairline. Light micro uppercase labels on the dark band. */}
-          <thead>
-            <tr
-              className="border-b"
-              style={{ backgroundColor: "#221F20", borderBottomColor: "rgba(201,197,187,0.22)" }}
-            >
-              <th className="px-2 py-1.5">
-                <input
-                  type="checkbox"
-                  checked={allPagedSelected}
-                  onChange={toggleAllPaged}
-                  aria-label="Select all on this page"
-                  className="cursor-pointer accent-base-900 align-middle"
-                />
-              </th>
-              <th className="px-1 py-1.5 text-center" title="Follow-up">
-                <Flag size={13} strokeWidth={2} className="inline text-[#C9C5BB]" aria-label="Follow-up" />
-              </th>
-              <Th>Order ID</Th>
-              <Th>Ref No</Th>
-              <Th>Customer</Th>
-              <Th>Region</Th>
-              <Th>Logistic</Th>
-              <Th>ETA</Th>
-              <Th>Deadline</Th>
-              <Th>Stock</Th>
-              <Th>Manage</Th>
-            </tr>
+          {/* Wireframe header band (P11) — the old solid black #221F20 band is
+              gone: a light warm surface + a 0.5px hairline, dark micro-uppercase
+              labels. When rows are selected the SAME row (same height) fills grey
+              with the bulk actions (BulkHeadRow) — Gmail-style, so the table
+              never jumps. sticky so the header stays put as the list scrolls. */}
+          <thead className="sticky top-0 z-10">
+            {selected.size > 0 ? (
+              <BulkHeadRow
+                count={selected.size}
+                total={total}
+                tabLabel={TABS.find((t) => t.key === tab)?.label ?? "this tab"}
+                allChecked={allPagedSelected}
+                someChecked={somePagedSelected}
+                onSelectAllInTab={selectAllInTab}
+                menu={bulkMenu}
+                setMenu={setBulkMenu}
+                partners={partnersQ.data?.partners ?? []}
+                onAssign={bulkAssignLogistic}
+                onExport={exportSelectedCsv}
+                onPrint={printSelected}
+                onTasks={bulkCreateTasks}
+                onComplete={bulkMarkCompleted}
+                onClear={clearSel}
+                busy={assignMut.isPending || taskMut.isPending || completeMut.isPending}
+              />
+            ) : (
+              <tr
+                className="border-b"
+                style={{ backgroundColor: "#F8F6F1", borderBottomColor: "rgba(34,31,32,0.14)" }}
+              >
+                <th className="px-2 py-1.5">
+                  <input
+                    type="checkbox"
+                    checked={allPagedSelected}
+                    onChange={toggleAllPaged}
+                    aria-label="Select all on this page"
+                    className="cursor-pointer accent-base-700 align-middle"
+                  />
+                </th>
+                <th className="px-1 py-1.5 text-center" title="Follow-up">
+                  <Flag size={13} strokeWidth={2} className="inline text-base-400" aria-label="Follow-up" />
+                </th>
+                <Th>Order ID</Th>
+                <Th>Ref No</Th>
+                <Th>Customer</Th>
+                <Th>Region</Th>
+                <Th>Logistic</Th>
+                <Th>ETA</Th>
+                <Th>Deadline</Th>
+                <Th>Stock</Th>
+                <Th>Manage</Th>
+              </tr>
+            )}
           </thead>
           <tbody>
             {total === 0 && (
@@ -1461,7 +1473,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 </td>
               </tr>
             )}
-            {paged.map((o) => (
+            {shown.map((o) => (
               <OrderRow
                 key={o.id}
                 o={o}
@@ -1474,6 +1486,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 onFlag={openFollowUp}
               />
             ))}
+            {/* Infinite-scroll sentinel — appends the next 30 as it nears view. */}
+            {shown.length < total && (
+              <tr ref={sentinelRef} aria-hidden>
+                <td colSpan={11} className="text-center text-[11px] text-base-400">
+                  Loading more… ({shown.length} of {total})
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
           </div>
@@ -1498,70 +1518,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
   );
 }
 
-function Pager({
-  safePage,
-  onPage,
-  total,
-  rangeStart,
-  rangeEnd,
-  pageCount,
-  onRefresh,
-}: {
-  safePage: number;
-  onPage: (updater: (p: number) => number) => void;
-  total: number;
-  rangeStart: number;
-  rangeEnd: number;
-  pageCount: number;
-  onRefresh: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 mb-2.5 text-[12px] text-base-600">
-      {/* Left — refresh + the rows-per-page selector (Jess 2026-06-24: the box is
-          fixed, more rows ⇒ smaller rows, no scroll). */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onRefresh}
-          title="Refresh"
-          aria-label="Refresh orders"
-          className="p-1.5 rounded text-base-500 hover:text-base-900 hover:bg-base-100 transition-colors"
-        >
-          <RefreshCw size={15} strokeWidth={2} />
-        </button>
-      </div>
-      {/* Range + prev/next (right) */}
-      <div className="flex items-center gap-1.5">
-        <span className="tabular-nums text-base-500 mr-1">
-          {rangeStart}–{rangeEnd} of {total}
-        </span>
-        <button
-          type="button"
-          disabled={safePage <= 0}
-          onClick={() => onPage((p) => Math.max(0, p - 1))}
-          aria-label="Previous page"
-          className="p-1 rounded text-base-600 disabled:opacity-30 enabled:hover:bg-base-100 transition-colors"
-        >
-          <ChevronLeft size={18} strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          disabled={safePage >= pageCount - 1}
-          onClick={() => onPage((p) => Math.min(pageCount - 1, p + 1))}
-          aria-label="Next page"
-          className="p-1 rounded text-base-600 disabled:opacity-30 enabled:hover:bg-base-100 transition-colors"
-        >
-          <ChevronRight size={18} strokeWidth={2} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** Gmail-style bulk-action bar — shown when ≥1 order is selected. A ⋮ menu
- *  expands to: Assign logistic (→ partner list) · Export CSV · Create tasks. */
-function BulkBar({
+/** Gmail-style bulk-action row (P11) — fills the table-header row itself (same
+ *  height) with a GREY band when ≥1 order is selected, so the table never jumps.
+ *  The select-all checkbox STAYS put (checked / indeterminate) so you can untick
+ *  in place like Gmail. When the loaded window is a subset of the tab it offers
+ *  "Select all N in <tab>". The two daily actions (Assign · Mark completed) are
+ *  inline; Export / Print / Create-tasks tuck under ⋮. Colours stay quiet. */
+function BulkHeadRow({
   count,
+  total,
+  tabLabel,
+  allChecked,
+  someChecked,
+  onSelectAllInTab,
   menu,
   setMenu,
   partners,
@@ -1574,6 +1543,11 @@ function BulkBar({
   busy,
 }: {
   count: number;
+  total: number;
+  tabLabel: string;
+  allChecked: boolean;
+  someChecked: boolean;
+  onSelectAllInTab: () => void;
   menu: null | "menu" | "assign";
   setMenu: (m: null | "menu" | "assign") => void;
   partners: { id: string; name: string }[];
@@ -1586,31 +1560,52 @@ function BulkBar({
   busy: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 mb-2.5 px-2 py-2 rounded bg-base-900 text-white">
-      <span className="text-[12px] font-semibold tabular-nums">
-        {count} selected
-      </span>
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setMenu(menu ? null : "menu")}
-          disabled={busy}
-          className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded hover:bg-white/10 disabled:opacity-50"
-        >
-          <MoreVertical size={14} /> {busy ? "Working…" : "Actions"}
-        </button>
-        {menu && (
-          <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
-            {menu === "menu" ? (
-              <>
-                <BulkMenuItem icon={Truck} label="Assign logistic…" onClick={() => setMenu("assign")} />
-                <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
-                <BulkMenuItem icon={Printer} label="Print / Save as PDF" onClick={onPrint} />
-                <BulkMenuItem icon={ListTodo} label="Create follow-up tasks" onClick={onTasks} />
-                <BulkMenuItem icon={CheckCircle2} label="Mark completed" onClick={onComplete} />
-              </>
-            ) : (
-              <>
+    <tr
+      className="border-b"
+      style={{ backgroundColor: "#D3E4F4", borderBottomColor: "rgba(31,111,191,0.22)" }}
+    >
+      {/* Col 1 — the select-all box stays in its column, untickable in place. */}
+      <th className="px-2 py-1.5">
+        <input
+          type="checkbox"
+          checked={allChecked}
+          ref={(el) => {
+            if (el) el.indeterminate = someChecked;
+          }}
+          onChange={onClear}
+          aria-label="Deselect all"
+          title="Deselect all"
+          className="cursor-pointer accent-base-700 align-middle"
+        />
+      </th>
+      <th colSpan={10} className="pl-1 pr-3 py-1.5 text-left font-normal">
+        <div className="flex items-center gap-2 text-base-800">
+          <span className="text-[12px] font-semibold tabular-nums whitespace-nowrap">
+            {count} selected
+          </span>
+          {/* Gmail cross-page select-all — only while the tab holds more. */}
+          {count < total && (
+            <button
+              type="button"
+              onClick={onSelectAllInTab}
+              className="text-[12px] text-[#1F6FBF] hover:underline whitespace-nowrap"
+            >
+              Select all {total} in {tabLabel}
+            </button>
+          )}
+          <span className="mx-1 h-4 w-px bg-black/10" aria-hidden />
+          {/* Daily actions — inline, one click, labelled (no icon-guessing). */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenu(menu === "assign" ? null : "assign")}
+              disabled={busy}
+              className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded hover:bg-black/5 disabled:opacity-50"
+            >
+              <Truck size={14} /> Assign <ChevronDown size={12} />
+            </button>
+            {menu === "assign" && (
+              <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
                 <div className="px-2 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
                   Assign to…
                 </div>
@@ -1627,26 +1622,46 @@ function BulkBar({
                     {p.name}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => setMenu("menu")}
-                  className="w-full text-left px-2 py-1.5 text-[11px] text-base-500 hover:bg-base-100 border-t border-base-100 mt-1"
-                >
-                  ← Back
-                </button>
-              </>
+              </div>
             )}
           </div>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={onClear}
-        className="ml-auto inline-flex items-center gap-1 text-[12px] text-base-300 hover:text-white"
-      >
-        <X size={14} /> Clear
-      </button>
-    </div>
+          <button
+            type="button"
+            onClick={onComplete}
+            disabled={busy}
+            className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded hover:bg-black/5 disabled:opacity-50"
+          >
+            <CheckCircle2 size={14} /> {busy ? "Working…" : "Mark delivered"}
+          </button>
+          {/* Occasional actions — folded under ⋮. */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenu(menu === "menu" ? null : "menu")}
+              disabled={busy}
+              aria-label="More actions"
+              className="inline-flex items-center text-[12px] px-1.5 py-0.5 rounded hover:bg-black/5 disabled:opacity-50"
+            >
+              <MoreVertical size={14} />
+            </button>
+            {menu === "menu" && (
+              <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
+                <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
+                <BulkMenuItem icon={Printer} label="Print / Save as PDF" onClick={onPrint} />
+                <BulkMenuItem icon={ListTodo} label="Create follow-up tasks" onClick={onTasks} />
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClear}
+            className="ml-auto inline-flex items-center gap-1 text-[12px] text-base-500 hover:text-base-900"
+          >
+            <X size={14} /> Clear
+          </button>
+        </div>
+      </th>
+    </tr>
   );
 }
 
@@ -1800,6 +1815,10 @@ function StatusTabs({
             title={t.title}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors"
             style={{
+              // The active tab is a solid ink fill (2990s-style) — a control
+              // needs clear contrast to read as "selected"; a tab pill is a
+              // point of emphasis, not the heavy header band we removed. Inactive
+              // stays white + hairline. Colour is still reserved for alerts.
               fontSize: "13px",
               fontWeight: on ? 600 : 500,
               color: on ? "#FFFFFF" : "#4B5563",
@@ -1810,7 +1829,7 @@ function StatusTabs({
             {t.label}
             <span
               className="tabular-nums"
-              style={{ color: on ? "rgba(255,255,255,0.85)" : "#9CA3AF", fontSize: "12px" }}
+              style={{ color: on ? "rgba(255,255,255,0.7)" : "#9CA3AF", fontSize: "12px" }}
             >
               {t.count}
             </span>
@@ -1863,7 +1882,7 @@ function OrderRow({
     <tr
       onClick={onOpen}
       className={`group border-t border-[rgba(34,31,32,0.06)] cursor-pointer align-middle ${
-        selected ? "bg-[#C2E7FF]" : "bg-white hover:bg-[#E9ECEF]"
+        selected ? "bg-[#DCEAF4]" : "bg-white hover:bg-[#F5F0E7]"
       }`}
       data-testid="order-row"
     >
@@ -2233,7 +2252,7 @@ function Th({
   return (
     <th
       className={`px-2 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      style={{ color: "#C9C5BB", fontSize: "11px", letterSpacing: "0.04em" }}
+      style={{ color: "#4A4335", fontSize: "11px", letterSpacing: "0.04em" }}
     >
       {children}
     </th>
