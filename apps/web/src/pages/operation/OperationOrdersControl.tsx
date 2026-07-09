@@ -894,8 +894,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
       const key = logisticOf(o, partnerName) ?? NO_CARRIER;
       m.set(key, (m.get(key) ?? 0) + 1);
     }
+    // Unassigned FIRST (most urgent — no carrier yet), then the rest by count
+    // desc (Loo 2026-07-09). Display order only; the filter is unchanged.
     return [...m.entries()]
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => {
+        if (a[0] === NO_CARRIER) return -1;
+        if (b[0] === NO_CARRIER) return 1;
+        return b[1] - a[1];
+      })
       .map(([carrier, count]) => ({ carrier, count }));
   }, [tabFiltered, partnerName]);
 
@@ -1396,7 +1402,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       >
         <table
           ref={listTableRef}
-          className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[50px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden"
+          className="w-full border-separate [border-spacing:0] text-[13px] table-fixed [&_td]:h-[50px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden [&_td]:border-t [&_td]:border-[rgba(34,31,32,0.06)]"
           style={{ minWidth: 880 }}
         >
           {/* Widths L→R: checkbox · ⚑ · Ref · Customer · Region · Deadline ·
@@ -1413,13 +1419,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 26 }} />
             <col style={{ width: 74 }} />
             <col style={{ width: 88 }} />
-            <col style={{ width: 120 }} />
+            <col style={{ width: 112 }} />
             <col style={{ width: 80 }} />
             <col style={{ width: 70 }} />
             <col style={{ width: 80 }} />
             <col style={{ width: 118 }} />
             <col style={{ width: 104 }} />
-            <col style={{ width: 126 }} />
+            <col style={{ width: 160 }} />
           </colgroup>
           {/* Dark ink header band (#221F20) — kept per Loo; the flame underline
               stays DROPPED (flame never enters the table), replaced by a faint
@@ -1449,7 +1455,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>ETA</Th>
               <Th>Deadline</Th>
               <Th>Stock</Th>
-              <Th>Next action</Th>
+              <Th>Manage</Th>
             </tr>
           </thead>
           <tbody>
@@ -1697,8 +1703,8 @@ function KanbanRow({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`w-full flex items-center gap-1.5 rounded-full text-left transition-colors ${
-        active ? "" : "hover:bg-[#F5F4F1]"
+      className={`w-full flex items-center gap-1.5 rounded-full text-left transition-shadow ${
+        active ? "" : "hover:shadow-[0_1px_4px_rgba(34,31,32,0.14)]"
       }`}
       style={{ padding: "6px 10px", backgroundColor: active ? "#D3E3FD" : undefined }}
     >
@@ -1872,12 +1878,14 @@ function OrderRow({
   return (
     <tr
       onClick={onOpen}
-      className={`group border-t border-[rgba(34,31,32,0.06)] cursor-pointer align-middle ${
-        selected ? "bg-[#D3E3FD]" : "bg-white hover:bg-[#F5F4F1]"
+      className={`group cursor-pointer align-middle ${
+        selected
+          ? "bg-[#D3E3FD]"
+          : "bg-white hover:relative hover:z-[1] hover:shadow-[0_3px_10px_rgba(34,31,32,0.18)]"
       }`}
       data-testid="order-row"
     >
-      <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+      <td className="pl-3 pr-0.5 py-2" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={selected}
@@ -1891,7 +1899,7 @@ function OrderRow({
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* Order ID — the system SO number (13px ink, tabular). Phone tooltip lives
           here; paired tight with the Ref No column to its right. */}
-      <td className="pl-3 pr-1 py-1.5" title={o.customer_phone ?? undefined}>
+      <td className="pl-1 pr-1 py-1.5" title={o.customer_phone ?? undefined}>
         <span
           className="font-mono tabular-nums"
           style={{ fontSize: "13px", fontWeight: 500, color: "#1F2937" }}
@@ -2020,6 +2028,24 @@ function OrderRow({
                     : { bg: "#EAE7DF", fg: "#6B7280" }; // 7d+ — grey
             return (
               <div className="flex items-center gap-1.5">
+                {/* Badge FIRST (Loo round 3), fixed min-width so today/1d/2d/over
+                    are all the same width → the dates after them line up. */}
+                {pillText && (
+                  <span
+                    className="tabular-nums shrink-0 text-center"
+                    style={{
+                      fontSize: "11.5px",
+                      color: heat.fg,
+                      background: heat.bg,
+                      padding: "0 4px",
+                      borderRadius: "999px",
+                      minWidth: "34px",
+                      display: "inline-block",
+                    }}
+                  >
+                    {pillText}
+                  </span>
+                )}
                 <span
                   className="tabular-nums"
                   style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}
@@ -2028,20 +2054,6 @@ function OrderRow({
                 </span>
                 {dayPart && (
                   <span style={{ fontSize: "11.5px", color: "#9CA3AF" }}>{dayPart}</span>
-                )}
-                {pillText && (
-                  <span
-                    className="tabular-nums shrink-0"
-                    style={{
-                      fontSize: "11.5px",
-                      color: heat.fg,
-                      background: heat.bg,
-                      padding: "0 6px",
-                      borderRadius: "999px",
-                    }}
-                  >
-                    {pillText}
-                  </span>
                 )}
               </div>
             );
@@ -2056,7 +2068,7 @@ function OrderRow({
       </td>
       {/* Next action — the most-urgent next step (one pill) + Gmail-style hover
           actions (open / flag / assign) that appear on row hover (P2 F). */}
-      <td className="pl-4 pr-2 py-2 whitespace-nowrap relative">
+      <td className="pl-2 pr-2 py-2 whitespace-nowrap relative">
         {(() => {
           const na = nextActionOf(o, stock, lines);
           const st = NEXT_TONE_STYLE[na.tone];
@@ -2134,7 +2146,7 @@ function ActionCell({
   const lead = openTaskOf(tasks);
   const u = lead ? taskUrgency(lead) : null;
   return (
-    <td className="px-1 py-2 border-r border-base-100 align-middle text-center" onClick={(e) => e.stopPropagation()}>
+    <td className="px-0.5 py-2 align-middle text-center" onClick={(e) => e.stopPropagation()}>
       {/* Icon-only follow-up flag (Jess 2026-06-29): no "Flag" / "Late" text — the
           colour carries the state so the column stays narrow + scannable.
           faint = none · amber = open · red = overdue. */}

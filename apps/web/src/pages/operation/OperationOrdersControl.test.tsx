@@ -491,7 +491,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("0/2")).toBeInTheDocument();
   });
 
-  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Logistic · ETA · Deadline · Stock · Next action", () => {
+  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Logistic · ETA · Deadline · Stock · Manage", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -516,7 +516,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "ETA",
       "Deadline",
       "Stock",
-      "Next action",
+      "Manage",
     ]);
     // Order ID (SO) + Ref No are now separate columns; the phone tooltip stays on
     // the Order ID cell.
