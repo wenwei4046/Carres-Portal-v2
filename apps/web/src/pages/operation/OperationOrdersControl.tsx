@@ -1894,11 +1894,20 @@ function OrderRow({
             const [datePart, dayPart] = fmtDate(o.delivery_date).split(", ");
             // Reuse the SAME DUE bucket as the top filter header so they can never
             // drift: the date turns red on the two hottest tiers (Overdue / Urgent).
-            const bucket = dueBucketOf(o);
             const dd = daysToDue(o);
-            const hot = bucket === "Overdue" || bucket === "Urgent";
             const pillText =
               dd == null ? null : dd < 0 ? "over" : dd === 0 ? "today" : `${dd}d`;
+            // Countdown heat (Loo 2026-07-09): a 4-level ramp by days-left so 2–6d
+            // read as orange / yellow urgency; only 7d+ goes grey. The DATE text
+            // stays clear black — only this pill carries the heat.
+            const heat =
+              dd == null || dd <= 1
+                ? { bg: "#FCE4E4", fg: "#991B1B" } // overdue / today / 1d — red
+                : dd <= 3
+                  ? { bg: "#FDEBD8", fg: "#B45309" } // 2–3d — orange
+                  : dd <= 6
+                    ? { bg: "#FEF7CD", fg: "#854D0E" } // 4–6d — yellow
+                    : { bg: "#EAE7DF", fg: "#6B7280" }; // 7d+ — grey
             return (
               <div className="flex items-center gap-1.5">
                 <span
@@ -1915,8 +1924,8 @@ function OrderRow({
                     className="tabular-nums shrink-0"
                     style={{
                       fontSize: "11.5px",
-                      color: hot ? "#991B1B" : "#4B5563",
-                      background: hot ? "#FCE4E4" : "#EAE7DF",
+                      color: heat.fg,
+                      background: heat.bg,
                       padding: "0 6px",
                       borderRadius: "999px",
                     }}
