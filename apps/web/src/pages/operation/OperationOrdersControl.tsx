@@ -31,6 +31,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   Filter,
   MoreVertical,
   Truck,
@@ -1165,6 +1166,38 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </div>
       </div>
 
+      {/* Toolbar — result count + bulk actions, full-width above the split (P2 D:
+          keeps the kanban + table header on one line). */}
+      <div className="shrink-0 mb-2">
+        {selected.size > 0 ? (
+          <BulkBar
+            count={selected.size}
+            menu={bulkMenu}
+            setMenu={setBulkMenu}
+            partners={partnersQ.data?.partners ?? []}
+            onAssign={bulkAssignLogistic}
+            onExport={exportSelectedCsv}
+            onPrint={printSelected}
+            onTasks={bulkCreateTasks}
+            onComplete={bulkMarkCompleted}
+            onClear={clearSel}
+            busy={assignMut.isPending || taskMut.isPending || completeMut.isPending}
+          />
+        ) : (
+          total > 0 && (
+            <Pager
+              safePage={safePage}
+              onPage={setPage}
+              total={total}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
+              pageCount={pageCount}
+              onRefresh={() => void refetch()}
+            />
+          )
+        )}
+      </div>
+
       {/* Body split (Loo 2026-07-09, P1) — a left FILTER KANBAN (240px, collapsible
           to a 28px rail) + the LIST column. The filter GROUPS + their state move
           here verbatim from the old top band; only the container changes (a
@@ -1317,51 +1350,19 @@ export default function OperationOrdersControl({ onImport }: Props) {
           </button>
         )}
 
-        {/* List column — toolbar + the scrolling listing. */}
+        {/* List column — the scrolling listing (the toolbar moved full-width
+            above the split so the kanban + table header line up, P2 D). */}
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          {/* Toolbar — result count + bulk actions (fixed, does not scroll). */}
-          <div className="shrink-0">
-      {selected.size > 0 ? (
-        <BulkBar
-          count={selected.size}
-          menu={bulkMenu}
-          setMenu={setBulkMenu}
-          partners={partnersQ.data?.partners ?? []}
-          onAssign={bulkAssignLogistic}
-          onExport={exportSelectedCsv}
-          onPrint={printSelected}
-          onTasks={bulkCreateTasks}
-          onComplete={bulkMarkCompleted}
-          onClear={clearSel}
-          busy={assignMut.isPending || taskMut.isPending || completeMut.isPending}
-        />
-      ) : (
-        total > 0 && (
-          <Pager
-            safePage={safePage}
-            onPage={setPage}
-            total={total}
-            rangeStart={rangeStart}
-            rangeEnd={rangeEnd}
-            pageCount={pageCount}
-            onRefresh={() => void refetch()}
-          />
-        )
-      )}
-
-      </div>
-
-      {/* Listing — the ONLY scroll area (Jess 2026-06-24: the page itself stays
-          put, only the rows scroll). table-fixed + a colgroup → columns keep
-          their width; long Ref/Customer/Location/Remark wrap to ≤3 lines. */}
+          {/* Listing — the ONLY scroll area (the page stays put, only the rows
+              scroll). table-fixed + a colgroup → columns keep their width. */}
       <div
         ref={listBoxRef}
-        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-2xl shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
+        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
       >
         <table
           ref={listTableRef}
           className="w-full border-collapse text-[13px] table-fixed [&_td]:h-[50px] [&_td]:py-2 [&_td]:align-middle [&_td]:overflow-hidden"
-          style={{ minWidth: 1040 }}
+          style={{ minWidth: 880 }}
         >
           {/* Widths L→R: checkbox · ⚑ · Ref · Customer · Region · Deadline ·
               MS · BF · Sofa · Stock · Logistic */}
@@ -1369,18 +1370,21 @@ export default function OperationOrdersControl({ onImport }: Props) {
               MS/BF/SOF dropped (Loo 2026-07-09 — the STOCK core ratio covers the
               core total). Logistic moved next to Region; a Logistic-ETA column
               sits beside Deadline for a deadline-vs-ETA compare. */}
+          {/* P2 (Loo 2026-07-09) — tightened so the table fits the list column
+              with the kanban OPEN (no horizontal scroll). Customer + Next action
+              narrowed the most (they drove the overflow) → ellipsis-truncated. */}
           <colgroup>
-            <col style={{ width: 34 }} />
-            <col style={{ width: 34 }} />
-            <col style={{ width: 92 }} />
-            <col style={{ width: 124 }} />
-            <col style={{ width: 240 }} />
-            <col style={{ width: 112 }} />
-            <col style={{ width: 110 }} />
+            <col style={{ width: 30 }} />
+            <col style={{ width: 26 }} />
+            <col style={{ width: 74 }} />
+            <col style={{ width: 88 }} />
             <col style={{ width: 120 }} />
-            <col style={{ width: 150 }} />
-            <col style={{ width: 130 }} />
-            <col style={{ width: 220 }} />
+            <col style={{ width: 80 }} />
+            <col style={{ width: 70 }} />
+            <col style={{ width: 80 }} />
+            <col style={{ width: 118 }} />
+            <col style={{ width: 104 }} />
+            <col style={{ width: 126 }} />
           </colgroup>
           {/* Dark ink header band (#221F20) — kept per Loo; the flame underline
               stays DROPPED (flame never enters the table), replaced by a faint
@@ -1407,7 +1411,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Customer</Th>
               <Th>Region</Th>
               <Th>Logistic</Th>
-              <Th>Logistic ETA</Th>
+              <Th>ETA</Th>
               <Th>Deadline</Th>
               <Th>Stock</Th>
               <Th>Next action</Th>
@@ -1817,21 +1821,12 @@ function OrderRow({
       ? partnerName.get(o.ops_assigned_logistic) ?? "…"
       : null);
 
-  // ≤3-line clamp shared by the wrapping cells (Ref / Customer / Region) —
-  // fixed width, never taller than 3 lines.
-  const clamp3 = {
-    display: "-webkit-box",
-    WebkitBoxOrient: "vertical" as const,
-    WebkitLineClamp: compact ? 1 : 3,
-    overflow: "hidden",
-  };
-
   return (
     <tr
       onClick={onOpen}
-      className={`border-t border-[rgba(34,31,32,0.06)] hover:bg-[#F5F1EA] cursor-pointer align-middle ${
+      className={`group border-t border-[rgba(34,31,32,0.06)] hover:bg-[#F5F1EA] cursor-pointer align-middle ${
         selected
-          ? "bg-[#EFE9DF] shadow-[inset_3px_0_0_#221F20]"
+          ? "bg-[#E6EDF9] shadow-[inset_3px_0_0_#1E40AF]"
           : idx % 2
             ? "bg-[#FBF9F5]"
             : "bg-white"
@@ -1860,9 +1855,9 @@ function OrderRow({
           SO-{o.so}
         </span>
       </td>
-      {/* Ref No — the day-to-day reference(s), the PRIMARY identifier (17px/700).
-          All refs stack vertically; only >3 fold to "+N". */}
-      <td className="pl-1 pr-2 py-1.5">
+      {/* Ref No — the day-to-day reference(s), the PRIMARY identifier. All refs
+          stack vertically; only >3 fold to "+N". Tight to the identity trio. */}
+      <td className="pl-1 pr-1 py-1.5">
         {ref.length === 0 ? (
           <span className="text-base-300">—</span>
         ) : (
@@ -1884,12 +1879,12 @@ function OrderRow({
           </div>
         )}
       </td>
-      {/* Customer — fixed width, wraps to ≤3 lines. */}
-      <td className="px-2 py-2">
+      {/* Customer — identity trio (tight to Ref); single-line ellipsis (P2). */}
+      <td className="pl-1 pr-3 py-2">
         {o.customer_name ? (
           <span
-            className={`${cjkClassName(o.customer_name)} text-[14px] text-base-800 leading-[1.35]`}
-            style={{ color: "#1F2937", ...clamp3 }}
+            className={`${cjkClassName(o.customer_name)} text-[14px] text-base-800 block truncate`}
+            style={{ color: "#1F2937" }}
             title={o.customer_name}
           >
             {o.customer_name}
@@ -1903,8 +1898,8 @@ function OrderRow({
       <td className="px-2 py-2">
         {loc.label ? (
           <span
-            className="text-[14px] leading-[1.35]"
-            style={{ color: loc.area === "Outstation" ? "#9A7B3F" : "#4B5563", ...clamp3 }}
+            className="text-[14px] block truncate"
+            style={{ color: loc.area === "Outstation" ? "#9A7B3F" : "#4B5563" }}
             title={
               loc.area === "Outstation"
                 ? "Outstation — no warehouse buffer; call the customer to confirm the ETA before ordering stock (do it in the order drawer)."
@@ -1919,7 +1914,7 @@ function OrderRow({
       </td>
       {/* Logistic — carrier name, moved up next to Region (who's delivering +
           where). Neutral grey. */}
-      <td className="px-2 py-2 whitespace-nowrap">
+      <td className="pl-2 pr-1 py-2 whitespace-nowrap">
         {logistic ? (
           <span className="text-[14px]" style={{ color: "#4B5563" }}>{logistic}</span>
         ) : (
@@ -1929,7 +1924,7 @@ function OrderRow({
       {/* Logistic ETA — the logistic's committed delivery date
           (ops_order_control.logistic_eta), just before the customer Deadline for
           a quick compare. "No ETA" (red) when it's overdue for chasing. */}
-      <td className="px-2 py-2 whitespace-nowrap">
+      <td className="pl-1 pr-2 py-2 whitespace-nowrap">
         {(() => {
           const eta = logisticEtaOf(o);
           if (eta) {
@@ -2016,14 +2011,15 @@ function OrderRow({
       <td className="px-2 py-2 whitespace-nowrap">
         <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} />
       </td>
-      {/* Next action — the single most-urgent next step (C2); one pill per row. */}
-      <td className="px-2 py-2 whitespace-nowrap">
+      {/* Next action — the most-urgent next step (one pill) + Gmail-style hover
+          actions (open / flag / assign) that appear on row hover (P2 F). */}
+      <td className="px-2 py-2 whitespace-nowrap relative">
         {(() => {
           const na = nextActionOf(o, stock, lines);
           const st = NEXT_TONE_STYLE[na.tone];
           return (
             <span
-              className="inline-flex items-center gap-1 rounded-full align-middle whitespace-nowrap"
+              className="inline-flex items-center gap-1 rounded-full align-middle max-w-full group-hover:opacity-0 transition-opacity"
               style={{
                 fontSize: "11px",
                 fontWeight: 600,
@@ -2036,10 +2032,43 @@ function OrderRow({
               data-next-action={na.label}
             >
               {na.locked && <Lock size={11} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />}
-              {na.label}
+              <span className="truncate min-w-0">{na.label}</span>
             </span>
           );
         })()}
+        {/* Hover actions — hidden until the row is hovered (Gmail pattern). */}
+        <div
+          className="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 rounded-md border border-base-200 bg-white shadow-sm px-0.5 py-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={onOpen}
+            title="Open order"
+            aria-label="Open order"
+            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
+          >
+            <ExternalLink size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onFlag(o)}
+            title="Flag for follow-up"
+            aria-label="Flag for follow-up"
+            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-[#9A7B3F]"
+          >
+            <Flag size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={onOpen}
+            title="Assign logistic (opens the order)"
+            aria-label="Assign logistic"
+            className="p-1 rounded text-base-500 hover:bg-base-100 hover:text-base-800"
+          >
+            <Truck size={13} />
+          </button>
+        </div>
       </td>
     </tr>
   );

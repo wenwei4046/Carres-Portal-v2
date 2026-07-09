@@ -491,7 +491,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(within(row).getByText("0/2")).toBeInTheDocument();
   });
 
-  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Logistic · Logistic ETA · Deadline · Stock · Next action", () => {
+  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Logistic · ETA · Deadline · Stock · Next action", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -513,7 +513,7 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Customer",
       "Region",
       "Logistic",
-      "Logistic ETA",
+      "ETA",
       "Deadline",
       "Stock",
       "Next action",
