@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   CircleCheck,
@@ -38,6 +38,26 @@ const CATEGORY_STYLE: Record<
   stock: { icon: Package, bg: "#E6F1FB", fg: "#185FA5" },
   system: { icon: FileText, bg: "#F1EFE8", fg: "#5F5E5A" },
 };
+
+// Friendly chip labels + the order categories appear in the filter row.
+const CATEGORY_LABEL: Record<OrderEventCategory, string> = {
+  milestone: "Milestones",
+  money: "Money",
+  edit: "Changes",
+  exception: "Alerts",
+  note: "Notes",
+  stock: "Stock",
+  system: "System",
+};
+const CATEGORY_ORDER: OrderEventCategory[] = [
+  "exception",
+  "note",
+  "milestone",
+  "money",
+  "edit",
+  "stock",
+  "system",
+];
 
 // ─── Tag helpers (human note tags keep their semantic colour) ─────────────────
 
@@ -205,6 +225,22 @@ interface Props {
 export default function AnnotationTimeline({ orderId }: Props) {
   const { data, isLoading } = useOrderTimeline(orderId);
   const entries = data ?? [];
+  const [filter, setFilter] = useState<OrderEventCategory | "all">("all");
+
+  // Tag each entry with its category once, then tally what's present so the
+  // filter row only offers categories that actually appear (with counts).
+  const described = useMemo(
+    () => entries.map((e) => ({ entry: e, category: describe(e).category })),
+    [entries],
+  );
+  const counts = useMemo(() => {
+    const m = {} as Record<OrderEventCategory, number>;
+    for (const d of described) m[d.category] = (m[d.category] ?? 0) + 1;
+    return m;
+  }, [described]);
+  const presentCategories = CATEGORY_ORDER.filter((c) => counts[c] > 0);
+  const shown =
+    filter === "all" ? described : described.filter((d) => d.category === filter);
 
   return (
     <div>
@@ -213,13 +249,65 @@ export default function AnnotationTimeline({ orderId }: Props) {
       ) : entries.length === 0 ? (
         <div className="text-[12px] text-base-500 py-2">No notes or activity yet.</div>
       ) : (
-        <div className="bg-white border border-base-200 rounded-[8px] px-4 py-1 mb-3">
-          {entries.map((e, i) => (
-            <TimelineRow key={e.id} entry={e} first={i === 0} />
-          ))}
-        </div>
+        <>
+          {/* Filter chips — only worth showing when the order spans 2+ kinds. */}
+          {presentCategories.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1 mb-1.5">
+              <FilterChip
+                label="All"
+                count={described.length}
+                active={filter === "all"}
+                onClick={() => setFilter("all")}
+              />
+              {presentCategories.map((c) => (
+                <FilterChip
+                  key={c}
+                  label={CATEGORY_LABEL[c]}
+                  count={counts[c]}
+                  active={filter === c}
+                  onClick={() => setFilter(c)}
+                />
+              ))}
+            </div>
+          )}
+          <div className="bg-white border border-base-200 rounded-[8px] px-4 py-1 mb-3">
+            {shown.map((d, i) => (
+              <TimelineRow key={d.entry.id} entry={d.entry} first={i === 0} />
+            ))}
+          </div>
+        </>
       )}
       <AddAnnotationForm orderId={orderId} />
     </div>
+  );
+}
+
+function FilterChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border transition-colors"
+      style={{
+        color: active ? "#FFFFFF" : "#4B5563",
+        background: active ? "#221F20" : "#FFFFFF",
+        borderColor: active ? "#221F20" : "#DDD8CE",
+      }}
+    >
+      {label}
+      <span className="tabular-nums" style={{ color: active ? "rgba(255,255,255,0.7)" : "#9CA3AF" }}>
+        {count}
+      </span>
+    </button>
   );
 }
