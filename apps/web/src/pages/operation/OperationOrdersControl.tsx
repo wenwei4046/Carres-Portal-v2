@@ -31,6 +31,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Filter,
   MoreVertical,
   Truck,
   Download,
@@ -733,6 +734,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   // Multi-select (Jess 2026-07-02): pick more than one category pill; an order
   // matches if it hits ANY selected category (OR). Empty set = no filter.
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
+  // P1 (Loo 2026-07-09) — the left filter KANBAN open/collapsed toggle.
+  const [kanbanOpen, setKanbanOpen] = useState(true);
   // Two action lanes (Jess 2026-06-25): 🚩 Follow-up = team handoff (follow_up
   // annotations) · ⏫ For Jess = escalations needing the boss (escalate). Each is
   // a derived open-annotation state with its own quick-view filter; the per-row
@@ -1162,14 +1165,32 @@ export default function OperationOrdersControl({ onImport }: Props) {
         </div>
       </div>
 
-      {/* Filter band (Jess 2026-06-29): ONE row of boxed groups. Each dimension
-          is its own bordered box (label on top); chips flow into a FIXED 2-row
-          grid that grows into MORE COLUMNS, never taller — so the band stays ~2
-          chip-rows high however many buckets show. Order: Status · Due · Stock ·
-          Category · Region · Logistic · Needs action. "All" is kept only on
-          Status (an explicit tab); elsewhere clicking the active chip clears. */}
-      <div className="shrink-0 mb-3 flex items-stretch gap-1 flex-wrap">
-        <FilterGroup label="Status">
+      {/* Body split (Loo 2026-07-09, P1) — a left FILTER KANBAN (240px, collapsible
+          to a 28px rail) + the LIST column. The filter GROUPS + their state move
+          here verbatim from the old top band; only the container changes (a
+          vertical stack, chips wrap within 240). Regroup (CHASE NOW…) + the
+          vertical-row chip restyle are P2 (deferred). */}
+      <div className="flex-1 flex gap-4 min-h-0">
+        {kanbanOpen ? (
+          <aside
+            className="w-[240px] shrink-0 flex flex-col gap-2 overflow-y-auto pb-2"
+            data-testid="orders-filter-kanban"
+          >
+            <div className="flex items-center justify-between px-0.5 pt-0.5">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-base-500">
+                Filters
+              </span>
+              <button
+                type="button"
+                onClick={() => setKanbanOpen(false)}
+                title="Collapse filters"
+                aria-label="Collapse filters"
+                className="p-1 -mr-1 rounded text-base-500 hover:bg-base-200"
+              >
+                <ChevronLeft size={15} />
+              </button>
+            </div>
+            <FilterGroup label="Status">
           {TABS.map((t) => (
             <RegionChip
               key={t.key}
@@ -1281,11 +1302,25 @@ export default function OperationOrdersControl({ onImport }: Props) {
             onClick={() => setEscalateOnly((v) => !v)}
           />
         </FilterGroup>
-      </div>
+          </aside>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setKanbanOpen(true)}
+            title="Show filters"
+            aria-label="Show filters"
+            data-testid="orders-filter-rail"
+            className="w-[28px] shrink-0 self-start flex flex-col items-center gap-2 pt-1.5 pb-2 rounded-md border border-base-200 bg-white text-base-500 hover:text-base-800 hover:bg-base-100"
+          >
+            <Filter size={14} />
+            <ChevronRight size={14} />
+          </button>
+        )}
 
-      {/* Toolbar — result count + bulk actions, between the filter card and the
-          listing (fixed, does not scroll). */}
-      <div className="shrink-0">
+        {/* List column — toolbar + the scrolling listing. */}
+        <div className="flex-1 min-w-0 flex flex-col min-h-0">
+          {/* Toolbar — result count + bulk actions (fixed, does not scroll). */}
+          <div className="shrink-0">
       {selected.size > 0 ? (
         <BulkBar
           count={selected.size}
@@ -1406,6 +1441,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
             ))}
           </tbody>
         </table>
+          </div>
+          {/* /list column */}
+        </div>
+        {/* /body split */}
       </div>
 
       {/* Follow-up form — slides in from the right (#2); opened by an order's flag. */}
@@ -1670,13 +1709,15 @@ function FilterGroup({
 }) {
   return (
     <div
-      className="grow border border-base-200 rounded-md bg-white px-1.5 py-1"
+      className="w-full border border-base-200 rounded-md bg-white px-1.5 py-1"
       data-testid={`filter-${label.toLowerCase()}`}
     >
       <div className="text-[9px] font-semibold uppercase tracking-[0.05em] text-base-600 mb-0.5">
         {label}
       </div>
-      <div className="grid grid-flow-col grid-rows-[auto_auto] gap-x-1 gap-y-1 justify-items-start">
+      {/* P1: chips WRAP within the 240px kanban column (was a horizontal
+          column-growing grid in the old top band). */}
+      <div className="flex flex-wrap gap-1">
         {children}
       </div>
     </div>
