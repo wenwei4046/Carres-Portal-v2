@@ -957,11 +957,6 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const rangeStart = total === 0 ? 0 : safePage * (pageSize === "all" ? total : pageSize) + 1;
   const rangeEnd = pageSize === "all" ? total : Math.min(total, (safePage + 1) * pageSize);
 
-  // Denser rows once the page shows 20+ (single-line cells + tight padding) so
-  // they fit at FULL-SIZE text instead of the auto-scale shrinking the font to
-  // unreadable (Jess 2026-06-24: "20 rows too small"). 15 = roomy multi-line.
-  const compact = typeof pageSize === "number" && pageSize >= 20;
-
   // Fixed listing — scale the whole table (CSS zoom) so every row of the page
   // fits the box with NO vertical scroll (Jess 2026-06-24: "fix listing, not
   // scroll; 15/30/45/60 → show smaller"). zoom reflows (font + row height shrink
@@ -1466,12 +1461,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
                 </td>
               </tr>
             )}
-            {paged.map((o, idx) => (
+            {paged.map((o) => (
               <OrderRow
                 key={o.id}
                 o={o}
-                idx={idx}
-                compact={compact}
                 partnerName={partnerName}
                 availableBySku={availableBySku}
                 tasks={orderTasks(o)}
@@ -1831,8 +1824,6 @@ function StatusTabs({
 
 function OrderRow({
   o,
-  idx,
-  compact,
   partnerName,
   availableBySku,
   tasks,
@@ -1842,10 +1833,6 @@ function OrderRow({
   onFlag,
 }: {
   o: operationOrderListRow;
-  idx: number;
-  /** Page shows 30+ rows → clamp wrapping cells to a single line so the
-   *  auto-scale doesn't have to shrink the text as hard. */
-  compact: boolean;
   partnerName: Map<string, string>;
   availableBySku?: Map<string, number>;
   /** Open follow-up ops_tasks for this order (#2) — drives the flag + Action cell. */
