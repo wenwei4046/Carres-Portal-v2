@@ -274,6 +274,9 @@
   .animate-page-enter { animation: pos-page-enter .32s cubic-bezier(0.22,1,0.36,1) both; }
   .animate-cart-pulse { animation: pos-cart-pulse .28s cubic-bezier(0.22,1,0.36,1); }
   .animate-drawer-slide-in { animation: pos-drawer-slide-in 0.26s cubic-bezier(0.22,1,0.36,1) both; }
+  /* Scrollable but with NO visible scrollbar (Orders kanban + list, 2026-07-09). */
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
   @media (prefers-reduced-motion: reduce) {
     .animate-page-enter, .animate-cart-pulse { animation: none; }
     .animate-drawer-slide-in { animation: none; }

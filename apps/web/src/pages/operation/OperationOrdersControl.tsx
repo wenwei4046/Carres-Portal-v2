@@ -90,12 +90,12 @@ type ControlTab =
 // bottom (see compareByDeadline), so the live work shows first WITHOUT a separate
 // "Open" tab (Jess 2026-06-29: dropped the Open meta-tab — it confused him).
 const TABS: { key: ControlTab; label: string }[] = [
+  { key: "all", label: "All" },
   { key: "placed", label: "Placed" },
   { key: "proceed", label: "Proceed" },
   { key: "pending", label: "Pending" },
   { key: "scheduled", label: "Scheduled" },
   { key: "completed", label: "Completed" },
-  { key: "all", label: "All" },
 ];
 
 /** Tooltip for the "All" meta tab — the five pipeline stages get theirs from
@@ -723,6 +723,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
   // P1 (Loo 2026-07-09) — the left filter KANBAN open/collapsed toggle.
   const [kanbanOpen, setKanbanOpen] = useState(true);
+  // Scroll shadow — a faint top line appears once the kanban is scrolled down.
+  const [kanbanScrolled, setKanbanScrolled] = useState(false);
   // GMAIL_FINAL C3 — per-group collapse; CATEGORY starts collapsed at the bottom.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(["CATEGORY"]),
@@ -1216,8 +1218,14 @@ export default function OperationOrdersControl({ onImport }: Props) {
       <div className="flex-1 flex gap-4 min-h-0">
         {kanbanOpen ? (
           <aside
-            className="w-[240px] shrink-0 flex flex-col gap-2 overflow-y-auto pb-2"
+            className="w-[240px] shrink-0 flex flex-col gap-2 overflow-y-auto no-scrollbar pb-2"
             data-testid="orders-filter-kanban"
+            onScroll={(e) => setKanbanScrolled(e.currentTarget.scrollTop > 2)}
+            style={{
+              boxShadow: kanbanScrolled
+                ? "inset 0 8px 6px -7px rgba(34,31,32,0.14)"
+                : undefined,
+            }}
           >
             {/* One white card (P2 G) — Gmail-nav rows. No "Filters" label; the
                 collapse chevron sits top-right. */}
@@ -1384,7 +1392,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
               scroll). table-fixed + a colgroup → columns keep their width. */}
       <div
         ref={listBoxRef}
-        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto"
+        className="flex-1 min-h-0 bg-white border border-[rgba(34,31,32,0.10)] rounded-t-lg rounded-b-none shadow-[0_1px_2px_rgba(34,31,32,0.04),0_4px_16px_rgba(34,31,32,0.05)] overflow-auto no-scrollbar"
       >
         <table
           ref={listTableRef}
@@ -1794,18 +1802,19 @@ function StatusTabs({
             type="button"
             onClick={() => onSelect(t.key)}
             title={t.title}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors hover:bg-base-100"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors"
             style={{
-              color: on ? "#221F20" : "#6F6960",
-              fontWeight: on ? 600 : 500,
               fontSize: "13px",
-              boxShadow: on ? "inset 0 -2px 0 #221F20" : undefined,
+              fontWeight: on ? 600 : 500,
+              color: on ? "#FFFFFF" : "#4B5563",
+              background: on ? "#221F20" : "#FFFFFF",
+              border: on ? "1px solid #221F20" : "1px solid #DDD8CE",
             }}
           >
             {t.label}
             <span
               className="tabular-nums"
-              style={{ color: on ? "#221F20" : "#9CA3AF", fontSize: "12px" }}
+              style={{ color: on ? "rgba(255,255,255,0.85)" : "#9CA3AF", fontSize: "12px" }}
             >
               {t.count}
             </span>
@@ -1882,7 +1891,7 @@ function OrderRow({
       <ActionCell order={o} tasks={tasks} onFlag={onFlag} />
       {/* Order ID — the system SO number (13px ink, tabular). Phone tooltip lives
           here; paired tight with the Ref No column to its right. */}
-      <td className="pl-2 pr-1 py-1.5" title={o.customer_phone ?? undefined}>
+      <td className="pl-3 pr-1 py-1.5" title={o.customer_phone ?? undefined}>
         <span
           className="font-mono tabular-nums"
           style={{ fontSize: "13px", fontWeight: 500, color: "#1F2937" }}
@@ -1892,7 +1901,7 @@ function OrderRow({
       </td>
       {/* Ref No — the day-to-day reference(s), the PRIMARY identifier. All refs
           stack vertically; only >3 fold to "+N". Tight to the identity trio. */}
-      <td className="pl-1 pr-1 py-1.5">
+      <td className="px-1 py-1.5">
         {ref.length === 0 ? (
           <span className="text-base-300">—</span>
         ) : (
@@ -1915,7 +1924,7 @@ function OrderRow({
         )}
       </td>
       {/* Customer — identity trio (tight to Ref); single-line ellipsis (P2). */}
-      <td className="pl-1 pr-3 py-2">
+      <td className="pl-1 pr-2 py-2">
         {o.customer_name ? (
           <span
             className={`${cjkClassName(o.customer_name)} text-[14px] text-base-800 block truncate`}
@@ -1928,9 +1937,8 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Region — delivery city/state (was "Location"). KV reads neutral grey;
-          only Outstation keeps a quiet amber (no warehouse buffer). */}
-      <td className="px-2 py-2">
+      {/* Region — its own group; gap before it separates it from the identity trio. */}
+      <td className="pl-4 pr-2 py-2">
         {loc.label ? (
           <span
             className="text-[14px] block truncate"
@@ -1949,7 +1957,7 @@ function OrderRow({
       </td>
       {/* Logistic — carrier name, moved up next to Region (who's delivering +
           where). Neutral grey. */}
-      <td className="pl-2 pr-1 py-2 whitespace-nowrap">
+      <td className="pl-4 pr-1 py-2 whitespace-nowrap">
         {logistic ? (
           <span className="text-[14px]" style={{ color: "#4B5563" }}>{logistic}</span>
         ) : (
@@ -1959,7 +1967,7 @@ function OrderRow({
       {/* Logistic ETA — the logistic's committed delivery date
           (ops_order_control.logistic_eta), just before the customer Deadline for
           a quick compare. "No ETA" (red) when it's overdue for chasing. */}
-      <td className="pl-1 pr-2 py-2 whitespace-nowrap">
+      <td className="px-1 py-2 whitespace-nowrap">
         {(() => {
           const eta = logisticEtaOf(o);
           if (eta) {
@@ -1986,7 +1994,7 @@ function OrderRow({
       {/* Deadline — three distinct segments: date (bold, red when hot) · weekday
           (grey) · a faint days-left pill (-Nd / today / Nd / over). */}
       <td
-        className="px-2 py-2 leading-[1.2] whitespace-nowrap"
+        className="pl-1 pr-2 py-2 leading-[1.2] whitespace-nowrap"
         title="Customer's requested delivery date + days left. Stock at the warehouse 7 days before; logistic contacts the customer 2–3 days before."
       >
         {o.delivery_date_tbd ? (
@@ -2042,13 +2050,13 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* Stock — one pill: status (Ready / Waiting / No PO) + core arrival ratio. */}
-      <td className="px-2 py-2 whitespace-nowrap">
+      {/* Stock — its own group; gap before it separates it from the logistic trio. */}
+      <td className="pl-4 pr-2 py-2 whitespace-nowrap">
         <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} />
       </td>
       {/* Next action — the most-urgent next step (one pill) + Gmail-style hover
           actions (open / flag / assign) that appear on row hover (P2 F). */}
-      <td className="px-2 py-2 whitespace-nowrap relative">
+      <td className="pl-4 pr-2 py-2 whitespace-nowrap relative">
         {(() => {
           const na = nextActionOf(o, stock, lines);
           const st = NEXT_TONE_STYLE[na.tone];
