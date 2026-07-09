@@ -557,7 +557,7 @@ function itemRollup(lines: { sku: string; qty: number }[]): string {
 /** Units of ONE core category (Mattress / Bedframe / Sofa) on an order — the
  *  per-category count the MS / BF / Sofa columns show. Sums each line's qty
  *  whose `lineCategory` matches; accessories / services never count. */
-function catQty(lines: { sku: string; qty: number }[], cat: CoreCat): number {
+export function catQty(lines: { sku: string; qty: number }[], cat: CoreCat): number {
   let t = 0;
   for (const l of lines)
     if (lineCategory(l.sku) === cat) t += Number(l.qty || 0);
@@ -1330,10 +1330,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
         >
           {/* Widths L→R: checkbox · ⚑ · Ref · Customer · Region · Deadline ·
               MS · BF · Sofa · Stock · Logistic */}
-          {/* Fill the FULL width (no cap); the data columns stay tight and the
-              two forgiving text columns — Customer + Next action — carry the
-              slack so nothing sprawls. Order ID + Ref No are a tight pair
-              (Loo final 2026-07-09). */}
+          {/* Fill the FULL width (no cap); Customer + Next action carry the slack.
+              MS/BF/SOF dropped (Loo 2026-07-09 — the STOCK core ratio covers the
+              core total). Logistic moved next to Region; a Logistic-ETA column
+              sits beside Deadline for a deadline-vs-ETA compare. */}
           <colgroup>
             <col style={{ width: 34 }} />
             <col style={{ width: 34 }} />
@@ -1341,12 +1341,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
             <col style={{ width: 124 }} />
             <col style={{ width: 240 }} />
             <col style={{ width: 112 }} />
-            <col style={{ width: 150 }} />
-            <col style={{ width: 38 }} />
-            <col style={{ width: 38 }} />
-            <col style={{ width: 44 }} />
-            <col style={{ width: 108 }} />
             <col style={{ width: 110 }} />
+            <col style={{ width: 150 }} />
+            <col style={{ width: 120 }} />
+            <col style={{ width: 130 }} />
             <col style={{ width: 220 }} />
           </colgroup>
           {/* Dark ink header band (#221F20) — kept per Loo; the flame underline
@@ -1373,12 +1371,10 @@ export default function OperationOrdersControl({ onImport }: Props) {
               <Th>Ref No</Th>
               <Th>Customer</Th>
               <Th>Region</Th>
-              <Th>Deadline</Th>
-              <Th center>MS</Th>
-              <Th center>BF</Th>
-              <Th center>Sofa</Th>
-              <Th>Stock</Th>
               <Th>Logistic</Th>
+              <Th>Deadline</Th>
+              <Th>Logistic ETA</Th>
+              <Th>Stock</Th>
               <Th>Next action</Th>
             </tr>
           </thead>
@@ -1386,7 +1382,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {total === 0 && (
               <tr>
                 <td
-                  colSpan={13}
+                  colSpan={11}
                   className="p-12 text-center text-[12px] text-base-500"
                 >
                   No orders in this tab.
@@ -1880,6 +1876,15 @@ function OrderRow({
           <span className="text-base-400">—</span>
         )}
       </td>
+      {/* Logistic — carrier name, moved up next to Region (who's delivering +
+          where). Neutral grey. */}
+      <td className="px-2 py-2 whitespace-nowrap">
+        {logistic ? (
+          <span className="text-[14px]" style={{ color: "#4B5563" }}>{logistic}</span>
+        ) : (
+          <span className="text-base-300">—</span>
+        )}
+      </td>
       {/* Deadline — three distinct segments: date (bold, red when hot) · weekday
           (grey) · a faint days-left pill (-Nd / today / Nd / over). */}
       <td
@@ -1939,21 +1944,36 @@ function OrderRow({
           <span className="text-base-300">—</span>
         )}
       </td>
-      {/* MS / BF / Sofa — per-category unit counts; 0 shows a faint dot. */}
-      <CatCountCell testid="cat-ms" qty={msQty} />
-      <CatCountCell testid="cat-bf" qty={bfQty} />
-      <CatCountCell testid="cat-sofa" qty={sofaQty} />
-      {/* Stock — status pill (Ready / Waiting / No PO) + core-only arrival ratio. */}
+      {/* Logistic ETA — the logistic's committed delivery date
+          (ops_order_control.logistic_eta), beside the customer Deadline for a
+          quick compare. "No ETA" (red) when it's overdue for chasing. */}
+      <td className="px-2 py-2 whitespace-nowrap">
+        {(() => {
+          const eta = logisticEtaOf(o);
+          if (eta) {
+            const [d, wd] = fmtDate(eta).split(", ");
+            return (
+              <span className="inline-flex items-baseline gap-1.5">
+                <span
+                  className="tabular-nums"
+                  style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}
+                >
+                  {d}
+                </span>
+                {wd && <span style={{ fontSize: "11.5px", color: "#9CA3AF" }}>{wd}</span>}
+              </span>
+            );
+          }
+          return needsEta(o) ? (
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "#991B1B" }}>No ETA</span>
+          ) : (
+            <span className="text-base-300">—</span>
+          );
+        })()}
+      </td>
+      {/* Stock — one pill: status (Ready / Waiting / No PO) + core arrival ratio. */}
       <td className="px-2 py-2 whitespace-nowrap">
         <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} />
-      </td>
-      {/* Logistic — the carrier name (neutral grey). */}
-      <td className="px-2 py-2 whitespace-nowrap">
-        {logistic ? (
-          <span className="text-[14px]" style={{ color: "#4B5563" }}>{logistic}</span>
-        ) : (
-          <span className="text-base-300">—</span>
-        )}
       </td>
       {/* Next action — the single most-urgent next step (C2); one pill per row. */}
       <td className="px-2 py-2 whitespace-nowrap">
@@ -1981,25 +2001,6 @@ function OrderRow({
         })()}
       </td>
     </tr>
-  );
-}
-
-/** Per-category unit-count cell (MS / BF / Sofa) — the integer, or a faint dot
- *  when the order has none of that category. */
-function CatCountCell({ testid, qty }: { testid: string; qty: number }) {
-  return (
-    <td data-testid={testid} className="px-1 py-2 text-center">
-      {qty > 0 ? (
-        <span
-          className="tabular-nums"
-          style={{ fontSize: "14px", fontWeight: 700, color: "#111827" }}
-        >
-          {qty}
-        </span>
-      ) : (
-        <span style={{ color: "#C9C5BB", fontSize: "14px" }}>–</span>
-      )}
-    </td>
   );
 }
 
@@ -2086,31 +2087,27 @@ function StockDot({ info, coreTotal }: { info: StockInfo; coreTotal: number }) {
       break;
   }
   const S = STOCK_PILL[key];
-  const num = key === "ready" ? String(coreTotal) : key === "no_po" ? "0" : "–";
+  // ONE pill = status + core ratio, e.g. "Waiting 0/2" (Loo 2026-07-09). Ready =
+  // all core; Waiting / No PO start at 0 received (the list payload has no
+  // per-line GRN-received qty, so 0 is the confirmed-received baseline).
+  const num = key === "ready" ? String(coreTotal) : "0";
   return (
     <span
-      className="inline-flex items-center gap-1.5 whitespace-nowrap"
+      className="inline-flex items-center rounded-full whitespace-nowrap"
+      style={{
+        fontSize: "11.5px",
+        fontWeight: 600,
+        padding: "1px 9px",
+        color: S.text,
+        background: S.bg,
+        border: `1px solid ${S.border}`,
+      }}
       title={title}
       data-stock-state={info.state}
     >
-      <span
-        className="inline-flex items-center rounded-full"
-        style={{
-          fontSize: "11px",
-          fontWeight: 600,
-          padding: "1px 8px",
-          color: S.text,
-          background: S.bg,
-          border: `1px solid ${S.border}`,
-        }}
-      >
-        {S.label}
-      </span>
+      <span>{S.label}</span>
       {coreTotal > 0 && (
-        <span
-          className="tabular-nums"
-          style={{ fontSize: "12.5px", fontWeight: 600, color: "#4B5563" }}
-        >
+        <span className="tabular-nums" style={{ marginLeft: 6, fontWeight: 700 }}>
           {num}/{coreTotal}
         </span>
       )}

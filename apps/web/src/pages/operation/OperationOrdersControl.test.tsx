@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import OperationOrdersControl, {
   buildOrdersCsv,
   buildOrdersPrintHtml,
+  catQty,
   nextActionOf,
 } from "./OperationOrdersControl";
 import type {
@@ -249,11 +250,10 @@ describe("OperationOrdersControl", () => {
     const row = screen
       .getAllByTestId("order-row")
       .find((r) => r.textContent?.includes("SO-1002"))!;
-    // AutoCount free-text SKUs → red "No PO" dot (no qty on the stock cell now).
+    // AutoCount free-text SKUs → red "No PO" pill; the core arrival ratio counts
+    // 2 mattress + 1 bedframe = 3 core units.
     expect(within(row).getByText("No PO")).toBeInTheDocument();
-    // Per-category counts: 2 mattress + 1 bedframe, no sofa.
-    expect(within(row).getByTestId("cat-ms")).toHaveTextContent("2");
-    expect(within(row).getByTestId("cat-bf")).toHaveTextContent("1");
+    expect(within(row).getByText("0/3")).toBeInTheDocument();
     // the CR/TCF ref shows in the merged Ref column.
     expect(row).toHaveTextContent("CR0418");
   });
@@ -444,58 +444,41 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     listHookState.data = { orders: [makeRow(partial)] };
   }
 
-  it("counts MS / BF / Sofa units per category, services not counted (A1)", () => {
-    oneRow({
-      id: "r1",
-      so: 3001,
-      order_lines: [
-        { sku: "MS01-L1201S-Q", qty: 2 }, // Mattress, Queen → core
-        { sku: "BF02-1013", qty: 1 }, // Bedframe, no size → core
-        { sku: "Pillow", qty: 3 }, // accessory — not a core category
-        { sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }, // → M.P, accessory
-        { sku: "Sofa Disposal", qty: 1 }, // → Disposal, SERVICE
-      ],
-    });
-    wrap(<OperationOrdersControl />);
-    const row = screen.getByTestId("order-row");
-    // Per-category count cells: 2 mattress + 1 bedframe + 0 sofa (accessories +
-    // service never count towards a core category).
-    expect(within(row).getByTestId("cat-ms")).toHaveTextContent("2");
-    expect(within(row).getByTestId("cat-bf")).toHaveTextContent("1");
-    // Sofa count is 0 → a faint dash placeholder, not a number.
-    expect(within(row).getByTestId("cat-sofa")).toHaveTextContent("–");
+  it("catQty classifies core lines by category — MS / BF / Sofa (services + accessories excluded) (A1)", () => {
+    const lines = [
+      { sku: "MS01-L1201S-Q", qty: 2 }, // Mattress, Queen → core
+      { sku: "BF02-1013", qty: 1 }, // Bedframe, no size → core
+      { sku: "Pillow", qty: 3 }, // accessory — not a core category
+      { sku: "Microfiber Waterproof Mattress Protector-K", qty: 1 }, // → M.P, accessory
+      { sku: "Sofa Disposal", qty: 1 }, // → Disposal, SERVICE
+    ];
+    // Accessories + service never count towards a core category.
+    expect(catQty(lines, "mattress")).toBe(2);
+    expect(catQty(lines, "bedframe")).toBe(1);
+    expect(catQty(lines, "sofa")).toBe(0);
   });
 
-  it("classifies real AutoCount free-text SKUs into MS/BF/Sofa counts — even with COL: colour codes and non-MS/BF/SF model families (P1 classifier fix)", () => {
-    oneRow({
-      id: "ac1",
-      so: 3099,
-      order_lines: [
-        // The COL: colour code used to shove this whole row into "acc" → leaked
-        // the raw model name. Now classifies as sofa (no K/Q/S size on sofas).
-        { sku: 'SF03-HK5535/30"(L+2 SEATER)/COL:KN390-15 DEEP GREY', qty: 1 },
-        // Bedframe family "Jager", size written as a WORD mid-SKU + COL: code.
-        { sku: "1013Jager/Fab3-King/COL:PC151-02", qty: 1 },
-        { sku: "1013Jager/Fab3-Queen/COL:PC151-02", qty: 2 },
-        // Mattress families, size in the canonical -K/-Q suffix.
-        { sku: "Breeze FirmCare-B1201F-K", qty: 1 },
-        { sku: "Lumi FirmCare-L1201F-Q", qty: 2 },
-        // Sofa family "Glano" — no MS/BF/SF prefix at all.
-        { sku: 'Glano TH5090/30"(2 Seater)/KN390-14 Metal', qty: 1 },
-      ],
-    });
-    wrap(<OperationOrdersControl />);
-    const row = screen.getByTestId("order-row");
-    // Category counts aggregate across sizes: MS = 1+2 = 3, BF = 1+2 = 3,
-    // Sofa = 1+1 = 2 (the classifier resolves each free-text SKU correctly).
-    expect(within(row).getByTestId("cat-ms")).toHaveTextContent("3");
-    expect(within(row).getByTestId("cat-bf")).toHaveTextContent("3");
-    expect(within(row).getByTestId("cat-sofa")).toHaveTextContent("2");
-    // The raw model names never leak into the row.
-    expect(within(row).queryByText(/jager|hk55|glano|breeze|lumi/i)).toBeNull();
+  it("catQty classifies real AutoCount free-text SKUs into MS/BF/Sofa — even with COL: colour codes and non-MS/BF/SF model families (P1 classifier fix)", () => {
+    const lines = [
+      // The COL: colour code used to shove this whole row into "acc" → leaked
+      // the raw model name. Now classifies as sofa (no K/Q/S size on sofas).
+      { sku: 'SF03-HK5535/30"(L+2 SEATER)/COL:KN390-15 DEEP GREY', qty: 1 },
+      // Bedframe family "Jager", size written as a WORD mid-SKU + COL: code.
+      { sku: "1013Jager/Fab3-King/COL:PC151-02", qty: 1 },
+      { sku: "1013Jager/Fab3-Queen/COL:PC151-02", qty: 2 },
+      // Mattress families, size in the canonical -K/-Q suffix.
+      { sku: "Breeze FirmCare-B1201F-K", qty: 1 },
+      { sku: "Lumi FirmCare-L1201F-Q", qty: 2 },
+      // Sofa family "Glano" — no MS/BF/SF prefix at all.
+      { sku: 'Glano TH5090/30"(2 Seater)/KN390-14 Metal', qty: 1 },
+    ];
+    // Aggregate across sizes: MS = 1+2 = 3, BF = 1+2 = 3, Sofa = 1+1 = 2.
+    expect(catQty(lines, "mattress")).toBe(3);
+    expect(catQty(lines, "bedframe")).toBe(3);
+    expect(catQty(lines, "sofa")).toBe(2);
   });
 
-  it("the Stock cell shows a state dot with no qty; the category counts carry the qty", () => {
+  it("the Stock cell shows a No PO pill with the core arrival ratio (0/2)", () => {
     oneRow({
       id: "r1b",
       so: 3010,
@@ -503,13 +486,12 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     });
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // Free-text SKU → red "No PO" dot (no qty on the stock cell);
-    // the Sofa count cell carries the 2 units.
+    // Free-text SKU → red "No PO" pill; the 2 sofa units drive the core ratio.
     expect(within(row).getByText("No PO")).toBeInTheDocument();
-    expect(within(row).getByTestId("cat-sofa")).toHaveTextContent("2");
+    expect(within(row).getByText("0/2")).toBeInTheDocument();
   });
 
-  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Deadline · MS · BF · Sofa · Stock · Logistic", () => {
+  it("orders columns: select · Follow-up · Order ID · Ref No · Customer · Region · Logistic · Deadline · Logistic ETA · Stock · Next action", () => {
     oneRow({
       id: "p2",
       so: 3012,
@@ -518,10 +500,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       source_ref: ["TCF2024/06-461"],
     });
     wrap(<OperationOrdersControl />);
-    // ONE header row (13 columns). The follow-up flag is the 2nd column (icon-only
-    // header). Ref is split into Order ID (SO) + Ref No (the day-to-day reference);
-    // the MS / BF / Sofa per-category count columns replace the Items summary, and
-    // C2 adds the "Next action" lamp as the final column.
+    // ONE header row (11 columns). The follow-up flag is the 2nd column (icon-only
+    // header). Ref is split into Order ID (SO) + Ref No; MS/BF/SOF dropped (the
+    // STOCK core ratio carries the core total). Logistic sits next to Region; a
+    // Logistic ETA column pairs with Deadline; Next action closes the row.
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toEqual([
       "", // select-all checkbox
@@ -530,12 +512,10 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       "Ref No",
       "Customer",
       "Region",
-      "Deadline",
-      "MS",
-      "BF",
-      "Sofa",
-      "Stock",
       "Logistic",
+      "Deadline",
+      "Logistic ETA",
+      "Stock",
       "Next action",
     ]);
     // Order ID (SO) + Ref No are now separate columns; the phone tooltip stays on
@@ -616,11 +596,11 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     // header present
     const head = within(screen.getByRole("table")).getAllByRole("columnheader");
     expect(head.map((h) => h.textContent)).toContain("Deadline");
-    // Deadline is the 7th cell (index 6: select · flag · Order ID · Ref No ·
-    // Customer · Region · Deadline). Shows date + weekday + days-left; not "—".
+    // Deadline is the 8th cell (index 7: select · flag · Order ID · Ref No ·
+    // Customer · Region · Logistic · Deadline). Shows date + weekday + days-left.
     const cells = within(screen.getByTestId("order-row")).getAllByRole("cell");
-    expect(cells[6].textContent).not.toBe("—");
-    expect(cells[6].textContent).toMatch(/\d/);
+    expect(cells[7].textContent).not.toBe("—");
+    expect(cells[7].textContent).toMatch(/\d/);
   });
 
   it("paginates — 15/page by default (fixed listing box), Next works", () => {
