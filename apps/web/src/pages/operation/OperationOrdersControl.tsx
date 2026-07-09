@@ -1562,7 +1562,7 @@ function BulkHeadRow({
   return (
     <tr
       className="border-b"
-      style={{ backgroundColor: "#E7E0D2", borderBottomColor: "rgba(34,31,32,0.14)" }}
+      style={{ backgroundColor: "#D3E4F4", borderBottomColor: "rgba(31,111,191,0.22)" }}
     >
       {/* Col 1 — the select-all box stays in its column, untickable in place. */}
       <th className="px-2 py-1.5">
