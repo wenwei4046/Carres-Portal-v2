@@ -1818,7 +1818,7 @@ function OrderRow({
     <tr
       onClick={onOpen}
       className={`group border-t border-[rgba(34,31,32,0.06)] cursor-pointer align-middle ${
-        selected ? "bg-[#EFE7D6]" : "bg-white hover:bg-[#F5F0E7]"
+        selected ? "bg-[#DCEAF4]" : "bg-white hover:bg-[#F5F0E7]"
       }`}
       data-testid="order-row"
     >
@@ -2188,7 +2188,7 @@ function Th({
   return (
     <th
       className={`px-2 py-1.5 font-semibold uppercase ${center ? "text-center" : "text-left"}`}
-      style={{ color: "#6B7280", fontSize: "11px", letterSpacing: "0.04em" }}
+      style={{ color: "#4A4335", fontSize: "11px", letterSpacing: "0.04em" }}
     >
       {children}
     </th>
