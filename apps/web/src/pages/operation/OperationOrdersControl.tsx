@@ -29,6 +29,7 @@ import type { OpsTask, OpsTasksListResponse } from "@carres/shared";
 import type { OperationStage } from "./components/StageChip";
 import {
   RefreshCw,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -40,8 +41,6 @@ import {
   CheckCircle2,
   X,
   Flag,
-  ChevronsUp,
-  CalendarClock,
   Lock,
   Printer,
   type LucideIcon,
@@ -269,19 +268,6 @@ function daysToDue(o: operationOrderListRow): number | null {
  *  Completed / TBD / undated orders sit in NO bucket (only "All" shows them). */
 const DUE_BUCKETS = ["Overdue", "Urgent", "Attention", "Upcoming", "Later"] as const;
 type DueBucket = (typeof DUE_BUCKETS)[number];
-/** Soft colour per bucket — a red→grey heat ramp (matches the agreed mock): the
- *  hotter the deadline, the warmer the chip. Applied as the chip's resting tint;
- *  the selected chip still flips to the shared black active state. */
-// Low-saturation hot→cool ramp (Loo 2026-07-09): the band matches the table's
-// restraint. Overdue keeps the ONE reserved real red (genuine danger); Urgent →
-// muted clay, Attention → low-sat amber, Upcoming → low-sat blue, Later → grey.
-const DUE_TONE: Record<DueBucket, { bg: string; text: string; border: string }> = {
-  Overdue: { bg: "rgba(140,63,54,0.09)", text: "#8C3F36", border: "rgba(140,63,54,0.26)" },
-  Urgent: { bg: "rgba(154,90,58,0.10)", text: "#9A5A3A", border: "rgba(154,90,58,0.26)" },
-  Attention: { bg: "rgba(138,109,47,0.11)", text: "#8A6D2F", border: "rgba(138,109,47,0.26)" },
-  Upcoming: { bg: "rgba(62,97,135,0.10)", text: "#3E6187", border: "rgba(62,97,135,0.26)" },
-  Later: { bg: "rgba(34,31,32,0.05)", text: "#6F6960", border: "rgba(34,31,32,0.14)" },
-};
 const DUE_DESC: Record<DueBucket, string> = {
   Overdue: "Past the delivery date",
   Urgent: "Due today or tomorrow (≤1 day)",
@@ -737,6 +723,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
   // P1 (Loo 2026-07-09) — the left filter KANBAN open/collapsed toggle.
   const [kanbanOpen, setKanbanOpen] = useState(true);
+  // P2 G — CATEGORY tucked under a "More" toggle (the other groups show in full).
+  const [moreOpen, setMoreOpen] = useState(false);
   // Two action lanes (Jess 2026-06-25): 🚩 Follow-up = team handoff (follow_up
   // annotations) · ⏫ For Jess = escalations needing the boss (escalate). Each is
   // a derived open-annotation state with its own quick-view filter; the per-row
@@ -1184,17 +1172,30 @@ export default function OperationOrdersControl({ onImport }: Props) {
             busy={assignMut.isPending || taskMut.isPending || completeMut.isPending}
           />
         ) : (
-          total > 0 && (
-            <Pager
-              safePage={safePage}
-              onPage={setPage}
-              total={total}
-              rangeStart={rangeStart}
-              rangeEnd={rangeEnd}
-              pageCount={pageCount}
-              onRefresh={() => void refetch()}
+          <div className="flex items-center justify-between gap-3">
+            {/* H — STATUS pipeline as top horizontal tabs (Gmail Primary/Social). */}
+            <StatusTabs
+              tabs={TABS.map((t) => ({
+                key: t.key,
+                label: t.label,
+                count: counts[t.key],
+                title: STATUS_META_DESC[t.key] ?? TAB_DESC[t.key as SettledTab],
+              }))}
+              active={tab}
+              onSelect={setTab}
             />
-          )
+            {total > 0 && (
+              <Pager
+                safePage={safePage}
+                onPage={setPage}
+                total={total}
+                rangeStart={rangeStart}
+                rangeEnd={rangeEnd}
+                pageCount={pageCount}
+                onRefresh={() => void refetch()}
+              />
+            )}
+          </div>
         )}
       </div>
 
@@ -1209,132 +1210,134 @@ export default function OperationOrdersControl({ onImport }: Props) {
             className="w-[240px] shrink-0 flex flex-col gap-2 overflow-y-auto pb-2"
             data-testid="orders-filter-kanban"
           >
-            <div className="flex items-center justify-between px-0.5 pt-0.5">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-base-500">
-                Filters
-              </span>
+            {/* One white card (P2 G) — Gmail-nav rows. No "Filters" label; the
+                collapse chevron sits top-right. */}
+            <div className="bg-white border rounded-[12px] p-1.5" style={{ borderColor: "#E5E1D8" }}>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setKanbanOpen(false)}
+                  title="Collapse filters"
+                  aria-label="Collapse filters"
+                  className="p-1 rounded text-base-500 hover:bg-base-100"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+              </div>
+
+              {/* CHASE NOW — the triage lane. No ETA + No PO reuse the logistic /
+                  stock filters, Urgent the Due filter, Follow-up + For Jess the
+                  task lanes. */}
+              <KanbanGroup title="CHASE NOW" danger>
+                <KanbanRow
+                  label="No ETA"
+                  count={etaCount}
+                  tone="danger"
+                  active={etaOnly}
+                  title="Logistic hasn't given an ETA + deadline near (≤7d) — chase them"
+                  onClick={() => setEtaOnly((v) => !v)}
+                />
+                <KanbanRow
+                  label="No PO"
+                  count={stockEntries.find((e) => e.bucket === "No PO")?.count ?? 0}
+                  tone="danger"
+                  active={stockFilter === "No PO"}
+                  onClick={() => setStockFilter((r) => (r === "No PO" ? null : "No PO"))}
+                />
+                <KanbanRow
+                  label="Urgent"
+                  count={dueEntries.find((e) => e.bucket === "Urgent")?.count ?? 0}
+                  tone="warning"
+                  active={dueFilter === "Urgent"}
+                  title={DUE_DESC.Urgent}
+                  onClick={() => setDueFilter((r) => (r === "Urgent" ? null : "Urgent"))}
+                />
+                <KanbanRow
+                  label="Follow-up"
+                  count={flaggedCount}
+                  tone="warning"
+                  active={flaggedOnly}
+                  title="Orders with an open follow-up note for the next operator"
+                  onClick={() => setFlaggedOnly((v) => !v)}
+                />
+                <KanbanRow
+                  label="For Jess"
+                  count={escalateCount}
+                  tone="danger"
+                  active={escalateOnly}
+                  title="Escalated to Jess — orders needing the boss's action"
+                  onClick={() => setEscalateOnly((v) => !v)}
+                />
+              </KanbanGroup>
+
+              <KanbanGroup title="STOCK">
+                {stockEntries.map((e) => (
+                  <KanbanRow
+                    key={e.bucket}
+                    label={e.bucket}
+                    count={e.count}
+                    dot={e.bucket === "Ready" ? "#5B7F63" : e.bucket === "Waiting" ? "#9A7B3F" : "#8C3F36"}
+                    active={stockFilter === e.bucket}
+                    onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
+                  />
+                ))}
+              </KanbanGroup>
+
+              <KanbanGroup title="LOGISTIC" testid="filter-logistic">
+                {logisticEntries.map((e) => (
+                  <KanbanRow
+                    key={e.carrier}
+                    label={e.carrier === NO_CARRIER ? "Unassigned" : e.carrier}
+                    count={e.count}
+                    active={logisticFilter === e.carrier}
+                    title={e.carrier === NO_CARRIER ? "No logistic partner assigned yet — assign / chase" : undefined}
+                    onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
+                  />
+                ))}
+              </KanbanGroup>
+
+              <KanbanGroup title="REGION">
+                {regionEntries.map((e) => (
+                  <KanbanRow
+                    key={e.region}
+                    label={e.region}
+                    count={e.count}
+                    active={regionFilter === e.region}
+                    onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
+                  />
+                ))}
+              </KanbanGroup>
+
+              {/* Category tucked under a More toggle (the others show in full). */}
               <button
                 type="button"
-                onClick={() => setKanbanOpen(false)}
-                title="Collapse filters"
-                aria-label="Collapse filters"
-                className="p-1 -mr-1 rounded text-base-500 hover:bg-base-200"
+                onClick={() => setMoreOpen((v) => !v)}
+                className="w-full flex items-center gap-1 px-2 pt-2 pb-1 text-[11px] font-medium text-base-500 hover:text-base-800"
               >
-                <ChevronLeft size={15} />
+                {moreOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                {moreOpen ? "Less" : "More"}
               </button>
+              {moreOpen && (
+                <KanbanGroup title="CATEGORY">
+                  {categoryEntries.map((e) => (
+                    <KanbanRow
+                      key={e.key}
+                      label={e.label}
+                      count={e.count}
+                      active={categoryFilter.has(e.key)}
+                      onClick={() =>
+                        setCategoryFilter((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(e.key)) next.delete(e.key);
+                          else next.add(e.key);
+                          return next;
+                        })
+                      }
+                    />
+                  ))}
+                </KanbanGroup>
+              )}
             </div>
-            <FilterGroup label="Status">
-          {TABS.map((t) => (
-            <RegionChip
-              key={t.key}
-              label={t.label}
-              count={counts[t.key]}
-              active={tab === t.key}
-              title={STATUS_META_DESC[t.key] ?? TAB_DESC[t.key as SettledTab]}
-              onClick={() => setTab(t.key)}
-            />
-          ))}
-        </FilterGroup>
-        <FilterGroup label="Due">
-          {dueEntries.map((e) => (
-            <RegionChip
-              key={e.bucket}
-              label={e.bucket}
-              count={e.count}
-              active={dueFilter === e.bucket}
-              tone={DUE_TONE[e.bucket]}
-              title={DUE_DESC[e.bucket]}
-              onClick={() => setDueFilter((r) => (r === e.bucket ? null : e.bucket))}
-            />
-          ))}
-        </FilterGroup>
-        <FilterGroup label="Stock">
-          {stockEntries.map((e) => (
-            <RegionChip
-              key={e.bucket}
-              label={e.bucket}
-              count={e.count}
-              active={stockFilter === e.bucket}
-              dot={e.bucket === "Ready" ? "#5B7F63" : e.bucket === "Waiting" ? "#9A7B3F" : "#8C3F36"}
-              onClick={() => setStockFilter((r) => (r === e.bucket ? null : e.bucket))}
-            />
-          ))}
-        </FilterGroup>
-        <FilterGroup label="Category">
-          {categoryEntries.map((e) => (
-            <RegionChip
-              key={e.key}
-              label={e.label}
-              count={e.count}
-              active={categoryFilter.has(e.key)}
-              onClick={() =>
-                setCategoryFilter((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(e.key)) next.delete(e.key);
-                  else next.add(e.key);
-                  return next;
-                })
-              }
-            />
-          ))}
-        </FilterGroup>
-        <FilterGroup label="Region">
-          {regionEntries.map((e) => (
-            <RegionChip
-              key={e.region}
-              label={e.region}
-              count={e.count}
-              active={regionFilter === e.region}
-              onClick={() => setRegionFilter((r) => (r === e.region ? null : e.region))}
-            />
-          ))}
-        </FilterGroup>
-        <FilterGroup label="Logistic">
-          {logisticEntries.map((e) => (
-            <RegionChip
-              key={e.carrier}
-              label={e.carrier === NO_CARRIER ? "Unassigned" : e.carrier}
-              count={e.count}
-              active={logisticFilter === e.carrier}
-              title={e.carrier === NO_CARRIER ? "No logistic partner assigned yet — operation to assign / chase" : undefined}
-              onClick={() => setLogisticFilter((r) => (r === e.carrier ? null : e.carrier))}
-            />
-          ))}
-          {/* No-ETA lives with the logistic chips (Jess 2026-07-07: it's a logistic
-              chase, not a separate needs-action lane). */}
-          <QuickView
-            icon={CalendarClock}
-            label="No ETA"
-            count={etaCount}
-            tone="danger"
-            active={etaOnly}
-            title="Logistic hasn't given a delivery ETA + deadline is near (≤7 days) — chase them"
-            onClick={() => setEtaOnly((v) => !v)}
-          />
-        </FilterGroup>
-        {/* Needs action — the two action lanes (Follow-up · For Jess) + the two
-            logistic-chase alerts (Unassigned carrier · No ETA), same boxed
-            2-row grid as the other groups. */}
-        <FilterGroup label="Needs action">
-          <QuickView
-            icon={Flag}
-            label="Follow-up"
-            count={flaggedCount}
-            tone="warning"
-            active={flaggedOnly}
-            title="Team handoff — orders with an open follow-up note for the next operator"
-            onClick={() => setFlaggedOnly((v) => !v)}
-          />
-          <QuickView
-            icon={ChevronsUp}
-            label="For Jess"
-            count={escalateCount}
-            tone="danger"
-            active={escalateOnly}
-            title="Escalated to Jess — orders needing the boss's action"
-            onClick={() => setEscalateOnly((v) => !v)}
-          />
-        </FilterGroup>
           </aside>
         ) : (
           <button
@@ -1639,60 +1642,62 @@ function BulkMenuItem({
   );
 }
 
-/** State-region filter pill (Klang Valley / each state / Others) + its count. */
-function RegionChip({
+/** Gmail-nav-style filter ROW (P2 G) — full-width, name LEFT / count RIGHT, no
+ *  box border; hover + selected get a tinted fill. Selected reuses the table's
+ *  row blue (#E6EDF9 / #1E40AF) so selection is ONE colour across the page.
+ *  `tone` colours only the COUNT on the CHASE NOW rows (danger red / warning
+ *  amber); other rows keep a grey count. `dot` prefixes a stock-state dot. */
+function KanbanRow({
   label,
   count,
   active,
   onClick,
-  dot,
   tone,
+  dot,
   title,
 }: {
   label: string;
   count: number;
   active: boolean;
   onClick: () => void;
-  /** Optional leading colour dot — the Stock chips use it (green/amber/red) to
-   *  tie to the Stock column + set them apart from the neutral Region chips. */
+  tone?: "danger" | "warning";
   dot?: string;
-  /** Resting colour tint for the DUE buckets (red→grey heat ramp). Applied only
-   *  when NOT selected; selected still flips to the shared black active state. */
-  tone?: { bg: string; text: string; border: string };
-  /** Hover tooltip — Status tab meaning, Due bucket day-range, etc. */
   title?: string;
 }) {
-  const tinted = !!tone && !active;
+  const countColor = active
+    ? "#1E40AF"
+    : tone === "danger"
+      ? "#991B1B"
+      : tone === "warning"
+        ? "#B45309"
+        : "#6F6960";
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      style={
-        tinted
-          ? { backgroundColor: tone!.bg, color: tone!.text, border: `0.5px solid ${tone!.border}` }
-          : undefined
-      }
-      className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] whitespace-nowrap shrink-0 transition-colors ${
-        active
-          ? "bg-base-900 text-white font-semibold"
-          : tinted
-            ? "font-medium hover:brightness-95"
-            : "text-base-600 font-medium hover:bg-base-100"
+      aria-pressed={active}
+      className={`w-full flex items-center gap-1.5 rounded-lg text-left transition-colors ${
+        active ? "" : "hover:bg-[#F5F1EA]"
       }`}
+      style={{ padding: "7px 8px", backgroundColor: active ? "#E6EDF9" : undefined }}
     >
       {dot && (
         <span
-          className="inline-block w-2 h-2 rounded-full shrink-0"
+          className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
           style={{ backgroundColor: dot }}
           aria-hidden="true"
         />
       )}
-      {label}
       <span
-        className={`text-[10px] tabular-nums ${
-          active ? "text-white/70" : tinted ? "opacity-60" : "text-base-400"
-        }`}
+        className="flex-1 min-w-0 truncate text-[13px]"
+        style={{ color: active ? "#1E40AF" : "#221F20", fontWeight: active ? 600 : 400 }}
+      >
+        {label}
+      </span>
+      <span
+        className="text-[13px] tabular-nums shrink-0"
+        style={{ color: countColor, fontWeight: active ? 700 : 500 }}
       >
         {count}
       </span>
@@ -1700,83 +1705,82 @@ function RegionChip({
   );
 }
 
-/** Filter-group box (Jess 2026-06-29): one bordered box per dimension, label on
- *  TOP, chips below in a FIXED 2-row grid that flows column-first — so a group
- *  with more values grows into MORE COLUMNS, never taller. The whole filter band
- *  therefore stays ~2 chip-rows high no matter how many buckets appear. */
-function FilterGroup({
-  label,
+/** Gmail-nav-style filter GROUP (P2 G) — a small uppercase title + its rows.
+ *  `testid` keeps `filter-logistic` addressable for the tests. */
+function KanbanGroup({
+  title,
+  danger,
+  testid,
   children,
 }: {
-  label: string;
+  title: string;
+  danger?: boolean;
+  testid?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className="w-full border border-base-200 rounded-md bg-white px-1.5 py-1"
-      data-testid={`filter-${label.toLowerCase()}`}
-    >
-      <div className="text-[9px] font-semibold uppercase tracking-[0.05em] text-base-600 mb-0.5">
-        {label}
+    <div data-testid={testid}>
+      <div
+        className="uppercase px-2 pt-2 pb-0.5"
+        style={{
+          fontSize: "10px",
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          color: danger ? "#991B1B" : "#6F6960",
+        }}
+      >
+        {title}
       </div>
-      {/* P1: chips WRAP within the 240px kanban column (was a horizontal
-          column-growing grid in the old top band). */}
-      <div className="flex flex-wrap gap-1">
-        {children}
-      </div>
+      <div className="flex flex-col gap-0.5">{children}</div>
     </div>
   );
 }
 
-/** Action-lane quick-view (Jess 2026-06-25): the two clickable filters for the
- *  open-annotation lanes — 🚩 Follow-up (amber, team) + ⏫ For Jess (red, boss).
- *  Always shown (even at 0) so the lanes are discoverable. */
-function QuickView({
-  icon: Icon,
-  label,
-  count,
+/** Status pipeline TABS (P2 H) — Gmail Primary/Social-style horizontal tabs at
+ *  the top of the LIST. Keeps `data-testid="filter-status"` + button names
+ *  (label + count) so the status-filter tests resolve. Active = ink label +
+ *  ink underline. */
+function StatusTabs({
+  tabs,
   active,
-  tone,
-  title,
-  onClick,
+  onSelect,
 }: {
-  icon: LucideIcon;
-  label: string;
-  count: number;
-  active: boolean;
-  tone: "warning" | "danger";
-  title: string;
-  onClick: () => void;
+  tabs: { key: ControlTab; label: string; count: number; title?: string }[];
+  active: ControlTab;
+  onSelect: (k: ControlTab) => void;
 }) {
-  // A zero count is not an alert — keep it a quiet ghost chip (no loud colour /
-  // border) so "For Jess 0" / "Unassigned 0" don't cry wolf; the alert styling
-  // only kicks in once there's actually something to act on (Jess 2026-06-29).
-  const quiet = count === 0 && !active;
-  // Low-saturation tones (Loo 2026-07-09) — the band matches the table: danger =
-  // the reserved muted red, warning = low-sat amber. Filled when active, quiet
-  // ghost at 0 so "For Jess 0" / "No ETA 0" don't cry wolf.
-  const c = tone === "danger" ? "#8C3F36" : "#8A6D2F";
-  const style = quiet
-    ? undefined
-    : active
-      ? { backgroundColor: c, color: "#fff", border: `0.5px solid ${c}` }
-      : { color: c, border: `0.5px solid ${c}59`, backgroundColor: "transparent" };
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-pressed={active}
-      style={style}
-      className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors ${
-        quiet ? "text-base-400 hover:bg-base-100" : "hover:brightness-95"
-      }`}
-    >
-      <Icon size={11} strokeWidth={2.5} /> {label}
-      <span className="tabular-nums opacity-80">{count}</span>
-    </button>
+    <div data-testid="filter-status" className="flex items-center gap-0.5 flex-wrap">
+      {tabs.map((t) => {
+        const on = active === t.key;
+        return (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => onSelect(t.key)}
+            title={t.title}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors hover:bg-base-100"
+            style={{
+              color: on ? "#221F20" : "#6F6960",
+              fontWeight: on ? 600 : 500,
+              fontSize: "13px",
+              boxShadow: on ? "inset 0 -2px 0 #221F20" : undefined,
+            }}
+          >
+            {t.label}
+            <span
+              className="tabular-nums"
+              style={{ color: on ? "#221F20" : "#9CA3AF", fontSize: "12px" }}
+            >
+              {t.count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
+
 
 function OrderRow({
   o,
