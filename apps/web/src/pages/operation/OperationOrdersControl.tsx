@@ -1766,7 +1766,6 @@ function OrderRow({
 }) {
   const ref = (o.source_ref ?? []).filter(Boolean);
   const lines = o.order_lines ?? [];
-  const qtyTotal = unitTotal(lines);
   const stock = stockReadiness(o, availableBySku);
   const loc = locationForAddress(o.customer_address ?? null);
   const msQty = catQty(lines, "mattress");
@@ -1944,9 +1943,9 @@ function OrderRow({
       <CatCountCell testid="cat-ms" qty={msQty} />
       <CatCountCell testid="cat-bf" qty={bfQty} />
       <CatCountCell testid="cat-sofa" qty={sofaQty} />
-      {/* Stock — a colour dot + word (No PO / Waiting / Partial / Ready), no qty. */}
+      {/* Stock — status pill (Ready / Waiting / No PO) + core-only arrival ratio. */}
       <td className="px-2 py-2 whitespace-nowrap">
-        <StockDot info={stock} qtyTotal={qtyTotal} />
+        <StockDot info={stock} coreTotal={msQty + bfQty + sofaQty} />
       </td>
       {/* Logistic — the carrier name (neutral grey). */}
       <td className="px-2 py-2 whitespace-nowrap">
@@ -2050,54 +2049,44 @@ function ActionCell({
   );
 }
 
-/** Stock dot — a colour ● + one WORD (No PO / Waiting / Partial / Ready), NO qty
- *  number (C1 redesign). Four states mapped from the readiness `info.state`:
- *    unknown → "No PO" (red) · awaiting → "Waiting" (amber) · need_po → "Partial"
- *    (grey, when some but not all units are on hand) else "Waiting" (amber) ·
- *    ready / in_stock → "Ready" (green). `data-stock-state` stays for tests. */
-function StockDot({ info, qtyTotal }: { info: StockInfo; qtyTotal: number }) {
-  let word: string;
-  let color: string;
+// STOCK cell = a 3-state pill (Partial merged into Waiting) + a CORE-only
+// received/total ratio (Loo 2026-07-09). Colours reuse Jess's proposal legend
+// (Ready green / Waiting amber / No PO red).
+const STOCK_PILL: Record<
+  "ready" | "waiting" | "no_po",
+  { label: string; text: string; bg: string; border: string }
+> = {
+  ready: { label: "Ready", text: "#166534", bg: "#D6EFD9", border: "#A9D8B0" },
+  waiting: { label: "Waiting", text: "#92400E", bg: "#FBE8C6", border: "#F0D08A" },
+  no_po: { label: "No PO", text: "#991B1B", bg: "#FCE4E4", border: "#F3B4B4" },
+};
+
+/** Stock cell — a status pill (Ready / Waiting / No PO, Partial folded into
+ *  Waiting) + a CORE-only arrival ratio `received/total`. Denominator = the
+ *  order's Mattress+Bedframe+Sofa unit total (accessories don't gate delivery,
+ *  so they're excluded). Numerator: Ready = all core, No PO = 0; Waiting shows
+ *  "–" because the list payload carries no per-line GRN-received qty (esp.
+ *  AutoCount orders). `data-stock-state` kept verbatim for the tests. */
+function StockDot({ info, coreTotal }: { info: StockInfo; coreTotal: number }) {
+  let key: "ready" | "waiting" | "no_po";
   let title: string;
   switch (info.state) {
+    case "ready":
+    case "in_stock":
+      key = "ready";
+      title = "All core stock secured for this order";
+      break;
     case "unknown":
-      word = "No PO";
-      color = "#8C3F36";
+      key = "no_po";
       title = "No PO raised yet — open the order to reserve stock or raise a PO";
       break;
-    case "need_po": {
-      const need = info.need ?? qtyTotal;
-      const have = info.have ?? 0;
-      if (have > 0 && have < need) {
-        word = "Partial";
-        color = "#726C64";
-      } else {
-        word = "Waiting";
-        color = "#9A7B3F";
-      }
-      title =
-        "Short — raise a PO" +
-        (info.short && info.short.length > 0
-          ? ": " + info.short.map((s) => `${shortSku(s.sku)} ${s.have}/${s.need}`).join(", ")
-          : "");
-      break;
-    }
-    case "ready":
-      word = "Ready";
-      color = "#5B7F63";
-      title = "Stock secured / reserved for this order";
-      break;
-    case "in_stock":
-      word = "Ready";
-      color = "#5B7F63";
-      title = "Free warehouse stock covers every line";
-      break;
-    default: // awaiting
-      word = "Waiting";
-      color = "#9A7B3F";
-      title = "PO open — stock on the way";
+    default: // awaiting / need_po → Waiting (Partial merged in)
+      key = "waiting";
+      title = "Core stock not all in yet — PO open / awaiting arrival";
       break;
   }
+  const S = STOCK_PILL[key];
+  const num = key === "ready" ? String(coreTotal) : key === "no_po" ? "0" : "–";
   return (
     <span
       className="inline-flex items-center gap-1.5 whitespace-nowrap"
@@ -2105,19 +2094,28 @@ function StockDot({ info, qtyTotal }: { info: StockInfo; qtyTotal: number }) {
       data-stock-state={info.state}
     >
       <span
-        className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-        style={{ backgroundColor: color }}
-        aria-hidden="true"
-      />
-      <span style={{ fontSize: "14px", fontWeight: 500, color }}>{word}</span>
+        className="inline-flex items-center rounded-full"
+        style={{
+          fontSize: "11px",
+          fontWeight: 600,
+          padding: "1px 8px",
+          color: S.text,
+          background: S.bg,
+          border: `1px solid ${S.border}`,
+        }}
+      >
+        {S.label}
+      </span>
+      {coreTotal > 0 && (
+        <span
+          className="tabular-nums"
+          style={{ fontSize: "12.5px", fontWeight: 600, color: "#4B5563" }}
+        >
+          {num}/{coreTotal}
+        </span>
+      )}
     </span>
   );
-}
-
-/** Trim a long/free-text SKU to a compact token for the items sub-line. */
-function shortSku(sku: string): string {
-  const s = sku.includes(":") ? sku.split(":").slice(1).join(":") : sku;
-  return s.length > 14 ? s.slice(0, 13) + "…" : s;
 }
 
 function Th({

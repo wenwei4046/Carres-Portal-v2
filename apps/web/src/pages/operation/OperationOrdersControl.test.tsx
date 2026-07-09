@@ -351,7 +351,7 @@ describe("OperationOrdersControl · Stock column", () => {
     expect(row.querySelector('[data-stock-state="in_stock"]')).toBeTruthy();
   });
 
-  it("shows a Partial dot when some — but not all — units are on hand", () => {
+  it("shows Waiting (Partial folded in) when some — but not all — units are on hand", () => {
     oneRow({
       id: "sh",
       so: 2002,
@@ -368,8 +368,9 @@ describe("OperationOrdersControl · Stock column", () => {
     ]);
     wrap(<OperationOrdersControl />);
     const row = screen.getByTestId("order-row");
-    // have = 3 ; need = 5 → 0 < have < need → grey "Partial" dot.
-    expect(within(row).getByText("Partial")).toBeInTheDocument();
+    // have = 3 ; need = 5 → partial arrival now reads as the amber "Waiting"
+    // pill (the separate "Partial" state was dropped, Loo 2026-07-09).
+    expect(within(row).getByText("Waiting")).toBeInTheDocument();
     expect(row.querySelector('[data-stock-state="need_po"]')).toBeTruthy();
   });
 
