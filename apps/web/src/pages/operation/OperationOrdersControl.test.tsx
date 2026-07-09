@@ -644,6 +644,29 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
       expect.stringContaining("Confirmed"),
     );
   });
+
+  // P11 (Gmail-style bulk header) — a partial tick offers "Select all N in
+  // <tab>"; clicking it selects the whole filtered tab; the in-bar checkbox
+  // stays put and unticks everything in place.
+  it("offers cross-tab select-all + unticks in place from the bulk header", () => {
+    wrap(<OperationOrdersControl />);
+    fireEvent.click(screen.getByLabelText("Select SO-1001"));
+    fireEvent.click(screen.getByLabelText("Select SO-1002"));
+    fireEvent.click(screen.getByLabelText("Select SO-1003"));
+    expect(screen.getByText("3 selected")).toBeInTheDocument();
+
+    // "Select all 7 in All" — the whole tab, not just the ticked rows.
+    fireEvent.click(screen.getByRole("button", { name: /Select all 7 in All/ }));
+    expect(screen.getByText("7 selected")).toBeInTheDocument();
+    // Banner disappears once everything is already selected.
+    expect(
+      screen.queryByRole("button", { name: /Select all 7/ }),
+    ).not.toBeInTheDocument();
+
+    // The header checkbox is still there (not hidden) and clears in place.
+    fireEvent.click(screen.getByLabelText("Deselect all"));
+    expect(screen.queryByText(/\d+ selected/)).not.toBeInTheDocument();
+  });
 });
 
 // ─── Orders export — bulk ⋮ menu, CSV + Print (Jess 2026-06-26, #4) ──────────
@@ -693,7 +716,7 @@ describe("orders export", () => {
     // Export/print live behind the row checkboxes + ⋮ — NOT a top-bar button
     // (Jess 2026-06-26: tick one customer → ⋮ → Print prints just that order).
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: /Actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
     expect(screen.getByRole("button", { name: /Export CSV/ })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Print \/ Save as PDF/ }),
@@ -716,7 +739,7 @@ describe("orders export", () => {
 
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: /Actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
     fireEvent.click(screen.getByRole("button", { name: /Export CSV/ }));
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
@@ -739,7 +762,7 @@ describe("orders export", () => {
 
     wrap(<OperationOrdersControl />);
     fireEvent.click(screen.getByLabelText("Select all on this page"));
-    fireEvent.click(screen.getByRole("button", { name: /Actions/ }));
+    fireEvent.click(screen.getByRole("button", { name: /More actions/ }));
     fireEvent.click(screen.getByRole("button", { name: /Print \/ Save as PDF/ }));
 
     expect(open).toHaveBeenCalledTimes(1);

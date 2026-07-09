@@ -973,6 +973,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const pagedIds = useMemo(() => shown.map((o) => o.id), [shown]);
   const allPagedSelected =
     pagedIds.length > 0 && pagedIds.every((id) => selected.has(id));
+  // Partial tick → the header checkbox shows an indeterminate dash (Gmail).
+  const somePagedSelected =
+    !allPagedSelected && pagedIds.some((id) => selected.has(id));
   function toggleOne(id: string) {
     setSelected((s) => {
       const n = new Set(s);
@@ -992,6 +995,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
   function clearSel() {
     setSelected(new Set());
     setBulkMenu(null);
+  }
+  // Gmail "Select all N in <tab>" — the whole filtered tab is already in memory
+  // (visible), windowing only limits what's RENDERED, so this needs no API call.
+  function selectAllInTab() {
+    setSelected(new Set(visible.map((o) => o.id)));
   }
   const selectedOrders = orders.filter((o) => selected.has(o.id));
 
@@ -1405,6 +1413,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
             {selected.size > 0 ? (
               <BulkHeadRow
                 count={selected.size}
+                total={total}
+                tabLabel={TABS.find((t) => t.key === tab)?.label ?? "this tab"}
+                allChecked={allPagedSelected}
+                someChecked={somePagedSelected}
+                onSelectAllInTab={selectAllInTab}
                 menu={bulkMenu}
                 setMenu={setBulkMenu}
                 partners={partnersQ.data?.partners ?? []}
@@ -1503,10 +1516,17 @@ export default function OperationOrdersControl({ onImport }: Props) {
 
 /** Gmail-style bulk-action row (P11) — fills the table-header row itself (same
  *  height) with a GREY band when ≥1 order is selected, so the table never jumps.
- *  A ⋮ menu expands to: Assign logistic (→ partner list) · Export CSV · Print ·
- *  Create tasks · Mark completed. Colours stay quiet — no black fill. */
+ *  The select-all checkbox STAYS put (checked / indeterminate) so you can untick
+ *  in place like Gmail. When the loaded window is a subset of the tab it offers
+ *  "Select all N in <tab>". The two daily actions (Assign · Mark completed) are
+ *  inline; Export / Print / Create-tasks tuck under ⋮. Colours stay quiet. */
 function BulkHeadRow({
   count,
+  total,
+  tabLabel,
+  allChecked,
+  someChecked,
+  onSelectAllInTab,
   menu,
   setMenu,
   partners,
@@ -1519,6 +1539,11 @@ function BulkHeadRow({
   busy,
 }: {
   count: number;
+  total: number;
+  tabLabel: string;
+  allChecked: boolean;
+  someChecked: boolean;
+  onSelectAllInTab: () => void;
   menu: null | "menu" | "assign";
   setMenu: (m: null | "menu" | "assign") => void;
   partners: { id: string; name: string }[];
@@ -1535,57 +1560,91 @@ function BulkHeadRow({
       className="border-b"
       style={{ backgroundColor: "#E7E0D2", borderBottomColor: "rgba(34,31,32,0.14)" }}
     >
-      <th colSpan={11} className="px-3 py-1.5 text-left font-normal">
+      {/* Col 1 — the select-all box stays in its column, untickable in place. */}
+      <th className="px-2 py-1.5">
+        <input
+          type="checkbox"
+          checked={allChecked}
+          ref={(el) => {
+            if (el) el.indeterminate = someChecked;
+          }}
+          onChange={onClear}
+          aria-label="Deselect all"
+          title="Deselect all"
+          className="cursor-pointer accent-base-700 align-middle"
+        />
+      </th>
+      <th colSpan={10} className="pl-1 pr-3 py-1.5 text-left font-normal">
         <div className="flex items-center gap-2 text-base-800">
-          <span className="text-[12px] font-semibold tabular-nums">
+          <span className="text-[12px] font-semibold tabular-nums whitespace-nowrap">
             {count} selected
           </span>
+          {/* Gmail cross-page select-all — only while the tab holds more. */}
+          {count < total && (
+            <button
+              type="button"
+              onClick={onSelectAllInTab}
+              className="text-[12px] text-[#1F6FBF] hover:underline whitespace-nowrap"
+            >
+              Select all {total} in {tabLabel}
+            </button>
+          )}
+          <span className="mx-1 h-4 w-px bg-black/10" aria-hidden />
+          {/* Daily actions — inline, one click, labelled (no icon-guessing). */}
           <div className="relative">
             <button
               type="button"
-              onClick={() => setMenu(menu ? null : "menu")}
+              onClick={() => setMenu(menu === "assign" ? null : "assign")}
               disabled={busy}
               className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded hover:bg-black/5 disabled:opacity-50"
             >
-              <MoreVertical size={14} /> {busy ? "Working…" : "Actions"}
+              <Truck size={14} /> Assign <ChevronDown size={12} />
             </button>
-            {menu && (
+            {menu === "assign" && (
               <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
-                {menu === "menu" ? (
-                  <>
-                    <BulkMenuItem icon={Truck} label="Assign logistic…" onClick={() => setMenu("assign")} />
-                    <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
-                    <BulkMenuItem icon={Printer} label="Print / Save as PDF" onClick={onPrint} />
-                    <BulkMenuItem icon={ListTodo} label="Create follow-up tasks" onClick={onTasks} />
-                    <BulkMenuItem icon={CheckCircle2} label="Mark completed" onClick={onComplete} />
-                  </>
-                ) : (
-                  <>
-                    <div className="px-2 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
-                      Assign to…
-                    </div>
-                    {partners.length === 0 && (
-                      <div className="px-2 py-1.5 text-[12px] text-base-400">No partners.</div>
-                    )}
-                    {partners.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => onAssign(p.id)}
-                        className="w-full text-left px-2 py-1.5 text-[12px] hover:bg-base-100"
-                      >
-                        {p.name}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setMenu("menu")}
-                      className="w-full text-left px-2 py-1.5 text-[11px] text-base-500 hover:bg-base-100 border-t border-base-100 mt-1"
-                    >
-                      ← Back
-                    </button>
-                  </>
+                <div className="px-2 py-1.5 text-[10px] uppercase tracking-[0.08em] text-base-400">
+                  Assign to…
+                </div>
+                {partners.length === 0 && (
+                  <div className="px-2 py-1.5 text-[12px] text-base-400">No partners.</div>
                 )}
+                {partners.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => onAssign(p.id)}
+                    className="w-full text-left px-2 py-1.5 text-[12px] hover:bg-base-100"
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onComplete}
+            disabled={busy}
+            className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded hover:bg-black/5 disabled:opacity-50"
+          >
+            <CheckCircle2 size={14} /> {busy ? "Working…" : "Mark completed"}
+          </button>
+          {/* Occasional actions — folded under ⋮. */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenu(menu === "menu" ? null : "menu")}
+              disabled={busy}
+              aria-label="More actions"
+              className="inline-flex items-center text-[12px] px-1.5 py-0.5 rounded hover:bg-black/5 disabled:opacity-50"
+            >
+              <MoreVertical size={14} />
+            </button>
+            {menu === "menu" && (
+              <div className="absolute left-0 top-full mt-1 z-30 w-56 bg-white text-base-900 rounded-md shadow-lg border border-base-200 py-1 max-h-72 overflow-auto">
+                <BulkMenuItem icon={Download} label="Export CSV" onClick={onExport} />
+                <BulkMenuItem icon={Printer} label="Print / Save as PDF" onClick={onPrint} />
+                <BulkMenuItem icon={ListTodo} label="Create follow-up tasks" onClick={onTasks} />
               </div>
             )}
           </div>
