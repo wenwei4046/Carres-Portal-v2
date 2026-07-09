@@ -208,13 +208,13 @@ describe("OperationOrdersControl", () => {
     wrap(<OperationOrdersControl />);
     const g = statusGroup();
     expect(g.getAllByRole("button")).toHaveLength(6);
-    // counts: All 7, Placed 1, Proceed 2, Pending 1, Scheduled 2, Completed 1.
+    // counts: All 7, Placed 1, Proceed 2, Pending 1, Scheduled 2, Delivered 1.
     expect(g.getByRole("button", { name: /All\s*7/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Placed\s*1/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Proceed\s*2/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Pending\s*1/ })).toBeInTheDocument();
     expect(g.getByRole("button", { name: /Scheduled\s*2/ })).toBeInTheDocument();
-    expect(g.getByRole("button", { name: /Completed\s*1/ })).toBeInTheDocument();
+    expect(g.getByRole("button", { name: /Delivered\s*1/ })).toBeInTheDocument();
   });
 
   it("defaults to All and shows every order (completed 1007 sorts to the bottom)", () => {
@@ -603,18 +603,20 @@ describe("OperationOrdersControl · listing columns (A1–A4)", () => {
     expect(cells[8].textContent).toMatch(/\d/);
   });
 
-  it("paginates — 15/page by default (fixed listing box), Next works", () => {
+  it("windows to the first 30 rows + shows the load-more sentinel (infinite scroll)", () => {
     listHookState.data = {
       orders: Array.from({ length: 120 }, (_, i) =>
         makeRow({ id: `p${i}`, so: 4000 + i }),
       ),
     };
     wrap(<OperationOrdersControl />);
-    expect(screen.getByText(/1.15 of 120/)).toBeInTheDocument();
-    expect(screen.getAllByTestId("order-row")).toHaveLength(15);
-
-    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
-    expect(screen.getByText(/16.30 of 120/)).toBeInTheDocument();
+    // P11: render only the first batch (30) into the DOM; the rest lazy-load as
+    // the bottom sentinel scrolls into view (IntersectionObserver — not firable
+    // in jsdom, so only the initial window is asserted here).
+    expect(screen.getAllByTestId("order-row")).toHaveLength(30);
+    expect(screen.getByText("30 of 120")).toBeInTheDocument();
+    // The sentinel row advertises what's left to load.
+    expect(screen.getByText(/Loading more/)).toBeInTheDocument();
   });
 
   it("surfaces an Unassigned-carrier alert (no-carrier count) and filters on click", () => {
