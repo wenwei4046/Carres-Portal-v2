@@ -12,8 +12,10 @@ import {
 } from "lucide-react";
 import {
   eventTypeForLegacyAction,
+  isOrderEventType,
   orderEventMeta,
   type OrderEventCategory,
+  type OrderEventType,
 } from "@carres/shared";
 import {
   useOrderTimeline,
@@ -87,6 +89,28 @@ function TagBadge({ tag }: { tag: AnnotationTag }) {
 // Human title + category come from the shared taxonomy; unmapped actions fall
 // back to a de-underscored label so nothing ever shows raw jsonb.
 
+// Human labels for the fields the auto-capture triggers record.
+const FIELD_LABEL: Record<string, string> = {
+  delivery_date: "Delivery date",
+  status: "Status",
+  balance: "Balance",
+  payment_status: "Payment status",
+  logistic_eta: "Logistic ETA",
+  stock_eta: "Stock ETA",
+  balance_due_date: "Balance due date",
+  called_customer: "Called customer",
+  delivery_time_slot: "Delivery time slot",
+  customer_request: "Customer request",
+  carres_remark: "Carres remark",
+  warehouse_remark: "Warehouse remark",
+  storage_waiver_status: "Storage waiver",
+};
+
+function fmtVal(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  return String(v);
+}
+
 function describe(entry: TimelineEntry): {
   category: OrderEventCategory;
   title: string;
@@ -99,14 +123,33 @@ function describe(entry: TimelineEntry): {
       body: entry.content ?? null,
     };
   }
-  const type = eventTypeForLegacyAction(entry.action);
+  const action = entry.action ?? "";
+  // New auto-capture rows write action = a taxonomy type directly; legacy rows
+  // map via the action table. Either way we get a category + human label.
+  const type: OrderEventType | null = isOrderEventType(action)
+    ? action
+    : eventTypeForLegacyAction(action);
   if (type) {
     const meta = orderEventMeta(type);
+    const d = (entry.detail ?? null) as { field?: string; from?: unknown; to?: unknown } | null;
+    // Field edits read as "Delivery date changed · 5 Jul → 9 Jul".
+    if (
+      (type === "order.field_changed" || type === "order.date_changed") &&
+      d &&
+      (d.from !== undefined || d.to !== undefined)
+    ) {
+      const field = (d.field && FIELD_LABEL[d.field]) || d.field || "Details";
+      return {
+        category: meta.category,
+        title: `${field} changed`,
+        body: `${fmtVal(d.from)} → ${fmtVal(d.to)}`,
+      };
+    }
     return { category: meta.category, title: meta.defaultTitle, body: null };
   }
   return {
     category: "system",
-    title: (entry.action ?? "Activity").replace(/_/g, " "),
+    title: action.replace(/_/g, " ") || "Activity",
     body: null,
   };
 }
