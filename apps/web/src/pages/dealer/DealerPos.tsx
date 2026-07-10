@@ -915,7 +915,7 @@ export default function DealerPos({
                 Total{" "}
                 <span
                   style={{
-                    fontFamily: "var(--font-mark)",
+                    fontFamily: "var(--font-num)",
                     fontWeight: 900,
                     fontSize: 18,
                     color: "var(--c-burnt)",
