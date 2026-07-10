@@ -6,8 +6,9 @@ import type { ModelMeta } from "./catalog-index";
 /**
  * One POS catalog product card — prototype skin (`.prod-card`, Loo's Claude
  * Design 2026-07-04): 4:3 photo with the category kicker badge + round
- * terracotta add affordance, then options line / name / detail / model key +
- * Bodoni price row. The whole card is a button that opens the configurator
+ * terracotta add affordance, then options line / name / detail / model key row.
+ * No price on cards (Loo 2026-07-10) — prices appear only in the configurator.
+ * The whole card is a button that opens the configurator
  * (page or drawer); configurable categories show the sliders icon, flat ones
  * a plus, in-cart a check. Locked cards (sofa-mutex) dim and stop responding.
  * Logic + DraftLine construction: UNCHANGED.
@@ -61,10 +62,6 @@ export default function ProductCard({
         <div className="prod-card__detail">{model.blurb ?? ""}</div>
         <div className="prod-card__row">
           <span className="prod-card__sku">{model.modelKey.toUpperCase()}</span>
-          <span className="prod-card__price">
-            <sup>FROM RM</sup>
-            {meta.fromPrice.toLocaleString("en-MY")}
-          </span>
         </div>
       </div>
     </button>
