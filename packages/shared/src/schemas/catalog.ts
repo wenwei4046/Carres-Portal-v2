@@ -975,7 +975,12 @@ export type ProductModelPatchInput = z.infer<typeof productModelPatchInput>;
 export const productSkuCreateInput = z
   .object({
     modelId: z.string().uuid(),
-    variant: z.string().trim().min(1).max(60),
+    // '' is allowed ONLY for the no-variant-axis categories (accessory /
+    // service — one SKU per model, Loo 2026-07-11); the POST /skus route
+    // enforces non-empty for every other category (the category lives on the
+    // model row, so the gate can't be in this schema). Empty variant → the SKU
+    // code is the bare MODEL_KEY (no `-` suffix).
+    variant: z.string().trim().max(60),
     variantKind: variantKindSchema,
     price: z.number().nonnegative(),
     cost: z.number().nonnegative().nullable().optional(),

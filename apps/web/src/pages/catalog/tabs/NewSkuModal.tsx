@@ -155,9 +155,16 @@ export default function NewSkuModal({
   // becomes `-K`); preview that so the code shown matches what's created.
   const effectiveCategory = mode === "new" ? category : existingModel?.category;
   const isBedVariant = effectiveCategory === "mattress" || effectiveCategory === "bedframe";
+  // Accessory / service carry NO size/variant axis (one SKU per model, Loo
+  // 2026-07-11): the field is hidden, nothing to fill — the server mints the
+  // bare MODEL_KEY as the SKU code.
+  const noVariantAxis = effectiveCategory === "accessory" || effectiveCategory === "service";
   const codeSuffix = isBedVariant ? canonicalSize(variant.trim()).code : variant.trim();
-  const codePreview =
-    modelKey && variant.trim() ? `${modelKey.toUpperCase()}-${codeSuffix}` : "";
+  const codePreview = noVariantAxis
+    ? modelKey.toUpperCase()
+    : modelKey && variant.trim()
+      ? `${modelKey.toUpperCase()}-${codeSuffix}`
+      : "";
 
   const priceNum = price.trim() === "" ? 0 : Number(price);
   const priceOk = Number.isFinite(priceNum) && priceNum >= 0;
@@ -188,7 +195,8 @@ export default function NewSkuModal({
         modelKey.length >= 2 &&
         selectedSizes.size > 0 &&
         (!isPrincipal || priceOk)
-      : variant.trim().length > 0 &&
+      : // No-variant-axis categories (accessory / service) need no size/variant.
+        (noVariantAxis || variant.trim().length > 0) &&
         // Price/cost only gate validity when the principal can actually set them.
         (!isPrincipal || (priceOk && costOk)) &&
         (mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel);
@@ -288,7 +296,9 @@ export default function NewSkuModal({
       }
       await createSku.mutateAsync({
         modelId: targetModelId,
-        variant: variant.trim(),
+        // Accessory / service: no variant axis — always sent empty (a stale
+        // value typed before a category flip must not leak into the code).
+        variant: noVariantAxis ? "" : variant.trim(),
         variantKind: kind,
         // 0175 — non-principal creates an UNPRICED SKU (price 0 / cost null);
         // the principal prices it later. Principal can seed price/cost here.
@@ -576,21 +586,34 @@ export default function NewSkuModal({
             size path (one SKU per ticked size instead). */}
         {!compFlow && !sizeFlow && (
           <>
-            <label className="block">
-              <span className="label block mb-1">Size / variant</span>
-              <input
-                value={variant}
-                onChange={(e) => setVariant(e.target.value)}
-                placeholder={category === "sofa" ? "3-seater" : "King"}
-                data-testid="new-sku-variant"
-                className={INPUT_CLS}
-              />
-              {codePreview && (
-                <div className="t-tiny text-base-500 mt-1 flex items-center gap-1.5">
+            {noVariantAxis ? (
+              // Accessory / service: no size/variant axis — nothing to fill.
+              // Just preview the code the server will mint (the bare model key).
+              codePreview && (
+                <div
+                  className="t-tiny text-base-500 flex items-center gap-1.5"
+                  data-testid="new-sku-no-variant-hint"
+                >
                   Code: <CodeChip>{codePreview}</CodeChip>
                 </div>
-              )}
-            </label>
+              )
+            ) : (
+              <label className="block">
+                <span className="label block mb-1">Size / variant</span>
+                <input
+                  value={variant}
+                  onChange={(e) => setVariant(e.target.value)}
+                  placeholder={category === "sofa" ? "3-seater" : "King"}
+                  data-testid="new-sku-variant"
+                  className={INPUT_CLS}
+                />
+                {codePreview && (
+                  <div className="t-tiny text-base-500 mt-1 flex items-center gap-1.5">
+                    Code: <CodeChip>{codePreview}</CodeChip>
+                  </div>
+                )}
+              </label>
+            )}
 
             {isPrincipal ? (
               <>

@@ -642,6 +642,89 @@ describe("Catalog admin — POST /api/catalog/skus", () => {
     expect((insert?.payload as { sku: string }).sku).toBe("CARRES-CLASSIC-Twin");
     expect((insert?.payload as { cost: number }).cost).toBe(1300);
   });
+
+  // Loo 2026-07-11 — accessory/service carry NO size/variant axis (one SKU per
+  // model): an EMPTY variant is allowed for them and the sku code is the bare
+  // MODEL_KEY (no dash suffix). Every other category still requires a variant.
+  it("accessory with an EMPTY variant → 201, sku = bare MODEL_KEY", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_models: [
+            {
+              id: MODEL_ID_LIVE,
+              category: "accessory",
+              model_key: "memory-foam-pillow",
+            },
+          ],
+        },
+        recorded,
+        writeReturn: {
+          id: "00000000-0000-0000-0000-00000000bb02",
+          model_id: MODEL_ID_LIVE,
+          sku: "MEMORY-FOAM-PILLOW",
+          variant: "",
+          variant_kind: "preset",
+          price: 99,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "",
+          variantKind: "preset",
+          price: 99,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const insert = recorded.find((r) => r.op === "insert");
+    expect((insert?.payload as { sku: string }).sku).toBe("MEMORY-FOAM-PILLOW");
+    expect((insert?.payload as { variant: string }).variant).toBe("");
+    // Supplierless category — supplier_id stays null, no cat_covered lookup.
+    expect((insert?.payload as { supplier_id: string | null }).supplier_id).toBeNull();
+  });
+
+  it("mattress with an EMPTY variant → 422 variant_required", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-classic" },
+          ],
+        },
+        recorded: [],
+        writeReturn: {},
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/skus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: MODEL_ID_LIVE,
+          variant: "",
+          variantKind: "size",
+          price: 2400,
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("variant_required");
+  });
 });
 
 describe("Catalog admin — PATCH /api/catalog/skus/:id", () => {
