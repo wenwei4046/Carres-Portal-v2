@@ -16,7 +16,15 @@ import type {
   SofaCompartmentDto,
   SofaFabricDto,
 } from "@carres/shared";
-import { analyzeSofa, findModule, groupSofas, moduleFootprint } from "@carres/shared";
+import {
+  analyzeSofa,
+  cellsBbox,
+  findModule,
+  groupSofas,
+  moduleFootprint,
+  ROOM_H,
+  ROOM_W,
+} from "@carres/shared";
 
 // Mock the PWP availability hook (usePwpAvailableForPhone) so the component's
 // useQuery has no QueryClient dependency + the voucher result is controllable.
@@ -37,7 +45,7 @@ vi.mock("@/lib/auth", () => ({
     selector({ role: roleMock.current }),
 }));
 
-import SofaConfigurePage, { comboSeedCells } from "./SofaConfigurePage";
+import SofaConfigurePage, { centerSeedInRoom, comboSeedCells } from "./SofaConfigurePage";
 
 beforeAll(() => {
   if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === "undefined") {
@@ -217,6 +225,19 @@ describe("comboSeedCells", () => {
     const groups = groupSofas(withIds, "24");
     expect(groups).toHaveLength(1);
     expect(analyzeSofa(groups[0], "24").closed).toBe(true);
+  });
+});
+
+describe("centerSeedInRoom", () => {
+  it("translates a seed so its footprint bbox centres in the room", () => {
+    const centered = centerSeedInRoom(comboSeedCells(COMBO, "24"), "24");
+    const bb = cellsBbox(centered.map((c, i) => ({ ...c, id: String(i) })), "24")!;
+    expect(Math.abs(bb.x + bb.w / 2 - ROOM_W / 2)).toBeLessThanOrEqual(1);
+    expect(Math.abs(bb.y + bb.h / 2 - ROOM_H / 2)).toBeLessThanOrEqual(1);
+    // uniform translate — relative geometry (and thus connectivity) intact
+    const src = comboSeedCells(COMBO, "24");
+    expect(centered[1].x - centered[0].x).toBe(src[1].x - src[0].x);
+    expect(centered[1].y - centered[0].y).toBe(src[1].y - src[0].y);
   });
 });
 

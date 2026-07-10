@@ -24,6 +24,7 @@ import {
   gatedSofaSizes,
   analyzeSofa,
   canMirror,
+  cellsBbox,
   computeSofaPrice,
   findModule,
   groupSofas,
@@ -31,6 +32,7 @@ import {
   moduleFootprint,
   resolveFabricDelta,
   ROOM_H,
+  ROOM_W,
   type FabricTier,
   type SofaBuild,
   type SofaPricingSnapshot,
@@ -174,6 +176,17 @@ function seedCornerL(codes: string[], depth: string): SeedCell[] | null {
  * validates itself). No closed arrangement, or 2+ corners → the straight
  * fallback and the user rearranges on canvas.
  */
+/** Translate a seeded arrangement so its footprint bbox centres in the room
+ *  (Loo 2026-07-11 — a loaded quick pick lands mid-canvas, not top-left).
+ *  Falls back to a 20px margin when the arrangement outgrows the room. */
+export function centerSeedInRoom(cells: SeedCell[], depth: string): SeedCell[] {
+  const bb = cellsBbox(cells.map((c, i) => ({ ...c, id: `seed-${i}` })), depth);
+  if (!bb) return cells;
+  const dx = Math.max(20, (ROOM_W - bb.w) / 2) - bb.x;
+  const dy = Math.max(20, (ROOM_H - bb.h) / 2) - bb.y;
+  return cells.map((c) => ({ ...c, x: Math.round(c.x + dx), y: Math.round(c.y + dy) }));
+}
+
 export function comboSeedCells(combo: SofaComboDto, depth: string): SeedCell[] {
   const codes = combo.slots
     .map((s) => s[0])
@@ -391,7 +404,7 @@ export default function SofaConfigurePage({
 
   function loadPick(pick: QuickPick) {
     const { slots } = displayFor(pick);
-    setSeed(comboSeedCells({ ...pick.combo, slots }, "24"));
+    setSeed(centerSeedInRoom(comboSeedCells({ ...pick.combo, slots }, "24"), "24"));
     setSeedKey((k) => k + 1);
     setMode("custom");
   }
