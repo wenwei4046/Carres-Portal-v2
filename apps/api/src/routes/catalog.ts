@@ -690,6 +690,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   // pos_active, description, supplier, restore toggle) stay open to internal.
   gateSkuPatchPriceCost(c, parsed.data);
   const patch: Record<string, unknown> = {};
+  // Loo 2026-07-11 — the CODE is a free, directly-renameable field (AutoCount
+  // style). DB unique(sku) turns a collision into a clean 409 via mapPgError.
+  if (parsed.data.sku !== undefined) patch.sku = parsed.data.sku;
   if (parsed.data.variant !== undefined) patch.variant = parsed.data.variant;
   if (parsed.data.variantKind !== undefined) patch.variant_kind = parsed.data.variantKind;
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;
@@ -713,9 +716,11 @@ catalogRouter.patch("/skus/:id", async (c) => {
 
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  // If variant changed we re-derive the sku code so it stays consistent with the
-  // {MODEL_KEY}-{variant} scheme. Look up the model first to know model_key.
-  if (parsed.data.variant !== undefined) {
+  // Loo 2026-07-11 — a variant/SIZE edit no longer rewrites the code (the CODE
+  // is a free field renamed via the explicit `sku` patch above). Only the
+  // CLEAR gate remains: '' is allowed solely for the no-variant-axis
+  // categories (accessory/service) — every other category needs its size.
+  if (parsed.data.variant === "") {
     const { data: skuRow, error: skuErr } = await sb
       .from("product_skus")
       .select("model_id")
@@ -730,17 +735,10 @@ catalogRouter.patch("/skus/:id", async (c) => {
     }
     const { data: modelRow } = await sb
       .from("product_models")
-      .select("model_key, category")
+      .select("category")
       .eq("id", skuRow.model_id)
       .maybeSingle();
-    // Clearing the variant ('') is allowed ONLY for the no-variant-axis
-    // categories (accessory/service, Loo 2026-07-11) — the sku re-derives to
-    // the bare MODEL_KEY. Other categories keep requiring a variant.
-    if (
-      parsed.data.variant === "" &&
-      modelRow &&
-      !SUPPLIERLESS_CATEGORIES.has(modelRow.category as string)
-    ) {
+    if (modelRow && !SUPPLIERLESS_CATEGORIES.has(modelRow.category as string)) {
       return c.json(
         {
           error: "validation",
@@ -749,11 +747,6 @@ catalogRouter.patch("/skus/:id", async (c) => {
         },
         422,
       );
-    }
-    if (modelRow) {
-      patch.sku = parsed.data.variant
-        ? deriveSkuCode(modelRow.model_key, parsed.data.variant)
-        : (modelRow.model_key as string).toUpperCase();
     }
   }
 
