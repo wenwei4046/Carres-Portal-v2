@@ -63,6 +63,11 @@ export interface SizeFootprint {
   label: string;
 }
 
+/** Mattress-gap "Confirm later" sentinel — rides attrs.gap verbatim so the
+ *  SO PDF / Create-PO / receive modals show the choice is still pending
+ *  (the team's KIV vocabulary, same as the fabric/leg dropdowns). */
+export const GAP_KIV = "KIV";
+
 /** Best-effort footprint from a sku's free-text variant ("Queen", "Fab2-King",
  *  "152 x 190", bare "K"/"Q"/"SS"/"S" codes). Null = unknown → the plan view
  *  falls back to its empty state; nothing else depends on this. */
@@ -372,7 +377,10 @@ export default function PosConfigurePage({
   );
 
   const [skuId, setSkuId] = useState<string>("");
-  const [gap, setGap] = useState<string>(gapChoices[0] ?? "");
+  // Mattress gap is THREE-state (Loo 2026-07-11): Confirm later (KIV, the
+  // default — the customer hasn't decided yet; rides attrs.gap = "KIV" so the
+  // PO/PDF show the pending choice) · None ("" — explicitly no gap) · a value.
+  const [gap, setGap] = useState<string>(gapChoices.length > 0 ? GAP_KIV : "");
   // Divan / leg / fabric are OPTIONAL (2990s "Confirm later", Loo 2026-06-11):
   // "" = customer confirms the dimension later; no surcharge applies.
   const [divan, setDivan] = useState<string>("");
@@ -909,12 +917,15 @@ export default function PosConfigurePage({
             )}
 
             {/* Mattress gap — bed frames; the master Gaps pool ∩ Modular ticks
-                (legacy model.gaps column when no pool is available). */}
+                (legacy model.gaps column when no pool is available). Three
+                states: Confirm later (KIV, default) · None · a thickness. */}
             {isBed && gapChoices.length > 0 && (
               <div className="cfg-section">
                 <div className="cfg-section__head">
                   <span className="pos-eyebrow">Mattress gap</span>
-                  <span className="cfg-section__detail">{gap ? `${gap} thickness` : "None"}</span>
+                  <span className="cfg-section__detail">
+                    {gap === GAP_KIV ? "Confirm later" : gap ? `${gap} thickness` : "None"}
+                  </span>
                 </div>
                 <select
                   value={gap}
@@ -923,7 +934,12 @@ export default function PosConfigurePage({
                   className="cfg-select"
                   data-testid="cfg-gap"
                 >
-                  <option value="">None</option>
+                  <option value={GAP_KIV} data-testid="cfg-gap-later">
+                    Confirm later
+                  </option>
+                  <option value="" data-testid="cfg-gap-none">
+                    None
+                  </option>
                   {gapChoices.map((g) => (
                     <option key={g} value={g} data-testid={`cfg-gap-${g}`}>
                       {g}
