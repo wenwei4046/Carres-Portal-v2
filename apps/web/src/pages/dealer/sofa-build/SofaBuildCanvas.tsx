@@ -121,6 +121,7 @@ export default function SofaBuildCanvas({
   heightValue,
   onHeightChange,
   onAddBuild,
+  onLiveTotal,
   onCreateCombo,
   onCreateQuickPick,
   onClose,
@@ -160,6 +161,10 @@ export default function SofaBuildCanvas({
   heightValue?: string;
   onHeightChange?: (h: string) => void;
   onAddBuild: (payload: SofaBuildAddPayload) => void;
+  /** Live engine-total feed (Loo 2026-07-10) — fires whenever the build
+   *  reprices (cells / size / fabric / leg), `null` while the canvas is empty.
+   *  Lets a host page mirror the canvas price in its own chrome. */
+  onLiveTotal?: (total: number | null) => void;
   /** Principal-only: capture the CURRENT arrangement as a sofa combo. When
    *  provided, a "Create combo" button appears beside Add to cart (enabled once
    *  the build is a valid connected sofa). Absent → no button (dealer flow). */
@@ -584,6 +589,12 @@ export default function SofaBuildCanvas({
     };
     return computeSofaPrice(build, snapshot);
   }, [cells, model.id, fabricTier, height, legHeight, snapshot]);
+
+  // Mirror the live total up to the host (POS header) — null while the canvas
+  // is empty so the host shows a placeholder instead of RM 0.
+  useEffect(() => {
+    onLiveTotal?.(cells.length > 0 ? priceResult.total : null);
+  }, [onLiveTotal, cells.length, priceResult.total]);
 
   // Cell indices the winning combo consumed → flame badge on those cells.
   const matchedCellIds = useMemo(() => {
