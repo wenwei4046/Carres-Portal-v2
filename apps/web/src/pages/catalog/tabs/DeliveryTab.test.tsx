@@ -143,9 +143,11 @@ describe("Special delivery rules + RuleTargetPicker", () => {
     // open the add form
     fireEvent.click(screen.getByRole("button", { name: "+ Add rule" }));
 
-    // tick the model in the RuleTargetPicker
-    const modelRow = screen.getByTestId(`rtp-model-${MODEL_ID}`);
-    fireEvent.click(within(modelRow).getByRole("checkbox"));
+    // add the model via the RuleTargetPicker's dropdown
+    fireEvent.change(screen.getByTestId("rtp-add-model"), {
+      target: { value: MODEL_ID },
+    });
+    expect(screen.getByTestId(`rtp-model-${MODEL_ID}`)).toBeInTheDocument();
 
     // set a standalone fee
     fireEvent.change(screen.getByTestId("rule-standalone-fee"), { target: { value: "150" } });
