@@ -5,7 +5,11 @@ import OperationStockOnHand from "./OperationStockOnHand";
 import type { OpsStockItem } from "@carres/shared";
 
 /**
- * OperationStockOnHand — the unified per-unit Stock list (Jess redesign step 3).
+ * OperationStockOnHand — the unified per-unit Stock list. On Hand redesign C+ ·
+ * P1: the four status chips moved into an always-visible LEFT filter rail
+ * (Design 2). They are now buttons in the "Status" group; the filtering logic
+ * (ready / reserved / defective predicates) is unchanged, so these tests target
+ * the status buttons by accessible name.
  *
  * Mocks apiFetch so the single /inventory fetch returns a fixture; OpsStockListView
  * is rendered for real with injected rows (its own fetch is disabled via the
@@ -53,6 +57,8 @@ function wrap(node: React.ReactNode) {
   return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
 }
 
+const statusBtn = (name: RegExp) => screen.getByRole("button", { name });
+
 beforeEach(() => {
   apiFetchMock.mockReset();
   apiFetchMock.mockImplementation((path: string) => {
@@ -64,18 +70,15 @@ beforeEach(() => {
 });
 
 describe("OperationStockOnHand", () => {
-  it("renders 4 filter chips with counts derived from the inventory grid", async () => {
+  it("renders the 4 status filters with counts derived from the inventory grid", async () => {
     wrap(<OperationStockOnHand />);
-    expect(await screen.findAllByRole("tab")).toHaveLength(4);
     // Counts start at 0 during the inventory fetch, then settle — wait for it.
     await waitFor(() => {
-      const tabs = screen.getAllByRole("tab");
-      expect(within(tabs[0]).getByText("7")).toBeInTheDocument(); // All
+      expect(within(statusBtn(/^All\b/)).getByText("7")).toBeInTheDocument();
     });
-    const tabs = screen.getAllByRole("tab");
-    expect(within(tabs[1]).getByText("3")).toBeInTheDocument(); // Ready
-    expect(within(tabs[2]).getByText("1")).toBeInTheDocument(); // Reserved
-    expect(within(tabs[3]).getByText("1")).toBeInTheDocument(); // Defective
+    expect(within(statusBtn(/^Ready\b/)).getByText("3")).toBeInTheDocument();
+    expect(within(statusBtn(/^Reserved\b/)).getByText("1")).toBeInTheDocument();
+    expect(within(statusBtn(/^Defective\b/)).getByText("1")).toBeInTheDocument();
   });
 
   it("defaults to All and lists every unit with its Unit ID", async () => {
@@ -88,10 +91,10 @@ describe("OperationStockOnHand", () => {
     expect(screen.getByText("id-ggg777")).toBeInTheDocument();
   });
 
-  it("Ready chip filters to free + sellable-grade + not-flagged units", async () => {
+  it("Ready filter shows free + sellable-grade + not-flagged units", async () => {
     wrap(<OperationStockOnHand />);
-    const chips = await screen.findAllByRole("tab");
-    fireEvent.click(chips[1]); // Ready
+    await waitFor(() => statusBtn(/^Ready\b/));
+    fireEvent.click(statusBtn(/^Ready\b/));
     await waitFor(() => {
       expect(screen.getByText("id-aaa111")).toBeInTheDocument(); // new
       expect(screen.getByText("id-bbb222")).toBeInTheDocument(); // display
@@ -102,10 +105,10 @@ describe("OperationStockOnHand", () => {
     expect(screen.queryByText("id-eee555")).not.toBeInTheDocument();
   });
 
-  it("Defective chip filters to needs-repair OR damaged units", async () => {
+  it("Defective filter shows needs-repair OR damaged units", async () => {
     wrap(<OperationStockOnHand />);
-    const chips = await screen.findAllByRole("tab");
-    fireEvent.click(chips[3]); // Defective
+    await waitFor(() => statusBtn(/^Defective\b/));
+    fireEvent.click(statusBtn(/^Defective\b/));
     await waitFor(() => {
       expect(screen.getByText("id-eee555")).toBeInTheDocument(); // needsRepair
     });
@@ -114,10 +117,10 @@ describe("OperationStockOnHand", () => {
     expect(screen.queryByText("id-aaa111")).not.toBeInTheDocument(); // ready
   });
 
-  it("Reserved chip shows the customer ref", async () => {
+  it("Reserved filter shows the customer ref", async () => {
     wrap(<OperationStockOnHand />);
-    const chips = await screen.findAllByRole("tab");
-    fireEvent.click(chips[2]); // Reserved
+    await waitFor(() => statusBtn(/^Reserved\b/));
+    fireEvent.click(statusBtn(/^Reserved\b/));
     await waitFor(() => {
       expect(screen.getByText("id-ccc333")).toBeInTheDocument();
     });
