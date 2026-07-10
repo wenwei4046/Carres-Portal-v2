@@ -853,7 +853,8 @@ function FreeItemCampaignsSection({
       </div>
       <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
         A giveaway a salesperson can apply to an eligible cart line ("Make free") — the line books at
-        RM0. Set which models / sizes / sofa builds qualify and the per-line free limit. A campaign is
+        RM0. Set which models / sizes / sofa builds qualify and how many units ONE order can get free
+        (counted across all its lines). A campaign is
         dormant until you flip it Active. Use &ldquo;+ New Free Item&rdquo; above to add one.
         {!isPrincipal && " Principal only — read-only for your role."}
       </p>
@@ -1016,7 +1017,7 @@ function CampaignForm({
           />
         </label>
         <label className="block">
-          <span className="label block mb-1">Max free / line</span>
+          <span className="label block mb-1">Max free / order</span>
           <input
             type="number"
             min={1}

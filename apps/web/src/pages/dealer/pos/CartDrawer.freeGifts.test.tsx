@@ -145,3 +145,105 @@ describe("CartDrawer — free item 'Make free'", () => {
     expect(screen.queryByTestId("make-free-L1-camp-1")).not.toBeInTheDocument();
   });
 });
+
+// max_free_qty is a per-campaign TOTAL across the whole ORDER (server F3) —
+// the cart must stop offering (and revert an over-bumped claim) live, so the
+// salesperson never builds a cart the server would 409.
+describe("CartDrawer — per-order free cap (max_free_qty)", () => {
+  const campaign = {
+    id: "camp-1",
+    name: "Pillow promo",
+    active: true,
+    maxFreeQty: 2,
+    eligible: [{ modelId: MATT, scope: "model" as const }],
+  };
+  const freedLine = (localId: string): DraftLine =>
+    ({
+      localId,
+      sku: "MATT-A",
+      qty: 1,
+      attrs: { free_item: { campaignId: "camp-1", name: "Pillow promo" } },
+      unitPrice: 0,
+      origUnitPrice: 1200,
+      label: "Matt X · Queen",
+    }) as DraftLine;
+  const paidLine = (localId: string, qty = 1): DraftLine => ({
+    localId,
+    sku: "MATT-A",
+    qty,
+    attrs: null,
+    unitPrice: 1200,
+    label: "Matt X · Queen",
+  });
+  function draftWithLines(lines: DraftLine[]): WizardDraft {
+    return { ...emptyDraft(), lines };
+  }
+
+  it("once the order's allowance is spent, other eligible lines stop offering + show the limit hint", () => {
+    render(
+      <CartDrawer
+        draft={draftWithLines([freedLine("L1"), paidLine("L2")])}
+        onChange={noop}
+        onProceed={noop}
+        onClose={noop}
+        catalog={catalog({ freeItemCampaigns: [{ ...campaign, maxFreeQty: 1 }] })}
+      />,
+    );
+    expect(screen.queryByTestId("make-free-L2-camp-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("free-limit-reached-L2")).toBeInTheDocument();
+  });
+
+  it("remaining allowance still offers: max 2 with 1 freed offers a qty-1 line, not a qty-2 line", () => {
+    render(
+      <CartDrawer
+        draft={draftWithLines([freedLine("L1"), paidLine("L2"), paidLine("L3", 2)])}
+        onChange={noop}
+        onProceed={noop}
+        onClose={noop}
+        catalog={catalog({ freeItemCampaigns: [campaign] })}
+      />,
+    );
+    expect(screen.getByTestId("make-free-L2-camp-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("make-free-L3-camp-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("free-limit-reached-L3")).toBeInTheDocument();
+  });
+
+  it("bumping a freed line's qty past the cap reverts the claim to the real price", () => {
+    const onChange = vi.fn();
+    render(
+      <CartDrawer
+        draft={draftWithLines([freedLine("L1")])}
+        onChange={onChange}
+        onProceed={noop}
+        onClose={noop}
+        catalog={catalog({ freeItemCampaigns: [{ ...campaign, maxFreeQty: 1 }] })}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("Increase quantity"));
+    const next = onChange.mock.calls[0][0] as WizardDraft;
+    expect(next.lines[0]!.qty).toBe(2);
+    expect(next.lines[0]!.unitPrice).toBe(1200);
+    expect((next.lines[0]!.attrs as Record<string, unknown> | null)?.free_item).toBeUndefined();
+  });
+
+  it("bumping within the cap keeps the line free", () => {
+    const onChange = vi.fn();
+    render(
+      <CartDrawer
+        draft={draftWithLines([freedLine("L1")])}
+        onChange={onChange}
+        onProceed={noop}
+        onClose={noop}
+        catalog={catalog({ freeItemCampaigns: [campaign] })}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("Increase quantity"));
+    const next = onChange.mock.calls[0][0] as WizardDraft;
+    expect(next.lines[0]!.qty).toBe(2);
+    expect(next.lines[0]!.unitPrice).toBe(0);
+    expect((next.lines[0]!.attrs as Record<string, unknown>).free_item).toEqual({
+      campaignId: "camp-1",
+      name: "Pillow promo",
+    });
+  });
+});
