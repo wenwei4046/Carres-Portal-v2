@@ -27,8 +27,9 @@ import type { ReserveFreeUnit } from "./ReserveStockDialog";
 
 const CONDITION_LABEL: Record<string, string> = {
   new: "New",
-  exhibition: "Exhibition",
-  old: "Old",
+  exhibition: "Display",
+  old: "Fair (used)",
+  refurbished: "Refurbished",
   damaged: "Damaged",
 };
 

@@ -42,7 +42,7 @@ opsStockRouter.get("/ready", requireOperationOrPrincipal, async (c) => {
     .from("ops_stock_items")
     .select("*")
     .eq("status", "free")
-    .in("condition", ["new", "exhibition"])
+    .in("condition", ["new", "exhibition", "old", "refurbished"])
     .eq("needs_repair", false)
     .order("date_in", { ascending: true, nullsFirst: false });
   if (error) throw new HTTPException(500, { message: error.message });
@@ -67,7 +67,7 @@ opsStockRouter.get("/repair", requireOperationOrPrincipal, async (c) => {
   const { data, error } = await sb
     .from("ops_stock_items")
     .select("*")
-    .or("needs_repair.eq.true,condition.in.(old,damaged)")
+    .or("needs_repair.eq.true,condition.in.(damaged)")
     .order("updated_at", { ascending: false });
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json({ items: shape(data ?? []), total: (data ?? []).length });
@@ -103,6 +103,15 @@ opsStockRouter.post("/reserve", requireOperationOrPrincipal, async (c) => {
     throw new HTTPException(404, {
       message: "No matching free unit available for this SKU",
     });
+  }
+  // 0212 — stamp WHY the ready-pool unit was pulled (urgent vs exchange).
+  // Best-effort under write_internal RLS: the reserve itself already succeeded,
+  // so a reason-stamp hiccup must not surface as a false reserve failure.
+  if (parsed.reason) {
+    await sb
+      .from("ops_stock_items")
+      .update({ reserve_reason: parsed.reason })
+      .eq("id", data as string);
   }
   return c.json({ itemId: data });
 });
@@ -269,7 +278,7 @@ interface RawRow {
   unit_code: string | null;
   sku: string;
   warehouse_id: string;
-  condition: "new" | "exhibition" | "old" | "damaged";
+  condition: "new" | "exhibition" | "old" | "refurbished" | "damaged";
   // 0153 added 'incoming' (PO opened, not yet at WH) + 'voided' (PO cancelled).
   status: "incoming" | "free" | "reserved" | "sold" | "transferred" | "voided";
   reserved_ref: string | null;
@@ -279,6 +288,8 @@ interface RawRow {
   po_no: string | null;
   source_ref: string | null;
   date_in: string | null;
+  // 0212 — why a ready-pool unit was pulled: 'urgent' | 'exchange' | null.
+  reserve_reason: string | null;
   // 0153 — sale linkage set on delivery.
   sold_at: string | null;
   sold_order_id: string | null;
@@ -301,6 +312,7 @@ function shape(rows: RawRow[]) {
     poNo: r.po_no,
     sourceRef: r.source_ref,
     dateIn: r.date_in,
+    reserveReason: r.reserve_reason ?? null,
     soldAt: r.sold_at,
     soldOrderId: r.sold_order_id,
     createdAt: r.created_at,

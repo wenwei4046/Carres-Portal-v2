@@ -2142,7 +2142,7 @@ export interface operationOrderDetailFreeUnit {
   unitCode: string | null;
   sku: string;
   warehouseId: string;
-  condition: "new" | "exhibition" | "old" | "damaged";
+  condition: "new" | "exhibition" | "old" | "refurbished" | "damaged";
   poNo: string | null;
   sourceRef: string | null;
   dateIn: string | null;

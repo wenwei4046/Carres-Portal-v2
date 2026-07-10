@@ -45,7 +45,10 @@ const CHIPS: { key: Chip; label: string }[] = [
 function isReady(r: OpsStockItem): boolean {
   return (
     r.status === "free" &&
-    (r.condition === "new" || r.condition === "exhibition") &&
+    (r.condition === "new" ||
+      r.condition === "exhibition" ||
+      r.condition === "old" ||
+      r.condition === "refurbished") &&
     !r.needsRepair
   );
 }
@@ -53,7 +56,7 @@ function isReserved(r: OpsStockItem): boolean {
   return r.status === "reserved";
 }
 function isDefective(r: OpsStockItem): boolean {
-  return r.needsRepair || r.condition === "old" || r.condition === "damaged";
+  return r.needsRepair || r.condition === "damaged";
 }
 
 function matchesChip(r: OpsStockItem, chip: Chip): boolean {

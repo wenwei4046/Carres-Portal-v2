@@ -37,7 +37,7 @@ function makeUnit(p: Partial<OpsStockItem> & { id: string; unitCode: string }): 
   };
 }
 
-// all=7, ready=2 (u1,u2), reserved=1 (u3), defective=2 (u4 old, u5 needsRepair)
+// all=7, ready=3 (u1 new, u2 display, u4 fair-used), reserved=1 (u3), defective=1 (u5 needsRepair)
 const UNITS: OpsStockItem[] = [
   makeUnit({ id: "1", unitCode: "id-aaa111", condition: "new", status: "free" }),
   makeUnit({ id: "2", unitCode: "id-bbb222", condition: "exhibition", status: "free" }),
@@ -73,9 +73,9 @@ describe("OperationStockOnHand", () => {
       expect(within(tabs[0]).getByText("7")).toBeInTheDocument(); // All
     });
     const tabs = screen.getAllByRole("tab");
-    expect(within(tabs[1]).getByText("2")).toBeInTheDocument(); // Ready
+    expect(within(tabs[1]).getByText("3")).toBeInTheDocument(); // Ready
     expect(within(tabs[2]).getByText("1")).toBeInTheDocument(); // Reserved
-    expect(within(tabs[3]).getByText("2")).toBeInTheDocument(); // Defective
+    expect(within(tabs[3]).getByText("1")).toBeInTheDocument(); // Defective
   });
 
   it("defaults to All and lists every unit with its Unit ID", async () => {
@@ -88,28 +88,29 @@ describe("OperationStockOnHand", () => {
     expect(screen.getByText("id-ggg777")).toBeInTheDocument();
   });
 
-  it("Ready chip filters to free + good-condition + not-flagged units", async () => {
+  it("Ready chip filters to free + sellable-grade + not-flagged units", async () => {
     wrap(<OperationStockOnHand />);
     const chips = await screen.findAllByRole("tab");
     fireEvent.click(chips[1]); // Ready
     await waitFor(() => {
-      expect(screen.getByText("id-aaa111")).toBeInTheDocument();
-      expect(screen.getByText("id-bbb222")).toBeInTheDocument();
+      expect(screen.getByText("id-aaa111")).toBeInTheDocument(); // new
+      expect(screen.getByText("id-bbb222")).toBeInTheDocument(); // display
+      expect(screen.getByText("id-ddd444")).toBeInTheDocument(); // fair (used) — now sellable
     });
-    // reserved / old / needsRepair / incoming / sold are excluded
+    // reserved / needsRepair / incoming / sold are excluded
     expect(screen.queryByText("id-ccc333")).not.toBeInTheDocument();
-    expect(screen.queryByText("id-ddd444")).not.toBeInTheDocument();
     expect(screen.queryByText("id-eee555")).not.toBeInTheDocument();
   });
 
-  it("Defective chip filters to needs-repair OR old/damaged units", async () => {
+  it("Defective chip filters to needs-repair OR damaged units", async () => {
     wrap(<OperationStockOnHand />);
     const chips = await screen.findAllByRole("tab");
     fireEvent.click(chips[3]); // Defective
     await waitFor(() => {
-      expect(screen.getByText("id-ddd444")).toBeInTheDocument(); // old
       expect(screen.getByText("id-eee555")).toBeInTheDocument(); // needsRepair
     });
+    // fair (used) is now sellable, no longer defective
+    expect(screen.queryByText("id-ddd444")).not.toBeInTheDocument();
     expect(screen.queryByText("id-aaa111")).not.toBeInTheDocument(); // ready
   });
 

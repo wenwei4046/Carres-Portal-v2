@@ -10,6 +10,7 @@ export const opsStockConditionSchema = z.enum([
   "new",
   "exhibition",
   "old",
+  "refurbished",
   "damaged",
 ]);
 export type OpsStockCondition = z.infer<typeof opsStockConditionSchema>;
@@ -28,11 +29,16 @@ export const opsStockStatusSchema = z.enum([
 export type OpsStockStatus = z.infer<typeof opsStockStatusSchema>;
 
 /** POST /api/ops/stock/reserve */
+export const opsStockReserveReasonSchema = z.enum(["urgent", "exchange"]);
+export type OpsStockReserveReason = z.infer<typeof opsStockReserveReasonSchema>;
+
 export const opsStockReserveInputSchema = z.object({
   sku: z.string().trim().min(1),
   ref: z.string().trim().min(1),
   condition: opsStockConditionSchema.optional(),
   warehouseId: z.string().uuid().optional(),
+  // Ready-pool usage reason (0212): urgent sale vs damage exchange.
+  reason: opsStockReserveReasonSchema.optional(),
 });
 export type OpsStockReserveInput = z.infer<typeof opsStockReserveInputSchema>;
 

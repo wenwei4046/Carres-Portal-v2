@@ -342,7 +342,7 @@ export const receiveLineInput = z
   .object({
     sku: z.string().trim().min(1).max(200),
     qty: z.number().int().min(1).max(999),
-    condition: z.enum(["new", "exhibition", "old"]).default("new"),
+    condition: z.enum(["new", "exhibition", "old", "refurbished"]).default("new"),
     location: z.string().trim().max(120).optional(),
     doNumber: z.string().trim().max(60).optional(),
   })

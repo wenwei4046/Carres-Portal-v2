@@ -70,7 +70,7 @@ export default function OpsStockListView(props: Props) {
   }
 
   const reserveMut = useMutation({
-    mutationFn: (args: { sku: string; ref: string }) =>
+    mutationFn: (args: { sku: string; ref: string; reason?: string }) =>
       apiFetch<{ itemId: string }>(`/api/ops/stock/reserve`, {
         method: "POST",
         body: JSON.stringify(args),
@@ -138,6 +138,10 @@ export default function OpsStockListView(props: Props) {
   // matching SKU automatically.
   const [reserveSku, setReserveSku] = useState("");
   const [reserveRef, setReserveRef] = useState("");
+  // 0212 — why the ready-pool unit is being pulled (required on reserve).
+  const [reserveReason, setReserveReason] = useState<"" | "urgent" | "exchange">(
+    "",
+  );
 
   // "+ Add stock" form state.
   const EMPTY_ADD = {
@@ -323,21 +327,43 @@ export default function OpsStockListView(props: Props) {
                 placeholder="SO-1001"
               />
             </label>
+            <label className="text-xs">
+              <span className="block text-base-500 mb-1">Reason</span>
+              <select
+                className="rounded border border-base-300 px-2 py-1.5 text-sm w-44"
+                value={reserveReason}
+                onChange={(e) =>
+                  setReserveReason(
+                    e.target.value as "" | "urgent" | "exchange",
+                  )
+                }
+              >
+                <option value="">Select…</option>
+                <option value="urgent">急单 · Urgent sale</option>
+                <option value="exchange">换货 · Exchange</option>
+              </select>
+            </label>
             <button
               type="button"
               className="rounded bg-base-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-base-800 disabled:opacity-50"
               disabled={
                 !reserveSku.trim() ||
                 !reserveRef.trim() ||
+                !reserveReason ||
                 reserveMut.isPending
               }
               onClick={() =>
                 reserveMut.mutate(
-                  { sku: reserveSku.trim(), ref: reserveRef.trim() },
+                  {
+                    sku: reserveSku.trim(),
+                    ref: reserveRef.trim(),
+                    reason: reserveReason,
+                  },
                   {
                     onSuccess: () => {
                       setReserveSku("");
                       setReserveRef("");
+                      setReserveReason("");
                     },
                   },
                 )
@@ -432,8 +458,9 @@ export default function OpsStockListView(props: Props) {
 
 const CONDITION_LABEL: Record<string, string> = {
   new: "New",
-  exhibition: "Exhibition",
-  old: "Old",
+  exhibition: "Display",
+  old: "Fair (used)",
+  refurbished: "Refurbished",
   damaged: "Damaged",
 };
 
