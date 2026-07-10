@@ -419,16 +419,29 @@ export default function SofaConfigurePage({
     }),
     [sofaCompartments, modelCompartments, sofaCombos, fabricTierOverride, fabricTierConfig, legOpts],
   );
-  const pricePick = (codes: string[], tier: FabricTier, height: string, leg: string | null) => {
+  // Price with the SAME cells (incl. seeded geometry) the DraftLine emits, so
+  // the preview total and the server recompute group/combo-gate identically —
+  // combo matching is connectivity-gated (rule 1b in `computeSofaPrice`).
+  const priceCells = (
+    cells: SofaBuild["cells"],
+    tier: FabricTier,
+    height: string,
+    leg: string | null,
+  ) => {
     const build: SofaBuild = {
       modelId: model.id,
-      cells: codes.map((moduleCode) => ({ moduleCode })),
+      cells,
       fabricTier: tier,
       height,
       legHeight: leg,
     };
     return computeSofaPrice(build, pricingSnapshot);
   };
+  // Geometry-free code-list pricing (card "from" labels): the whole pick is one
+  // connected sofa by definition, which is exactly the engine's no-geometry
+  // fallback group.
+  const pricePick = (codes: string[], tier: FabricTier, height: string, leg: string | null) =>
+    priceCells(codes.map((moduleCode) => ({ moduleCode })), tier, height, leg);
   // Card "from" price — the base layout total at PRICE_1 fabric, no leg.
   const cardHeight = offeredHeights[0] ?? "24";
   const cardPriceLabel = (codes: string[]) => {
@@ -462,27 +475,37 @@ export default function SofaConfigurePage({
     : 0;
   // Leg-height surcharge (0201 pool; server re-verifies via computeSofaPrice).
   const qpLegDelta = qpLeg ? legOpts.find((o) => o.value === qpLeg)?.surcharge ?? 0 : 0;
-  // LIVE TOTAL = component sum, or a matched combo price — priced live via the
-  // shared engine (NOT read off the combo, which has no price for a quick pick).
-  const qpTotal = heroPick
-    ? pricePick(heroPick.codes, qpFabric?.tier ?? "PRICE_1", effHeight, qpLeg || null).total
-    : null;
-
   // The hero layout seeded at the chosen depth — ONE joined plan view + bbox dims.
   const heroCells = heroPick
     ? comboSeedCells({ ...heroPick.combo, slots: displayFor(heroPick).slots }, effHeight)
     : [];
+  // LIVE TOTAL = component sum, or a matched combo price — priced live via the
+  // shared engine (NOT read off the combo, which has no price for a quick pick).
+  // Priced on the SEEDED cells (the geometry `addQuickPick` emits), so the
+  // connectivity-gated combo decision here == the server recompute's.
+  const qpTotal = heroPick
+    ? priceCells(
+        heroCells.map((c) => ({ moduleCode: c.moduleCode, x: c.x, y: c.y, rot: c.rot })),
+        qpFabric?.tier ?? "PRICE_1",
+        effHeight,
+        qpLeg || null,
+      ).total
+    : null;
   const heroDims = cellsDims(heroCells, effHeight);
 
   /** Add the previewed preset straight to the cart (no canvas hop). Priced live
    *  via the shared engine — à-la-carte, or a matched combo. */
   function addQuickPick(pick: QuickPick) {
     const { slots } = displayFor(pick);
-    const cells = comboSeedCells({ ...pick.combo, slots }, effHeight);
-    const priced = pricePick(pick.codes, qpFabric?.tier ?? "PRICE_1", effHeight, qpLeg || null);
+    const seeded = comboSeedCells({ ...pick.combo, slots }, effHeight);
+    const cells = seeded.map((c) => ({ moduleCode: c.moduleCode, x: c.x, y: c.y, rot: c.rot }));
+    // Price the EXACT cells the line emits (geometry included) — the server
+    // recompute re-groups them for the connectivity-gated combo decision, and
+    // the drift gate demands the preview agree.
+    const priced = priceCells(cells, qpFabric?.tier ?? "PRICE_1", effHeight, qpLeg || null);
     const line = buildToDraftLine(
       {
-        cells: cells.map((c) => ({ moduleCode: c.moduleCode, x: c.x, y: c.y, rot: c.rot })),
+        cells,
         height: effHeight,
         fabricTier: qpFabric?.tier ?? "PRICE_1",
         fabricId: qpFabric?.id ?? null,
