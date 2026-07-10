@@ -136,6 +136,30 @@ export default function CartDrawer({
     onChange({ ...draft, lines: draft.lines.map((l) => (l.localId === localId ? next : l)) });
   }
 
+  // Save-Quote capture (Loo 2026-07-11): a quote must carry the customer's
+  // NAME + PHONE before it saves — that's what makes it findable in the
+  // Quotes drawer later. Seeded from draft.customer when opened; written back
+  // on save so the customer step doesn't ask twice.
+  const [quoteFormOpen, setQuoteFormOpen] = useState(false);
+  const [quoteName, setQuoteName] = useState("");
+  const [quotePhone, setQuotePhone] = useState("");
+  const quoteFormValid = quoteName.trim().length > 0 && quotePhone.trim().length > 0;
+  function commitSaveQuote() {
+    if (!quoteFormValid) return;
+    const q = saveQuote({
+      label: quoteName,
+      phone: quotePhone,
+      lines: draft.lines,
+      addons: draft.addons,
+    });
+    onChange({
+      ...draft,
+      customer: { ...draft.customer, name: quoteName.trim(), phone: quotePhone.trim() },
+    });
+    setQuoteFormOpen(false);
+    toast.success(`Quote saved — "${q.label}"`);
+  }
+
   // 0185 — deterministic default-gift preview (display-only; the server appends
   // the real RM0 gift lines). Empty when nothing is configured (DORMANT).
   const giftPreview = catalog ? previewDefaultGifts(draft.lines, catalog) : [];
@@ -421,19 +445,17 @@ export default function CartDrawer({
               <Trash2 size={16} strokeWidth={1.75} />
               Clear cart
             </button>
-            {/* Save Quote — parks a sanitized snapshot on this device (POS
-                topbar → Quotes lists + loads them back). */}
+            {/* Save Quote — opens the name+phone capture first (Loo 2026-07-11:
+                a quote must carry the customer's name + phone so it can be
+                FOUND later), then parks a sanitized snapshot on this device
+                (POS topbar → Quotes lists + loads them back). */}
             <button
               type="button"
               disabled={draft.lines.length === 0}
               onClick={() => {
-                const q = saveQuote({
-                  label: draft.customer.name,
-                  phone: draft.customer.phone,
-                  lines: draft.lines,
-                  addons: draft.addons,
-                });
-                toast.success(`Quote saved — "${q.label}"`);
+                setQuoteName(draft.customer.name ?? "");
+                setQuotePhone(draft.customer.phone ?? "");
+                setQuoteFormOpen(true);
               }}
               className="btn btn--ghost"
               data-testid="pos-save-quote"
@@ -452,6 +474,88 @@ export default function CartDrawer({
         </div>
         </aside>
       </div>
+
+      {/* Save-Quote capture (Loo 2026-07-11): name + phone are REQUIRED so the
+          quote can be found again in the Quotes drawer (label + phone render
+          on every quote row). Enter saves, Escape/backdrop cancels. */}
+      {quoteFormOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Save quote"
+        >
+          <div
+            className="absolute inset-0 bg-black/30"
+            role="presentation"
+            onClick={(e) => {
+              e.stopPropagation();
+              setQuoteFormOpen(false);
+            }}
+          />
+          <div
+            className="relative bg-white rounded-xl shadow-xl p-5 w-[340px] flex flex-col gap-3"
+            data-testid="save-quote-form"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setQuoteFormOpen(false);
+              }
+              if (e.key === "Enter") commitSaveQuote();
+            }}
+          >
+            <div>
+              <div className="t-h4 font-display">Save quote</div>
+              <p className="t-tiny text-base-500 mt-0.5">
+                The customer&apos;s name + phone are how you find this quote again.
+              </p>
+            </div>
+            <label className="block">
+              <span className="t-micro text-base-500 block mb-1">Customer name</span>
+              <input
+                value={quoteName}
+                onChange={(e) => setQuoteName(e.target.value)}
+                placeholder="e.g. Tan Mei Ling"
+                autoFocus
+                aria-label="Quote customer name"
+                data-testid="save-quote-name"
+                className="w-full rounded-[4px] border border-base-200 px-2.5 py-1.5 t-small text-base-900 placeholder:text-base-400 focus:border-base-400 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="t-micro text-base-500 block mb-1">Phone</span>
+              <input
+                value={quotePhone}
+                onChange={(e) => setQuotePhone(e.target.value)}
+                placeholder="e.g. 012-345 6789"
+                inputMode="tel"
+                aria-label="Quote customer phone"
+                data-testid="save-quote-phone"
+                className="w-full rounded-[4px] border border-base-200 px-2.5 py-1.5 t-small font-mono text-base-900 placeholder:text-base-400 focus:border-base-400 focus:outline-none"
+              />
+            </label>
+            <div className="flex items-center justify-end gap-2 mt-1">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => setQuoteFormOpen(false)}
+                data-testid="save-quote-cancel"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={!quoteFormValid}
+                onClick={commitSaveQuote}
+                data-testid="save-quote-confirm"
+              >
+                Save quote
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
