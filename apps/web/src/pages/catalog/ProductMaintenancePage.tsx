@@ -59,7 +59,7 @@ const TABS: readonly PillTab<TabKey>[] = [
   { key: "delivery", label: "Delivery" },
   { key: "maintenance", label: "Maintenance" },
   { key: "combos", label: "Sofa Combos" },
-  { key: "promo", label: "Promo / Free Gifts" },
+  { key: "promo", label: "Promo / GWP" },
 ];
 
 export default function ProductMaintenancePage({

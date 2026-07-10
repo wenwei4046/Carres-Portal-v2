@@ -101,7 +101,7 @@ export default function PromoTab({
               className="btn-ghost text-[12px]"
               data-testid="gwp-add"
             >
-              + New Free Gift
+              + New GWP
             </button>
             <button
               type="button"
@@ -248,13 +248,14 @@ function DefaultGiftsSection({
       <div className="flex items-center justify-between mb-1">
         <div className="t-h4 font-display flex items-center gap-2">
           <Gift size={16} strokeWidth={1.75} className="text-primary" />
-          Free gifts — per Model
+          GWP — per Model
         </div>
       </div>
       <p className="t-tiny text-base-500 mb-4 pb-3 border-b border-base-100">
-        An accessory auto-added at RM 0 when this Model is placed on an order. Applies to every SKU
-        of the Model; a complete sofa of the Model grants its gift once. Changes apply to new orders
-        only. Use &ldquo;+ New Free Gift&rdquo; above to add one gift to many Models at once.
+        A GWP (Gift With Purchase): an accessory auto-added at RM 0 when this Model is placed on an
+        order. Applies to every SKU of the Model; a complete sofa of the Model grants its gift once.
+        Changes apply to new orders only. Use &ldquo;+ New GWP&rdquo; above to add one gift to many
+        Models at once.
         {!isPrincipal && " Principal only — read-only for your role."}
       </p>
 
@@ -270,7 +271,7 @@ function DefaultGiftsSection({
       {accSkus.length === 0 && isPrincipal && (
         <p className="t-tiny text-warning mb-3">
           No accessory SKUs exist yet — add an accessory in the SKU Master / Modular tabs before
-          configuring a free gift.
+          configuring a GWP.
         </p>
       )}
 
@@ -278,7 +279,7 @@ function DefaultGiftsSection({
       <div className="flex flex-col gap-3">
         {configs.length === 0 && editingModelId === null && (
           <div className="t-small text-base-500 bg-base-50 border border-base-200 rounded-[4px] px-3 py-4">
-            No default gifts configured.
+            No GWP configured.
           </div>
         )}
         {configs.map((cfg) => {
@@ -386,7 +387,7 @@ function ModelGiftsEditor({
     if (!valid) return;
     try {
       await upsert.mutateAsync({ modelId: model.id, input: { gifts: cleaned } });
-      toast.success("Free gifts saved");
+      toast.success("GWP saved");
       onDone();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Save failed");
@@ -396,7 +397,7 @@ function ModelGiftsEditor({
     if (!confirm(`Remove all default gifts for "${modelLabel(model)}"?`)) return;
     try {
       await del.mutateAsync(model.id);
-      toast.success("Free gifts removed");
+      toast.success("GWP removed");
       onDone();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Remove failed");
@@ -652,7 +653,7 @@ function BulkGwpModal({
   }
 
   return (
-    <Modal title="New Free Gift — add to Models" onClose={onClose} size="lg">
+    <Modal title="New GWP — add to Models" onClose={onClose} size="lg">
       <p className="t-tiny text-base-500 mb-3">
         Pick the Models, choose the gift, then Add. The gift is appended — a Model can hold several
         (e.g. 2 pillows + a protector). 🎁 marks Models that already have a gift.
