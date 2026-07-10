@@ -59,7 +59,8 @@ describe("OrderSummaryRail — default free gift", () => {
       />,
     );
     const gift = screen.getByTestId("summary-gift-PILLOW");
-    expect(gift.textContent).toContain("Memory Pillow");
+    // Product name (the accessory MODEL name) beats the sku description.
+    expect(gift.textContent).toContain("Acc X");
     expect(gift.textContent).toContain("FREE");
     // The mattress + the gift = 2 items.
     expect(screen.getByText("Items · 2")).toBeInTheDocument();

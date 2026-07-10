@@ -152,15 +152,17 @@ function accessorySkus(catalog: CatalogResponse): ProductSkuDto[] {
   return catalog.skus.filter((s) => catByModel.get(s.modelId) === "accessory");
 }
 
-/** Friendly name for a gift accessory SKU: its description → the accessory's
- *  MODEL name (an accessory is one model = one product, e.g. "Pasir Wool Rug")
- *  → bare code. Never surface a raw SKU code when a human name exists
- *  (Loo 2026-07-06: "Free gift: ACC-601"). */
+/** Friendly name for a gift accessory SKU: the accessory's MODEL name — the
+ *  PRODUCT NAME (an accessory is one model = one product, e.g. "Memory Foam
+ *  Pillow"; Loo 2026-07-11: show the product name, NOT the description) →
+ *  description → bare code. Never surface a raw SKU code when a human name
+ *  exists (Loo 2026-07-06: "Free gift: ACC-601"). */
 const skuDisplay = (s: ProductSkuDto, catalog: CatalogResponse): string => {
-  const desc = (s.description ?? "").trim();
-  if (desc) return desc;
   const model = catalog.models.find((m) => m.id === s.modelId);
-  return (model && modelLabel(model)) || s.sku;
+  const name = model ? modelLabel(model).trim() : "";
+  if (name) return name;
+  const desc = (s.description ?? "").trim();
+  return desc || s.sku;
 };
 
 /** Collapse a draft refinement to a persistable one, or undefined when it

@@ -67,7 +67,8 @@ describe("CartDrawer — default free gift preview", () => {
       />,
     );
     const row = screen.getByTestId("gift-preview-PILLOW");
-    expect(row.textContent).toContain("Memory Pillow");
+    // Product name (the accessory MODEL name) beats the sku description.
+    expect(row.textContent).toContain("Acc X");
     expect(row.textContent).toContain("FREE");
   });
 
