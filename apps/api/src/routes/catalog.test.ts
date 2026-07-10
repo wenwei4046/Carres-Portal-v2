@@ -760,6 +760,76 @@ describe("Catalog admin — PATCH /api/catalog/skus/:id", () => {
     const upd = recorded.find((r) => r.op === "update");
     expect(upd?.payload).toEqual({ cost: 950 });
   });
+
+  // Loo 2026-07-11 — clearing the variant ('') is allowed ONLY for the
+  // no-variant-axis categories (accessory/service): the sku re-derives to the
+  // bare MODEL_KEY. Other categories 422.
+  it("PATCH variant '' on an accessory → sku re-derives to the bare MODEL_KEY", async () => {
+    const SKU_ID = "00000000-0000-0000-0000-00000000bb02";
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_skus: [{ id: SKU_ID, model_id: MODEL_ID_LIVE }],
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "accessory", model_key: "memory-foam-pillow" },
+          ],
+        },
+        recorded,
+        writeReturn: {
+          id: SKU_ID,
+          model_id: MODEL_ID_LIVE,
+          sku: "MEMORY-FOAM-PILLOW",
+          variant: "",
+          variant_kind: "preset",
+          price: 99,
+          cost: null,
+          supplier_id: null,
+          discontinued_at: null,
+        },
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ variant: "" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const upd = recorded.find((r) => r.op === "update");
+    expect(upd?.payload).toEqual({ variant: "", sku: "MEMORY-FOAM-PILLOW" });
+  });
+
+  it("PATCH variant '' on a mattress → 422 variant_required", async () => {
+    const SKU_ID = "00000000-0000-0000-0000-00000000bb03";
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        reads: {
+          product_skus: [{ id: SKU_ID, model_id: MODEL_ID_LIVE }],
+          product_models: [
+            { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-classic" },
+          ],
+        },
+        recorded: [],
+        writeReturn: {},
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ variant: "" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("variant_required");
+  });
 });
 
 // ---------------------------------------------------------------------------

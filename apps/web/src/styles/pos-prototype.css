@@ -2331,6 +2331,22 @@
   color: var(--c-burnt); letter-spacing: 0.02em;
   margin-top: 4px;
 }
+/* Per-card "Continue in Customize" (Loo 2026-07-11) — jump straight from a
+   preset card onto the drag canvas with that layout loaded. */
+.sof-qp__cardCustomize {
+  margin-top: 8px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  width: 100%; padding: 6px 10px;
+  border: 1px solid var(--line); border-radius: 999px;
+  font-family: var(--font-button); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--fg-muted); cursor: pointer;
+  transition: 120ms ease;
+}
+.sof-qp__cardCustomize:hover {
+  border-color: var(--c-burnt); color: var(--c-burnt);
+  background: rgba(166, 71, 30, 0.05);
+}
 .sof-qp__flip {
   position: absolute; top: 8px; right: 8px;
   display: inline-flex; padding: 2px;

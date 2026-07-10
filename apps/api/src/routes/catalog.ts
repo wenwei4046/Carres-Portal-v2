@@ -730,11 +730,30 @@ catalogRouter.patch("/skus/:id", async (c) => {
     }
     const { data: modelRow } = await sb
       .from("product_models")
-      .select("model_key")
+      .select("model_key, category")
       .eq("id", skuRow.model_id)
       .maybeSingle();
+    // Clearing the variant ('') is allowed ONLY for the no-variant-axis
+    // categories (accessory/service, Loo 2026-07-11) — the sku re-derives to
+    // the bare MODEL_KEY. Other categories keep requiring a variant.
+    if (
+      parsed.data.variant === "" &&
+      modelRow &&
+      !SUPPLIERLESS_CATEGORIES.has(modelRow.category as string)
+    ) {
+      return c.json(
+        {
+          error: "validation",
+          code: "variant_required",
+          message: `A size / variant is required for ${modelRow.category} SKUs.`,
+        },
+        422,
+      );
+    }
     if (modelRow) {
-      patch.sku = deriveSkuCode(modelRow.model_key, parsed.data.variant);
+      patch.sku = parsed.data.variant
+        ? deriveSkuCode(modelRow.model_key, parsed.data.variant)
+        : (modelRow.model_key as string).toUpperCase();
     }
   }
 

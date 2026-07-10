@@ -43,6 +43,14 @@ describe("sameLine", () => {
   it("differs on sku", () => {
     expect(sameLine(line(), line({ sku: "OTHER" }))).toBe(false);
   });
+  it("a PWP reward line never merges (server enforces reward qty = 1)", () => {
+    const pwp = { pwp: { ruleId: "rule-1" } };
+    // Even attrs-identical code-less claims stay separate lines…
+    expect(sameLine(line({ attrs: pwp }), line({ localId: "L2", attrs: pwp }))).toBe(false);
+    // …and a PWP line never merges into a plain line either.
+    expect(sameLine(line({ attrs: pwp }), line({ localId: "L2" }))).toBe(false);
+    expect(sameLine(line(), line({ localId: "L2", attrs: pwp }))).toBe(false);
+  });
 });
 
 describe("mergeLine", () => {
