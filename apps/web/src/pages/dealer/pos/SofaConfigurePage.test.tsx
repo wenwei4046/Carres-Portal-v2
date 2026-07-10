@@ -344,6 +344,17 @@ describe("SofaConfigurePage", () => {
     expect(within(room).getAllByTestId("sofa-group-outline")).toHaveLength(1);
   });
 
+  it("each card's Continue-in-Customize loads THAT pick onto the canvas", () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId(`sofa-quick-pick-customize-${COMBO.id}`));
+    expect(screen.getByTestId("sofa-build-canvas")).toBeTruthy();
+    const room = screen.getByTestId("sofa-build-room");
+    // the pick's modules land pre-assembled as ONE connected sofa
+    expect(within(room).getAllByTestId("sofa-group-outline")).toHaveLength(1);
+    // and the loaded pick became the selection (header echoes it back on return)
+    expect(screen.getByTestId("sofa-build-total").textContent).toContain("2,990");
+  });
+
   it("hovering a quick pick does NOT move the hero preview — only clicking selects", () => {
     pwpMock.current = { data: { vouchers: [] }, isFetching: false };
     const solo: SofaComboDto = {
