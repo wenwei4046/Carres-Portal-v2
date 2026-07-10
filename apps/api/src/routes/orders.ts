@@ -1248,7 +1248,10 @@ ordersRouter.post("/import", async (c) => {
           result: d.result,
           orderId: d.id,
           so: d.so,
-          unmatchedDescriptions: m.unmatched,
+          // 0214: import is create-only. An existing order is skipped without
+          // touching its lines, so its unmatched-SKU list is noise — only
+          // surface unmatched descriptions for orders we actually created.
+          unmatchedDescriptions: d.result === "created" ? m.unmatched : [],
           error: d.error ?? null,
         });
       });

@@ -125,9 +125,9 @@ export default function OperationImport() {
           Import listing
         </h1>
         <p className="text-sm text-base-600 mt-2">
-          Drop the AutoCount listing CSV here. The portal will create / update
-          the orders, preserving anything you&apos;ve edited inside the portal
-          since the last import.
+          Drop the AutoCount listing CSV here. The portal will create any new
+          orders. Orders already in the portal are left untouched — once a sale
+          is imported, the portal is the source of truth.
         </p>
       </div>
 
@@ -271,12 +271,19 @@ export default function OperationImport() {
           <h2 className="text-sm font-semibold text-success-800 mb-3">
             Import complete
           </h2>
-          <div className="grid grid-cols-4 gap-4 mb-4">
-            <Stat label="Orders touched" value={submitMut.data.ordersTotal} />
-            <Stat label="Created" value={submitMut.data.created} accent="ok" />
-            <Stat label="Updated" value={submitMut.data.updated} />
-            <Stat label="Skipped locked" value={submitMut.data.skippedLocked} />
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <Stat label="Orders in file" value={submitMut.data.ordersTotal} />
+            <Stat label="Created (new)" value={submitMut.data.created} accent="ok" />
+            <Stat
+              label="Already in portal"
+              value={submitMut.data.skippedLocked + submitMut.data.updated}
+            />
           </div>
+          <p className="text-xs text-base-600 mb-4">
+            AutoCount only <strong>creates</strong> new orders. Any order already
+            in the portal is left untouched — the portal is the source of truth
+            once a sale is imported.
+          </p>
           {submitMut.data.errored > 0 ? (
             <div className="rounded border border-error-300 bg-error-50 p-3 text-xs text-error-800 mb-3">
               <div className="font-semibold mb-1">
