@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ArrowRight, BookmarkPlus, X, Trash2, Minus, Plus, Gift, Ticket, UserRound } from "lucide-react";
 import type { CatalogResponse, PwpCodeDto, PwpDiscoverDto, PwpRuleDto } from "@carres/shared";
@@ -149,6 +149,19 @@ export default function CartDrawer({
     if (c) boundPwpCodes.add(c);
   }
 
+  // Product photo per sku (via its model) — the cart line shows the real
+  // product shot like the 2990s sheet; ▦ placeholder when there's no photo.
+  const photoBySku = useMemo(() => {
+    const bySku = new Map<string, string>();
+    if (!catalog) return bySku;
+    const models = new Map(catalog.models.map((m) => [m.id, m]));
+    for (const s of catalog.skus) {
+      const url = models.get(s.modelId)?.photoUrl;
+      if (url) bySku.set(s.sku, url);
+    }
+    return bySku;
+  }, [catalog]);
+
   const lineSub = cartLineSubtotal(draft.lines);
   const addonSub = cartAddonSubtotal(draft.addons);
   const total = lineSub + addonSub;
@@ -193,107 +206,112 @@ export default function CartDrawer({
             </div>
           </div>
 
-        {/* Scrollable line list */}
-        <div className="flex-1 overflow-auto px-6 py-4">
+        {/* Scrollable line list — 2990s CustomerOrderSheet rows (Loo 2026-07-11):
+            open rows on hairline dividers, photo · bold name / muted detail ·
+            qty pill, flame price in the right column. No boxes. */}
+        <div className="cart__body">
           {empty ? (
             <p className="t-small text-base-500 text-center py-12">
               Your cart is empty — pick a product to get started.
             </p>
           ) : (
-            <div className="flex flex-col gap-4">
-              {draft.lines.map((l) => (
-                <div key={l.localId} className="pos-card p-3 flex items-start gap-3">
-                  {/* Product photo placeholder */}
-                  <div
-                    className="shrink-0 rounded-xl bg-base-100 flex items-center justify-center text-base-400"
-                    style={{ width: 56, height: 56, fontSize: 22 }}
-                    aria-hidden="true"
-                  >
-                    ▦
-                  </div>
-
-                  {/* Name + SKU + qty stepper */}
-                  <div className="min-w-0 flex-1">
-                    <div className="t-small font-medium text-base-900 truncate">{l.label}</div>
-                    <div className="font-mono text-[11px] text-base-500 mt-0.5">{l.sku}</div>
-                    <SpecialsSummary attrs={l.attrs} />
-
-                    {/* Pill stepper */}
-                    <div className="flex items-center gap-2 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => bumpLineQty(l.localId, -1)}
-                        disabled={l.qty <= 1}
-                        aria-label="Decrease quantity"
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-base-200 text-base-600 transition-colors hover:border-base-400 hover:text-base-900 disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        <Minus size={13} strokeWidth={1.75} />
-                      </button>
-                      <span className="font-mono text-[13px] font-semibold w-6 text-center text-base-900">
-                        {l.qty}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => bumpLineQty(l.localId, 1)}
-                        aria-label="Increase quantity"
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-base-200 text-base-600 transition-colors hover:border-base-400 hover:text-base-900"
-                      >
-                        <Plus size={13} strokeWidth={1.75} />
-                      </button>
+            <div className="flex flex-col">
+              {draft.lines.map((l) => {
+                const photo = photoBySku.get(l.sku);
+                // "Booqit · 1A(LHF) + 2A(RHF) · 24″ · Fabric KIV" → bold model
+                // name on top, the configuration as the muted detail line.
+                const [name, ...detailParts] = l.label.split(" · ");
+                const detail = detailParts.join(" · ");
+                return (
+                  <div key={l.localId} className="cart-item">
+                    <div
+                      className="cart-item__photo shrink-0"
+                      style={photo ? { backgroundImage: `url(${photo})` } : undefined}
+                      aria-hidden="true"
+                    >
+                      {!photo && "▦"}
                     </div>
 
-                    {/* 0185 — free-item "Make free" affordance (eligible lines). */}
-                    {catalog && (
-                      <MakeFreeRow line={l} catalog={catalog} onSet={replaceLine} />
-                    )}
+                    {/* Name + detail + SKU + qty stepper */}
+                    <div className="min-w-0">
+                      <div className="cart-item__name">{name}</div>
+                      {detail && <div className="cart-item__detail">{detail}</div>}
+                      <div className="cart-item__detail font-mono">{l.sku}</div>
+                      <SpecialsSummary attrs={l.attrs} />
 
-                    {/* 0186 — PWP / promo "Use PWP price" affordance (reward lines).
-                        Hidden once the line is claimed free (free-item wins — a
-                        line can't be both free AND PWP-priced). 0187 binds a
-                        RESERVED voucher code on claim (Auto-Fill). */}
-                    {catalog && !isLineFreeItem(l) && (
-                      <PwpRow
-                        line={l}
-                        lines={draft.lines}
-                        catalog={catalog}
-                        onSet={replaceLine}
-                        reservedCodes={pwpReservedCodes ?? []}
-                        consumedCodes={boundPwpCodes}
-                        claimGroup={pwpClaimGroup}
-                        customerPhone={customerPhone}
-                        availableVouchers={pwpAvailableVouchers ?? []}
-                        onApplyVoucherCode={onApplyVoucherCode}
-                      />
-                    )}
-                  </div>
+                      <div className="cart-item__qty">
+                        <button
+                          type="button"
+                          onClick={() => bumpLineQty(l.localId, -1)}
+                          disabled={l.qty <= 1}
+                          aria-label="Decrease quantity"
+                          className="disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Minus />
+                        </button>
+                        <span>{l.qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => bumpLineQty(l.localId, 1)}
+                          aria-label="Increase quantity"
+                        >
+                          <Plus />
+                        </button>
+                      </div>
 
-                  {/* Line price + remove (FREE when free / promo-claimed, PWP price
-                      when claimed under a 'pwp' rule) */}
-                  <div className="shrink-0 flex flex-col items-end gap-2 pt-0.5">
-                    {catalog && (isLineFreeItem(l) || isPwpFreeLine(l, catalog)) ? (
-                      <span
-                        className="pill pill-confirmed"
-                        data-testid={`cart-line-free-${l.localId}`}
+                      {/* 0185 — free-item "Make free" affordance (eligible lines). */}
+                      {catalog && (
+                        <MakeFreeRow line={l} catalog={catalog} onSet={replaceLine} />
+                      )}
+
+                      {/* 0186 — PWP / promo "Use PWP price" affordance (reward lines).
+                          Hidden once the line is claimed free (free-item wins — a
+                          line can't be both free AND PWP-priced). 0187 binds a
+                          RESERVED voucher code on claim (Auto-Fill). */}
+                      {catalog && !isLineFreeItem(l) && (
+                        <PwpRow
+                          line={l}
+                          lines={draft.lines}
+                          catalog={catalog}
+                          onSet={replaceLine}
+                          reservedCodes={pwpReservedCodes ?? []}
+                          consumedCodes={boundPwpCodes}
+                          claimGroup={pwpClaimGroup}
+                          customerPhone={customerPhone}
+                          availableVouchers={pwpAvailableVouchers ?? []}
+                          onApplyVoucherCode={onApplyVoucherCode}
+                        />
+                      )}
+                    </div>
+
+                    {/* Remove on top, price under (FREE when free / promo-claimed,
+                        PWP price when claimed under a 'pwp' rule) */}
+                    <div className="cart-item__right">
+                      <button
+                        type="button"
+                        onClick={() => removeLine(l.localId)}
+                        aria-label={`Remove ${l.label}`}
+                        className="cart-item__remove"
                       >
-                        FREE
-                      </span>
-                    ) : (
-                      <span className="pos-price text-[16px]">
-                        <span className="pos-price-rm">RM</span>
-                        {(l.unitPrice * l.qty).toLocaleString()}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeLine(l.localId)}
-                      aria-label={`Remove ${l.label}`}
-                      className="text-base-400 hover:text-destructive transition-colors"
-                    >
-                      <Trash2 size={15} strokeWidth={1.75} />
-                    </button>
+                        <Trash2 />
+                      </button>
+                      {catalog && (isLineFreeItem(l) || isPwpFreeLine(l, catalog)) ? (
+                        <span
+                          className="pill pill-confirmed"
+                          data-testid={`cart-line-free-${l.localId}`}
+                        >
+                          FREE
+                        </span>
+                      ) : (
+                        <span className="cart-item__price">
+                          <sup>RM</sup>
+                          {(l.unitPrice * l.qty).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* 0185 — default free-gift preview (display-only). The server
                   appends the real RM0 gift lines authoritatively; the client
@@ -301,7 +319,6 @@ export default function CartDrawer({
               {giftPreview.length > 0 && (
                 <div
                   className="flex flex-col gap-2 pt-3"
-                  style={{ borderTop: "1px solid hsl(var(--base-100))" }}
                   data-testid="cart-gift-preview"
                 >
                   {giftPreview.map((g) => (
@@ -330,10 +347,7 @@ export default function CartDrawer({
 
               {/* Add-ons */}
               {draft.addons.length > 0 && (
-                <div
-                  className="flex flex-col gap-3 pt-3"
-                  style={{ borderTop: "1px solid hsl(var(--base-100))" }}
-                >
+                <div className="flex flex-col gap-3 pt-3">
                   {draft.addons.map((a) => (
                     <div
                       key={a.key}

@@ -357,20 +357,25 @@
 .cart__empty h5 { font-family: var(--font-title); font-size: 18px; color: var(--fg); }
 .cart__empty p { font-size: 13px; max-width: 22ch; }
 
+/* 2990s CustomerOrderSheet line metrics (Loo 2026-07-11): 64px photo, 15px
+   name over 12px muted detail, roomy 14px rows — hierarchy from type + colour,
+   not boxes. */
 .cart-item {
   display: grid;
-  grid-template-columns: 60px 1fr auto;
+  grid-template-columns: 64px 1fr auto;
   gap: 12px;
-  padding: 12px 4px;
+  padding: 14px 4px;
   border-bottom: 1px solid var(--line);
 }
 .cart-item:last-child { border-bottom: none; }
 .cart-item__photo {
-  width: 60px; height: 60px; border-radius: 10px;
+  width: 64px; height: 64px; border-radius: 12px;
   background-color: #d8d2c4; background-size: cover; background-position: center;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--fg-muted); font-size: 20px;
 }
-.cart-item__name { font-family: var(--font-title); font-weight: 700; font-size: 14px; line-height: 1.25; }
-.cart-item__detail { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+.cart-item__name { font-family: var(--font-title); font-weight: 700; font-size: 15px; line-height: 1.25; }
+.cart-item__detail { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
 .cart-item__qty {
   display: inline-flex; align-items: center; gap: 4px;
   margin-top: 8px;
@@ -378,16 +383,16 @@
   width: fit-content;
 }
 .cart-item__qty button {
-  width: 22px; height: 22px; border-radius: 99px;
+  width: 26px; height: 26px; border-radius: 99px;
   display: inline-flex; align-items: center; justify-content: center;
   color: var(--fg-muted);
   transition: 100ms ease;
 }
 .cart-item__qty button:hover { background: var(--pos-panel, #fff); color: var(--fg); }
 .cart-item__qty button svg { width: 12px; height: 12px; stroke-width: 2; }
-.cart-item__qty span { min-width: 16px; text-align: center; font-size: 12px; font-weight: 600; }
-.cart-item__right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.cart-item__price { font-family: var(--font-mark); font-weight: 900; font-size: 16px; color: var(--c-burnt); letter-spacing: -0.02em; }
+.cart-item__qty span { min-width: 20px; text-align: center; font-size: 13px; font-weight: 600; }
+.cart-item__right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.cart-item__price { font-family: var(--font-mark); font-weight: 900; font-size: 20px; color: var(--c-burnt); letter-spacing: -0.02em; }
 .cart-item__price sup { font-size: 9px; vertical-align: top; }
 .cart-item__remove {
   color: var(--fg-muted);
@@ -512,7 +517,10 @@
 }
 @keyframes cart-pop-fade { from { opacity: 0; } to { opacity: 1; } }
 .cart.cart--pop {
-  width: 460px; max-width: 100%; max-height: calc(100vh - 48px);
+  /* 2990s CustomerOrderSheet proportions (Loo 2026-07-11) — viewport-relative
+     width + a stable height so the sheet reads airy, not a narrow strip. */
+  width: clamp(400px, 42vw, 580px); max-width: 100%;
+  height: clamp(520px, 78vh, 820px); max-height: calc(100vh - 48px);
   border-radius: 20px;
   border: 1px solid var(--line);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.30);
