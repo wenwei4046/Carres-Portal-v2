@@ -58,6 +58,9 @@ function wrap(node: React.ReactNode) {
 }
 
 const statusBtn = (name: RegExp) => screen.getByRole("button", { name });
+// Default view is grouped (rollup, collapsed) — switch to Flat to assert on
+// individual unit rows.
+const showFlat = () => fireEvent.click(screen.getByRole("tab", { name: /Flat/ }));
 
 beforeEach(() => {
   apiFetchMock.mockReset();
@@ -81,8 +84,10 @@ describe("OperationStockOnHand", () => {
     expect(within(statusBtn(/^Defective\b/)).getByText("1")).toBeInTheDocument();
   });
 
-  it("defaults to All and lists every unit with its Unit ID", async () => {
+  it("Flat view lists every unit with its Unit ID", async () => {
     wrap(<OperationStockOnHand />);
+    await waitFor(() => statusBtn(/^All\b/));
+    showFlat();
     await waitFor(() =>
       expect(screen.getAllByRole("row").length).toBeGreaterThan(7),
     );
@@ -94,6 +99,7 @@ describe("OperationStockOnHand", () => {
   it("Ready filter shows free + sellable-grade + not-flagged units", async () => {
     wrap(<OperationStockOnHand />);
     await waitFor(() => statusBtn(/^Ready\b/));
+    showFlat();
     fireEvent.click(statusBtn(/^Ready\b/));
     await waitFor(() => {
       expect(screen.getByText("id-aaa111")).toBeInTheDocument(); // new
@@ -108,6 +114,7 @@ describe("OperationStockOnHand", () => {
   it("Defective filter shows needs-repair OR damaged units", async () => {
     wrap(<OperationStockOnHand />);
     await waitFor(() => statusBtn(/^Defective\b/));
+    showFlat();
     fireEvent.click(statusBtn(/^Defective\b/));
     await waitFor(() => {
       expect(screen.getByText("id-eee555")).toBeInTheDocument(); // needsRepair
@@ -120,11 +127,27 @@ describe("OperationStockOnHand", () => {
   it("Reserved filter shows the customer ref", async () => {
     wrap(<OperationStockOnHand />);
     await waitFor(() => statusBtn(/^Reserved\b/));
+    showFlat();
     fireEvent.click(statusBtn(/^Reserved\b/));
     await waitFor(() => {
       expect(screen.getByText("id-ccc333")).toBeInTheDocument();
     });
     expect(screen.getByText("SO-1142")).toBeInTheDocument();
     expect(screen.queryByText("id-aaa111")).not.toBeInTheDocument();
+  });
+
+  it("Grouped view rolls units up by model (collapsed by default), expandable", async () => {
+    wrap(<OperationStockOnHand />);
+    // Default is grouped: the shared SKU-1 model appears as one collapsed group
+    // header, and the individual unit ids are hidden until expanded.
+    await waitFor(() =>
+      expect(screen.getByText("SKU-1")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("id-aaa111")).not.toBeInTheDocument();
+    // Expanding the group reveals its units.
+    fireEvent.click(screen.getByText("SKU-1"));
+    await waitFor(() =>
+      expect(screen.getByText("id-aaa111")).toBeInTheDocument(),
+    );
   });
 });

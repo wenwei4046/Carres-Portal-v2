@@ -106,6 +106,8 @@ export default function OperationStockOnHand() {
   const [onlyRepair, setOnlyRepair] = useState(false);
   const [onlyNoPo, setOnlyNoPo] = useState(false);
   const [q, setQ] = useState("");
+  // Grouped-by-model rollup (default) vs flat per-unit list. P2 scale view.
+  const [view, setView] = useState<"grouped" | "flat">("grouped");
 
   const invQ = useQuery<OpsStockListResponse>({
     queryKey: ["operation", "ops-stock", "inventory"],
@@ -340,16 +342,40 @@ export default function OperationStockOnHand() {
 
           {/* LIST — reuse the per-unit table + all shipped actions/mutations. */}
           <div className="flex-1 min-w-0">
-            <div className="text-[12px] text-base-500 mb-2">
-              Showing{" "}
-              <span className="font-semibold text-base-800">
-                {filtered.length}
-              </span>{" "}
-              of {counts.all} units
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[12px] text-base-500">
+                Showing{" "}
+                <span className="font-semibold text-base-800">
+                  {filtered.length}
+                </span>{" "}
+                of {counts.all} units
+              </div>
+              <div
+                className="flex gap-1 p-0.5 bg-base-100 rounded"
+                role="tablist"
+                aria-label="Stock view"
+              >
+                {(["grouped", "flat"] as const).map((v) => (
+                  <button
+                    key={v}
+                    role="tab"
+                    aria-selected={view === v}
+                    onClick={() => setView(v)}
+                    className={`px-2.5 py-1 text-[11px] rounded capitalize ${
+                      view === v
+                        ? "bg-white text-base-900 font-semibold shadow-sm"
+                        : "text-base-600 hover:text-base-900"
+                    }`}
+                  >
+                    {v === "grouped" ? "Grouped by model" : "Flat units"}
+                  </button>
+                ))}
+              </div>
             </div>
             <OpsStockListView
               embedded
               rows={filtered}
+              grouped={view === "grouped"}
               endpoint="/inventory"
               cacheKey="inventory"
               title="On Hand"
