@@ -323,16 +323,38 @@ describe("SkuMasterTab — inline row editing (no modal)", () => {
     expect(screen.queryByLabelText("CLOUD-KING code")).not.toBeInTheDocument();
   });
 
-  it("code edit commits the VARIANT segment on blur (server re-derives the code)", async () => {
+  it("code edit commits the FULL code on blur (free rename, Loo 2026-07-11)", async () => {
     render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
     fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
     const code = screen.getByLabelText("CLOUD-KING code");
-    fireEvent.change(code, { target: { value: "KING-XL" } });
+    // The whole current code is editable — not a locked prefix + suffix.
+    expect((code as HTMLInputElement).defaultValue).toBe("CLOUD-KING");
+    fireEvent.change(code, { target: { value: "ACC-777" } });
     fireEvent.blur(code);
     await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
     const call = mockPatchMutate.mock.calls[0][0];
     expect(call.id).toBe("s2");
-    expect(call.patch).toEqual({ variant: "KING-XL" });
+    expect(call.patch).toEqual({ sku: "ACC-777" });
+  });
+
+  it("size edit commits the variant label WITHOUT touching the code", async () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    const size = screen.getByLabelText("CLOUD-KING size");
+    fireEvent.change(size, { target: { value: "King XL" } });
+    fireEvent.blur(size);
+    await waitFor(() => expect(mockPatchMutate).toHaveBeenCalledOnce());
+    expect(mockPatchMutate.mock.calls[0][0].patch).toEqual({ variant: "King XL" });
+  });
+
+  it("clearing the size is ignored for a sized category (mattress)", async () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    fireEvent.click(screen.getByTestId("sku-edit-CLOUD-KING"));
+    const size = screen.getByLabelText("CLOUD-KING size");
+    fireEvent.change(size, { target: { value: "" } });
+    fireEvent.blur(size);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockPatchMutate).not.toHaveBeenCalled();
   });
 
   it("description edit commits on blur; blank clears to null", async () => {
