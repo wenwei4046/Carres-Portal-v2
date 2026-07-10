@@ -361,6 +361,12 @@ export default function CatalogStep({
                 sofaCompartments={catalog.sofaCompartments ?? []}
                 modelCompartments={offered}
                 sofaCombos={catalog.sofaCombos ?? []}
+                catalog={catalog}
+                cartLines={draft.lines}
+                pwpReservedCodes={pwpReservedCodes}
+                pwpClaimGroup={pwpClaimGroup}
+                customerPhone={customerPhone}
+                onApplyVoucherCode={onApplyVoucherCode}
                 onAdd={addLine}
                 onClose={() => setConfigureModelId(null)}
               />
