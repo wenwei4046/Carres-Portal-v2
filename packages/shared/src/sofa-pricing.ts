@@ -19,6 +19,14 @@
  *      "bundle" layer — it is removed). NO cheaper-only guard: a matched combo
  *      applies whenever `prices_by_height[height] > 0`, EVEN IF PRICIER. The
  *      2990s "only-if-cheaper" doc-comment is DEAD code; we follow the live code.
+ *   1b. A combo only matches WITHIN one CONNECTED sofa (Loo 2026-07-10): cells
+ *      are partitioned by `groupSofas` (the same union-find contact analysis
+ *      the builder's arm-cap gate uses, depth = the build's height key) and
+ *      combo matching runs PER GROUP — two compartments sitting apart on the
+ *      canvas can never jointly satisfy a combo's slots. Each connected group
+ *      may win its own combo (2990s prices per group). Cells without geometry
+ *      (quick-pick code lists, legacy lines with null x/y) fall back to ONE
+ *      group = the pre-gate behavior, so geometry-free builds price unchanged.
  *   2. Combo covers ONLY the matched subset. Modules beyond the matched slots
  *      ("extras") add at full à-la-carte. `base = comboPrice + comboExtras`.
  *   3. Combo matching = Kuhn bipartite MAX matching (augmenting paths), NOT a
@@ -44,6 +52,7 @@ import {
   type FabricTierOverride,
   type FabricTierGlobalConfig,
 } from "./fabric-tier";
+import { groupSofas, type GeoCell, type Rot } from "./sofa-geometry";
 
 /* ─── Cents helpers (Carres numeric-MYR convention) ────────────────────── */
 
@@ -419,7 +428,10 @@ export interface SofaPriceResult {
   /** Sum of resolved compartment prices over every cell (mirror fallback). */
   aLaCarteSum: number;
   basis: SofaPriceBasis;
+  /** The FIRST matched group's combo id (informational; a multi-sofa canvas
+   *  can match one combo per connected group). */
   comboId?: string;
+  /** Σ of every matched group's combo price. */
   comboPrice?: number;
   /** À-la-carte sum of the MATCHED-subset cells (same lookup incl. mirror). */
   comboSubsetSum?: number;
@@ -435,6 +447,42 @@ export interface SofaPriceResult {
   total: number;
   /** The build-cell indices the combo consumed (when basis === 'combo'). */
   matchedCellIndices?: number[];
+}
+
+/**
+ * Partition a build's cell INDICES into connected-sofa groups (rule 1b). Uses
+ * the SAME `groupSofas` union-find the builder's closure analysis runs on, with
+ * depth = the build's height key (the canvas sets `depth = height`, so client
+ * preview and server recompute group identically). Fail-open to ONE group —
+ * the pre-gate whole-build behavior — whenever geometry is unusable:
+ *   · a single-cell build (grouping is moot),
+ *   · ANY cell missing a finite x/y (quick-pick code-list pricing, legacy
+ *     order lines whose attrs carry null geometry).
+ * A cell's `rot` is snapped to the nearest 0/90/180/270 (the only values the
+ * builder emits; a legacy free rotation must not desync the footprint math).
+ */
+function connectedCellIndexGroups(build: SofaBuild): number[][] {
+  const allIndices = build.cells.map((_, i) => i);
+  if (build.cells.length <= 1) return [allIndices];
+
+  const geo: GeoCell[] = [];
+  for (let i = 0; i < build.cells.length; i++) {
+    const c = build.cells[i]!;
+    if (
+      typeof c.x !== "number" ||
+      !Number.isFinite(c.x) ||
+      typeof c.y !== "number" ||
+      !Number.isFinite(c.y)
+    ) {
+      return [allIndices];
+    }
+    const rotRaw = typeof c.rot === "number" && Number.isFinite(c.rot) ? c.rot : 0;
+    const rot = ((((Math.round(rotRaw / 90) * 90) % 360) + 360) % 360) as Rot;
+    geo.push({ id: String(i), moduleCode: c.moduleCode, x: c.x, y: c.y, rot });
+  }
+  return groupSofas(geo, build.height).map((g) =>
+    g.map((cell) => Number(cell.id)).sort((a, b) => a - b),
+  );
 }
 
 /**
@@ -484,18 +532,37 @@ export function computeSofaPrice(
 
   // Combo override. Default lookup tier when fabricTier is unset = PRICE_1
   // (combos are authored at PRICE_1; the fabric P2/P3 delta is a SEPARATE add).
+  //
+  // Rule 1b (Loo 2026-07-10): combo matching runs PER CONNECTED GROUP — a combo
+  // only applies to compartments joined into ONE sofa. Each group gets its own
+  // pickSofaCombo over its OWN codes; a group's 0-priced winner still falls to
+  // à-la-carte without retrying a lower-priority combo (unchanged post-rank
+  // gate, now per group). A fully-connected build is one group → byte-identical
+  // to the pre-gate engine.
   const lookupTier: FabricTier = build.fabricTier ?? "PRICE_1";
-  const builtCodes = build.cells.map((c) => c.moduleCode);
-  const match = pickSofaCombo(
-    {
-      modelId: build.modelId,
-      builtCodes,
-      tier: lookupTier,
-      height: build.height,
-      asOf: build.asOf,
-    },
-    snapshot.sofaCombos,
-  );
+  const cellGroups = connectedCellIndexGroups(build);
+  const groupMatches: Array<{ comboId: string; priceMyr: number; cellIndices: number[] }> = [];
+  for (const groupIdx of cellGroups) {
+    const match = pickSofaCombo(
+      {
+        modelId: build.modelId,
+        builtCodes: groupIdx.map((i) => build.cells[i]!.moduleCode),
+        tier: lookupTier,
+        height: build.height,
+        asOf: build.asOf,
+      },
+      snapshot.sofaCombos,
+    );
+    if (match && match.priceMyr > 0) {
+      groupMatches.push({
+        comboId: match.combo.id,
+        priceMyr: match.priceMyr,
+        // matchedIndices are LOCAL to the group's builtCodes → map back to
+        // build-level cell indices.
+        cellIndices: match.matchedIndices.map((li) => groupIdx[li]!),
+      });
+    }
+  }
 
   let basis: SofaPriceBasis = "a_la_carte";
   let baseCents = aLaCarteCents;
@@ -505,33 +572,39 @@ export function computeSofaPrice(
   let comboExtras: number | undefined;
   let matchedCellIndices: number[] | undefined;
 
-  if (match && match.priceMyr > 0) {
+  if (groupMatches.length > 0) {
     basis = "combo";
-    const comboCents = toCents(match.priceMyr);
-
-    // À-la-carte sum of the matched subset — SAME lookup (incl. mirror) as the
-    // full à-la-carte loop above (the C1 invariant). Without this a mirrored
-    // matched cell counts in aLaCarteCents but not subsetCents, so comboExtras
-    // re-charges it on top of the combo price.
-    const matchedSet = new Set(match.matchedIndices);
+    let comboCents = 0;
     let subsetCents = 0;
-    for (let i = 0; i < build.cells.length; i++) {
-      if (!matchedSet.has(i)) continue;
-      subsetCents += cellPriceCents(
-        build.cells[i]!.moduleCode,
-        poolByCode,
-        modelByCompId,
-        build.height,
-      );
+    const matchedAll: number[] = [];
+    for (const gm of groupMatches) {
+      comboCents += toCents(gm.priceMyr);
+      // À-la-carte sum of the matched subset — SAME lookup (incl. mirror) as
+      // the full à-la-carte loop above (the C1 invariant). Without this a
+      // mirrored matched cell counts in aLaCarteCents but not subsetCents, so
+      // comboExtras re-charges it on top of the combo price.
+      for (const i of gm.cellIndices) {
+        subsetCents += cellPriceCents(
+          build.cells[i]!.moduleCode,
+          poolByCode,
+          modelByCompId,
+          build.height,
+        );
+        matchedAll.push(i);
+      }
     }
     const extrasCents = Math.max(0, aLaCarteCents - subsetCents);
     baseCents = comboCents + extrasCents;
 
-    comboId = match.combo.id;
-    comboPrice = match.priceMyr;
+    // Aggregates across the matched groups (a multi-sofa canvas can win one
+    // combo per connected sofa): comboPrice / comboSubsetSum sum over every
+    // matched combo, so the POS "saves RM" chip = subsetSum − comboPrice stays
+    // honest; comboId reports the first matched group's combo.
+    comboId = groupMatches[0]!.comboId;
+    comboPrice = toMyr(comboCents);
     comboSubsetSum = toMyr(subsetCents);
     comboExtras = toMyr(extrasCents);
-    matchedCellIndices = match.matchedIndices;
+    matchedCellIndices = matchedAll.sort((a, b) => a - b);
   }
 
   // Recliner extra — Phase-3 stub (interface present, no data → 0).
